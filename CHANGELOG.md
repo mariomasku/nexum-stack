@@ -4,6 +4,13 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.50.0 · 22 oct 2026
+
+- **Buscar actualizaciones:** busca la versión nueva en GitHub, en las publicaciones del repositorio de Nexum Stack, y ya no hace falta dejar el .deb en Descargas. Si hay una más nueva, la descarga a `~/.lvm-instalador/actualizaciones`, enseña su fecha y su huella y la instala al poner la contraseña. Sin conexión se sigue buscando en Descargas.
+- **Seguridad:** cada versión va firmada por quien publica el programa. Se comprueba la firma antes de ofrecerla y otra vez como administrador antes de instalarla, con la clave que trae el paquete (`/opt/lvm-instalador/nexum-stack-firma.gpg`); sin firma válida no se instala nada desde la ventana. Tampoco se instala una versión más vieja que la que tienes, aunque esté firmada.
+  - Esta versión se instala una vez en la terminal (sudo apt install): cambian su ayudante y sus dependencias (gpgv).
+- **Herramientas:** «Icono en el menú de aplicaciones» decía todavía «LAMPP Version Manager».
+
 ## 1.49.0 · 22 oct 2026
 
 - **Nuevo nombre:** Nexum Stack (antes LAMPP Version Manager). Cambian el título de la ventana, el nombre del icono del menú y los textos; los comandos (lvm-instalador, lvm), las carpetas y el funcionamiento siguen igual.
