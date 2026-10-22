@@ -302,7 +302,20 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.49.0"
+APP_VERSION="1.50.0"
+
+# Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
+# lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
+# publica va aqui y en /opt/lvm-instalador/nexum-stack-firma.gpg (la que usa el ayudante, como root)
+UPDATE_REPO="mariomasku/nexum-stack"
+UPDATE_KEY_FPR="3506F1EB091AD4A23F40081FF24FD5CC07557404"
+UPDATE_KEY_B64='
+mDMEatoqkhYJKwYBBAHaRw8BAQdAxAut0to4730sesIdm2rZyf1OW711qSJX0I1R05RzfS+0M05l
+eHVtIFN0YWNrIC0gZmlybWEgZGUgcGFxdWV0ZXMgPHNvcG9ydGVAaGV4ZXIuZGV2PoiTBBMWCgA7
+FiEENQbx6wka1KI/QAgf8k/VzAdVdAQFAmraKpICGwMFCwkIBwICIgIGFQoJCAsCBBYCAwECHgcC
+F4AACgkQ8k/VzAdVdARhwgD+PjUtI6Bn7GLlySuGZHPldPSF2YKPk32jWFsUZXRtHLIBAPO+uAx+
+lARQvnHUnZRmG9VdnoUuRq5Phb/RhBOXrqIA
+'
 
 # Logo de hexer abajo a la izquierda, fuera de las ventanas: '#' en blanco y '/' en verde #45A57C
 LOGO=(
@@ -7973,6 +7986,23 @@ QUE HACE
 
 VERSIONES
 
+1.50.0 (22 oct 2026)
+- Buscar actualizaciones: busca la versión nueva en GitHub, en las
+  publicaciones del repositorio de Nexum Stack, y ya no hace falta
+  dejar el .deb en Descargas. Si hay una más nueva, la descarga a
+  ~/.lvm-instalador/actualizaciones, enseña su fecha y su huella y la
+  instala al poner la contraseña. Sin conexión se sigue buscando en
+  Descargas.
+- Seguridad: cada versión va firmada por quien publica el programa. Se
+  comprueba la firma antes de ofrecerla y otra vez como administrador
+  antes de instalarla, con la clave que trae el paquete
+  (/opt/lvm-instalador/nexum-stack-firma.gpg); sin firma válida no se
+  instala nada desde la ventana. Tampoco se instala una versión más
+  vieja que la que tienes, aunque esté firmada.
+  * Esta versión se instala una vez en la terminal (sudo apt install):
+    cambian su ayudante y sus dependencias (gpgv).
+- Herramientas: «Icono en el menú de aplicaciones» decía todavía
+  «LAMPP Version Manager».
 1.49.0 (22 oct 2026)
 - Nuevo nombre: Nexum Stack (antes LAMPP Version Manager). Cambian el
   título de la ventana, el nombre del icono del menú y los textos; los
@@ -9062,13 +9092,17 @@ function gui_available() {
 }
 
 # Para la ventana: N|version|fecha|sha256|ruta del paquete .deb de lvm-instalador mas nuevo que esta
-# version que haya en la carpeta de descargas (el Centro de aplicaciones no ofrece actualizar un
-# .deb suelto). Solo lo busca cuando se pide (Herramientas): se instala como root, y cualquier web
-# puede dejar un fichero en Descargas. Solo vale un paquete tuyo, sin enlaces y que solo lleve los
-# ficheros de lvm-instalador, de root y con sus permisos (755 o 644).
+# version, y avisos (I|texto). Se busca en la ultima publicacion del repositorio de GitHub (su .deb
+# y su firma se descargan a UPDATES_DIR) y en la carpeta de descargas (el Centro de aplicaciones no
+# ofrece actualizar un .deb suelto). Solo cuando se pide (Buscar actualizaciones): se instala como
+# root, y cualquier web puede dejar un fichero en Descargas. Solo vale un paquete tuyo, sin enlaces,
+# firmado con la clave de UPDATE_KEY_FPR (su .sig al lado) y que solo lleve los ficheros de
+# lvm-instalador, de root y con sus permisos (755 o 644).
+UPDATES_DIR="$LOG_DIR/actualizaciones"
 PACKAGE_FILES_PY='
 import posixpath, sys, tarfile
 files = {"opt/lvm-instalador/lvm-instalador.sh", "opt/lvm-instalador/lvm-actualizar",
+         "opt/lvm-instalador/nexum-stack-firma.gpg",
          "usr/share/applications/lampp-version-manager.desktop",
          "usr/share/icons/hicolor/256x256/apps/lampp-version-manager.png",
          "usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy"}
@@ -9092,22 +9126,111 @@ try:
 except tarfile.TarError:
     sys.exit(1)
 '
+# Ultima publicacion de GitHub (JSON de la API en la entrada): version|fecha|url del .deb|url del
+# .sig. Sin borradores ni versiones de prueba, y las descargas solo de esa publicacion
+RELEASE_PY='
+import json, re, sys
+repo = sys.argv[1]
+try:
+    r = json.load(sys.stdin)
+except ValueError:
+    sys.exit(1)
+if not isinstance(r, dict) or not isinstance(r.get("assets"), list):
+    sys.exit(1)
+tag = r.get("tag_name") or ""
+m = re.fullmatch(r"v([0-9]{1,4}(\.[0-9]{1,4}){1,3})", tag)
+when = r.get("published_at") or ""
+if not m or r.get("draft") or r.get("prerelease") or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", when):
+    sys.exit(1)
+deb = "lvm-instalador_%s_all.deb" % m.group(1)
+base = "https://github.com/%s/releases/download/%s/" % (repo, tag)
+urls = {a.get("name"): a.get("browser_download_url") for a in r["assets"] if isinstance(a, dict)}
+if urls.get(deb) != base + deb or urls.get(deb + ".sig") != base + deb + ".sig":
+    sys.exit(1)
+print("%s|%s|%s|%s" % (m.group(1), when, base + deb, base + deb + ".sig"))
+'
+
+# ¿Esta <paquete> firmado con la clave de las actualizaciones? (la firma, en <paquete>.sig)
+function update_signed() {
+    local dir status=""
+
+    [ -f "$1.sig" ] && [ ! -L "$1.sig" ] && command -v gpgv > /dev/null || return 1
+    dir=$(mktemp -d) || return 1
+    base64 -d <<< "$UPDATE_KEY_B64" > "$dir/firma.gpg" 2> /dev/null \
+        && status=$(GNUPGHOME=$dir gpgv --status-fd 1 --keyring "$dir/firma.gpg" "$1.sig" "$1" 2> /dev/null)
+    rm -rf "$dir"
+
+    grep -q "^\[GNUPG:\] VALIDSIG $UPDATE_KEY_FPR " <<< "$status"
+}
+
+# Si la ultima publicacion de GitHub es mas nueva que esta version, descarga su .deb y su firma a
+# UPDATES_DIR (solo tuya; el .deb con la fecha de la publicacion). Si no se puede, lo dice (I|...)
+function github_update() {
+    local json code rel v when deb_url sig_url f
+    local get=(curl -q --proto =https --proto-redir =https -fsSL --max-time 60)
+
+    # (sin -f: un 404 es que aun no hay ninguna publicacion, no un fallo de la conexion)
+    json=$(curl -q --proto =https --proto-redir =https -sSL --max-time 30 --max-filesize 1048576 \
+        -H "Accept: application/vnd.github+json" -w '\n%{http_code}' \
+        "https://api.github.com/repos/$UPDATE_REPO/releases/latest" 2> /dev/null)
+    code=${json##*$'\n'} json=${json%$'\n'*}
+    case "$code" in
+        200) ;;
+        404) echo "I|Todavía no hay ninguna versión publicada en GitHub"; return 0 ;;
+        *) echo "I|No se ha podido consultar GitHub (¿sin conexión?): solo se ha buscado en Descargas"; return 0 ;;
+    esac
+    rel=$(python3 -I -c "$RELEASE_PY" "$UPDATE_REPO" <<< "$json") \
+        || { echo "I|La última publicación de GitHub no trae un paquete de Nexum Stack con su firma"; return 0; }
+    IFS='|' read -r v when deb_url sig_url <<< "$rel"
+    dpkg --compare-versions "$v" gt "$APP_VERSION" || return 0
+
+    [ -L "$UPDATES_DIR" ] && { echo "I|$UPDATES_DIR es un enlace: no se descarga nada ahí"; return 0; }
+    mkdir -p -m 700 "$UPDATES_DIR" && chmod 700 "$UPDATES_DIR" || return 0
+    f=$UPDATES_DIR/lvm-instalador_${v}_all.deb
+    # Ya descargada y bien firmada: no se vuelve a bajar
+    update_signed "$f" && return 0
+    rm -f -- "$UPDATES_DIR"/lvm-instalador_*
+    if ! "${get[@]}" --max-filesize 52428800 -o "$f.part" "$deb_url" 2> /dev/null \
+            || ! "${get[@]}" --max-filesize 65536 -o "$f.sig" "$sig_url" 2> /dev/null; then
+        rm -f -- "$f.part" "$f.sig"
+        echo "I|No se ha podido descargar la $v de GitHub"
+        return 0
+    fi
+    mv -f -- "$f.part" "$f"
+    touch -d "$when" "$f" 2> /dev/null
+    if ! update_signed "$f"; then
+        rm -f -- "$f" "$f.sig"
+        echo "I|La $v de GitHub no está firmada por quien hace el programa: no se ofrece"
+    fi
+
+    return 0
+}
+
 function gui_package() {
-    local dir f v best="" best_v=$APP_VERSION real
+    local dir f v best="" best_v=$APP_VERSION real unsigned=""
 
     command -v dpkg-deb > /dev/null || return 0
-    for dir in "$(xdg-user-dir DOWNLOAD 2> /dev/null)" "$HOME/Descargas" "$HOME/Downloads"; do
+    github_update
+    for dir in "$UPDATES_DIR" "$(xdg-user-dir DOWNLOAD 2> /dev/null)" "$HOME/Descargas" "$HOME/Downloads"; do
         [ -d "$dir" ] || continue
         for f in "$dir"/lvm-instalador_*_all.deb; do
             [ -f "$f" ] && [ ! -L "$f" ] && [ -O "$f" ] || continue
             [ "$(dpkg-deb -f "$f" Package 2> /dev/null)" == "lvm-instalador" ] || continue
-            # Solo los ficheros de lvm-instalador, normales (sin enlaces ni especiales): lo mismo
-            # que comprueba como root lvm-actualizar antes de instalarlo
+            # Solo los ficheros de lvm-instalador, normales (sin enlaces ni especiales), y firmado:
+            # lo mismo que comprueba como root lvm-actualizar antes de instalarlo
             dpkg-deb --fsys-tarfile "$f" 2> /dev/null | python3 -I -c "$PACKAGE_FILES_PY" || continue
             v=$(dpkg-deb -f "$f" Version 2> /dev/null)
-            [ -n "$v" ] && dpkg --compare-versions "$v" gt "$best_v" && best=$f best_v=$v
+            [ -n "$v" ] && dpkg --compare-versions "$v" gt "$best_v" || continue
+            if update_signed "$f"; then
+                best=$f best_v=$v
+            else
+                unsigned=$f
+            fi
         done
     done
+    # Uno sin firma (hecho en este equipo con empaquetar-deb.sh, por ejemplo) solo en la terminal
+    [ -z "$best" ] && [ -n "$unsigned" ] \
+        && echo "I|$(basename "$unsigned") no lleva la firma de quien publica el programa. Si es tuyo, instálalo en la terminal: sudo apt install $unsigned"
     if [ -n "$best" ]; then
         real=$(readlink -f "$best")
         echo "N|$best_v|$(date -r "$real" '+%d/%m/%Y %H:%M')|$(sha256sum "$real" | cut -d' ' -f1)|$real"
@@ -12458,28 +12581,37 @@ class App(Gtk.Application):
     # ------------------------------------------- paquete .deb nuevo en Descargas
     def check_package(self, manual=False):
         def got(_rc, out):
-            found = False
+            found, notes = False, []
             for f in parse_lines(out):
                 if f[0] == "N" and len(f) >= 5:
                     found = True
                     self.offer_package(f[1], f[2], f[3], "|".join(f[4:]))
+                elif f[0] == "I" and len(f) >= 2:
+                    notes.append("|".join(f[1:]))
             if manual and not found:
-                self.toast("No hay ningún paquete más nuevo que la %s en Descargas"
-                           % self.data["version"])
+                if notes:
+                    message(self.win, "No hay ninguna versión nueva para instalar desde aquí",
+                            "Tienes la %s.\n\n%s" % (self.data["version"], "\n\n".join(notes)))
+                else:
+                    self.toast("Tienes la última versión (%s)" % self.data["version"])
             return False
+        self.toast("Buscando actualizaciones…")
         run_quick(["gui-paquete"], got)
         return False
 
     def offer_package(self, version, when, sha, path):
         current = (self.data or {}).get("version", "")
+        if os.path.dirname(path) == os.path.join(LOG_DIR, "actualizaciones"):
+            where = "GitHub, publicada el %s" % when
+        else:
+            where = "%s (%s, del %s)" % (os.path.dirname(path), os.path.basename(path), when)
         if not confirm(self.win, "Hay una versión nueva de Nexum Stack",
-                       "Tienes la %s y en %s está la %s (%s, del %s).\n\nSe instala como "
-                       "administrador: instálala solo si ese fichero te lo ha pasado quien hace el "
-                       "programa. Su huella SHA-256 es:\n%s\n\nAl actualizar se pide la contraseña de "
-                       "administrador y la ventana se vuelve a abrir con la versión nueva. Tus "
-                       "versiones de PHP, tus proyectos y tus BBDD no se tocan."
-                       % (current, os.path.dirname(path), version, os.path.basename(path), when,
-                          sha),
+                       "Tienes la %s y está la %s en %s.\n\nEstá firmada por quien hace el "
+                       "programa (se comprueba también al instalarla). Su huella SHA-256 es:\n%s\n\n"
+                       "Al actualizar se pide la contraseña de administrador y la ventana se vuelve "
+                       "a abrir con la versión nueva. Tus versiones de PHP, tus proyectos y tus BBDD "
+                       "no se tocan. Las novedades están en Novedades, una vez instalada."
+                       % (current, version, where, sha),
                        "Actualizar a la %s" % version):
             return
         if SIMULATE:
@@ -13344,10 +13476,10 @@ class App(Gtk.Application):
         self.build_error_logs(add_row)
 
         box, lb = group("Programa")
-        add_row(lb, "Buscar una versión nueva", "Busca un lvm-instalador_*.deb más nuevo en "
-                "Descargas y lo instala", "Buscar", lambda: self.check_package(manual=True))
-        add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «LAMPP Version "
-                "Manager» si no aparece o no abre esta ventana", "Crear de nuevo",
+        add_row(lb, "Buscar una versión nueva", "Busca en GitHub (y en Descargas) una versión más "
+                "nueva, firmada, y la instala", "Buscar", lambda: self.check_package(manual=True))
+        add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Stack» "
+                "si no aparece o no abre esta ventana", "Crear de nuevo",
                 self.on_create_launcher)
         self.tools_box.pack_start(box, False, False, 0)
 

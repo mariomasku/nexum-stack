@@ -53,7 +53,9 @@ QUÉ NECESITA
   - Nada de sudo ni de root. Donde el script usaría sudo, las pruebas ponen
     una función sudo de mentira que apunta lo que se pediría.
   - bash, python3, openssl, curl, bc, unzip, fakeroot, dpkg-deb, script y
-    setsid (util-linux), mkfifo, pgrep.
+    setsid (util-linux), mkfifo, pgrep, gpg y gpgv. La firma de las
+    actualizaciones se prueba con claves de prueba creadas en la carpeta
+    temporal: la clave de verdad no se usa nunca.
   - XAMPP 8.2.4 instalado en /opt/lampp-8.2.4: de ahí salen el Apache
     (bin/httpd), el MariaDB (sbin/mysqld, bin/mysql_install_db, bin/mysql)
     y bin/my_print_defaults de las pruebas. Se usan siempre con
@@ -149,7 +151,11 @@ LOS FICHEROS
 
   Solo Linux:
   ayudante.sh         lvm-actualizar: paquetes buenos y manipulados (con una
-                      copia del ayudante que no instala nada).
+                      copia del ayudante que no instala nada), su firma
+                      (sin firma, otra clave, firma de otro paquete o
+                      enlazada, clave cambiada), versiones no más nuevas,
+                      la comprobación de la ventana (update_signed) y la
+                      lectura de las publicaciones de GitHub (RELEASE_PY).
   arreglar-certs.sh   cert_audit y fix_certs con CAs de prueba.
   procesos.sh         lampp_processes con .pid manipulados.
   entorno.sh          Entorno de las tareas de la ventana (sin funciones

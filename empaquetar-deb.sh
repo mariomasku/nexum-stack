@@ -1,6 +1,7 @@
 #!/bin/bash
 # Crea el paquete .deb de Nexum Stack a partir de lvm-instalador.sh (la version sale de
-# su APP_VERSION y el icono de su ICON_PNG_B64). Doble clic sobre el .deb = instalar o actualizar.
+# su APP_VERSION, el icono de su ICON_PNG_B64 y la clave de las firmas de su UPDATE_KEY_B64).
+# Doble clic sobre el .deb = instalar o actualizar.
 #
 # Uso: ./empaquetar-deb.sh [carpeta de salida]     (por defecto ~/Descargas)
 #
@@ -9,6 +10,7 @@
 #   /usr/share/applications/lampp-version-manager.desktop    icono del menu para todos los usuarios
 #   /usr/share/icons/hicolor/256x256/apps/lampp-version-manager.png
 #   /opt/lvm-instalador/lvm-actualizar                       instala un lvm-instalador_*.deb nuevo
+#   /opt/lvm-instalador/nexum-stack-firma.gpg                clave publica de las firmas (.sig)
 #   /usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy
 #                                    mensaje en español de la contraseña al actualizar (pkexec)
 # y al instalarse (postinst):
@@ -46,14 +48,19 @@ cat > "$ROOT$DEST/lvm-actualizar" <<'EOF'
 #!/bin/sh
 # Instala una version nueva de Nexum Stack. Lo ejecuta la ventana con pkexec.
 # Uso: lvm-actualizar /ruta/lvm-instalador_X.Y.Z_all.deb <sha256 que se ha mostrado>
+# (con su firma al lado: /ruta/lvm-instalador_X.Y.Z_all.deb.sig)
 #
-# El paquete esta en una carpeta tuya (Descargas): se copia (sin seguir enlaces y solo si es un
-# fichero normal) a una carpeta de root y todo se comprueba e instala desde esa copia:
+# El paquete esta en una carpeta tuya (Descargas o la de las descargas de GitHub): se copia con su
+# firma (sin seguir enlaces y solo si son ficheros normales) a una carpeta de root y todo se
+# comprueba e instala desde esa copia:
 #   - la huella SHA-256 que se te ha mostrado (obligatoria)
+#   - la firma, hecha con la clave de quien publica el programa (la de nexum-stack-firma.gpg)
+#   - que es una version mas nueva que la instalada (una vieja, aunque este firmada, podria traer
+#     fallos ya corregidos)
 #   - su contenido, leido con tarfile: solo ficheros y carpetas normales (sin enlaces ni
 #     dispositivos), solo los de lvm-instalador, de root y con sus permisos (755 o 644, sin setuid
-#     ni escritura para otros), y este ayudante y la accion de polkit iguales a los instalados (si
-#     no, cualquier paquete podria darse permisos de root)
+#     ni escritura para otros), y este ayudante, la clave de las firmas y la accion de polkit
+#     iguales a los instalados (si no, cualquier paquete podria darse permisos de root)
 #   - sus scripts de instalacion (que se ejecutan como root): ficheros normales (no enlaces), de
 #     root, 755 e iguales a los del paquete instalado
 #   - sus dependencias (Depends, Recommends, Suggests y Enhances), iguales a las del paquete
@@ -73,26 +80,40 @@ tmp=$(mktemp -d /tmp/lvm-actualizar.XXXXXX)
 trap 'rm -rf "$tmp"' EXIT
 chmod 700 "$tmp"
 pkg=$tmp/paquete.deb
-python3 -I - "$deb" "$pkg" "$want" <<'PY'
+python3 -I - "$deb" "$pkg" "$want" "$deb.sig" "$tmp/paquete.sig" <<'PY'
 import hashlib, os, stat, sys
-src, dst, want = sys.argv[1:4]
-try:
-    fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-except OSError:
-    sys.exit("El paquete no es un fichero normal (es un enlace o no se puede abrir)")
-st = os.fstat(fd)
-if not stat.S_ISREG(st.st_mode) or st.st_size > 50 * 1024 * 1024:
-    sys.exit("El paquete no es un fichero normal (o es demasiado grande)")
-h = hashlib.sha256()
-with os.fdopen(fd, "rb") as f, open(dst, "wb") as out:
-    for chunk in iter(lambda: f.read(1 << 20), b""):
-        h.update(chunk)
-        out.write(chunk)
-if h.hexdigest() != want:
+src, dst, want, sig_src, sig_dst = sys.argv[1:6]
+def copy(src, dst, limit, what):
+    try:
+        fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        sys.exit("%s no es un fichero normal (es un enlace, no esta o no se puede abrir)" % what)
+    st = os.fstat(fd)
+    if not stat.S_ISREG(st.st_mode) or st.st_size > limit:
+        sys.exit("%s no es un fichero normal (o es demasiado grande)" % what)
+    h = hashlib.sha256()
+    with os.fdopen(fd, "rb") as f, open(dst, "wb") as out:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+            out.write(chunk)
+    return h.hexdigest()
+if copy(src, dst, 50 * 1024 * 1024, "El paquete") != want:
     sys.exit("El paquete ha cambiado desde que se te mostro: su huella SHA-256 ya no es la misma.")
+copy(sig_src, sig_dst, 64 * 1024, "Su firma (" + sig_src + ")")
 PY
+# Firmado por quien publica el programa: gpgv solo mira la clave instalada y ademas se exige su
+# huella en el resultado (por si el fichero de la clave llevara otra)
+if ! GNUPGHOME=$tmp gpgv --status-fd 1 --keyring /opt/lvm-instalador/nexum-stack-firma.gpg \
+        "$tmp/paquete.sig" "$pkg" 2> /dev/null | grep -q '^\[GNUPG:\] VALIDSIG @UPDATE_KEY_FPR@ '; then
+    echo "La firma del paquete no es valida: no lo ha publicado quien hace el programa. No se instala." >&2; exit 2
+fi
 if [ "$(dpkg-deb -f "$pkg" Package 2>/dev/null)" != lvm-instalador ]; then
     echo "El fichero no es un paquete de Nexum Stack: $deb" >&2; exit 2
+fi
+new=$(dpkg-deb -f "$pkg" Version 2>/dev/null)
+installed=$(dpkg-query -W -f='${Version}' lvm-instalador 2>/dev/null)
+if [ -z "$new" ] || ! dpkg --compare-versions "$new" gt "${installed:-0}"; then
+    echo "El paquete es la ${new:-?} y tienes la ${installed:-?}: solo se instalan versiones mas nuevas." >&2; exit 2
 fi
 for field in Pre-Depends Conflicts Breaks Replaces Provides Essential; do
     value=$(dpkg-deb -f "$pkg" "$field" 2>/dev/null)
@@ -110,10 +131,12 @@ done
 check=$(cat <<'PY'
 import posixpath, sys, tarfile
 files = {"opt/lvm-instalador/lvm-instalador.sh", "opt/lvm-instalador/lvm-actualizar",
+         "opt/lvm-instalador/nexum-stack-firma.gpg",
          "usr/share/applications/lampp-version-manager.desktop",
          "usr/share/icons/hicolor/256x256/apps/lampp-version-manager.png",
          "usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy"}
 same = {"opt/lvm-instalador/lvm-actualizar": "/opt/lvm-instalador/lvm-actualizar",
+        "opt/lvm-instalador/nexum-stack-firma.gpg": "/opt/lvm-instalador/nexum-stack-firma.gpg",
         "usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy":
             "/usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy"}
 dirs = {""}
@@ -217,6 +240,16 @@ sed -n "/^ICON_PNG_B64='/,/^'$/p" "$SRC" | sed '1s/^ICON_PNG_B64=.//; $d' | base
 file "$ROOT/usr/share/icons/hicolor/256x256/apps/lampp-version-manager.png" | grep -q 'PNG image' \
     || { echo "No se ha podido sacar el icono del script"; exit 1; }
 
+# Clave publica de las firmas: la que lleva el script, y en el ayudante su huella
+KEY_FPR=$(grep -m1 '^UPDATE_KEY_FPR=' "$SRC" | cut -d'"' -f2)
+[[ $KEY_FPR =~ ^[0-9A-F]{40}$ ]] || { echo "No se encuentra UPDATE_KEY_FPR en $SRC"; exit 1; }
+sed -n "/^UPDATE_KEY_B64='/,/^'$/p" "$SRC" | sed '1s/^UPDATE_KEY_B64=.//; $d' | base64 -d \
+    > "$ROOT$DEST/nexum-stack-firma.gpg"
+mkdir -m 700 "$BUILD/gnupg"
+gpg --homedir "$BUILD/gnupg" --show-keys --with-colons "$ROOT$DEST/nexum-stack-firma.gpg" 2> /dev/null \
+    | grep -qx "fpr:::::::::$KEY_FPR:" || { echo "La clave de UPDATE_KEY_B64 no es la de $KEY_FPR"; exit 1; }
+sed -i "s/@UPDATE_KEY_FPR@/$KEY_FPR/" "$ROOT$DEST/lvm-actualizar"
+
 cat > "$ROOT/usr/share/applications/lampp-version-manager.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -235,7 +268,7 @@ Version: $VERSION
 Section: devel
 Priority: optional
 Architecture: all
-Depends: bash, curl, python3, sudo, openssl, binutils
+Depends: bash, curl, python3, sudo, openssl, binutils, gpgv
 Recommends: python3-gi, gir1.2-gtk-3.0, whiptail
 Installed-Size: $(du -ks "$ROOT" | cut -f1)
 Maintainer: M.Mascuñano - HEXER <soporte@hexer.dev>

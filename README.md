@@ -42,7 +42,7 @@ El resto de dependencias (`net-tools`, librerías de compilación) las instala e
 
 ## Instalar o actualizar con el paquete .deb
 
-Lo más sencillo: doble clic en `lvm-instalador_<versión>_all.deb`. Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04): **Instalar** y la contraseña. Para actualizar, igual con el `.deb` nuevo. En una terminal: `sudo apt install ./lvm-instalador_<versión>_all.deb`.
+Cada versión se publica en las [Releases del repositorio](https://github.com/mariomasku/nexum-stack/releases) con su paquete `lvm-instalador_<versión>_all.deb` y su firma (`.sig`). **Primera instalación:** descarga el `.deb` de la última Release y haz doble clic. Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04): **Instalar** y la contraseña. En una terminal: `sudo apt install ./lvm-instalador_<versión>_all.deb`. **Actualizar:** desde la propia ventana, con **Buscar actualizaciones** (ver [Uso diario](#uso-diario)).
 
 - Instala el script en `/opt/lvm-instalador/lvm-instalador.sh`, el icono del menú en `/usr/share/applications/lampp-version-manager.desktop` y el del icono en `/usr/share/icons/hicolor/256x256/apps/`.
 - Al instalarse, `/usr/local/bin/lvm-instalador` (y `lvm`, si ya era un enlace a `lvm-instalador.sh`) apunta al script de `/opt`, y los iconos del menú de cada usuario (`~/.local/share/applications/lampp-version-manager.desktop`) se reapuntan también. Así deja de abrirse la versión vieja de la carpeta donde se descomprimió.
@@ -106,7 +106,7 @@ En la carpeta `manual/` hay un manual interactivo (ábrelo con doble clic en `ma
 
 Haz esto una vez al instalar el gestor en un equipo, y cada vez que la ventana muestre un aviso naranja. Así queda como el equipo de referencia. Cada paso pide la contraseña de administrador.
 
-1. **Instala el paquete.** Equipo nuevo: doble clic en el `.deb` (o `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`). Si ya lo tenías, las versiones que cambian el ayudante de actualización (la 1.39.0, la 1.40.0, la 1.44.0 y la 1.49.0) se instalan una vez en la terminal con ese mismo `sudo apt install`; las demás, desde la ventana.
+1. **Instala el paquete.** Equipo nuevo: doble clic en el `.deb` (o `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`). Si ya lo tenías, las versiones que cambian el ayudante de actualización (la 1.39.0, la 1.40.0, la 1.44.0, la 1.49.0 y la 1.50.0) se instalan una vez en la terminal con ese mismo `sudo apt install`; las demás, desde la ventana.
 2. **Abre la ventana y mira la pestaña Versiones.** Arriba aparecen los avisos pendientes, cada uno con su botón. Púlsalos de arriba abajo:
 
    | Aviso | Qué pasa si no lo arreglas | Botón |
@@ -144,7 +144,7 @@ sudo /opt/lampp/lampp start | stop | restart | status     # lo mismo, como en XA
 
 La lista completa de comandos está en [Comandos sin panel](#comandos-sin-panel).
 
-Para actualizar, deja el `.deb` nuevo en Descargas y pulsa **Buscar actualizaciones** (menú ☰ o Herramientas): si es más nuevo que la versión instalada, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `lvm-instalador novedades`.
+Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). Desde la 1.50.0 busca la última Release del repositorio de GitHub (y, sin conexión, un `.deb` con su `.sig` en Descargas): si es más nueva que la versión instalada, la descarga a `~/.lvm-instalador/actualizaciones`, comprueba su firma, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Un paquete sin la firma de quien publica el programa no se instala desde la ventana. Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `lvm-instalador novedades`.
 
 ---
 
@@ -160,7 +160,7 @@ Para actualizar, deja el `.deb` nuevo en Descargas y pulsa **Buscar actualizacio
 | **Bases de datos** | Un **buscador**, las bases de cada versión (sin las del sistema) con el botón **Abrir phpMyAdmin** en la versión activa y la descarga de cada base. Debajo, **Subir o actualizar una base de datos** |
 | **Hosts** | Los dominios de los vhosts de `/opt/config/httpd-vhosts.conf` y si están falseados en `/etc/hosts` (llevan a este equipo). Arriba, **Host falseado**: el dominio de la tienda PrestaShop cargada, con el interruptor encendido y el botón **Abrir**. Debajo, el resto de dominios con su interruptor para falsearlos o dejar de falsearlos a mano (pide la contraseña de sudo). En medio, **Nuevo proyecto con dominio falseado**: dominio de producción, carpeta elegida de la lista de `/opt/htdocs` (por ejemplo, la de un `git clone`) o nueva con **+**, y base de datos de la versión activa, nueva con **+** o ninguna (si la carpeta trae `wp-config.php`, PrestaShop o `.env`, se propone su base); crea la carpeta en `/opt/htdocs`, su vhost http y https con certificado, la base vacía en la versión activa y falsea el dominio, para construir el proyecto en local y subirlo a producción tal cual (`lvm-instalador nuevo-dominio <dominio> <carpeta> [base]`). «Cargar proyecto» vuelve a falsear su dominio |
 | **Versiones → Instalar nuevas versiones de PHP** (debajo de Instaladas) | Las ramas de PHP con su último parche, los componentes que llevaría y la carpeta donde se instala. Cada rama lleva su estado según php.net, como texto de color: **Estable** (verde, recibe correcciones de errores y de seguridad: la mejor opción para proyectos nuevos), **Solo seguridad** (ámbar, solo parches de seguridad hasta la fecha que se indica) o **Sin soporte** (rojo, solo para proyectos antiguos). También «Otro parche concreto…», que muestra el estado de la rama y marca su último parche, y los XAMPP oficiales |
-| **Herramientas** | Lo que se usa de vez en cuando: **Editar** los vhosts y los hosts, registrar un XAMPP de `/opt/lampp`, abrir las carpetas de proyectos, copias y **Registros de instalaciones**, el **Registro de errores** (`/opt/lampp/logs/error_log` de la versión montada, con **Ver el final** para leer las últimas líneas sin abrir ficheros enormes, y **Abrir**), **Buscar una versión nueva** (un `.deb` más nuevo en Descargas), volver a crear el icono del menú, **Comandos de lvm-instalador** (la ayuda con todos los comandos), **Novedades** y **Acerca de** |
+| **Herramientas** | Lo que se usa de vez en cuando: **Editar** los vhosts y los hosts, registrar un XAMPP de `/opt/lampp`, abrir las carpetas de proyectos, copias y **Registros de instalaciones**, el **Registro de errores** (`/opt/lampp/logs/error_log` de la versión montada, con **Ver el final** para leer las últimas líneas sin abrir ficheros enormes, y **Abrir**), **Buscar una versión nueva** (la última Release de GitHub, firmada), volver a crear el icono del menú, **Comandos de lvm-instalador** (la ayuda con todos los comandos), **Novedades** y **Acerca de** |
 
 - **Contraseña:** las acciones que necesitan `sudo` piden la contraseña en una ventana, una sola vez por acción.
 - **Progreso:** al instalar o actualizar se ve una barra con el porcentaje, los componentes (hechos, en curso y pendientes), el tiempo y una estimación del que queda. «Ver registro» muestra la salida completa. Al terminar, el botón **Activar** activa la versión recién instalada. Si la instalación falla, el botón **Ver el log del error** abre un informe con el sistema, el compilador, el paso que ha fallado, sus primeros errores, el final de su log y, si falló la configuración, lo último de su `config.log`. **Copiar todo** lo copia para buscar la solución. El informe también se guarda como `informe-error.txt` junto a los logs de la compilación.
@@ -388,7 +388,7 @@ Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equi
 - **Desde la 1.37.0:**
   - `/opt` es del administrador (sus carpetas siguen siendo de quien eran): el PHP de una web, que se ejecuta con tu usuario, no puede cambiar `/opt/lampp` ni `/opt/lvm-instalador`.
   - Aplicar vhosts y `/etc/hosts` lee la copia una sola vez a una carpeta de root y escribe exactamente lo que se ha comprobado. En los vhosts no se admiten `Define` ni `${VAR}`, y los registros solo van a un fichero de `logs`.
-  - `lvm-actualizar` copia el `.deb` a una carpeta de root y comprueba allí la huella SHA-256 que se te ha mostrado, que solo lleva ficheros de lvm-instalador y que su `postinst`/`postrm` son los del paquete instalado (si cambian, se instala a mano con `sudo apt install`). Aún sin firma.
+  - `lvm-actualizar` copia el `.deb` y su firma a una carpeta de root y comprueba allí la huella SHA-256 que se te ha mostrado, la firma (con la clave instalada en `/opt/lvm-instalador/nexum-stack-firma.gpg` y su huella), que es más nueva que la instalada, que solo lleva ficheros de lvm-instalador y que su `postinst`/`postrm`, el propio ayudante y la clave son los del paquete instalado (si cambian, se instala a mano con `sudo apt install`).
   - Todas las versiones se dejan solo para este equipo (`lvm-instalador asegurar --todas`, o «Protegerlas» en Versiones). Si una no se puede, no se arranca.
   - phpMyAdmin solo en `http://127.0.0.1/phpmyadmin/` (desde la 1.38.0/1.26.0 tiene su propio origen: en `127.0.0.1` no hay nada más, y en `localhost`, `web.local` o un dominio falseado da 403; un XSS en un proyecto no lo alcanza), sin `setup/`. No se sirven `.env`, `.git`, `.svn` ni `.hg`. El vhost de dominios desconocidos también está en el 443.
   - Los volcados se cargan con un usuario temporal (`lvm_imp_*`) con permisos solo sobre su base y sin `DEFINER`: no pueden tocar otras bases, crear usuarios ni usar ficheros del servidor. Un volcado de varias bases (`--all-databases`) ya no se carga.
@@ -440,7 +440,7 @@ Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equi
 - **Vhosts del administrador.** Apache los lee como root: si fueran tuyos, un plugin de una web podría añadirles una orden que se ejecutaría como root. Se editan con una copia que se comprueba antes de aplicarla.
 - **Ficheros de los proyectos.** Si `wp-config.php`, `parameters.php`, `settings.inc.php` o `var/cache` son enlaces a otra carpeta, no se tocan. Los nombres de bases, prefijos de tablas y carpetas que vienen de un proyecto se comprueban antes de usarlos en consultas o en los vhosts.
 - **Contraseña de administrador.** La ventana solo la envía si la pide un `sudo` de verdad de la tarea (de root, en su terminal y con el eco apagado).
-- **Actualizaciones.** El `.deb` de Descargas se busca solo desde Herramientas. Antes de instalarlo se muestran su fecha y su huella SHA-256, y no se acepta un paquete que lleve ficheros fuera de los suyos.
+- **Actualizaciones.** Se buscan solo cuando se pide (Buscar actualizaciones), en las Releases de GitHub. Cada paquete va firmado con la clave de quien publica el programa: la firma se comprueba antes de ofrecerlo y otra vez como root antes de instalarlo, y no se acepta uno sin firma válida, más viejo que el instalado o que lleve ficheros fuera de los suyos. Antes de instalarlo se muestran su fecha y su huella SHA-256.
 - **Copias.** `~/lvm-copias` y `~/.lvm-instalador` (copias de bases y de configuraciones con contraseñas) solo son accesibles para tu usuario.
 
 Límite que no se puede cerrar desde el gestor: un programa que ya corre con tu usuario puede cambiar tus accesos directos (`~/.local/share/applications`) o tu `.bashrc` y mostrarte una ventana falsa que pida la contraseña. El gestor solo la pide en su ventana o en la de polkit; si algo la pide de forma rara, no la escribas.
@@ -473,6 +473,16 @@ Lo que sigue igual a propósito: MariaDB con root sin contraseña y Apache con t
 | Al actualizar: «El paquete trae otro /opt/lvm-instalador/lvm-actualizar» y «Tubería rota» | No es un error: esa versión cambia el ayudante de actualización (la 1.44.0, viniendo de la 1.43 o anterior). Se instala una vez en la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. Desde la 1.45.0 la ventana lo explica y copia la orden |
 
 ---
+
+## Publicar una versión nueva
+
+Para quien mantiene el programa. Hace falta [`gh`](https://cli.github.com/) con la sesión iniciada (`gh auth login`) y, en `gpg`, la clave privada de las firmas (la de `UPDATE_KEY_FPR` en `lvm-instalador.sh`).
+
+1. Sube `APP_VERSION` en `lvm-instalador.sh` y escribe sus novedades al principio de `VERSIONES` (sin barras invertidas: la lista pasa por `echo -e`).
+2. Haz commit y push de los cambios.
+3. Ejecuta `./publicar.sh`. Comprueba que todo está subido y que la versión es más nueva que la última publicada, pasa la batería de pruebas, crea el paquete en `dist/` y lo firma (pide la frase de la clave). Enseña las novedades y, si confirmas, pone al día [CHANGELOG.md](CHANGELOG.md) y la versión de este README, crea la etiqueta `vX.Y.Z` y la Release con el `.deb`, su firma y sus novedades.
+
+A partir de ese momento, **Buscar actualizaciones** la encuentra en todos los equipos.
 
 ## Versión para macOS
 

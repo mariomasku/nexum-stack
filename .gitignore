@@ -41,3 +41,6 @@ manual/
 
 # --- Paquetes .deb antiguos ---------------------------------------------------------------
 linux old/
+
+# --- Paquetes firmados que prepara publicar.sh --------------------------------------------
+dist/

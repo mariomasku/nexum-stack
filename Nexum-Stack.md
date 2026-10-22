@@ -1,7 +1,7 @@
 # Nexum Stack (lvm-instalador)
 
 **Gestor de entornos locales de desarrollo para Linux y Mac**
-Versión actual: **Linux 1.49.0** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
+Versión actual: **Linux 1.50.0** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
 
 ---
 
@@ -152,7 +152,7 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 - **Navegador:** una web que se visite no puede leer phpMyAdmin ni los proyectos locales, ni enviar consultas a phpMyAdmin. phpMyAdmin tiene su propia dirección y los dominios desconocidos reciben un error 403.
 - **Ficheros que no se sirven:** `.env`, `.git`, claves, copias de bases de datos, copias de seguridad de las webs, registros y otros ficheros sensibles de los proyectos no se pueden descargar desde el navegador.
 - **Volcados de bases de datos:** se cargan con un usuario que solo puede tocar esa base. Un volcado de una web comprometida no puede cambiar otras bases, crear usuarios, leer ficheros del equipo ni ejecutar programas.
-- **Actualizaciones de la aplicación:** antes de instalar un paquete se muestran su fecha y su huella SHA-256, y no se acepta uno que lleve ficheros que no son suyos.
+- **Actualizaciones de la aplicación:** cada versión va **firmada** por quien publica el programa. La firma se comprueba antes de ofrecerla y otra vez al instalarla, y no se acepta un paquete sin firma válida, más viejo que el instalado o que lleve ficheros que no son suyos.
 - **Copias de seguridad automáticas** en `~/lvm-copias` (solo accesibles para tu usuario) antes de cambiar `/etc/hosts` o los vhosts, antes de cargar una copia encima de una base, al borrar bases de datos y al desinstalar versiones.
 - **Modo simulación** (`--simular`): muestra lo que haría cualquier acción sin cambiar nada.
 - La contraseña de administrador se pide en una **ventana propia**, solo cuando una acción la necesita, y no la puede leer ningún otro programa.
@@ -166,8 +166,9 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 ### Linux (Ubuntu / Debian, 64 bits; desde Ubuntu 20.04)
 
 - **Instalar:** doble clic en `lvm-instalador_<versión>_all.deb` → "Instalar".
-- **Actualizar:** dejar el `.deb` nuevo en **Descargas** y, en la aplicación, pulsar **Buscar actualizaciones** (menú ☰ o Herramientas). Muestra la fecha y la huella del paquete y lo instala tras pedir la contraseña.
-- Algunas versiones cambian el programa que instala las actualizaciones y hay que instalarlas una vez en la terminal (`sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`); la aplicación lo detecta y da la orden lista para copiar. La 1.49.0 es una de ellas.
+- **Instalar:** el `.deb` de cada versión está en las [publicaciones del repositorio](https://github.com/mariomasku/nexum-stack/releases).
+- **Actualizar:** en la aplicación, pulsar **Buscar actualizaciones** (menú ☰ o Herramientas). Busca la última versión publicada en GitHub, comprueba su firma, muestra su fecha y su huella y la instala tras pedir la contraseña. Sin conexión, busca un `.deb` firmado en **Descargas**.
+- Algunas versiones cambian el programa que instala las actualizaciones y hay que instalarlas una vez en la terminal (`sudo apt install ./lvm-instalador_<versión>_all.deb`); la aplicación lo detecta y da la orden lista para copiar. La 1.50.0 es una de ellas.
 - Se abre desde el menú de aplicaciones: **Nexum Stack**.
 
 ### Mac (Apple Silicon: M1 o posterior)
@@ -225,7 +226,7 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 
 ## 8. Estado y pendientes
 
-- **Linux:** versión 1.49.0, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
+- **Linux:** versión 1.50.0, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
 - **Mac:** versión 1.36.0, con las mismas funciones que Linux. Se probó a fondo en un Mac real hasta la 1.12.0; las versiones posteriores pasan la batería de pruebas automáticas, pero quedan por comprobar en un Mac real "Apartar" con un XAMPP oficial de un compañero y que el navegador acepte los certificados de los proyectos. La versión de Mac todavía no lleva el nombre Nexum Stack.
-- **Actualizaciones desde GitHub:** en preparación. La aplicación buscará la versión nueva en las publicaciones del repositorio, en lugar de en la carpeta Descargas, y comprobará su firma antes de instalarla.
+- **Actualizaciones desde GitHub:** desde la 1.50.0. Pendiente de la primera prueba completa: publicar la 1.50.1 e instalarla con **Buscar actualizaciones**.
 - **Manual interactivo:** pendiente de rehacer con datos de ejemplo (las capturas actuales son de un equipo real).

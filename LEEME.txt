@@ -38,17 +38,19 @@ PRIMERA INSTALACIÓN: haz doble clic en lvm-instalador_<versión>_all.deb.
 Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04):
 pulsa "Instalar" y escribe tu contraseña.
 
-ACTUALIZAR: deja el .deb nuevo en tu carpeta Descargas y abre "Nexum
-Stack". Al abrirse ve que el paquete es más nuevo que la
-versión instalada y te ofrece "Actualizar a la <versión>". Pide tu
-contraseña en una ventana, lo instala y se vuelve a abrir con la
-versión nueva. (Desde la 1.17.0. El Centro de aplicaciones no sirve
-para actualizar: ve el programa ya instalado y no ofrece el botón.)
+El paquete de cada versión está en las publicaciones (Releases) del
+repositorio: https://github.com/mariomasku/nexum-stack/releases
 
-También puedes actualizar desde una terminal:
-      pkexec apt install -y ~/Descargas/lvm-instalador_<versión>_all.deb
-(pkexec pide la contraseña en una ventana; "sudo apt install ..." hace
-lo mismo pidiéndola en la terminal).
+ACTUALIZAR: abre "Nexum Stack" y pulsa "Buscar actualizaciones" (menú
+☰ o Herramientas). Desde la 1.50.0 busca la última versión publicada
+en GitHub, comprueba que está firmada por quien hace el programa y te
+ofrece "Actualizar a la <versión>". Pide tu contraseña en una ventana,
+la instala y se vuelve a abrir con la versión nueva. (El Centro de
+aplicaciones no sirve para actualizar: ve el programa ya instalado y
+no ofrece el botón.)
+
+También puedes actualizar desde una terminal, con el .deb descargado:
+      sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
 
 - Se instala en /opt/lvm-instalador. El comando lvm-instalador y el
   icono "Nexum Stack" del menú apuntan ahí, también si ya
