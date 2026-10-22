@@ -107,7 +107,7 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
   3. Crea su **virtual host http y https** si no existe, con el mismo formato que los ya existentes.
   4. **Falsea el dominio** en `/etc/hosts` para que el navegador abra la copia local, y hace que el navegador acepte su certificado mientras está falseado (sin el aviso "La conexión no es privada").
   5. Al cargar **cualquier otro proyecto**, el dominio deja de estar falseado, vuelve a llevar a la web real y el navegador deja de aceptar el certificado local.
-- **Lista de todos los dominios** de los vhosts con un **interruptor** para falsearlos o no a mano. El dominio falseado en cada momento aparece arriba, con el interruptor encendido y un botón para abrirlo. Los dominios `.local` siempre quedan en `/etc/hosts` (si no, el equipo los preguntaría a la red).
+- **Lista de todos los dominios** de los vhosts con un **interruptor** para falsearlos o no a mano. El dominio falseado en cada momento aparece arriba, con el interruptor encendido y un botón para abrirlo. Los dominios `.local` quedan en `/etc/hosts` (si no, el equipo los preguntaría a la red) salvo que se apaguen a mano, con un aviso, y no aparecen como falseados.
 - **Nuevo proyecto con dominio falseado:** pensado para proyectos que se construyen desde cero (por ejemplo, con Figma + Claude) y se van a subir a producción tal cual:
   - Se indica el **dominio de producción**.
   - Se elige la **carpeta** del proyecto de la lista de `htdocs` (por ejemplo, la descargada con `git clone`) o se crea una nueva.

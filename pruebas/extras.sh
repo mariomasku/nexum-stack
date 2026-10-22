@@ -34,6 +34,30 @@ check "hosts: un .local no se apaga (sigue en hosts)" 'grep -q "^127.0.0.1 tiend
 sed -i 's/^127.0.0.1 tienda.local$/#127.0.0.1 tienda.local/' "$W/h"
 hosts_fake cargar nueva.com > /dev/null
 check "hosts: un .local comentado a mano vuelve a añadirse al cargar otro proyecto" 'grep -q "^127.0.0.1 tienda.local$" "$W/h"'
+# Desde la 1.50.1 un .local se puede apagar en la pestaña Hosts (hosts-falsear): se recuerda, con su
+# www., y ya no se vuelve a añadir; al encenderlo se olvida (solo Linux: el Mac aun no lo tiene)
+if grep -q '^function local_off() {' "$SRC"; then
+extract "$SRC" local_off hosts_fake_one || exit 1
+DRY=0 LOCAL_OFF_FILE=$W/apagados
+valid_domain() { [[ "$1" =~ ^[a-z0-9.-]+$ ]]; }
+printf '127.0.0.1 localhost\n127.0.0.1 web.local\n127.0.0.1 ejemplo.local\n127.0.0.1 www.ejemplo.local\n' > "$W/h"
+vhosts_info() { printf '80|x|web.local||\n80|s|ejemplo.local|www.ejemplo.local|\n80|n|nueva.com||\n'; }
+hosts_fake_one ejemplo.local no > /dev/null
+check "hosts: un .local apagado a mano se comenta (con su www.)" '! grep -q "^127.0.0.1 .*ejemplo.local" "$W/h" && grep -q "^#127.0.0.1 ejemplo.local$" "$W/h" && grep -q "^#127.0.0.1 www.ejemplo.local$" "$W/h"'
+check "hosts: el .local apagado se recuerda, con su www." 'grep -qx ejemplo.local "$W/apagados" && grep -qx www.ejemplo.local "$W/apagados"'
+check "hosts: la lista de apagados es solo tuya" '[ "$(stat -c %a "$W/apagados")" = 600 ]'
+hosts_fake cargar nueva.com > /dev/null; hosts_fake locales > /dev/null
+check "hosts: un .local apagado no vuelve a añadirse (al cargar otro ni al asegurar)" '! grep -q "^127.0.0.1 .*ejemplo.local" "$W/h"'
+hosts_fake_one ejemplo.local si > /dev/null
+check "hosts: al encenderlo vuelve a hosts" 'grep -q "^127.0.0.1 ejemplo.local$" "$W/h" && grep -q "^127.0.0.1 www.ejemplo.local$" "$W/h"'
+check "hosts: al encenderlo se olvida" '! grep -q ejemplo "$W/apagados"'
+hosts_fake cargar nueva.com > /dev/null
+check "hosts: encendido otra vez, se mantiene al cargar otro proyecto" 'grep -q "^127.0.0.1 ejemplo.local$" "$W/h"'
+edit_hosts() { return 1; }
+hosts_fake_one ejemplo.local no > /dev/null 2>&1
+check "hosts: si no se puede cambiar hosts (contraseña cancelada), no se recuerda apagado" '! grep -q ejemplo "$W/apagados" && grep -q "^127.0.0.1 ejemplo.local$" "$W/h"'
+edit_hosts() { cp "$2" "$HOSTS_FILE"; }
+fi
 # --- web.local que no lleva a 127.0.0.1 (127.0.1.1 del nombre del equipo): aviso y arreglo ---
 extract "$SRC" gui_hosts hosts_fix_link || exit 1
 valid_domain() { [[ "$1" =~ ^[a-z0-9.-]+$ ]]; }

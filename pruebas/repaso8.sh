@@ -195,10 +195,13 @@ imp=$(awk '/^function import_database\(\)/,/^}/' "$SRC")
 e=$(grep -n "information_schema.ENGINES" <<< "$imp" | head -1 | cut -d: -f1)
 d=$(grep -n "DROP DATABASE" <<< "$imp" | head -1 | cut -d: -f1)
 check "vaciar: los motores se miran antes de borrar la base" '[ -n "$e" ] && [ -n "$d" ] && [ "$e" -lt "$d" ]'
+# (desde la 1.50.1 de Linux un .local se puede apagar a mano: lo prueba extras.sh)
+if ! grep -q '^function local_off() {' "$SRC"; then
 extract "$SRC" hosts_fake_one || exit 1
 valid_domain() { return 0; }
 out=$(hosts_fake_one otra.local no 2>&1); rc=$?
 check "hosts-falsear: un .local no se apaga" '[ $rc -ne 0 ] && grep -q "no se deja de falsear" <<< "$out"'
+fi
 
 # --- La ayuda: cada comando que enseña existe
 cmds=$(sed -n '3,/^$/p' "$SRC" | grep -oE '^#   lvm-instalador [a-z][a-z-]*' | awk '{print $3}' | sort -u)

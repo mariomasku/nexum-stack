@@ -302,7 +302,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.50.0"
+APP_VERSION="1.50.1"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -3090,7 +3090,8 @@ function hosts_fake() {
     local mode=$1 copy rc
     shift
     copy=$(mktemp "${TMPDIR:-/tmp}/lvm-hosts.XXXXXX") || return 1
-    LVM_INFO=$(vhosts_info) python3 -I - "$HOSTS_FILE" "$copy" "$mode" "$PROJECT_VHOST $(project_link)" "$@" <<'EOF'
+    LVM_INFO=$(vhosts_info) LVM_LOCAL_OFF="$(cat "$LOCAL_OFF_FILE" 2> /dev/null) $LOCAL_OFF_DRY" \
+        python3 -I - "$HOSTS_FILE" "$copy" "$mode" "$PROJECT_VHOST $(project_link)" "$@" <<'EOF'
 import os, re, sys
 src, dst, mode, links = sys.argv[1:5]
 wanted = [d.lower() for d in sys.argv[5:]]
@@ -3105,8 +3106,10 @@ for row in os.environ.get("LVM_INFO", "").splitlines():
 managed -= skip
 # Los .local no existen fuera: se quedan siempre en hosts (al cargar otro proyecto no se comentan) y
 # se añaden si les falta la linea. Sin ella, el equipo los pregunta a la red (mDNS) y cualquiera de
-# la misma wifi podria contestar con su IP y servir su web con ese nombre
-always = {n.lower() for n in managed if n.lower().endswith(".local")}
+# la misma wifi podria contestar con su IP y servir su web con ese nombre. Salvo los que se han
+# apagado a mano en la pestaña Hosts (LOCAL_OFF_FILE): esos se tratan como un dominio mas
+off = {n.lower() for n in os.environ.get("LVM_LOCAL_OFF", "").split()}
+always = {n.lower() for n in managed if n.lower().endswith(".local")} - off
 managed -= always
 target = set()
 for d in wanted:
@@ -3147,7 +3150,10 @@ for line in lines:
         if keep:
             line = m.group(1) + "#" + m.group(3) + m.group(4) + " ".join(n for n in names if n.lower() not in always)
             out.append(m.group(1) + m.group(3) + m.group(4) + " ".join(keep))
-        changes.append("Ya no esta falseado (lleva a la web real): " + " ".join(names))
+        if all(n.lower().endswith(".local") for n in names):
+            changes.append("Apagado en %s: %s" % (src, " ".join(names)))
+        else:
+            changes.append("Ya no esta falseado (lleva a la web real): " + " ".join(names))
     if on:
         done |= lnames
     out.append(line)
@@ -3251,16 +3257,30 @@ function hosts_fake_one() {
             return 1
         fi
     done
-    if [[ "$domain" == *.local ]] && [ "$state" == no ]; then
-        echo "$domain no se deja de falsear: un .local no existe fuera de este equipo y, sin su linea en"
-        echo "$HOSTS_FILE, el equipo lo preguntaria a la red (cualquiera de la misma wifi podria contestar)."
-
-        return 1
-    fi
     if ! vhosts_info | awk -F'|' -v d="$domain" '$3 == d || index(" " $4 " ", " " d " ") { f = 1 } END { exit !f }'; then
         echo "$domain no es el dominio de ningun vhost de $VHOSTS_FILE"
 
         return 1
+    fi
+    # Un .local se queda siempre en hosts (sin su linea, el equipo lo preguntaria a la red y
+    # cualquiera de la misma wifi podria contestar), salvo que se apague aqui: se recuerda en
+    # LOCAL_OFF_FILE, con su www., y al encenderlo se olvida
+    if [[ "$domain" == *.local ]]; then
+        local base=${domain#www.}
+        local_off "$state" "$base" "www.$base" || return 1
+        if ! hosts_fake "$state" "$domain"; then
+            local_off "$([ "$state" == no ] && echo si || echo no)" "$base" "www.$base"
+
+            return 1
+        fi
+        if [ "$state" == si ]; then
+            echo "$domain encendido: lleva a este equipo (127.0.0.1) y se vuelve a mantener en $HOSTS_FILE"
+        else
+            echo "$domain apagado: su linea de $HOSTS_FILE queda comentada y no se vuelve a añadir."
+            echo "Mientras este apagado, el equipo lo pregunta a la red (cualquiera de la misma wifi podria contestar)."
+        fi
+
+        return 0
     fi
     hosts_fake "$state" "$domain" || return 1
     if [ "$state" == si ]; then
@@ -3268,6 +3288,29 @@ function hosts_fake_one() {
     else
         echo "$domain ya no esta falseado: lleva a la web real"
     fi
+}
+
+# Dominios .local apagados a mano en la pestaña Hosts: ya no se mantienen en /etc/hosts.
+# local_off si|no <dominio...>: no = apagado (se recuerda), si = encendido (se olvida)
+LOCAL_OFF_FILE="$HOME/.lvm-instalador/locales-apagados"
+# (en simulacion no se guarda: los apagados van aqui, para que hosts_fake enseñe lo que haria)
+LOCAL_OFF_DRY=""
+function local_off() {
+    local state=$1 d rest
+    shift
+    if [ "$DRY" -eq 1 ]; then
+        [ "$state" == no ] && LOCAL_OFF_DRY+=" $*"
+        echo "  [simulacion] $* $([ "$state" == no ] && echo "se recuerda apagado" || echo "se olvida como apagado") en $LOCAL_OFF_FILE"
+
+        return 0
+    fi
+    mkdir -p -m 700 "$(dirname "$LOCAL_OFF_FILE")" || return 1
+    rest=$(cat "$LOCAL_OFF_FILE" 2> /dev/null)
+    for d in "$@"; do
+        rest=$(grep -vxF -- "$d" <<< "$rest")
+        [ "$state" == no ] && rest+=$'\n'"$d"
+    done
+    ( umask 077; sed '/^$/d' <<< "$rest" > "$LOCAL_OFF_FILE" )
 }
 
 # Para la pestaña Hosts: F|dominio|alias|carpeta|falseado (1/0)|https (1/0)|certificado (1/0)|PrestaShop (1/0)|personalizado (1/0)
@@ -7986,6 +8029,17 @@ QUE HACE
 
 VERSIONES
 
+1.50.1 (22 oct 2026)
+- Pestaña Hosts: los dominios .local de los vhosts se pueden apagar. Su
+  interruptor estaba bloqueado: el gestor los mantiene siempre en
+  /etc/hosts (sin su línea, el equipo los pregunta a la red y cualquiera
+  de la misma wifi podría contestar) y volvía a añadirlos aunque se
+  quitaran a mano. Ahora, al apagar uno (se avisa antes), su línea
+  queda comentada y se recuerda que está apagado, así que no se vuelve a
+  añadir; al encenderlo, vuelve a mantenerse. En la terminal:
+  lvm-instalador hosts-falsear <dominio>.local si|no.
+- Pestaña Hosts: los .local ya no salen como «Host falseado» (no hay
+  ninguna web real a la que lleven): van en «Dominios de los vhosts».
 1.50.0 (22 oct 2026)
 - Buscar actualizaciones: busca la versión nueva en GitHub, en las
   publicaciones del repositorio de Nexum Stack, y ya no hace falta
@@ -13159,8 +13213,10 @@ class App(Gtk.Application):
         if self.hosts is None:
             self.loading(self.hosts_box)
             return
-        fake = [h for h in self.hosts if h["fake"]]
-        rest = [h for h in self.hosts if not h["fake"]]
+        # Un .local siempre esta en /etc/hosts (sin su linea se preguntaria a la red) y no hay ninguna
+        # web real a la que devolverlo: no es un dominio falseado, va con los demas (sin apagarse)
+        fake = [h for h in self.hosts if h["fake"] and not h["name"].lower().endswith(".local")]
+        rest = [h for h in self.hosts if h not in fake]
 
         # Primero, si el vhost de los proyectos no lleva a este equipo: el navegador no conecta
         for name, now in getattr(self, "hosts_link_fix", []):
@@ -13406,11 +13462,9 @@ class App(Gtk.Application):
                 "%s://%s" % ("https" if h["https"] else "http", h["name"])))
             row.add_suffix(b)
         sw = Gtk.Switch(active=h["fake"], valign=Gtk.Align.CENTER)
-        # Un .local siempre lleva a este equipo (si no, se preguntaria a la red): no se apaga
-        if h["name"].lower().endswith(".local") and h["fake"]:
-            sw.set_sensitive(False)
-            sw.set_tooltip_text("Un .local siempre lleva a este equipo: no existe fuera y, sin su "
-                                "línea en /etc/hosts, se preguntaría a la red")
+        if h["name"].lower().endswith(".local"):
+            sw.set_tooltip_text("Un .local no existe fuera de este equipo: encendido, se mantiene "
+                                "en /etc/hosts; apagado, el equipo lo pregunta a la red")
         sw.connect("state-set", self.on_host_switch, h)
         row.add_suffix(sw)
         return row
@@ -13419,7 +13473,21 @@ class App(Gtk.Application):
         if state == h["fake"]:
             return False
         name = h["name"]
-        if state:
+        local = name.lower().endswith(".local")
+        if local and not state and not confirm(
+                self.win, "¿Apagar %s?" % name,
+                "Un .local no existe fuera de este equipo. Su línea de /etc/hosts queda comentada y "
+                "ya no se vuelve a añadir sola.\n\nMientras esté apagado, si se abre %s el equipo "
+                "pregunta ese nombre a la red, y cualquiera de la misma wifi podría contestar con "
+                "una web suya. Si no lo usas, también puedes quitar su vhost en Herramientas → "
+                "Editar vhosts.\n\nSe puede volver a encender cuando quieras." % (name, name),
+                "Apagarlo"):
+            sw.set_active(True)
+            return True
+        if local:
+            title = "%s %s" % ("Encendiendo" if state else "Apagando", name)
+            done = "%s %s" % (name, "lleva a este equipo" if state else "apagado")
+        elif state:
             title, done = "Falseando %s" % name, "%s lleva a este equipo" % name
         else:
             title, done = "Dejando de falsear %s" % name, "%s lleva a la web real" % name
