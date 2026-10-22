@@ -1,0 +1,410 @@
+NEXUM STACK 1.13.2 - Instalador de versiones LAMPP y PHP para Linux
+By M.Mascuñano - HEXER
+============================================================================
+
+XAMPP ya no saca versiones con los PHP nuevos (la última es la 8.2). Este
+gestor monta por su cuenta un LAMPP (Linux, Apache, MySQL/MariaDB, PHP y
+Perl) para cada versión de PHP: un XAMPP virtual por versión.
+
+Este instalador permite tener varias versiones de PHP en el mismo equipo
+(de la 7.4 a la 8.5), cada una con su propio Apache, MariaDB, ProFTPD,
+Perl y phpMyAdmin. Solo una está activa a la vez y puedes cambiar de una
+a otra cuando quieras. No instala PHP ni MariaDB en el sistema: todo va
+dentro de /opt/lampp-<versión>.
+
+
+QUÉ NECESITAS
+-------------
+
+  - Ubuntu o Debian de 64 bits (probado en Ubuntu 24.04).
+  - Para la ventana gráfica: GTK 3 para Python, que ya viene en Ubuntu
+    de escritorio desde la 20.04. Sin ella, todo funciona igual desde el
+    panel de la terminal.
+  - Un usuario que pueda usar "sudo" (te pedirá tu contraseña).
+  - Conexión a internet.
+  - Espacio libre: unos 5 GB por cada versión de PHP mientras se instala
+    (después ocupa 1,5 GB aprox.).
+  - Tiempo: cada versión de PHP se compila en tu equipo y tarda entre
+    10 y 20 minutos (más en equipos ARM o con poca memoria).
+
+Lo demás (librerías, herramientas de compilación) lo instala el propio
+instalador cuando hace falta.
+
+
+LO MÁS FÁCIL: EL PAQUETE .deb
+-----------------------------
+
+PRIMERA INSTALACIÓN: haz doble clic en lvm-instalador_<versión>_all.deb.
+Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04):
+pulsa "Instalar" y escribe tu contraseña.
+
+ACTUALIZAR: deja el .deb nuevo en tu carpeta Descargas y abre "Nexum
+Stack". Al abrirse ve que el paquete es más nuevo que la
+versión instalada y te ofrece "Actualizar a la <versión>". Pide tu
+contraseña en una ventana, lo instala y se vuelve a abrir con la
+versión nueva. (Desde la 1.17.0. El Centro de aplicaciones no sirve
+para actualizar: ve el programa ya instalado y no ofrece el botón.)
+
+También puedes actualizar desde una terminal:
+      pkexec apt install -y ~/Descargas/lvm-instalador_<versión>_all.deb
+(pkexec pide la contraseña en una ventana; "sudo apt install ..." hace
+lo mismo pidiéndola en la terminal).
+
+- Se instala en /opt/lvm-instalador. El comando lvm-instalador y el
+  icono "Nexum Stack" del menú apuntan ahí, también si ya
+  tenías una versión anterior descomprimida en otra carpeta.
+- Si el doble clic abre otro programa: botón derecho > "Abrir con" >
+  "Centro de aplicaciones", o usa el comando de la terminal de arriba.
+- Si la ventana estaba abierta, ciérrala y ábrela otra vez para usar la
+  versión nueva.
+- Con el .deb no hacen falta los pasos 1 a 4: sigue en el paso 5.
+
+
+PASO 1. DESCOMPRIMIR
+--------------------
+
+Descomprime este zip en tu carpeta personal, por ejemplo en:
+
+    /home/<tu-usuario>/lvm-instalador
+
+IMPORTANTE: elige bien el sitio, porque los accesos directos que se crean
+después apuntan a esa carpeta. Si luego la mueves o la borras, dejarán
+de funcionar.
+
+
+PASO 2. ABRIR UNA TERMINAL EN LA CARPETA
+----------------------------------------
+
+Abre la carpeta con el explorador de archivos, haz clic derecho en un
+espacio vacío y elige "Abrir en una terminal".
+
+También puedes abrir una terminal (Ctrl+Alt+T) y escribir:
+
+    cd ~/lvm-instalador
+
+
+PASO 3. EJECUTAR EL INSTALADOR POR PRIMERA VEZ
+----------------------------------------------
+
+Escribe estas dos líneas (pulsa Intro después de cada una):
+
+    chmod +x lvm-instalador.sh
+    ./lvm-instalador.sh
+
+La primera línea da permiso de ejecución al archivo (solo hace falta la
+primera vez). La segunda abre el panel.
+
+Si sale "Falta el comando curl", instálalo y vuelve a probar:
+
+    sudo apt install curl
+
+
+PASO 4. CREAR LOS ACCESOS DIRECTOS
+----------------------------------
+
+La primera vez te pregunta si quieres crear los accesos directos.
+Responde "Si" y escribe tu contraseña (al escribirla no se ve nada en
+pantalla; es normal). Se crean:
+
+  - El icono "Nexum Stack" en el menú de aplicaciones.
+  - El comando "lvm-instalador" para abrirlo desde cualquier terminal.
+
+A partir de ahora puedes abrirlo desde el menú de aplicaciones, sin
+usar la terminal: el icono abre la VENTANA GRÁFICA del gestor.
+
+SI YA TENÍAS UNA VERSIÓN ANTERIOR: descomprime el zip encima de la
+carpeta de antes (sustituyendo lvm-instalador.sh) y pulsa el icono del
+menú: se pone al día solo. Si lo descomprimes en otra carpeta, ejecuta
+el nuevo una vez desde la terminal (paso 3) para que el icono y el
+comando apunten a él.
+
+
+CARGAR UNA BASE DE DATOS: en la ventana, pestaña "Bases de datos",
+apartado "Subir o actualizar una base de datos". Elige el fichero .sql
+(también .sql.gz o el .zip tal como lo descargas del servidor, sin
+descomprimirlo), la base de destino y pulsa "Cargar"; la barra muestra
+lo que queda. La primera línea "/*M!999999\- enable the sandbox mode */"
+de las copias del servidor se quita sola. Se carga en la versión activa, que tiene que estar en marcha.
+Con el botón + creas una base nueva y con la papelera la borras. Al
+borrar, si la base tiene contenido, se elimina todo y no se puede
+deshacer; por eso se ofrece guardar antes una copia en ~/lvm-copias.
+Si la base ya existe en otra versión, te avisa y pregunta si quieres
+cargarla también en la activa.
+
+BUSCAR Y DESCARGAR BASES DE DATOS: arriba de la pestaña "Bases de
+datos" hay un buscador. Escribe parte del nombre y verás en qué versión
+está cada base y con qué PHP; "Activar" cambia a esa versión. El botón
+de descarga de cada base guarda una copia .sql.gz (en cualquier versión;
+si no es la activa, pide la contraseña de sudo).
+
+CARGAR UN PROYECTO: en cada resultado del buscador, "Cargar proyecto"
+activa la versión de PHP de esa base y apunta web.local a la carpeta
+del proyecto en /opt/htdocs (lo que antes hacías con unlink web.local
+y ln -s). Encuentra la carpeta leyendo el nombre de la base en
+wp-config.php o en la configuración de PrestaShop. Si no la encuentra,
+o hay varias, la eliges tú y se recuerda. Si la base está en varias
+versiones, te pregunta cuál montar. Si en tu equipo todavía no existe
+web.local, se crea solo la primera vez que cargas un proyecto (con su
+https y su línea en /etc/hosts) y te pide la contraseña de sudo.
+
+
+PASO 5. INSTALAR TU PRIMERA VERSIÓN DE PHP
+------------------------------------------
+
+Con la ventana gráfica (icono "Nexum Stack" del menú):
+
+1. Ve a la pestaña "Instalar".
+2. Marca la versión que quieras (por ejemplo PHP 8.4) y pulsa
+   "Instalar 1 versión".
+3. Cuando la pida, escribe tu contraseña en la ventana que aparece.
+   Una barra muestra cómo va cada componente. No cierres la ventana.
+4. Al terminar, pulsa "Activar lampp-8.4".
+
+Con el panel de la terminal (lvm-instalador):
+
+Cómo moverse por las ventanas:
+  - Flechas arriba/abajo: moverse por la lista.
+  - Espacio: marcar o desmarcar una versión (aparece [*]).
+  - Tabulador: pasar a los botones.
+  - Intro: aceptar.
+
+1. En el menú principal elige "Instalar versiones".
+2. Muévete hasta la versión que quieras (por ejemplo PHP 8.4) y
+   MÁRCALA CON ESPACIO. Solo resaltarla no basta.
+3. Pulsa Intro, revisa el resumen y confirma.
+4. Escribe tu contraseña si la pide. Una barra de progreso muestra cómo
+   va la instalación. No cierres la terminal mientras tanto.
+5. Al terminar te pregunta si quieres activar la versión: responde "Si"
+   y elígela.
+
+
+PASO 6. COMPROBAR QUE FUNCIONA
+------------------------------
+
+  - En el navegador:   http://127.0.0.1/phpmyadmin
+  - En la terminal:    /opt/lampp/bin/php -v
+
+Tus proyectos van en /opt/htdocs, una carpeta que comparten todas las
+versiones (/opt/lampp/htdocs apunta a ella). Las bases de datos de cada
+versión empiezan vacías: entra en phpMyAdmin como "root" sin contraseña.
+
+
+SI QUIERES PROBAR SIN CAMBIAR NADA
+----------------------------------
+
+    ./lvm-instalador.sh --simular            (panel de la terminal)
+    ./lvm-instalador.sh --simular ventana    (ventana gráfica)
+
+Modo simulación: enseña lo que haría, pero no instala ni cambia nada.
+
+
+MANUAL DE USUARIO
+-----------------
+
+Abre manual/index.html (doble clic): manual con capturas, casos paso a
+paso y todas las medidas de seguridad explicadas. Funciona sin conexión.
+
+
+PUESTA A PUNTO DE SEGURIDAD (EQUIPO NUEVO O TRAS ACTUALIZAR)
+-----------------------------------------------------------
+
+Hazlo una vez al instalar el gestor y cada vez que la ventana muestre
+un aviso naranja. Cada paso pide la contraseña de administrador.
+
+1. Instala el paquete. Si ya lo tenías, las versiones 1.39.0 y 1.40.0
+   se instalan una vez en la terminal:
+      sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
+   Las demás se actualizan desde la ventana.
+
+2. Abre la ventana, pestaña Versiones. Arriba salen los avisos que
+   tengas pendientes. Pulsa sus botones de arriba abajo:
+
+   "A algunas versiones les faltan protecciones" -> Protegerlas
+      Deja todas las versiones solo para este equipo y les pone una
+      clave SSL propia (la de XAMPP es la misma en todos los equipos).
+      Desde la 1.41.0, además: phpMyAdmin no acepta consultas que
+      mande otra web y MariaDB no puede leer ni escribir ficheros del
+      equipo. Este aviso vuelve a salir al actualizar el gestor si la
+      versión nueva trae protecciones nuevas: púlsalo otra vez.
+      Deja de funcionar, a propósito, importar en phpMyAdmin un CSV
+      con la opción "CSV usando LOAD DATA" (el CSV normal sí va).
+
+   "Tablas del sistema de MariaDB antiguas" -> Repararlas
+      Las tablas del sistema de MariaDB son de una versión anterior y
+      su registro de errores crece sin parar (llegó a 28 GB). Las pone
+      al día sin tocar las BBDD de los proyectos (antes guarda una
+      copia en ~/lvm-copias). La versión tiene que estar en marcha.
+
+   "phpMyAdmin antiguo" -> Actualizarlos
+      Pone el phpMyAdmin con los fallos de seguridad corregidos.
+
+   "Certificados en los que confía todo el equipo" -> Arreglarlos
+      Pone a cada proyecto https un certificado propio que solo vale
+      para su dominio, y quita la confianza a las CAs locales (mkcert,
+      generar-certificados.sh...). Con la clave de una de esas CAs, el
+      PHP de una web podría falsificar cualquier web real, como tu
+      banco, en este equipo.
+
+   "El navegador avisa al abrir estos proyectos" -> Confiar
+      (desde la 1.46.0) Chrome y Firefox aceptan el certificado propio
+      de los proyectos con dominio de pruebas (web.local, .local,
+      .test). Sin esto sale "La conexión no es privada" y las
+      herramientas que manejan el navegador, como Claude in Chrome, no
+      pueden abrirlos. Después cierra el navegador y vuelve a abrirlo.
+      En la terminal: lvm-instalador confiar-certificados [dominio]
+      (desde la 1.47.0) Las tiendas con dominio real, solo mientras están
+      falseadas en /etc/hosts: al falsear una, el navegador acepta su
+      certificado; al dejar de falsearla, deja de aceptarlo.
+
+   "El navegador acepta webs reales que ya no están falseadas" -> Quitar
+      Sale si cambias /etc/hosts a mano: el navegador aún acepta el
+      certificado de una tienda que ya no está falseada, y con su clave se
+      podría suplantar la web de verdad. Quitar hace que deje de
+      aceptarlo. En la terminal: lvm-instalador confiar-certificados --quitar
+
+   Cuando no queda ningún aviso, el equipo está al día.
+
+3. Después de Arreglarlos, el navegador acepta sin aviso los proyectos
+   con dominio de pruebas (web.local, .local, .test). Los de un dominio
+   real (tiendas falseadas en /etc/hosts) siguen avisando una vez ("La
+   conexión no es privada"): Avanzado > Acceder. Es a propósito: Apache
+   tiene su clave en memoria, donde la puede leer el PHP de cualquier
+   web, y con ella se podría suplantar la web de verdad.
+
+4. Si tenías una CA propia, el gestor te dice dónde está su clave
+   privada: bórrala (o guárdala cifrada fuera de tu carpeta). No
+   vuelvas a instalar una CA así.
+
+5. Para ver antes qué haría, en la terminal:
+      lvm-instalador --simular asegurar --todas
+      lvm-instalador --simular arreglar-certificados
+
+No cargues proyectos ni volcados de origen dudoso: MariaDB sigue con
+root sin contraseña y Apache con tu usuario, a propósito.
+
+
+DESPUÉS
+-------
+
+  - Cambiar de versión:  botón "Activar" de la ventana, opción
+                         "Cambiar la version activa" del panel,
+                         o  lvm-instalador use 8.4
+  - Actualizar parches:  opción "Actualizar versiones de PHP".
+  - Ver la versión del instalador y sus cambios: opción "Acerca de".
+  - Instrucciones completas: archivo README.md de esta carpeta.
+
+
+SI ALGO FALLA
+-------------
+
+El instalador no deja nada a medias: si una instalación falla, la
+versión que tenías sigue funcionando. Los registros (logs) quedan en la
+carpeta oculta ~/.lvm-instalador. Envíalos junto con lo que salió en
+pantalla a quien te pasó el instalador.
+
+SI phpMyAdmin DICE "phpMyAdmin esta en http://127.0.0.1/phpmyadmin/"
+---------------------------------------------------------------------
+
+phpMyAdmin solo se abre en http://127.0.0.1/phpmyadmin/ (no por
+localhost/phpmyadmin, web.local ni el dominio de un proyecto), para que
+un fallo en una web no pueda usarlo. Usa esa dirección o el botón de
+phpMyAdmin del gestor. Desde la 1.42.2, localhost/phpmyadmin lleva solo
+a la dirección buena (pulsa Protegerlas tras actualizar).
+
+SI AL ACTUALIZAR SALE "El paquete trae otro /opt/lvm-instalador/lvm-actualizar"
+---------------------------------------------------------------------------------
+
+No es un error ni un paquete dañado (el "Tubería rota" de dpkg-deb que
+sale detrás tampoco). Esa versión cambia el programa que instala las
+actualizaciones, y el que tienes no puede dar por buena su propia
+sustitución: se instala una vez en la terminal (Ctrl+Alt+T):
+   sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
+Luego abre de nuevo el gestor; las siguientes se actualizan desde la
+ventana. Pasa al venir de la 1.43 o anterior (la 1.44.0 cambió ese
+programa). Desde la 1.45.0, la ventana lo explica y da la orden con un
+botón para copiarla.
+
+SI UNA VERSIÓN NO ARRANCA Y DICE "Los vhosts (...) abren Apache a la red"
+-------------------------------------------------------------------------
+
+Alguien puso en los vhosts compartidos una línea Listen (por ejemplo
+"Listen 8080", siguiendo una guía de vhosts por puerto) y Apache
+quedaría abierto a toda la red. Herramientas > Editar vhosts: quita esa
+línea y aplica. Después, arranca la versión otra vez.
+
+SI web.local DA "No se puede acceder a este sitio web" (ERR_CONNECTION_REFUSED)
+-------------------------------------------------------------------------------
+
+En /etc/hosts, web.local apunta a otra dirección (por ejemplo 127.0.1.1,
+la que Ubuntu usa para el nombre del equipo) y Apache solo escucha en
+127.0.0.1. En la pestaña Hosts sale el aviso "web.local no lleva a este
+equipo": pulsa Arreglarlo (pide la contraseña; una sola vez). A mano:
+Herramientas > Editar hosts y cambia la dirección de web.local por
+127.0.0.1.
+
+MONTAR UN PROYECTO NUEVO DE GITHUB
+----------------------------------
+
+En Versiones, Cargar proyecto, el botón "Montar nuevo proyecto" (a la
+derecha del buscador). Tres pasos:
+  1. La dirección del repositorio y el nombre de la carpeta. Si es
+     privado, usa la dirección SSH (git@github.com:usuario/repo.git) con
+     tu clave SSH ya configurada en GitHub.
+  2. La versión de PHP.
+  3. El nombre de la BBDD nueva y, si lo tienes, su volcado (.sql,
+     .sql.gz o .zip). Sin volcado, la BBDD se crea vacía.
+Se clona en htdocs, se carga en esa versión y se crea la BBDD. En la
+terminal: lvm-instalador montar-proyecto <url> <carpeta> <version> <base>
+[volcado]
+
+Desde la 1.45.0:
+  - Por SSH solo se clona de GitHub, GitLab, Bitbucket y los servidores
+    cuya clave ya conoces. Si el repositorio está en otro (el de un
+    compañero, un GitLab propio) y sale "Host key verification failed",
+    conéctate una vez en la terminal, comprueba la huella que te enseña
+    y acéptala:  ssh -T git@servidor   Luego vuelve a montarlo.
+  - Si es una tienda PrestaShop con volcado, su dominio (el de la base)
+    no se falsea solo: la base y el nombre vienen con el repositorio.
+    Si es el suyo, pestaña Hosts > Nuevo proyecto con dominio falseado,
+    con la carpeta del proyecto y ese dominio.
+
+ENTRAR AL PANEL (WP-ADMIN O BACK OFFICE) CON EL ADMINISTRADOR DE PRUEBAS
+-------------------------------------------------------------------------
+
+Desde la 1.45.0, al cargar una BBDD de WordPress o PrestaShop se le añade
+un administrador de pruebas, igual en todos los equipos:
+   usuario: local@local.test      contraseña: local
+En Versiones, Cargar proyecto, el botón del panel (logo de WordPress o de
+PrestaShop) abre una página con los dos ya escritos: pulsa Entrar. Si la
+BBDD ya estaba cargada de antes, se crea al pulsar el botón. Si no entra
+(por ejemplo, un PrestaShop 9 o un plugin de seguridad que pide algo
+más), la misma página tiene el enlace al panel normal: escribe ahí el
+usuario y la contraseña. En la terminal:
+   lvm-instalador usuario-pruebas <base> [carpeta]
+Ese usuario se queda en la BBDD de tu equipo, que nunca va a producción.
+
+DESMONTAR EL PROYECTO CARGADO
+-----------------------------
+
+El botón de expulsar, junto a "web.local → proyecto": web.local
+deja de apuntar a él y enseña una página vacía. En la terminal:
+lvm-instalador desmontar-proyecto
+
+PROBAR UN PROYECTO CON OTRA VERSIÓN DE PHP
+-----------------------------------------
+
+En la pestaña BBDD, junto a cada BBDD, el botón de copiar (dos hojas) la
+copia a otra versión de PHP. La de origen no se toca. Si esa versión ya
+tiene una BBDD con ese nombre (por ejemplo, la copiaste antes), sale
+marcada "ya la tiene: se sustituye": se pide confirmación, se guarda una
+copia de la que había en ~/lvm-copias y se pone la nueva en su lugar.
+Después, en Versiones, carga el proyecto y elige esa versión. En la
+terminal: lvm-instalador copiar-bd <base> <origen> <destino> [--sustituir]
+
+SI LA WEB DA "Ha habido un error crítico en esta web"
+-----------------------------------------------------
+
+Es un error de PHP (muchas veces, un plugin que no funciona con la versión
+de PHP cargada). Herramientas > Registro de errores: el primero es el del
+vhost del proyecto (web.local-error_log). "Ver el final" muestra lo más
+reciente, con el fichero y la línea del error.

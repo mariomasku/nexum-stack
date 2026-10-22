@@ -1,0 +1,43 @@
+# --- Notas de trabajo internas -----------------------------------------------------------
+# Registro de las sesiones de desarrollo: rutas y usuario del equipo, y dominios de clientes
+CONTEXTO.md
+
+# --- Paquetes generados -------------------------------------------------------------------
+# empaquetar-deb.sh crea lvm-instalador_<versión>_all.deb (por defecto en ~/Descargas)
+*.deb
+# Versión de macOS: los .dmg y .zip se publican aparte, no van en el repositorio
+macos/*.dmg
+macos/*.zip
+
+# --- Capturas del manual sin renombrar ----------------------------------------------------
+# capturas.py guarda las tareas como tarea-*.png; las buenas se renombran a caso-despues-*.png
+manual/img/tarea-*.png
+
+# --- Restos de pruebas y depuración -------------------------------------------------------
+ultimo-web-logs/
+lvm-pruebas.*/
+w-*.????/
+
+# --- Python -------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+
+# --- Editores y sistema -------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Claude Code (ajustes locales de cada equipo) -----------------------------------------
+.claude/settings.local.json
+
+# --- Manual (de momento solo en local) ----------------------------------------------------
+# Sus capturas y registros (datos.js) están hechos sobre un equipo real, con dominios y
+# carpetas de clientes. Se publicará cuando se rehaga con datos inventados
+manual/
+
+# --- Paquetes .deb antiguos ---------------------------------------------------------------
+linux old/

@@ -1,0 +1,266 @@
+BATERÍA DE PRUEBAS AUTOMÁTICAS DE LVM-INSTALADOR
+================================================
+
+Pruebas de seguridad y de funcionamiento de lvm-instalador.sh (Linux) y del
+lvm-instalador.sh del Mac. Se pasan enteras en cada versión, antes de
+publicarla. Con Linux 1.45.1 y Mac 1.33.1 dan 799 pruebas, 0 fallos.
+
+
+CÓMO SE EJECUTA
+---------------
+
+Desde esta carpeta, sin sudo:
+
+    ./todas.sh
+
+Por defecto prueba:
+
+  - Linux: ../lvm-instalador.sh
+    (es decir, el lvm-instalador.sh de la carpeta de arriba)
+  - Mac: el lvm-instalador.sh del zip más reciente de
+    ../macos/lvm-instalador-mac-*.zip (se saca a la carpeta temporal)
+  - El empaquetador: ../empaquetar-deb.sh
+  - El script xampp antiguo del Mac: datos/mac-1.27.1-xampp.sh
+
+Para probar otros, con variables:
+
+    LVM_SCRIPT=/ruta/lvm-instalador.sh ./todas.sh
+    LVM_SCRIPT_MAC=/ruta/del/mac/lvm-instalador.sh ./todas.sh
+    LVM_EMPAQUETAR=/ruta/empaquetar-deb.sh ./todas.sh
+    LVM_MAC_ANTIGUO=/ruta/mac-1.27.1.sh ./todas.sh
+
+(También valen como argumentos, en este orden:
+ ./todas.sh <linux.sh> <mac.sh> <empaquetar-deb.sh> <mac antiguo>.)
+
+Tarda menos de un minuto. Al final escribe una línea por bloque y el total:
+
+    Total: 799 pruebas, 0 fallos
+
+Si algo falla, el bloque sale con "FALLAN" y debajo las primeras líneas con
+el fallo. todas.sh devuelve 0 solo si no falla nada.
+
+Una prueba suelta (por ejemplo, para depurar):
+
+    ./web.sh ../lvm-instalador.sh
+    ./certs.sh /ruta/del/mac/lvm-instalador.sh
+
+Cada una escribe "  ok    <qué>" o "  FALLA <qué>".
+
+
+QUÉ NECESITA
+------------
+
+  - Nada de sudo ni de root. Donde el script usaría sudo, las pruebas ponen
+    una función sudo de mentira que apunta lo que se pediría.
+  - bash, python3, openssl, curl, bc, unzip, fakeroot, dpkg-deb, script y
+    setsid (util-linux), mkfifo, pgrep.
+  - XAMPP 8.2.4 instalado en /opt/lampp-8.2.4: de ahí salen el Apache
+    (bin/httpd), el MariaDB (sbin/mysqld, bin/mysql_install_db, bin/mysql)
+    y bin/my_print_defaults de las pruebas. Se usan siempre con
+    LD_LIBRARY_PATH=/opt/lampp-8.2.4/lib (y PHPRC=/opt/lampp-8.2.4/etc),
+    porque /opt/lampp ya no es un XAMPP (la activa es otra o no hay
+    ninguna). Las pruebas no usan /opt/lampp para nada.
+  - /opt/lampp-8.4 (la pila propia): raiz.sh comprueba que pasa la
+    revisión de enlaces (solo lee).
+  - Los puertos 127.0.0.1:18080 y 127.0.0.1:18081 libres (Apache de prueba).
+
+
+QUÉ TOCA Y QUÉ NO
+-----------------
+
+  - Solo escribe en su carpeta temporal (ver abajo). No toca /opt, ni las
+    versiones, ni /etc/hosts, ni la configuración de nadie.
+  - No habla con ningún MariaDB de verdad: volcados.sh crea uno nuevo, vacío,
+    sin red (solo un socket en la carpeta temporal), y lo para al acabar.
+  - El Apache de web.sh escucha solo en 127.0.0.1:18080 y :18081 y se para al
+    acabar (también si la prueba se corta). Su configuración la prepara
+    apache-temporal.py a partir de /opt/lampp-8.2.4/etc/httpd.conf (solo la
+    lee): htdocs vacío, sin SSL ni PHP, y un phpMyAdmin falso (una página
+    estática). Nunca recibe nada el phpMyAdmin de verdad.
+  - No ejecuta lvm-instalador.sh entero ni abre la ventana: saca del script
+    las funciones y el Python incrustado que prueba (extract, getvar).
+  - Solo lee: /opt/lampp-8.2.4 (binarios y httpd.conf), /opt/lampp-8.4
+    (raiz.sh) y, con real-secure.sh, las /opt/lampp-*.
+
+
+CARPETAS TEMPORALES
+-------------------
+
+  - todas.sh crea una carpeta nueva en cada ejecución,
+    ${TMPDIR:-/tmp}/lvm-pruebas.XXXXXX (la pasa a las pruebas como LVM_TMP),
+    y la borra al acabar. Ahí va también el script del Mac sacado del zip.
+  - Cada prueba crea dentro la suya (w-web.XXXX, w-cert.XXXX, w-mdb.XXXX...)
+    y la borra al acabar.
+  - volcados.sh: el MariaDB temporal (datos, socket, registro y un cliente)
+    va en w-mdb.XXXX. Si esa ruta fuera muy larga para un socket (más de 80
+    caracteres), el socket va en /tmp/lvm-mdb.XXXX, que también se borra.
+  - Una prueba lanzada sola (sin todas.sh) usa ${TMPDIR:-/tmp}.
+  - Para depurar: KEEP=1 ./web.sh <script> copia los registros del Apache a
+    ~/ultimo-web-logs (o a $KEEP_DIR/ultimo-web-logs); KEEP=1 ./secure.sh
+    <script> no borra su carpeta de trabajo.
+
+
+LOS FICHEROS
+------------
+
+  todas.sh            La batería entera (Linux y Mac).
+  comun.sh            Ayudas comunes: extract (define en bash funciones del
+                      script), check, ok, bad, TMPBASE y DATOS.
+  apache-temporal.py  Prepara la configuración del Apache de web.sh.
+
+  Linux y Mac:
+  volcados.sh         Volcados de BBDD contra un MariaDB temporal: vistas y
+                      rutinas INVOKER, eventos, DATA DIRECTORY, paquetes,
+                      KILL USER, usuario lvm_bd_ bloqueado al final.
+  certs.sh            make_selfsigned (certificados en su carpeta, clave 600,
+                      CA:FALSE, rutas y dominios no válidos) y custom_domain.
+  secure.sh           SECURE_PY sobre árboles de prueba: Listen, bind-address,
+                      skip-networking, secure_file_priv, local-infile, FTP,
+                      vhost de dominios desconocidos, certificado de fábrica.
+  escritura.sh        PROJECT_WRITE_PY: no escribe fuera de htdocs.
+  cache.sh            CACHE_CLEAR_PY: vacía var/cache sin seguir enlaces.
+  web.sh              Reglas web en un Apache temporal: ficheros que no se
+                      sirven (.env, .git, copias, claves...), CSRF contra
+                      phpMyAdmin, phpMyAdmin solo en 127.0.0.1, TRACE.
+  notty.sh            NO_TTY_PY: lo compilado no tiene terminal.
+  compila.sh          Todo el Python incrustado (variables *_PY y la ventana
+                      GTK) compila.
+  extras.sh           hosts (.local), reglas de los vhosts (VHOSTS_CHECK_PY),
+                      copiar-bd, htdocs sin escritura para otros, tablas del
+                      sistema antiguas, ventana de Linux con un FIFO.
+  repaso8.sh          Octavo repaso (1.44.0 / Mac 1.32.0): nombres de
+                      proceso trucados y kill_pids, filtro de INVOKER al
+                      cargar (con un MariaDB temporal), bloqueo del usuario
+                      de la base sin permisos de fuera, MariaDB temporal
+                      nunca como root, envoltorio de copiar-bd,
+                      secure_failed, direcciones de git, la ayuda y
+                      montar-proyecto / desmontar-proyecto en simulación.
+  repaso9.sh          Noveno repaso (1.45.0 / Mac 1.33.0): cliente de
+                      MariaDB sin ~/.my.cnf (DB_SAFE), no_tty, la contraseña
+                      solo para un sudo de verdad (Linux), \r en hosts, el
+                      dominio de una tienda montada desde un repositorio,
+                      Listen abierto en los vhosts, PHP_TIMEZONE,
+                      ServerAdmin, importar-bd --proyecto, LC_COLLATE, .pid
+                      del script lampp, versiones de php.net y, en el Mac,
+                      Apartar sin root y rutas por /Applications/XAMPP.
+  admin-pruebas.sh    Administrador de pruebas (local@local.test / local) en
+                      WordPress y PrestaShop 1.7 y 1.6, con un MariaDB
+                      temporal: sin tocar a los de verdad ni duplicarse.
+
+  Solo Linux:
+  ayudante.sh         lvm-actualizar: paquetes buenos y manipulados (con una
+                      copia del ayudante que no instala nada).
+  arreglar-certs.sh   cert_audit y fix_certs con CAs de prueba.
+  procesos.sh         lampp_processes con .pid manipulados.
+  entorno.sh          Entorno de las tareas de la ventana (sin funciones
+                      exportadas, SHELLOPTS, PS4 ni variables de prueba).
+  raiz.sh             Lo que hace root sobre carpetas tuyas: enlaces de lo
+                      compilado, .pid del MariaDB temporal, secure_lampp.
+
+  Solo Mac:
+  mac-xampp.sh        El parche de SECURE_PY al script xampp de la 1.27 y el
+                      script xampp nuevo.
+  mac-procesos.sh     lampp_processes del Mac con una salida de ps inventada.
+
+  Aparte (no está en todas.sh):
+  real-secure.sh      Qué cambiaría SECURE_PY en las versiones instaladas
+                      (/opt/lampp-*). Solo lee; escribe en una carpeta
+                      temporal. Uso: ./real-secure.sh [script]
+
+  datos/fabrica.crt   Certificado autofirmado de mentira con el emisor
+                      "Apache Friends" (como el que trae XAMPP), para la
+                      prueba del certificado de fábrica de secure.sh. Se
+                      puede rehacer con:
+                        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+                          -subj "/C=DE/O=Apache Friends/CN=localhost" \
+                          -keyout /dev/null -out datos/fabrica.crt
+  datos/mac-1.27.1-xampp.sh
+                      El script xampp que dejaba el Mac 1.27.1 en sus pilas
+                      propias (MariaDB como root), para mac-xampp.sh. Es una
+                      reconstrucción (ver HISTORIA).
+
+
+CÓMO AÑADIR PRUEBAS
+-------------------
+
+1. A un fichero que ya existe: una línea más con
+
+       check "lo que se comprueba" '<orden que da 0 si está bien>'
+
+   (la orden va entre comillas simples; se evalúa con eval).
+
+2. Un fichero nuevo, por ejemplo nuevo.sh:
+
+       #!/bin/bash
+       # Qué prueba. Uso: nuevo.sh <lvm-instalador.sh>
+       SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
+       . "$HERE/comun.sh"
+       W=$(mktemp -d "$TMPBASE/w-nuevo.XXXX"); trap 'rm -rf "$W"' EXIT
+       extract "$SRC" nombre_de_funcion || exit 1
+       sudo() { echo "SUDO $*" >> "$W/sudo.log"; return 1; }   # si hace falta
+       check "..." '...'
+       exit $fail
+
+   chmod +x nuevo.sh, y en todas.sh una línea en el bloque de Linux, en el
+   del Mac o en los dos:
+
+       suite "nombre del bloque" "$HERE/nuevo.sh" "$L"
+       suite "nombre del bloque" "$HERE/nuevo.sh" "$M"
+
+3. Reglas (para que nunca rompa nada del equipo):
+   - Sin sudo: sustituye la función sudo.
+   - Todo lo que escriba, en $W (dentro de TMPBASE). Datos fijos en datos/
+     (léelos con "$DATOS/...").
+   - Nada de MariaDB ni Apache de verdad: los temporales de volcados.sh y
+     web.sh, en puertos altos y solo en 127.0.0.1, y parados con trap.
+   - No ejecutes lvm-instalador.sh entero. Si hiciera falta, siempre con
+     --simular como primer argumento, y nunca "ventana" (reescribe el
+     lanzador) ni nada que borre en /opt/lampp-*.
+   - Binarios de XAMPP siempre de /opt/lampp-8.2.4 con
+     LD_LIBRARY_PATH=/opt/lampp-8.2.4/lib.
+
+
+RESULTADO DE REFERENCIA (21 de octubre de 2026)
+-----------------------------------------------
+
+Linux 1.44.0 (316): ayudante 26, volcados 20, certificados 15,
+arreglar-certificados 12, SECURE_PY 27, escritura 5, caché 4, web 80,
+compilación sin terminal 6, procesos 3, entorno 4, Python compila 14,
+root sobre carpetas tuyas 31, hosts/vhosts/htdocs/MariaDB 46, octavo
+repaso 43.
+
+Mac 1.32.0 (278): volcados 20, certificados 13, SECURE_PY 27, escritura 5,
+caché 4, web 80, script xampp 4, compilación sin terminal 6, Python compila
+13, procesos 2, hosts/vhosts/htdocs/MariaDB 45, octavo repaso 39.
+
+Total: 799 pruebas, 0 fallos.
+
+Algunos bloques cuentan cosas del script (compila.sh, una prueba por cada
+variable *_PY), así que con otra versión el total puede cambiar sin que
+falle nada.
+
+
+HISTORIA
+--------
+
+La batería se hizo entre el 20 y el 21 de octubre de 2026 en carpetas
+temporales de las sesiones de trabajo, y se perdió al borrarse. Se ha
+reconstruido el 21 de octubre de 2026 a partir de los registros de esas
+sesiones, repitiendo en orden cada orden que creó o cambió un fichero de
+pruebas. Lo reconstruido coincide con todas las lecturas de los ficheros
+que quedaron en los registros y con los totales de cada ejecución de
+entonces (507 con Linux 1.43.1 y Mac 1.31.1).
+
+Cambios respecto a la de entonces (solo dónde están las cosas):
+  - Las carpetas de trabajo van en una carpeta temporal y no dentro de
+    pruebas/.
+  - El MariaDB temporal se crea nuevo en cada ejecución (antes era una
+    carpeta mdb/ preparada a mano).
+  - La configuración del Apache temporal la prepara apache-temporal.py en
+    cada ejecución (antes era una carpeta sec2/ preparada a mano con los
+    vhosts y el phpMyAdmin de la 8.2.4; ahora con un phpMyAdmin falso).
+  - El certificado de fábrica falso y el script xampp del Mac 1.27.1 están
+    en datos/. La copia completa del script del Mac 1.27.1 no se ha podido
+    recuperar: datos/mac-1.27.1-xampp.sh es su bloque xampp, rehecho a
+    partir del Mac 1.31.1 quitando los cambios de la 1.28.0.
+  - Los scripts que se prueban se eligen con LVM_SCRIPT y LVM_SCRIPT_MAC.
