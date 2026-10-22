@@ -4,6 +4,11 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.50.1 · 22 oct 2026
+
+- **Pestaña Hosts:** los dominios .local de los vhosts se pueden apagar. Su interruptor estaba bloqueado: el gestor los mantiene siempre en `/etc/hosts` (sin su línea, el equipo los pregunta a la red y cualquiera de la misma wifi podría contestar) y volvía a añadirlos aunque se quitaran a mano. Ahora, al apagar uno (se avisa antes), su línea queda comentada y se recuerda que está apagado, así que no se vuelve a añadir; al encenderlo, vuelve a mantenerse. En la terminal: lvm-instalador hosts-falsear <dominio>.local si|no.
+- **Pestaña Hosts:** los .local ya no salen como «Host falseado» (no hay ninguna web real a la que lleven): van en «Dominios de los vhosts».
+
 ## 1.50.0 · 22 oct 2026
 
 - **Buscar actualizaciones:** busca la versión nueva en GitHub, en las publicaciones del repositorio de Nexum Stack, y ya no hace falta dejar el .deb en Descargas. Si hay una más nueva, la descarga a `~/.lvm-instalador/actualizaciones`, enseña su fecha y su huella y la instala al poner la contraseña. Sin conexión se sigue buscando en Descargas.
