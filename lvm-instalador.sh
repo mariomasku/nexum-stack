@@ -8051,7 +8051,7 @@ VERSIONES
   * La contraseña de administrador solo se manda a un sudo de verdad de
     la tarea: un programa que escribiera la marca de sudo ya no hace salir
     el cuadro de la contraseña.
-  * Editar /etc/hosts: una línea con un retorno de carro (\r) en medio se
+  * Editar /etc/hosts: una línea con un retorno de carro (CR) en medio se
     saltaba la comprobación y podía llevar cualquier dominio a otra IP.
   * Montar nuevo proyecto: el dominio de una tienda (el de su base) ya no
     se falsea solo, porque la base y el nombre de la carpeta vienen con el
@@ -8300,7 +8300,7 @@ VERSIONES
     la acción de polkit sean los instalados y las mismas dependencias.
     /opt pasa a ser del administrador al instalar el paquete.
   * Vhosts y /etc/hosts: se leen como los lee el sistema (por bytes);
-    un carácter de control como \0 hacía que Apache viera una línea
+    un carácter de control como el nulo hacía que Apache viera una línea
     que la comprobación no veía.
   * Volcados: cada base tiene su usuario (lvm_bd_<base>), con el
     permiso solo para ella (el _ ya no vale por cualquier carácter),

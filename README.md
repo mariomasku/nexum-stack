@@ -4,6 +4,8 @@ Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
+**Versión actual: 1.49.0** · [Novedades de todas las versiones](CHANGELOG.md)
+
 ## Por qué existe
 
 XAMPP ya no saca versiones con los PHP nuevos: la última es la 8.2. Muchos proyectos ya necesitan PHP 8.3, 8.4 o 8.5, y otros siguen necesitando PHP 7.x.
@@ -142,7 +144,7 @@ sudo /opt/lampp/lampp start | stop | restart | status     # lo mismo, como en XA
 
 La lista completa de comandos está en [Comandos sin panel](#comandos-sin-panel).
 
-**Versión actual: 1.17.0.** Para actualizar, deja el `.deb` nuevo en Descargas y abre la ventana: si es más nuevo que la versión instalada, ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `pkexec apt install -y ~/Descargas/lvm-instalador_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `lvm-instalador novedades`.
+Para actualizar, deja el `.deb` nuevo en Descargas y pulsa **Buscar actualizaciones** (menú ☰ o Herramientas): si es más nuevo que la versión instalada, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `lvm-instalador novedades`.
 
 ---
 
