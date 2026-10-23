@@ -148,6 +148,11 @@ LOS FICHEROS
   admin-pruebas.sh    Administrador de pruebas (local@local.test / local) en
                       WordPress y PrestaShop 1.7 y 1.6, con un MariaDB
                       temporal: sin tocar a los de verdad ni duplicarse.
+  vinculos.sh         BBDD vinculadas a la carpeta de su proyecto en cada
+                      versión (1.51.0): vincular-bd, --unica, gui-proyectos
+                      (V|), copiar-bd --como/--carpeta en simulación,
+                      carpetas con la versión completa, gui-fechas y el
+                      nombre propuesto en la ventana.
 
   Solo Linux:
   ayudante.sh         lvm-actualizar: paquetes buenos y manipulados (con una

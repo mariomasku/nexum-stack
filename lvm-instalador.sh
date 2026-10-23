@@ -103,10 +103,15 @@
 #   lvm-instalador exportar-bd <base> <fichero.zip|.sql|.sql.gz> [version]
 #       Descarga una copia de una base (sin version, de la montada)
 #
-#   lvm-instalador copiar-bd <base> <origen> <destino> [--sustituir]
+#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]
 #       Copia una BBDD a otra version (para probar el proyecto con otro PHP); la de origen no se
-#       toca. Si la de destino ya la tiene, solo con --sustituir: antes guarda una copia suya en
-#       ~/lvm-copias
+#       toca. --como: nombre de la copia en la de destino (sin el, el mismo). --carpeta: carpeta
+#       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
+#       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
+#
+#   lvm-instalador vincular-bd <base> <version> <carpeta|->
+#       La carpeta de /opt/htdocs del proyecto de esa BBDD en esa version (Cargar proyecto la
+#       carga con ella). Con -, la BBDD deja de estar vinculada a ninguna carpeta en esa version
 #
 #   lvm-instalador borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/lvm-copias
@@ -238,7 +243,8 @@ function native_binaries() {
 # Cada rama nueva sube un escalon (MariaDB LTS y Perl mas modernos), para que los proyectos
 # evolucionen con todo compatible entre si. Apache y ProFTPD solo tienen una rama estable.
 # Las ramas sin soporte de php.net (7.4-8.1) son para proyectos antiguos y usan la pila de 8.2.
-# Se instala el ultimo parche de cada rama (en /opt/lampp-X.Y) o uno concreto (en /opt/lampp-X.Y.Z).
+# Cada version de PHP va en su carpeta con la version completa (/opt/lampp-X.Y.Z; hasta la 1.50, el
+# ultimo parche de la rama iba en /opt/lampp-X.Y).
 # Los componentes son siempre los ultimos parches de su rama, consultados en las webs oficiales.
 STACK_MATRIX=(
     "7.4|2.4|10.11|1.3.9|5.40"
@@ -302,7 +308,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.50.1"
+APP_VERSION="1.51.0"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -1072,12 +1078,13 @@ function php_patches() {
     php_all_releases | awk -v b="$1." 'index($1, b) == 1'
 }
 
-# Elemento del plan para instalar una version de PHP: el ultimo parche de su rama va en
-# /opt/lampp-X.Y (php:); uno anterior, o si la carpeta de la rama ya existe, en /opt/lampp-X.Y.Z (parche:)
+# Elemento del plan para instalar una version de PHP: el ultimo parche de su rama (php:) o uno
+# anterior (parche:). Desde la 1.51 los dos van en su propia carpeta, con la version completa
+# (/opt/lampp-X.Y.Z): las lampp-X.Y de antes se siguen poniendo al dia con Actualizar
 function php_item() {
     local full=$1 latest=$2
 
-    if [ "$full" == "$latest" ] && [ ! -e "${TEST_DIR:-/opt}/lampp-${full%.*}" ]; then
+    if [ "$full" == "$latest" ]; then
         echo "php:$full"
     else
         echo "parche:$full"
@@ -1101,7 +1108,7 @@ function item_folder() {
     local name=${1#*:}
 
     case "${1%%:*}" in
-        php|rehacer) echo "${name%.*}" ;;
+        rehacer) echo "${name%.*}" ;;
         *) echo "$name" ;;
     esac
 }
@@ -1809,6 +1816,9 @@ for name in sorted(os.listdir(root), key=str.lower):
     print("P|%s|%s|%s|%s" % (name, db, ver, kind))
 EOF
     [ -f "$PROJECTS_FILE" ] && grep -E '^[A-Za-z0-9_][A-Za-z0-9_-]*=[^|]+$' "$PROJECTS_FILE" | sed 's/^\([^=]*\)=/R|\1|/'
+    # V|base|version|carpeta: los vinculos de una version (sin carpeta: desvinculada en esa version)
+    [ -f "$PROJECTS_FILE" ] && grep -E '^[A-Za-z0-9_][A-Za-z0-9_-]*@[A-Za-z0-9._-]+=[^|]*$' "$PROJECTS_FILE" \
+        | sed 's/^\([^@]*\)@\([^=]*\)=/V|\1|\2|/'
     return 0
 }
 
@@ -2197,7 +2207,7 @@ function load_project() {
     # Tienda PrestaShop: su dominio con vhost, certificado y falseado en /etc/hosts. Otro proyecto:
     # ningun dominio falseado
     # La base con la que se carga queda asociada a la carpeta (wp-config.php la usa la proxima vez)
-    [[ "$3" =~ ^[A-Za-z0-9_-]+$ ]] && remember_project "$3" "$folder"
+    [[ "$3" =~ ^[A-Za-z0-9_-]+$ ]] && remember_project "$3" "$folder" "$(active_name)"
     load_project_domain "$folder" "$3" || return 1
 
     echo "Proyecto cargado: $link -> $folder$([ -L /opt/lampp ] && echo " ($(readlink /opt/lampp | sed 's:^/opt/::'))")"
@@ -3497,11 +3507,7 @@ function new_custom_domain() {
             create_database "$db" || echo "Aviso: no se ha creado la base $db. Creala despues en la pestaña Bases de datos."
         fi
         # Cargar proyecto desde el buscador de bases encuentra la carpeta aunque aun no haya configuracion
-        if [ "$DRY" -eq 0 ]; then
-            mkdir -p "$(dirname "$PROJECTS_FILE")"
-            { [ -f "$PROJECTS_FILE" ] && grep -v "^$db=" "$PROJECTS_FILE"; echo "$db=$folder"; } > "$PROJECTS_FILE.nuevo"
-            mv "$PROJECTS_FILE.nuevo" "$PROJECTS_FILE"
-        fi
+        remember_project "$db" "$folder"
     fi
 
     hosts_fake cargar "$domain" || return 1
@@ -4442,7 +4448,7 @@ function is_prestashop() {
 function ps_guess_db() {
     local folder=$1 db=$2 tail
     if [ -z "$db" ] && [ -f "$PROJECTS_FILE" ]; then
-        db=$(awk -F= -v f="$folder" '$2 == f { d = $1 } END { if (d != "") print d }' "$PROJECTS_FILE")
+        db=$(saved_project_db "$folder")
     fi
     if [ -z "$db" ]; then
         tail=$(tr 'A-Z' 'a-z' <<< "${folder##*[-.]}")
@@ -4620,7 +4626,7 @@ function ps_clear_cache() {
 function ps_clear_cache_db() {
     local db=$1 folder="" tail
     [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Base de datos no valida: $db"; return 1; }
-    [ -f "$PROJECTS_FILE" ] && folder=$(awk -F= -v d="$db" '$1 == d { f = $2 } END { print f }' "$PROJECTS_FILE")
+    folder=$(linked_folder "$db")
     if [ -z "$folder" ] || [ ! -d "$HTDOCS_DIR/$folder" ]; then
         folder=$(gui_projects | awk -F'|' -v d="$db" '$1 == "P" && $3 == d { print $2 }')
         if [ "$(grep -c . <<< "$folder")" != 1 ]; then
@@ -4665,21 +4671,80 @@ function is_wordpress() {
     [ -f "$HTDOCS_DIR/$1/wp-config.php" ] || [ -d "$HTDOCS_DIR/$1/wp-includes" ]
 }
 
-# Base recordada para una carpeta (la ultima de ~/.lvm-instalador/proyectos)
-function saved_project_db() {
-    [ -f "$PROJECTS_FILE" ] || return 0
-    awk -F= -v f="$1" '$2 == f { d = $1 } END { if (d != "") print d }' "$PROJECTS_FILE"
+# Vinculos entre las BBDD y las carpetas de los proyectos (~/.lvm-instalador/proyectos), uno por
+# linea: base@version=carpeta (en esa version; sin carpeta, la base no es de ningun proyecto en esa
+# version) o base=carpeta (en todas las versiones, como se guardaban hasta la 1.50). El de la
+# version manda: asi la copia de una base en otra version puede ir con otra carpeta
+
+# Nombre de la version activa (8.4.27), o nada
+function active_name() {
+    local a=$(active_dir)
+    [ -n "$a" ] && echo "${a##*/lampp-}"
 }
 
-# Recuerda la carpeta de una base. Con --unica, la carpeta deja de estar asociada a otras bases
-# (la base nueva sustituye a la anterior)
+# Carpeta vinculada a <base> en <version> (sin version, la activa). Nada si no tiene
+function linked_folder() {
+    local db=$1 ver=${2:-$(active_name)}
+    [ -f "$PROJECTS_FILE" ] || return 0
+    awk -F= -v d="$db" -v k="$db@$ver" '$1 == k { v = $2; hv = 1 } $1 == d { g = $2 } END { print (hv ? v : g) }' "$PROJECTS_FILE"
+}
+
+# Base vinculada a una carpeta en <version> (sin version, la activa): la ultima que se vinculo
+function saved_project_db() {
+    local ver=${2:-$(active_name)}
+    [ -f "$PROJECTS_FILE" ] || return 0
+    awk -F= -v f="$1" -v ver="$ver" '{
+        n = index($1, "@")
+        if (n) { d = substr($1, 1, n - 1); if (substr($1, n + 1) != ver) next; per[d] = $2; has[d] = 1 }
+        else { d = $1; all[d] = $2 }
+        last[d] = NR
+    } END {
+        for (d in last) { v = (d in has) ? per[d] : all[d]; if (v == f && last[d] > best) { best = last[d]; db = d } }
+        if (db != "") print db
+    }' "$PROJECTS_FILE"
+}
+
+# remember_project <base> <carpeta> [version] [--unica]: vincula la base a la carpeta en esa version
+# (sin version, la activa; sin carpeta, la desvincula). Con --unica, en esa version la carpeta deja
+# de estar vinculada a otras bases (la base nueva sustituye a la anterior)
 function remember_project() {
-    local db=$1 folder=$2
+    local db=$1 folder=$2 ver=${3:-$(active_name)} key
     [ "$DRY" -eq 1 ] && return 0
+    key=$db${ver:+@$ver}
     mkdir -p "$(dirname "$PROJECTS_FILE")"
-    { [ -f "$PROJECTS_FILE" ] && awk -F= -v d="$db" -v f="$folder" -v u="$3" \
-        '$1 != d && !(u == "--unica" && $2 == f)' "$PROJECTS_FILE"; echo "$db=$folder"; } > "$PROJECTS_FILE.nuevo"
+    { [ -f "$PROJECTS_FILE" ] && awk -F= -v k="$key" -v d="$db" -v f="$folder" -v ver="$ver" -v u="$4" '
+        $1 == k { next }
+        u == "--unica" && f != "" && $2 == f && $1 != d {
+            # (la de todas las versiones se queda para las demas y en esta se desvincula)
+            if (index($1, "@") == 0) { print; if (ver != "") print $1 "@" ver "="; next }
+            if (substr($1, index($1, "@") + 1) == ver) next
+        }
+        { print }' "$PROJECTS_FILE"; echo "$key=$folder"; } > "$PROJECTS_FILE.nuevo"
     mv "$PROJECTS_FILE.nuevo" "$PROJECTS_FILE"
+}
+
+# vincular-bd <base> <version> <carpeta|->: la carpeta del proyecto de la base en esa version (- =
+# ninguna). Cargar proyecto la carga con ella
+function link_database() {
+    local db=$1 ver=$2 folder=$3
+    if [ -z "$db" ] || [ -z "$ver" ] || [ -z "$folder" ]; then
+        echo "Uso: lvm-instalador vincular-bd <base de datos> <version> <carpeta de /opt/htdocs|->"
+        return 1
+    fi
+    db_valid_name "$db" || return 1
+    if ! valid_version_name "$ver" || [ ! -d "${TEST_DIR:-/opt}/lampp-$ver" ]; then
+        echo "No existe la version lampp-$ver"
+        return 1
+    fi
+    if [ "$folder" == "-" ]; then
+        remember_project "$db" "" "$ver"
+        echo "$db ya no esta vinculada a ningun proyecto en lampp-$ver"
+    else
+        folder=${folder%/}
+        valid_project "$folder" || return 1
+        remember_project "$db" "$folder" "$ver"
+        echo "$db queda vinculada a $folder en lampp-$ver"
+    fi
 }
 
 # Datos de un wp-config.php, uno por linea: base, usuario, servidor, prefijo y contraseña
@@ -4729,7 +4794,7 @@ function test_admin() {
         echo "Base no valida: $db"
         return 1
     fi
-    [ -z "$folder" ] && folder=$(awk -F= -v d="$db" '$1 == d { split($2, a, " "); f = a[1] } END { print f }' "$PROJECTS_FILE" 2> /dev/null)
+    [ -z "$folder" ] && folder=$(linked_folder "$db" "${DB_TARGET_FOLDER:-}")
     [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && [ -d "$HTDOCS_DIR/$folder" ] || folder=""
     local mysql=("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N --default-character-set=utf8mb4)
     if [ "$DRY" -eq 1 ]; then
@@ -6534,7 +6599,8 @@ function install_stack() {
         exit 1
     fi
 
-    # La carpeta es la rama (lampp-8.4) o, para un parche concreto, la version completa (lampp-8.4.10)
+    # La carpeta es la version completa (lampp-8.4.27); sin tercer argumento (actualizar una lampp-X.Y
+    # de antes de la 1.51), la rama
     local short=${version%.*}
     local lampp_name=${3:-$short}
     local target=/opt/lampp-$lampp_name link=/opt/lampp
@@ -6947,7 +7013,7 @@ function plan_label() {
 
     case "${1%%:*}" in
         xampp) echo "XAMPP $name" ;;
-        php) echo "PHP ${name%.*} (pila propia)" ;;
+        php) echo "PHP $name (pila propia)" ;;
         parche) echo "PHP $name (pila propia)" ;;
         rehacer) echo "PHP ${name%.*} (actualizar)" ;;
     esac
@@ -6957,7 +7023,7 @@ function plan_label() {
 function run_plan_item() {
     case "${1%%:*}" in
         xampp) ( install_xampp "${1#*:}" ) ;;
-        php) ( install_stack "${1#*:}" ) ;;
+        php) ( install_stack "${1#*:}" 0 "${1#*:}" ) ;;
         parche) ( install_stack "${1#*:}" 0 "${1#*:}" ) ;;
         rehacer) ( install_stack "${1#*:}" 1 ) ;;
     esac
@@ -7185,8 +7251,8 @@ function panel_pick_patch() {
         fi
 
         local text="Versiones publicadas de PHP $branch, de la mas nueva a la mas antigua.\n"
-        text+="El ultimo parche va en /opt/lampp-$branch y los demas en su propia carpeta\n"
-        text+="(/opt/lampp-$branch.Z), asi que pueden convivir varios. Todas llevan la misma\n"
+        text+="Cada una va en su propia carpeta, con la version completa (/opt/lampp-$branch.Z),\n"
+        text+="asi que pueden convivir varias. Todas llevan la misma\n"
         text+="pila (Apache, MariaDB, ProFTPD y Perl) y sus propias bases de datos.\n"
         text+="Los parches antiguos tienen fallos de seguridad ya corregidos: usalos solo\n"
         text+="si el proyecto necesita esa version exacta."
@@ -7219,9 +7285,7 @@ function panel_install() {
     local old_branches=0 security_branches=0 states=$(php_branch_states)
     while read -r branch full; do
         [ -z "$branch" ] && continue
-        # Si la carpeta de la rama ya es una pila propia, se pone al dia con "Actualizar". Si es un
-        # XAMPP (por ejemplo lampp-7.4), el ultimo parche se instala a su lado, en lampp-X.Y.Z.
-        is_fpm_install "/opt/lampp-$branch" && continue
+        # El ultimo parche va en su carpeta (lampp-X.Y.Z), al lado de las que ya haya de la rama
         local item=$(php_item "$full" "$full")
         [ -e "/opt/lampp-$(item_folder "$item")" ] && continue
         php_installed_in "$full" > /dev/null && continue
@@ -8018,7 +8082,7 @@ estilo XAMPP de forma independiente. Para Linux.
 QUE HACE
 - Instala varias versiones de PHP, de la 7.4 a la 8.5 y cualquier parche
   (8.3.10...), cada una con su propia pila: Apache, PHP-FPM, MariaDB,
-  ProFTPD, Perl y phpMyAdmin, en /opt/lampp-X.Y y con sus propias bases
+  ProFTPD, Perl y phpMyAdmin, en /opt/lampp-X.Y.Z y con sus propias bases
   de datos. Cada rama de PHP lleva componentes compatibles entre si.
 - Instala XAMPP completos para proyectos antiguos (equipos x86_64).
 - Solo hay una versión activa (/opt/lampp). Se cambia sin tocar los
@@ -8029,6 +8093,27 @@ QUE HACE
 
 VERSIONES
 
+1.51.0 (23 oct 2026)
+- BBDD, copiar a otra versión: se pregunta el nombre que tendrá la copia
+  en la versión de destino. Se propone el de origen con el número de esa
+  versión (wp_tienda_8_4 → wp_tienda_8_5) y se puede cambiar; si ya hay
+  una con ese nombre, se avisa de que se sustituye. Se elige también la
+  carpeta del proyecto con la que va la copia (la de origen, otra o
+  ninguna). En la terminal: copiar-bd <base> <origen> <destino> --como
+  <nombre> --carpeta <carpeta|->.
+- Cargar proyecto: cada versión de PHP puede ir con su propia carpeta.
+  Las BBDD quedan vinculadas a la carpeta del proyecto en cada versión,
+  no en todas a la vez, así que la copia de una BBDD en la 8.5 puede ir
+  con una carpeta distinta de la de la 8.4. Con el botón de vincular de
+  cada proyecto se elige su BBDD en cada versión, o «Ninguna» para
+  desvincularla; los botones del proyecto cargado (phpMyAdmin, panel)
+  usan la de la versión activa. En la terminal: lvm-instalador
+  vincular-bd <base> <versión> <carpeta|->.
+- Versiones instaladas: junto a la versión de PHP sale la fecha en que
+  se publicó.
+- Instalar: cada versión nueva de PHP va en una carpeta con su versión
+  completa (/opt/lampp-8.4.27), también la última de cada rama, que
+  antes iba en /opt/lampp-8.4. Las que ya estaban no cambian de nombre.
 1.50.1 (22 oct 2026)
 - Pestaña Hosts: los dominios .local de los vhosts se pueden apagar. Su
   interruptor estaba bloqueado: el gestor los mantiene siempre en
@@ -9372,7 +9457,7 @@ function gui_data() {
 #   B|rama|ultimo parche|con soporte (1/0)|MariaDB|Perl|estado|carpeta|estado en php.net|fin del soporte
 #     activo|fin de los parches de seguridad (de php_branch_states; vacios si no se pudo consultar)
 #     estado: nueva (se instala en lampp-<carpeta>), instalada (en lampp-<carpeta>),
-#     actualizable (lampp-<rama> tiene un parche anterior) o existe (ya hay otra cosa en esa carpeta)
+#     existe (ya hay otra cosa en esa carpeta)
 #     ... |fecha del ultimo parche (AAAA-MM-DD)|seguridad (1 si php.net lo marca como parche de seguridad)
 #   X|carpeta|release|php|instalado (1/0)          (catalogo de XAMPP, solo en equipos x86_64)
 function gui_branches() {
@@ -9392,8 +9477,6 @@ function gui_branches() {
         have=$(php_installed_in "$latest")
         if [ -n "$have" ]; then
             state=instalada folder=${have#/opt/lampp-}
-        elif is_fpm_install "${TEST_DIR:-/opt}/lampp-$branch"; then
-            state=actualizable folder=$branch
         else
             folder=$(item_folder "$(php_item "$latest" "$latest")")
             state=nueva
@@ -9414,6 +9497,19 @@ function gui_branches() {
             echo "X|$folder|$release|$php|$([ -e "/opt/lampp-$folder" ] && echo 1 || echo 0)"
         done
     fi
+}
+
+# Fecha de publicacion en php.net del PHP de cada version instalada: F|carpeta|php|AAAA-MM-DD
+function gui_php_dates() {
+    local all=$(php_all_releases) dir php date
+    [ -n "$all" ] || return 1
+    for dir in $(lampp_dirs); do
+        php=$(stack_fields "$dir" | cut -d'|' -f1)
+        [[ "$php" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+        date=$(awk -v v="$php" '$1 == v { print $2; exit }' <<< "$all")
+        [[ "$date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && echo "F|${dir#/opt/lampp-}|$php|$date"
+    done
+    return 0
 }
 
 # Parches de una rama: P|version|fecha|carpeta|estado (nueva, instalada o existe)|seguridad (1/0)
@@ -9813,23 +9909,41 @@ function db_temp_stop() {
     DB_TMP="" DB_TMP_PID=""
 }
 
-# copiar-bd <base> <version de origen> <version de destino>: copia una base a otra version que no
-# la tiene, para probar el proyecto con otro PHP. Se descarga de la de origen (como exportar-bd) a un
+# copiar-bd <base> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->]
+# [--sustituir]: copia una base a otra version, para probar el proyecto con otro PHP. --como le da
+# otro nombre en la de destino (base_8_4 -> base_8_5) y --carpeta la vincula alli a esa carpeta de
+# proyecto (- = a ninguna; sin --carpeta, el vinculo no se toca). Se descarga de la de origen (como exportar-bd) a un
 # fichero solo tuyo y se carga en la de destino con la carga protegida de importar-bd (usuario de la
 # base, sin DEFINER, lo INVOKER y los eventos neutralizados). Si la de destino no es la activa en
 # marcha, se arranca su MariaDB solo para la copia (sin red y con su propio socket). La de origen no
 # se toca
 function copy_database() {
     local db=$1 src=$2 dst=$3 sdir ddir src_owner dst_owner tmp rc active active_owner
-    local replace=0 load=(--crear)
+    local replace=0 load=(--crear) new="" link="" usage=0
+    shift 3 2> /dev/null
     # --sustituir: si la de destino ya la tiene, antes se guarda una copia suya en ~/lvm-copias y se
     # carga la de origen encima (la de destino se vacia antes de cargar)
-    [ "$4" == "--sustituir" ] && replace=1
-    if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ]; then
-        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--sustituir]"
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --sustituir) replace=1; shift ;;
+            --como|--carpeta)
+                [ -n "$2" ] || { usage=1; break; }
+                [ "$1" == --como ] && new=$2 || link=$2
+                shift 2 ;;
+            *) usage=1; break ;;
+        esac
+    done
+    if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ] || [ $usage -eq 1 ]; then
+        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]"
         return 1
     fi
+    new=${new:-$db}
     db_valid_name "$db" || return 1
+    db_valid_name "$new" || return 1
+    link=${link%/}
+    if [ -n "$link" ] && [ "$link" != "-" ]; then
+        valid_project "$link" || return 1
+    fi
     valid_version_name "$src" && valid_version_name "$dst" || { echo "Version no valida"; return 1; }
     sdir="${TEST_DIR:-/opt}/lampp-$src" ddir="${TEST_DIR:-/opt}/lampp-$dst"
     [ -d "$sdir" ] && [ ! -L "$sdir" ] || { echo "No existe la version lampp-$src"; return 1; }
@@ -9840,14 +9954,16 @@ function copy_database() {
         echo "lampp-$src y lampp-$dst comparten las BBDD: $db ya esta en las dos"
         return 1
     fi
+    local shown=$db
+    [ "$new" != "$db" ] && shown="$db (como $new)"
     if ! db_names "/opt/lampp-$src_owner" | grep -qxF "$db"; then
         echo "No hay ninguna BBDD $db en lampp-$src"
         return 1
     fi
-    if db_names "/opt/lampp-$dst_owner" | grep -qxF "$db"; then
+    if db_names "/opt/lampp-$dst_owner" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
-            echo "lampp-$dst ya tiene una BBDD $db: no se toca (con --sustituir se guarda una copia suya en"
-            echo "~/lvm-copias y se pone la de lampp-$src en su lugar)"
+            echo "lampp-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
+            echo "~/lvm-copias y se pone la de lampp-$src en su lugar; o copiala con otro nombre: --como)"
             return 1
         fi
         load=(--crear --sin-copia)
@@ -9857,23 +9973,28 @@ function copy_database() {
     active=$(active_dir)
     active_owner=""
     [ -n "$active" ] && { active_owner=$(data_owner "$active"); active_owner=${active_owner:-${active#/opt/lampp-}}; }
-    echo "Copia de la BBDD $db: de lampp-$src a lampp-$dst (lampp-$src no se toca)"
+    echo "Copia de la BBDD $shown: de lampp-$src a lampp-$dst (lampp-$src no se toca)"
     if [ "$DRY" -eq 1 ]; then
-        [ $replace -eq 1 ] && echo "  [simulacion] copia de $db de lampp-$dst en ~/lvm-copias (la sustituida)"
+        [ $replace -eq 1 ] && echo "  [simulacion] copia de $new de lampp-$dst en ~/lvm-copias (la sustituida)"
         echo "  [simulacion] descarga de $db de lampp-$src a un fichero temporal en ~/.lvm-instalador"
         if [ "$dst_owner" == "$active_owner" ] && lampp_running; then
             echo "  [simulacion] carga en el MariaDB en marcha de lampp-$dst (importar-bd ${load[*]})"
         else
-            echo "  [simulacion] MariaDB temporal de lampp-$dst (sin red) y carga de $db"
+            echo "  [simulacion] MariaDB temporal de lampp-$dst (sin red) y carga de $new"
+        fi
+        if [ "$link" == "-" ]; then
+            echo "  [simulacion] $new sin vincular a ningun proyecto en lampp-$dst"
+        elif [ -n "$link" ]; then
+            echo "  [simulacion] $new vinculada a $link en lampp-$dst"
         fi
         return 0
     fi
     if [ $replace -eq 1 ]; then
-        local backup="$HOME/lvm-copias/lampp-$dst-$db-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
-        echo "lampp-$dst ya tiene $db: antes se guarda una copia suya en $backup"
+        local backup="$HOME/lvm-copias/lampp-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
+        echo "lampp-$dst ya tiene $new: antes se guarda una copia suya en $backup"
         mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-        if ! export_database "$db" "$backup" "$dst"; then
-            echo "No se ha podido guardar la copia de $db de lampp-$dst, asi que no se ha cambiado nada."
+        if ! export_database "$new" "$backup" "$dst"; then
+            echo "No se ha podido guardar la copia de $new de lampp-$dst, asi que no se ha cambiado nada."
             return 1
         fi
         db_temp_stop
@@ -9890,7 +10011,7 @@ function copy_database() {
     fi
     db_temp_stop
     if [ "$dst_owner" == "$active_owner" ] && lampp_running; then
-        import_database "$tmp" "$db" "${load[@]}"
+        import_database "$tmp" "$new" "${load[@]}"
         rc=$?
     else
         # MariaDB de la de destino solo para la copia, con sus usuarios (la carga va con el usuario de
@@ -9916,7 +10037,7 @@ function copy_database() {
             db_temp_stop
             return 1
         fi
-        DB_CLIENT=$DB_CLI DB_TARGET_FOLDER=$dst DB_TARGET_DATA="/opt/lampp-$dst_owner/var/mysql" import_database "$tmp" "$db" "${load[@]}"
+        DB_CLIENT=$DB_CLI DB_TARGET_FOLDER=$dst DB_TARGET_DATA="/opt/lampp-$dst_owner/var/mysql" import_database "$tmp" "$new" "${load[@]}"
         rc=$?
         db_client_wrapper_remove
         db_temp_stop
@@ -9924,7 +10045,14 @@ function copy_database() {
     rm -f "$tmp"
     DB_COPY_TMP=""
     if [ $rc -eq 0 ]; then
-        echo "$db esta ahora tambien en lampp-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null), cargalo"
+        if [ "$link" == "-" ]; then
+            remember_project "$new" "" "$dst"
+            echo "$new no queda vinculada a ningun proyecto en lampp-$dst (vinculala en Cargar proyecto)."
+        elif [ -n "$link" ]; then
+            remember_project "$new" "$link" "$dst"
+            echo "$new queda vinculada al proyecto $link en lampp-$dst."
+        fi
+        echo "$new esta ahora en lampp-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null), cargalo"
         echo "en Versiones y elige lampp-$dst."
     fi
     return $rc
@@ -10723,7 +10851,7 @@ function secure_mariadb() {
 # parameters.php (o settings.inc.php) pasa a usarla y se vacia su cache
 function import_project() {
     local db=$1 folder=$2
-    remember_project "$db" "$folder" --unica
+    remember_project "$db" "$folder" "${DB_TARGET_FOLDER:-}" --unica
     echo "La base $db queda asociada al proyecto $folder"
     if is_prestashop "$folder"; then
         PS_NEW_PARAMS=0
@@ -10876,24 +11004,58 @@ def name_match_project(db, folders):
     return hits[0] if len(hits) == 1 else None
 
 
-def guess_project(db):
-    """Carpeta del proyecto de una base: la recordada (~/.lvm-instalador/proyectos), la única
-    cuya configuración la usa o la que se llama como la base. None si no se sabe."""
+def guess_project(db, ver=None):
+    """Carpeta del proyecto de una base: la vinculada (~/.lvm-instalador/proyectos; la de la
+    versión, si se indica, manda sobre la de todas), la única cuya configuración la usa o la que se
+    llama como la base. None si no se sabe o si en esa versión está desvinculada."""
     folders = project_folders()
-    saved = None
+    saved = per = None
     try:
         with open(PROJECTS_FILE, encoding="utf-8") as f:
             for line in f.read().splitlines():
                 if line.startswith(db + "="):
                     saved = line.split("=", 1)[1]
+                elif ver and line.startswith("%s@%s=" % (db, ver)):
+                    per = line.split("=", 1)[1]
     except OSError:
         pass
+    if per is not None:
+        return per if per in folders else None
     if saved in folders:
         return saved
     users = [f for f in folders if project_db(f) == db]
     if len(users) == 1:
         return users[0]
     return name_match_project(db, folders)
+
+
+def copy_name(db, php):
+    """Nombre propuesto para la copia de una BBDD en otra versión: sin el sufijo de versión que
+    traiga y con el de la de destino (wp_tienda_8_4 → wp_tienda_8_5)."""
+    base = re.sub(r"[_-]\d+_\d+(_\d+)?$", "", db) or db
+    name = "%s_%s" % (base, "_".join(php.split(".")[:2]))
+    return name if len(name) <= 64 else db
+
+
+def write_links(changes):
+    """Guarda vínculos (base, versión, carpeta; carpeta vacía = ninguna) en
+    ~/.lvm-instalador/proyectos, como base@versión=carpeta. Devuelve el error o None."""
+    keys = {"%s@%s" % (db, ver) for db, ver, _ in changes}
+    lines = []
+    try:
+        with open(PROJECTS_FILE, encoding="utf-8") as f:
+            lines = [l for l in f.read().splitlines() if l and l.split("=", 1)[0] not in keys]
+    except OSError:
+        pass
+    lines += ["%s@%s=%s" % c for c in changes]
+    try:
+        os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+        with open(PROJECTS_FILE + ".nuevo", "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        os.replace(PROJECTS_FILE + ".nuevo", PROJECTS_FILE)
+    except OSError as exc:
+        return str(exc)
+    return None
 
 
 def project_db(folder):
@@ -12500,6 +12662,7 @@ class App(Gtk.Application):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.data = None
         self.branches = None
+        self.php_dates = {}
         self.branches_error = None
         self.expanded = set()
         self.extra_patches = []
@@ -12853,9 +13016,14 @@ class App(Gtk.Application):
         return next((x for x in self.projects["list"] if x["name"] == name), None)
 
     def loaded_project_db(self):
-        """BBDD del proyecto cargado (la recordada o la de su configuración), o vacío."""
+        """BBDD del proyecto cargado en la versión activa (la vinculada o la de su configuración),
+        o vacío."""
         x = self.loaded_project_entry()
-        db = self.project_base(x) if x else ""
+        db = ""
+        if x and self.data:
+            pairs = self.project_pairs(x)
+            db = next((d for i, d in pairs if i["folder"] == self.data.get("active")), None) or \
+                (pairs[0][1] if pairs else self.project_base(x))
         return db if re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db or "") else ""
 
     def loaded_project_admin(self):
@@ -12976,6 +13144,16 @@ class App(Gtk.Application):
             self.branches_error = None
             self.loading(self.inst_box, "Consultando las versiones de PHP en php.net…")
             run_quick(["gui-ramas"], self.on_branches)
+        run_quick(["gui-fechas"], self.on_php_dates)
+
+    def on_php_dates(self, rc, out):
+        """Fecha de publicación del PHP de cada versión instalada (de php.net: llega después)."""
+        dates = {f[1]: (f[2], f[3]) for f in parse_lines(out) if f[0] == "F" and len(f) >= 4}
+        if dates and dates != self.php_dates:
+            self.php_dates = dates
+            if self.data:
+                self.build_versions()
+        return False
 
     def on_refresh(self, *_):
         self.reload(branches=True)
@@ -13679,7 +13857,7 @@ class App(Gtk.Application):
 
     # ------------------------------------------------- cargar un proyecto (Versiones)
     def on_projects_data(self, rc, out):
-        p = {"link": "", "current": "", "create": False, "list": [], "saved": {}}
+        p = {"link": "", "current": "", "create": False, "list": [], "saved": {}, "vlinks": {}}
         for f in parse_lines(out):
             if f[0] == "E" and len(f) >= 3:
                 p["link"], p["current"] = f[1], f[2]
@@ -13689,6 +13867,8 @@ class App(Gtk.Application):
                                   "kind": f[4] if len(f) > 4 else ""})
             elif f[0] == "R" and len(f) >= 3:
                 p["saved"][f[1]] = "|".join(f[2:])
+            elif f[0] == "V" and len(f) >= 4:
+                p["vlinks"][(f[1], f[2])] = f[3]
         if rc != 0 and not p["list"]:
             p = None
         if p != self.projects:
@@ -14011,9 +14191,32 @@ class App(Gtk.Application):
         self.run_task("Desmontando el proyecto %s" % name, ["desmontar-proyecto"],
                       done_text="%s ya no apunta a %s" % (p["link"], name), auto_close=True)
 
+    def link_of(self, db, ver):
+        """Carpeta vinculada a una BBDD en una versión: la de esa versión ("" = ninguna), la de
+        todas las versiones (como se guardaba hasta la 1.50) o None si no tiene."""
+        p = self.projects or {}
+        if (db, ver) in p.get("vlinks", {}):
+            return p["vlinks"][(db, ver)]
+        return p.get("saved", {}).get(db)
+
+    def project_pairs(self, x):
+        """(versión, BBDD) de un proyecto: las BBDD vinculadas a su carpeta en cada versión o, si no
+        tiene ninguna, la de su configuración en las versiones donde no es de otro proyecto."""
+        if not self.data:
+            return []
+        pairs = [(i, db) for i in self.installs() for db in self.data["dbs"].get(i["folder"], [])
+                 if self.link_of(db, i["folder"]) == x["name"]]
+        if pairs or not x["db"]:
+            return pairs
+        return [(i, x["db"]) for i in self.installs() if x["db"] in self.data["dbs"].get(i["folder"], [])
+                and self.link_of(x["db"], i["folder"]) is None]
+
     def project_base(self, x):
-        """Base de un proyecto: la recordada para su carpeta (si está en alguna versión) o la de su
-        configuración."""
+        """Base de un proyecto que no está en ninguna versión (para los textos): la recordada para su
+        carpeta o la de su configuración."""
+        pairs = self.project_pairs(x)
+        if pairs:
+            return pairs[0][1]
         dbs = {db for i in self.installs() for db in self.data["dbs"].get(i["folder"], [])}
         saved = [db for db, f in (self.projects or {}).get("saved", {}).items() if f == x["name"]]
         for db in reversed(saved):
@@ -14048,12 +14251,15 @@ class App(Gtk.Application):
         warn = ""
         if now and self.data and self.data.get("active"):
             db = self.loaded_project_db()
-            if db and db not in self.data["dbs"].get(self.data["active"], []):
-                where = [i["folder"] for i in self.installs() if db in self.data["dbs"].get(i["folder"], [])]
+            x = self.loaded_project_entry()
+            pairs = self.project_pairs(x) if x else []
+            if db and not any(i["folder"] == self.data["active"] for i, _ in pairs) \
+                    and db not in self.data["dbs"].get(self.data["active"], []):
+                where = ["lampp-%s (%s)" % (i["folder"], d) for i, d in pairs]
                 warn = ("El proyecto vinculado a %s no está disponible para esa versión: lampp-%s no "
                         "tiene su BBDD %s%s." % (p["link"], self.data["active"], db,
                                                  (" (está en %s; vuelve a cargarlo para cambiar de versión)"
-                                                  % ", ".join("lampp-%s" % x for x in where)) if where else ""))
+                                                  % ", ".join(where)) if where else ""))
         self.proj_warn.set_label(warn)
         self.proj_warn.set_visible(bool(warn))
         if now:
@@ -14106,13 +14312,18 @@ class App(Gtk.Application):
         esc = GLib.markup_escape_text
         row.title.set_markup("%s<b>%s</b>%s" % (esc(name[:start]), esc(name[start:start + len(q)]),
                                                 esc(name[start + len(q):])))
+        pairs = self.project_pairs(x)
         db = self.project_base(x)
-        where = [i["folder"] for i in self.installs() if db and db in self.data["dbs"].get(i["folder"], [])]
         parts = [{"wp": "WordPress", "ps": "PrestaShop"}.get(x["kind"], "")]
-        if db:
+        if pairs:
+            # (BBDD wp_tienda en lampp-8.4, wp_tienda_8_5 en lampp-8.5.12)
+            by = {}
+            for i, d in pairs:
+                by.setdefault(d, []).append("lampp-%s" % i["folder"])
+            parts.append(", ".join("BBDD %s en %s" % (d, ", ".join(v)) for d, v in by.items()))
+        elif db:
             parts.append("BBDD %s" % db)
-            parts.append(("en " + ", ".join("lampp-%s" % w for w in where)) if where
-                         else "no está en ninguna versión")
+            parts.append("no está en ninguna versión")
         else:
             parts.append("sin BBDD detectada")
         if x["php"]:
@@ -14122,10 +14333,83 @@ class App(Gtk.Application):
         current = self.projects and os.path.basename(self.projects["current"].rstrip("/")) == name
         if current:
             row.add_title_tag(label("Cargado", "texto-activa", "subtitulo"))
+        lk = Gtk.Button(tooltip_text="Vincular %s con su BBDD en cada versión de PHP (o desvincularla)"
+                        % name, relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy and bool(self.data))
+        lk.add(icon("insert-link-symbolic"))
+        lk.connect("clicked", lambda *_: self.on_link_project(x))
+        row.add_suffix(lk)
         b = Gtk.Button(label="Cargar", sensitive=not self.busy)
         b.connect("clicked", lambda *_: self.on_load_folder(x))
         row.add_suffix(b)
         return row
+
+    def on_link_project(self, x):
+        """Elige con qué BBDD va la carpeta en cada versión (o con ninguna): Cargar proyecto monta
+        la versión con esa BBDD. Cada BBDD es de un solo proyecto en cada versión."""
+        installs = sorted(self.installs(), key=lambda i: ver_tuple(i["php"]), reverse=True)
+        if not installs:
+            return
+        pairs = self.project_pairs(x)
+        name = x["name"]
+        dlg = Gtk.Dialog(title="Vincular BBDD", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(600, -1)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=24)
+        dlg.get_content_area().add(box)
+        box.pack_start(css(label("BBDD de %s en cada versión" % name, wrap=True, max_width_chars=60),
+                           "title-3"), False, False, 0)
+        box.pack_start(label("Cargar proyecto monta la versión con la BBDD que elijas aquí. Con "
+                             "«Ninguna», la carpeta deja de ir con esa versión (la BBDD no se toca). "
+                             "Cada BBDD es de un solo proyecto en cada versión: si era de otro, "
+                             "deja de serlo.", "dim-label", wrap=True, max_width_chars=60),
+                         False, False, 0)
+        grid = Gtk.Grid(column_spacing=12, row_spacing=8, margin_top=6)
+        combos = []
+        for n, i in enumerate(installs):
+            dbs = sorted(self.data["dbs"].get(i["folder"], []), key=str.lower)
+            mine = [d for j, d in pairs if j["folder"] == i["folder"]]
+            grid.attach(label("PHP %s  (lampp-%s)" % (i["php"], i["folder"])), 0, n, 1, 1)
+            c = Gtk.ComboBoxText(hexpand=True)
+            c.append("@ninguna", "— Ninguna —")
+            for d in dbs:
+                other = self.link_of(d, i["folder"])
+                c.append(d, d if other in (None, "", name) else "%s  (de %s)" % (d, other))
+            c.set_active_id(mine[0] if mine else "@ninguna")
+            narrow(c, 34)
+            if not dbs:
+                c.set_sensitive(False)
+            grid.attach(c, 1, n, 1, 1)
+            combos.append((i, c, mine))
+        box.pack_start(grid, False, False, 0)
+        box.show_all()
+        resp = run_dialog(dlg)
+        chosen = [(i, "" if c.get_active_id() in (None, "@ninguna") else c.get_active_id(), mine)
+                  for i, c, mine in combos]
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT:
+            return
+        changes = []
+        for i, new, mine in chosen:
+            ver = i["folder"]
+            for d in mine:
+                if d != new:
+                    changes.append((d, ver, ""))
+            # (también la que solo venía de su configuración: así queda fija)
+            if new and self.link_of(new, ver) != name:
+                changes.append((new, ver, name))
+        if not changes:
+            return
+        if SIMULATE:
+            self.toast("[simulación] no se cambian los vínculos")
+            return
+        err = write_links(changes)
+        if err:
+            message(self.win, "No se han podido guardar los vínculos", err, Gtk.MessageType.ERROR)
+            return
+        self.toast("Vínculos de %s guardados" % name)
+        run_quick(["gui-proyectos"], self.on_projects_data)
 
     def on_load_folder(self, x):
         p = self.projects
@@ -14135,10 +14419,10 @@ class App(Gtk.Application):
                     "enlace de /opt/htdocs (como web.local).", Gtk.MessageType.WARNING)
             return
         db = self.project_base(x)
-        cands = [i for i in self.installs() if db and db in self.data["dbs"].get(i["folder"], [])]
+        cands = self.project_pairs(x)
         found = bool(cands)
         if not cands:
-            cands = list(self.installs())
+            cands = [(i, db) for i in self.installs()]
         if not cands:
             message(self.win, "No hay ninguna versión instalada",
                     "Instala una versión de PHP en esta pestaña para cargar proyectos.",
@@ -14146,18 +14430,20 @@ class App(Gtk.Application):
             return
         asked = len(cands) > 1
         if asked:
-            inst = self.pick_version(x, db, cands, found)
-            if not inst:
+            chosen = self.pick_version(x, db, cands, found)
+            if not chosen:
                 return
         else:
-            inst = cands[0]
+            chosen = cands[0]
+        inst, db = chosen
         self.do_load_project(x["name"], db, inst, p["link"], p["create"], confirm_switch=not asked)
 
     def pick_version(self, x, db, cands, found):
-        """Versión de PHP en la que se carga un proyecto, cuando puede ir en varias."""
+        """Versión de PHP (y su BBDD) en la que se carga un proyecto, cuando puede ir en varias.
+        cands: (versión, BBDD). Devuelve la elegida o None."""
         active = self.data["active"]
-        pre = next((i for i in cands if i["folder"] == active), None) or \
-            next((i for i in cands if x["php"] and i["php"].startswith(x["php"])), None) or cands[0]
+        pre = next((c for c in cands if c[0]["folder"] == active), None) or \
+            next((c for c in cands if x["php"] and c[0]["php"].startswith(x["php"])), None) or cands[0]
         dlg = Gtk.Dialog(title="Cargar proyecto", transient_for=self.win, modal=True,
                          use_header_bar=True)
         dlg.set_default_size(520, -1)
@@ -14170,8 +14456,9 @@ class App(Gtk.Application):
                "¿Con qué versión de PHP quieres cargar el proyecto?")
         box.pack_start(css(label(ask, wrap=True, max_width_chars=60), "title-3"), False, False, 0)
         if found:
-            why = ("%s tiene su BBDD (%s) en %d versiones de PHP y cada una guarda su "
-                   "propia copia. Elige cuál cargar:" % (x["name"], db, len(cands)))
+            why = ("%s está vinculado a una BBDD en %d versiones de PHP y cada una guarda su "
+                   "propia copia. Elige cuál cargar (cámbialas con el botón de vincular):"
+                   % (x["name"], len(cands)))
         elif db:
             why = ("La BBDD de %s (%s) no está en ninguna versión: súbela después en la "
                    "pestaña BBDD. Elige con qué versión de PHP cargarlo:" % (x["name"], db))
@@ -14180,8 +14467,11 @@ class App(Gtk.Application):
                    % x["name"])
         box.pack_start(label(why, "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
-        for i in cands:
+        for c in cands:
+            i, cdb = c
             notes = []
+            if found:
+                notes.append("BBDD %s" % cdb)
             if i["folder"] == active:
                 notes.append("la activa")
             if x["php"] and i["php"].startswith(x["php"]):
@@ -14191,7 +14481,7 @@ class App(Gtk.Application):
             rb = Gtk.RadioButton.new_from_widget(first)
             lines = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             lines.pack_start(label(text), False, False, 0)
-            when = db_date_text(*self.data["dbdate"].get((i["folder"], db), (0, ""))) if found else ""
+            when = db_date_text(*self.data["dbdate"].get((i["folder"], cdb), (0, ""))) if found else ""
             if when:
                 lines.pack_start(label("BBDD: " + when, "dim-label", "subtitulo"),
                                  False, False, 0)
@@ -14203,10 +14493,10 @@ class App(Gtk.Application):
             rb.connect("toggled", lambda b, o=opt: (o.get_style_context().add_class("elegida")
                                                      if b.get_active() else
                                                      o.get_style_context().remove_class("elegida")))
-            rb.set_active(i is pre)
-            if i is pre:
+            rb.set_active(c is pre)
+            if c is pre:
                 css(opt, "elegida")
-            radios.append((rb, i))
+            radios.append((rb, c))
             box.pack_start(opt, False, False, 0)
         box.show_all()
         resp = run_dialog(dlg)
@@ -14436,6 +14726,12 @@ class App(Gtk.Application):
         is_active = folder == self.data["active"]
         exp = ExpanderRow("PHP %s" % inst["php"], "/opt/lampp-%s" % folder,
                           on_toggle=lambda on, f=folder: self.remember(f, on))
+        # Fecha de publicación de su PHP, junto a la versión (como en Instalar)
+        php_date = self.php_dates.get(folder)
+        if php_date and php_date[0] == inst["php"]:
+            tag = label(fmt_day(php_date[1]), "dim-label", "fecha-version")
+            tag.set_tooltip_text("Publicada en php.net el %s" % fmt_day(php_date[1]))
+            exp.add_title_tag(tag)
         kind = inst["kind"]
         # Icono: el de XAMPP si es (o va sobre) un XAMPP; el de PHP si es una pila propia
         if kind != "propia":
@@ -15074,8 +15370,9 @@ class App(Gtk.Application):
         box.pack_start(label("Se copia %s desde lampp-%s, que no se toca. Después, carga el "
                              "proyecto en esa versión para probarlo con su PHP. Si no es la activa, se "
                              "arranca su MariaDB solo para la copia y se pide la contraseña de "
-                             "administrador. Si la versión ya tiene %s, se sustituye: antes se guarda "
-                             "una copia suya en ~/lvm-copias." % (db, inst["folder"], db),
+                             "administrador. Si la versión ya tiene una BBDD con el nombre de la copia, "
+                             "se sustituye: antes se guarda una copia suya en ~/lvm-copias."
+                             % (db, inst["folder"]),
                              "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
         # (primero las que no la tienen; dentro, de la más nueva a la más antigua)
@@ -15085,7 +15382,7 @@ class App(Gtk.Application):
             rb = Gtk.RadioButton.new_from_widget(first)
             rb.add(label("PHP %s  (lampp-%s)%s%s" % (
                 i["php"], i["folder"], "  ·  la activa" if i["folder"] == self.data["active"] else "",
-                "  ·  ya la tiene: se sustituye" if self.has_db(i["folder"], db) else "")))
+                "  ·  ya tiene %s" % db if self.has_db(i["folder"], db) else "")))
             first = first or rb
             opt = css(Gtk.Box(), "opcion")
             opt.pack_start(rb, True, True, 0)
@@ -15096,24 +15393,93 @@ class App(Gtk.Application):
                 css(opt, "elegida")
             radios.append((rb, i))
             box.pack_start(opt, False, False, 0)
+
+        # Nombre de la copia: el de origen con el sufijo de la versión de destino (se puede cambiar)
+        box.pack_start(label("Nombre de la BBDD en la versión de destino", "grupo-titulo",
+                             margin_top=8), False, False, 0)
+        entry = Gtk.Entry(max_length=64, activates_default=True)
+        box.pack_start(entry, False, False, 0)
+        hint = label("", "dim-label", "subtitulo", wrap=True, max_width_chars=60)
+        box.pack_start(hint, False, False, 0)
+        # Carpeta del proyecto con la que va la copia (la de la BBDD de origen, otra o ninguna)
+        box.pack_start(label("Proyecto vinculado en la versión de destino", "grupo-titulo",
+                             margin_top=8), False, False, 0)
+        src_folder = self.link_of(db, inst["folder"])
+        if src_folder is None:
+            users = [x["name"] for x in (self.projects or {}).get("list", []) if x["db"] == db]
+            src_folder = users[0] if len(users) == 1 else ""
+        folders = project_folders()
+        fcombo = Gtk.ComboBoxText()
+        fcombo.append("@ninguna", "— Ninguno: vincúlalo después en Cargar proyecto —")
+        for f in folders:
+            fcombo.append(f, f + ("  (el de lampp-%s)" % inst["folder"] if f == src_folder else ""))
+        fcombo.set_active_id(src_folder if src_folder in folders else "@ninguna")
+        narrow(fcombo, 48)
+        box.pack_start(fcombo, False, False, 0)
+        box.pack_start(label("Cargar proyecto cargará esa carpeta con esta copia. Si el proyecto de "
+                             "la nueva versión tiene su propia carpeta, elígela aquí.",
+                             "dim-label", "subtitulo", wrap=True, max_width_chars=60), False, False, 0)
+        ok = dlg.get_widget_for_response(Gtk.ResponseType.ACCEPT)
+        state = {"auto": True, "set": False}
+
+        def target():
+            return next((i for rb, i in radios if rb.get_active()), None)
+
+        def update(*_):
+            t = target()
+            name = entry.get_text().strip()
+            valid = bool(re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name)) and \
+                name.lower() not in ("information_schema", "mysql", "performance_schema",
+                                     "phpmyadmin", "sys", "test")
+            if not valid:
+                hint.set_label("Letras sin acentos, números, _ y - (sin - delante).")
+            elif t and self.has_db(t["folder"], name):
+                hint.set_markup('<span foreground="#e01b24">lampp-%s ya tiene una BBDD %s: se sustituye '
+                                '(antes se guarda una copia suya en ~/lvm-copias).</span>'
+                                % (t["folder"], GLib.markup_escape_text(name)))
+            else:
+                hint.set_label("Se crea %s en lampp-%s." % (name, t["folder"]) if t else "")
+            ok.set_sensitive(valid and t is not None)
+
+        def retarget(*_):
+            # (mientras no se escriba otro, el nombre sigue a la versión elegida)
+            t = target()
+            if t and state["auto"]:
+                state["set"] = True
+                entry.set_text(copy_name(db, t["php"]))
+                state["set"] = False
+            update()
+
+        def edited(*_):
+            if not state["set"]:
+                state["auto"] = False
+            update()
+        for rb, _ in radios:
+            rb.connect("toggled", retarget)
+        entry.connect("changed", edited)
+        retarget()
         box.show_all()
         resp = run_dialog(dlg)
-        chosen = next((i for rb, i in radios if rb.get_active()), None)
+        chosen = target()
+        name = entry.get_text().strip()
+        folder = fcombo.get_active_id()
         dlg.destroy()
-        if resp != Gtk.ResponseType.ACCEPT or chosen is None:
+        if resp != Gtk.ResponseType.ACCEPT or chosen is None or not name:
             return
-        args = ["copiar-bd", db, inst["folder"], chosen["folder"]]
-        if self.has_db(chosen["folder"], db):
-            if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (db, chosen["folder"]),
+        args = ["copiar-bd", db, inst["folder"], chosen["folder"], "--como", name,
+                "--carpeta", "-" if folder in (None, "@ninguna") else folder]
+        if self.has_db(chosen["folder"], name):
+            if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (name, chosen["folder"]),
                            "lampp-%s ya tiene una BBDD %s. Se guarda antes una copia suya en "
-                           "~/lvm-copias y después se pone en su lugar la de lampp-%s: lo que "
+                           "~/lvm-copias y después se pone en su lugar la %s de lampp-%s: lo que "
                            "tuviera la de lampp-%s se pierde (salvo en esa copia)."
-                           % (chosen["folder"], db, inst["folder"], chosen["folder"]),
+                           % (chosen["folder"], name, db, inst["folder"], chosen["folder"]),
                            "Sustituir", destructive=True):
                 return
             args.append("--sustituir")
         self.run_task("Copiando %s a lampp-%s" % (db, chosen["folder"]), args,
-                      done_text="%s copiada a lampp-%s" % (db, chosen["folder"]), auto_close=True)
+                      done_text="%s copiada a lampp-%s como %s" % (db, chosen["folder"], name),
+                      auto_close=True)
 
     def download_button(self, db, folder):
         b = Gtk.Button(tooltip_text="Descargar una copia de %s (.zip)" % db,
@@ -15233,6 +15599,7 @@ class App(Gtk.Application):
     def on_load_project(self, db, inst):
         def got(rc, out):
             link, current, projects, saved, create = "", "", [], {}, False
+            vlinks = {}
             for f in parse_lines(out):
                 if f[0] == "E" and len(f) >= 3:
                     link, current = f[1], f[2]
@@ -15241,6 +15608,11 @@ class App(Gtk.Application):
                     projects.append({"name": f[1], "db": f[2], "php": f[3]})
                 elif f[0] == "R" and len(f) >= 3:
                     saved[f[1]] = f[2]
+                elif f[0] == "V" and len(f) >= 4:
+                    vlinks[(f[1], f[2])] = f[3]
+            # (el vínculo de la versión manda sobre el de todas; "" = desvinculada en ella)
+            if (db, inst["folder"]) in vlinks:
+                saved[db] = vlinks[(db, inst["folder"])]
             if rc != 0 or not projects:
                 message(self.win, "No se han podido leer los proyectos",
                         "No se ha podido leer la carpeta /opt/htdocs.", Gtk.MessageType.WARNING)
@@ -15262,7 +15634,7 @@ class App(Gtk.Application):
         folder, manual = None, False
         if saved.get(db) in by_name:
             folder = saved[db]
-        elif len(matches) == 1:
+        elif len(matches) == 1 and saved.get(db) != "":
             folder = matches[0]
         else:
             folder = self.pick_project_folder(db, projects, matches)
@@ -15296,7 +15668,7 @@ class App(Gtk.Application):
                            "la contraseña de sudo." % (link, folder), "Cargar proyecto"):
                 return
         if remember:
-            self.remember_project(db, folder)
+            self.remember_project(db, folder, target)
         def loaded(ok_, *_):
             if not ok_:
                 return
@@ -15366,21 +15738,14 @@ class App(Gtk.Application):
         dlg.destroy()
         return row.name if resp == Gtk.ResponseType.ACCEPT and row is not None else None
 
-    def remember_project(self, db, folder):
-        """Guarda en ~/.lvm-instalador/proyectos la carpeta elegida a mano para una base."""
-        lines = []
-        try:
-            with open(PROJECTS_FILE, encoding="utf-8") as f:
-                lines = [l for l in f.read().splitlines() if l and not l.startswith(db + "=")]
-        except OSError:
-            pass
-        lines.append("%s=%s" % (db, folder))
-        try:
-            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
-            with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-        except OSError as exc:
-            self.toast("No se ha podido recordar la carpeta: %s" % exc)
+    def remember_project(self, db, folder, ver):
+        """Guarda en ~/.lvm-instalador/proyectos la carpeta elegida a mano para una base en una
+        versión."""
+        if SIMULATE:
+            return
+        err = write_links([(db, ver, folder)])
+        if err:
+            self.toast("No se ha podido recordar la carpeta: %s" % err)
 
     # ------------------------------------------------- descargar una base de datos
     def on_download_db(self, db, folder):
@@ -15490,7 +15855,7 @@ class App(Gtk.Application):
             self.imp["project"] = None
         # La primera vez con esta base se propone su proyecto; luego se respeta lo elegido
         if self.imp["db"] and self.imp.get("project_for") != self.imp["db"]:
-            self.imp["project"] = guess_project(self.imp["db"]) or self.imp["project"]
+            self.imp["project"] = guess_project(self.imp["db"], self.data["active"] if self.data else None) or self.imp["project"]
             self.imp["project_for"] = self.imp["db"]
         self.imp_proj_row = ActionRow("Proyecto", self.import_project_hint())
         # Ancho del nombre más largo (hasta 56 letras), para verlo entero al elegirlo
@@ -15552,7 +15917,7 @@ class App(Gtk.Application):
             stem = re.sub(r"(?i)(\.sql)?(\.gz|\.zip)?$", "", os.path.basename(path))
             if not self.imp["db"] and stem in self.data["dbs"].get(self.data["active"], []):
                 self.imp["db"] = stem
-                self.imp["project"] = guess_project(stem) or self.imp.get("project")
+                self.imp["project"] = guess_project(stem, self.data["active"] if self.data else None) or self.imp.get("project")
                 self.imp["project_for"] = stem
             elif stem not in self.data["dbs"].get(self.data["active"], []):
                 others = self.db_installs(stem)
@@ -15582,7 +15947,7 @@ class App(Gtk.Application):
         if db == "@ninguna":
             return
         self.imp["db"] = db
-        guess = guess_project(db)
+        guess = guess_project(db, self.data["active"] if self.data else None)
         if guess:
             self.imp_proj_combo.set_active_id(guess)
         self.imp["project_for"] = db
@@ -15976,10 +16341,6 @@ function cli_install() {
             else
                 full=$(awk -v b="$branch" '$1 == b {print $2}' <<< "$releases")
                 [ -z "$full" ] && echo "PHP $branch no esta disponible en php.net, se omite" && continue
-                if is_fpm_install "${TEST_DIR:-/opt}/lampp-$branch"; then
-                    echo "lampp-$branch ya existe, se omite (para ponerla al dia: lvm-instalador actualizar $branch)"
-                    continue
-                fi
                 item=$(php_item "$full" "$full")
             fi
             [ -e "${TEST_DIR:-/opt}/lampp-$(item_folder "$item")" ] && echo "lampp-$(item_folder "$item") ya existe, se omite" && continue
@@ -16229,6 +16590,7 @@ case "$1" in
     gui-datos) gui_data ;;
     gui-paquete) gui_package ;;
     gui-ramas) gui_branches ;;
+    gui-fechas) gui_php_dates ;;
     gui-parches) gui_patches "$2" ;;
     gui-al-dia) gui_up_to_date "$2" ;;
     gui-crear-acceso) write_launcher ;;
@@ -16237,9 +16599,10 @@ case "$1" in
     crear-bd) create_database "$2" ;;
     borrar-bd) drop_database "$2" "$3" ;;
     exportar-bd|descargar-bd) export_database "$2" "$3" "$4" ;;
-    copiar-bd) copy_database "$2" "$3" "$4" "$5" ;;
+    copiar-bd) shift; copy_database "$@" ;;
     gui-bd-info) gui_db_info "$2" ;;
     gui-proyectos) gui_projects ;;
+    vincular-bd) link_database "$2" "$3" "$4" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
     usuario-pruebas) test_admin "$2" "$3" ;;

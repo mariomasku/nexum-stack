@@ -19,6 +19,8 @@ for i in $(seq 50); do "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 && bre
 "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 || { echo "  FALLA el MariaDB temporal no arranca"; exit 1; }
 trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
 extract "$SRC" test_admin wp_table_prefixes ps_table_prefix || exit 1
+# (la carpeta de la base: linked_folder desde la 1.51; antes, una linea de awk dentro de test_admin)
+grep -q "^function linked_folder" "$SRC" && { extract "$SRC" linked_folder || exit 1; active_name() { :; }; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
@@ -76,9 +78,10 @@ check "PrestaShop 1.7: otra vez, sin duplicar" '[ "$(m ps17 -e "SELECT COUNT(*) 
 
 # --- PrestaShop 1.6: md5(_COOKIE_KEY_ + contraseña), con la clave de la carpeta recordada
 ps_schema ps16 32 'abcdefabcdefabcdefabcdefabcdefab'
-mkdir -p "$HTDOCS_DIR/tienda16/config"
-printf "<?php\ndefine('_COOKIE_KEY_', 'K3yDePrueba1234');\n" > "$HTDOCS_DIR/tienda16/config/settings.inc.php"
-echo "ps16=tienda16 8.2.4" > "$PROJECTS_FILE"
+# (carpeta con un espacio en el nombre: se toma entera)
+mkdir -p "$HTDOCS_DIR/tienda16 8.2/config"
+printf "<?php\ndefine('_COOKIE_KEY_', 'K3yDePrueba1234');\n" > "$HTDOCS_DIR/tienda16 8.2/config/settings.inc.php"
+echo "ps16=tienda16 8.2" > "$PROJECTS_FILE"
 test_admin ps16 > /dev/null
 check "PrestaShop 1.6: md5 de _COOKIE_KEY_ y «local»" '[ "$(m ps16 -e "SELECT passwd FROM ps_employee WHERE email = '"'"'local@local.test'"'"'")" = "$(printf K3yDePrueba1234local | md5sum | cut -d" " -f1)" ]'
 ps_schema ps16b 32 'abcdefabcdefabcdefabcdefabcdefab'
