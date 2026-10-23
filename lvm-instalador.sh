@@ -308,7 +308,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.51.0"
+APP_VERSION="1.52.0"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -8093,14 +8093,14 @@ QUE HACE
 
 VERSIONES
 
-1.51.0 (23 oct 2026)
-- BBDD, copiar a otra versión: se pregunta el nombre que tendrá la copia
-  en la versión de destino. Se propone el de origen con el número de esa
-  versión (wp_tienda_8_4 → wp_tienda_8_5) y se puede cambiar; si ya hay
-  una con ese nombre, se avisa de que se sustituye. Se elige también la
-  carpeta del proyecto con la que va la copia (la de origen, otra o
-  ninguna). En la terminal: copiar-bd <base> <origen> <destino> --como
-  <nombre> --carpeta <carpeta|->.
+1.52.0 (23 oct 2026)
+- Cargar proyecto: botón Replicar, junto a «Montar nuevo proyecto», para
+  llevar un proyecto a otra versión de PHP. Se elige el proyecto, de qué
+  versión se copia su BBDD, a cuál, el nombre que tendrá allí (se
+  propone el de esa versión: wp_tienda_8_4 → wp_tienda_8_5; si ya hay
+  una con ese nombre, se avisa de que se sustituye) y la carpeta con la
+  que se cargará en ella. En la terminal: copiar-bd <base> <origen>
+  <destino> --como <nombre> --carpeta <carpeta|->.
 - Cargar proyecto: cada versión de PHP puede ir con su propia carpeta.
   Las BBDD quedan vinculadas a la carpeta del proyecto en cada versión,
   no en todas a la vez, así que la copia de una BBDD en la 8.5 puede ir
@@ -8109,8 +8109,19 @@ VERSIONES
   desvincularla; los botones del proyecto cargado (phpMyAdmin, panel)
   usan la de la versión activa. En la terminal: lvm-instalador
   vincular-bd <base> <versión> <carpeta|->.
-- Versiones instaladas: junto a la versión de PHP sale la fecha en que
+- BBDD, copiar: el botón de cada BBDD la copia, con el mismo nombre, de
+  esa versión a la que elijas, y siempre avisa antes de hacerlo (y de si
+  la sustituye). Para copiarla con otro nombre o con otra carpeta está
+  Replicar.
+- BBDD por versión: en la versión activa, la BBDD que usa el proyecto
+  cargado lleva un punto verde.
+- Versiones: junto a cada versión de PHP instalada sale la fecha en que
   se publicó.
+- Versiones: «Instaladas» e «Instalar nuevas versiones de PHP» se pliegan
+  y se despliegan al pulsar su título (plegadas, dicen cuántas hay), y
+  siguen así al volver a abrir la ventana.
+- Versión activa: los botones de arrancar, reiniciar y parar son más
+  grandes.
 - Instalar: cada versión nueva de PHP va en una carpeta con su versión
   completa (/opt/lampp-8.4.27), también la última de cada rama, que
   antes iba en /opt/lampp-8.4. Las que ya estaban no cambian de nombre.
@@ -10910,6 +10921,8 @@ APP_ID = "dev.hexer.LamppVersionManager"
 ICON = "lampp-version-manager"
 LOG_DIR = os.path.expanduser("~/.lvm-instalador")
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")
+# Apartados de la ventana que se han plegado (uno por línea): siguen plegados al volver a abrirla
+FOLDED_FILE = os.path.join(LOG_DIR, "ventana-plegados")
 
 
 def is_ps_db(db):
@@ -11099,6 +11112,10 @@ GREEN = "#45A57C"
 # Tramos de la barra de la pila propia (los mismos que usa el script en whiptail)
 CSS = """
 .grupo-titulo { font-weight: bold; }
+/* Título de un apartado plegable: sin el relleno del botón, alineado con los demás títulos */
+button.plegable { padding: 0 4px 0 0; min-height: 0; }
+/* Arrancar, reiniciar y parar la versión activa */
+button.control-grande { min-width: 40px; min-height: 40px; padding: 4px; }
 .info { color: alpha(currentColor, 0.55); }
 .info:hover { color: currentColor; }
 .subtitulo { font-size: smaller; }
@@ -11769,6 +11786,43 @@ def group(title=None, description=None):
     lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
     lb.connect("row-activated", on_row_activated)
     box.pack_start(lb, False, False, 0)
+    return box, lb
+
+
+def fold_group(title, description, opened, on_toggle, summary=""):
+    """Como group(), pero se pliega y se despliega al pulsar el título (on_toggle(abierto)).
+    Plegado, al lado del título sale el resumen."""
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    head = Gtk.Box(spacing=6)
+    btn = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE, can_focus=True), "plegable")
+    inner = Gtk.Box(spacing=6)
+    arrow = icon("pan-down-symbolic" if opened else "pan-end-symbolic")
+    inner.pack_start(label(title, "grupo-titulo"), False, False, 0)
+    inner.pack_start(arrow, False, False, 0)
+    btn.add(inner)
+    btn.set_tooltip_text("Plegar" if opened else "Desplegar")
+    head.pack_start(btn, False, False, 0)
+    if description:
+        head.pack_start(info_icon(description), False, False, 0)
+    note = label(summary, "dim-label", "subtitulo")
+    note.set_no_show_all(True)
+    note.set_visible(bool(summary) and not opened)
+    head.pack_start(note, False, False, 0)
+    box.pack_start(head, False, False, 0)
+    lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
+    lb.connect("row-activated", on_row_activated)
+    rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN, reveal_child=opened)
+    rev.add(lb)
+    box.pack_start(rev, False, False, 0)
+
+    def toggle(*_):
+        on = not rev.get_reveal_child()
+        rev.set_reveal_child(on)
+        arrow.set_from_icon_name("pan-down-symbolic" if on else "pan-end-symbolic", Gtk.IconSize.BUTTON)
+        btn.set_tooltip_text("Plegar" if on else "Desplegar")
+        note.set_visible(bool(summary) and not on)
+        on_toggle(on)
+    btn.connect("clicked", toggle)
     return box, lb
 
 
@@ -12665,6 +12719,11 @@ class App(Gtk.Application):
         self.php_dates = {}
         self.branches_error = None
         self.expanded = set()
+        try:
+            with open(FOLDED_FILE, encoding="utf-8") as f:
+                self.folded = {l.strip() for l in f if l.strip()}
+        except OSError:
+            self.folded = set()
         self.extra_patches = []
         self.busy = False
         # Formulario «Subir o actualizar una base de datos» (se conserva al redibujar la pestaña)
@@ -13878,6 +13937,9 @@ class App(Gtk.Application):
             # (el registro de errores de Herramientas es el del vhost del proyecto cargado)
             if self.data and old_link != ((p or {}).get("link"), (p or {}).get("current")):
                 self.build_tools()
+            # (en BBDD, el punto verde va en la BBDD que usa el proyecto cargado)
+            if self.data:
+                self.build_databases()
         return False
 
     def build_project_box(self):
@@ -13962,6 +14024,17 @@ class App(Gtk.Application):
         self.proj_new_btn.set_tooltip_text("Clona un proyecto de GitHub en /opt/htdocs, elige su "
                                            "versión de PHP y créale su BBDD")
         self.proj_new_btn.connect("clicked", lambda *_: self.toggle_new_project(True))
+        # Replicar: el proyecto en otra versión de PHP (su BBDD copiada con otro nombre y vinculada
+        # allí a la carpeta que se elija)
+        self.proj_rep_btn = Gtk.Button(valign=Gtk.Align.CENTER)
+        rb = Gtk.Box(spacing=6)
+        rb.pack_start(icon("edit-copy-symbolic"), False, False, 0)
+        rb.pack_start(Gtk.Label(label="Replicar"), False, False, 0)
+        self.proj_rep_btn.add(rb)
+        self.proj_rep_btn.set_tooltip_text("Replicar un proyecto en otra versión de PHP: copia su "
+                                           "BBDD con el nombre que elijas y la vincula allí a su carpeta")
+        self.proj_rep_btn.connect("clicked", lambda *_: self.on_replicate())
+        search_row.pack_start(self.proj_rep_btn, False, False, 0)
         search_row.pack_start(self.proj_new_btn, False, False, 0)
         box.pack_start(search_row, False, False, 0)
         self.new_proj_rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN)
@@ -14688,8 +14761,9 @@ class App(Gtk.Application):
                             "Parar y desactivar (como lvm disable): php deja de responder hasta "
                             "que actives una versión", "parar", "icono-rojo"))
             for ic, tip, cmd, color in actions:
-                b = css(Gtk.Button(tooltip_text=tip, relief=Gtk.ReliefStyle.NONE), color)
-                b.add(icon(ic))
+                # (más grandes que los demás botones de icono: son los que más se usan)
+                b = css(Gtk.Button(tooltip_text=tip, relief=Gtk.ReliefStyle.NONE), color, "control-grande")
+                b.add(icon(ic, 24))
                 b.connect("clicked", self.on_control, cmd, tip)
                 row.add_suffix(b)
             web = Gtk.Button(label="Abrir localhost", sensitive=d["running"])
@@ -14705,7 +14779,11 @@ class App(Gtk.Application):
         self.sg_tag = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         self.sg_btn = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         if d["installs"]:
-            box, lb = group("Instaladas", "Pulsa una versión para ver sus componentes.")
+            box, lb = fold_group("Instaladas", "Pulsa una versión para ver sus componentes. "
+                                 "Pulsa el título para plegar o desplegar la lista.",
+                                 "instaladas" not in self.folded,
+                                 lambda on: self.remember_fold("instaladas", on),
+                                 plural(len(d["installs"]), "versión", "versiones"))
             for inst in d["installs"]:
                 lb.add(self.version_row(inst))
         else:
@@ -14793,6 +14871,16 @@ class App(Gtk.Application):
 
     def remember(self, folder, on):
         (self.expanded.add if on else self.expanded.discard)(folder)
+
+    def remember_fold(self, key, opened):
+        """Guarda qué apartados están plegados (siguen así al volver a abrir la ventana)."""
+        (self.folded.discard if opened else self.folded.add)(key)
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(FOLDED_FILE, "w", encoding="utf-8") as f:
+                f.write("".join(k + "\n" for k in sorted(self.folded)))
+        except OSError:
+            pass
 
     # acciones
     def run_task(self, title, args, **kw):
@@ -15026,12 +15114,16 @@ class App(Gtk.Application):
             self.inst_box.show_all()
             return
 
-        box, lb = group("Instalar nuevas versiones de PHP",
+        nuevas = sum(1 for f in self.branches if f[0] == "B" and (f + [""] * 8)[6] == "nueva")
+        box, lb = fold_group("Instalar nuevas versiones de PHP",
+                        "Pulsa el título para plegar o desplegar la lista. "
                         "Cada versión lleva su propio Apache, MariaDB, ProFTPD y Perl, "
                         "compilados para ella, y sus propias BBDD. Según php.net: "
                         "Estable recibe correcciones de errores y de seguridad (la mejor opción "
                         "para proyectos nuevos), Solo seguridad recibe únicamente parches de "
-                        "seguridad hasta la fecha indicada y Sin soporte ya no recibe parches.")
+                        "seguridad hasta la fecha indicada y Sin soporte ya no recibe parches.",
+                        "instalar" not in self.folded, lambda on: self.remember_fold("instalar", on),
+                        plural(nuevas, "versión nueva", "versiones nuevas") if nuevas else "")
         rows = sorted((f for f in self.branches if f[0] == "B"),
                       key=lambda f: [int(x) for x in f[1].split(".")], reverse=True)
         for f in rows:
@@ -15301,8 +15393,20 @@ class App(Gtk.Application):
                 exp.add_row(row)
             elif not dbs:
                 exp.add_row(ActionRow("Sin BBDD propias"))
+            # En la activa, punto verde en la BBDD que usa el proyecto cargado
+            used = self.loaded_project_db() if active else ""
             for db in dbs:
                 row = ActionRow(db, db_date_text(*d["dbdate"].get((folder, db), (0, ""))))
+                if active:
+                    dot = label("●", "punto-verde")
+                    if db == used:
+                        x = self.loaded_project_entry()
+                        dot.set_tooltip_text("La usa el proyecto cargado%s"
+                                             % (" (%s)" % x["name"] if x else ""))
+                    else:
+                        # (invisible: así los nombres quedan alineados)
+                        dot.set_opacity(0)
+                    row.add_prefix(dot)
                 if d["dbdate"].get((folder, db), (0, ""))[1] == "c":
                     row.subtitle.set_tooltip_text(DB_DATE_HELP)
                 if is_ps_db(db):
@@ -15355,6 +15459,8 @@ class App(Gtk.Application):
         return b
 
     def on_copy_db(self, db, inst):
+        """Copia la BBDD, con el mismo nombre, de la versión pulsada a otra. Siempre se avisa
+        antes. (Copiarla con otro nombre o con otra carpeta: Replicar, en Cargar proyecto.)"""
         targets = self.copy_targets(db, inst)
         if not targets:
             return
@@ -15365,24 +15471,20 @@ class App(Gtk.Application):
         dlg.set_default_response(Gtk.ResponseType.ACCEPT)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=24)
         dlg.get_content_area().add(box)
-        box.pack_start(css(label("¿A qué versión de PHP quieres copiarla?", wrap=True,
+        box.pack_start(css(label("¿A qué versión de PHP copias %s?" % db, wrap=True,
                                  max_width_chars=60), "title-3"), False, False, 0)
-        box.pack_start(label("Se copia %s desde lampp-%s, que no se toca. Después, carga el "
-                             "proyecto en esa versión para probarlo con su PHP. Si no es la activa, se "
-                             "arranca su MariaDB solo para la copia y se pide la contraseña de "
-                             "administrador. Si la versión ya tiene una BBDD con el nombre de la copia, "
-                             "se sustituye: antes se guarda una copia suya en ~/lvm-copias."
-                             % (db, inst["folder"]),
+        box.pack_start(label("Se copia con el mismo nombre desde lampp-%s, que no se toca. Para "
+                             "copiarla con otro nombre o con otra carpeta de proyecto, usa Replicar "
+                             "(Versiones, Cargar proyecto)." % inst["folder"],
                              "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
         # (primero las que no la tienen; dentro, de la más nueva a la más antigua)
-        for i in sorted(targets, key=lambda i: (not self.has_db(i["folder"], db),
-                                                [int(n) if n.isdigit() else 0 for n in i["php"].split(".")]),
+        for i in sorted(targets, key=lambda i: (not self.has_db(i["folder"], db), ver_tuple(i["php"])),
                         reverse=True):
             rb = Gtk.RadioButton.new_from_widget(first)
             rb.add(label("PHP %s  (lampp-%s)%s%s" % (
                 i["php"], i["folder"], "  ·  la activa" if i["folder"] == self.data["active"] else "",
-                "  ·  ya tiene %s" % db if self.has_db(i["folder"], db) else "")))
+                "  ·  ya la tiene: se sustituye" if self.has_db(i["folder"], db) else "")))
             first = first or rb
             opt = css(Gtk.Box(), "opcion")
             opt.pack_start(rb, True, True, 0)
@@ -15393,93 +15495,183 @@ class App(Gtk.Application):
                 css(opt, "elegida")
             radios.append((rb, i))
             box.pack_start(opt, False, False, 0)
+        box.show_all()
+        resp = run_dialog(dlg)
+        chosen = next((i for rb, i in radios if rb.get_active()), None)
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or chosen is None:
+            return
+        args = ["copiar-bd", db, inst["folder"], chosen["folder"]]
+        dst = chosen["folder"]
+        notes = ["Se copia %s de lampp-%s (PHP %s) a lampp-%s (PHP %s), con el mismo nombre. "
+                 "La de lampp-%s no se toca." % (db, inst["folder"], inst["php"], dst, chosen["php"],
+                                                 inst["folder"])]
+        if dst != self.data["active"]:
+            notes.append("lampp-%s no es la activa: se arranca su MariaDB solo para la copia y se "
+                         "pide la contraseña de administrador." % dst)
+        replace = self.has_db(dst, db)
+        if replace:
+            notes.append("lampp-%s ya tiene una BBDD %s: se guarda antes una copia suya en "
+                         "~/lvm-copias y después se pone en su lugar la de lampp-%s. Lo que tuviera "
+                         "se pierde (salvo en esa copia)." % (dst, db, inst["folder"]))
+            args.append("--sustituir")
+        if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (db, dst) if replace else
+                       "¿Copiar %s a lampp-%s?" % (db, dst), "\n\n".join(notes),
+                       "Sustituir" if replace else "Copiar", destructive=replace):
+            return
+        self.run_task("Copiando %s a lampp-%s" % (db, dst), args,
+                      done_text="%s copiada a lampp-%s" % (db, dst), auto_close=True)
 
-        # Nombre de la copia: el de origen con el sufijo de la versión de destino (se puede cambiar)
-        box.pack_start(label("Nombre de la BBDD en la versión de destino", "grupo-titulo",
-                             margin_top=8), False, False, 0)
-        entry = Gtk.Entry(max_length=64, activates_default=True)
-        box.pack_start(entry, False, False, 0)
-        hint = label("", "dim-label", "subtitulo", wrap=True, max_width_chars=60)
-        box.pack_start(hint, False, False, 0)
-        # Carpeta del proyecto con la que va la copia (la de la BBDD de origen, otra o ninguna)
-        box.pack_start(label("Proyecto vinculado en la versión de destino", "grupo-titulo",
-                             margin_top=8), False, False, 0)
-        src_folder = self.link_of(db, inst["folder"])
-        if src_folder is None:
-            users = [x["name"] for x in (self.projects or {}).get("list", []) if x["db"] == db]
-            src_folder = users[0] if len(users) == 1 else ""
-        folders = project_folders()
-        fcombo = Gtk.ComboBoxText()
-        fcombo.append("@ninguna", "— Ninguno: vincúlalo después en Cargar proyecto —")
-        for f in folders:
-            fcombo.append(f, f + ("  (el de lampp-%s)" % inst["folder"] if f == src_folder else ""))
-        fcombo.set_active_id(src_folder if src_folder in folders else "@ninguna")
-        narrow(fcombo, 48)
-        box.pack_start(fcombo, False, False, 0)
-        box.pack_start(label("Cargar proyecto cargará esa carpeta con esta copia. Si el proyecto de "
-                             "la nueva versión tiene su propia carpeta, elígela aquí.",
-                             "dim-label", "subtitulo", wrap=True, max_width_chars=60), False, False, 0)
-        ok = dlg.get_widget_for_response(Gtk.ResponseType.ACCEPT)
-        state = {"auto": True, "set": False}
+    def on_replicate(self):
+        """Replicar un proyecto en otra versión de PHP: copia su BBDD de una versión a otra con el
+        nombre que se elija (se propone el de la versión de destino: wp_x_8_4 → wp_x_8_5) y la
+        vincula allí a la carpeta que se elija (la misma, otra o ninguna)."""
+        if not self.data or not self.projects or self.busy:
+            return
+        projects = [x for x in self.projects["list"] if self.project_pairs(x)]
+        if not projects:
+            message(self.win, "No hay proyectos que replicar",
+                    "Ningún proyecto de /opt/htdocs tiene su BBDD en una versión instalada.",
+                    Gtk.MessageType.INFO)
+            return
+        if len({i["owner"] for i in self.installs()}) < 2:
+            message(self.win, "No hay otra versión de PHP",
+                    "Instala otra versión de PHP (con sus propias BBDD) para replicar un proyecto en ella.",
+                    Gtk.MessageType.INFO)
+            return
+        loaded = self.loaded_project_entry()
+        dlg = Gtk.Dialog(title="Replicar proyecto", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(600, -1)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Replicar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=24)
+        dlg.get_content_area().add(box)
+        box.pack_start(css(label("Replicar un proyecto en otra versión de PHP", wrap=True,
+                                 max_width_chars=60), "title-3"), False, False, 0)
+        box.pack_start(label("Se copia su BBDD a la otra versión, con el nombre que elijas, y allí "
+                             "queda vinculada a la carpeta que elijas: después, Cargar proyecto lo "
+                             "monta con esa versión. La versión de origen no se toca.",
+                             "dim-label", wrap=True, max_width_chars=60), False, False, 0)
+        grid = Gtk.Grid(column_spacing=12, row_spacing=10, margin_top=8)
+        box.pack_start(grid, False, False, 0)
+
+        def field(n, text, widget):
+            grid.attach(label(text, "dim-label"), 0, n, 1, 1)
+            widget.set_hexpand(True)
+            grid.attach(widget, 1, n, 1, 1)
+            return widget
+        pcombo = field(0, "Proyecto", Gtk.ComboBoxText())
+        for x in projects:
+            pcombo.append(x["name"], x["name"])
+        scombo = field(1, "Desde", Gtk.ComboBoxText())
+        tcombo = field(2, "A la versión", Gtk.ComboBoxText())
+        entry = field(3, "Nombre de la BBDD", Gtk.Entry(max_length=64, activates_default=True))
+        hint = label("", "dim-label", "subtitulo", wrap=True, max_width_chars=50)
+        grid.attach(hint, 1, 4, 1, 1)
+        fcombo = field(5, "Carpeta", Gtk.ComboBoxText())
+        fcombo.append("@ninguna", "— Ninguna: vincúlala después —")
+        for f in project_folders():
+            fcombo.append(f, f)
+        grid.attach(label("La carpeta del proyecto con la que se cargará en esa versión (si tiene "
+                          "una propia para ella, elígela).", "dim-label", "subtitulo", wrap=True,
+                          max_width_chars=50), 1, 6, 1, 1)
+        for c in (pcombo, scombo, tcombo, fcombo):
+            narrow(c, 40)
+        state = {"auto": True, "set": False, "pairs": [], "targets": []}
+
+        def source():
+            n = scombo.get_active()
+            return state["pairs"][n] if 0 <= n < len(state["pairs"]) else None
 
         def target():
-            return next((i for rb, i in radios if rb.get_active()), None)
+            n = tcombo.get_active()
+            return state["targets"][n] if 0 <= n < len(state["targets"]) else None
 
         def update(*_):
-            t = target()
-            name = entry.get_text().strip()
+            t, name = target(), entry.get_text().strip()
             valid = bool(re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name)) and \
                 name.lower() not in ("information_schema", "mysql", "performance_schema",
                                      "phpmyadmin", "sys", "test")
             if not valid:
                 hint.set_label("Letras sin acentos, números, _ y - (sin - delante).")
             elif t and self.has_db(t["folder"], name):
-                hint.set_markup('<span foreground="#e01b24">lampp-%s ya tiene una BBDD %s: se sustituye '
-                                '(antes se guarda una copia suya en ~/lvm-copias).</span>'
+                hint.set_markup('<span foreground="#e01b24">lampp-%s ya tiene una BBDD %s: se '
+                                'sustituye (antes se guarda una copia suya en ~/lvm-copias).</span>'
                                 % (t["folder"], GLib.markup_escape_text(name)))
             else:
                 hint.set_label("Se crea %s en lampp-%s." % (name, t["folder"]) if t else "")
-            ok.set_sensitive(valid and t is not None)
+            ok.set_sensitive(valid and t is not None and source() is not None)
 
-        def retarget(*_):
+        def on_target(*_):
             # (mientras no se escriba otro, el nombre sigue a la versión elegida)
-            t = target()
-            if t and state["auto"]:
+            s, t = source(), target()
+            if s and t and state["auto"]:
                 state["set"] = True
-                entry.set_text(copy_name(db, t["php"]))
+                entry.set_text(copy_name(s[1], t["php"]))
                 state["set"] = False
             update()
+
+        def on_source(*_):
+            s = source()
+            tcombo.remove_all()
+            state["targets"] = sorted((i for i in self.installs() if s and i["owner"] != s[0]["owner"]),
+                                      key=lambda i: ver_tuple(i["php"]), reverse=True)
+            for i in state["targets"]:
+                tcombo.append(i["folder"], "PHP %s  (lampp-%s)" % (i["php"], i["folder"]))
+            tcombo.set_active(0 if state["targets"] else -1)
+            on_target()
+
+        def on_project(*_):
+            x = next((p for p in projects if p["name"] == pcombo.get_active_id()), None)
+            scombo.remove_all()
+            state["pairs"] = sorted(self.project_pairs(x), key=lambda c: ver_tuple(c[0]["php"]),
+                                    reverse=True) if x else []
+            for i, d in state["pairs"]:
+                scombo.append(None, "PHP %s  (lampp-%s)  ·  BBDD %s" % (i["php"], i["folder"], d))
+            # (la de la versión activa, si la tiene)
+            act = next((n for n, (i, _) in enumerate(state["pairs"])
+                        if i["folder"] == self.data["active"]), 0)
+            scombo.set_active(act if state["pairs"] else -1)
+            if x:
+                fcombo.set_active_id(x["name"])
+            on_source()
 
         def edited(*_):
             if not state["set"]:
                 state["auto"] = False
             update()
-        for rb, _ in radios:
-            rb.connect("toggled", retarget)
+        pcombo.connect("changed", on_project)
+        scombo.connect("changed", on_source)
+        tcombo.connect("changed", on_target)
         entry.connect("changed", edited)
-        retarget()
+        pcombo.set_active_id(loaded["name"] if loaded and loaded in projects else projects[0]["name"])
         box.show_all()
         resp = run_dialog(dlg)
-        chosen = target()
-        name = entry.get_text().strip()
-        folder = fcombo.get_active_id()
+        s, t, name, folder = source(), target(), entry.get_text().strip(), fcombo.get_active_id()
         dlg.destroy()
-        if resp != Gtk.ResponseType.ACCEPT or chosen is None or not name:
+        if resp != Gtk.ResponseType.ACCEPT or not s or not t or not name:
             return
-        args = ["copiar-bd", db, inst["folder"], chosen["folder"], "--como", name,
-                "--carpeta", "-" if folder in (None, "@ninguna") else folder]
-        if self.has_db(chosen["folder"], name):
-            if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (name, chosen["folder"]),
-                           "lampp-%s ya tiene una BBDD %s. Se guarda antes una copia suya en "
-                           "~/lvm-copias y después se pone en su lugar la %s de lampp-%s: lo que "
-                           "tuviera la de lampp-%s se pierde (salvo en esa copia)."
-                           % (chosen["folder"], name, db, inst["folder"], chosen["folder"]),
-                           "Sustituir", destructive=True):
-                return
+        (src, db), dst = s, t["folder"]
+        folder = None if folder in (None, "@ninguna") else folder
+        args = ["copiar-bd", db, src["folder"], dst, "--como", name, "--carpeta", folder or "-"]
+        notes = ["Se copia %s de lampp-%s (PHP %s) a lampp-%s (PHP %s) como %s, y allí queda "
+                 "vinculada a %s." % (db, src["folder"], src["php"], dst, t["php"], name,
+                                       folder or "ninguna carpeta")]
+        if dst != self.data["active"]:
+            notes.append("lampp-%s no es la activa: se arranca su MariaDB solo para la copia y se "
+                         "pide la contraseña de administrador." % dst)
+        replace = self.has_db(dst, name)
+        if replace:
+            notes.append("lampp-%s ya tiene una BBDD %s: se guarda antes una copia suya en "
+                         "~/lvm-copias y se pone en su lugar. Lo que tuviera se pierde (salvo en esa "
+                         "copia)." % (dst, name))
             args.append("--sustituir")
-        self.run_task("Copiando %s a lampp-%s" % (db, chosen["folder"]), args,
-                      done_text="%s copiada a lampp-%s como %s" % (db, chosen["folder"], name),
-                      auto_close=True)
+        if not confirm(self.win, "¿Replicar en lampp-%s?" % dst, "\n\n".join(notes),
+                       "Sustituir" if replace else "Replicar", destructive=replace):
+            return
+        self.run_task("Replicando en lampp-%s" % dst, args,
+                      done_text="%s replicada en lampp-%s como %s" % (db, dst, name), auto_close=True)
 
     def download_button(self, db, folder):
         b = Gtk.Button(tooltip_text="Descargar una copia de %s (.zip)" % db,
