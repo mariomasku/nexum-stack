@@ -4,6 +4,17 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.52.0 · 23 oct 2026
+
+- **Cargar proyecto:** botón Replicar, junto a «Montar nuevo proyecto», para llevar un proyecto a otra versión de PHP. Se elige el proyecto, de qué versión se copia su BBDD, a cuál, el nombre que tendrá allí (se propone el de esa versión: wp_tienda_8_4 → wp_tienda_8_5; si ya hay una con ese nombre, se avisa de que se sustituye) y la carpeta con la que se cargará en ella. En la terminal: copiar-bd <base> <origen> <destino> --como <nombre> --carpeta <carpeta|->.
+- **Cargar proyecto:** cada versión de PHP puede ir con su propia carpeta. Las BBDD quedan vinculadas a la carpeta del proyecto en cada versión, no en todas a la vez, así que la copia de una BBDD en la 8.5 puede ir con una carpeta distinta de la de la 8.4. Con el botón de vincular de cada proyecto se elige su BBDD en cada versión, o «Ninguna» para desvincularla; los botones del proyecto cargado (phpMyAdmin, panel) usan la de la versión activa. En la terminal: lvm-instalador vincular-bd <base> <versión> <carpeta|->.
+- **BBDD, copiar:** el botón de cada BBDD la copia, con el mismo nombre, de esa versión a la que elijas, y siempre avisa antes de hacerlo (y de si la sustituye). Para copiarla con otro nombre o con otra carpeta está Replicar.
+- **BBDD por versión:** en la versión activa, la BBDD que usa el proyecto cargado lleva un punto verde.
+- **Versiones:** junto a cada versión de PHP instalada sale la fecha en que se publicó.
+- **Versiones:** «Instaladas» e «Instalar nuevas versiones de PHP» se pliegan y se despliegan al pulsar su título (plegadas, dicen cuántas hay), y siguen así al volver a abrir la ventana.
+- **Versión activa:** los botones de arrancar, reiniciar y parar son más grandes.
+- **Instalar:** cada versión nueva de PHP va en una carpeta con su versión completa (`/opt/lampp-8.4.27`), también la última de cada rama, que antes iba en `/opt/lampp-8.4`. Las que ya estaban no cambian de nombre.
+
 ## 1.50.1 · 22 oct 2026
 
 - **Pestaña Hosts:** los dominios .local de los vhosts se pueden apagar. Su interruptor estaba bloqueado: el gestor los mantiene siempre en `/etc/hosts` (sin su línea, el equipo los pregunta a la red y cualquiera de la misma wifi podría contestar) y volvía a añadirlos aunque se quitaran a mano. Ahora, al apagar uno (se avisa antes), su línea queda comentada y se recuerda que está apagado, así que no se vuelve a añadir; al encenderlo, vuelve a mantenerse. En la terminal: lvm-instalador hosts-falsear <dominio>.local si|no.
