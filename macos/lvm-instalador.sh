@@ -2080,7 +2080,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.39.12"
+APP_VERSION="1.39.13"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -23895,6 +23895,10 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.39.13 (25 oct 2026)
+- Igual que la 1.39.12, sin datos de ejemplo de proyectos reales en el
+  código.
 
 1.39.12 (25 oct 2026)
 - Cargar un proyecto es todo o nada: la contraseña se pide antes de cambiar
