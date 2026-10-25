@@ -4,6 +4,62 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.55.0 · 25 oct 2026
+
+- **Correo de pruebas con Mailpit:** lo que mandan las webs de este equipo (formularios, pedidos, contraseñas) no llega a nadie, se ve en su bandeja (botón Correo, arriba, con los correos sin leer). Encendido por defecto; se apaga en Configuración. Mailpit arranca y para con la versión activa, con tu usuario y solo en 127.0.0.1.
+- **Mailpit se instala desde Configuración:** la versión oficial de GitHub, comprobada con su sha256 y de root en `/opt/config/mailpit`.
+- **PHP de todas las versiones:** mail() va a Mailpit. PrestaShop: al cargar la tienda, su correo va por SMTP a Mailpit (en todas sus tiendas).
+- WordPress con plugins de SMTP o Brevo, en Configuración: llevarlos a Mailpit (por defecto: WP Mail SMTP, Easy WP SMTP y los de SMTP siguen, con su correo a Mailpit; Brevo, FluentSMTP, Post SMTP y los que mandan por una API se desactivan en la copia local), desactivarlos todos o no tocarlos (avisa: su correo puede llegar de verdad).
+- Lo que se cambia en las BBDD para el correo no va en las copias (exportar-bd, copiar-bd, Docker): llevan el correo de producción. Al apagarlo o elegir «No tocarlos», se deshace al cargar el proyecto.
+- **En la terminal:** lvm-instalador correo (estado, si, no, wordpress mailpit|desactivar|nada, instalar, vaciar y bd <base>).
+- **Docker:** sus proyectos aún no mandan a Mailpit.
+
+## 1.54.3 · 25 oct 2026
+
+- Al instalar o actualizar vuelve a salir la lista de pasos (se quedaba vacía), cada uno con su logotipo: Apache, PHP, Perl, ProFTPD, MariaDB y phpMyAdmin.
+- **Arriba ya no está el botón de phpMyAdmin:** sigue en la pestaña Bases de datos.
+- En el título, «Dev Stack» va sin negrita y en azul.
+- **Bases de datos y Docker:** al entrar en la pestaña, todas las versiones y los proyectos aparecen plegados; se despliega uno a la vez.
+
+## 1.54.2 · 24 oct 2026
+
+- **Proyecto cargado:** botón Docker, junto a Panel. Si no hay Docker, ofrece instalarlo; si el proyecto no está en Docker, lo monta con la versión de PHP que elijas (descarga las imágenes que falten); si ya lo está, lo arranca y, con varias versiones, pregunta cuál. Un proyecto puede estar en Docker con varias versiones de PHP (docker-crear … --nombre).
+- Diálogos con el texto centrado y más corto, y el botón principal dice lo que hace («Borrar la BBDD», «Actualizar a PHP 8.4.27»…).
+- Arriba, los avisos a la izquierda del visor y el menú a su derecha.
+- **Versiones de PHP:** «Actualizado» en verde. Bases de datos: una sola versión desplegada a la vez y botones de acciones con separación.
+- **Docker:** columna ID de cada contenedor (en lugar de Estado) y, primero en la fila del proyecto, arrancar o parar todos sus servicios a la vez.
+- **Docker, Imágenes:** imagen, etiqueta e ID por separado, y botones para volver a descargarla de Docker Hub o borrarla (si no la usa ningún contenedor). Volúmenes: botón para borrar los que no use ninguno. En la terminal: docker-imagenes borrar|descargar <imagen> y docker-volumen-borrar <volumen>.
+
+## 1.54.1 · 24 oct 2026
+
+- **PHP2Shell (CVE-2026-109618 y CVE-2026-109619):** en Versiones de PHP, las que no tienen el arreglo salen en rojo («Vulnerable (PHP2Shell)») y activarlas lo pregunta. Lo tienen 8.2.35, 8.3.36, 8.4.27 y 8.5.12 o posteriores; los XAMPP no se pueden arreglar.
+- PHP 7.4.33, 8.0.30 y 8.1.34 se compilan con el parche de seguridad que publicó el equipo de PHP (no es una versión nueva: se ven como «7.4.33 + parche de seguridad»).
+- «Actualizar a PHP X.Y.Z» en el menú ⋮ de las versiones con un parche concreto (lampp-8.3.10) y de los XAMPP: instala la nueva al lado, le copia las BBDD con sus vínculos y, si era la activa, la activa. La de antes se queda hasta que la desinstales. En la terminal: lvm-instalador actualizar-a <versión> <php>.
+- Ya no se ofrece el XAMPP 8.2.4.
+- En todas las versiones y en Docker, el php.ini con las mitigaciones de PHP2Shell: sin el progreso de las subidas en la sesión, poco anidamiento en los formularios y 64 MB como mucho por petición. PHP-FPM renueva sus procesos cada 50 peticiones.
+- **Barrera entre webs para todos los proyectos:** otra web abierta en el navegador no puede mandarles formularios ni peticiones. Se apaga en Configuración (o lvm-instalador barrera-web no) para probar una pasarela de pago que vuelve con un POST.
+- Sin CGI ni SSI en las carpetas de los proyectos.
+- Las descargas de PHP, Apache, APR, MariaDB y phpMyAdmin se comprueban también con la firma de quien las publica.
+- Las pilas propias se compilan con un usuario del sistema (nexum-build): nada de tu usuario puede cambiar lo que root copia.
+- La BBDD descargada ya no lleva el administrador de pruebas (local@local.test); la de trabajo no cambia.
+- **Docker:** el phpMyAdmin de cada proyecto pide usuario y contraseña (la copia el botón de la llave); «Actualizar imagen» rehace su PHP con lo último de Docker Hub. Docker va sin la terminal y con su propia configuración, y la contraseña de la BBDD no sale en las órdenes.
+
+## 1.54.0 · 24 oct 2026
+
+- **Nuevo nombre:** Nexum Dev Stack, con logotipo nuevo (en el menú de aplicaciones, en la ventana y en el paquete). Los comandos (lvm-instalador, lvm) y las carpetas no cambian.
+- **Ventana nueva:** cambian la organización y el aspecto, con las mismas órdenes de siempre. Arriba, siempre a la vista, el visor de la versión montada (PHP, Apache y MariaDB con su punto, encender o apagar y sus servicios), el menú, Localhost, phpMyAdmin y los avisos en un solo botón. En Proyectos, el cargado en grande con su entorno (versión de PHP), su BBDD y sus botones, y la lista de todos, que busca por el nombre de la carpeta o de su BBDD. Versiones de PHP con su soporte y su último parche (los componentes, en un diálogo), Bases de datos y Docker en tablas por versión y por proyecto, con sus tarjetas arriba, y tema claro u oscuro en el menú. Los diálogos, con el mismo aspecto y en azul.
+- **Bases de datos:** el tamaño de cada BBDD (datos e índices) y el total de cada versión. Se mide con su versión activa y en marcha, y se recuerda.
+- **Tareas:** barra más gruesa con el porcentaje y lo que queda siempre a la vista, y el registro como una terminal: una descarga es una línea con su porcentaje que avanza, no una línea por cada paso.
+- **Versiones de PHP:** Actualizar solo sale cuando hay un parche más nuevo, y si ya está al día lo dice.
+- **Docker:** los contenedores ya no arrancan solos al encender el equipo (se arrancan desde la pestaña Docker); los que ya había se cambian solos. CPU y memoria de los contenedores, sus imágenes y volúmenes, y acciones para cada contenedor, también borrarlo. En la terminal: lvm-instalador docker-contenedor arrancar|parar|reiniciar|registros| borrar <contenedor>.
+
+## 1.53.0 · 23 oct 2026
+
+- **Nueva pestaña Docker:** proyectos con cualquier versión de PHP (de la 5.6 a la 8.5, también 7.1 o 7.4) en contenedores, a la vez que LAMPP. Cada uno lleva su PHP, su MariaDB con una copia de su BBDD de LAMPP y su phpMyAdmin, y se abre por su dominio (carpeta.docker.local, con https) desde el Apache de la versión activa, con sus .htaccess de siempre. Su `wp-config.php` (o la configuración de PrestaShop) se sustituye solo dentro del contenedor, así que la carpeta se puede seguir usando con LAMPP. Arrancar, parar, ver registros y borrar desde la pestaña.
+- **Docker, cambiar de PHP:** el botón con la versión de cada proyecto la cambia sin borrarlo (solo cambia su contenedor de PHP; su BBDD y su configuración se quedan). Si con la nueva no arranca, vuelve a la de antes. Así se prueba un proyecto con 7.4, 8.1, 8.2... uno tras otro. En la terminal: lvm-instalador docker-php <nombre> <versión>.
+- **Docker, consola:** arriba de la pestaña, como en Docker Desktop, todos los contenedores con su imagen, si están en marcha (y desde cuándo) y sus puertos.
+- Docker se instala desde la pestaña en modo sin root: los contenedores corren con tu usuario y el Docker del sistema (con root) se deja apagado, así que ni un proyecto ni Docker pueden hacerse administradores del equipo. En la terminal: lvm-instalador docker-instalar, docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <versión>], docker-arrancar|docker-parar|docker-registros| docker-borrar <nombre>.
+
 ## 1.52.0 · 23 oct 2026
 
 - **Cargar proyecto:** botón Replicar, junto a «Montar nuevo proyecto», para llevar un proyecto a otra versión de PHP. Se elige el proyecto, de qué versión se copia su BBDD, a cuál, el nombre que tendrá allí (se propone el de esa versión: wp_tienda_8_4 → wp_tienda_8_5; si ya hay una con ese nombre, se avisa de que se sustituye) y la carpeta con la que se cargará en ella. En la terminal: copiar-bd <base> <origen> <destino> --como <nombre> --carpeta <carpeta|->.

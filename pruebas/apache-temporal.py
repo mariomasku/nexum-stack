@@ -3,7 +3,7 @@
 Uso: python3 -I apache-temporal.py <httpd.conf de la version> <carpeta de trabajo> <unk.conf>
 
 Parte del httpd.conf de una version instalada (por defecto /opt/lampp-8.2.4; solo se lee) y escribe
-<carpeta>/httpd.conf para un Apache que solo escucha en 127.0.0.1:18080 y 127.0.0.1:18081, con:
+<carpeta>/httpd.conf para un Apache que solo escucha en 127.0.0.1:28471 y 127.0.0.1:28472, con:
   - los registros y el .pid en <carpeta>/logs;
   - htdocs en <carpeta>/htdocs (vacia: las pruebas piden ficheros que no existen);
   - el vhost de dominios desconocidos que se le pase (<unk.conf>, sacado del script que se prueba);
@@ -41,7 +41,7 @@ t = re.sub(r"(?m)^Include etc/extra/httpd-xampp\.conf.*$", "Include %s/xampp.con
 t = re.sub(r'(?m)^Include "?%s/apache2/conf/httpd\.conf"?.*$' % re.escape(base), "", t)
 if inc_unk not in t or inc_vh not in t:
     sys.exit("no se ha podido preparar el httpd.conf de prueba")
-t += ("\nListen 127.0.0.1:18080\nListen 127.0.0.1:18081\nPidFile %s/logs/httpd.pid\n"
+t += ("\nListen 127.0.0.1:28471\nListen 127.0.0.1:28472\nPidFile %s/logs/httpd.pid\n"
       "ErrorLog %s/logs/error_log\nDefaultRuntimeDir %s/logs\n" % (W, W, W))
 
 for d in ("logs", "htdocs", "phpmyadmin", "web.local"):
@@ -55,7 +55,7 @@ open(os.path.join(W, "xampp.conf"), "w").write(
     'Alias /phpmyadmin "%s/phpmyadmin"\n<Directory "%s/phpmyadmin">\n    AllowOverride None\n'
     '    Require local\n</Directory>\n' % (W, W))
 open(os.path.join(W, "vhosts.conf"), "w").write(
-    '<VirtualHost *:18080>\n    ServerName web.local\n    DocumentRoot "%s/web.local"\n'
+    '<VirtualHost *:28471>\n    ServerName web.local\n    DocumentRoot "%s/web.local"\n'
     '    <Directory "%s/web.local">\n        Require all granted\n    </Directory>\n</VirtualHost>\n' % (W, W))
 if not os.path.isfile(unk):
     sys.exit("falta " + unk)

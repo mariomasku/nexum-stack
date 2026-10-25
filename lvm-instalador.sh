@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# lvm-instalador - Nexum Stack: gestor e instalador de versiones LAMPP y PHP para Linux en un solo archivo.
+# lvm-instalador - Nexum Dev Stack: gestor e instalador de versiones LAMPP y PHP para Linux en un solo archivo.
 #
 # Gestiona varias instalaciones de LAMPP en /opt/lampp-<version>, de las que solo una
 # esta activa (/opt/lampp es un enlace a ella). Puede instalar:
@@ -61,7 +61,7 @@
 #
 # === INSTALAR, ACTUALIZAR Y DESINSTALAR ======================================================
 #
-#   lvm-instalador instalar [--xampp 8.2.4,8.1] [--php 7.4,8.4,8.3.10] [--si]
+#   lvm-instalador instalar [--xampp 7.4,8.1] [--php 7.4,8.4,8.3.10] [--si]
 #       Instala sin preguntas. 8.4 = ultimo parche de la rama en lampp-8.4; 8.3.10 = ese
 #       parche en lampp-8.3.10; --si confirma
 #
@@ -69,11 +69,19 @@
 #       Instala una version de PHP con su pila propia
 #
 #   lvm-instalador add-xampp <version>
-#       Instala un XAMPP oficial (7.1.33, 7.4, 8.1 u 8.2.4)
+#       Instala un XAMPP oficial (7.1.33, 7.4 u 8.1). Ninguno tiene el arreglo de PHP2Shell
+#       ni se puede arreglar: solo para lo que no funcione con una pila propia
 #
 #   lvm-instalador actualizar <version>
 #       Vuelve a compilar una version con la ultima pila de su rama (las basadas en XAMPP
 #       pasan a pila propia)
+#
+#   lvm-instalador actualizar-a <version> <php>
+#       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
+#       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
+#       lampp-<php>, le copia las BBDD con sus vinculos y, si era la activa, la activa. La
+#       de antes no se toca: desinstalala cuando compruebes la nueva. 7.4.33, 8.0.30 y
+#       8.1.34 se compilan con el parche de seguridad de PHP2Shell
 #
 #   lvm-instalador desinstalar <version> [--copia]
 #       Borra una version (no la activa ni una cuyas bases usen otras); --copia guarda antes
@@ -108,6 +116,17 @@
 #       toca. --como: nombre de la copia en la de destino (sin el, el mismo). --carpeta: carpeta
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
 #       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
+#
+#   lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
+#   lvm-instalador docker-php <nombre> <version de PHP>
+#   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
+#   lvm-instalador docker-imagen <nombre>
+#       Proyectos en Docker sin root (pestaña Docker): docker-php cambia su version de PHP;
+#       docker-imagen rehace su imagen de PHP con lo ultimo de Docker Hub (parches de seguridad)
+#   lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
+#   lvm-instalador docker-volumen-borrar <volumen>
+#       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
+#       a descargarla de Docker Hub, o borrar un volumen (sus datos se pierden)
 #
 #   lvm-instalador vincular-bd <base> <version> <carpeta|->
 #       La carpeta de /opt/htdocs del proyecto de esa BBDD en esa version (Cargar proyecto la
@@ -176,6 +195,27 @@
 #       Deja Apache, MariaDB y el FTP solo para este equipo (no se puede entrar desde la red)
 #       y los vhosts del administrador. Se hace solo al montar o arrancar una version
 #
+#   lvm-instalador barrera-web [si|no]
+#       Barrera entre webs (encendida si no se apaga): otra web abierta en el navegador no
+#       puede mandar formularios ni peticiones a tus proyectos. Una pasarela de pago que vuelve
+#       a la tienda con un POST no pasa: apagala mientras la pruebas. Sin argumento, como esta
+#
+#   lvm-instalador correo [estado] | si [--instalar] | no
+#       Correo de pruebas (encendido si no se apaga): lo que mandan las webs locales (formularios,
+#       pedidos, contraseñas) no llega a nadie, va a Mailpit (http://127.0.0.1:8025/), que arranca
+#       y para con la version activa. mail() de PHP en todas las versiones, PrestaShop por SMTP y
+#       WordPress segun su modo. Apagado, el correo sale como sin el gestor. --instalar: y Mailpit
+#
+#   lvm-instalador correo wordpress mailpit|desactivar|nada
+#       Plugins de correo de WordPress (WP Mail SMTP, Post SMTP, FluentSMTP, Brevo...) en la copia
+#       local: mailpit (por defecto) los de SMTP siguen, con su correo a Mailpit, y los que mandan
+#       por una API (Brevo) se desactivan; desactivar, todos fuera; nada, no se tocan (avisa: el
+#       correo puede llegar de verdad). Los cambios no van en las copias (exportar-bd, Docker)
+#
+#   lvm-instalador correo instalar | vaciar | bd <base>
+#       Instala Mailpit (comprobado con su sha256, de root en /opt/config/mailpit); vacia su
+#       bandeja; o aplica (o deshace) el correo de pruebas en una BBDD (se hace solo al cargarla)
+#
 #   lvm-instalador arreglar-certificados
 #       Los vhosts https con certificados en los que confia todo el equipo (en /etc/ssl/certs,
 #       de CA o de una CA local sin limite de dominios) pasan a uno propio, y esa CA deja de
@@ -228,7 +268,7 @@ SPACE_XAMPP_GB=2
 SPACE_STACK_GB=5
 
 # Solo librerias para compilar (nunca PHP, Apache ni MariaDB del sistema)
-STACK_BUILD_DEPS="build-essential pkg-config libxml2-dev libssl-dev libsqlite3-dev zlib1g-dev libcurl4-openssl-dev libonig-dev libzip-dev libpng-dev libjpeg-dev libfreetype-dev libwebp-dev libicu-dev libsodium-dev libargon2-dev libreadline-dev libpcre2-dev libexpat1-dev libnghttp2-dev libbrotli-dev patchelf"
+STACK_BUILD_DEPS="build-essential pkg-config libxml2-dev libssl-dev libsqlite3-dev zlib1g-dev libcurl4-openssl-dev libonig-dev libzip-dev libpng-dev libjpeg-dev libfreetype-dev libwebp-dev libicu-dev libsodium-dev libargon2-dev libreadline-dev libpcre2-dev libexpat1-dev libnghttp2-dev libbrotli-dev patchelf patch"
 XAMPP_DEPS="net-tools"
 # Solo en equipos que no son x86_64 (ARM...): MariaDB no publica binarios y se compila
 MARIADB_BUILD_DEPS="cmake bison libncurses-dev liblz4-dev libzstd-dev"
@@ -266,6 +306,371 @@ ICU72_SHA="a2d2d38217092a7ed56635e34467f92f976b370e20182ad325edea6681a71d68"
 function needs_openssl11() { [[ "$1" == "7.4" || "$1" == "8.0" ]]; }
 function needs_icu72() { [[ "$1" == "7.4" || "$1" == "8.0" || "$1" == "8.1" ]]; }
 
+# PHP2Shell (CVE-2026-109618 y CVE-2026-109619, oct 2026): las peticiones con muchas variables
+# anidadas o con el progreso de las subidas en la sesion pueden ejecutar codigo en PHP. Primer parche
+# de cada rama con soporte que lo arregla (los anteriores son vulnerables)
+PHP2SHELL_FIXED="8.2.35 8.3.36 8.4.27 8.5.12"
+# Las ramas 7.4, 8.0 y 8.1 ya no tienen versiones nuevas: el equipo de seguridad de PHP publico un
+# arreglo minimo (no una version: siguen siendo 7.4.33, 8.0.30 y 8.1.34) en las ramas
+# PHP-X.Y-CVE-2026-109618-109619 de php-src, de Arnaud Le Blanc. Las pilas propias de esos parches
+# se compilan con el: aqui va solo el diff (xz y base64), que se comprueba con su sha256 antes de
+# aplicarlo. version|commit de php-src|sha256 del diff
+PHP2SHELL_BACKPORTS=(
+    "7.4.33|712e60f9edfd03f0960fc4fc3c2c375f42b90aa2|d059c1b4ea0f9023a1e1c17f6eddee82e3c2e029c60dd0a08fc5466764b5eaa4"
+    "8.0.30|82f8f31b16a035c1b67cc253e79f7cc288f4cc20|4cda6e04266d0799c546cd0d79e1161eec82810da62252c164fc19ee00571b54"
+    "8.1.34|1d7dec178a094e6e75b229ce22754045f8c6070a|5bd88c386523dde98fefaa7bac97ec80f754b84cc58d6511c01dfde39ce1fbe2"
+)
+# Las pilas que lo llevan lo dicen en este fichero (lo que sale en la ventana: «+ parche de seguridad»)
+PHP2SHELL_MARK=etc/lvm-parche-php2shell
+PHP2SHELL_DIFF_7_4_33='
+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
+'
+PHP2SHELL_DIFF_8_0_30='
+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
+VwABsC+1tAIAm/XDQLHEZ/sCAAAAAARZWg==
+'
+PHP2SHELL_DIFF_8_1_34='
+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
+'
+
+# Arreglo de PHP2Shell para un parche de PHP: "commit|sha256" (nada si no hay)
+function php2shell_backport() {
+    local row
+    for row in "${PHP2SHELL_BACKPORTS[@]}"; do
+        [ "${row%%|*}" == "$1" ] && echo "${row#*|}" && return 0
+    done
+    return 1
+}
+
+# php2shell_apply <version> <carpeta del codigo de PHP> <log>: aplica el arreglo (comprobado antes con
+# su sha256: si no coincide o no entra limpio, no se compila nada)
+function php2shell_apply() {
+    local version=$1 src=$2 log=$3 info var diff
+    info=$(php2shell_backport "$version") || return 1
+    var=PHP2SHELL_DIFF_${version//./_}
+    diff=$(dirname "$log")/php2shell-$version.diff
+    base64 -d <<< "${!var}" 2> /dev/null | xz -dc > "$diff" 2> /dev/null
+    if [ "$(sha256sum "$diff" | cut -d' ' -f1)" != "${info#*|}" ]; then
+        echo "  El parche de seguridad de PHP $version no coincide con su suma sha256. Se cancela."
+        return 1
+    fi
+    if ! patch -d "$src" -p1 --forward --batch --no-backup-if-mismatch < "$diff" > "$log" 2>&1; then
+        echo "  El parche de seguridad no entra en PHP $version. Ultimas lineas de $(basename "$log"):"
+        tail -10 "$log" | sed 's/^/    /'
+        return 1
+    fi
+}
+
+# Estado de PHP2Shell de una version instalada: php2shell_state <carpeta> <php>
+#   ok|                      tiene el arreglo (su parche o uno posterior)
+#   parche|<texto>           un parche sin soporte compilado con el arreglo de php-src
+#   vulnerable|<texto>       sin el arreglo (y que hacer)
+function php2shell_state() {
+    local dir=$1 php=$2 branch=${2%.*} min v
+    if ! is_fpm_install "$dir"; then
+        echo "vulnerable|XAMPP (PHP $php): sus binarios no tienen el arreglo ni se pueden arreglar"
+        return 0
+    fi
+    for v in $PHP2SHELL_FIXED; do
+        [ "${v%.*}" == "$branch" ] && min=$v
+    done
+    if [ -n "$min" ]; then
+        if [ "$(printf '%s\n' "$min" "$php" | sort -V | head -1)" == "$min" ]; then
+            echo "ok|"
+        else
+            echo "vulnerable|PHP $php: el arreglo esta en PHP $min"
+        fi
+    elif php2shell_backport "$php" > /dev/null; then
+        if [ -f "$dir/$PHP2SHELL_MARK" ]; then
+            echo "parche|PHP $php + parche de seguridad (oct 2026)"
+        else
+            echo "vulnerable|PHP $php sin el parche de seguridad: Actualizar la compila con el"
+        fi
+    elif [ "$(printf '%s\n' 8.5 "$branch" | sort -V | tail -1)" == "$branch" ]; then
+        # (una rama posterior a la 8.5 ya sale con el arreglo)
+        echo "ok|"
+    else
+        echo "vulnerable|PHP $php: no tiene arreglo (solo lo tienen 7.4.33, 8.0.30, 8.1.34 y desde 8.2.35)"
+    fi
+}
+
 # Solo para probar el instalador sin sudo: LVM_PRUEBA=/ruta instala las pilas en /ruta/lampp-X.Y
 # con puertos altos y sin tocar /opt/lampp, /opt/htdocs, /opt/config ni apt
 TEST_DIR=${LVM_PRUEBA:-}
@@ -273,7 +678,8 @@ TEST_DIR=${LVM_PRUEBA:-}
 # poner cualquier programa tuyo) cambiaria que ficheros toca el gestor con sudo
 if [ -z "$TEST_DIR" ]; then
     unset LVM_HTDOCS LVM_VHOSTS LVM_VHOSTS_ACTIVO LVM_SSL_CERTS LVM_SSL_KEYS LVM_HOSTS LVM_BD_CLIENTE \
-        LVM_BD_VOLCADO LVM_ENLACE LVM_PS LVM_PRUEBA_CAS LVM_PRUEBA_CLAVES LVM_PRUEBA_SSL
+        LVM_BD_VOLCADO LVM_ENLACE LVM_PS LVM_PRUEBA_CAS LVM_PRUEBA_CLAVES LVM_PRUEBA_SSL LVM_MAILPIT_URL \
+        LVM_MAILPIT_SHA
 fi
 # Proyectos y vhosts compartidos por todas las versiones (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-/opt/htdocs}
@@ -298,8 +704,9 @@ XAMPP_CATALOG=(
     "7.1.33|7.1.33-1|7.1.33|2.4.41|10.4.10|1.3.6|5.16.3|4.9.2|896394f65873a2b14eca63b3c6d7f1ac|15b46deccb8a81946e9c1e26eade6c19481108906effb4bdbdfc55895c7c5da8"
     "7.4|7.4.33-0|7.4.33|2.4.54|10.4.27|1.3.6|5.34.1|5.2.0|8467421af9ee1f04464b3e439199480c|8785db581be53d6126e2f400112cb86ae3ab9119d73e18f619231c33231302d0"
     "8.1|8.1.25-0|8.1.25|2.4.58|10.4.32|1.3.6|5.34.1|5.2.1|e380a45f13e1dbe6b0544c9a304e153c|0e3940cb7315ea3432e6925a60e6d6cd6705d5b116f0c7398aa585e4a5081b5c"
-    "8.2.4|8.2.4-0|8.2.4|2.4.56|10.4.28|1.3.6|5.34.1|5.2.1|89c473a88eaaea0b00f530bee7cf40f5|80649062144fbe2d71e534e82d3043176a040b1a952abf06c73f168c4c4c4b8b"
 )
+# (1.54.1: sin el XAMPP 8.2.4. Ningun XAMPP tiene el arreglo de PHP2Shell ni se puede arreglar: se
+# ofrecen solo para proyectos que no funcionan con una pila propia, avisando)
 
 DRY=0
 PROGRESS=""
@@ -308,7 +715,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.52.0"
+APP_VERSION="1.55.3"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -336,7 +743,7 @@ LOGO=(
 # Interfaz: ventanas con whiptail si hay terminal, texto en caso contrario
 # ===========================================================================
 
-APP_NAME="Nexum Stack"
+APP_NAME="Nexum Dev Stack"
 TITLE="$APP_NAME"
 UI=text
 if [ "$LVM_UI" != "text" ] && [ -t 0 ] && [ -t 1 ] && command -v whiptail > /dev/null; then
@@ -1472,6 +1879,14 @@ function use_lampp() {
         return 1
     fi
 
+    # (se monta igual, avisando: la ventana lo pregunta antes)
+    local p2s
+    p2s=$(php2shell_state "/opt/lampp-$version" "$(stack_fields "/opt/lampp-$version" | cut -d'|' -f1)")
+    if [[ "$p2s" == vulnerable\|* ]]; then
+        echo "Aviso: lampp-$version es vulnerable a PHP2Shell (${p2s#*|})."
+        echo "  Usala solo con proyectos tuyos y pasa a una version con el arreglo (lvm-instalador actualizar-a)."
+    fi
+
     [ -L /opt/lampp ] && run sudo /opt/lampp/lampp stop
     [ -L /opt/lampp ] && run sudo unlink /opt/lampp
     # Lo que no se haya cerrado al parar (de esta version o de otras anteriores) no puede seguir en
@@ -1490,6 +1905,8 @@ function use_lampp() {
     run sudo /opt/lampp/lampp start
     # MariaDB de XAMPP: sin el usuario anonimo ni los permisos de cualquiera en las bases test
     [ "$DRY" -eq 0 ] && wait_mariadb && secure_mariadb
+    # (el correo de pruebas va con la version)
+    mailpit_sync
 
     echo "Usando lampp $version"
 }
@@ -2145,13 +2562,45 @@ function mount_project() {
 
 # Carga un proyecto: activa la version (si se indica y no es la activa) y apunta el enlace del vhost
 # a la carpeta del proyecto (lo mismo que unlink web.local; ln -s <carpeta>/ web.local)
+# Cargar un proyecto es todo o nada: la contraseña se pide antes de cambiar nada y, si se cancela (la
+# ventana manda TERM a la tarea) o falla un paso, el enlace del vhost vuelve al proyecto de antes, la
+# version activa a la de antes y Apache se recarga. Lo de antes, en LOAD_UNDO_*
+LOAD_UNDO_LINK="" LOAD_UNDO_TARGET="" LOAD_UNDO_ACTIVE=""
+
+function load_project_undo() {
+    trap - TERM INT HUP
+    [ -n "$LOAD_UNDO_LINK" ] || return 0
+    local sudo="" now
+    echo "Se deja como estaba: $LOAD_UNDO_LINK -> ${LOAD_UNDO_TARGET:-nada}"
+    [ -w "$HTDOCS_DIR" ] || sudo=sudo
+    now=$(readlink "$HTDOCS_DIR/$LOAD_UNDO_LINK" 2> /dev/null)
+    if [ "$now" != "$LOAD_UNDO_TARGET" ]; then
+        if [ -n "$LOAD_UNDO_TARGET" ]; then
+            run $sudo ln -sfn "$LOAD_UNDO_TARGET" "$HTDOCS_DIR/$LOAD_UNDO_LINK"
+        elif [ -L "$HTDOCS_DIR/$LOAD_UNDO_LINK" ]; then
+            run $sudo unlink "$HTDOCS_DIR/$LOAD_UNDO_LINK"
+        fi
+    fi
+    if [ -n "$LOAD_UNDO_ACTIVE" ] && [ "$(readlink /opt/lampp)" != "$LOAD_UNDO_ACTIVE" ]; then
+        use_lampp "${LOAD_UNDO_ACTIVE#/opt/lampp-}"
+    elif [ -f /opt/lampp/logs/httpd.pid ]; then
+        run sudo /opt/lampp/lampp reloadapache > /dev/null
+    fi
+    LOAD_UNDO_LINK=""
+}
+
 function load_project() {
-    local folder=${1%/} version=$2 link sudo="" secured=1
+    local folder=${1%/} version=$2 link rc
 
     valid_project "$folder" || return 1
     if [ -n "$version" ] && { ! valid_version_name "$version" || [ ! -d "/opt/lampp-$version" ]; }; then
         echo "No existe la version $version de lampp en el sistema"
 
+        return 1
+    fi
+    # La contraseña antes de cambiar nada: cancelarla deja el proyecto de antes cargado
+    if [ "$DRY" -eq 0 ] && [ -n "$SUDO" ] && ! sudo -v; then
+        echo "Cancelado: no se ha cambiado nada"
         return 1
     fi
 
@@ -2166,6 +2615,22 @@ function load_project() {
 
         return 1
     fi
+    LOAD_UNDO_LINK=$link LOAD_UNDO_TARGET=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null)
+    LOAD_UNDO_ACTIVE=$(readlink /opt/lampp 2> /dev/null)
+    [ "$DRY" -eq 0 ] && trap 'load_project_undo; exit 130' TERM INT HUP
+    load_project_steps "$folder" "$version" "$link" "$3"
+    rc=$?
+    if [ $rc -ne 0 ] && [ "$DRY" -eq 0 ]; then
+        load_project_undo
+    fi
+    trap - TERM INT HUP
+    LOAD_UNDO_LINK=""
+    return $rc
+}
+
+# Los cambios de load_project (ver arriba): <carpeta> <version> <enlace> <base>
+function load_project_steps() {
+    local folder=$1 version=$2 link=$3 sudo="" secured=1
     htdocs_close_world "$HTDOCS_DIR/$folder"
 
     [ -w "$HTDOCS_DIR" ] || sudo=sudo
@@ -2207,8 +2672,13 @@ function load_project() {
     # Tienda PrestaShop: su dominio con vhost, certificado y falseado en /etc/hosts. Otro proyecto:
     # ningun dominio falseado
     # La base con la que se carga queda asociada a la carpeta (wp-config.php la usa la proxima vez)
-    [[ "$3" =~ ^[A-Za-z0-9_-]+$ ]] && remember_project "$3" "$folder" "$(active_name)"
-    load_project_domain "$folder" "$3" || return 1
+    [[ "$4" =~ ^[A-Za-z0-9_-]+$ ]] && remember_project "$4" "$folder" "$(active_name)"
+    load_project_domain "$folder" "$4" || return 1
+    # Correo de pruebas: Mailpit con la version y la BBDD del proyecto al dia (sus plugins de correo, la
+    # configuracion de la tienda)
+    mailpit_sync
+    local mdb
+    mdb=$(mail_project_db "$folder" "$4") && db_names "$(active_dir)" | grep -qxF "$mdb" && mail_db "$mdb"
 
     echo "Proyecto cargado: $link -> $folder$([ -L /opt/lampp ] && echo " ($(readlink /opt/lampp | sed 's:^/opt/::'))")"
 }
@@ -2275,7 +2745,7 @@ for raw in open(sys.argv[1], errors="replace"):
                             " ".join(a.lower() for a in block["alias"]), block["crt"], block["key"]]))
         block = None
         continue
-    key, value = (re.split(r"\s+", line, 1) + [""])[:2]
+    key, value = (re.split(r"\s+", line, maxsplit=1) + [""])[:2]
     value = value.strip().strip('"')
     key = key.lower()
     if key == "documentroot":
@@ -2615,7 +3085,7 @@ for line in lines:
     if block is not None:
         block.append(len(out) - 1)
         if re.match(r"(?i)</VirtualHost>", s):
-            names = [re.split(r"\s+", out[i].strip(), 1)[1].split(":")[0].lower() for i in block
+            names = [re.split(r"\s+", out[i].strip(), maxsplit=1)[1].split(":")[0].lower() for i in block
                      if re.match(r"(?i)\s*ServerName\s+\S", out[i])]
             if dom in names:
                 for i in block:
@@ -3582,6 +4052,30 @@ function ensure_web_user() {
 # con User/Group, solo se cambia lo que falta; lo anterior queda en ~/lvm-copias.
 SECURE_MARK=etc/lvm-seguridad
 
+# Mitigaciones de PHP2Shell (CVE-2026-109618 y CVE-2026-109619) en el PHP de todas las pilas, tambien
+# en las que ya llevan el arreglo: sin el progreso de las subidas en la sesion, poco anidamiento en las
+# variables de la peticion, peticiones de 64 MB como mucho y sin decir la version de PHP. SECURE_PY
+# las pone en las versiones instaladas (las recibe en LVM_PHP_INI y LVM_PHP_INI_85)
+PHP_SECURE_INI="session.upload_progress.enabled = Off
+max_input_nesting_level = 6
+post_max_size = 64M
+upload_max_filesize = 64M
+expose_php = Off"
+# (solo desde PHP 8.5: sin la traza de las llamadas en los errores fatales)
+PHP_SECURE_INI_85="fatal_error_backtraces = 0"
+
+# ¿Es la rama X.Y de PHP la 8.5 o posterior?
+function php_85_or_later() {
+    [ "$(printf '%s\n' 8.5 "$1" | sort -V | head -1)" == 8.5 ]
+}
+
+# Fichero conf.d/99-lvm-seguridad.ini de una pila propia (el mismo que escribe SECURE_PY)
+function php_secure_ini_file() {
+    printf '; lvm-instalador: mitigaciones de PHP2Shell (CVE-2026-109618 y CVE-2026-109619)\n%s\n' "$PHP_SECURE_INI"
+    php_85_or_later "${1%.*}" && printf '%s\n' "$PHP_SECURE_INI_85"
+    return 0
+}
+
 # ¿Tiene el equipo la direccion ::1? (sin ella, Apache no arrancaria con Listen [::1]:80)
 function has_ipv6_loopback() {
     grep -q '^0\{31\}1 ' /proc/net/if_inet6 2> /dev/null
@@ -3676,6 +4170,22 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
         Header always unset Access-Control-Allow-Credentials
     </If>
 </IfModule>
+
+# Barrera entre webs, en todas (localhost, web.local, los dominios falseados y los vhosts de los
+# proyectos): otra web abierta en el navegador no puede mandar nada a tus proyectos con tus sesiones
+# (un formulario o un fetch a https://tienda.local/admin/...). Desde otro sitio (Sec-Fetch-Site:
+# cross-site) solo se puede abrir una pagina con un enlace (GET o HEAD, de navegacion), y un POST,
+# PUT o DELETE solo vale desde la propia web (su Origin). Una pasarela de pago que vuelve a la tienda
+# con un POST no pasa: se apaga en Configuracion (o lvm-instalador barrera-web no) mientras se prueba
+# (los navegadores mandan Sec-Fetch-Mode y Sec-Fetch-Dest con Sec-Fetch-Site: si faltan, cuenta como enlace)
+# >>> barrera entre webs
+<If "(%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
+    Require all denied
+    ErrorDocument 403 "Otra web ha intentado mandar algo a esta: no se ha hecho nada (barrera entre webs de lvm-instalador). Si es una pasarela de pago que vuelve a la tienda, apaga la barrera en Configuracion mientras la pruebas."
+</If>
+# <<< barrera entre webs
+# Peticiones de 64 MB como mucho (lo mismo que post_max_size y upload_max_filesize de PHP)
+LimitRequestBody 67108864
 TraceEnable Off
 '
 UNKNOWN_HOST_SSL='
@@ -3699,10 +4209,425 @@ UNKNOWN_HOST_SSL='
 </VirtualHost>
 </IfModule>
 '
+# Barrera entre webs (Configuracion): encendida salvo que exista este fichero. Apagada, el
+# lvm-dominio-desconocido.conf de cada version se escribe sin ella (SECURE_PY lo rehace al cambiarla)
+CROSS_SITE_OFF="$LOG_DIR/sin-barrera-entre-webs"
+function cross_site_on() {
+    [ ! -e "$CROSS_SITE_OFF" ]
+}
+
+# Texto de lvm-dominio-desconocido.conf con la barrera entre webs o sin ella: lo deja en HOST_VHOST
+function host_vhost() {
+    HOST_VHOST=$UNKNOWN_HOST_VHOST
+    cross_site_on && return 0
+    HOST_VHOST=${UNKNOWN_HOST_VHOST%%"# >>> barrera entre webs"*}${UNKNOWN_HOST_VHOST#*"# <<< barrera entre webs"$'\n'}
+}
+
+# ===========================================================================
+# Correo de pruebas: Mailpit
+# ===========================================================================
+# Lo que mandan las webs locales (formularios, pedidos, contraseñas) no puede llegar a nadie: con las
+# BBDD copiadas de los clientes, un pedido de prueba avisaria al cliente real. Con el correo de pruebas
+# encendido (por defecto), todo va a Mailpit (https://github.com/axllent/mailpit, MIT), que lo guarda
+# y lo enseña en http://127.0.0.1:8025/:
+#   - mail() de PHP en todas las versiones (sendmail_path al sendmail de Mailpit; SECURE_PY)
+#   - WordPress con plugins de SMTP o Brevo, segun MAIL_WP_FILE: mailpit (los de SMTP siguen, pero
+#     con su correo a Mailpit: etc/lvm-correo-wordpress.php en auto_prepend_file; los que mandan por
+#     una API se desactivan en la copia local), desactivar (todos fuera de la copia local, con lo que
+#     WordPress usa mail()) o nada (no se tocan: el correo puede salir de verdad)
+#   - PrestaShop: su configuracion de correo, por SMTP a Mailpit (en la copia local)
+# Los cambios en las BBDD se apuntan (con lo que habia) en la tabla MAIL_TABLE de la propia base: se
+# deshacen al apagarlo y no salen en las copias (exportar-bd, copiar-bd, Docker). Mailpit va con la
+# version activa: arranca y para con ella, con tu usuario y solo en 127.0.0.1
+# Version fijada y sha256 de cada .tar.gz (de los digest de la publicacion en GitHub, comprobados al
+# descargarlos el 25/10/2026). La 1.32.0 arregla fallos de seguridad (GHSA-379p-g4f4-hq5h)
+MAILPIT_VERSION="1.32.0"
+MAILPIT_SHA_AMD64="4b5993c978e8604c70d43927e2ad103b311bba3b1822fa0cf1d4ee4ec890a93c"
+MAILPIT_SHA_ARM64="e1e45d1dc72bd497fb262a1e4100178eee057c42c5fc36d143eb8621769e1137"
+# El programa, de root junto a la configuracion compartida (/opt/config/mailpit): ni tu usuario ni
+# una web pueden cambiar lo que ejecuta PHP al mandar un correo. Sus datos, solo tuyos
+MAILPIT_DIR=$(dirname "$VHOSTS_FILE")/mailpit
+MAILPIT_BIN=$MAILPIT_DIR/mailpit
+MAILPIT_DATA=$LOG_DIR/mailpit
+MAILPIT_MAX=500
+MAIL_SMTP_PORT=1025
+MAIL_UI_PORT=8025
+MAIL_UI_URL="http://127.0.0.1:$MAIL_UI_PORT/"
+# Encendido salvo que exista MAIL_OFF_FILE; el modo de WordPress, en MAIL_WP_FILE (mailpit si no hay)
+MAIL_OFF_FILE=$LOG_DIR/correo-apagado
+MAIL_WP_FILE=$LOG_DIR/correo-wordpress
+MAIL_TABLE=lvm_correo_original
+
+# etc/lvm-correo-wordpress.php de cada version (lo escribe SECURE_PY como root; @PUERTO@, el SMTP de
+# Mailpit). PHP 7.1 o posterior (el XAMPP mas antiguo)
+MAIL_WP_PHP=$(cat <<'PHP'
+<?php
+// lvm-instalador (Nexum Dev Stack): correo de pruebas de WordPress. Lo pone root y PHP lo carga antes
+// de cada script de esta version (auto_prepend_file) mientras el correo de pruebas esta encendido y
+// los plugins de SMTP de WordPress van a Mailpit. Fuera de WordPress no hace nada: solo deja dos
+// ganchos en la lista que WordPress lee al arrancar (desde la 4.7 la pasa a WP_Hook con
+// WP_Hook::build_preinitialized_hooks; las anteriores la usan tal cual).
+//  - phpmailer_init, el ultimo: lo que sale por PHPMailer (wp_mail y los plugins de SMTP que lo usan:
+//    WP Mail SMTP, Easy WP SMTP, SMTP Mailer, WP SMTP...) va al SMTP de Mailpit, sin usuario ni cifrado
+//  - pre_http_request: no se llama a las API de envio de correo (Brevo, SendGrid, Mailgun...)
+if (!isset($GLOBALS['wp_filter']) || is_array($GLOBALS['wp_filter'])) {
+    $GLOBALS['wp_filter']['phpmailer_init'][PHP_INT_MAX][] = array(
+        'function' => function ($mailer) {
+            if (!is_object($mailer) || !method_exists($mailer, 'isSMTP')) {
+                return;
+            }
+            $mailer->isSMTP();
+            $mailer->Host = '127.0.0.1';
+            $mailer->Port = @PUERTO@;
+            $mailer->SMTPAuth = false;
+            $mailer->Username = '';
+            $mailer->Password = '';
+            $mailer->SMTPSecure = '';
+            $mailer->SMTPAutoTLS = false;
+        },
+        'accepted_args' => 1,
+    );
+    $GLOBALS['wp_filter']['pre_http_request'][PHP_INT_MAX][] = array(
+        'function' => function ($pre, $args = array(), $url = '') {
+            $host = strtolower((string) parse_url((string) $url, PHP_URL_HOST));
+            $path = strtolower((string) parse_url((string) $url, PHP_URL_PATH));
+            // dominio => parte de la ruta ('' = cualquiera)
+            $apis = array(
+                'brevo.com' => '', 'sendinblue.com' => '', 'sendgrid.com' => '', 'sendgrid.net' => '',
+                'mailgun.net' => '', 'postmarkapp.com' => '', 'sparkpost.com' => '', 'mailjet.com' => '',
+                'smtp2go.com' => '', 'resend.com' => '', 'mailersend.com' => '', 'elasticemail.com' => '',
+                'sendlayer.com' => '', 'smtp.com' => '', 'mandrillapp.com' => '', 'zeptomail.com' => '',
+                'zeptomail.eu' => '', 'sendpulse.com' => '', 'pepipost.com' => '', 'netcorecloud.net' => '',
+                'socketlabs.com' => '', 'gmail.googleapis.com' => '/send', 'graph.microsoft.com' => '/sendmail',
+                'mail.zoho.com' => '/messages', 'mail.zoho.eu' => '/messages',
+            );
+            $hit = (bool) preg_match('/^email(-smtp)?\.[a-z0-9-]+\.amazonaws\.com$/', $host);
+            foreach ($apis as $api => $part) {
+                if (($host === $api || substr($host, -strlen($api) - 1) === '.' . $api)
+                        && ($part === '' || strpos($path, $part) !== false)) {
+                    $hit = true;
+                }
+            }
+            if ($hit && class_exists('WP_Error')) {
+                return new WP_Error('lvm_correo', 'Correo de pruebas (lvm-instalador): en este equipo no se llama a '
+                    . 'las API de envio de correo; lo que se mande va a Mailpit.');
+            }
+            return $pre;
+        },
+        'accepted_args' => 3,
+    );
+}
+PHP
+)
+
+function mail_on() {
+    [ ! -e "$MAIL_OFF_FILE" ]
+}
+
+# Modo de los plugins de correo de WordPress: mailpit, desactivar o nada
+function mail_wp_mode() {
+    local m=""
+    [ -f "$MAIL_WP_FILE" ] && m=$(head -c 20 "$MAIL_WP_FILE" | tr -d ' \n')
+    case $m in
+        desactivar|nada) echo "$m" ;;
+        *) echo mailpit ;;
+    esac
+}
+
+function mailpit_installed() {
+    [ -f "$MAILPIT_BIN" ] && [ -x "$MAILPIT_BIN" ] && [ ! -L "$MAILPIT_BIN" ]
+}
+
+function mailpit_installed_version() {
+    head -c 20 "$MAILPIT_DIR/version" 2> /dev/null | head -1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'
+}
+
+# Lo que SECURE_PY pone en el PHP de cada version (LVM_CORREO): binario|puerto|WordPress a Mailpit
+# (1/0). Nada con el correo apagado. Sin Mailpit instalado tambien: mail() falla en lugar de salir
+function mail_secure_spec() {
+    mail_on || return 0
+    echo "$MAILPIT_BIN|$MAIL_SMTP_PORT|$([ "$(mail_wp_mode)" == mailpit ] && echo 1 || echo 0)"
+}
+
+# Numero del proceso de Mailpit: el de su .pid si es tuyo y es el del gestor o, si se ha perdido, el
+# que este en marcha con su binario
+function mailpit_pid() {
+    local p
+    p=$(head -c 20 "$MAILPIT_DATA/mailpit.pid" 2> /dev/null | tr -d ' \n')
+    if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -gt 1 ] && [ -O "/proc/$p" ] \
+            && tr '\0' '\n' < "/proc/$p/cmdline" 2> /dev/null | grep -qxF -- "$MAILPIT_BIN"; then
+        echo "$p"
+        return 0
+    fi
+    p=$(pgrep -u "$(id -u)" -f -- "$MAILPIT_BIN --smtp" 2> /dev/null | head -1)
+    [ -n "$p" ] && echo "$p"
+}
+
+# Arranca Mailpit con tu usuario: SMTP y web solo en 127.0.0.1, la web solo con su direccion (Mailpit
+# rechaza otro Host: una web cuyo dominio apunte a 127.0.0.1, DNS rebinding, no puede leer los
+# correos; y las peticiones de otras webs que cambian algo, por su Origin), sin buscar versiones
+# nuevas, sin CSS ni fuentes de fuera en los correos y como mucho MAILPIT_MAX. Con el entorno limpio:
+# Mailpit lee su configuracion de las variables MP_* (una MP_SMTP_RELAY_ALL de tu sesion mandaria los
+# correos de verdad)
+function mailpit_start() {
+    local p="" i
+    [ -n "$(mailpit_pid)" ] && return 0
+    mailpit_installed || return 1
+    # (--suave, desde la ventana cada 20 s: si no pudo arrancar hace menos de 5 minutos, no se espera otra vez)
+    [ "$1" == --suave ] && [ -n "$(find "$MAILPIT_DATA/no-arranca" -mmin -5 2> /dev/null)" ] && return 1
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] Mailpit en 127.0.0.1:$MAIL_SMTP_PORT (SMTP) y $MAIL_UI_URL, con datos en $MAILPIT_DATA"
+        return 0
+    fi
+    if [ -L "$MAILPIT_DATA" ] || { [ -e "$MAILPIT_DATA" ] && [ ! -O "$MAILPIT_DATA" ]; }; then
+        echo "$MAILPIT_DATA no es una carpeta tuya: no se arranca Mailpit"
+        return 1
+    fi
+    mkdir -p -m 700 "$MAILPIT_DATA" && chmod 700 "$MAILPIT_DATA" || return 1
+    ( cd / && exec env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin setsid "$MAILPIT_BIN" \
+        --smtp "127.0.0.1:$MAIL_SMTP_PORT" --listen "127.0.0.1:$MAIL_UI_PORT" \
+        --allowed-hosts "127.0.0.1:$MAIL_UI_PORT,localhost:$MAIL_UI_PORT" \
+        --database "$MAILPIT_DATA/mailpit.db" --max "$MAILPIT_MAX" --label "Nexum Dev Stack" \
+        --disable-version-check --block-remote-css-and-fonts --smtp-disable-rdns --quiet \
+        --log-file "$MAILPIT_DATA/mailpit.log" ) < /dev/null > /dev/null 2>&1 &
+    # (lista en un par de segundos; si no aparece o se cierra enseguida, el puerto lo usa otro programa.
+    # Su numero se busca: setsid puede arrancarlo en un proceso aparte)
+    for i in $(seq 30); do
+        sleep 0.1
+        p=$(pgrep -u "$(id -u)" -f -- "$MAILPIT_BIN --smtp" 2> /dev/null | head -1)
+        [ -n "$p" ] && curl -s --noproxy '*' --max-time 1 -o /dev/null "${MAIL_UI_URL}readyz" 2> /dev/null && break
+    done
+    p=$(pgrep -u "$(id -u)" -f -- "$MAILPIT_BIN --smtp" 2> /dev/null | head -1)
+    if [ -z "$p" ]; then
+        rm -f "$MAILPIT_DATA/mailpit.pid"
+        : > "$MAILPIT_DATA/no-arranca"
+        echo "Mailpit no ha arrancado (¿otro programa en el puerto $MAIL_SMTP_PORT o $MAIL_UI_PORT?): mira $MAILPIT_DATA/mailpit.log"
+        return 1
+    fi
+    echo "$p" > "$MAILPIT_DATA/mailpit.pid"
+    rm -f "$MAILPIT_DATA/no-arranca"
+    echo "Mailpit en marcha: el correo de las webs se ve en $MAIL_UI_URL"
+}
+
+function mailpit_stop() {
+    local p i
+    p=$(mailpit_pid)
+    if [ -z "$p" ]; then
+        rm -f "$MAILPIT_DATA/mailpit.pid"
+        return 0
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se para Mailpit ($p)"
+        return 0
+    fi
+    kill "$p" 2> /dev/null
+    for i in $(seq 50); do
+        kill -0 "$p" 2> /dev/null || break
+        sleep 0.1
+    done
+    kill -0 "$p" 2> /dev/null && kill -9 "$p" 2> /dev/null
+    rm -f "$MAILPIT_DATA/mailpit.pid"
+    echo "Mailpit parado"
+}
+
+# Mailpit en marcha solo con el correo de pruebas encendido, instalado y la version activa en marcha
+# (--suave: lo pasa a mailpit_start)
+function mailpit_sync() {
+    if mail_on && mailpit_installed && lampp_running; then
+        mailpit_start "$1"
+    else
+        mailpit_stop
+    fi
+}
+
+# Instala (o pone al dia) Mailpit en MAILPIT_DIR: el .tar.gz oficial de GitHub para este equipo,
+# comprobado con su sha256 y abierto como root en una carpeta de root (asi ningun programa tuyo puede
+# cambiarlo entre la comprobacion y la copia). Solo el programa y su licencia, de root
+function mailpit_install() {
+    local arch sha url tmp rtmp got own=(-o 0 -g 0) tls=(--proto '=https' --tlsv1.2)
+    case $(uname -m) in
+        x86_64|amd64) arch=amd64 sha=$MAILPIT_SHA_AMD64 ;;
+        aarch64|arm64) arch=arm64 sha=$MAILPIT_SHA_ARM64 ;;
+        *) echo "Mailpit no publica version para este equipo ($(uname -m))"; return 1 ;;
+    esac
+    url=https://github.com/axllent/mailpit/releases/download/v$MAILPIT_VERSION/mailpit-linux-$arch.tar.gz
+    # (las pruebas, sin root ni red: otro fichero y su suma)
+    if [ -n "$TEST_DIR" ]; then
+        url=${LVM_MAILPIT_URL:-$url} sha=${LVM_MAILPIT_SHA:-$sha} own=() tls=()
+    fi
+    if mailpit_installed && [ "$(mailpit_installed_version)" == "$MAILPIT_VERSION" ]; then
+        echo "Mailpit $MAILPIT_VERSION ya esta instalado en $MAILPIT_DIR"
+        return 0
+    fi
+    echo "Instalando Mailpit $MAILPIT_VERSION (correo de pruebas) en $MAILPIT_DIR"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] descarga de $url, comprobacion de su sha256 y copia de root en $MAILPIT_BIN"
+        return 0
+    fi
+    # La carpeta compartida tiene que ser de root (Mailpit va dentro)
+    vhosts_root
+    if [ -L "$MAILPIT_DIR" ] || { [ -z "$TEST_DIR" ] && [ -e "$MAILPIT_DIR" ] && [ "$(stat -c %u "$MAILPIT_DIR")" != 0 ]; }; then
+        echo "$MAILPIT_DIR no es una carpeta de root: no se instala Mailpit"
+        return 1
+    fi
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    tmp=$(mktemp -d "$LOG_DIR/mailpit-descarga.XXXXXX") || return 1
+    echo "Descargando $(basename "$url")..."
+    if ! curl -fsSL "${tls[@]}" --retry 2 --max-time 600 -o "$tmp/mailpit.tar.gz" "$url"; then
+        rm -rf "$tmp"
+        echo "No se ha podido descargar Mailpit ($url)"
+        echo "Se puede descargar a mano de https://github.com/axllent/mailpit/releases/tag/v$MAILPIT_VERSION"
+        return 1
+    fi
+    rtmp=$($SUDO mktemp -d "${TEST_DIR:-/tmp}/lvm-mailpit.XXXXXX") && $SUDO chmod 700 "$rtmp" || { rm -rf "$tmp"; return 1; }
+    $SUDO cp "$tmp/mailpit.tar.gz" "$rtmp/mailpit.tar.gz"
+    rm -rf "$tmp"
+    got=$($SUDO sha256sum "$rtmp/mailpit.tar.gz" 2> /dev/null | cut -d' ' -f1)
+    if [ "$got" != "$sha" ]; then
+        $SUDO rm -rf "$rtmp"
+        echo "La descarga de Mailpit no coincide con su suma sha256 (${got:-ninguna}): no se instala."
+        return 1
+    fi
+    # Se abre entero en su carpeta (ya comprobado con su sha256) y se busca el programa: segun la
+    # version, el paquete lo guarda como mailpit o ./mailpit, con o sin LICENSE al lado
+    local x=$rtmp/x bin lic err
+    if ! err=$({ $SUDO mkdir "$x" && $SUDO tar -xzf "$rtmp/mailpit.tar.gz" -C "$x" --no-same-owner --no-same-permissions; } 2>&1); then
+        $SUDO rm -rf "$rtmp"
+        echo "No se ha podido abrir el paquete de Mailpit: no se instala."
+        [ -n "$err" ] && sed 's/^/  /' <<< "$err" | head -5
+        echo "Se puede descargar a mano de https://github.com/axllent/mailpit/releases/tag/v$MAILPIT_VERSION ($(basename "$url"))"
+        return 1
+    fi
+    bin=$($SUDO find "$x" -maxdepth 2 -type f -name mailpit 2> /dev/null | head -1)
+    lic=$($SUDO find "$x" -maxdepth 2 -type f -name LICENSE 2> /dev/null | head -1)
+    if [ -z "$bin" ]; then
+        $SUDO rm -rf "$rtmp"
+        echo "El paquete de Mailpit no trae su programa: no se instala."
+        return 1
+    fi
+    if ! { $SUDO install -d "${own[@]}" -m 755 "$MAILPIT_DIR" \
+            && $SUDO install "${own[@]}" -m 755 "$bin" "$MAILPIT_DIR/mailpit.nuevo" \
+            && $SUDO mv -f "$MAILPIT_DIR/mailpit.nuevo" "$MAILPIT_BIN" \
+            && { [ -z "$lic" ] || $SUDO install "${own[@]}" -m 644 "$lic" "$MAILPIT_DIR/LICENSE"; } \
+            && echo "$MAILPIT_VERSION" | $SUDO tee "$MAILPIT_DIR/version" > /dev/null; }; then
+        $SUDO rm -rf "$rtmp"
+        echo "No se ha podido copiar Mailpit a $MAILPIT_DIR"
+        return 1
+    fi
+    $SUDO rm -rf "$rtmp"
+    echo "Mailpit $MAILPIT_VERSION instalado: $MAILPIT_BIN (sus correos, en $MAILPIT_DATA)"
+    # (el de antes, si estaba en marcha, se para: mailpit_sync arranca el nuevo)
+    [ -n "$(mailpit_pid)" ] && mailpit_stop > /dev/null
+    return 0
+}
+
+# Despues de cambiar el correo de pruebas: el PHP de todas las versiones (como asegurar --todas, pide
+# la contraseña), Apache y PHP-FPM de la activa recargados, Mailpit en marcha o parado y la BBDD del
+# proyecto cargado al dia
+function mail_apply() {
+    local rc
+    secure_all
+    rc=$?
+    if [ $rc -eq 2 ]; then
+        echo "No se ha podido cambiar en todas las versiones: prueba con lvm-instalador asegurar --todas"
+        return 1
+    fi
+    if [ $rc -eq 0 ] && lampp_running; then
+        run sudo /opt/lampp/lampp reloadapache > /dev/null || { echo "No se ha podido recargar Apache"; return 1; }
+    fi
+    mailpit_sync
+    mail_loaded_project
+    return 0
+}
+
+# Texto del modo de WordPress
+function mail_wp_text() {
+    case $1 in
+        mailpit) echo "los plugins de SMTP de WordPress siguen, con su correo a Mailpit (los que mandan por una API, como Brevo, se desactivan en la copia local)" ;;
+        desactivar) echo "los plugins de SMTP y de envio de correo de WordPress se desactivan en la copia local (WordPress usa mail(), que va a Mailpit)" ;;
+        nada) echo "los plugins de correo de WordPress no se tocan: lo que manden por SMTP o por su API puede llegar de verdad" ;;
+    esac
+}
+
+# correo [estado] | si | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>
+function mail_command() {
+    local mode
+    case $1 in
+        ""|estado)
+            if mail_on; then
+                echo "Correo de pruebas encendido: lo que mandan las webs va a Mailpit"
+            else
+                echo "Correo de pruebas apagado: lo que mandan las webs sale como sin el gestor (puede llegar de verdad)"
+            fi
+            echo "  WordPress: $(mail_wp_text "$(mail_wp_mode)")"
+            if mailpit_installed; then
+                echo "  Mailpit $(mailpit_installed_version) en $MAILPIT_BIN$([ -n "$(mailpit_pid)" ] && echo ", en marcha: $MAIL_UI_URL" || echo ", parado (va con la version activa)")"
+            else
+                echo "  Mailpit no esta instalado (lvm-instalador correo instalar): sin el, mail() falla y no sale nada"
+            fi
+            return 0 ;;
+        si|on|no|off)
+            mkdir -p -m 700 "$LOG_DIR" || return 1
+            if [ "$1" == si ] || [ "$1" == on ]; then
+                mail_on && { echo "El correo de pruebas ya estaba encendido"; return 0; }
+                # (--instalar: y Mailpit, si no lo esta; lo ofrece la ventana la primera vez)
+                if [ "$2" == --instalar ] && ! mailpit_installed; then
+                    mailpit_install || return 1
+                fi
+                [ "$DRY" -eq 0 ] && rm -f "$MAIL_OFF_FILE"
+                mailpit_installed || echo "Aviso: Mailpit no esta instalado (lvm-instalador correo instalar): hasta entonces mail() falla"
+            else
+                mail_on || { echo "El correo de pruebas ya estaba apagado"; return 0; }
+                [ "$DRY" -eq 0 ] && { : > "$MAIL_OFF_FILE" || return 1; }
+            fi
+            if [ "$DRY" -eq 1 ]; then
+                echo "  [simulacion] correo de pruebas $([[ "$1" =~ ^(si|on)$ ]] && echo encendido || echo apagado) en todas las versiones"
+                return 0
+            fi
+            mail_apply || return 1
+            mail_on && echo "Correo de pruebas encendido: lo que manden las webs va a Mailpit" \
+                || echo "Correo de pruebas apagado: lo que manden las webs puede llegar de verdad"
+            return 0 ;;
+        wordpress)
+            mode=$2
+            case $mode in
+                mailpit|desactivar|nada) ;;
+                *) echo "Uso: lvm-instalador correo wordpress mailpit|desactivar|nada"; return 1 ;;
+            esac
+            if [ "$DRY" -eq 1 ]; then
+                echo "  [simulacion] WordPress: $(mail_wp_text "$mode")"
+                return 0
+            fi
+            mkdir -p -m 700 "$LOG_DIR" && echo "$mode" > "$MAIL_WP_FILE" || return 1
+            mail_apply || return 1
+            echo "WordPress: $(mail_wp_text "$mode")"
+            return 0 ;;
+        instalar)
+            mailpit_install || return 1
+            [ "$DRY" -eq 1 ] && return 0
+            if mail_on; then
+                mail_apply
+            else
+                echo "El correo de pruebas esta apagado: enciendelo con lvm-instalador correo si"
+            fi
+            return 0 ;;
+        vaciar)
+            [ -n "$(mailpit_pid)" ] || { echo "Mailpit no esta en marcha"; return 1; }
+            run curl -fs --noproxy '*' --max-time 10 -X DELETE -o /dev/null "${MAIL_UI_URL}api/v1/messages" \
+                || { echo "No se ha podido vaciar la bandeja de Mailpit"; return 1; }
+            echo "Bandeja de Mailpit vacia"
+            return 0 ;;
+        bd)
+            mail_db "$2" ;;
+        *)
+            echo "Uso: lvm-instalador correo [estado] | si [--instalar] | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>"
+            return 1 ;;
+    esac
+}
 
 # Ficheros de configuracion de una version que hay que cambiar: <ruta>|<fichero nuevo>|<que cambia>
 SECURE_PY='
-import glob, os, re, sys
+import glob, os, re, stat, sys
 base, out, v6 = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 UNKNOWN_HOST_CONF, UNKNOWN_HOST_VHOST, UNKNOWN_HOST_SSL = sys.argv[4], sys.argv[5], sys.argv[6]
 changes = []
@@ -3833,6 +4758,22 @@ if own(path):
     elif own(conf) and read(conf).startswith("# lvm-instalador:") and read(conf) != want:
         save(conf, want, "Apache, phpMyAdmin en 127.0.0.1 y sin .env, .git ni copias de bases")
 
+# Apache: sin CGI ni SSI en las carpetas de los proyectos (htdocs): un .cgi o .pl subido a una web
+# (por un formulario de un proyecto antiguo) ya no se ejecuta. El cgi-bin de la version sigue igual
+path = os.path.join(base, "etc/httpd.conf")
+if own(path):
+    text = read(path)
+    def no_cgi(m):
+        words = [w for w in m.group(3).split() if w.lower() not in ("execcgi", "includes", "+execcgi", "+includes")]
+        return m.group(1) + m.group(2) + " ".join(words) + m.group(4)
+    new = re.sub(r"(?is)(<Directory[ \t]+\"?[^\">\n]*/htdocs/?\"?[ \t]*>.*?^)([ \t]*Options[ \t]+)([^\r\n]*?)([ \t]*\r?$)",
+                 lambda m: no_cgi(m) if re.search(r"(?i)\b(execcgi|includes)\b", m.group(3))
+                 and "</directory" not in m.group(1).lower() else m.group(0), text, flags=re.M)
+    new = re.sub(r"(?mi)^([ \t]*)(AddHandler[ \t]+cgi-script[ \t]+\.cgi[ \t]+\.pl[ \t]*)(\r?)$",
+                 r"\1# (lvm-instalador: sin CGI en los proyectos) \2\3", new)
+    if new != text:
+        save(path, new, "Apache, sin CGI ni SSI en los proyectos (ExecCGI, Includes y .cgi .pl)")
+
 # MariaDB: bind-address = 127.0.0.1 en [mysqld] si no tiene un bind-address de este equipo ni
 # skip-networking. Un bind-address abierto (0.0.0.0, ::, *, la IP de la red) o skip-networking=0 se
 # comentan: estaban ahi, pero dejaban entrar desde la red
@@ -3921,6 +4862,114 @@ if own(path):
     if os.path.normpath(priv) == NOFILES and not os.path.isdir(NOFILES):
         # (una carpeta, no un fichero: secure_lampp la crea de root)
         changes.append(("etc/lvm-sin-ficheros/", "", "MariaDB, carpeta vacia de secure_file_priv"))
+
+# PHP: mitigaciones de PHP2Shell (PHP_SECURE_INI, en LVM_PHP_INI). Las pilas propias, en un fichero
+# suyo de conf.d (99-lvm-seguridad.ini, que va despues de 99-lampp.ini); los XAMPP, en su etc/php.ini:
+# cada directiva se cambia donde esta o, si no esta, se añade al final con las demas del gestor
+# (las directivas, separadas por ; para que la orden de sudo sea una sola linea)
+ini = [l.strip() for l in re.split(r"[;\n]", os.environ.get("LVM_PHP_INI", "")) if "=" in l]
+stack_php = ""
+if own(os.path.join(base, "etc/lvm-php")):
+    stack_php = read(os.path.join(base, "etc/lvm-php")).strip()
+def at_least(v, want):
+    try:
+        return tuple(int(x) for x in v.split(".")[:2]) >= want
+    except ValueError:
+        return False
+if ini and at_least(stack_php, (8, 5)):
+    ini += [l.strip() for l in re.split(r"[;\n]", os.environ.get("LVM_PHP_INI_85", "")) if "=" in l]
+confd = os.path.join(base, "php/etc/conf.d")
+if ini and own(os.path.join(base, "etc/lvm-stack")) and os.path.isdir(confd) and not os.path.islink(confd):
+    path = os.path.join(confd, "99-lvm-seguridad.ini")
+    want = "; lvm-instalador: mitigaciones de PHP2Shell (CVE-2026-109618 y CVE-2026-109619)\n" + "\n".join(ini) + "\n"
+    if not os.path.lexists(path) or (own(path) and read(path) != want):
+        save(path, want, "PHP, mitigaciones de PHP2Shell (sin el progreso de las subidas, 64 MB como mucho)")
+elif ini and own(os.path.join(base, "etc/php.ini")):
+    path = os.path.join(base, "etc/php.ini")
+    text = read(path)
+    nl = "\r\n" if "\r\n" in text else "\n"
+    new, add = text, []
+    for line in ini:
+        key, val = (x.strip() for x in line.split("=", 1))
+        rx = re.compile(r"(?mi)^[ \t]*%s[ \t]*=[ \t]*([^\r\n]*?)[ \t]*(\r?)$" % re.escape(key))
+        if rx.search(new):
+            # (las que ya tienen el valor, igual: asi no se vuelve a escribir cada vez)
+            new = rx.sub(lambda m: m.group(0) if m.group(1).strip("\"\x27").lower() == val.lower()
+                         else "%s = %s%s" % (key, val, m.group(2)), new)
+        else:
+            add.append("%s = %s" % (key, val))
+    if add:
+        new = new + ("" if new.endswith("\n") else nl) + nl + "; lvm-instalador: mitigaciones de PHP2Shell" + nl \
+            + nl.join(add) + nl
+    if new != text:
+        save(path, new, "PHP, mitigaciones de PHP2Shell en php.ini (sin el progreso de las subidas, 64 MB como mucho)")
+# PHP-FPM de las pilas propias: cada proceso se renueva cada 50 peticiones (lo que se haya podido
+# quedar en su memoria no dura)
+path = os.path.join(base, "php/etc/php-fpm.conf")
+if ini and own(os.path.join(base, "etc/lvm-stack")) and own(path):
+    text = read(path)
+    if not re.search(r"(?mi)^[ \t]*pm\.max_requests\b", text):
+        new = re.sub(r"(?m)^([ \t]*pm\.max_children[ \t]*=[^\n]*\n)", r"\1pm.max_requests = 50\n", text, count=1)
+        if new != text:
+            save(path, new, "PHP-FPM, cada proceso se renueva cada 50 peticiones")
+
+# PHP: correo de pruebas (LVM_CORREO = binario de Mailpit|puerto|WordPress a Mailpit 1/0; vacio, apagado).
+# mail() va a Mailpit (sendmail_path) y, si los plugins de SMTP de WordPress van a Mailpit, PHP carga
+# antes de cada script etc/lvm-correo-wordpress.php (auto_prepend_file; su texto llega en
+# LVM_CORREO_PHP). Las dos rutas solo si son de root, sin enlaces ni escritura para otros, hasta /: nadie
+# mas puede cambiar lo que ejecuta o carga PHP. Las pilas propias, en su conf.d/99-lvm-correo.ini (va
+# despues de los demas); los XAMPP, en un bloque al final de su php.ini, con lo que tenian comentado
+# (vuelve al apagarlo)
+def root_path_ok(path):
+    p = os.path.abspath(path)
+    while not os.path.lexists(p):
+        p = os.path.dirname(p)
+    while True:
+        st = os.lstat(p)
+        if stat.S_ISLNK(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022:
+            return False
+        if p == "/":
+            return True
+        p = os.path.dirname(p)
+mail_lines = []
+m = re.fullmatch(r"(/[A-Za-z0-9._/-]+)\|([0-9]{1,5})\|([01])", os.environ.get("LVM_CORREO", ""))
+if m and "/../" not in m.group(1) + "/":
+    binp, port, wp = m.group(1), m.group(2), m.group(3) == "1"
+    prep = os.path.join(base, "etc/lvm-correo-wordpress.php")
+    php = os.environ.get("LVM_CORREO_PHP", "")
+    # (solo las pruebas, sin root, se saltan la comprobacion; nunca al aplicar)
+    test = os.environ.get("LVM_CORREO_PRUEBA") == "1" and os.environ.get("LVM_SECURE_APPLY") != "1"
+    if test or root_path_ok(binp):
+        mail_lines.append("sendmail_path = \"%s sendmail -S 127.0.0.1:%s\"" % (binp, port))
+        if wp and php.startswith("<?php") and (not os.path.lexists(prep) or own(prep)) and (test or root_path_ok(prep)):
+            want = php.replace("@PUERTO@", port).rstrip("\n") + "\n"
+            if not os.path.lexists(prep) or read(prep) != want:
+                save(prep, want, "PHP, plugins de SMTP de WordPress a Mailpit (lvm-correo-wordpress.php)")
+            mail_lines.append("auto_prepend_file = \"%s\"" % prep)
+MAIL_BEGIN, MAIL_END = "; >>> lvm-instalador: correo de pruebas (Mailpit)", "; <<< lvm-instalador: correo de pruebas"
+MAIL_OFF = "; (lvm-instalador: correo de pruebas) "
+confd = os.path.join(base, "php/etc/conf.d")
+if own(os.path.join(base, "etc/lvm-stack")) and os.path.isdir(confd) and not os.path.islink(confd):
+    path = os.path.join(confd, "99-lvm-correo.ini")
+    want = "; lvm-instalador: correo de pruebas (Mailpit). Se cambia en Configuracion o con lvm-instalador correo\n" \
+        + ("".join(l + "\n" for l in mail_lines) if mail_lines else "; (apagado: el correo de PHP sale como sin el gestor)\n")
+    if (mail_lines and not os.path.lexists(path)) or (own(path) and read(path) != want):
+        save(path, want, "PHP, el correo de las webs va a Mailpit" if mail_lines else "PHP, correo de pruebas apagado")
+elif own(os.path.join(base, "etc/php.ini")):
+    path = os.path.join(base, "etc/php.ini")
+    text = read(path)
+    nl = "\r\n" if "\r\n" in text else "\n"
+    # Lo que habia: sin el bloque del gestor y con lo que dejo comentado
+    new = re.sub(r"(?s)(?:\r?\n)?%s[^\n]*\n.*?%s[^\n]*(?:\n|$)" % (re.escape(MAIL_BEGIN), re.escape(MAIL_END)), "", text)
+    new = re.sub(r"(?m)^%s" % re.escape(MAIL_OFF), "", new)
+    if mail_lines:
+        for line in mail_lines:
+            key = line.split("=", 1)[0].strip()
+            new = re.sub(r"(?mi)^(?=[ \t]*%s[ \t]*=)" % re.escape(key), MAIL_OFF, new)
+        new = new + ("" if new.endswith("\n") or not new else nl) + nl + MAIL_BEGIN + nl + nl.join(mail_lines) + nl + MAIL_END + nl
+    if new != text:
+        save(path, new, "PHP, el correo de las webs va a Mailpit (php.ini)" if mail_lines
+             else "PHP, correo de pruebas apagado (php.ini como estaba)")
 
 # ProFTPD: DefaultAddress 127.0.0.1 y SocketBindTight on, detras de Port
 path = os.path.join(base, "etc/proftpd.conf")
@@ -4089,10 +5138,14 @@ function secure_lampp() {
     # programa tuyo podria cambiarlos (un ErrorLog "|orden" en httpd.conf) antes de que root los
     # copie a la version. En la simulacion, como antes, en una tuya y sin sudo
     # Primero se mira sin sudo si hay algo que cambiar (casi siempre no)
-    local rooted=0
+    local rooted=0 HOST_VHOST mail
+    host_vhost
+    # (el correo de pruebas: binario|puerto|WordPress, o nada si esta apagado)
+    mail=$(mail_secure_spec)
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 2
-    list=$(/usr/bin/python3 -I -c "$SECURE_PY" "$dir" "$tmp" "$v6" "$UNKNOWN_HOST_CONF" "$UNKNOWN_HOST_VHOST" \
-        "$UNKNOWN_HOST_SSL") || { rm -rf "$tmp"; return 2; }
+    list=$(LVM_PHP_INI=${PHP_SECURE_INI//$'\n'/;} LVM_PHP_INI_85=$PHP_SECURE_INI_85 LVM_CORREO=$mail LVM_CORREO_PHP=$MAIL_WP_PHP \
+        LVM_CORREO_PRUEBA= /usr/bin/python3 -I -c "$SECURE_PY" \
+        "$dir" "$tmp" "$v6" "$UNKNOWN_HOST_CONF" "$HOST_VHOST" "$UNKNOWN_HOST_SSL") || { rm -rf "$tmp"; return 2; }
     rm -rf "$tmp"
     local sudo=sudo
     if [ -n "$list" ]; then
@@ -4102,8 +5155,10 @@ function secure_lampp() {
         else
             tmp=$(sudo mktemp -d /tmp/lvm-seguridad.XXXXXX) && sudo chmod 700 "$tmp" || return 2
         fi
-        list=$($sudo env LVM_SECURE_APPLY=1 LVM_FTP_USER="${SUDO_USER:-$USER}" /usr/bin/python3 -I -c "$SECURE_PY" "$dir" \
-            "$tmp" "$v6" "$UNKNOWN_HOST_CONF" "$UNKNOWN_HOST_VHOST" "$UNKNOWN_HOST_SSL") || { $sudo rm -rf "$tmp"; return 2; }
+        list=$($sudo env LVM_SECURE_APPLY=1 LVM_FTP_USER="${SUDO_USER:-$USER}" LVM_PHP_INI="${PHP_SECURE_INI//$'\n'/;}" \
+            LVM_PHP_INI_85="$PHP_SECURE_INI_85" LVM_CORREO="$mail" LVM_CORREO_PHP="$MAIL_WP_PHP" \
+            /usr/bin/python3 -I -c "$SECURE_PY" "$dir" \
+            "$tmp" "$v6" "$UNKNOWN_HOST_CONF" "$HOST_VHOST" "$UNKNOWN_HOST_SSL") || { $sudo rm -rf "$tmp"; return 2; }
         rooted=1
     fi
     while IFS='|' read -r rel src what; do
@@ -4182,12 +5237,15 @@ function secure_all() {
 # Versiones a las que les falta algo para ser solo de este equipo (lo que cambiaria secure_lampp),
 # separadas por espacios. Para avisar en la ventana: protegerlas pide la contraseña.
 function unsecured_versions() {
-    local d tmp list out=""
+    local d tmp list out="" HOST_VHOST mail
     [ -n "$TEST_DIR" ] && return 0
+    host_vhost
+    mail=$(mail_secure_spec)
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 0
     for d in $(lampp_dirs); do
         [ -L "$d" ] || [ ! -f "$d/etc/httpd.conf" ] && continue
-        list=$(python3 -I -c "$SECURE_PY" "$d" "$tmp" 1 "$UNKNOWN_HOST_CONF" "$UNKNOWN_HOST_VHOST" \
+        list=$(LVM_PHP_INI=${PHP_SECURE_INI//$'\n'/;} LVM_PHP_INI_85=$PHP_SECURE_INI_85 LVM_CORREO=$mail LVM_CORREO_PHP=$MAIL_WP_PHP \
+            LVM_CORREO_PRUEBA= python3 -I -c "$SECURE_PY" "$d" "$tmp" 1 "$UNKNOWN_HOST_CONF" "$HOST_VHOST" \
             "$UNKNOWN_HOST_SSL" 2> /dev/null)
         if [ -n "$list" ] || { [ ! -f "$d/$SECURE_MARK" ] \
                 && { [ -f "$d/etc/xampp/startftp" ] || [ -f "$d/etc/lvm-startftp" ]; }; }; then
@@ -4240,6 +5298,49 @@ function exposed_summary() {
 # ¿Arranca el FTP con la version? (lo activa «servicio ftp arrancar» y lo quita «servicio ftp parar»)
 function ftp_autostart() {
     [ -f "$1/etc/xampp/startftp" ] || [ -f "$1/etc/lvm-startftp" ]
+}
+
+# barrera-web [si|no]: enciende o apaga la barrera entre webs. Al cambiarla se rehace el
+# lvm-dominio-desconocido.conf de todas las versiones (como asegurar --todas, pide la contraseña) y
+# se recarga el Apache de la montada si esta en marcha. Sin argumento, dice como esta
+function cross_site_command() {
+    local rc
+    case $1 in
+        "")
+            if cross_site_on; then
+                echo "La barrera entre webs esta encendida (lvm-instalador barrera-web no para apagarla)"
+            else
+                echo "La barrera entre webs esta apagada (lvm-instalador barrera-web si para encenderla)"
+            fi
+            return 0 ;;
+        si|on) cross_site_on && { echo "La barrera entre webs ya estaba encendida"; return 0; } ;;
+        no|off) cross_site_on || { echo "La barrera entre webs ya estaba apagada"; return 0; } ;;
+        *) echo "Uso: lvm-instalador barrera-web [si|no]"; return 1 ;;
+    esac
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] barrera entre webs $([ "$1" == si ] || [ "$1" == on ] && echo encendida || echo apagada) en todas las versiones"
+        return 0
+    fi
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    if [ "$1" == si ] || [ "$1" == on ]; then
+        rm -f "$CROSS_SITE_OFF"
+    else
+        : > "$CROSS_SITE_OFF" || return 1
+    fi
+    secure_all
+    rc=$?
+    if [ $rc -eq 2 ]; then
+        echo "No se ha podido cambiar en todas las versiones: prueba con lvm-instalador asegurar --todas"
+        return 1
+    fi
+    if [ $rc -eq 0 ] && lampp_running; then
+        run sudo /opt/lampp/lampp reloadapache > /dev/null || { echo "No se ha podido recargar Apache"; return 1; }
+    fi
+    if cross_site_on; then
+        echo "Barrera entre webs encendida: otra web no puede mandar nada a tus proyectos"
+    else
+        echo "Barrera entre webs apagada: enciendela cuando acabes de probar la pasarela de pago"
+    fi
 }
 
 # asegurar [version]: lo que falte para que solo se pueda entrar desde este equipo. Si es la version
@@ -4324,6 +5425,7 @@ function service_control() {
     for c in "${cmds[@]}"; do
         run sudo /opt/lampp/lampp "$c" || return 1
     done
+    mailpit_sync
 }
 
 # Para la pestaña Servicios: S|servicio|en marcha (1/0)|puertos|abierto a la red (1/0)|arranca con
@@ -5272,8 +6374,9 @@ function disable_lampp() {
         run sudo /opt/lampp/lampp stop
         run sudo unlink /opt/lampp
     fi
-    # Sin version montada no queda ningun proceso de LAMPP en memoria
+    # Sin version montada no queda ningun proceso de LAMPP en memoria (ni Mailpit)
     close_processes --todos
+    mailpit_sync
 }
 
 # Motivo por el que no se puede desinstalar una version (vacio si se puede)
@@ -5379,6 +6482,8 @@ function control_lampp() {
     if [ "$1" == stop ]; then
         close_processes --todos
     fi
+    # Mailpit (correo de pruebas) arranca y para con la version
+    mailpit_sync
     return $rc
 }
 
@@ -5723,7 +6828,7 @@ function latest_apr() {
         | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -uV | tail -1
 }
 
-# Ultima version de una rama de MariaDB: "version|url|sha256". En x86_64, del binario oficial; en
+# Ultima version de una rama de MariaDB: "version|url|sha256|firma en base64". En x86_64, del binario oficial; en
 # el resto, del codigo fuente (se compila).
 function mariadb_release() {
     local kind=binario
@@ -5744,7 +6849,10 @@ for version, release in json.load(sys.stdin)["releases"].items():
         sha = (files[0].get("checksum") or {}).get("sha256sum", "")
         if not url.startswith("https://") or "|" in url or not re.fullmatch(r"[0-9a-f]{64}", sha):
             continue
-        print(version + "|" + url + "|" + sha)
+        # (y su firma, en base64 en una sola linea: la comprueba install_stack)
+        import base64
+        sig = base64.b64encode((files[0].get("signature") or "").encode()).decode()
+        print(version + "|" + url + "|" + sha + "|" + sig)
         break' "$kind" 2> /dev/null
 }
 
@@ -5797,6 +6905,1481 @@ function stack_versions() {
     echo "$php|${apache:-${branches[0]}.x}|${mariadb:-${branches[1]}.x}|${ftp:-${branches[2]}.x}|${perl:-${branches[3]}.x}|$(latest_pma)"
 }
 
+# Firmas de lo que se descarga para compilar: claves publicas de quienes publican PHP, Apache (httpd
+# y APR), MariaDB y phpMyAdmin, sacadas el 24/10/2026 de php.net/distributions/php-keyring.gpg (las
+# de php.net/gpg-keys.php), downloads.apache.org/httpd/KEYS y apr/KEYS, supplychain.mariadb.com y
+# files.phpmyadmin.net/phpmyadmin.keyring. En binario (gpg --export --export-options export-minimal),
+# con xz y base64. Una firma solo vale si es de una de las huellas de su proyecto (GPG_FPR_*), no de
+# cualquiera de estas claves. Perl, ProFTPD, OpenSSL e ICU no publican firmas: solo su sha256
+GPG_KEYS_B64='
+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
+Z/sCAAAAAARZWg==
+'
+# Release managers de httpd y APR (Eric Covener, Stefan Eissing, Jim Jagielski, Daniel Ruggeri,
+# Christophe Jaillet, Yann Ylavic, Joe Orton, Graham Leggett y Jeff Trawick)
+GPG_FPR_APACHE="65B2D44FE74BD5E3DE3AC3F082781DE46D5954FA 26F51EF9A82F4ACB43F1903ED377C9E7D1944C66
+A93D62ECC3C8EA12DB220EC934EA76E6791485A8 8B39757B1D8A994DF2433ED58B3A601F08C975E5
+B9E8213AEFB861AF35A41F2C995E35221AD84DFF E3480043595621FE56105F112AB12A7ADC55C003
+C55AB7B9139EB2263CD1AABC19B033D1760C227B 8935926745E1CE7E3ED748F6EC99EE267EB5F61A
+93525CFCF6FDFFB3FD9700DD5A4B10AE43B56A27 CBA1525BAA7A47BE28FF23DDD3B13FCA2CE60BED
+EB138C6AF0FC691001B16D93344A844D751D7F27 5B5181C2C0AB13E59DA3F7A3EC582EB639FF092C"
+# MariaDB Signing Key
+GPG_FPR_MARIADB="177F4010FE56CA3336300305F1656F24C74CD1D8"
+# Isaac Bennetch, Marc Delisle, Michal Cihar y el equipo de seguridad de phpMyAdmin
+GPG_FPR_PMA="3D06A59ECE730EB71B511C17CE752F178259BD92 436FF1884B1A0C3FDCBF0D79FEFC65D181AF644A
+63CB1DF1EF12CF2AC0EE5A329C27B31342B7511D 5BAD38CFB98050B94BD7FB5BDA68AB39218AB947"
+
+# Release managers de cada rama de PHP (php.net/gpg-keys.php). Una rama que no esta aqui no se
+# puede comprobar: hay que actualizar lvm-instalador
+function php_gpg_fprs() {
+    case $1 in
+        7.4) echo "5A52880781F755608BF815FC910DEB46F53EA312 42670A7FE4D0441C8E4632349E4FDC074A4EF02D" ;;
+        8.0) echo "1729F83938DA44E27BA0F4D3DBDB397470D12172 BFDDD28642824F8118EF77909B67A5C12229118F 2C16C765DBE54A088130F1BC4B9B5F600B55F3B4 39B641343D8C104B2B146DC3F9C39DC0B9698544" ;;
+        8.1) echo "528995BFEDFBA7191D46839EF9BA0ADA31CBD89E 39B641343D8C104B2B146DC3F9C39DC0B9698544 F1F692238FBC1666E5A5CCD4199F9DFEF6FFBAFD" ;;
+        8.2) echo "1198C0117593497A5EC5C199286AF1F9897469DC 39B641343D8C104B2B146DC3F9C39DC0B9698544 E60913E4DF209907D8E30D96659A97C9CF2A795A" ;;
+        8.3) echo "1198C0117593497A5EC5C199286AF1F9897469DC AFD8691FDAEDF03BDF6E460563F15A9B715376CA C28D937575603EB4ABB725861C0779DC5C0A9DE4" ;;
+        8.4) echo "AFD8691FDAEDF03BDF6E460563F15A9B715376CA 9D7F99A0CB8F05C8A6958D6256A97AF7600A39A6 0616E93D95AF471243E26761770426E17EBBB3DD" ;;
+        8.5) echo "1198C0117593497A5EC5C199286AF1F9897469DC 49D9AF6BC72A80D6691719C8AA23F5BE9C7097D4 D95C03BC702BE9515344AE3374E44BC9067701A5" ;;
+        8.6) echo "D95C03BC702BE9515344AE3374E44BC9067701A5 016895DE9A475111D537A6E69134FF30BC5A99B5 5CFF17B64DC1C244F5D0EAC3E43535E2EB19010E" ;;
+        *) return 1 ;;
+    esac
+}
+
+# verify_sig <archivo> <firma .asc> <huellas>: 0 si la firma es buena y de una de esas huellas
+# (la de su clave principal). Con gpgv y solo las claves de GPG_KEYS_B64, en una carpeta temporal: ni
+# tus claves (~/.gnupg) ni un servidor de claves. Una clave caducada vale para lo que firmo antes
+function verify_sig() {
+    local file=$1 sig=$2 fprs=" ${3//$'\n'/ } " home out f
+    [ -s "$sig" ] || return 1
+    home=$(mktemp -d "${TMPDIR:-/tmp}/lvm-gpg.XXXXXX") || return 1
+    base64 -d <<< "$GPG_KEYS_B64" 2> /dev/null | xz -dc > "$home/claves.gpg" 2> /dev/null
+    out=$(gpgv --homedir "$home" --keyring "$home/claves.gpg" --status-fd 1 "$sig" "$file" 2> /dev/null)
+    rm -rf "$home"
+    grep -q '^\[GNUPG:\] BADSIG' <<< "$out" && return 1
+    for f in $(awk '$2 == "VALIDSIG" { print $NF }' <<< "$out"); do
+        [[ "$fprs" == *" $f "* ]] && return 0
+    done
+    return 1
+}
+
+# download_signed <url> <archivo> <sha256> <huellas> [url de la firma, por defecto <url>.asc]: como
+# download y, ademas, su firma. Si no esta o no es de quien lo publica, no se usa
+function download_signed() {
+    local url=$1 file=$2 sum=$3 fprs=$4 sig_url=${5:-$1.asc}
+    download "$url" "$file" "$sum" || return 1
+    if ! curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file.asc" "$sig_url" 2> /dev/null \
+            || ! verify_sig "$file" "$file.asc" "$fprs"; then
+        echo "  La firma de $(basename "$url") no es buena o no es de quien lo publica. Se cancela."
+        return 1
+    fi
+    echo "  Firma de $(basename "$url"): buena"
+}
+
 # download <url> <archivo> <sha256>: descarga un archivo y comprueba su suma
 function download() {
     local url=$1 file=$2 sum=$3
@@ -5823,7 +8406,8 @@ function download_apache() {
 
     for base in https://dlcdn.apache.org https://archive.apache.org/dist; do
         sum=$(curl -q --proto =https --proto-redir =https -fsSL "$base/$1.sha256" 2> /dev/null | grep -oE '^[0-9a-f]{64}')
-        [ -n "$sum" ] && download "$base/$1" "$2" "$sum" && return 0
+        # (y su firma: la sha256 viene del mismo sitio que el fichero)
+        [ -n "$sum" ] && download_signed "$base/$1" "$2" "$sum" "$GPG_FPR_APACHE" && return 0
     done
 
     return 1
@@ -6039,7 +8623,7 @@ KeepAlive On
 
 DocumentRoot "$link/htdocs"
 <Directory "$link/htdocs">
-    Options Indexes FollowSymLinks ExecCGI Includes
+    Options Indexes FollowSymLinks
     AllowOverride All
     Require all granted
 </Directory>
@@ -6066,8 +8650,8 @@ ScriptAlias /cgi-bin/ "$target/cgi-bin/"
 TypesConfig apache2/conf/mime.types
 AddType application/x-compress .Z
 AddType application/x-gzip .gz .tgz
-# Scripts CGI (Perl de esta version: #!$link/bin/perl)
-AddHandler cgi-script .cgi .pl
+# Scripts CGI solo en cgi-bin (Perl de esta version: #!$link/bin/perl): en los proyectos, un .cgi
+# o .pl no se ejecuta
 
 <IfModule http2_module>
     Protocols h2 h2c http/1.1
@@ -6079,7 +8663,9 @@ Include etc/extra/httpd-vhosts.conf
 Include etc/extra/httpd-ssl.conf
 Include etc/extra/httpd-lampp.conf
 EOF
-    printf '%s' "$UNKNOWN_HOST_VHOST" > "$S/$UNKNOWN_HOST_CONF"
+    local HOST_VHOST
+    host_vhost
+    printf '%s' "$HOST_VHOST" > "$S/$UNKNOWN_HOST_CONF"
 
     cat > "$S/etc/extra/httpd-ssl.conf" <<EOF
 # HTTPS con un certificado autofirmado para localhost (los vhosts usan los suyos)
@@ -6123,10 +8709,11 @@ EOF
 
     # --- PHP ---
     cat > "$S/php/etc/conf.d/99-lampp.ini" <<EOF
-; Mismos valores que el php.ini de XAMPP. Sin error_log: los errores van al log de Apache
+; Mismos valores que el php.ini de XAMPP (las subidas, 64 MB como 99-lvm-seguridad.ini). Sin
+; error_log: los errores van al log de Apache
 memory_limit = 512M
-upload_max_filesize = 40M
-post_max_size = 40M
+upload_max_filesize = 64M
+post_max_size = 64M
 max_execution_time = 120
 max_input_time = 60
 max_input_vars = 3000
@@ -6144,6 +8731,9 @@ EOF
     if needs_openssl11 "$short" && [ -f /etc/ssl/certs/ca-certificates.crt ]; then
         printf 'openssl.cafile = /etc/ssl/certs/ca-certificates.crt\nopenssl.capath = /etc/ssl/certs\n' >> "$S/php/etc/conf.d/99-lampp.ini"
     fi
+
+    # Mitigaciones de PHP2Shell (el mismo fichero que pone SECURE_PY en las versiones de antes)
+    php_secure_ini_file "$version" > "$S/php/etc/conf.d/99-lvm-seguridad.ini"
 
     # A partir de PHP 8.5 opcache va integrado y no se carga como extension
     if ls "$S"/php/lib/php/extensions/*/opcache.so > /dev/null 2>&1; then
@@ -6165,6 +8755,7 @@ listen.group = $web_group
 listen.mode = 0660
 pm = ondemand
 pm.max_children = 20
+pm.max_requests = 50
 pm.process_idle_timeout = 60s
 request_terminate_timeout = 300
 catch_workers_output = yes
@@ -6500,6 +9091,8 @@ EOF
     fi
 
     echo "$version" > "$S/etc/lvm-php"
+    # (compilada con el arreglo de PHP2Shell: install_stack deja su commit en php2shell)
+    [ -n "$php2shell" ] && echo "CVE-2026-109618 CVE-2026-109619: php-src ${php2shell%%|*}" > "$S/$PHP2SHELL_MARK"
     echo "$version|$apache|$mariadb|$ftp|$perl|$pma" > "$S/etc/lvm-stack"
     # Ya se instala solo para este equipo (secure_lampp no tiene nada que cambiar)
     echo "1" > "$S/$SECURE_MARK"
@@ -6581,6 +9174,239 @@ function check_no_build_paths() {
 
         return 1
     fi
+}
+
+# Usuario del sistema que compila las pilas propias (sin contraseña, sin sesion y sin carpeta propia)
+BUILD_USER=nexum-build
+function build_user_ready() {
+    id "$BUILD_USER" > /dev/null 2>&1 && return 0
+    echo "Creando el usuario $BUILD_USER (sin contraseña ni sesion: solo compila las pilas propias)..."
+    sudo useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$BUILD_USER"
+}
+
+# Borra la carpeta de la compilacion (la de root con la de BUILD_USER dentro, o la tuya en las pruebas)
+function stack_rm_build() {
+    if [ -n "$build_top" ]; then
+        [[ "$build_top" == /tmp/lvm-pila-* ]] && sudo rm -rf "$build_top"
+    else
+        rm -rf "$build"
+    fi
+}
+
+# Compilacion de install_stack con BUILD_USER: este mismo script (copiado por root a su carpeta) con
+# construir-pila y las variables de install_stack en un fichero de root. Su progreso se pasa al de
+# la ventana. Usa las variables de install_stack
+function stack_build_child() {
+    local vars=$build_top/variables prog="" tailpid="" rc
+    [ -n "$PROGRESS" ] && prog=$build/progreso
+    { declare -p version short lampp_name target link apache apr aprutil mariadb_info mariadb ftp perl pma \
+          php_sha web_user web_group build stage S jobs MARIADB_SRC mariadb_jobs stack_line PHP_TIMEZONE
+      printf 'PROGRESS=%q\n' "$prog"; } | sudo sh -c 'umask 022; cat > "$1"' sh "$vars" || return 1
+    sudo install -m 644 -o 0 -g 0 "$SELF" "$build_top/lvm-instalador.sh" || return 1
+    if [ -n "$prog" ]; then
+        tail -n +1 -F "$prog" 2> /dev/null >> "$PROGRESS" &
+        tailpid=$!
+    fi
+    echo "Compilando con el usuario $BUILD_USER en $build"
+    sudo -u "$BUILD_USER" env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME="$build" TMPDIR="$build" LANG=C.UTF-8 \
+        /bin/bash "$build_top/lvm-instalador.sh" construir-pila "$vars" < /dev/null
+    rc=$?
+    if [ -n "$tailpid" ]; then
+        sleep 1
+        kill "$tailpid" 2> /dev/null
+        wait "$tailpid" 2> /dev/null
+    fi
+    return $rc
+}
+
+# stack_fail de la compilacion con BUILD_USER: deja el paso que fallo (y su config.log) para
+# install_stack, que guarda los logs con el informe y borra la carpeta
+function stack_child_fail() {
+    printf '%s\n%s\n' "$STEP_LOG" "$STEP_DESC" > "$build/fallo"
+    [ -f config.log ] && cp config.log "$build/fallo-$(basename "$PWD")-config.log"
+    exit 1
+}
+
+# Descargas, compilacion y configuracion de una pila propia en $build (install_stack). Usa sus variables
+function stack_build_phase() {
+    local php_part="PHP $version"
+    php2shell_backport "$version" > /dev/null && php_part+=" + parche de seguridad"
+    needs_openssl11 "$short" && php_part+=" + OpenSSL $OPENSSL11_VERSION"
+    needs_icu72 "$short" && php_part+=" + ICU 72.1"
+    progress_parts "Descargas" "Apache $apache" "$php_part" "Perl $perl" "ProFTPD $ftp" "MariaDB $mariadb" \
+        "phpMyAdmin $pma y configuracion"
+
+    echo "Descargando el codigo fuente (con comprobacion sha256)..."
+    progress 1 0 2 "codigo fuente"
+    download_apache "httpd/httpd-$apache.tar.bz2" httpd.tar.bz2 || stack_fail
+    download_apache "apr/apr-$apr.tar.bz2" apr.tar.bz2 || stack_fail
+    download_apache "apr/apr-util-$aprutil.tar.bz2" apr-util.tar.bz2 || stack_fail
+    local php_fprs
+    php_fprs=$(php_gpg_fprs "$short") || { echo "  No se conocen las claves de quienes publican PHP $short: actualiza lvm-instalador"; stack_fail; }
+    download_signed "https://www.php.net/distributions/php-$version.tar.xz" php.tar.xz "$php_sha" "$php_fprs" || stack_fail
+    if needs_openssl11 "$short"; then
+        download "https://www.openssl.org/source/openssl-$OPENSSL11_VERSION.tar.gz" openssl11.tar.gz "$OPENSSL11_SHA" || stack_fail
+    fi
+    if needs_icu72 "$short"; then
+        download "https://github.com/unicode-org/icu/releases/download/release-72-1/icu4c-72_1-src.tgz" icu72.tgz "$ICU72_SHA" || stack_fail
+    fi
+    download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
+        "$(curl -q --proto =https --proto-redir =https -fsSL "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+    download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
+        "$(curl -q --proto =https --proto-redir =https -fsSL "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+    download_signed "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
+        "$(pma_sum "$pma")" "$GPG_FPR_PMA" || stack_fail
+    local mariadb_sig
+    IFS='|' read -r _ mariadb_url mariadb_sha mariadb_sig <<< "$mariadb_info"
+    if [ $MARIADB_SRC -eq 1 ]; then
+        progress 1 2 10 "MariaDB (codigo fuente)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
+    else
+        echo "  MariaDB $mariadb ocupa unos 450 MB, puede tardar."
+        progress 1 2 10 "MariaDB (450 MB)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
+    fi
+    download "$mariadb_url" mariadb.tar.gz "$mariadb_sha" || stack_fail
+    # (la firma de MariaDB viene con la sha256 en su API: se comprueba con su clave)
+    if ! base64 -d <<< "$mariadb_sig" > mariadb.tar.gz.asc 2> /dev/null \
+            || ! verify_sig mariadb.tar.gz mariadb.tar.gz.asc "$GPG_FPR_MARIADB"; then
+        echo "  La firma de MariaDB $mariadb no es buena o no es de MariaDB. Se cancela."
+        stack_fail
+    fi
+    echo "  Firma de MariaDB $mariadb: buena"
+
+    echo "Apache $apache (con APR $apr y APR-util $aprutil)"
+    tar -xjf httpd.tar.bz2 && tar -xjf apr.tar.bz2 && tar -xjf apr-util.tar.bz2 || stack_fail
+    mv "apr-$apr" "httpd-$apache/srclib/apr" && mv "apr-util-$aprutil" "httpd-$apache/srclib/apr-util" || stack_fail
+    cd "httpd-$apache" || stack_fail
+    local pcre=$(command -v pcre2-config)
+    step 2 10 15 1063 "Configurando" "$build/apache-configure.log" ./configure --prefix="$target/apache2" \
+        --with-included-apr ${pcre:+--with-pcre="$pcre"} --enable-mods-shared=most \
+        --enable-ssl --enable-proxy --enable-proxy-fcgi --enable-mpms-shared="event prefork" || stack_fail
+    step 2 15 24 712 "Compilando" "$build/apache-make.log" make -j"$jobs" || stack_fail
+    step 2 24 27 583 "Instalando" "$build/apache-install.log" make install DESTDIR="$stage" || stack_fail
+    cd "$build" || stack_fail
+
+    echo "PHP $version"
+    # Las ramas antiguas llevan sus propios OpenSSL 1.1 e ICU 72 (cada uno ocupa 5 puntos de la barra)
+    local php_env=() p=27
+    if needs_openssl11 "$short"; then
+        echo "  OpenSSL $OPENSSL11_VERSION (solo para esta version de PHP, en $target/openssl)"
+        tar -xzf openssl11.tar.gz && cd "openssl-$OPENSSL11_VERSION" || stack_fail
+        step 3 $p $((p + 1)) 30 "OpenSSL $OPENSSL11_VERSION: configurando" "$build/openssl11-configure.log" \
+            ./config shared no-tests --prefix="$target/openssl" --openssldir="$target/openssl/ssl" \
+            -Wl,-rpath,"$target/openssl/lib" || stack_fail
+        step 3 $((p + 1)) $((p + 4)) 1700 "OpenSSL $OPENSSL11_VERSION: compilando" "$build/openssl11-make.log" make -j"$jobs" || stack_fail
+        step 3 $((p + 4)) $((p + 5)) 300 "OpenSSL $OPENSSL11_VERSION: instalando" "$build/openssl11-install.log" \
+            make install_sw DESTDIR="$stage" || stack_fail
+        cd "$build" || stack_fail
+        # PHP se enlaza con la copia de la carpeta temporal; al terminar, fix_php_runpath hace que
+        # busque las librerias en $target/openssl/lib
+        php_env+=(OPENSSL_CFLAGS="-I$S/openssl/include" OPENSSL_LIBS="-L$S/openssl/lib -lssl -lcrypto"
+            LD_LIBRARY_PATH="$S/openssl/lib")
+        p=$((p + 5))
+    fi
+    if needs_icu72 "$short"; then
+        echo "  ICU 72.1 (estatico, queda dentro de PHP)"
+        local deps=$build/deps
+        tar -xzf icu72.tgz && cd icu/source || stack_fail
+        step 3 $p $((p + 1)) 250 "ICU 72.1: configurando" "$build/icu72-configure.log" \
+            env CFLAGS="-O2 -fPIC" CXXFLAGS="-O2 -fPIC" ./runConfigureICU Linux --prefix="$deps" \
+            --enable-static --disable-shared --with-data-packaging=static \
+            --disable-tests --disable-samples --disable-extras || stack_fail
+        step 3 $((p + 1)) $((p + 4)) 900 "ICU 72.1: compilando" "$build/icu72-make.log" make -j"$jobs" || stack_fail
+        step 3 $((p + 4)) $((p + 5)) 200 "ICU 72.1: instalando" "$build/icu72-install.log" make install || stack_fail
+        cd "$build" || stack_fail
+        # Los compiladores actuales tratan como errores avisos del codigo de las ramas antiguas
+        php_env+=(ICU_CFLAGS="-I$deps/include"
+            ICU_LIBS="-L$deps/lib -licui18n -licuio -licuuc -licudata -lstdc++ -lm -ldl -lpthread"
+            CFLAGS="-O2 -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types -Wno-error=int-conversion"
+            CXXFLAGS="-O2")
+        # PHP 7.4 usa TRUE/FALSE, que ICU dejo de definir en la version 68
+        [ "$short" == "7.4" ] && php_env+=(CPPFLAGS="-DU_DEFINE_FALSE_AND_TRUE=1")
+        p=$((p + 5))
+    fi
+
+    tar -xJf php.tar.xz && cd "php-$version" || stack_fail
+    # 7.4.33, 8.0.30 y 8.1.34: con el arreglo de PHP2Shell de php-src (PHP2SHELL_BACKPORTS)
+    local php2shell=""
+    if php2shell=$(php2shell_backport "$version"); then
+        echo "  Parche de seguridad de PHP2Shell (CVE-2026-109618 y CVE-2026-109619, php-src ${php2shell:0:12})"
+        php2shell_apply "$version" "$PWD" "$build/php2shell.log" || stack_fail
+    fi
+    step 3 $p $((p + 5)) 701 "Configurando" "$build/php-configure.log" env "${php_env[@]}" ./configure --prefix="$target/php" \
+        --with-config-file-path="$target/php/etc" \
+        --with-config-file-scan-dir="$target/php/etc/conf.d" \
+        --enable-fpm --with-fpm-user="$web_user" --with-fpm-group="$web_group" --disable-cgi \
+        --with-openssl --with-zlib --with-curl --with-readline --with-gettext \
+        --enable-mbstring --enable-intl --enable-bcmath --enable-calendar --enable-exif --enable-ftp \
+        --enable-gd --with-jpeg --with-freetype --with-webp \
+        --with-zip --enable-soap --enable-sockets --with-sodium --with-password-argon2 \
+        --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd \
+        --with-mysql-sock="$target/var/mysql/mysql.sock" \
+        --with-sqlite3 --with-pdo-sqlite || stack_fail
+    step 3 $((p + 5)) 72 913 "Compilando (tarda unos minutos)" "$build/php-make.log" env "${php_env[@]}" make -j"$jobs" || stack_fail
+    step 3 72 74 17 "Instalando" "$build/php-install.log" env "${php_env[@]}" make install INSTALL_ROOT="$stage" || stack_fail
+    fix_php_runpath || stack_fail
+    mkdir -p "$S/php/etc" && cp php.ini-production "$S/php/etc/php.ini" || stack_fail
+    cd "$build" || stack_fail
+
+    echo "Perl $perl"
+    tar -xJf perl.tar.xz && cd "perl-$perl" || stack_fail
+    step 4 74 80 948 "Configurando" "$build/perl-configure.log" sh Configure -des -Dprefix="$target/perl" \
+        -Dman1dir=none -Dman3dir=none || stack_fail
+    step 4 80 86 1798 "Compilando" "$build/perl-make.log" make -j"$jobs" || stack_fail
+    step 4 86 89 3319 "Instalando" "$build/perl-install.log" make install DESTDIR="$stage" || stack_fail
+    cd "$build" || stack_fail
+
+    echo "ProFTPD $ftp"
+    tar -xzf proftpd.tar.gz && cd "proftpd-$ftp" || stack_fail
+    step 5 89 91 575 "Configurando" "$build/proftpd-configure.log" env install_user="$(id -un)" install_group="$(id -gn)" \
+        ./configure --prefix="$target/proftpd" --sysconfdir="$target/etc" \
+        --localstatedir="$target/var/proftpd" --enable-shadow || stack_fail
+    step 5 91 92 162 "Compilando" "$build/proftpd-make.log" make -j"$jobs" || stack_fail
+    step 5 92 93 50 "Instalando" "$build/proftpd-install.log" make install DESTDIR="$stage" || stack_fail
+    cd "$build" || stack_fail
+
+    if [ $MARIADB_SRC -eq 1 ]; then
+        echo "MariaDB $mariadb (se compila: no hay binario oficial para $(uname -m); es lo que mas tarda)"
+        tar -xzf mariadb.tar.gz && rm -f mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
+        step 6 53 55 0 "Configurando" "$build/mariadb-configure.log" cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$target/mysql" \
+            -DCMAKE_INSTALL_RPATH="$target/mysql/lib" -DWITH_SSL=system -DWITH_PCRE=system \
+            -DWITH_UNIT_TESTS=OFF -DWITH_WSREP=OFF -DWITH_SYSTEMD=no -DWITH_EMBEDDED_SERVER=OFF \
+            -DINSTALL_MYSQLTESTDIR= -DINSTALL_SQLBENCHDIR= \
+            -DPLUGIN_TOKUDB=NO -DPLUGIN_MROONGA=NO -DPLUGIN_SPIDER=NO -DPLUGIN_OQGRAPH=NO -DPLUGIN_ROCKSDB=NO \
+            -DPLUGIN_CONNECT=NO -DPLUGIN_COLUMNSTORE=NO -DPLUGIN_S3=NO -DPLUGIN_AUTH_GSSAPI=NO \
+            -DDEFAULT_CHARSET=utf8mb4 -DDEFAULT_COLLATION=utf8mb4_general_ci -DCOMPILATION_COMMENT="lvm-instalador" \
+            || stack_fail
+        step 6 55 94 0 "Compilando ($mariadb_jobs procesos, tarda bastante)" "$build/mariadb-make.log" \
+            cmake --build build --parallel "$mariadb_jobs" || stack_fail
+        step 6 94 96 0 "Instalando" "$build/mariadb-install.log" env DESTDIR="$stage" cmake --install build || stack_fail
+        cd "$build" && rm -rf "mariadb-$mariadb" || stack_fail
+    else
+        echo "MariaDB $mariadb"
+        mkdir -p "$S/mysql"
+        step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
+            --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
+        rm -f mariadb.tar.gz
+    fi
+    # Sin simbolos de depuracion ocupa unos 600 MB menos
+    find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \
+        -exec strip --strip-unneeded {} + > /dev/null 2>&1
+    local libs=$(ldd "$S/mysql/bin/mariadbd" "$S/mysql/bin/mariadb" 2> /dev/null | grep 'not found' | sort -u)
+    if [ -n "$libs" ]; then
+        echo "  Faltan librerias del sistema para MariaDB:"
+        echo "$libs" | sed 's/^\s*/    /'
+        stack_fail
+    fi
+
+    echo "phpMyAdmin $pma"
+    progress 7 96 97 "configurando"
+    tar -xJf pma.tar.xz && mv "phpMyAdmin-$pma-all-languages" "$S/phpmyadmin" || stack_fail
+
+    echo "Configuracion"
+    write_stack_files || stack_fail
+    check_no_build_paths || stack_fail
+    check_build_links || stack_fail
 }
 
 # install_stack <version de PHP> [reemplazar] [carpeta: lampp-<carpeta>, por defecto la rama X.Y]
@@ -6712,7 +9538,19 @@ function install_stack() {
     fi
 
     STEP_LOG="" STEP_DESC=""
-    local build=$(mktemp -d /tmp/lvm-pila-$lampp_name-XXXX)
+    # Se compila con el usuario BUILD_USER, en una carpeta que crea root: lo que root copia a /opt (y
+    # despues arranca como root) no lo puede cambiar ningun programa tuyo entre que se compila y se
+    # copia. Las descargas y sus comprobaciones (sha256 y firmas) tambien van con el. En las pruebas
+    # (LVM_PRUEBA, sin sudo), con tu usuario como antes
+    local build_top="" build
+    if [ -z "$TEST_DIR" ]; then
+        build_user_ready || exit 1
+        build_top=$(sudo mktemp -d /tmp/lvm-pila-$lampp_name-XXXX) && sudo chmod 755 "$build_top" \
+            && sudo install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 755 "$build_top/w" || exit 1
+        build=$build_top/w
+    else
+        build=$(mktemp -d /tmp/lvm-pila-$lampp_name-XXXX)
+    fi
     local stage=$build/stage
     local S=$stage$target
     local jobs=$(nproc)
@@ -6732,12 +9570,19 @@ function install_stack() {
         cp "$build"/*.log "$logs/" 2> /dev/null
         # El config.log del componente que fallaba (stack_fail se llama desde su carpeta): ahi esta
         # el motivo real de los errores de configure
-        local config=""
+        local config="" f
         if [ -f config.log ]; then
             config="$logs/$(basename "$PWD")-config.log"
             cp config.log "$config"
         fi
-        rm -rf "$build"
+        # (si fallo compilando con BUILD_USER, el paso y el config.log los dejo en la carpeta)
+        if [ -f "$build/fallo" ]; then
+            { IFS= read -r STEP_LOG; IFS= read -r STEP_DESC; } < "$build/fallo"
+            for f in "$build"/fallo-*-config.log; do
+                [ -f "$f" ] && config="$logs/${f#"$build/fallo-"}" && cp "$f" "$config"
+            done
+        fi
+        stack_rm_build
         error_report "$logs/informe-error.txt" "$stack_line" "${STEP_LOG:+$logs/$(basename "$STEP_LOG")}" "$STEP_DESC" "$config"
         echo "No se ha instalado nada. Logs de la compilacion en $logs"
         echo "Informe del error: $logs/informe-error.txt"
@@ -6745,169 +9590,12 @@ function install_stack() {
         exit 1
     }
 
-    cd "$build" || exit 1
-
-    local php_part="PHP $version"
-    needs_openssl11 "$short" && php_part+=" + OpenSSL $OPENSSL11_VERSION"
-    needs_icu72 "$short" && php_part+=" + ICU 72.1"
-    progress_parts "Descargas" "Apache $apache" "$php_part" "Perl $perl" "ProFTPD $ftp" "MariaDB $mariadb" \
-        "phpMyAdmin $pma y configuracion"
-
-    echo "Descargando el codigo fuente (con comprobacion sha256)..."
-    progress 1 0 2 "codigo fuente"
-    download_apache "httpd/httpd-$apache.tar.bz2" httpd.tar.bz2 || stack_fail
-    download_apache "apr/apr-$apr.tar.bz2" apr.tar.bz2 || stack_fail
-    download_apache "apr/apr-util-$aprutil.tar.bz2" apr-util.tar.bz2 || stack_fail
-    download "https://www.php.net/distributions/php-$version.tar.xz" php.tar.xz "$php_sha" || stack_fail
-    if needs_openssl11 "$short"; then
-        download "https://www.openssl.org/source/openssl-$OPENSSL11_VERSION.tar.gz" openssl11.tar.gz "$OPENSSL11_SHA" || stack_fail
-    fi
-    if needs_icu72 "$short"; then
-        download "https://github.com/unicode-org/icu/releases/download/release-72-1/icu4c-72_1-src.tgz" icu72.tgz "$ICU72_SHA" || stack_fail
-    fi
-    download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
-    download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" | grep -oE '^[0-9a-f]{64}')" || stack_fail
-    download "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
-        "$(pma_sum "$pma")" || stack_fail
-    IFS='|' read -r _ mariadb_url mariadb_sha <<< "$mariadb_info"
-    if [ $MARIADB_SRC -eq 1 ]; then
-        progress 1 2 10 "MariaDB (codigo fuente)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
+    if [ -n "$build_top" ]; then
+        cd "$build" && stack_build_child || stack_fail
     else
-        echo "  MariaDB $mariadb ocupa unos 450 MB, puede tardar."
-        progress 1 2 10 "MariaDB (450 MB)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
+        cd "$build" || exit 1
+        stack_build_phase
     fi
-    download "$mariadb_url" mariadb.tar.gz "$mariadb_sha" || stack_fail
-
-    echo "Apache $apache (con APR $apr y APR-util $aprutil)"
-    tar -xjf httpd.tar.bz2 && tar -xjf apr.tar.bz2 && tar -xjf apr-util.tar.bz2 || stack_fail
-    mv "apr-$apr" "httpd-$apache/srclib/apr" && mv "apr-util-$aprutil" "httpd-$apache/srclib/apr-util" || stack_fail
-    cd "httpd-$apache" || stack_fail
-    local pcre=$(command -v pcre2-config)
-    step 2 10 15 1063 "Configurando" "$build/apache-configure.log" ./configure --prefix="$target/apache2" \
-        --with-included-apr ${pcre:+--with-pcre="$pcre"} --enable-mods-shared=most \
-        --enable-ssl --enable-proxy --enable-proxy-fcgi --enable-mpms-shared="event prefork" || stack_fail
-    step 2 15 24 712 "Compilando" "$build/apache-make.log" make -j"$jobs" || stack_fail
-    step 2 24 27 583 "Instalando" "$build/apache-install.log" make install DESTDIR="$stage" || stack_fail
-    cd "$build" || stack_fail
-
-    echo "PHP $version"
-    # Las ramas antiguas llevan sus propios OpenSSL 1.1 e ICU 72 (cada uno ocupa 5 puntos de la barra)
-    local php_env=() p=27
-    if needs_openssl11 "$short"; then
-        echo "  OpenSSL $OPENSSL11_VERSION (solo para esta version de PHP, en $target/openssl)"
-        tar -xzf openssl11.tar.gz && cd "openssl-$OPENSSL11_VERSION" || stack_fail
-        step 3 $p $((p + 1)) 30 "OpenSSL $OPENSSL11_VERSION: configurando" "$build/openssl11-configure.log" \
-            ./config shared no-tests --prefix="$target/openssl" --openssldir="$target/openssl/ssl" \
-            -Wl,-rpath,"$target/openssl/lib" || stack_fail
-        step 3 $((p + 1)) $((p + 4)) 1700 "OpenSSL $OPENSSL11_VERSION: compilando" "$build/openssl11-make.log" make -j"$jobs" || stack_fail
-        step 3 $((p + 4)) $((p + 5)) 300 "OpenSSL $OPENSSL11_VERSION: instalando" "$build/openssl11-install.log" \
-            make install_sw DESTDIR="$stage" || stack_fail
-        cd "$build" || stack_fail
-        # PHP se enlaza con la copia de la carpeta temporal; al terminar, fix_php_runpath hace que
-        # busque las librerias en $target/openssl/lib
-        php_env+=(OPENSSL_CFLAGS="-I$S/openssl/include" OPENSSL_LIBS="-L$S/openssl/lib -lssl -lcrypto"
-            LD_LIBRARY_PATH="$S/openssl/lib")
-        p=$((p + 5))
-    fi
-    if needs_icu72 "$short"; then
-        echo "  ICU 72.1 (estatico, queda dentro de PHP)"
-        local deps=$build/deps
-        tar -xzf icu72.tgz && cd icu/source || stack_fail
-        step 3 $p $((p + 1)) 250 "ICU 72.1: configurando" "$build/icu72-configure.log" \
-            env CFLAGS="-O2 -fPIC" CXXFLAGS="-O2 -fPIC" ./runConfigureICU Linux --prefix="$deps" \
-            --enable-static --disable-shared --with-data-packaging=static \
-            --disable-tests --disable-samples --disable-extras || stack_fail
-        step 3 $((p + 1)) $((p + 4)) 900 "ICU 72.1: compilando" "$build/icu72-make.log" make -j"$jobs" || stack_fail
-        step 3 $((p + 4)) $((p + 5)) 200 "ICU 72.1: instalando" "$build/icu72-install.log" make install || stack_fail
-        cd "$build" || stack_fail
-        # Los compiladores actuales tratan como errores avisos del codigo de las ramas antiguas
-        php_env+=(ICU_CFLAGS="-I$deps/include"
-            ICU_LIBS="-L$deps/lib -licui18n -licuio -licuuc -licudata -lstdc++ -lm -ldl -lpthread"
-            CFLAGS="-O2 -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types -Wno-error=int-conversion"
-            CXXFLAGS="-O2")
-        # PHP 7.4 usa TRUE/FALSE, que ICU dejo de definir en la version 68
-        [ "$short" == "7.4" ] && php_env+=(CPPFLAGS="-DU_DEFINE_FALSE_AND_TRUE=1")
-        p=$((p + 5))
-    fi
-
-    tar -xJf php.tar.xz && cd "php-$version" || stack_fail
-    step 3 $p $((p + 5)) 701 "Configurando" "$build/php-configure.log" env "${php_env[@]}" ./configure --prefix="$target/php" \
-        --with-config-file-path="$target/php/etc" \
-        --with-config-file-scan-dir="$target/php/etc/conf.d" \
-        --enable-fpm --with-fpm-user="$web_user" --with-fpm-group="$web_group" --disable-cgi \
-        --with-openssl --with-zlib --with-curl --with-readline --with-gettext \
-        --enable-mbstring --enable-intl --enable-bcmath --enable-calendar --enable-exif --enable-ftp \
-        --enable-gd --with-jpeg --with-freetype --with-webp \
-        --with-zip --enable-soap --enable-sockets --with-sodium --with-password-argon2 \
-        --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd \
-        --with-mysql-sock="$target/var/mysql/mysql.sock" \
-        --with-sqlite3 --with-pdo-sqlite || stack_fail
-    step 3 $((p + 5)) 72 913 "Compilando (tarda unos minutos)" "$build/php-make.log" env "${php_env[@]}" make -j"$jobs" || stack_fail
-    step 3 72 74 17 "Instalando" "$build/php-install.log" env "${php_env[@]}" make install INSTALL_ROOT="$stage" || stack_fail
-    fix_php_runpath || stack_fail
-    mkdir -p "$S/php/etc" && cp php.ini-production "$S/php/etc/php.ini" || stack_fail
-    cd "$build" || stack_fail
-
-    echo "Perl $perl"
-    tar -xJf perl.tar.xz && cd "perl-$perl" || stack_fail
-    step 4 74 80 948 "Configurando" "$build/perl-configure.log" sh Configure -des -Dprefix="$target/perl" \
-        -Dman1dir=none -Dman3dir=none || stack_fail
-    step 4 80 86 1798 "Compilando" "$build/perl-make.log" make -j"$jobs" || stack_fail
-    step 4 86 89 3319 "Instalando" "$build/perl-install.log" make install DESTDIR="$stage" || stack_fail
-    cd "$build" || stack_fail
-
-    echo "ProFTPD $ftp"
-    tar -xzf proftpd.tar.gz && cd "proftpd-$ftp" || stack_fail
-    step 5 89 91 575 "Configurando" "$build/proftpd-configure.log" env install_user="$(id -un)" install_group="$(id -gn)" \
-        ./configure --prefix="$target/proftpd" --sysconfdir="$target/etc" \
-        --localstatedir="$target/var/proftpd" --enable-shadow || stack_fail
-    step 5 91 92 162 "Compilando" "$build/proftpd-make.log" make -j"$jobs" || stack_fail
-    step 5 92 93 50 "Instalando" "$build/proftpd-install.log" make install DESTDIR="$stage" || stack_fail
-    cd "$build" || stack_fail
-
-    if [ $MARIADB_SRC -eq 1 ]; then
-        echo "MariaDB $mariadb (se compila: no hay binario oficial para $(uname -m); es lo que mas tarda)"
-        tar -xzf mariadb.tar.gz && rm -f mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
-        step 6 53 55 0 "Configurando" "$build/mariadb-configure.log" cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$target/mysql" \
-            -DCMAKE_INSTALL_RPATH="$target/mysql/lib" -DWITH_SSL=system -DWITH_PCRE=system \
-            -DWITH_UNIT_TESTS=OFF -DWITH_WSREP=OFF -DWITH_SYSTEMD=no -DWITH_EMBEDDED_SERVER=OFF \
-            -DINSTALL_MYSQLTESTDIR= -DINSTALL_SQLBENCHDIR= \
-            -DPLUGIN_TOKUDB=NO -DPLUGIN_MROONGA=NO -DPLUGIN_SPIDER=NO -DPLUGIN_OQGRAPH=NO -DPLUGIN_ROCKSDB=NO \
-            -DPLUGIN_CONNECT=NO -DPLUGIN_COLUMNSTORE=NO -DPLUGIN_S3=NO -DPLUGIN_AUTH_GSSAPI=NO \
-            -DDEFAULT_CHARSET=utf8mb4 -DDEFAULT_COLLATION=utf8mb4_general_ci -DCOMPILATION_COMMENT="lvm-instalador" \
-            || stack_fail
-        step 6 55 94 0 "Compilando ($mariadb_jobs procesos, tarda bastante)" "$build/mariadb-make.log" \
-            cmake --build build --parallel "$mariadb_jobs" || stack_fail
-        step 6 94 96 0 "Instalando" "$build/mariadb-install.log" env DESTDIR="$stage" cmake --install build || stack_fail
-        cd "$build" && rm -rf "mariadb-$mariadb" || stack_fail
-    else
-        echo "MariaDB $mariadb"
-        mkdir -p "$S/mysql"
-        step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
-            --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
-        rm -f mariadb.tar.gz
-    fi
-    # Sin simbolos de depuracion ocupa unos 600 MB menos
-    find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \
-        -exec strip --strip-unneeded {} + > /dev/null 2>&1
-    local libs=$(ldd "$S/mysql/bin/mariadbd" "$S/mysql/bin/mariadb" 2> /dev/null | grep 'not found' | sort -u)
-    if [ -n "$libs" ]; then
-        echo "  Faltan librerias del sistema para MariaDB:"
-        echo "$libs" | sed 's/^\s*/    /'
-        stack_fail
-    fi
-
-    echo "phpMyAdmin $pma"
-    progress 7 96 97 "configurando"
-    tar -xJf pma.tar.xz && mv "phpMyAdmin-$pma-all-languages" "$S/phpmyadmin" || stack_fail
-
-    echo "Configuracion"
-    write_stack_files || stack_fail
-    check_no_build_paths || stack_fail
-    check_build_links || stack_fail
 
     # Copia a /opt. Si se rehace una version, la anterior se aparta hasta que todo este copiado.
     local aside="" was_running=0 links
@@ -6988,7 +9676,7 @@ function install_stack() {
     fi
 
     [ -n "$aside" ] && $SUDO rm -R --one-file-system "$aside"
-    rm -rf "$build"
+    stack_rm_build
 
     if [ $was_running -eq 1 ]; then
         $SUDO "$target/lampp" start
@@ -7016,6 +9704,7 @@ function plan_label() {
         php) echo "PHP $name (pila propia)" ;;
         parche) echo "PHP $name (pila propia)" ;;
         rehacer) echo "PHP ${name%.*} (actualizar)" ;;
+        reparar) echo "PHP $name (con el parche de seguridad)" ;;
     esac
 }
 
@@ -7026,6 +9715,8 @@ function run_plan_item() {
         php) ( install_stack "${1#*:}" 0 "${1#*:}" ) ;;
         parche) ( install_stack "${1#*:}" 0 "${1#*:}" ) ;;
         rehacer) ( install_stack "${1#*:}" 1 ) ;;
+        # (una lampp-X.Y.Z se vuelve a compilar en su carpeta, con el mismo parche: actualizar-a)
+        reparar) ( install_stack "${1#*:}" 1 "${1#*:}" ) ;;
     esac
 }
 
@@ -7682,222 +10373,459 @@ ICON_FILE="$HOME/.local/share/icons/lampp-version-manager.png"
 OLD_ICON_FILES=("$HOME/.local/share/icons/lvm-instalador.png" "$HOME/.local/share/icons/php-version-loader.png"
     "$HOME/.local/share/icons/php-version-manager.png")
 ICON_PNG_B64='
-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
+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
+ampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqhor/BTeGEXt9
+e5sFAAAAAElFTkSuQmCC
 '
 
 function install_icon() {
@@ -8090,9 +11018,166 @@ QUE HACE
 - Actualiza cada versión a los últimos parches de su rama, muestra sus
   bases de datos y desinstala versiones guardando copia en ~/lvm-copias.
 - No instala PHP ni MariaDB en el sistema.
+- Correo de pruebas: lo que mandan las webs locales va a Mailpit y no
+  llega a nadie.
 
 VERSIONES
 
+1.55.3 (25 oct 2026)
+- Cargar un proyecto es todo o nada: la contraseña se pide antes de cambiar
+  nada y, si se cancela o falla un paso, se queda el proyecto que había
+  (el enlace del vhost, la versión activa y Apache, como estaban). Antes
+  podía quedar a medias: cargado en la ventana y la web sin estilos.
+
+1.55.2 (25 oct 2026)
+- Al cargar un proyecto, el visor pasa a él en cuanto termina la carga, con
+  sus botones, sin esperar a volver a leer todo. Elegir un proyecto de la
+  lista es instantáneo (antes se rehacía la lista entera).
+
+1.55.1 (25 oct 2026)
+- Mailpit: se instala aunque el paquete cambie de forma; si no se puede,
+  dice por qué y desde dónde descargarlo a mano.
+
+1.55.0 (25 oct 2026)
+- Correo de pruebas con Mailpit: lo que mandan las webs de este equipo
+  (formularios, pedidos, contraseñas) no llega a nadie, se ve en su
+  bandeja (botón Correo, arriba, con los correos sin leer). Encendido por
+  defecto; se apaga en Configuración. Mailpit arranca y para con la
+  versión activa, con tu usuario y solo en 127.0.0.1.
+- Mailpit se instala desde Configuración: la versión oficial de GitHub,
+  comprobada con su sha256 y de root en /opt/config/mailpit.
+- PHP de todas las versiones: mail() va a Mailpit. PrestaShop: al cargar
+  la tienda, su correo va por SMTP a Mailpit (en todas sus tiendas).
+- WordPress con plugins de SMTP o Brevo, en Configuración: llevarlos a
+  Mailpit (por defecto: WP Mail SMTP, Easy WP SMTP y los de SMTP siguen,
+  con su correo a Mailpit; Brevo, FluentSMTP, Post SMTP y los que mandan
+  por una API se desactivan en la copia local), desactivarlos todos o no
+  tocarlos (avisa: su correo puede llegar de verdad).
+- Lo que se cambia en las BBDD para el correo no va en las copias
+  (exportar-bd, copiar-bd, Docker): llevan el correo de producción. Al
+  apagarlo o elegir «No tocarlos», se deshace al cargar el proyecto.
+- En la terminal: lvm-instalador correo (estado, si, no, wordpress
+  mailpit|desactivar|nada, instalar, vaciar y bd <base>).
+- Docker: sus proyectos aún no mandan a Mailpit.
+- La versión del programa va arriba, detrás de «Entornos LAMPP y Docker»
+  (abajo de la barra lateral ya no va la firma: está en Acerca de).
+- Versiones de PHP: una versión vulnerable ya no sale también como
+  «Actualizada», y los tres puntos ya no enseñan «Más» al pasar el ratón.
+
+1.54.3 (25 oct 2026)
+- Al instalar o actualizar vuelve a salir la lista de pasos (se quedaba
+  vacía), cada uno con su logotipo: Apache, PHP, Perl, ProFTPD, MariaDB y
+  phpMyAdmin.
+- Arriba ya no está el botón de phpMyAdmin: sigue en la pestaña Bases de
+  datos.
+- En el título, «Dev Stack» va sin negrita y en azul.
+- Bases de datos y Docker: al entrar en la pestaña, todas las versiones y
+  los proyectos aparecen plegados; se despliega uno a la vez.
+
+1.54.2 (24 oct 2026)
+- Proyecto cargado: botón Docker, junto a Panel. Si no hay Docker, ofrece
+  instalarlo; si el proyecto no está en Docker, lo monta con la versión
+  de PHP que elijas (descarga las imágenes que falten); si ya lo está, lo
+  arranca y, con varias versiones, pregunta cuál. Un proyecto puede estar
+  en Docker con varias versiones de PHP (docker-crear … --nombre).
+- Diálogos con el texto centrado y más corto, y el botón principal dice lo
+  que hace («Borrar la BBDD», «Actualizar a PHP 8.4.27»…).
+- Arriba, los avisos a la izquierda del visor y el menú a su derecha.
+- Versiones de PHP: «Actualizado» en verde. Bases de datos: una sola
+  versión desplegada a la vez y botones de acciones con separación.
+- Docker: columna ID de cada contenedor (en lugar de Estado) y, primero en
+  la fila del proyecto, arrancar o parar todos sus servicios a la vez.
+- Docker, Imágenes: imagen, etiqueta e ID por separado, y botones para
+  volver a descargarla de Docker Hub o borrarla (si no la usa ningún
+  contenedor). Volúmenes: botón para borrar los que no use ninguno. En la
+  terminal: docker-imagenes borrar|descargar <imagen> y
+  docker-volumen-borrar <volumen>.
+
+1.54.1 (24 oct 2026)
+- PHP2Shell (CVE-2026-109618 y CVE-2026-109619): en Versiones de PHP,
+  las que no tienen el arreglo salen en rojo («Vulnerable (PHP2Shell)»)
+  y activarlas lo pregunta. Lo tienen 8.2.35, 8.3.36, 8.4.27 y 8.5.12
+  o posteriores; los XAMPP no se pueden arreglar.
+- PHP 7.4.33, 8.0.30 y 8.1.34 se compilan con el parche de seguridad
+  que publicó el equipo de PHP (no es una versión nueva: se ven como
+  «7.4.33 + parche de seguridad»).
+- «Actualizar a PHP X.Y.Z» en el menú ⋮ de las versiones con un parche
+  concreto (lampp-8.3.10) y de los XAMPP: instala la nueva al lado, le
+  copia las BBDD con sus vínculos y, si era la activa, la activa. La de
+  antes se queda hasta que la desinstales. En la terminal:
+  lvm-instalador actualizar-a <versión> <php>.
+- Ya no se ofrece el XAMPP 8.2.4.
+- En todas las versiones y en Docker, el php.ini con las mitigaciones de
+  PHP2Shell: sin el progreso de las subidas en la sesión, poco
+  anidamiento en los formularios y 64 MB como mucho por petición.
+  PHP-FPM renueva sus procesos cada 50 peticiones.
+- Barrera entre webs para todos los proyectos: otra web abierta en el
+  navegador no puede mandarles formularios ni peticiones. Se apaga en
+  Configuración (o lvm-instalador barrera-web no) para probar una
+  pasarela de pago que vuelve con un POST.
+- Sin CGI ni SSI en las carpetas de los proyectos.
+- Las descargas de PHP, Apache, APR, MariaDB y phpMyAdmin se comprueban
+  también con la firma de quien las publica.
+- Las pilas propias se compilan con un usuario del sistema
+  (nexum-build): nada de tu usuario puede cambiar lo que root copia.
+- La BBDD descargada ya no lleva el administrador de pruebas
+  (local@local.test); la de trabajo no cambia.
+- Docker: el phpMyAdmin de cada proyecto pide usuario y contraseña (la
+  copia el botón de la llave); «Actualizar imagen» rehace su PHP con lo
+  último de Docker Hub. Docker va sin la terminal y con su propia
+  configuración, y la contraseña de la BBDD no sale en las órdenes.
+
+1.54.0 (24 oct 2026)
+- Nuevo nombre: Nexum Dev Stack, con logotipo nuevo (en el menú de
+  aplicaciones, en la ventana y en el paquete). Los comandos
+  (lvm-instalador, lvm) y las carpetas no cambian.
+- Ventana nueva: cambian la organización y el aspecto, con las mismas
+  órdenes de siempre. Arriba, siempre a la vista, el visor de la versión
+  montada (PHP, Apache y MariaDB con su punto, encender o apagar y sus
+  servicios), el menú, Localhost, phpMyAdmin y los avisos en un solo
+  botón. En Proyectos, el cargado en grande con su entorno (versión de
+  PHP), su BBDD y sus botones, y la lista de todos, que busca por el
+  nombre de la carpeta o de su BBDD. Versiones de PHP con su soporte y su
+  último parche (los componentes, en un diálogo), Bases de datos y Docker
+  en tablas por versión y por proyecto, con sus tarjetas arriba, y tema
+  claro u oscuro en el menú. Los diálogos, con el mismo aspecto y en azul.
+- Bases de datos: el tamaño de cada BBDD (datos e índices) y el total de
+  cada versión. Se mide con su versión activa y en marcha, y se recuerda.
+- Tareas: barra más gruesa con el porcentaje y lo que queda siempre a la
+  vista, y el registro como una terminal: una descarga es una línea con
+  su porcentaje que avanza, no una línea por cada paso.
+- Versiones de PHP: Actualizar solo sale cuando hay un parche más nuevo,
+  y si ya está al día lo dice.
+- Docker: los contenedores ya no arrancan solos al encender el equipo
+  (se arrancan desde la pestaña Docker); los que ya había se cambian
+  solos. CPU y memoria de los contenedores, sus imágenes y volúmenes, y
+  acciones para cada contenedor, también borrarlo. En la terminal:
+  lvm-instalador docker-contenedor arrancar|parar|reiniciar|registros|
+  borrar <contenedor>.
+1.53.0 (23 oct 2026)
+- Nueva pestaña Docker: proyectos con cualquier versión de PHP (de la 5.6
+  a la 8.5, también 7.1 o 7.4) en contenedores, a la vez que LAMPP. Cada
+  uno lleva su PHP, su MariaDB con una copia de su BBDD de LAMPP y su
+  phpMyAdmin, y se abre por su dominio (carpeta.docker.local, con https)
+  desde el Apache de la versión activa, con sus .htaccess de siempre. Su
+  wp-config.php (o la configuración de PrestaShop) se sustituye solo
+  dentro del contenedor, así que la carpeta se puede seguir usando con
+  LAMPP. Arrancar, parar, ver registros y borrar desde la pestaña.
+- Docker, cambiar de PHP: el botón con la versión de cada proyecto la
+  cambia sin borrarlo (solo cambia su contenedor de PHP; su BBDD y su
+  configuración se quedan). Si con la nueva no arranca, vuelve a la de
+  antes. Así se prueba un proyecto con 7.4, 8.1, 8.2... uno tras otro. En
+  la terminal: lvm-instalador docker-php <nombre> <versión>.
+- Docker, consola: arriba de la pestaña, como en Docker Desktop, todos los
+  contenedores con su imagen, si están en marcha (y desde cuándo) y sus
+  puertos.
+- Docker se instala desde la pestaña en modo sin root: los contenedores
+  corren con tu usuario y el Docker del sistema (con root) se deja
+  apagado, así que ni un proyecto ni Docker pueden hacerse
+  administradores del equipo. En la terminal: lvm-instalador
+  docker-instalar, docker-crear <carpeta> <php> <mariadb> [--bd <base>
+  --desde <versión>], docker-arrancar|docker-parar|docker-registros|
+  docker-borrar <nombre>.
 1.52.0 (23 oct 2026)
 - Cargar proyecto: botón Replicar, junto a «Montar nuevo proyecto», para
   llevar un proyecto a otra versión de PHP. Se elige el proyecto, de qué
@@ -9330,7 +12415,7 @@ function github_update() {
         *) echo "I|No se ha podido consultar GitHub (¿sin conexión?): solo se ha buscado en Descargas"; return 0 ;;
     esac
     rel=$(python3 -I -c "$RELEASE_PY" "$UPDATE_REPO" <<< "$json") \
-        || { echo "I|La última publicación de GitHub no trae un paquete de Nexum Stack con su firma"; return 0; }
+        || { echo "I|La última publicación de GitHub no trae un paquete de Nexum Dev Stack con su firma"; return 0; }
     IFS='|' read -r v when deb_url sig_url <<< "$rel"
     dpkg --compare-versions "$v" gt "$APP_VERSION" || return 0
 
@@ -9423,12 +12508,18 @@ function gui_open() {
 #   D|carpeta|base de datos|fecha|tipo (i: importada con lvm-instalador, c: ultimo cambio de tablas)
 #   Z|procesos de LAMPP que sobran en memoria (de otras versiones)
 #   Y|version montada|bytes del registro de errores: sus tablas del sistema de MariaDB son antiguas
+#   R|carpeta|ok, parche o vulnerable|texto     PHP2Shell en cada version (php2shell_state)
 function gui_data() {
     local active=$(active_dir) dir name owner blocker kind
 
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
     echo "A|${active#/opt/lampp-}|$(lampp_running && echo 1 || echo 0)|$([ -e /opt/lampp ] && [ ! -L /opt/lampp ] && echo 1 || echo 0)|$(native_binaries && echo 1 || echo 0)|$([ -f "$LAUNCHER" ] && echo 1 || echo 0)"
     echo "H|$ACTIVE_VHOSTS|$HOSTS_FILE"
+    # Correo de pruebas: E|Mailpit instalado (1/0)|encendido (1/0)|modo de WordPress|Mailpit en marcha
+    # (1/0)|version instalada|direccion de su web|version que instala el gestor. Si la version activa
+    # esta en marcha y Mailpit no (se ha cerrado la sesion, por ejemplo), se arranca
+    [ "$DRY" -eq 0 ] && mailpit_sync --suave > /dev/null 2>&1
+    echo "E|$(mailpit_installed && echo 1 || echo 0)|$(mail_on && echo 1 || echo 0)|$(mail_wp_mode)|$([ -n "$(mailpit_pid)" ] && echo 1 || echo 0)|$(mailpit_installed_version)|$MAIL_UI_URL|$MAILPIT_VERSION"
     # Procesos de LAMPP en memoria que no son de la version montada
     local stray=$(stray_summary)
     [ -n "$stray" ] && echo "Z|$stray"
@@ -9459,7 +12550,9 @@ function gui_data() {
         owner=${owner:-$name}
         blocker=$(remove_blocker "$name")
         blocker=${blocker//\\n/ }
-        echo "V|$name|$(stack_fields "$dir")|$kind|$owner|${blocker//|/ }"
+        local fields=$(stack_fields "$dir")
+        echo "V|$name|$fields|$kind|$owner|${blocker//|/ }"
+        echo "R|$name|$(php2shell_state "$dir" "${fields%%|*}")"
         db_dates "/opt/lampp-$owner/var/mysql" | sed "s/^/D|$name|/"
     done
 }
@@ -9523,6 +12616,727 @@ function gui_php_dates() {
     return 0
 }
 
+# ===========================================================================
+# Docker (sin root): proyectos con cualquier version de PHP en contenedores
+# ===========================================================================
+# Cada proyecto en Docker lleva su PHP-FPM, su MariaDB (con una copia de su BBDD) y su phpMyAdmin en
+# contenedores de Docker sin root: corren con tu usuario, asi que ni un proyecto ni Docker pueden
+# hacerse administradores del equipo. La web la sigue sirviendo el Apache de la version LAMPP activa,
+# por su dominio (<carpeta>.docker.local, http y https con su certificado), con los .htaccess de
+# siempre: los .php los pasa al PHP-FPM del contenedor por un socket de una carpeta solo tuya. Dentro
+# del contenedor el proyecto esta en la misma ruta que ve Apache (/opt/lampp/htdocs/<carpeta>), y su
+# wp-config.php (o parameters.php / settings.inc.php) se sustituye por uno con la BBDD del contenedor:
+# el del proyecto no se toca, y la carpeta se puede seguir usando con LAMPP a la vez.
+# (LVM_DOCKER, LVM_DOCKER_DIR y LVM_DOCKER_HOST solo para pruebas)
+DOCKER_DIR=${LVM_DOCKER_DIR:-$HOME/.lvm-instalador/docker}
+DOCKER_BIN=${LVM_DOCKER:-/usr/bin/docker}
+# Versiones que se ofrecen: imagenes oficiales php:<version>-fpm y mariadb:<version> de Docker Hub
+DOCKER_PHP_VERSIONS="8.5 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2 7.1 7.0 5.6"
+DOCKER_MARIADB_VERSIONS="11.8 11.4 10.11 10.6 10.5 10.4"
+DOCKER_PMA_IMAGE="phpmyadmin:5.2"
+# Extensiones de PHP de las imagenes (las que piden WordPress y PrestaShop)
+DOCKER_PHP_EXT="bcmath exif gd intl mysqli opcache pdo_mysql soap zip"
+# Paquetes de Ubuntu para Docker sin root (el demonio del sistema, con root, se deja apagado)
+DOCKER_PACKAGES="docker.io docker-compose-v2 rootlesskit uidmap slirp4netns dbus-user-session"
+# Puertos de 127.0.0.1 para el phpMyAdmin de cada proyecto (uno por proyecto, desde este)
+DOCKER_PMA_PORT=28080
+
+# Docker sin root siempre por su socket: nunca el del demonio del sistema
+function docker_sock() {
+    echo "${LVM_DOCKER_HOST:-unix://${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock}"
+}
+
+# Configuracion del cliente de Docker: una carpeta del gestor (solo tuya) y no ~/.docker, donde
+# cualquier programa tuyo puede dejar un complemento (cli-plugins/docker-*) o un ayudante de claves
+# (credsStore) que docker ejecutaria. Cada vez sin complementos propios y con un config.json vacio:
+# docker compose y buildx son los del sistema (/usr/libexec/docker/cli-plugins)
+DOCKER_CONFIG_DIR="$LOG_DIR/docker-config"
+function docker_config_dir() {
+    local cfg=$DOCKER_CONFIG_DIR
+    if [ -L "$cfg" ] || { [ -e "$cfg" ] && [ ! -O "$cfg" ]; }; then
+        echo "$cfg no es una carpeta tuya: no se usa Docker" >&2
+        return 1
+    fi
+    mkdir -p -m 700 "$cfg" && chmod 700 "$cfg" || return 1
+    [ -e "$cfg/cli-plugins" ] && rm -rf "$cfg/cli-plugins"
+    [ "$(cat "$cfg/config.json" 2> /dev/null)" == "{}" ] || { rm -f "$cfg/config.json"; echo "{}" > "$cfg/config.json"; }
+    chmod 600 "$cfg/config.json"
+    echo "$cfg"
+}
+
+# docker como git (no_tty): en su propia sesion, sin la terminal de la tarea (sus complementos no
+# pueden usar el permiso de sudo recordado ni leer lo que se escribe en ella). Su salida y sus
+# errores pasan por tuberias; la entrada, solo si no es la terminal (una carga de BBDD por tuberia)
+function dk() {
+    local cfg
+    cfg=$(docker_config_dir) || return 1
+    ( [ -t 0 ] && exec < /dev/null
+      set -o pipefail
+      DOCKER_HOST=$(docker_sock) DOCKER_CONFIG=$cfg /usr/bin/python3 -I -c "$NO_TTY_PY" "$DOCKER_BIN" "$@" \
+          2> >(cat >&2) | cat )
+}
+
+# ¿Responde Docker sin root? (0 si si)
+function docker_ready() {
+    [ -x "$DOCKER_BIN" ] || return 1
+    local info
+    info=$(dk info --format '{{json .SecurityOptions}}' 2> /dev/null) || return 1
+    [[ "$info" == *rootless* ]]
+}
+
+# Nombre corto de un proyecto: el de su carpeta en minusculas, solo letras, numeros y - (va en el
+# nombre de los contenedores y en el dominio)
+function docker_slug() {
+    local s
+    s=$(tr 'A-Z' 'a-z' <<< "$1" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-40 | sed -E 's/-+$//')
+    [ -n "$s" ] && echo "$s"
+}
+
+# Carpeta del socket de PHP-FPM de un proyecto: en /run/user/<tu uid> (solo tuya, en memoria y corta:
+# la ruta de un socket no puede pasar de 107 caracteres)
+function docker_run_dir() {
+    echo "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/nexum/$1"
+}
+
+function docker_valid_slug() {
+    [[ "$1" =~ ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$ ]]
+}
+
+# Valor de proyecto.conf (lineas CLAVE=valor que escribe el gestor)
+function docker_conf() {
+    local f=$DOCKER_DIR/$1/proyecto.conf
+    [ -f "$f" ] && [ ! -L "$f" ] || return 1
+    awk -F= -v k="$2" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$f"
+}
+
+# Proyectos en Docker (nombres cortos validos con su proyecto.conf)
+function docker_projects() {
+    local d
+    [ -d "$DOCKER_DIR" ] || return 0
+    for d in "$DOCKER_DIR"/*/; do
+        d=$(basename "$d")
+        docker_valid_slug "$d" && [ -f "$DOCKER_DIR/$d/proyecto.conf" ] && echo "$d"
+    done
+}
+
+# Estado de los contenedores de un proyecto: marcha (todos), parado (ninguno), parcial o nuevo
+function docker_state() {
+    local out up=0 total=0 state
+    out=$(dk ps -a --filter "label=com.docker.compose.project=nexum-$1" --format '{{.State}}' 2> /dev/null) || { echo "?"; return 0; }
+    while read -r state; do
+        [ -z "$state" ] && continue
+        total=$((total + 1))
+        [ "$state" == running ] && up=$((up + 1))
+    done <<< "$out"
+    if [ $total -eq 0 ]; then echo nuevo
+    elif [ $up -eq $total ]; then echo marcha
+    elif [ $up -eq 0 ]; then echo parado
+    else echo parcial
+    fi
+}
+
+# Para la ventana:
+#   S|instalado (1/0)|Docker sin root responde (1/0)|version|LAMPP activa en marcha (1/0)|Docker o
+#     containerd del sistema (con root) en marcha (1/0)
+#   V|versiones de PHP|versiones de MariaDB
+#   P|nombre|carpeta|php|mariadb|dominio|estado|bbdd|puerto de phpMyAdmin
+#   C|contenedor|imagen|estado (running, exited...)|estado en texto|puertos|proyecto de compose
+#     (todos los contenedores de tu Docker, para la consola de la pestaña)
+#   I|imagen:etiqueta|tamaño|creada  y  O|volumen|driver   (imagenes y volumenes de tu Docker)
+function gui_docker() {
+    local installed=0 ready=0 version="" p
+    [ -x "$DOCKER_BIN" ] && installed=1
+    if [ $installed -eq 1 ] && docker_ready; then
+        ready=1
+        version=$(dk version --format '{{.Server.Version}}' 2> /dev/null | tr -cd '0-9.')
+    fi
+    [ $ready -eq 1 ] && docker_fix_restart > /dev/null
+    echo "S|$installed|$ready|$version|$(lampp_running && echo 1 || echo 0)|$(systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null && echo 1 || echo 0)"
+    echo "V|$DOCKER_PHP_VERSIONS|$DOCKER_MARIADB_VERSIONS"
+    for p in $(docker_projects); do
+        echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" PHP)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|$(docker_conf "$p" PUERTO_PMA)" \
+            | tr -d '\000-\010\013-\037'
+    done
+    if [ $ready -eq 1 ]; then
+        # (al final, el ID corto del contenedor)
+        dk ps -a --format '{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}|{{.ID}}' 2> /dev/null \
+            | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ { print "C|" $0 }'
+        # (imagen, etiqueta e ID corto por separado)
+        dk images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}|{{.CreatedSince}}' 2> /dev/null \
+            | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
+        dk volume ls --format '{{.Name}}|{{.Driver}}' 2> /dev/null \
+            | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "O|" $0 }'
+    fi
+    return 0
+}
+
+# Uso de CPU y memoria de los contenedores en marcha (tarda un par de segundos: docker stats mide):
+#   T|nucleos|memoria del equipo en bytes   y   K|contenedor|% de CPU|memoria usada (texto de Docker)
+function gui_docker_stats() {
+    docker_ready || return 0
+    echo "T|$(nproc 2> /dev/null || echo 1)|$(awk '/^MemTotal:/ { print $2 * 1024 }' /proc/meminfo)"
+    dk stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}' 2> /dev/null \
+        | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 3 { print "K|" $0 }'
+    return 0
+}
+
+# docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>: uno solo de los contenedores de
+# un proyecto del gestor (nexum-<proyecto>-php|db|pma-N), no cualquiera de tu Docker
+function docker_container_action() {
+    local action=$1 name=$2
+    if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ ]]; then
+        echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
+        return 1
+    fi
+    case $action in
+        arrancar) run dk start "$name" ;;
+        parar) run dk stop "$name" ;;
+        reiniciar) run dk restart "$name" ;;
+        registros) dk logs --tail 200 "$name" ;;
+        # (se quita el contenedor; los datos de la BBDD siguen en su volumen y, al arrancar el
+        # proyecto, se vuelve a crear. Para quitarlo todo: docker-borrar <proyecto>)
+        borrar) run dk rm -f "$name" ;;
+        *) echo "Uso: lvm-instalador docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
+    esac
+}
+
+# docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>: las imagenes de tu Docker.
+# Se borra sin -f: si la usa algun contenedor (aunque este parado), Docker no la borra y lo dice
+function docker_image_action() {
+    local action=$1 ref=$2
+    case $action in
+        borrar)
+            [[ "$ref" =~ ^[0-9a-f]{12,64}$ || "$ref" =~ ^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
+                || { echo "Imagen no valida: $ref"; return 1; }
+            run dk image rm "$ref" ;;
+        descargar)
+            [[ "$ref" =~ ^[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] \
+                || { echo "Imagen no valida: $ref (imagen:etiqueta)"; return 1; }
+            # (las nexum-php:X son del gestor y no estan en Docker Hub: se rehacen con docker-imagen)
+            [[ "$ref" == nexum-* ]] && { echo "$ref es del gestor: se rehace con «Actualizar imagen» de su proyecto"; return 1; }
+            run dk pull "$ref" ;;
+        *) echo "Uso: lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>"; return 1 ;;
+    esac
+}
+
+# docker-volumen-borrar <volumen>: Docker no borra uno que use algun contenedor (aunque este parado)
+function docker_volume_remove() {
+    [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$ ]] || { echo "Volumen no valido: $1"; return 1; }
+    run dk volume rm "$1"
+}
+
+# Los contenedores de los proyectos no arrancan solos al encender el equipo (se arrancan desde la
+# pestaña Docker). Hasta la 1.54 se creaban con restart: unless-stopped y Docker los volvia a arrancar
+# al iniciar la sesion: se cambia en sus compose.yaml y en los contenedores que ya existen (sin pararlos)
+function docker_fix_restart() {
+    local p dir
+    for p in $(docker_projects); do
+        dir=$DOCKER_DIR/$p
+        grep -q '^    restart: unless-stopped$' "$dir/compose.yaml" 2> /dev/null || continue
+        [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: sin arranque automatico"; continue; }
+        sed -i 's/^    restart: unless-stopped$/    restart: "no"/' "$dir/compose.yaml"
+        dk ps -aq --filter "label=com.docker.compose.project=nexum-$p" 2> /dev/null \
+            | xargs -r "$DOCKER_BIN" -H "$(docker_sock)" update --restart=no > /dev/null 2>&1
+    done
+    docker_fix_pma
+    return 0
+}
+
+# Hasta la 1.54.0 el phpMyAdmin de cada proyecto entraba solo como root (PMA_USER y PMA_PASSWORD):
+# cualquier programa o web que llegara a su puerto tenia la BBDD entera. Ahora enseña su pantalla
+# de acceso (usuario root y la contraseña de la BBDD, que la ventana copia). Se quita de sus
+# compose.yaml; el contenedor se rehace al arrancar el proyecto (o ya, si esta en marcha)
+function docker_fix_pma() {
+    local p dir
+    for p in $(docker_projects); do
+        dir=$DOCKER_DIR/$p
+        grep -qE '^      PMA_(USER|PASSWORD):' "$dir/compose.yaml" 2> /dev/null || continue
+        [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: phpMyAdmin con su pantalla de acceso"; continue; }
+        sed -i -E '/^      PMA_(USER|PASSWORD):/d' "$dir/compose.yaml" || continue
+        if [ "$(docker_state "$p")" == marcha ]; then
+            dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d pma > /dev/null 2>&1
+        fi
+    done
+    return 0
+}
+
+# docker-imagen <nombre>: rehace la imagen de PHP de un proyecto (nexum-php:<version>) con lo ultimo
+# de Docker Hub (--pull, sin la cache: con los parches de seguridad de PHP y del sistema de la
+# imagen) y vuelve a crear su contenedor de PHP. La BBDD y la configuracion no se tocan. Los demas
+# proyectos con esa version de PHP pasan a la imagen nueva al volver a crear su contenedor
+function docker_update_image() {
+    local slug=$1 dir php
+    if ! docker_valid_slug "$slug" || [ ! -f "$DOCKER_DIR/$slug/proyecto.conf" ]; then
+        echo "No hay ningun proyecto en Docker con el nombre $slug"
+        return 1
+    fi
+    dir=$DOCKER_DIR/$slug
+    php=$(docker_conf "$slug" PHP)
+    [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "$slug usa una version de PHP que no se ofrece: $php"; return 1; }
+    echo "$slug: imagen de PHP $php de nuevo, con lo ultimo de Docker Hub (la BBDD y la configuracion no cambian)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] docker build --pull --no-cache -t nexum-php:$php y contenedor de PHP nuevo"
+        return 0
+    fi
+    docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    docker_php_image "$php" --nueva || { echo "No se ha podido rehacer la imagen de PHP $php: sigue con la anterior"; return 1; }
+    mkdir -p -m 700 "$(docker_run_dir "$slug")"
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate php || return 1
+    dk image prune -f > /dev/null 2>&1
+    echo "$slug ya funciona con la imagen nueva de PHP $php"
+}
+
+# docker-php <nombre> <version>: cambia la version de PHP de un proyecto en Docker. Solo se cambia su
+# contenedor de PHP (con la imagen de esa version, que se prepara si hace falta): su BBDD, su
+# phpMyAdmin y su configuracion se quedan como estaban
+function docker_set_php() {
+    local slug=$1 php=$2 dir old
+    if ! docker_valid_slug "$slug" || [ ! -f "$DOCKER_DIR/$slug/proyecto.conf" ]; then
+        echo "No hay ningun proyecto en Docker con el nombre $slug"
+        return 1
+    fi
+    [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "PHP $php no se ofrece en Docker ($DOCKER_PHP_VERSIONS)"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    old=$(docker_conf "$slug" PHP)
+    if [ "$old" == "$php" ]; then
+        echo "$slug ya usa PHP $php"
+        return 0
+    fi
+    if ! grep -qE '^    image: nexum-php:[0-9.]+$' "$dir/compose.yaml"; then
+        echo "No se encuentra el contenedor de PHP en $dir/compose.yaml"
+        return 1
+    fi
+    echo "$slug: PHP $old -> $php (la BBDD y la configuracion no cambian)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] imagen nexum-php:$php y contenedor de PHP nuevo"
+        return 0
+    fi
+    docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php: sigue con PHP $old"; return 1; }
+    sed -i -E "s|^    image: nexum-php:[0-9.]+$|    image: nexum-php:$php|" "$dir/compose.yaml" \
+        && sed -i "s/^PHP=.*/PHP=$php/" "$dir/proyecto.conf" || return 1
+    mkdir -p -m 700 "$(docker_run_dir "$slug")"
+    if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d php; then
+        echo "No arranca con PHP $php: se vuelve a PHP $old"
+        sed -i -E "s|^    image: nexum-php:[0-9.]+$|    image: nexum-php:$old|" "$dir/compose.yaml"
+        sed -i "s/^PHP=.*/PHP=$old/" "$dir/proyecto.conf"
+        dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d php
+        return 1
+    fi
+    echo "$slug ya funciona con PHP $php"
+}
+
+# Arranque de Docker sin root y su servicio de usuario (lo mismo que hace dockerd-rootless-setuptool.sh
+# del Docker oficial, que el paquete docker.io de Ubuntu no trae): rootlesskit crea el espacio de
+# usuarios y la red (slirp4netns) y dentro arranca dockerd, que al verse ahi usa
+# $XDG_RUNTIME_DIR/docker.sock y ~/.local/share/docker
+DOCKER_ROOTLESS_SH='#!/bin/sh
+# Docker sin root de Nexum Dev Stack (como dockerd-rootless.sh de Docker). Lo arranca systemctl --user
+set -e
+if [ -z "$_DOCKERD_ROOTLESS_CHILD" ]; then
+    : "${XDG_RUNTIME_DIR:?falta XDG_RUNTIME_DIR}"
+    export _DOCKERD_ROOTLESS_CHILD=1
+    exec /usr/bin/rootlesskit --state-dir="$XDG_RUNTIME_DIR/dockerd-rootless" --net=slirp4netns --mtu=65520 \
+        --slirp4netns-sandbox=auto --slirp4netns-seccomp=auto --disable-host-loopback --port-driver=builtin \
+        --copy-up=/etc --copy-up=/run --propagation=rslave "$0" "$@"
+fi
+[ "$_DOCKERD_ROOTLESS_CHILD" = 1 ]
+# (los del Docker del sistema: dentro del espacio de usuarios /run es una copia propia)
+rm -f /run/docker /run/containerd /run/xtables.lock
+exec /usr/bin/dockerd "$@"
+'
+DOCKER_UNIT='[Unit]
+Description=Docker sin root (Nexum Dev Stack)
+Documentation=https://docs.docker.com/engine/security/rootless/
+
+[Service]
+Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=%h/.lvm-instalador/docker/bin/dockerd-rootless
+ExecReload=/bin/kill -s HUP $MAINPID
+TimeoutSec=0
+RestartSec=2
+Restart=always
+StartLimitBurst=3
+StartLimitInterval=60s
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+Delegate=yes
+Type=notify
+NotifyAccess=all
+KillMode=mixed
+
+[Install]
+WantedBy=default.target
+'
+
+# docker-instalar: Docker sin root. Instala los paquetes de Ubuntu (con sudo, si falta alguno), deja
+# apagados el Docker y el containerd del sistema (los que corren como root), prepara los rangos de
+# usuarios (subuid/subgid) y, si Ubuntu limita los espacios de usuarios, el perfil de AppArmor de
+# rootlesskit. Despues, ya con tu usuario, el servicio de Docker sin root (systemctl --user)
+function docker_install() {
+    local me=$(id -un) p missing=""
+    if ! command -v apt-get > /dev/null; then
+        echo "Docker sin root solo se instala solo en Ubuntu o Debian. Instalalo a mano: https://docs.docker.com/engine/security/rootless/"
+        return 1
+    fi
+    for p in $DOCKER_PACKAGES; do
+        dpkg-query -W -f='${Status}' "$p" 2> /dev/null | grep -q "install ok installed" || missing+=" $p"
+    done
+    if [ -n "$missing" ]; then
+        echo "1/4 Paquetes:$missing"
+        # (sin preguntas de debconf: la tarea no tiene una terminal donde contestarlas)
+        run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y $missing || return 1
+    else
+        echo "1/4 Paquetes: ya estan instalados"
+    fi
+    # (el paquete deja en marcha el demonio con root: con el, el grupo docker seria como ser root)
+    echo "2/4 Docker y containerd del sistema (con root), apagados: se usa solo el tuyo"
+    if systemctl is-enabled -q docker.service docker.socket containerd.service 2> /dev/null \
+            || systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null; then
+        run sudo systemctl disable --now docker.service docker.socket containerd.service 2> /dev/null || true
+    fi
+    if ! grep -q "^$me:" /etc/subuid 2> /dev/null || ! grep -q "^$me:" /etc/subgid 2> /dev/null; then
+        echo "   Rangos de usuarios para los contenedores (/etc/subuid y /etc/subgid)"
+        run sudo usermod --add-subuids 231072-296607 --add-subgids 231072-296607 "$me" || return 1
+    fi
+    if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2> /dev/null)" == 1 ] \
+            && ! grep -lqs 'rootlesskit' /etc/apparmor.d/* 2> /dev/null; then
+        echo "   Perfil de AppArmor para rootlesskit (Ubuntu limita los espacios de usuarios)"
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] /etc/apparmor.d/usr.bin.rootlesskit y recarga de AppArmor"
+        else
+            printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' '' \
+                '"/usr/bin/rootlesskit" flags=(unconfined) {' '  userns,' '' \
+                '  include if exists <local/usr.bin.rootlesskit>' '}' \
+                | sudo tee /etc/apparmor.d/usr.bin.rootlesskit > /dev/null \
+                && sudo apparmor_parser -r /etc/apparmor.d/usr.bin.rootlesskit || return 1
+        fi
+    fi
+    echo "3/4 Docker sin root para $me (servicio de tu usuario)"
+    local unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $DOCKER_DIR/bin/dockerd-rootless y $unit_dir/docker.service"
+    else
+        mkdir -p -m 700 "$DOCKER_DIR" "$DOCKER_DIR/bin" && mkdir -p "$unit_dir" || return 1
+        printf '%s' "$DOCKER_ROOTLESS_SH" > "$DOCKER_DIR/bin/dockerd-rootless.nuevo" \
+            && chmod 700 "$DOCKER_DIR/bin/dockerd-rootless.nuevo" \
+            && mv -f "$DOCKER_DIR/bin/dockerd-rootless.nuevo" "$DOCKER_DIR/bin/dockerd-rootless" || return 1
+        printf '%s' "$DOCKER_UNIT" > "$unit_dir/docker.service.nuevo" \
+            && mv -f "$unit_dir/docker.service.nuevo" "$unit_dir/docker.service" || return 1
+    fi
+    run systemctl --user daemon-reload || return 1
+    run systemctl --user enable docker.service || return 1
+    run systemctl --user restart docker.service || {
+        echo "No arranca Docker sin root. Lo que dice:"
+        journalctl --user -u docker.service -n 30 --no-pager 2> /dev/null
+        return 1
+    }
+    echo "4/4 Comprobando"
+    local i
+    for i in $(seq 20); do docker_ready && break; [ "$DRY" -eq 1 ] && break; sleep 1; done
+    if [ "$DRY" -eq 0 ] && ! docker_ready; then
+        echo "Docker sin root no responde. Prueba a cerrar la sesion y volver a entrar, y pulsa Comprobar."
+        return 1
+    fi
+    echo "Docker sin root listo (socket $(docker_sock))."
+}
+
+# Imagen de PHP del gestor para una version (nexum-php:<version>): la oficial php:<version>-fpm con
+# las extensiones de DOCKER_PHP_EXT (con install-php-extensions, que sabe instalarlas tambien en las
+# versiones antiguas). PHP-FPM escucha en un socket de /run/nexum (docker_run_dir del proyecto) y corre
+# como el root del contenedor, que en Docker sin root eres tu: asi escribe en el proyecto con tu usuario
+# Con --nueva se rehace aunque ya exista (Actualizar imagen: con lo ultimo de Docker Hub, sin cache).
+# El php.ini es el de produccion, con las mitigaciones de PHP2Shell (PHP_SECURE_INI), y cada proceso
+# de PHP-FPM se renueva cada 50 peticiones
+# (install-php-extensions, fijado por su huella: la etiqueta 2 la puede mover cualquiera que llegue a
+# esa cuenta de Docker Hub. Es la 2.12.3, del 20/10/2026; para otra: docker buildx imagetools inspect)
+DOCKER_EXT_INSTALLER="mlocati/php-extension-installer:2.12.3@sha256:ac4b252c153a9f6de5578ff2c417790aba836bb49855543144606033eceda253"
+function docker_php_image() {
+    local php=$1 dir=$DOCKER_DIR/imagenes/php-$1 fresh=() ini
+    if [ "$2" == "--nueva" ]; then
+        fresh=(--pull --no-cache)
+    elif [ "$DRY" -eq 0 ] && dk image inspect "nexum-php:$php" > /dev/null 2>&1; then
+        return 0
+    fi
+    mkdir -p -m 700 "$dir" || return 1
+    ini=$(printf 'memory_limit = 512M\nmax_execution_time = 300\n%s' "$PHP_SECURE_INI")
+    php_85_or_later "$php" && ini+=$'\n'$PHP_SECURE_INI_85
+    ini=${ini//$'\n'/\\n}
+    cat > "$dir/Dockerfile" << EOF
+FROM php:$php-fpm
+COPY --from=$DOCKER_EXT_INSTALLER /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions $DOCKER_PHP_EXT
+RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \\
+ && printf '[global]\\nerror_log = /proc/self/fd/2\\ndaemonize = no\\n[www]\\nuser = root\\ngroup = root\\nlisten = /run/nexum/php.sock\\nlisten.mode = 0660\\nclear_env = no\\ncatch_workers_output = yes\\npm.max_requests = 50\\n' > /usr/local/etc/php-fpm.d/zz-nexum.conf \\
+ && cp "\$PHP_INI_DIR/php.ini-production" "\$PHP_INI_DIR/php.ini" \\
+ && printf '$ini\\n' > "\$PHP_INI_DIR/conf.d/zz-nexum.ini"
+CMD ["php-fpm", "-R", "-F"]
+EOF
+    echo "Preparando la imagen de PHP $php (${fresh:+de nuevo, }tarda unos minutos)..."
+    run dk build "${fresh[@]}" -t "nexum-php:$php" "$dir"
+}
+
+# Configuracion del proyecto para el contenedor: copia de su wp-config.php (o parameters.php /
+# settings.inc.php) con la BBDD del contenedor y, en WordPress, su dominio. Imprime la ruta relativa
+# del fichero dentro del proyecto (la que se sustituye en el contenedor), nada si no tiene
+function docker_project_config() {
+    local folder=$1 dir=$2 domain=$3 db=$4 user=$5 pass=$6 rel
+    for rel in wp-config.php app/config/parameters.php config/settings.inc.php; do
+        [ -f "$HTDOCS_DIR/$folder/$rel" ] && [ ! -L "$HTDOCS_DIR/$folder/$rel" ] && break
+        rel=""
+    done
+    [ -z "$rel" ] && return 0
+    python3 -I - "$HTDOCS_DIR/$folder/$rel" "$dir/config.php" "$rel" "$domain" "$db" "$user" "$pass" << 'EOF' || return 1
+import os, re, sys
+src, dst, rel, domain, db, user, pw = sys.argv[1:8]
+with open(src, encoding="utf-8", errors="surrogateescape", newline="") as f:
+    text = f.read(2000000)
+def lit(v):
+    return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
+if rel == "wp-config.php":
+    for name, val in (("DB_NAME", db), ("DB_USER", user), ("DB_PASSWORD", pw), ("DB_HOST", "db")):
+        # (en cualquier sitio de la linea, salvo detras de un comentario // o #)
+        text, n = re.subn(r"""(?m)^((?:(?!//|#)[^\n])*?\bdefine\(\s*['"]%s['"]\s*,\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")""" % name,
+                          lambda m: m.group(1) + lit(val), text, count=1)
+        if not n:
+            text = re.sub(r"^<\?php", lambda m: "<?php\ndefine(%s, %s);" % (lit(name), lit(val)), text, count=1)
+    # (el dominio del contenedor, sin tocar la BBDD; detras de un proxy con https)
+    extra = ("\nif (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' || ($_SERVER['HTTPS'] ?? '') === 'on') { $_SERVER['HTTPS'] = 'on'; }\n"
+             "define('WP_HOME', 'https://%s');\ndefine('WP_SITEURL', 'https://%s');\n" % (domain, domain))
+    text = re.sub(r"(?m)^[ \t]*define\(\s*['\"](WP_HOME|WP_SITEURL)['\"].*$", "", text)
+    text = re.sub(r"^<\?php", lambda m: "<?php" + extra, text, count=1)
+elif rel == "app/config/parameters.php":
+    for key, val in (("database_host", "db"), ("database_port", ""), ("database_name", db),
+                     ("database_user", user), ("database_password", pw)):
+        text = re.sub(r"""(['"]%s['"]\s*=>\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|NULL|null|\d+)""" % key,
+                      lambda m: m.group(1) + lit(val), text, count=1)
+else:
+    for name, val in (("_DB_SERVER_", "db"), ("_DB_NAME_", db), ("_DB_USER_", user), ("_DB_PASSWD_", pw)):
+        text = re.sub(r"""(define\(\s*['"]%s['"]\s*,\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")""" % name,
+                      lambda m: m.group(1) + lit(val), text, count=1)
+fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+    f.write(text)
+EOF
+    echo "$rel"
+}
+
+# Bloque del vhost de un proyecto en Docker (http y https) para los vhosts compartidos: la carpeta
+# del proyecto como siempre y los .php al PHP-FPM del contenedor
+function docker_vhost_block() {
+    local slug=$1 folder=$2 domain=$3 sock=$4 crt=$5 key=$6 admin=$(server_admin) port
+    printf '\n# nexum-docker %s: el PHP va en Docker (no se edita a mano: lo quita Docker, Borrar)\n' "$slug"
+    for port in "$PORT_HTTP" "$PORT_HTTPS"; do
+        printf '<VirtualHost *:%s>\n    ServerAdmin %s\n    DocumentRoot "/opt/lampp/htdocs/%s"\n    ServerName %s\n' \
+            "$port" "$admin" "$folder" "$domain"
+        [ "$port" == "$PORT_HTTPS" ] && printf '    SSLEngine on\n    SSLCertificateFile "%s"\n    SSLCertificateKeyFile "%s"\n' "$crt" "$key"
+        printf '    <FilesMatch "\\.php$">\n        SetHandler "proxy:unix:%s|fcgi://nexum-%s"\n    </FilesMatch>\n' "$sock" "$slug"
+        printf '    ErrorLog "logs/%s-error_log"\n</VirtualHost>\n' "$domain"
+    done
+    printf '# /nexum-docker %s\n' "$slug"
+}
+
+# Cambia los vhosts compartidos por los de la copia, con la comprobacion de siempre (edit_vhosts)
+function docker_apply_vhosts() {
+    local copy=$1
+    edit_vhosts --aplicar "$copy"
+}
+
+# docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version LAMPP>] [--dominio <dominio>]
+#   [--nombre <nombre>]  (otro nombre: el mismo proyecto en Docker con otra version de PHP)
+function docker_create() {
+    local folder=${1%/} php=$2 maria=$3 db="" from="" domain="" name="" slug dir sock rel pma_port p
+    shift 3 2> /dev/null
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --bd|--desde|--dominio|--nombre)
+                [ -n "$2" ] || { echo "Falta el valor de $1"; return 1; }
+                case $1 in --bd) db=$2 ;; --desde) from=$2 ;; --dominio) domain=$2 ;; --nombre) name=$2 ;; esac
+                shift 2 ;;
+            *) echo "Opcion desconocida: $1"; return 1 ;;
+        esac
+    done
+    if [ -z "$folder" ] || [ -z "$php" ] || [ -z "$maria" ]; then
+        echo "Uso: lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <dominio>] [--nombre <nombre>]"
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "PHP $php no se ofrece en Docker ($DOCKER_PHP_VERSIONS)"; return 1; }
+    [[ " $DOCKER_MARIADB_VERSIONS " == *" $maria "* ]] || { echo "MariaDB $maria no se ofrece en Docker ($DOCKER_MARIADB_VERSIONS)"; return 1; }
+    if [ -n "$db" ]; then
+        db_valid_name "$db" || return 1
+        [ -n "$from" ] && valid_version_name "$from" && [ -d "${TEST_DIR:-/opt}/lampp-$from" ] \
+            || { echo "Con --bd hay que decir de que version LAMPP se copia (--desde)"; return 1; }
+    fi
+    if [ -n "$name" ]; then
+        slug=$name
+        docker_valid_slug "$slug" || { echo "Nombre no valido para Docker: $slug (minusculas, numeros y guiones)"; return 1; }
+    else
+        slug=$(docker_slug "$folder") && docker_valid_slug "$slug" || { echo "No se puede sacar un nombre corto de $folder"; return 1; }
+    fi
+    domain=${domain:-$slug.docker.local}
+    domain=$(tr 'A-Z' 'a-z' <<< "$domain")
+    valid_domain "$domain" || { echo "Dominio no valido: $domain"; return 1; }
+    [[ "$domain" == *.local ]] || { echo "El dominio de un proyecto en Docker tiene que acabar en .local ($domain)"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    if [ -e "$dir" ]; then
+        echo "Ya hay un proyecto en Docker con el nombre $slug ($dir): borralo antes o usa otra carpeta"
+        return 1
+    fi
+    if vhosts_info | awk -F'|' -v d="$domain" '$3 == d || (" " $4 " ") ~ (" " d " ") { f = 1 } END { exit !f }'; then
+        echo "Ya hay un vhost con el dominio $domain"
+        return 1
+    fi
+    if [ "$DRY" -eq 0 ] && ! docker_ready; then
+        echo "Docker sin root no esta en marcha: instalalo o arrancalo en la pestaña Docker."
+        return 1
+    fi
+    # Puerto de 127.0.0.1 para su phpMyAdmin: el primero libre
+    pma_port=$DOCKER_PMA_PORT
+    while grep -qs "^PUERTO_PMA=$pma_port$" "$DOCKER_DIR"/*/proyecto.conf || ss -Hltn "sport = :$pma_port" 2> /dev/null | grep -q .; do
+        pma_port=$((pma_port + 1))
+    done
+    local dbname=${db:-$(tr '-' '_' <<< "$slug")} user=nexum
+    local root_pass app_pass
+    root_pass=$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')
+    app_pass=$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')
+    sock=$(docker_run_dir "$slug")/php.sock
+    if [ ${#sock} -gt 100 ]; then
+        echo "La ruta del socket de PHP ($sock) es demasiado larga: usa una carpeta con un nombre mas corto"
+        return 1
+    fi
+
+    echo "Proyecto en Docker: $folder con PHP $php y MariaDB $maria (https://$domain)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $dir con compose.yaml, la imagen nexum-php:$php, vhost de $domain y su linea en $HOSTS_FILE"
+        [ -n "$db" ] && echo "  [simulacion] copia de $db de lampp-$from a la MariaDB del contenedor"
+        return 0
+    fi
+    mkdir -p -m 700 "$DOCKER_DIR" "$dir" "$(dirname "$sock")" || return 1
+    chmod 700 "$DOCKER_DIR" "$dir" "$(dirname "$(dirname "$sock")")" "$(dirname "$sock")"
+    # (las contraseñas, solo en ficheros solo tuyos)
+    ( umask 077
+      printf 'DB_ROOT_PASS=%s\nDB_PASS=%s\n' "$root_pass" "$app_pass" > "$dir/.env"
+      printf 'CARPETA=%s\nPHP=%s\nMARIADB=%s\nDOMINIO=%s\nBBDD=%s\nPUERTO_PMA=%s\n' \
+          "$folder" "$php" "$maria" "$domain" "$dbname" "$pma_port" > "$dir/proyecto.conf" ) || return 1
+    rel=$(docker_project_config "$folder" "$dir" "$domain" "$dbname" "$user" "$app_pass") || return 1
+    {
+        printf 'name: nexum-%s\nservices:\n' "$slug"
+        printf '  php:\n    image: nexum-php:%s\n    restart: "no"\n    volumes:\n' "$php"
+        printf '      - "%s:/opt/lampp/htdocs/%s"\n' "$HTDOCS_DIR/$folder" "$folder"
+        printf '      - "%s:/run/nexum"\n' "$(dirname "$sock")"
+        [ -n "$rel" ] && printf '      - "./config.php:/opt/lampp/htdocs/%s/%s:ro"\n' "$folder" "$rel"
+        printf '    depends_on: [db]\n'
+        printf '  db:\n    image: mariadb:%s\n    restart: "no"\n    environment:\n' "$maria"
+        printf '      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_DATABASE: %s\n      MARIADB_USER: %s\n      MARIADB_PASSWORD: ${DB_PASS}\n' "$dbname" "$user"
+        printf '    volumes:\n      - "db:/var/lib/mysql"\n'
+        # (sin PMA_USER ni PMA_PASSWORD: phpMyAdmin enseña su pantalla de acceso; la contraseña de
+        # root la copia la ventana)
+        printf '  pma:\n    image: %s\n    restart: "no"\n    environment:\n      PMA_HOST: db\n      UPLOAD_LIMIT: 64M\n' "$DOCKER_PMA_IMAGE"
+        printf '    ports:\n      - "127.0.0.1:%s:80"\n    depends_on: [db]\n' "$pma_port"
+        printf 'volumes:\n  db: {}\n'
+    } > "$dir/compose.yaml" || return 1
+
+    echo "1/4 Imagen de PHP $php"
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    echo "2/4 Contenedores"
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d || return 1
+    echo "3/4 BBDD $dbname"
+    local i
+    # (la contraseña no va en ninguna orden, que se ve en ps: el cliente la toma dentro del contenedor
+    # de MARIADB_ROOT_PASSWORD, la variable con la que se creo)
+    for i in $(seq 60); do
+        dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+            sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot -e "SELECT 1"' < /dev/null > /dev/null 2>&1 && break
+        sleep 1
+    done
+    if [ -n "$db" ]; then
+        local tmp
+        mkdir -p -m 700 "$LOG_DIR" || return 1
+        tmp=$(mktemp "$LOG_DIR/docker-$slug-XXXXXX") && mv -f "$tmp" "$tmp.sql.gz" && tmp=$tmp.sql.gz || return 1
+        echo "Copiando $db de lampp-$from..."
+        if ! export_database "$db" "$tmp" "$from"; then
+            rm -f "$tmp"
+            echo "No se ha podido descargar $db de lampp-$from: el proyecto queda con la BBDD vacia."
+        else
+            db_temp_stop
+            gzip -dc "$tmp" | dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+                sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot --binary-mode "$0"' "$dbname" \
+                || echo "Aviso: la carga de $db ha dado errores (mira el registro)."
+            rm -f "$tmp"
+            docker_ps_domain "$dir" "$dbname" "$domain" "$root_pass"
+        fi
+    fi
+    echo "4/4 Vhost de $domain"
+    local crt=$OWN_SSL_DIR/$domain-selfsigned.crt key=$OWN_SSL_DIR/$domain-selfsigned.key copy
+    [ -f "$crt" ] || make_selfsigned "$domain" "" "$crt" "$key" || return 1
+    copy=$(mktemp "$LOG_DIR/vhosts-docker-XXXXXX") || return 1
+    { cat "$(readlink -f "$ACTIVE_VHOSTS")"; docker_vhost_block "$slug" "$folder" "$domain" "$sock" "$crt" "$key"; } > "$copy"
+    docker_apply_vhosts "$copy" || { rm -f "$copy"; echo "No se ha podido añadir el vhost de $domain (los contenedores quedan creados)"; return 1; }
+    rm -f "$copy"
+    if ! grep -qE "^[^#]*[[:space:]]${domain//./\\.}([[:space:]]|$)" "$HOSTS_FILE" 2> /dev/null; then
+        copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
+        { cat "$HOSTS_FILE"; printf '127.0.0.1 %s\n' "$domain"; } > "$copy"
+        edit_hosts --aplicar "$copy"
+        rm -f "$copy"
+    fi
+    browser_trust "$domain" || true
+    echo "Proyecto en Docker listo: https://$domain (PHP $php). phpMyAdmin: http://127.0.0.1:$pma_port/"
+}
+
+# Tienda PrestaShop copiada al contenedor: su dominio pasa a ser el del contenedor (la BBDD es una copia)
+function docker_ps_domain() {
+    local dir=$1 db=$2 domain=$3 pass=$4 prefix
+    # (la contraseña, la del contenedor: MARIADB_ROOT_PASSWORD)
+    prefix=$(dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+        sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot -N -e "SELECT LEFT(table_name, LENGTH(table_name) - 8) FROM information_schema.tables WHERE table_schema = \"$0\" AND table_name LIKE \"%shop\\_url\" LIMIT 1"' "$db" < /dev/null 2> /dev/null | tr -d '\r')
+    [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || return 0
+    echo "Tienda PrestaShop: su dominio pasa a $domain en la copia del contenedor"
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+        sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$0"' "$db" << EOF
+UPDATE \`${prefix}shop_url\` SET domain = '$domain', domain_ssl = '$domain';
+UPDATE \`${prefix}configuration\` SET value = '$domain' WHERE name IN ('PS_SHOP_DOMAIN', 'PS_SHOP_DOMAIN_SSL');
+UPDATE \`${prefix}configuration\` SET value = '1' WHERE name IN ('PS_SSL_ENABLED', 'PS_SSL_ENABLED_EVERYWHERE');
+EOF
+}
+
+# docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>
+function docker_action() {
+    local action=$1 slug=$2 dir
+    docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    local c=(dk compose --project-directory "$dir" -f "$dir/compose.yaml")
+    case $action in
+        # (la carpeta del socket esta en memoria: tras reiniciar el equipo hay que volver a crearla)
+        arrancar) run mkdir -p -m 700 "$(docker_run_dir "$slug")" && run "${c[@]}" up -d ;;
+        parar) run "${c[@]}" stop ;;
+        registros) "${c[@]}" logs --no-color --tail 200 ;;
+        borrar)
+            local domain=$(docker_conf "$slug" DOMINIO) copy
+            echo "Se borran los contenedores de $slug y su BBDD (la copia del contenedor; la de LAMPP no se toca)"
+            run "${c[@]}" down -v || return 1
+            if grep -q "^# nexum-docker $slug:" "$(readlink -f "$ACTIVE_VHOSTS")" 2> /dev/null; then
+                copy=$(mktemp "$LOG_DIR/vhosts-docker-XXXXXX") || return 1
+                awk -v s="$slug" '$0 ~ ("^# nexum-docker " s ":") { skip = 1 } !skip { print } $0 == ("# /nexum-docker " s) { skip = 0 }' \
+                    "$(readlink -f "$ACTIVE_VHOSTS")" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "$copy"
+                docker_apply_vhosts "$copy" || { rm -f "$copy"; return 1; }
+                rm -f "$copy"
+            fi
+            if [ -n "$domain" ] && valid_domain "$domain" && grep -qE "^127\.0\.0\.1[[:space:]]+${domain//./\\.}$" "$HOSTS_FILE"; then
+                copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
+                grep -vE "^127\.0\.0\.1[[:space:]]+${domain//./\\.}$" "$HOSTS_FILE" > "$copy"
+                edit_hosts --aplicar "$copy"
+                rm -f "$copy"
+            fi
+            [ "$DRY" -eq 1 ] || rm -rf "$dir" "$(docker_run_dir "$slug")"
+            echo "Proyecto en Docker $slug borrado"
+            ;;
+        *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
+    esac
+}
+
 # Parches de una rama: P|version|fecha|carpeta|estado (nueva, instalada o existe)|seguridad (1/0)
 function gui_patches() {
     local branch=$1 latest version date item folder state sec
@@ -9567,7 +13381,9 @@ function gui_up_to_date() {
     local full=$(rebuild_version "$dir" "$(php_releases)")
     if [ -z "$full" ]; then
         echo "error"
-    elif is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ]; then
+    elif is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] \
+            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; }; then
+        # (7.4.33, 8.0.30 y 8.1.34 sin el parche de seguridad no estan al dia: se vuelven a compilar)
         echo "si|$full"
     else
         echo "no|$full"
@@ -9587,6 +13403,28 @@ DB_CLIENT=${LVM_BD_CLIENTE:-/opt/lampp/bin/mysql}
 # tuyo puede preparar (plugin-dir/default-auth les hacen cargar una biblioteca) y se ejecutan en la
 # terminal de la tarea, con el permiso de sudo recordado: siempre sin esos ficheros
 DB_SAFE=(/usr/bin/env -u MYSQL_HOME -u MARIADB_HOME HOME=/nonexistent)
+
+# Tamaño de cada BBDD (datos e indices, de information_schema) de la version activa en marcha. Se
+# guarda para enseñar tambien el de las demas versiones (sus carpetas son de mysql y no se pueden
+# leer sin sudo): Z|version duena de las BBDD|base|bytes|cuando se midio (segundos desde 1970)
+function gui_db_sizes() {
+    local cache=$LOG_DIR/cache/bbdd-tamanos active owner out check now
+    now=$(date +%s)
+    mkdir -p -m 700 "$LOG_DIR/cache" || return 0
+    active=$(active_dir)
+    if [ -n "$active" ] && check=$(gui_db_check) && [[ "$check" == ok\|* ]]; then
+        owner=$(data_owner "$active")
+        owner=${owner:-${active#/opt/lampp-}}
+        out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -B -e "SELECT table_schema, SUM(data_length + index_length) FROM information_schema.tables GROUP BY table_schema" < /dev/null 2> /dev/null)
+        if [ -n "$out" ] && valid_version_name "$owner"; then
+            { [ -f "$cache" ] && grep -v "^$owner|" "$cache"
+              awk -F'\t' -v v="$owner" -v t="$now" '$1 ~ /^[A-Za-z0-9_-]+$/ && $2 ~ /^[0-9]+$/ { print v "|" $1 "|" $2 "|" t }' <<< "$out"
+            } > "$cache.nuevo" && mv -f "$cache.nuevo" "$cache"
+        fi
+    fi
+    [ -f "$cache" ] && grep -E '^[A-Za-z0-9._-]+\|[A-Za-z0-9_-]+\|[0-9]+\|[0-9]+$' "$cache" | sed 's/^/Z|/'
+    return 0
+}
 
 # ¿Se puede cargar en la version activa? ok|carpeta|version de MariaDB / clave|carpeta / no|motivo
 function gui_db_check() {
@@ -10112,7 +13950,7 @@ function export_database() {
 
     echo "Base de datos: $db (lampp-$folder$([ "$owner" != "$folder" ] && echo ", bases de lampp-$owner"))"
     echo "Destino: $dest"
-    local dump=() check
+    local dump=() query=() check i
     trap db_cleanup EXIT
     trap 'exit 130' INT TERM HUP
     if [ "$owner" == "$active_owner" ] && check=$(gui_db_check) && [[ "$check" != no\|* ]]; then
@@ -10121,6 +13959,7 @@ function export_database() {
         [ $rc -ne 0 ] && return $rc
         echo "Se usa el MariaDB en marcha de lampp-$DB_FOLDER (MariaDB $DB_VERSION)"
         dump=("${DB_SAFE[@]}" "${LVM_BD_VOLCADO:-$(dirname "$DB_CLIENT")/mysqldump}" -uroot)
+        query=("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N)
     elif [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] MariaDB temporal de lampp-$owner y mysqldump $db > $dest"
 
@@ -10128,10 +13967,21 @@ function export_database() {
     else
         db_temp_start "/opt/lampp-$owner" || return 1
         # El cliente de la propia version (el de XAMPP, con sus bibliotecas)
-        local client=/opt/lampp-$owner/mysql/bin/mariadb-dump
-        [ -x "$client" ] || client=/opt/lampp-$owner/bin/mysqldump
+        local client=/opt/lampp-$owner/mysql/bin/mariadb-dump sql=/opt/lampp-$owner/mysql/bin/mariadb
+        [ -x "$client" ] || client=/opt/lampp-$owner/bin/mysqldump sql=/opt/lampp-$owner/bin/mysql
         dump=(env LD_LIBRARY_PATH="/opt/lampp-$owner/lib" "$client" --no-defaults -S "$DB_TMP_SOCK" -uroot)
+        query=(env LD_LIBRARY_PATH="/opt/lampp-$owner/lib" "$sql" --no-defaults -S "$DB_TMP_SOCK" -uroot -N)
     fi
+    # El administrador de pruebas (test_admin) no sale en la copia: sus filas de los usuarios de
+    # WordPress y de los empleados de PrestaShop se quedan fuera del volcado (la BBDD de trabajo no
+    # se toca). Esas tablas van aparte, con --where
+    local skip=() only=() wheres=() mail_sql=""
+    test_admin_filter "$db"
+    [ ${#only[@]} -gt 0 ] && echo "El administrador de pruebas ($TEST_ADMIN_USER) no va en la copia"
+    # Lo que cambio el correo de pruebas (plugins de WordPress, correo de PrestaShop) tampoco: la copia
+    # lleva lo que habia antes (al final del volcado) y sin la tabla donde se apunto
+    mail_export_filter "$db"
+    [ -n "$mail_sql" ] && echo "Los cambios del correo de pruebas no van en la copia: lleva el correo como estaba"
 
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] mysqldump $db > $dest"
@@ -10151,8 +14001,14 @@ function export_database() {
     echo "Descargando..."
     while :; do
         # (solo para ti: lleva la base entera, aunque la carpeta de destino sea de todos)
-        ( umask 077; set -o pipefail; "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick \
-            $routines --triggers --max-allowed-packet=1G "$db" < /dev/null 2> "$errors" | "${out[@]}" > "$part" ) &
+        ( umask 077; set -o pipefail
+          { "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick \
+                $routines --triggers --max-allowed-packet=1G "${skip[@]}" "$db" || exit 1
+            for i in "${!only[@]}"; do
+                "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick --triggers \
+                    --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" || exit 1
+            done
+            [ -z "$mail_sql" ] || printf '%s\n' "$mail_sql"; } < /dev/null 2> "$errors" | "${out[@]}" > "$part" ) &
         pid=$!
         while kill -0 $pid 2> /dev/null; do
             sleep 2
@@ -10178,6 +14034,499 @@ function export_database() {
     mv -f "$part" "$dest"
     DB_PART=""
     echo "Copia guardada: $dest ($(du -h "$dest" | cut -f1))"
+}
+
+# Tablas del administrador de pruebas en una base (para exportar-bd): deja en skip los --ignore-table
+# del volcado de siempre y en only/wheres cada tabla con su condicion (sin las filas de
+# local@local.test). Solo las tablas de verdad que lo tienen. Usa query (el cliente de la base)
+function test_admin_filter() {
+    local db=$1 t c p n
+    local -A cols=()
+    while IFS=$'\t' read -r t c; do
+        [[ "$t" =~ ^[A-Za-z0-9_]+$ ]] && cols[$t]=$c
+    done < <("${query[@]}" -e "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c
+        JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+        WHERE c.TABLE_SCHEMA = '$db' AND t.TABLE_TYPE = 'BASE TABLE' AND (
+            (c.TABLE_NAME LIKE '%users' AND c.COLUMN_NAME = 'user_login')
+            OR (c.TABLE_NAME LIKE '%employee' AND c.COLUMN_NAME = 'email'))" < /dev/null 2> /dev/null)
+    for t in "${!cols[@]}"; do
+        if [ "${cols[$t]}" == user_login ]; then
+            p=${t%users}
+            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
+            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
+            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (user_login <=> '$TEST_ADMIN_USER')")
+            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}usermeta' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
+                skip+=(--ignore-table="$db.${p}usermeta") only+=("${p}usermeta")
+                wheres+=("user_id IS NULL OR user_id NOT IN (SELECT ID FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER')")
+            fi
+        else
+            p=${t%employee}
+            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE email = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
+            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
+            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (email <=> '$TEST_ADMIN_USER')")
+            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}employee_shop' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
+                skip+=(--ignore-table="$db.${p}employee_shop") only+=("${p}employee_shop")
+                wheres+=("id_employee IS NULL OR id_employee NOT IN (SELECT id_employee FROM \`$t\` WHERE email = '$TEST_ADMIN_USER')")
+            fi
+        fi
+    done
+    return 0
+}
+
+# Correo de pruebas en las BBDD: WordPress (sus plugins de correo) y PrestaShop (su configuracion de
+# correo, por SMTP a Mailpit). Lo que cambia se apunta, con lo de antes, en MAIL_TABLE de la propia
+# base; MAIL_DB_PY lo deshace al cambiar de modo o apagarlo y para las copias (ver mail_export_filter)
+MAIL_DB_PY='
+import re, sys
+# Correo de pruebas en una BBDD (mail_db y exportar-bd). Ordenes:
+#   consulta                      (entrada: tabla<TAB>columna de la base) -> SQL que saca las filas
+#   cambios <modo> <puerto> <sql> (entrada: esas filas) -> en <sql>, lo que deshace lo de antes y aplica
+#                                 el modo (mailpit, desactivar, nada o apagado); en la salida, que cambia
+#   copia                         (entrada: esas filas) -> SQL que deja los valores de antes (para el
+#                                 final de un volcado)
+# Las filas llegan con los valores en hexadecimal (- = NULL): O (opciones de WordPress), M (sitemeta de
+# un multisitio), C (configuracion de PrestaShop), T (tabla y su tipo) y R (lo apuntado en MAIL_TABLE:
+# tabla, fila, clave, tipo, ruta, valor de antes y valor puesto). Los nombres de tablas y claves se
+# comprueban: la tabla apuntada puede venir de un volcado
+Q = chr(39)
+NAME = re.compile(r"^[A-Za-z0-9_]+$")
+REC = "lvm_correo_original"
+WP_OPTS = ("active_plugins", "wp_mail_smtp", "easy_wp_smtp", "solid_smtp_providers")
+PS_MAIL = (("PS_MAIL_METHOD", "2"), ("PS_MAIL_SERVER", "127.0.0.1"), ("PS_MAIL_SMTP_PORT", None),
+           ("PS_MAIL_SMTP_ENCRYPTION", "off"), ("PS_MAIL_USER", ""), ("PS_MAIL_PASSWD", ""))
+# Plugins de correo de WordPress, por su carpeta: nombre y si su correo se lleva a Mailpit con
+# phpmailer_init (los demas sustituyen wp_mail o mandan por una API: se desactivan). WP SMTP (Solid
+# Mail) tambien se desactiva si tiene una conexion de Postmark, que va por API
+PLUGINS = {
+    "wp-mail-smtp": ("WP Mail SMTP", True), "wp-mail-smtp-pro": ("WP Mail SMTP Pro", True),
+    "easy-wp-smtp": ("Easy WP SMTP", True), "smtp-mailer": ("SMTP Mailer", True),
+    "wp-smtp": ("WP SMTP (Solid Mail)", True),
+    "mailin": ("Brevo", False), "woocommerce-sendinblue-newsletter-subscription": ("Brevo para WooCommerce", False),
+    "post-smtp": ("Post SMTP", False), "fluent-smtp": ("FluentSMTP", False), "gmail-smtp": ("Gmail SMTP", False),
+    "wp-ses": ("WP Offload SES", False), "wp-offload-ses": ("WP Offload SES", False),
+    "sendgrid-email-delivery-simplified": ("SendGrid", False), "mailgun": ("Mailgun", False),
+    "postmark-approved-wordpress-plugin": ("Postmark", False), "sparkpost": ("SparkPost", False),
+    "wp-mail-bank": ("Mail Bank", False), "mailjet-for-wordpress": ("Mailjet", False),
+    "mailpoet": ("MailPoet", False), "suremails": ("SureMail", False),
+}
+# Opciones de WP Mail SMTP y Easy WP SMTP: con un servicio por API (brevo, sendgrid...), a mail()
+MAILER_OPTS = {"wp_mail_smtp": ("wp-mail-smtp", "wp-mail-smtp-pro"), "easy_wp_smtp": ("easy-wp-smtp",)}
+SMTP_MAILERS = (b"mail", b"smtp", b"pepipost")
+
+
+def plugin_info(path):
+    folder = path.split(b"/")[0].decode("utf-8", "replace").lower()
+    if folder in PLUGINS:
+        return PLUGINS[folder]
+    if folder.startswith(("sendinblue", "brevo")):
+        return ("Brevo", False)
+    return None
+
+
+# Datos serializados de PHP (los de las opciones): N, b, i, d, s y a (las claves, en orden). Los
+# objetos no: esa opcion no se toca
+def unser(b, i=0):
+    t = b[i:i + 1]
+    if t == b"N" and b[i + 1:i + 2] == b";":
+        return ("N", b""), i + 2
+    if t in (b"b", b"i", b"d") and b[i + 1:i + 2] == b":":
+        j = b.index(b";", i)
+        return (t.decode(), b[i + 2:j]), j + 1
+    if t == b"s" and b[i + 1:i + 2] == b":":
+        j = b.index(b":", i + 2)
+        n = int(b[i + 2:j])
+        if b[j + 1:j + 2] != b"\x22" or b[j + 2 + n:j + 4 + n] != b"\x22;":
+            raise ValueError("cadena")
+        return ("s", b[j + 2:j + 2 + n]), j + 4 + n
+    if t == b"a" and b[i + 1:i + 2] == b":":
+        j = b.index(b":", i + 2)
+        n = int(b[i + 2:j])
+        if b[j + 1:j + 2] != b"{":
+            raise ValueError("lista")
+        k, items = j + 2, []
+        for _ in range(n):
+            key, k = unser(b, k)
+            if key[0] not in ("i", "s"):
+                raise ValueError("clave")
+            val, k = unser(b, k)
+            items.append([key, val])
+        if b[k:k + 1] != b"}":
+            raise ValueError("fin de lista")
+        return ("a", items), k + 1
+    raise ValueError("tipo")
+
+
+def parse(b):
+    if b is None:
+        return None
+    try:
+        v, i = unser(b)
+    except (ValueError, IndexError):
+        return None
+    return v if i == len(b) else None
+
+
+def ser(v):
+    t, x = v
+    if t == "N":
+        return b"N;"
+    if t in ("b", "i", "d"):
+        return t.encode() + b":" + x + b";"
+    if t == "s":
+        return b"s:%d:\x22" % len(x) + x + b"\x22;"
+    return b"a:%d:{" % len(x) + b"".join(ser(k) + ser(val) for k, val in x) + b"}"
+
+
+def get_path(v, path):
+    for part in path:
+        if not v or v[0] != "a":
+            return None
+        v = next((val for k, val in v[1] if k == ("s", part)), None)
+    return v
+
+
+def set_path(v, path, new):
+    for part in path[:-1]:
+        v = next((val for k, val in v[1] if k == ("s", part)), None)
+    for item in v[1]:
+        if item[0] == ("s", path[-1]):
+            item[1] = new
+
+
+def sql(b):
+    if b is None:
+        return "NULL"
+    return "0x" + b.hex().upper() if b else Q + Q
+
+
+def unhex(x):
+    if x == "-":
+        return None
+    if not re.fullmatch(r"(?:[0-9A-Fa-f]{2})*", x):
+        raise ValueError("hex")
+    return bytes.fromhex(x)
+
+
+def read_rows():
+    tables, rows, recs = {}, {}, []
+    for line in sys.stdin.read().splitlines():
+        f = line.split("\t")
+        try:
+            if f[0] == "T" and len(f) >= 3 and NAME.match(f[1]):
+                tables[f[1]] = f[2]
+            elif f[0] in ("O", "M", "C") and len(f) >= 5 and NAME.match(f[1]) and f[2].isdigit():
+                rows[(f[1], f[2])] = {"kind": f[0], "name": f[3], "value": unhex(f[4]), "table": f[1], "id": f[2]}
+            elif f[0] == "R" and len(f) >= 8:
+                recs.append({"tabla": f[1], "fila": f[2], "clave": f[3], "tipo": f[4], "ruta": f[5],
+                             "original": unhex(f[6]), "puesto": unhex(f[7])})
+        except ValueError:
+            continue
+    # (solo lo apuntado sobre tablas de esta base que se han leido, con claves y tipos conocidos)
+    known = set(WP_OPTS) | {"active_sitewide_plugins"} | {n for n, _ in PS_MAIL}
+    recs = [r for r in recs if r["tabla"] in tables and tables[r["tabla"]] in ("wp", "ms", "ps")
+            and r["fila"].isdigit() and r["clave"] in known
+            and r["tipo"] in ("quitados", "ruta", "valor", "nuevo") and r["ruta"] in ("", "mail/mailer")]
+    return tables, rows, recs
+
+
+def restore(rows, recs, notes):
+    """Deja en rows lo de antes (lo apuntado, del ultimo al primero). Lo que se ha cambiado despues en
+    local (otro plugin activado, otro servidor de correo) se respeta."""
+    back = {}
+    for r in reversed(recs):
+        row = rows.get((r["tabla"], r["fila"]))
+        if not row or row.get("gone") or row["name"] != r["clave"]:
+            continue
+        if r["tipo"] == "nuevo":
+            if row["value"] == r["puesto"]:
+                row["gone"] = True
+        elif r["tipo"] == "valor":
+            if row["value"] == r["puesto"]:
+                row["value"] = r["original"]
+                back.setdefault(r["tabla"], set()).add("correo de PrestaShop")
+        elif r["tipo"] == "ruta":
+            cur = parse(row["value"])
+            path = [p.encode() for p in r["ruta"].split("/")]
+            got = get_path(cur, path)
+            if got and got[0] == "s" and got[1] == r["puesto"] and r["original"] is not None:
+                set_path(cur, path, ("s", r["original"]))
+                row["value"] = ser(cur)
+                back.setdefault(r["tabla"], set()).add("su servicio de correo")
+        elif r["tipo"] == "quitados":
+            cur, old = parse(row["value"]), parse(r["original"])
+            if not cur or not old or cur[0] != "a" or old[0] != "a":
+                continue
+            names = []
+            if r["clave"] == "active_plugins":
+                have = {ser(v) for _k, v in cur[1]}
+                last = max([int(k[1]) for k, _v in cur[1] if k[0] == "i"] + [-1])
+                for _k, v in old[1]:
+                    if ser(v) not in have and v[0] == "s":
+                        last += 1
+                        cur[1].append([("i", str(last).encode()), v])
+                        names.append(v[1])
+            else:
+                have = {k for k, _v in cur[1]}
+                for k, v in old[1]:
+                    if k not in have:
+                        cur[1].append([k, v])
+                        names.append(k[1])
+            if names:
+                row["value"] = ser(cur)
+                back.setdefault(r["tabla"], set()).update(
+                    (plugin_info(n) or (n.decode("utf-8", "replace"),))[0] for n in names)
+    for t in sorted(back):
+        notes.append("Correo de pruebas deshecho en %s: vuelve %s" % (t, ", ".join(sorted(back[t]))))
+
+
+def apply(tables, rows, mode, port, recs, inserts, notes):
+    """Aplica el modo sobre rows (ya con lo de antes) y apunta en recs lo que cambia."""
+    if mode not in ("mailpit", "desactivar"):
+        return
+    for t, kind in sorted(tables.items()):
+        mine = [r for r in rows.values() if r["table"] == t and not r.get("gone")]
+        if kind in ("wp", "ms"):
+            key = "active_plugins" if kind == "wp" else "active_sitewide_plugins"
+            providers = next((r["value"] or b"" for r in mine if r["name"] == "solid_smtp_providers"), b"")
+            row = next((r for r in mine if r["name"] == key), None)
+            cur = parse(row["value"]) if row else None
+            active = set()
+            if row and not (cur and cur[0] == "a"):
+                notes.append("Aviso: WordPress (%s): no se pueden leer sus plugins activos; revisa sus plugins de correo" % t)
+            if cur and cur[0] == "a":
+                keep, gone = [], []
+                for k, v in cur[1]:
+                    path = (v if kind == "wp" else k)
+                    path = path[1] if path[0] == "s" else b""
+                    info = plugin_info(path) if path else None
+                    off = info is not None and (mode == "desactivar" or not info[1]
+                                                or (path.startswith(b"wp-smtp/") and b"postmark" in providers.lower()))
+                    (gone if off else keep).append([k, v])
+                    if not off and path:
+                        active.add(path.split(b"/")[0].decode("utf-8", "replace").lower())
+                if gone:
+                    if kind == "wp":
+                        keep = [[("i", str(n).encode()), v] for n, (_k, v) in enumerate(keep)]
+                    row["value"] = ser(("a", keep))
+                    recs.append((t, row["id"], key, "quitados", "", ser(("a", gone)), None))
+                    names = sorted({(plugin_info((v if kind == "wp" else k)[1]) or ("?",))[0] for k, v in gone})
+                    notes.append("WordPress (%s): desactivados en la copia local: %s" % (t, ", ".join(names)))
+            if mode == "mailpit" and kind == "wp":
+                for opt, folders in MAILER_OPTS.items():
+                    r = next((x for x in mine if x["name"] == opt), None)
+                    if not r or not active & set(folders):
+                        continue
+                    cur = parse(r["value"])
+                    got = get_path(cur, [b"mail", b"mailer"])
+                    if cur is None:
+                        notes.append("Aviso: WordPress (%s): no se puede leer la configuracion de %s; revisa por donde manda"
+                                     % (t, PLUGINS[folders[0]][0]))
+                    if got and got[0] == "s" and got[1] not in SMTP_MAILERS:
+                        set_path(cur, [b"mail", b"mailer"], ("s", b"mail"))
+                        r["value"] = ser(cur)
+                        recs.append((t, r["id"], opt, "ruta", "mail/mailer", got[1], b"mail"))
+                        notes.append("WordPress (%s): %s mandaba por %s (API): ahora por PHP, a Mailpit"
+                                     % (t, PLUGINS[folders[0]][0], got[1].decode("utf-8", "replace")))
+        elif kind == "ps":
+            changed = False
+            for name, want in PS_MAIL:
+                want = (want if want is not None else port).encode()
+                same = [r for r in mine if r["name"] == name]
+                if not same:
+                    # (una que se borro al deshacer, con su numero, o una nueva para todas las tiendas)
+                    old = next((r for r in rows.values() if r["table"] == t and r.get("gone") and r["name"] == name), None)
+                    if old:
+                        old["gone"], old["value"] = False, want
+                        recs.append((t, old["id"], name, "nuevo", "", None, want))
+                    else:
+                        inserts.append((t, name, want))
+                    changed = True
+                for r in same:
+                    if r["value"] != want:
+                        recs.append((t, r["id"], name, "valor", "", r["value"], want))
+                        r["value"] = want
+                        changed = True
+            if changed or any(x[0] == t for x in recs):
+                notes.append("PrestaShop (%s): correo por SMTP a Mailpit (127.0.0.1:%s)" % (t, port))
+
+
+COLS = {"O": ("option_value", "option_id"), "M": ("meta_value", "meta_id"), "C": ("value", "id_configuration")}
+
+
+def statements(rows, before):
+    out = []
+    for key, r in sorted(rows.items()):
+        val, idc = COLS[r["kind"]]
+        if r.get("gone"):
+            out.append("DELETE FROM `%s` WHERE %s = %s;" % (r["table"], idc, r["id"]))
+        elif r["value"] != before[key]:
+            out.append("UPDATE `%s` SET %s = %s WHERE %s = %s;" % (r["table"], val, sql(r["value"]), idc, r["id"]))
+    return out
+
+
+cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+if cmd == "consulta":
+    cols = {}
+    for line in sys.stdin.read().splitlines():
+        f = line.split("\t")
+        if len(f) >= 2 and NAME.match(f[0]):
+            cols.setdefault(f[0], set()).add(f[1])
+    out = []
+    lit = lambda s: Q + s + Q
+    for t, c in sorted(cols.items()):
+        if t == REC and {"tabla", "fila", "clave", "tipo", "ruta", "original", "puesto"} <= c:
+            out.append("SELECT %s, %s, %s;" % (lit("T"), lit(t), lit("rec")))
+            out.append("SELECT %s, tabla, fila, clave, tipo, ruta, IFNULL(HEX(original), %s), IFNULL(HEX(puesto), %s) FROM `%s` ORDER BY id;"
+                       % (lit("R"), lit("-"), lit("-"), t))
+        elif {"option_id", "option_name", "option_value"} <= c:
+            out.append("SELECT %s, %s, %s;" % (lit("T"), lit(t), lit("wp")))
+            out.append("SELECT %s, %s, option_id, option_name, IFNULL(HEX(option_value), %s) FROM `%s` WHERE option_name IN (%s);"
+                       % (lit("O"), lit(t), lit("-"), t, ", ".join(lit(n) for n in WP_OPTS)))
+        elif {"meta_id", "meta_key", "meta_value", "site_id"} <= c:
+            out.append("SELECT %s, %s, %s;" % (lit("T"), lit(t), lit("ms")))
+            out.append("SELECT %s, %s, meta_id, meta_key, IFNULL(HEX(meta_value), %s) FROM `%s` WHERE meta_key = %s;"
+                       % (lit("M"), lit(t), lit("-"), t, lit("active_sitewide_plugins")))
+        elif {"id_configuration", "name", "value", "id_shop", "id_shop_group"} <= c:
+            out.append("SELECT %s, %s, %s;" % (lit("T"), lit(t), lit("ps")))
+            out.append("SELECT %s, %s, id_configuration, name, IFNULL(HEX(value), %s) FROM `%s` WHERE name IN (%s);"
+                       % (lit("C"), lit(t), lit("-"), t, ", ".join(lit(n) for n, _v in PS_MAIL)))
+    print("\n".join(out))
+elif cmd in ("cambios", "copia"):
+    tables, rows, recs = read_rows()
+    before = {k: r["value"] for k, r in rows.items()}
+    notes, new_recs, inserts = [], [], []
+    restore(rows, recs, notes)
+    if cmd == "copia":
+        st = statements(rows, before)
+        if st:
+            print("\n-- lvm-instalador: el correo de pruebas cambio esto en la copia local; aqui vuelve lo de antes")
+            print("\n".join(st))
+        sys.exit(0)
+    mode, port, dst = sys.argv[2], sys.argv[3], sys.argv[4]
+    if not port.isdigit():
+        sys.exit("puerto no valido")
+    apply(tables, rows, mode, port, new_recs, inserts, notes)
+    st = statements(rows, before)
+    has_rec = "rec" in tables.values()
+    out = []
+    if st or inserts or new_recs or has_rec:
+        if new_recs or inserts:
+            out.append("CREATE TABLE IF NOT EXISTS `%s` (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, "
+                       "tabla VARCHAR(64) NOT NULL, fila VARCHAR(20) NOT NULL, clave VARCHAR(191) NOT NULL, "
+                       "tipo VARCHAR(16) NOT NULL, ruta VARCHAR(64) NOT NULL DEFAULT %s, original LONGTEXT NULL, "
+                       "puesto LONGTEXT NULL, cuando DATETIME NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 "
+                       "COMMENT=%s;" % (REC, Q + Q, Q + "lvm-instalador: correo de pruebas, valores de antes (no va en las copias)" + Q))
+        out.append("START TRANSACTION;")
+        if has_rec and (new_recs or inserts):
+            out.append("DELETE FROM `%s`;" % REC)
+        out += st
+        cols = "(tabla, fila, clave, tipo, ruta, original, puesto, cuando)"
+        for t, fila, clave, tipo, ruta, orig, put in new_recs:
+            out.append("INSERT INTO `%s` %s VALUES (%s, %s, %s, %s, %s, %s, %s, NOW());"
+                       % (REC, cols, Q + t + Q, Q + fila + Q, Q + clave + Q, Q + tipo + Q, Q + ruta + Q, sql(orig), sql(put)))
+        for t, name, val in inserts:
+            out.append("INSERT INTO `%s` (id_shop_group, id_shop, name, value, date_add, date_upd) VALUES (NULL, NULL, %s, %s, NOW(), NOW());"
+                       % (t, Q + name + Q, sql(val)))
+            out.append("INSERT INTO `%s` %s VALUES (%s, LAST_INSERT_ID(), %s, %s, %s, NULL, %s, NOW());"
+                       % (REC, cols, Q + t + Q, Q + name + Q, Q + "nuevo" + Q, Q + Q, sql(val)))
+        out.append("COMMIT;")
+        if has_rec and not (new_recs or inserts):
+            out.append("DROP TABLE IF EXISTS `%s`;" % REC)
+    with open(dst, "w", encoding="utf-8") as f:
+        f.write("\n".join(out) + ("\n" if out else ""))
+    for n in notes:
+        print(n)
+else:
+    sys.exit("uso: consulta | cambios <modo> <puerto> <sql> | copia")
+'
+
+# Filas de una base que mira MAIL_DB_PY (con su orden «consulta»). mail_db_rows <base> <cliente...>
+function mail_db_rows() {
+    local db=$1 cols sql
+    shift
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] || return 1
+    cols=$("$@" -B -e "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c
+        JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+        WHERE c.TABLE_SCHEMA = '$db' AND t.TABLE_TYPE = 'BASE TABLE' AND c.COLUMN_NAME IN ('option_id', 'option_name',
+        'option_value', 'meta_id', 'meta_key', 'meta_value', 'site_id', 'id_configuration', 'name', 'value', 'id_shop',
+        'id_shop_group', 'tabla', 'fila', 'clave', 'tipo', 'ruta', 'original', 'puesto')" < /dev/null 2> /dev/null) || return 1
+    [ -n "$cols" ] || return 0
+    sql=$(python3 -I -c "$MAIL_DB_PY" consulta <<< "$cols") || return 1
+    [ -n "$sql" ] || return 0
+    "$@" -B "$db" -e "$sql" < /dev/null 2> /dev/null
+}
+
+# correo bd <base>: el correo de pruebas en esa base (de la version activa en marcha), segun como este:
+# encendido, lleva a Mailpit (o desactiva) lo de WordPress y PrestaShop; apagado o con WordPress en
+# «nada», deshace lo que se hizo. Se hace solo al cargar un proyecto o una BBDD
+function mail_db() {
+    local db=$1 mode=apagado rows out sqlf
+    if ! [[ "$db" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]]; then
+        echo "Base no valida: $db"
+        return 1
+    fi
+    mail_on && mode=$(mail_wp_mode)
+    local mysql=("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N --default-character-set=utf8mb4)
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] correo de pruebas en $db ($mode)"
+        return 0
+    fi
+    rows=$(mail_db_rows "$db" "${mysql[@]}") || { echo "Aviso: no se ha podido leer $db para el correo de pruebas"; return 1; }
+    [ -n "$rows" ] || return 0
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    sqlf=$(mktemp "$LOG_DIR/correo-XXXXXX") || return 1
+    if ! out=$(python3 -I -c "$MAIL_DB_PY" cambios "$mode" "$MAIL_SMTP_PORT" "$sqlf" <<< "$rows"); then
+        rm -f "$sqlf"
+        echo "Aviso: no se ha podido preparar el correo de pruebas en $db"
+        return 1
+    fi
+    if [ -s "$sqlf" ] && ! "${mysql[@]}" "$db" < "$sqlf" > /dev/null 2>&1; then
+        rm -f "$sqlf"
+        echo "Aviso: no se ha podido cambiar el correo de pruebas en $db: lo que mande la web puede salir de verdad"
+        return 1
+    fi
+    rm -f "$sqlf"
+    [ -n "$out" ] && echo "$out"
+    return 0
+}
+
+# Base de un proyecto para el correo de pruebas: la indicada, la de su configuracion (PrestaShop o
+# wp-config.php) o la vinculada a la carpeta
+function mail_project_db() {
+    local folder=$1 db=$2 conf
+    if [ -z "$db" ]; then
+        conf=$(ps_config "$folder")
+        db=${conf%%|*}
+    fi
+    [ -z "$db" ] && [ -f "$HTDOCS_DIR/$folder/wp-config.php" ] && db=$(wp_config_read "$HTDOCS_DIR/$folder/wp-config.php" | head -1)
+    [ -z "$db" ] && db=$(saved_project_db "$folder")
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && echo "$db"
+}
+
+# Al cambiar el correo de pruebas: la BBDD del proyecto cargado (si MariaDB esta en marcha)
+function mail_loaded_project() {
+    local link folder db check
+    link=$(project_link)
+    [ -n "$link" ] && [ -L "$HTDOCS_DIR/$link" ] || return 0
+    folder=$(readlink "$HTDOCS_DIR/$link")
+    folder=${folder%/}
+    valid_project "$folder" > /dev/null 2>&1 || return 0
+    check=$(gui_db_check)
+    [[ "$check" == ok\|* ]] || return 0
+    db=$(mail_project_db "$folder") || return 0
+    db_names "$(active_dir)" | grep -qxF "$db" || return 0
+    mail_db "$db"
+}
+
+# Copias de una base (exportar-bd, copiar-bd, Docker): sin MAIL_TABLE (va a skip) y con lo que habia
+# antes del correo de pruebas al final (mail_sql, que se añade al volcado). Usa query (el cliente)
+function mail_export_filter() {
+    local db=$1 rows
+    rows=$(mail_db_rows "$db" "${query[@]}") || return 0
+    grep -q "^T"$'\t'"$MAIL_TABLE"$'\t' <<< "$rows" || return 0
+    skip+=(--ignore-table="$db.$MAIL_TABLE")
+    mail_sql=$(python3 -I -c "$MAIL_DB_PY" copia <<< "$rows")
+    return 0
 }
 
 # Mientras se carga un volcado, sus funciones y procedimientos ya existen: si fueran SQL SECURITY
@@ -10510,6 +14859,9 @@ function import_database() {
     admin=$(test_admin "$db" "$project")
     grep -v '^A|' <<< "$admin" | grep .
     grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+    # Correo de pruebas: lo que mande la web (sus plugins de correo, la configuracion de la tienda) va a
+    # Mailpit (o, apagado, se deshace lo que traiga hecho)
+    mail_db "$db"
     [ -n "$project" ] && { import_project "$db" "$project" || return 1; }
     return 0
 }
@@ -10879,7 +15231,7 @@ function import_project() {
 function gui_source() {
     cat <<'LVM_GUI_PY'
 #!/usr/bin/env python3
-# Ventana de Nexum Stack (GTK 3 y Python 3.8: funciona desde Ubuntu 20.04).
+# Ventana de Nexum Dev Stack (GTK 3 y Python 3.8: funciona desde Ubuntu 20.04).
 # La escribe y la abre "lvm-instalador ventana". No repite la logica del instalador: lo ejecuta con
 # los comandos gui-* (datos) y con los de siempre (use, instalar, actualizar, desinstalar...)
 # dentro de una pseudoterminal, para que sudo funcione igual que en la terminal; la contraseña
@@ -10918,6 +15270,8 @@ for _k in [k for k in os.environ if k.startswith(("LD_", "PYTHON", "BASH_FUNC_")
            or k in ("BASH_ENV", "ENV", "IFS", "CDPATH", "SHELLOPTS", "BASHOPTS", "PS4", "GLOBIGNORE")]:
     del os.environ[_k]
 APP_ID = "dev.hexer.LamppVersionManager"
+# Parches de PHP sin soporte que se compilan con el arreglo de PHP2Shell (PHP2SHELL_BACKPORTS del script)
+PHP2SHELL_BACKPORTS = ("7.4.33", "8.0.30", "8.1.34")
 ICON = "lampp-version-manager"
 LOG_DIR = os.path.expanduser("~/.lvm-instalador")
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")
@@ -11042,6 +15396,30 @@ def guess_project(db, ver=None):
     return name_match_project(db, folders)
 
 
+def docker_status_text(status):
+    """Estado de un contenedor en español: «Up 2 minutes» → «en marcha · 2 min»."""
+    units = [(r"(\d+) seconds?", r"\1 s"), (r"Less than a second", "1 s"), (r"(\d+) minutes?", r"\1 min"),
+             (r"About a minute", "1 min"), (r"About an hour", "1 h"), (r"(\d+) hours?", r"\1 h"),
+             (r"(\d+) days?", r"\1 días"), (r"(\d+) weeks?", r"\1 semanas"), (r"(\d+) months?", r"\1 meses")]
+    text = status
+    for rx, rep_ in units:
+        text = re.sub(rx, rep_, text)
+    text = re.sub(r"\s*\((healthy|unhealthy|health: starting)\)", "", text)
+    m = re.match(r"Up (.+)$", text)
+    if m:
+        return "en marcha · %s" % m.group(1)
+    m = re.match(r"Exited \((\d+)\) (.+) ago$", text)
+    if m:
+        return "parado hace %s%s" % (m.group(2), "" if m.group(1) == "0" else " (error %s)" % m.group(1))
+    return {"Created": "creado", "Restarting": "reiniciándose", "Paused": "en pausa"}.get(text.split(" ")[0], text)
+
+
+def docker_slug(folder):
+    """Nombre corto de un proyecto en Docker (como docker_slug del script)."""
+    s = re.sub(r"[^a-z0-9]+", "-", folder.lower()).strip("-")[:40].rstrip("-")
+    return s or "proyecto"
+
+
 def copy_name(db, php):
     """Nombre propuesto para la copia de una BBDD en otra versión: sin el sufijo de versión que
     traiga y con el de la de destino (wp_tienda_8_4 → wp_tienda_8_5)."""
@@ -11116,6 +15494,13 @@ CSS = """
 button.plegable { padding: 0 4px 0 0; min-height: 0; }
 /* Arrancar, reiniciar y parar la versión activa */
 button.control-grande { min-width: 40px; min-height: 40px; padding: 4px; }
+/* Consola de Docker (pestaña Docker): oscura, con letra de terminal, como Docker Desktop */
+.consola-docker { background-color: #1d2228; border-radius: 10px; padding: 14px 16px; }
+.consola-docker label { color: #d7dee6; font-family: monospace; font-size: 0.92em; }
+.consola-docker label.consola-titulo { font-family: inherit; font-size: 1.15em; font-weight: bold; color: #ffffff; }
+.consola-docker label.consola-tenue { color: #8c99a6; }
+.consola-docker label.consola-verde { color: #4cc38a; }
+.consola-docker label.consola-gris { color: #6d7884; }
 .info { color: alpha(currentColor, 0.55); }
 .info:hover { color: currentColor; }
 .subtitulo { font-size: smaller; }
@@ -11276,6 +15661,27 @@ def icon(name, size=16):
 # Logotipos de los paquetes (Simple Icons, CC0: un solo trazo en una caja de 24x24). Cada marca
 # es de su dueño; se usan solo para identificar cada paquete
 LOGO_PATHS = {
+    # Docker (Simple Icons 13.21.0, CC0)
+    "docker": (
+        "M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.18"
+        "5 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3."
+        "574a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m0"
+        " 2.716h2.118a.187.187 0 00.186-.186V6.29a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.1"
+        "85.185v1.887c0 .102.082.185.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.29a.185.185 0 "
+        "00-.185-.185H8.1a.185.185 0 00-.185.185v1.887c0 .102.083.185.185.186m-2.964 0h2.119a.186"
+        ".186 0 00.185-.186V6.29a.185.185 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.887c0 .10"
+        "2.084.185.186.186m5.893 2.715h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186"
+        "h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 00.1"
+        "84-.185V9.006a.185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.185v1.888c0 .102.083.185."
+        "185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.184-.186h-2.12a.186.1"
+        "86 0 00-.186.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 00.184-.185V9.006a"
+        ".185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.185v1.888c0 .102.082.185.185.185M23.763"
+        " 9.89c-.065-.051-.672-.51-1.954-.51-.338.001-.676.03-1.01.087-.248-1.7-1.653-2.53-1.716-"
+        "2.566l-.344-.199-.226.327c-.284.438-.49.922-.612 1.43-.23.97-.09 1.882.403 2.661-.595.33"
+        "2-1.55.413-1.744.42H.751a.751.751 0 00-.75.748 11.376 11.376 0 00.692 4.062c.545 1.428 1"
+        ".355 2.48 2.41 3.124 1.18.723 3.1 1.137 5.275 1.137.983.003 1.963-.086 2.93-.266a12.248 "
+        "12.248 0 003.823-1.389c.98-.567 1.86-1.288 2.61-2.136 1.252-1.418 1.998-2.997 2.553-4.4h"
+        ".221c1.372 0 2.215-.549 2.68-1.009.309-.293.55-.65.707-1.046l.098-.288Z"),
     "php": (
         "M7.01 10.207h-.944l-.515 2.648h.838c.556 0 .97-.105 1.242-.314.272-.21.455-.559.55-1.049"
         ".092-.47.05-.802-.124-.995-.175-.193-.523-.29-1.047-.29zM12 5.688C5.373 5.688 0 8.514 0 "
@@ -11456,6 +15862,15 @@ LOGO_PATHS = {
         "001l-.002.01-.002.014.004-.025zm1.353 5.928c-2.553 1.138-5.44 1.44-8.192 1.007-.14 1.108"
         ".384 2.218 1.214 2.93l.012.01c2.703-.433 4.975-2.168 6.966-3.946z"
     ),
+    # Mailpit (correo de pruebas): su logotipo (server/ui/mailpit.svg de la 1.32.0, MIT), con sus dos
+    # trazos llevados a la caja de 24x24 y en un solo color
+    "mailpit": (
+        "M2.235 0.96l9.771 9.782L21.836 0.96zM0.935 2.597l11.038 10.826 11.105-10.792-0.034 6.682L12."
+        "141 13.757l2.751 2.289-1.476 1.086-7.549 0.033c-0.878-0.004-4.695-3.327-4.932-7.484zM14.22 1"
+        "4.031l9.78-3.933-1.457 10.398-2.149-1.657c-3.942 4.204-8.21 4.769-12.336 3.78S2.228 18.81 0."
+        "935 16.163-0.122 10.596 0.516 7.993c0.205 1.907-0.238 2.96 1.157 6.098 1.145 2.068 2.615 3.7"
+        "04 4.697 4.527 2.522 1.124 5.85 0.609 7.565-0.551l2.583-2.205z"
+    ),
     # Bola del mundo (abrir el proyecto en el navegador), la de Material Icons
     "globo": (
         "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93"
@@ -11469,7 +15884,8 @@ LOGO_COLORS = {"php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
-               "globo": ("#1C71D8", "#62A0EA")}
+               "globo": ("#1C71D8", "#62A0EA"), "docker": ("#2496ED", "#4FAEF2"),
+               "mailpit": ("#00A87B", "#2FD3A4")}
 _logo_cache = {}
 
 
@@ -11482,12 +15898,11 @@ def dark_theme():
     return _logo_cache["dark"]
 
 
-def logo(name, size=18):
-    """Logotipo de un paquete en su color, nítido también en pantallas con escala 2."""
-    scale = max(1, Gdk.Display.get_default().get_monitor(0).get_scale_factor())
-    key = (name, size, scale)
+def logo_pixbuf(name, size, scale, color=None):
+    """Imagen del logotipo de un paquete a esa escala, en su color o en el que se indique."""
+    key = (name, size, scale, color)
     if key not in _logo_cache:
-        color = LOGO_COLORS[name][1 if dark_theme() else 0]
+        color = color or LOGO_COLORS[name][1 if dark_theme() else 0]
         svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="%d" height="%d">'
                '<path fill="%s" d="%s"/></svg>' % (size * scale, size * scale, color,
                                                    LOGO_PATHS[name]))
@@ -11495,9 +15910,38 @@ def logo(name, size=18):
         loader.write(svg.encode())
         loader.close()
         _logo_cache[key] = loader.get_pixbuf()
+    return _logo_cache[key]
+
+
+def logo(name, size=18):
+    """Logotipo de un paquete en su color, nítido también en pantallas con escala 2."""
+    scale = max(1, Gdk.Display.get_default().get_monitor(0).get_scale_factor())
     img = Gtk.Image()
-    img.set_from_surface(Gdk.cairo_surface_create_from_pixbuf(_logo_cache[key], scale, None))
+    img.set_from_surface(Gdk.cairo_surface_create_from_pixbuf(logo_pixbuf(name, size, scale), scale, None))
     return img
+
+
+class MonoLogo(Gtk.DrawingArea):
+    """Logotipo de un solo color, el del texto de donde va (como los iconos simbólicos del tema): en
+    la barra lateral, igual que los demás iconos, también al elegir el apartado o cambiar de tema."""
+
+    def __init__(self, name, size=16):
+        super().__init__()
+        self.name, self.size = name, size
+        self.set_size_request(size, size)
+        self.set_valign(Gtk.Align.CENTER)
+
+    def do_draw(self, cr):
+        c = self.get_style_context().get_color(self.get_state_flags())
+        color = "#%02x%02x%02x" % (int(c.red * 255), int(c.green * 255), int(c.blue * 255))
+        scale = max(1, self.get_scale_factor())
+        pix = logo_pixbuf(self.name, self.size, scale, color)
+        cr.save()
+        cr.scale(1.0 / scale, 1.0 / scale)
+        Gdk.cairo_set_source_pixbuf(cr, pix, 0, (self.get_allocated_height() * scale - pix.get_height()) / 2)
+        cr.paint_with_alpha(c.alpha)
+        cr.restore()
+        return False
 
 
 def symbol(name, size=18):
@@ -11533,6 +15977,9 @@ SECTION_ICONS = [
     ("Información", ("icono", "dialog-information-symbolic", "")),
     ("Registro de errores", ("icono", "text-x-generic-symbolic", "")),
     ("Cargar proyecto", ("icono", "folder-open-symbolic", "verde-suave")),
+    ("Docker sin root", ("logo", "docker")),
+    ("Proyectos en Docker", ("logo", "docker")),
+    ("Nuevo proyecto en Docker", ("logo", "docker")),
 ]
 
 
@@ -11577,6 +16024,19 @@ ROW_ICONS = [
     ("Buscar una versión nueva", ("icono", "software-update-available-symbolic", "")),
     ("Icono en el menú de aplicaciones", ("icono", "view-app-grid-symbolic", "")),
     ("Comandos de lvm-instalador", ("icono", "utilities-terminal-symbolic", "")),
+    # Los pasos de una instalación o actualización (la lista de la ventana de la tarea)
+    ("Descargas", ("icono", "folder-download-symbolic", "")),
+    ("Descarga de XAMPP", ("logo", "xampp")),
+    ("Instalador oficial de XAMPP", ("logo", "xampp")),
+    ("Apache ", ("logo", "apache")),
+    ("Perl ", ("logo", "perl")),
+    ("ProFTPD ", ("icono", "folder-remote-symbolic", "")),
+    ("MariaDB ", ("logo", "mariadb")),
+    ("phpMyAdmin ", ("logo", "phpmyadmin")),
+    ("Configuracion", ("icono", "emblem-system-symbolic", "")),
+    # Correo de pruebas: el logotipo de Mailpit en todas sus filas
+    ("Mailpit", ("logo", "mailpit")),
+    ("Bandeja de entrada", ("logo", "mailpit")),
 ]
 
 
@@ -11841,10 +16301,22 @@ def clear(box):
         box.remove(child)
 
 
+def center_texts(box):
+    """Centra el título y la explicación de un diálogo: los textos (y los iconos) con que empieza
+    cada caja vertical, hasta el primer campo, lista o botón."""
+    for c in box.get_children():
+        if isinstance(c, Gtk.Label):
+            c.set_justify(Gtk.Justification.CENTER)
+            c.set_xalign(0.5)
+            c.set_halign(Gtk.Align.FILL)
+        elif not isinstance(c, Gtk.Image):
+            break
+
+
 def airy_dialog(dlg):
     """Más aire en cualquier diálogo: las cajas verticales con separación (no las de dos líneas
     como título y subtítulo, ni lo que va dentro de listas o botones) pasan a 16 px, y el texto de
-    los mensajes, más separado de los botones."""
+    los mensajes, más separado de los botones. Su título y su explicación, centrados."""
     if getattr(dlg, "aireado", False):
         return
     dlg.aireado = True
@@ -11853,14 +16325,20 @@ def airy_dialog(dlg):
     def walk(w):
         if isinstance(w, (Gtk.ListBox, Gtk.Button, Gtk.ScrolledWindow, Gtk.TextView, Gtk.ComboBox)):
             return
-        if isinstance(w, Gtk.Box) and w.get_orientation() == Gtk.Orientation.VERTICAL \
-                and w.get_spacing() >= 6:
-            w.set_spacing(max(w.get_spacing(), 16))
+        if isinstance(w, Gtk.Box) and w.get_orientation() == Gtk.Orientation.VERTICAL:
+            if w.get_spacing() >= 6:
+                w.set_spacing(max(w.get_spacing(), 16))
+            center_texts(w)
         if isinstance(w, Gtk.Container):
             for c in w.get_children():
                 walk(c)
     walk(area)
     if isinstance(dlg, Gtk.MessageDialog):
+        # (sin el icono de al lado: el texto, centrado de verdad)
+        for c in area.get_parent().get_children():
+            if isinstance(c, Gtk.Image):
+                c.set_no_show_all(True)
+                c.hide()
         area.set_spacing(max(area.get_spacing(), 16))
         area.set_margin_top(max(area.get_margin_top(), 8))
         area.set_margin_bottom(max(area.get_margin_bottom(), 12))
@@ -12226,6 +16704,107 @@ def fmt_minutes(secs):
     return "menos de 1 min" if secs < 60 else "%d min" % ((secs + 30) // 60)
 
 
+def fmt_clock(secs):
+    """Tiempo transcurrido como un reloj: 0:42, 3:05, 1:02:10"""
+    secs = int(secs)
+    return ("%d:%02d:%02d" % (secs // 3600, secs // 60 % 60, secs % 60)) if secs >= 3600 else \
+        "%d:%02d" % (secs // 60, secs % 60)
+
+
+def time_left(elapsed, done, left):
+    """Lo que queda, al ritmo de hasta ahora (done % en elapsed segundos; quedan left %)."""
+    if done < 3 or elapsed < 3:
+        return "calculando lo que queda…"
+    secs = int(elapsed * left / done)
+    if secs < 60:
+        return "quedan unos %d s" % max(5, (secs + 4) // 5 * 5)
+    if secs < 90:
+        return "queda 1 min"
+    if secs < 3600:
+        return "quedan unos %d min" % ((secs + 30) // 60)
+    return "quedan unas %d h %02d min" % (secs // 3600, secs // 60 % 60)
+
+
+class Console:
+    """El registro de una tarea como lo pinta una terminal: \r vuelve al principio de la línea (las
+    barras de las descargas se quedan en una línea que avanza), ESC[nA sube n líneas y ESC[K / ESC[2K
+    las borran (docker pull), y las líneas seguidas que solo cambian en sus números y llevan un % se
+    quedan en una sola, que va subiendo. Solo las últimas líneas se pueden reescribir: las de antes
+    pasan al texto fijo."""
+    LIVE = 80
+    TOKEN = re.compile(r"\x1b\[([0-9;?]*)([A-Za-z])|\x1b[78()][0-9A-Za-z]?|\r\n|\r|\n|\x08")
+
+    def __init__(self, buf):
+        self.buf = buf
+        self.fixed = 0            # caracteres del texto fijo (al principio del buffer)
+        self.lines, self.row, self.col = [""], 0, 0
+
+    def put(self, s):
+        line = self.lines[self.row]
+        if len(line) < self.col:
+            line += " " * (self.col - len(line))
+        self.lines[self.row] = line[:self.col] + s + line[self.col + len(s):]
+        self.col += len(s)
+
+    def newline(self):
+        # Un contador (12 %, 13 %, …) en líneas seguidas: se queda la última
+        if self.row > 0 and "%" in self.lines[self.row]:
+            shape = re.sub(r"\d+(?:[.,]\d+)?", "#", self.lines[self.row].strip())
+            if shape == re.sub(r"\d+(?:[.,]\d+)?", "#", self.lines[self.row - 1].strip()):
+                del self.lines[self.row - 1]
+                self.row -= 1
+        self.row += 1
+        self.col = 0
+        if self.row == len(self.lines):
+            self.lines.append("")
+
+    def write(self, text):
+        pos = 0
+        for m in self.TOKEN.finditer(text):
+            if m.start() > pos:
+                self.put(text[pos:m.start()])
+            pos = m.end()
+            tok = m.group(0)
+            if tok in ("\n", "\r\n"):
+                self.newline()
+            elif tok == "\r":
+                self.col = 0
+            elif tok == "\x08":
+                self.col = max(0, self.col - 1)
+            elif m.group(2):
+                arg, cmd = m.group(1), m.group(2)
+                n = int(arg) if arg.isdigit() else 1
+                if cmd == "A":
+                    self.row = max(0, self.row - n)
+                elif cmd == "B":
+                    self.row = min(len(self.lines) - 1, self.row + n)
+                elif cmd == "G":
+                    self.col = max(0, n - 1)
+                elif cmd == "K":
+                    line = self.lines[self.row]
+                    self.lines[self.row] = "" if arg == "2" else " " * min(self.col, len(line)) + \
+                        line[self.col:] if arg == "1" else line[:self.col]
+        if pos < len(text):
+            self.put(text[pos:])
+        self.show()
+
+    def show(self):
+        frozen = []
+        while self.row > self.LIVE:
+            frozen.append(self.lines.pop(0))
+            self.row -= 1
+        live = "\n".join(self.lines)
+        self.buf.delete(self.buf.get_iter_at_offset(self.fixed), self.buf.get_end_iter())
+        if frozen:
+            fixed = "\n".join(frozen) + "\n"
+            self.buf.insert(self.buf.get_end_iter(), fixed)
+            self.fixed += len(fixed)
+        self.buf.insert(self.buf.get_end_iter(), live)
+
+    def text(self):
+        return self.buf.get_text(self.buf.get_start_iter(), self.buf.get_end_iter(), False)
+
+
 def fmt_age(secs):
     """Antigüedad aproximada: hace 5 min, hace 3 h, hace 12 días, hace 4 meses, hace 2 años."""
     if secs < 3600:
@@ -12288,17 +16867,26 @@ class Task:
         # Al terminar bien, un check verde grande: «Terminado» en gris no se ve de un vistazo
         ok_icon = "emblem-ok-symbolic" if Gtk.IconTheme.get_default().has_icon(
             "emblem-ok-symbolic") else "object-select-symbolic"
-        self.done_icon = css(icon(ok_icon, 64), "punto-verde")
+        self.done_icon = css(icon(ok_icon, 64), "nv-hecho")
         self.done_icon.set_no_show_all(True)
         box.pack_start(self.done_icon, False, False, 0)
-        self.head = label(title)
-        css(self.head, "title-3")
+        self.head = label(title, xalign=0.5, justify=Gtk.Justification.CENTER)
+        css(self.head, "nv-titulo")
         self.head.set_line_wrap(True)
         box.pack_start(self.head, False, False, 0)
-        self.bar = Gtk.ProgressBar(show_text=True)
+        # Encima de la barra: lo que se hace (a la izquierda) y el porcentaje con lo que queda
+        top = Gtk.Box(spacing=12, margin_top=4)
+        self.what = label("", "nv-tenue", ellipsize=3)
+        top.pack_start(self.what, True, True, 0)
+        self.pct = label("", "nv-porcentaje")
+        top.pack_end(self.pct, False, False, 0)
+        box.pack_start(top, False, False, 0)
+        self.bar = css(Gtk.ProgressBar(), "nv-progreso")
         box.pack_start(self.bar, False, False, 0)
-        self.info = label("", "dim-label")
+        self.info = label("", "nv-chico", "nv-tenue")
         box.pack_start(self.info, False, False, 0)
+        # Porcentaje que se lee en la salida (tareas sin progreso propio): (primero, último, cuándo empezó)
+        self.seen_pct = None
 
         self.parts_box = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
         self.parts_box.set_no_show_all(True)
@@ -12307,8 +16895,11 @@ class Task:
 
         self.expander = Gtk.Expander(label="Ver registro", expanded=not self.progress)
         self.log = css(Gtk.TextView(editable=False, monospace=True, cursor_visible=False,
-                                    wrap_mode=Gtk.WrapMode.CHAR), "log")
-        self.log_sw = Gtk.ScrolledWindow(min_content_height=200 if self.progress else 160)
+                                    wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=14, right_margin=14,
+                                    top_margin=10, bottom_margin=10, pixels_below_lines=2), "log", "nv-consola")
+        self.console = Console(self.log.get_buffer())
+        self.log_sw = css(Gtk.ScrolledWindow(min_content_height=220 if self.progress else 180, margin_top=8),
+                          "nv-consola-marco")
         self.log_sw.add(self.log)
         self.expander.add(self.log_sw)
         box.pack_start(self.expander, True, True, 0)
@@ -12332,11 +16923,18 @@ class Task:
         dlg.show_all()
 
     def append(self, text):
-        text = ANSI.sub("", text).replace("\r\n", "\n").replace("\r", "")
         if not text:
             return
-        buf = self.log.get_buffer()
-        buf.insert(buf.get_end_iter(), text)
+        self.console.write(text)
+        if not self.progress:
+            found = re.findall(r"(?<![\d.,])(\d{1,3})(?:[.,]\d+)?\s?%", ANSI.sub("", text))
+            found = [int(n) for n in found if int(n) <= 100]
+            if found:
+                now = time.time()
+                if self.seen_pct is None or found[-1] < self.seen_pct[1] - 30:
+                    self.seen_pct = (found[-1], found[-1], now)
+                else:
+                    self.seen_pct = (self.seen_pct[0], found[-1], self.seen_pct[2])
         adj = self.log_sw.get_vadjustment()
         GLib.idle_add(lambda: adj.set_value(adj.get_upper() - adj.get_page_size()) and False)
 
@@ -12495,34 +17093,44 @@ class Task:
             return False
         if self.progress:
             self.show_progress(read_progress(self.pfile))
+        elif self.seen_pct:
+            # Sin progreso propio, pero la salida da un porcentaje (una descarga, por ejemplo)
+            first, pct, since = self.seen_pct
+            self.bar.set_fraction(pct / 100)
+            self.what.set_label("Trabajando…")
+            self.set_pct(pct, time_left(time.time() - since, pct - first, 100 - pct))
+            self.info.set_label("Tiempo: %s" % fmt_clock(time.time() - self.started))
         else:
             self.bar.pulse()
-            self.bar.set_text("Trabajando…")
+            self.what.set_label("Trabajando…")
+            self.pct.set_label("")
+            self.info.set_label("Tiempo: %s  ·  sin porcentaje: esta tarea no dice cuánto le queda"
+                                % fmt_clock(time.time() - self.started))
         return True
+
+    def set_pct(self, pct, left):
+        self.pct.set_label("%d %%" % pct + ("   ·   %s" % left if left else ""))
 
     def show_progress(self, p):
         elapsed = int(time.time() - self.started)
         if not p:
             self.bar.pulse()
-            self.bar.set_text("Preparando…")
-            self.info.set_label("Tiempo: %s" % fmt_minutes(elapsed))
+            self.what.set_label("Preparando…")
+            self.pct.set_label("0 %")
+            self.info.set_label("Tiempo: %s" % fmt_clock(elapsed))
             return
         pct = p["pct"]
         total = ((p["k"] - 1) * 100 + pct) // p["n"]
         self.head.set_label(p["name"] + ("   (%d de %d)" % (p["k"], p["n"]) if p["n"] > 1 else ""))
         self.bar.set_fraction(total / 100)
         what = p["what"] or ("terminado" if pct >= 100 else "")
-        self.bar.set_text(("%s  ·  %d %%" % (what[:1].upper() + what[1:], total)) if what
-                          else "%d %%" % total)
+        self.what.set_label(what[:1].upper() + what[1:])
         since = int(time.time() - (p["started"] or self.started))
-        text = "Tiempo: %s" % fmt_minutes(since)
+        self.set_pct(total, time_left(since, pct, 100 - pct) if pct < 100 else "")
+        text = "Tiempo: %s" % fmt_clock(since)
         if p["mode"] == "fdpos" and p["total"]:
             text = "%s de %s   ·   %s" % (fmt_size(min(p["done"], p["total"])),
                                          fmt_size(p["total"]), text)
-        if 5 <= pct < 100:
-            left = since * (100 - pct) // pct
-            text += "   ·   Queda menos de 1 min" if left < 60 else \
-                "   ·   Queda 1 min" if left < 90 else "   ·   Quedan unos %s" % fmt_minutes(left)
         self.info.set_label(text)
         self.show_parts(p["parts"], p["cur"])
 
@@ -12542,8 +17150,9 @@ class Task:
                 r.add_suffix(st)
                 self.parts_box.add(r)
                 self.part_rows.append(st)
+            # (sin no_show_all: con él, show_all no muestra las filas y la lista sale vacía)
+            self.parts_box.set_no_show_all(False)
             self.parts_box.show_all()
-            self.parts_box.set_visible(True)
             self.parts_shown = parts
         for i, st in enumerate(self.part_rows, 1):
             st.set_visible_child_name("ok" if i < cur else "run" if i == cur else "pend")
@@ -12571,22 +17180,23 @@ class Task:
             except OSError:
                 pass
         ok = rc == 0 and not self.cancelled
-        if self.progress:
-            self.info.set_label("Tiempo total: %s" % fmt_minutes(int(time.time() - self.started)))
+        self.info.set_label("Tiempo total: %s" % fmt_clock(time.time() - self.started))
         self.bar.set_fraction(1 if ok else self.bar.get_fraction())
         self.close_btn.set_label("Cerrar")
         if self.cancelled:
             self.head.set_label("Cancelado")
-            self.bar.set_text("Cancelado")
+            self.what.set_label("Cancelado")
+            self.pct.set_label("")
         elif ok:
             self.head.set_label(self.done_text or "Terminado")
-            self.bar.set_text("Terminado")
+            self.what.set_label("Terminado")
+            self.pct.set_label("100 %")
             self.done_icon.show()
             self.head.set_xalign(0.5)
-            css(self.head, "texto-activa")
         else:
             self.head.set_label("No se ha podido completar")
-            self.bar.set_text("Error")
+            self.what.set_label("Error")
+            css(self.bar, "nv-progreso-error")
             self.expander.set_expanded(True)
             self.report_btn.show()
             if p and self.part_rows_present():
@@ -12605,8 +17215,7 @@ class Task:
             self.app.toast(self.done_text or "Terminado")
 
     def log_text(self):
-        buf = self.log.get_buffer()
-        return buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
+        return self.console.text()
 
     def show_report(self, *_):
         """El informe que deja el script al fallar una instalacion (uno por version con error) o,
@@ -12701,8 +17310,7 @@ class Task:
         if self.progress:
             title, text, ok = self.cancel_text or (
                 "¿Cancelar la instalación?",
-                "Lo que se haya descargado o compilado hasta ahora se pierde. "
-                "Las versiones que ya estén instaladas no se tocan.",
+                "Se pierde lo descargado y compilado. Las versiones instaladas no se tocan.",
                 "Cancelar la instalación")
             if not confirm(self.dlg, title, text, ok, destructive=True):
                 return
@@ -12717,6 +17325,9 @@ class App(Gtk.Application):
         self.data = None
         self.branches = None
         self.php_dates = {}
+        # Pestaña Docker: datos de gui-docker (None hasta leerlos) y el formulario de proyecto nuevo
+        self.docker = None
+        self.docker_form = {}
         self.branches_error = None
         self.expanded = set()
         try:
@@ -12772,13 +17383,13 @@ class App(Gtk.Application):
             act.connect("activate", cb)
             self.add_action(act)
 
-        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Stack")
+        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
         self.win.set_default_size(920, 760)
 
         header = Gtk.HeaderBar(show_close_button=True)
         title = Gtk.Box(spacing=8)
         title.pack_start(icon(self.icon, 24), False, False, 0)
-        self.title_lbl = label("Nexum Stack", "title")
+        self.title_lbl = label("Nexum Dev Stack", "title")
         title.pack_start(self.title_lbl, False, False, 0)
         header.set_custom_title(title)
         menu = Gio.Menu()
@@ -12797,7 +17408,7 @@ class App(Gtk.Application):
         menu.append_section(None, sec)
         sec = Gio.Menu()
         sec.append("Novedades", "app.changes")
-        sec.append("Acerca de Nexum Stack", "app.about")
+        sec.append("Acerca de Nexum Dev Stack", "app.about")
         menu.append_section(None, sec)
         mb = Gtk.MenuButton(menu_model=menu)
         mb.add(icon("open-menu-symbolic"))
@@ -12812,11 +17423,13 @@ class App(Gtk.Application):
         self.page_tools, self.tools_box = page()
         self.page_hosts, self.hosts_box = page()
         self.page_services, self.services_box = page()
+        self.page_docker, self.docker_box = page()
         self.stack.add_named(self.page_versions, "versiones")
         self.stack.add_named(self.page_services, "servicios")
         self.stack.add_named(self.page_hosts, "hosts")
         self.stack.add_named(self.page_dbs, "bbdd")
         self.stack.add_named(self.page_tools, "herramientas")
+        self.stack.add_named(self.page_docker, "docker")
 
         main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         # Apartados en una barra a la izquierda, como Configuración de Ubuntu
@@ -12881,12 +17494,9 @@ class App(Gtk.Application):
             where = "GitHub, publicada el %s" % when
         else:
             where = "%s (%s, del %s)" % (os.path.dirname(path), os.path.basename(path), when)
-        if not confirm(self.win, "Hay una versión nueva de Nexum Stack",
-                       "Tienes la %s y está la %s en %s.\n\nEstá firmada por quien hace el "
-                       "programa (se comprueba también al instalarla). Su huella SHA-256 es:\n%s\n\n"
-                       "Al actualizar se pide la contraseña de administrador y la ventana se vuelve "
-                       "a abrir con la versión nueva. Tus versiones de PHP, tus proyectos y tus BBDD "
-                       "no se tocan. Las novedades están en Novedades, una vez instalada."
+        if not confirm(self.win, "Hay una versión nueva de Nexum Dev Stack",
+                       "De la %s a la %s (%s), firmada. Pide la contraseña de administrador y la ventana "
+                       "se vuelve a abrir. Tus versiones, proyectos y BBDD no se tocan.\n\nHuella SHA-256:\n%s"
                        % (current, version, where, sha),
                        "Actualizar a la %s" % version):
             return
@@ -12948,7 +17558,7 @@ class App(Gtk.Application):
             "Esta versión cambia el programa que instala las actualizaciones, y el que tienes no "
             "puede dar por buena su propia sustitución. No es un error ni un paquete dañado.\n\n"
             "Abre una terminal (Ctrl+Alt+T), pega esta orden y escribe tu contraseña:\n\n%s\n\n"
-            "Después, abre de nuevo Nexum Stack. Las siguientes versiones se vuelven a "
+            "Después, abre de nuevo Nexum Dev Stack. Las siguientes versiones se vuelven a "
             "actualizar desde aquí." % cmd)
         dlg.add_button("Copiar la orden", 1)
         dlg.add_button("Cerrar", Gtk.ResponseType.CLOSE)
@@ -12989,11 +17599,14 @@ class App(Gtk.Application):
                                ("bbdd", "BBDD", "drive-multidisk-symbolic"),
                                ("servicios", "Servicios", "network-server-symbolic"),
                                ("hosts", "Hosts", "network-workgroup-symbolic"),
+                               ("docker", "Docker", "logo:docker"),
                                # Lo que se usa de vez en cuando
                                ("herramientas", "Herramientas", "applications-utilities-symbolic")]:
             row = Gtk.ListBoxRow()
             inner = Gtk.Box(spacing=12)
-            inner.pack_start(symbol(ic, 16), False, False, 0)
+            # (Docker con su logotipo, de un color como los demás iconos del tema)
+            inner.pack_start(MonoLogo(ic[5:], 16) if ic.startswith("logo:") else symbol(ic, 16),
+                             False, False, 0)
             inner.pack_start(label(text), False, False, 0)
             row.add(inner)
             row.tab_name = name
@@ -13008,6 +17621,8 @@ class App(Gtk.Application):
     def on_tab(self, _lb, row):
         if row is not None:
             self.stack.set_visible_child_name(row.tab_name)
+            if row.tab_name == "docker":
+                run_quick(["gui-docker"], self.on_docker_data)
 
     def show_tab(self, name):
         self.tabs_list.select_row(self.tabs[name])
@@ -13204,6 +17819,7 @@ class App(Gtk.Application):
             self.loading(self.inst_box, "Consultando las versiones de PHP en php.net…")
             run_quick(["gui-ramas"], self.on_branches)
         run_quick(["gui-fechas"], self.on_php_dates)
+        run_quick(["gui-docker"], self.on_docker_data)
 
     def on_php_dates(self, rc, out):
         """Fecha de publicación del PHP de cada versión instalada (de php.net: llega después)."""
@@ -13223,15 +17839,20 @@ class App(Gtk.Application):
             run_quick(["gui-hosts"], self.on_hosts_data)
             run_quick(["gui-servicios"], self.on_services_data)
             run_quick(["gui-proyectos"], self.on_projects_data)
+            # (Docker solo mientras se ve su pestaña: pregunta a su servicio)
+            if self.stack.get_visible_child_name() == "docker":
+                run_quick(["gui-docker"], self.on_docker_data)
         return True
 
     def on_data(self, rc, out):
         d = {"installs": [], "dbs": {}, "dbdate": {}, "active": "", "running": False,
              "unregistered": False, "native": True, "launcher": True,
-             "name": "Nexum Stack", "version": "", "signature": "",
+             "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
              "stray": "", "exposed": "", "unsecured": [], "certs": [], "cas": [], "untrusted": [], "stale": [],
-             "dbsys": None}
+             "dbsys": None, "php2shell": {},
+             "mail": {"installed": False, "on": True, "wp": "mailpit", "running": False, "version": "",
+                      "url": "http://127.0.0.1:8025/", "offer": ""}}
         for f in parse_lines(out):
             if f[0] == "M" and len(f) >= 4:
                 d["name"], d["version"], d["signature"] = f[1], f[2], f[3]
@@ -13266,15 +17887,26 @@ class App(Gtk.Application):
                 d["untrusted"].append(f[1])
             elif f[0] == "Q" and len(f) >= 2:
                 d["stale"].append(f[1])
+            elif f[0] == "E" and len(f) >= 8:
+                # Correo de pruebas: Mailpit instalado, encendido, modo de WordPress, en marcha...
+                d["mail"] = {"installed": f[1] == "1", "on": f[2] == "1", "wp": f[3], "running": f[4] == "1",
+                             "version": f[5], "url": f[6] if f[6].startswith("http://127.0.0.1:") else
+                             "http://127.0.0.1:8025/", "offer": f[7]}
+            elif f[0] == "R" and len(f) >= 3:
+                # PHP2Shell en cada version: ok, parche (7.4.33... con el arreglo) o vulnerable
+                d["php2shell"][f[1]] = (f[2], "|".join(f[3:]))
         if rc != 0 and not d["installs"]:
             message(self.win, "No se han podido leer las versiones instaladas", out[-600:],
                     Gtk.MessageType.ERROR)
         if d == self.data:
             return False
         self.data = d
-        self.foot.set_label("%s  ·  v%s%s" % (d["signature"], d["version"],
-                                             "  ·  SIMULACIÓN: no se cambia nada"
-                                             if SIMULATE else ""))
+        # (solo la versión: la firma está en Acerca de, en el menú)
+        # (la versión va arriba, detrás de «Entornos LAMPP y Docker»; abajo solo el aviso de la simulación)
+        self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE else "")
+        if getattr(self, "brand_sub", None) is not None:
+            self.brand_sub.set_label("Entornos LAMPP y Docker  ·  v%s" % d["version"] if d["version"]
+                                     else "Entornos LAMPP y Docker")
         self.build_versions()
         self.build_databases()
         self.build_services()
@@ -13713,12 +18345,10 @@ class App(Gtk.Application):
         local = name.lower().endswith(".local")
         if local and not state and not confirm(
                 self.win, "¿Apagar %s?" % name,
-                "Un .local no existe fuera de este equipo. Su línea de /etc/hosts queda comentada y "
-                "ya no se vuelve a añadir sola.\n\nMientras esté apagado, si se abre %s el equipo "
-                "pregunta ese nombre a la red, y cualquiera de la misma wifi podría contestar con "
-                "una web suya. Si no lo usas, también puedes quitar su vhost en Herramientas → "
-                "Editar vhosts.\n\nSe puede volver a encender cuando quieras." % (name, name),
-                "Apagarlo"):
+                "Su línea de /etc/hosts queda comentada. Mientras esté apagado, al abrir %s "
+                "cualquiera de tu misma wifi podría contestar con una web suya. Se puede volver a "
+                "encender cuando quieras." % name,
+                "Apagar %s" % name):
             sw.set_active(True)
             return True
         if local:
@@ -13783,7 +18413,7 @@ class App(Gtk.Application):
         box, lb = group("Programa")
         add_row(lb, "Buscar una versión nueva", "Busca en GitHub (y en Descargas) una versión más "
                 "nueva, firmada, y la instala", "Buscar", lambda: self.check_package(manual=True))
-        add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Stack» "
+        add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Dev Stack» "
                 "si no aparece o no abre esta ventana", "Crear de nuevo",
                 self.on_create_launcher)
         self.tools_box.pack_start(box, False, False, 0)
@@ -14739,7 +19369,7 @@ class App(Gtk.Application):
         if not d["launcher"] and not SIMULATE:
             box, lb = group()
             row = ActionRow("Icono en el menú de aplicaciones",
-                            "Crea el acceso «Nexum Stack» para abrir esta ventana.")
+                            "Crea el acceso «Nexum Dev Stack» para abrir esta ventana.")
             b = Gtk.Button(label="Crear")
             b.connect("clicked", self.on_create_launcher)
             row.add_suffix(b)
@@ -14989,6 +19619,13 @@ class App(Gtk.Application):
                       done_text="%s actualizado" % src, auto_close=True)
 
     def on_activate_version(self, _btn, folder):
+        st, why = (self.data or {}).get("php2shell", {}).get(folder, ("", ""))
+        if st == "vulnerable" and not confirm(
+                self.win, "lampp-%s es vulnerable a PHP2Shell" % folder,
+                "%s. Una petición preparada puede ejecutar código con tu usuario. Mejor actualízala "
+                "(menú ⋮ de la versión)." % why,
+                "Activar lampp-%s igualmente" % folder, destructive=True):
+            return
         self.run_task("Activando lampp-%s" % folder, ["use", folder],
                       done_text="lampp-%s activada" % folder, auto_close=True)
 
@@ -15003,10 +19640,9 @@ class App(Gtk.Application):
                 self.toast("El paquete lampp-%s se encuentra actualizado" % folder)
             elif res[0] == "no" and len(res) > 1:
                 if confirm(self.win, "¿Actualizar lampp-%s?" % folder,
-                           "Se instalará PHP %s con los últimos parches de Apache, MariaDB, "
-                           "ProFTPD, Perl y phpMyAdmin de su rama. La versión actual sigue "
-                           "funcionando mientras se compila. Tarda varios minutos." % res[1],
-                           "Actualizar"):
+                           "PHP %s con los últimos parches de su rama. La actual sigue funcionando "
+                           "mientras se compila (varios minutos)." % res[1],
+                           "Actualizar a PHP %s" % res[1]):
                     self.run_task("Actualizando lampp-%s" % folder, ["actualizar", folder],
                                   progress=True, reload_branches=True,
                                   done_text="lampp-%s actualizada a PHP %s" % (folder, res[1]))
@@ -15078,9 +19714,9 @@ class App(Gtk.Application):
     def on_register(self, *_):
         entry = Gtk.Entry(placeholder_text="por ejemplo 8.2.12")
         dlg_ok = confirm(self.win, "Registrar el XAMPP de /opt/lampp",
-                         "Se moverá a /opt/lampp-<nombre> y compartirá htdocs y los vhosts con "
-                         "las demás versiones. Escribe el nombre de la versión:",
-                         "Registrar", extra=entry)
+                         "Pasa a /opt/lampp-<nombre> y comparte htdocs y los vhosts con las demás. "
+                         "Nombre de la versión:",
+                         "Registrar el XAMPP", extra=entry)
         name = entry.get_text().strip()
         if not dlg_ok or not name:
             return
@@ -15179,7 +19815,8 @@ class App(Gtk.Application):
             lb.add(r)
         xampps = [f for f in self.branches if f[0] == "X"]
         if xampps:
-            xexp = ExpanderRow("XAMPP oficiales", "Para proyectos antiguos (PHP 7.1 a 8.2)",
+            xexp = ExpanderRow("XAMPP oficiales", "Para proyectos antiguos (PHP 7.1 a 8.1). Sin parche posible "
+                               "de PHP2Shell: mejor una pila propia",
                                on_toggle=lambda on: self.remember("@xampp", on))
             for f in xampps:
                 _, folder, release, php, installed = (f + [""] * 5)[:5]
@@ -15188,7 +19825,8 @@ class App(Gtk.Application):
                     xr.set_sensitive(False)
                 else:
                     xr = ActionRow("XAMPP %s" % release,
-                                   "PHP %s  ·  → /opt/lampp-%s" % (php, folder), activatable=True)
+                                   "PHP %s  ·  → /opt/lampp-%s  ·  sin parche posible (PHP2Shell)" % (php, folder),
+                                   activatable=True)
                     chk = Gtk.CheckButton()
                     chk.connect("toggled", self.on_check)
                     xr.add_prefix(chk)
@@ -15323,12 +19961,10 @@ class App(Gtk.Application):
         php = [self.checks[k][1] for k in sel if not k.startswith("xampp:")]
         xampp = [self.checks[k][1] for k in sel if k.startswith("xampp:")]
         names = ["XAMPP %s" % x for x in xampp] + ["PHP %s" % v for v in php]
-        text = ("Se va a instalar: %s.\n\nCada versión de PHP se compila en tu equipo y tarda "
-                "unos minutos (más en equipos lentos). Se pedirá la contraseña de "
-                "administrador una sola vez. Las versiones instaladas no se tocan."
+        text = ("%s. Cada PHP se compila aquí (unos minutos). Las versiones instaladas no se tocan."
                 % ", ".join(names))
         if not confirm(self.win, "¿Instalar %s?" % plural(len(names), "versión", "versiones"),
-                       text, "Instalar"):
+                       text, "Instalar %s" % (names[0] if len(names) == 1 else plural(len(names), "versión", "versiones"))):
             return
         args = ["instalar"]
         if xampp:
@@ -15517,7 +20153,7 @@ class App(Gtk.Application):
             args.append("--sustituir")
         if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (db, dst) if replace else
                        "¿Copiar %s a lampp-%s?" % (db, dst), "\n\n".join(notes),
-                       "Sustituir" if replace else "Copiar", destructive=replace):
+                       ("Sustituir en lampp-%s" if replace else "Copiar a lampp-%s") % dst, destructive=replace):
             return
         self.run_task("Copiando %s a lampp-%s" % (db, dst), args,
                       done_text="%s copiada a lampp-%s" % (db, dst), auto_close=True)
@@ -15668,7 +20304,7 @@ class App(Gtk.Application):
                          "copia)." % (dst, name))
             args.append("--sustituir")
         if not confirm(self.win, "¿Replicar en lampp-%s?" % dst, "\n\n".join(notes),
-                       "Sustituir" if replace else "Replicar", destructive=replace):
+                       ("Sustituir en lampp-%s" if replace else "Replicar en lampp-%s") % dst, destructive=replace):
             return
         self.run_task("Replicando en lampp-%s" % dst, args,
                       done_text="%s replicada en lampp-%s como %s" % (db, dst, name), auto_close=True)
@@ -15856,14 +20492,22 @@ class App(Gtk.Application):
         if notes:
             title = "¿Cambiar a PHP %s?" % inst["php"] if target != self.data["active"] \
                 and confirm_switch else "¿Crear %s?" % link
-            if not confirm(self.win, title, "\n\n".join(notes) + "\n\n%s apuntará a %s. Se pide "
-                           "la contraseña de sudo." % (link, folder), "Cargar proyecto"):
+            if not confirm(self.win, title, "\n\n".join(notes) + "\n\n%s apuntará a %s." % (link, folder),
+                           "Cargar %s" % folder):
                 return
         if remember:
             self.remember_project(db, folder, target)
         def loaded(ok_, *_):
             if not ok_:
                 return
+            # El visor pasa al proyecto nuevo al momento, con sus botones: lo que se acaba de hacer se
+            # sabe sin preguntarlo (gui-datos tarda unos segundos; la lectura completa sigue detrás)
+            if self.projects is not None:
+                self.projects = dict(self.projects, link=link, current=folder, create=False)
+                self.selected_project = folder
+            if self.data is not None and target != self.data["active"]:
+                self.data = dict(self.data, active=target)
+            self.update_project_search()
 
             def got(_rc, out):
                 # Tienda PrestaShop: su dominio queda falseado (se ve en la pestaña Hosts)
@@ -15938,6 +20582,312 @@ class App(Gtk.Application):
         err = write_links([(db, ver, folder)])
         if err:
             self.toast("No se ha podido recordar la carpeta: %s" % err)
+
+    # ------------------------------------------------------------------ Docker
+    def on_docker_data(self, rc, out):
+        d = {"installed": False, "ready": False, "version": "", "lampp": False,
+             "php": [], "maria": [], "projects": [], "containers": []}
+        for f in parse_lines(out):
+            if f[0] == "S" and len(f) >= 5:
+                d.update(installed=f[1] == "1", ready=f[2] == "1", version=f[3], lampp=f[4] == "1",
+                         rootful=len(f) > 5 and f[5] == "1")
+            elif f[0] == "V" and len(f) >= 3:
+                d["php"], d["maria"] = f[1].split(), f[2].split()
+            elif f[0] == "P" and len(f) >= 9 and re.fullmatch(r"[a-z0-9-]{1,40}", f[1]):
+                d["projects"].append({"slug": f[1], "folder": f[2], "php": f[3], "maria": f[4],
+                                      "domain": f[5], "state": f[6], "db": f[7], "pma": f[8]})
+            elif f[0] == "C" and len(f) >= 7:
+                d["containers"].append({"name": f[1], "image": f[2], "state": f[3], "status": f[4],
+                                        "ports": f[5], "project": f[6], "id": f[7][:12] if len(f) > 7 else ""})
+            elif f[0] == "I" and len(f) >= 6:
+                d.setdefault("images", []).append({"repo": f[1], "tag": f[2], "id": f[3][:12], "size": f[4],
+                                                   "created": f[5]})
+            elif f[0] == "O" and len(f) >= 3:
+                d.setdefault("volumes", []).append({"name": f[1], "driver": f[2]})
+        if d != self.docker:
+            self.docker = d
+            self.build_docker()
+        return False
+
+    def build_docker(self):
+        clear(self.docker_box)
+        d = self.docker
+        if d is None:
+            self.loading(self.docker_box, "Comprobando Docker…")
+            return
+        if d["ready"]:
+            self.docker_box.pack_start(self.build_docker_console(), False, False, 0)
+        box, lb = group("Docker sin root",
+                        "Cada proyecto en Docker lleva su propio PHP (cualquier versión, también 7.1 o "
+                        "7.4), su MariaDB con una copia de su BBDD y su phpMyAdmin, en contenedores. "
+                        "Docker corre sin root, con tu usuario: ni un proyecto ni Docker pueden hacerse "
+                        "administradores del equipo. La web la sirve el Apache de la versión LAMPP "
+                        "activa por su dominio (carpeta.docker.local), con sus .htaccess, así que LAMPP "
+                        "y Docker funcionan a la vez.")
+        if not d["installed"]:
+            row = ActionRow("Docker no está instalado",
+                            "Se instala Docker de Ubuntu en modo sin root (el Docker del sistema, con "
+                            "root, se deja apagado). Pide la contraseña de administrador.")
+            row.add_prefix(label("●", "punto-gris"))
+            b = css(Gtk.Button(label="Instalar Docker", sensitive=not self.busy), "verde")
+            b.connect("clicked", lambda *_: self.run_task(
+                "Instalando Docker sin root", ["docker-instalar"], done_text="Docker sin root instalado",
+                on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+            row.add_suffix(b)
+            lb.add(row)
+        elif not d["ready"]:
+            row = ActionRow("Docker sin root no responde",
+                            "Está instalado, pero su servicio (el de tu usuario) no está en marcha o no "
+                            "se ha preparado. Prepararlo lo deja listo; no cambia los contenedores.")
+            row.add_prefix(label("●", "punto-gris"))
+            b = css(Gtk.Button(label="Prepararlo", sensitive=not self.busy), "verde")
+            b.connect("clicked", lambda *_: self.run_task(
+                "Preparando Docker sin root", ["docker-instalar"], done_text="Docker sin root listo",
+                on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+            row.add_suffix(b)
+            lb.add(row)
+        else:
+            row = ActionRow("Docker %s, sin root" % d["version"], "En marcha con tu usuario")
+            row.add_prefix(label("●", "punto-verde"))
+            lb.add(row)
+            if d.get("rootful"):
+                # (lo deja en marcha el paquete de Ubuntu: corre como root y no hace falta)
+                row = ActionRow("El Docker del sistema (con root) está en marcha",
+                                "Lo deja en marcha el paquete de Ubuntu y no hace falta: el tuyo va sin "
+                                "root. Apagarlo pide la contraseña de administrador.")
+                row.add_prefix(css(icon("dialog-warning-symbolic"), "error"))
+                b = css(Gtk.Button(label="Apagarlo", sensitive=not self.busy), "verde")
+                b.connect("clicked", lambda *_: self.run_task(
+                    "Apagando el Docker del sistema", ["docker-instalar"], done_text="Docker del sistema apagado",
+                    auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+                row.add_suffix(b)
+                lb.add(row)
+            if not d["lampp"]:
+                row = ActionRow("La versión LAMPP activa está parada",
+                                "Los proyectos en Docker se abren por su Apache: arráncala en Versiones.")
+                row.add_prefix(css(icon("dialog-warning-symbolic"), "error"))
+                lb.add(row)
+        self.docker_box.pack_start(box, False, False, 0)
+        if d["ready"]:
+            self.docker_box.pack_start(self.build_docker_projects(), False, False, 0)
+            self.docker_box.pack_start(self.build_docker_new(), False, False, 0)
+        self.docker_box.show_all()
+
+    def build_docker_projects(self):
+        d = self.docker
+        box, lb = group("Proyectos en Docker",
+                        "Arrancados, siguen en marcha aunque cierres esta ventana. Borrar quita sus "
+                        "contenedores y la copia de su BBDD (la carpeta del proyecto y la BBDD de "
+                        "LAMPP no se tocan).")
+        if not d["projects"]:
+            lb.add(ActionRow("Todavía no hay ningún proyecto en Docker", "Créalo abajo."))
+        for p in d["projects"]:
+            on = p["state"] == "marcha"
+            row = ActionRow(p["folder"], "MariaDB %s  ·  https://%s%s" % (
+                p["maria"], p["domain"],
+                {"parcial": "  ·  a medias", "nuevo": "  ·  sin contenedores"}.get(p["state"], "")))
+            dot = label("●", "punto-verde" if on else "punto-gris")
+            dot.set_tooltip_text({"marcha": "En marcha", "parado": "Parado",
+                                  "parcial": "Algún contenedor está parado"}.get(p["state"], p["state"]))
+            row.add_prefix(dot)
+            php = Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                             tooltip_text="Cambiar la versión de PHP de %s (su BBDD y su configuración "
+                                          "se quedan)" % p["folder"])
+            php.connect("clicked", lambda *_, p=p: self.on_docker_php(p))
+            row.add_suffix(php)
+            for ic, tip, fn, ok in [
+                    ("web-browser-symbolic", "Abrir https://%s" % p["domain"],
+                     lambda *_, p=p: self.open_uri("https://%s/" % p["domain"]), on),
+                    ("drive-multidisk-symbolic", "Abrir su phpMyAdmin (http://127.0.0.1:%s/)" % p["pma"],
+                     lambda *_, p=p: self.open_uri("http://127.0.0.1:%s/" % p["pma"]),
+                     on and p["pma"].isdigit()),
+                    ("text-x-generic-symbolic", "Ver los registros de sus contenedores",
+                     lambda *_, p=p: self.run_task("Registros de %s" % p["folder"],
+                                                   ["docker-registros", p["slug"]]), True),
+                    ("media-playback-stop-symbolic" if on else "media-playback-start-symbolic",
+                     "Parar sus contenedores" if on else "Arrancar sus contenedores",
+                     lambda *_, p=p, on=on: self.run_task(
+                         ("Parando %s" if on else "Arrancando %s") % p["folder"],
+                         ["docker-parar" if on else "docker-arrancar", p["slug"]],
+                         done_text="%s %s" % (p["folder"], "parado" if on else "en marcha"),
+                         auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
+                     True),
+                    ("user-trash-symbolic", "Borrar el proyecto en Docker",
+                     lambda *_, p=p: self.on_docker_delete(p), True)]:
+                b = Gtk.Button(tooltip_text=tip, relief=Gtk.ReliefStyle.NONE,
+                               sensitive=ok and not self.busy)
+                b.add(icon(ic))
+                b.connect("clicked", fn)
+                row.add_suffix(b)
+            lb.add(row)
+        return box
+
+    def build_docker_console(self):
+        """Consola de Docker (arriba de la pestaña, como Docker Desktop): todos los contenedores con su
+        imagen, si están en marcha, desde cuándo y sus puertos."""
+        d = self.docker
+        cons = d.get("containers", [])
+        box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "consola-docker")
+        head = Gtk.Box(spacing=10)
+        head.pack_start(logo("docker", 26), False, False, 0)
+        head.pack_start(label("Docker", "consola-titulo"), False, False, 0)
+        up = sum(1 for c in cons if c["state"] == "running")
+        head.pack_end(label("%d en marcha  ·  %d parados" % (up, len(cons) - up), "consola-tenue"),
+                      False, False, 0)
+        box.pack_start(head, False, False, 0)
+        if not cons:
+            box.pack_start(label("$ docker ps\nNo hay contenedores.", "consola-tenue"), False, False, 0)
+            return box
+        grid = Gtk.Grid(column_spacing=18, row_spacing=4)
+        for n, title in enumerate(["", "CONTENEDOR", "IMAGEN", "ESTADO", "PUERTOS"]):
+            grid.attach(label(title, "consola-tenue"), n, 0, 1, 1)
+        for row, c in enumerate(sorted(cons, key=lambda c: (c["project"], c["name"])), 1):
+            on = c["state"] == "running"
+            grid.attach(label("●", "consola-verde" if on else "consola-gris"), 0, row, 1, 1)
+            # (sin el prefijo del gestor: nexum-<proyecto>-php-1 → <proyecto>-php)
+            name = re.sub(r"-\d+$", "", re.sub(r"^nexum-", "", c["name"]))
+            n_lbl = label(name, ellipsize=3, max_width_chars=34)
+            n_lbl.set_tooltip_text(c["name"])
+            grid.attach(n_lbl, 1, row, 1, 1)
+            grid.attach(label(c["image"], "consola-tenue", ellipsize=3, max_width_chars=18), 2, row, 1, 1)
+            grid.attach(label(docker_status_text(c["status"]), "consola-verde" if on else "consola-gris"),
+                        3, row, 1, 1)
+            ports = ", ".join(p for p in c["ports"].split(", ") if "->" in p) or "—"
+            grid.attach(label(ports.replace("/tcp", ""), "consola-tenue"), 4, row, 1, 1)
+        box.pack_start(grid, False, False, 0)
+        return box
+
+    def on_docker_php(self, p):
+        """Cambiar la versión de PHP de un proyecto en Docker (solo su contenedor de PHP)."""
+        versions = self.docker["php"]
+        dlg = Gtk.Dialog(title="Cambiar PHP", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(460, -1)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Cambiar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=24)
+        dlg.get_content_area().add(box)
+        box.pack_start(css(label("¿Con qué versión de PHP quieres %s?" % p["folder"], wrap=True,
+                                 max_width_chars=50), "title-3"), False, False, 0)
+        box.pack_start(label("Solo se cambia su contenedor de PHP: su BBDD, su phpMyAdmin y su "
+                             "configuración se quedan como están. La primera vez con cada versión se "
+                             "prepara su imagen (unos minutos). Si no arranca, vuelve a PHP %s."
+                             % p["php"], "dim-label", wrap=True, max_width_chars=50), False, False, 0)
+        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=4,
+                           column_spacing=8, row_spacing=8, homogeneous=True)
+        first, radios = None, []
+        for v in versions:
+            rb = Gtk.RadioButton.new_with_label_from_widget(first, "PHP %s%s" % (v, "  (ahora)" if v == p["php"] else ""))
+            first = first or rb
+            rb.set_active(v == p["php"])
+            radios.append((rb, v))
+            flow.add(rb)
+        box.pack_start(flow, False, False, 0)
+        box.show_all()
+        resp = run_dialog(dlg)
+        chosen = next((v for rb, v in radios if rb.get_active()), None)
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not chosen or chosen == p["php"]:
+            return
+        self.run_task("%s: PHP %s → %s" % (p["folder"], p["php"], chosen), ["docker-php", p["slug"], chosen],
+                      done_text="%s funciona ya con PHP %s" % (p["folder"], chosen), auto_close=True,
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def on_docker_delete(self, p):
+        if not confirm(self.win, "¿Borrar %s de Docker?" % p["folder"],
+                       "Se borran sus contenedores, su copia de la BBDD (%s) y su vhost (%s). La carpeta "
+                       "y las BBDD de LAMPP no se tocan." % (p["db"], p["domain"]),
+                       "Borrar de Docker", destructive=True):
+            return
+        self.run_task("Borrando %s de Docker" % p["folder"], ["docker-borrar", p["slug"]],
+                      done_text="%s borrado de Docker" % p["folder"], auto_close=True,
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def build_docker_new(self):
+        d = self.docker
+        box, lb = group("Nuevo proyecto en Docker",
+                        "Elige la carpeta del proyecto, su versión de PHP y de MariaDB y, si quieres, "
+                        "la BBDD de LAMPP que se copia al contenedor. Su wp-config.php (o la "
+                        "configuración de PrestaShop) se sustituye solo dentro del contenedor: el del "
+                        "proyecto no cambia y la carpeta se puede seguir usando con LAMPP.")
+        f = self.docker_form
+        taken = {p["folder"] for p in d["projects"]}
+        folders = [x for x in project_folders() if x not in taken]
+
+        def combo_row(title, items, key, on_change=None):
+            row = ActionRow(title)
+            c = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+            for k, text in items:
+                c.append(k, text)
+            if not c.set_active_id(f.get(key) or "") and items:
+                c.set_active(0)
+            f[key] = c.get_active_id()
+            narrow(c)
+
+            def changed(cb):
+                f[key] = cb.get_active_id()
+                if on_change:
+                    on_change()
+            c.connect("changed", changed)
+            row.add_suffix(c)
+            lb.add(row)
+            return c
+        combo_row("Carpeta", [(x, x) for x in folders], "folder",
+                  lambda: GLib.idle_add(lambda: (self.docker_folder_changed(), False)[1]))
+        combo_row("PHP", [(v, "PHP %s" % v) for v in d["php"]], "php")
+        combo_row("MariaDB", [(v, "MariaDB %s" % v) for v in d["maria"]], "maria")
+        # BBDD de LAMPP que se copia: las vinculadas a la carpeta en cada versión
+        x = next((p for p in (self.projects or {}).get("list", []) if p["name"] == f.get("folder")), None)
+        pairs = self.project_pairs(x) if x and self.data else []
+        combo_row("BBDD que se copia", [("@vacia", "— Ninguna: vacía —")] +
+                  [("%s|%s" % (i["folder"], db), "%s (lampp-%s)" % (db, i["folder"])) for i, db in pairs],
+                  "source")
+        row = ActionRow("Dominio", "Se abre por https, con su certificado")
+        entry = Gtk.Entry(valign=Gtk.Align.CENTER, width_chars=24, max_length=80)
+        entry.set_text(f.get("domain") or (docker_slug(f["folder"]) + ".docker.local" if f.get("folder") else ""))
+        f["domain"] = entry.get_text()
+        entry.connect("changed", lambda e: f.update(domain=e.get_text().strip().lower(), domain_set=True))
+        row.add_suffix(entry)
+        lb.add(row)
+        row = ActionRow("")
+        b = css(Gtk.Button(label="Crear en Docker", sensitive=bool(folders) and not self.busy), "verde")
+        b.connect("clicked", lambda *_: self.on_docker_create())
+        row.add_suffix(b)
+        lb.add(row)
+        return box
+
+    def docker_folder_changed(self):
+        f = self.docker_form
+        f["source"] = None
+        if not f.get("domain_set"):
+            f["domain"] = docker_slug(f["folder"] or "") + ".docker.local" if f.get("folder") else ""
+        self.build_docker()
+
+    def on_docker_create(self):
+        f = self.docker_form
+        folder, php, maria, domain = f.get("folder"), f.get("php"), f.get("maria"), f.get("domain") or ""
+        if not (folder and php and maria):
+            return
+        if not DOMAIN_RX.match(domain) or not domain.endswith(".local"):
+            message(self.win, "Dominio no válido",
+                    "El dominio de un proyecto en Docker tiene que acabar en .local "
+                    "(por ejemplo %s.docker.local)." % docker_slug(folder), Gtk.MessageType.WARNING)
+            return
+        args = ["docker-crear", folder, php, maria, "--dominio", domain]
+        src = f.get("source")
+        text = "PHP %s y MariaDB %s, en https://%s." % (php, maria, domain)
+        if src and src != "@vacia" and "|" in src:
+            ver, db = src.split("|", 1)
+            args += ["--bd", db, "--desde", ver]
+            text += " Con una copia de %s de lampp-%s (esa no se toca)." % (db, ver)
+        else:
+            text += " La BBDD empieza vacía."
+        text += " La primera vez con cada PHP se prepara su imagen (unos minutos)."
+        if not confirm(self.win, "¿Crear %s en Docker?" % folder, text, "Crear en Docker"):
+            return
+        self.run_task("Creando %s en Docker" % folder, args,
+                      done_text="%s en Docker: https://%s" % (folder, domain),
+                      on_done=lambda *a: (f.clear(), run_quick(["gui-docker"], self.on_docker_data)))
 
     # ------------------------------------------------- descargar una base de datos
     def on_download_db(self, db, folder):
@@ -16270,15 +21220,12 @@ class App(Gtk.Application):
         state = {"copy": tables > 0}
         if tables:
             dlg.format_secondary_markup(
-                "Está en el MariaDB de lampp-%s y tiene <b>%s</b> (%s).\n\n"
-                "<b>Se eliminará todo su contenido. Esta acción es irreversible: "
-                "no se puede deshacer.</b>"
+                "En lampp-%s, con <b>%s</b> (%s). <b>No se puede deshacer.</b>"
                 % (folder, plural(tables, "tabla", "tablas"), fmt_size(size)))
         else:
-            dlg.format_secondary_text("Está en el MariaDB de lampp-%s y está vacía (no tiene "
-                                      "tablas). Esta acción no se puede deshacer." % folder)
+            dlg.format_secondary_text("En lampp-%s, vacía (sin tablas). No se puede deshacer." % folder)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        ok = css(dlg.add_button("Borrar", Gtk.ResponseType.ACCEPT), "destructive-action")
+        ok = css(dlg.add_button("Borrar la BBDD", Gtk.ResponseType.ACCEPT), "destructive-action")
         dlg.set_default_response(Gtk.ResponseType.CANCEL)
         if tables:
             extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -16478,6 +21425,2324 @@ class App(Gtk.Application):
         return False
 
 
+# ===================================================================================================
+# La ventana (desde la 1.54). Sobre App, que lleva los datos (gui-*), las tareas (con su contraseña) y
+# los dialogos, y lanza las mismas ordenes de siempre; App2 cambia la organizacion y el aspecto.
+#   - Arriba, siempre a la vista: la version activa (sus servicios al pulsarla), Localhost,
+#     phpMyAdmin y los avisos en un solo boton
+#   - Proyectos: el cargado en grande (su entorno y su BBDD) y la lista compacta de todos
+#   - Versiones de PHP (tabla, e Instalar en un dialogo), Bases de datos, Docker, Dominios y hosts y
+#     Configuracion
+BLUE = "#0a84ff"
+NEW_GREEN = "#30d158"
+NEW_CSS = """
+.nv-tenue { color: alpha(@theme_fg_color, 0.55); }
+.nv-mono { font-family: monospace; }
+.nv-chico { font-size: 0.86em; }
+.nv-seccion { font-size: 0.78em; font-weight: bold; color: alpha(@theme_fg_color, 0.45); }
+.nv-titulo { font-size: 1.2em; font-weight: bold; }
+.nv-titulo-grande { font-size: 1.65em; font-weight: bold; }
+/* «Dev Stack» del título: sin negrita y en azul, mezclado con el color del texto para que se lea
+   bien en los dos temas (más claro sobre el gris oscuro, más oscuro sobre el claro) */
+.nv-marca { font-weight: normal; color: mix(%(b)s, @theme_fg_color, 0.22); }
+.nv-lateral { background-color: alpha(@theme_fg_color, 0.035); border-right: 1px solid alpha(@theme_fg_color, 0.08); }
+.nv-nav { background: transparent; }
+.nv-nav row { padding: 13px 14px; border-radius: 10px; margin: 2px 10px; }
+.nv-nav row:hover { background-color: alpha(@theme_fg_color, 0.06); }
+.nv-nav row:selected { background-color: %(b)s; color: white; }
+.nv-nav row:selected label, .nv-nav row:selected image { color: white; }
+/* Barra de arriba mas alta, y el recuadro de la version montada, hundido (como una pantallita) */
+headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+.nv-pastilla { background-color: shade(@theme_bg_color, 0.78); border: 1px solid alpha(black, 0.25); border-radius: 12px;
+               padding: 3px 4px; box-shadow: inset 0 2px 4px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.10),
+               0 1px 0 alpha(white, 0.06); }
+.nv-pastilla button { border: none; background: transparent; box-shadow: none; }
+.nv-sep { background-color: alpha(@theme_fg_color, 0.15); min-width: 1px; margin: 6px 2px; }
+.nv-verde { color: %(g)s; }
+.nv-gris { color: alpha(@theme_fg_color, 0.3); }
+.nv-aviso-num { background-color: #ff453a; color: white; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
+.nv-correo-num { background-color: %(b)s; color: white; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
+.nv-correo-aviso { color: #ff9f0a; }
+/* Botones: redondeados, con borde gris y, al pasar el raton, borde azul (todos, tambien los planos
+   y los desplegables; no los de cerrar, maximizar y minimizar). El principal, en azul */
+button { border-radius: 8px; }
+button:not(.titlebutton) { border-color: alpha(@theme_fg_color, 0.22); }
+button:not(.titlebutton):hover, button:not(.titlebutton):checked:hover {
+    border-color: %(b)s; background-image: none; background-color: alpha(%(b)s, 0.08); }
+button.flat:not(.titlebutton):hover { border: 1px solid %(b)s; }
+button.verde, button.suggested-action, .nv-azul { background-image: none; background-color: %(b)s; color: white; border-color: transparent; box-shadow: none; }
+button.verde:hover, .nv-azul:hover { background-color: shade(%(b)s, 1.12); border-color: shade(%(b)s, 1.35); }
+button.verde label, button.verde image, .nv-azul label, .nv-azul image { color: white; }
+button.verde:disabled, .nv-azul:disabled { background-color: alpha(%(b)s, 0.35); }
+popover { border-radius: 12px; padding: 5px; }
+popover modelbutton { border-radius: 7px; padding: 6px 12px; min-height: 26px; }
+popover modelbutton:hover { background-color: %(b)s; color: white; }
+/* El boton del menu: sin recuadro (tampoco al pasar el raton: solo un fondo suave) */
+button.flat.nv-hamburguesa:not(.titlebutton), button.flat.nv-hamburguesa:not(.titlebutton):hover,
+button.flat.nv-hamburguesa:not(.titlebutton):checked {
+    border: 1px solid transparent; box-shadow: none; background-image: none; padding: 6px 8px; }
+button.flat.nv-hamburguesa:not(.titlebutton):hover, button.flat.nv-hamburguesa:not(.titlebutton):checked {
+    background-color: alpha(@theme_fg_color, 0.08); }
+/* Opciones del menu: a todo el ancho, sin borde, y en azul al pasar el raton */
+button.flat.nv-menuitem:not(.titlebutton), button.flat.nv-menuitem:not(.titlebutton):hover {
+    border: 1px solid transparent; border-radius: 7px; padding: 7px 12px; min-height: 0; }
+button.flat.nv-menuitem:not(.titlebutton):hover { background-color: %(b)s; }
+button.flat.nv-menuitem:hover label, button.flat.nv-menuitem:hover image { color: white; }
+combobox button, entry { border-radius: 8px; }
+list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-radius: 12px; border: 1px solid alpha(@theme_fg_color, 0.07); }
+.nv-grupo row { border-bottom: 1px solid alpha(@theme_fg_color, 0.06); }
+.nv-grupo row:last-child { border-bottom: none; }
+.nv-fila { padding: 8px 14px; }
+.nv-cab label { font-size: 0.76em; font-weight: bold; color: alpha(@theme_fg_color, 0.45); }
+.nv-tarjeta { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 14px; padding: 20px 22px; }
+.nv-avatar { border-radius: 10px; background-color: alpha(@theme_fg_color, 0.06); }
+.nv-etiqueta { font-size: 0.78em; padding: 1px 8px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.07); color: alpha(@theme_fg_color, 0.75); }
+.nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
+.nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
+.nv-chip-docker { background-color: alpha(#1d63ed, 0.16); color: #4c8dff; }
+.nv-selectores { background-color: alpha(black, 0.07); border: 1px solid alpha(black, 0.12); border-radius: 12px;
+                 padding: 12px 14px; box-shadow: inset 0 1px 3px alpha(black, 0.22), 0 1px 0 alpha(white, 0.05); }
+/* El boton de vincular (cambiar la BBDD de cada version): azul al pasar el raton */
+.nv-selectores button:hover { background-image: none; background-color: %(b)s; border-color: %(b)s; }
+.nv-selectores button:hover image { color: white; }
+.nv-pie { border-top: 1px solid alpha(@theme_fg_color, 0.08); }
+.nv-cargada { background-color: alpha(%(b)s, 0.10); }
+.nv-elegida { background-color: alpha(@theme_fg_color, 0.06); }
+.nv-discontinuo { border-style: dashed; }
+.nv-proyecto-btn, .nv-proyecto-btn button { background-image: none; background-color: transparent; box-shadow: none;
+                                           border: 1px solid alpha(@theme_fg_color, 0.22); }
+.nv-proyecto-btn:hover, .nv-proyecto-btn button:hover { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
+.nv-proyecto-btn.nv-discontinuo { border-style: dashed; }
+switch:checked { background-color: %(g)s; border-color: transparent; }
+.nv-running { font-size: 0.86em; color: %(g)s; }
+.nv-exited { font-size: 0.8em; padding: 1px 9px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.08); color: alpha(@theme_fg_color, 0.6); }
+.nv-enlace { color: #4c8dff; }
+.nv-dk-icono { border-radius: 8px; background-color: alpha(#1d63ed, 0.14); padding: 5px; }
+.nv-stat { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.07); border-radius: 12px; padding: 14px 16px; }
+.nv-cifra { font-size: 1.5em; font-weight: bold; }
+/* Botones de siempre (los de la pestaña Docker): borde gris claro y azul al pasar el raton */
+button.nv-clasico { background-image: none; background-color: transparent; box-shadow: none;
+                    border: 1px solid alpha(@theme_fg_color, 0.16); }
+button.nv-clasico:hover { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
+button.nv-stop image { color: #ff453a; }
+button.nv-play image { color: %(g)s; }
+/* El boton de la version activa: como «Activar», con borde y letra azules */
+button.nv-activa, button.nv-activa:disabled { background-image: none; background-color: transparent; box-shadow: none;
+                                             border: 1px solid %(b)s; }
+button.nv-activa label, button.nv-activa:disabled label { color: %(b)s; }
+/* Punto que parpadea: lo que esta en marcha */
+@keyframes nv-latido { 0%% { opacity: 1; } 50%% { opacity: 0.25; } 100%% { opacity: 1; } }
+.nv-latido { animation: nv-latido 1.6s ease-in-out infinite; }
+/* Opciones de los desplegables: fondo azul y letra blanca al pasar el raton */
+menu menuitem:hover, .menu menuitem:hover { background-color: %(b)s; }
+menu menuitem:hover label, menu menuitem:hover cellview, .menu menuitem:hover label { color: white; }
+.nv-barra trough { min-height: 6px; border-radius: 3px; background-color: alpha(@theme_fg_color, 0.08); }
+.nv-barra progress { min-height: 6px; border-radius: 3px; background-color: #1d63ed; }
+.nv-segmentado { background-color: alpha(@theme_fg_color, 0.07); border-radius: 9px; padding: 2px; }
+.nv-segmentado radiobutton, .nv-segmentado button { border-radius: 7px; border: none; background: transparent; box-shadow: none; padding: 3px 14px; }
+.nv-segmentado radiobutton:checked, .nv-segmentado button:checked { background-color: alpha(@theme_fg_color, 0.16); }
+.nv-dk-proyecto { font-weight: bold; }
+.nv-on { color: %(g)s; background-image: none; background-color: alpha(%(g)s, 0.14); border-color: transparent; }
+.nv-off { color: #ff453a; background-image: none; background-color: alpha(#ff453a, 0.14); border-color: transparent; }
+.nv-on label, .nv-on image { color: %(g)s; }
+.nv-off label, .nv-off image { color: #ff453a; }
+/* Dialogos: como las pestañas (mismo fondo, botones redondeados con borde) y en azul, no en verde */
+dialog, messagedialog { background-color: @theme_bg_color; }
+dialog headerbar { min-height: 52px; border-bottom: 1px solid alpha(@theme_fg_color, 0.08); box-shadow: none; }
+messagedialog .titlebar { min-height: 10px; }
+messagedialog .dialog-action-box { margin: 0; padding: 4px 22px 20px 22px; border-top: none; }
+messagedialog .dialog-action-area button, messagedialog .dialog-action-area button:first-child,
+messagedialog .dialog-action-area button:last-child {
+    border-radius: 8px; min-height: 34px; padding: 4px 18px; margin: 0 5px;
+    border: 1px solid alpha(@theme_fg_color, 0.22); }
+messagedialog .dialog-action-area button.verde { border-color: transparent; }
+messagedialog .dialog-action-area button.destructive-action { border-color: transparent; }
+messagedialog image { color: %(b)s; }
+messagedialog label.title { font-size: 1.15em; }
+dialog .dialog-action-area button { border-radius: 8px; min-height: 32px; padding: 4px 18px; }
+progressbar progress { background-image: none; background-color: %(b)s; border-color: %(b)s; }
+.opcion.elegida { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
+list.caja > row:selected, list.caja > row:selected:hover { background-color: alpha(%(b)s, 0.22); }
+.pastilla.activa { background-color: %(b)s; }
+.icono-seccion.verde-suave, .icono-servicio.verde-suave { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
+.texto-activa { color: %(b)s; }
+radio:checked, check:checked { background-image: none; background-color: %(b)s; border-color: %(b)s; color: white; }
+button.pildora { border-radius: 8px; padding: 6px 20px; }
+/* Tareas: barra gruesa con su porcentaje y lo que queda, y el registro como una terminal */
+.nv-progreso trough { min-height: 12px; border-radius: 6px; background-color: alpha(@theme_fg_color, 0.10); border: none; }
+.nv-progreso progress { min-height: 12px; border-radius: 6px; background-color: %(b)s; border: none; }
+.nv-progreso-error progress { background-color: #ff453a; }
+.nv-porcentaje { font-weight: bold; }
+.nv-hecho { color: %(b)s; }
+.nv-consola-marco { border-radius: 10px; background-color: #1d2228; border: 1px solid alpha(black, 0.25); }
+textview.nv-consola, textview.nv-consola text { background-color: #1d2228; color: #d7dee6; font-size: 9.5pt; }
+expander title > arrow { min-width: 14px; }
+""" % {"b": BLUE, "g": NEW_GREEN}
+
+KIND_TEXT = {"wp": "WordPress", "ps": "PrestaShop"}
+
+# Tema claro u oscuro de la ventana nueva (solo para ella: el escritorio no se toca)
+THEME_FILE = os.path.join(LOG_DIR, "ventana-tema")
+
+
+def theme_exists(name):
+    """¿Hay un tema GTK 3 con ese nombre (del sistema o tuyo)?"""
+    if not re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", name or ""):
+        return False
+    if name in ("Adwaita", "HighContrast"):
+        return True
+    return any(os.path.isdir(os.path.join(d, name, "gtk-3.0")) for d in
+               ("/usr/share/themes", os.path.expanduser("~/.themes"), os.path.expanduser("~/.local/share/themes")))
+
+
+PAGE_MAX = 1500
+
+
+def new_page(width=860):
+    """Pagina de la ventana nueva: con un ancho minimo y, con la ventana grande (maximizada), crece
+    con ella hasta PAGE_MAX; a partir de ahi, centrada."""
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, margin=26,
+                      halign=Gtk.Align.FILL)
+    content.set_size_request(width, -1)
+    sw.add(content)
+
+    def fit(_w, alloc):
+        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        if content.get_margin_start() != side:
+            content.set_margin_start(side)
+            content.set_margin_end(side)
+    sw.connect("size-allocate", fit)
+    return sw, content
+
+
+def nv_dot(on):
+    return label("●", "nv-verde" if on else "nv-gris")
+
+
+def nv_button(icon_name, text=None, tip=None, cb=None, *classes, flat=False):
+    b = Gtk.Button(tooltip_text=tip, valign=Gtk.Align.CENTER)
+    if flat:
+        b.set_relief(Gtk.ReliefStyle.NONE)
+    box = Gtk.Box(spacing=6)
+    if icon_name is not None:
+        box.pack_start(icon_name if isinstance(icon_name, Gtk.Widget) else icon(icon_name), False, False, 0)
+    if text:
+        box.pack_start(Gtk.Label(label=text), False, False, 0)
+    b.add(box)
+    css(b, *classes)
+    if cb:
+        b.connect("clicked", cb)
+    return b
+
+
+def kind_icon(kind, size=18):
+    return logo({"wp": "wordpress", "ps": "prestashop"}[kind], size) if kind in ("wp", "ps") \
+        else icon("folder-symbolic", size)
+
+
+class Hamburger(Gtk.DrawingArea):
+    """Icono del menu: tres rayas, algo mas anchas que las del tema, del color del texto."""
+
+    def __init__(self, width=20, height=16):
+        super().__init__()
+        self.set_size_request(width, height)
+
+    def do_draw(self, cr):
+        c = self.get_style_context().get_color(self.get_state_flags())
+        cr.set_source_rgba(c.red, c.green, c.blue, c.alpha)
+        w, h = self.get_allocated_width(), self.get_allocated_height()
+        cr.set_line_width(2)
+        cr.set_line_cap(1)  # (extremos redondeados)
+        for y in (h / 2 - 5, h / 2, h / 2 + 5):
+            cr.move_to(1, round(y) + 0.5)
+            cr.line_to(w - 1, round(y) + 0.5)
+        cr.stroke()
+        return False
+
+
+class App2(App):
+    def __init__(self):
+        super().__init__()
+
+        self.selected_project = None
+        self.np_dialog = None
+        # Pestaña Docker: vista (cont, img, vol), filtros, proyectos plegados y uso de CPU y memoria
+        # (dk_open: el proyecto desplegado, uno como mucho; al entrar en la pestaña, todos plegados)
+        self.dk_view, self.dk_query, self.dk_only_up, self.dk_open, self.dk_stats = "cont", "", False, set(), None
+        # Pestaña Bases de datos: buscador y «solo la activa» (la activa se ve desplegada al abrir)
+        self.db_query, self.db_only_active = "", False
+        # Tamaño de cada BBDD: (version duena, base) -> (bytes, cuando se midio)
+        self.db_sizes = {}
+        # Correo de pruebas: correos sin leer en Mailpit (None: no se sabe) y si se esta preguntando
+        self.mail_unread, self.mail_polling = None, False
+
+    # ------------------------------------------------------------------ ventana
+    def do_activate(self):
+        if getattr(self, "win", None):
+            self.win.present()
+            return
+        hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
+
+        def pointer_hook(widget, event, *_):
+            if isinstance(widget, (Gtk.Button, Gtk.Switch)) and event.window is not None:
+                event.window.set_cursor(hand if widget.is_sensitive() else None)
+            return True
+        GObject.add_emission_hook(Gtk.Widget, "enter-notify-event", pointer_hook)
+
+        # Los desplegables se abren debajo del boton, como una lista. Sin esto, GTK 3 pone la opcion
+        # elegida encima del boton y, con muchas (los proyectos), deja huecos vacios por arriba o abajo
+        def combo_hook(widget, *_):
+            if isinstance(widget, Gtk.ComboBox) and widget.get_wrap_width() == 0:
+                widget.set_wrap_width(1)
+            return True
+        GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
+        for text in (CSS, NEW_CSS):
+            prov = Gtk.CssProvider()
+            prov.load_from_data(text.encode())
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        theme = Gtk.IconTheme.get_default()
+        self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
+        Gtk.Window.set_default_icon_name(self.icon)
+        for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
+                         ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
+                         ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
+                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
+                         ("update", lambda *_: self.check_package(manual=True)),
+                         ("terminal", self.on_terminal), ("refresh", self.on_refresh),
+                         ("changes", self.on_changes), ("about", self.on_about)]:
+            act = Gio.SimpleAction.new(name, None)
+            act.connect("activate", cb)
+            self.add_action(act)
+        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
+        self.win.set_default_size(1240, 840)
+        self.win.set_titlebar(self.nv_header())
+        try:
+            with open(THEME_FILE, encoding="utf-8") as f:
+                saved = f.read().strip()
+        except OSError:
+            saved = ""
+        if saved in ("claro", "oscuro"):
+            self.nv_apply_theme(saved == "oscuro")
+        else:
+            self.nv_apply_theme(self.nv_is_dark())
+
+        # Cajas que rellenan los constructores de siempre (algunas no se ven: de ellas se sacan los
+        # avisos, el asistente de proyecto nuevo e Instalar)
+        self.legacy_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.ver_box = self.legacy_box
+        self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        self.services_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=12)
+        self.services_box.set_size_request(520, -1)
+        self.services_pop.add(self.services_box)
+        self.page_dbs, self.db_box = new_page()
+        self.page_tools, self.tools_box = new_page()
+        self.page_hosts, self.hosts_box = new_page()
+        self.page_docker, self.docker_box = new_page(940)
+        self.page_projects, self.proj_page = new_page(940)
+        self.page_vers, self.vers_page = new_page(900)
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        for name, w in [("proyectos", self.page_projects), ("versiones", self.page_vers),
+                        ("bbdd", self.page_dbs), ("docker", self.page_docker),
+                        ("dominios", self.page_hosts), ("config", self.page_tools)]:
+            self.stack.add_named(w, name)
+        body = Gtk.Box()
+        body.pack_start(self.nv_sidebar(), False, False, 0)
+        body.pack_start(self.stack, True, True, 0)
+        overlay = Gtk.Overlay()
+        overlay.add(body)
+        overlay.add_overlay(self.build_toast())
+        self.win.add(overlay)
+        self.nv_build_projects_shell()
+        for box in (self.db_box, self.vers_page):
+            self.loading(box)
+        self.win.show_all()
+        self.toast_rev.set_reveal_child(False)
+        self.reload(branches=True)
+        GLib.timeout_add_seconds(20, self.on_tick)
+        # (los correos sin leer, tambien al volver a la ventana)
+        self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+
+    def nv_header(self):
+        hb = css(Gtk.HeaderBar(show_close_button=True), "nv-cabecera")
+        brand = Gtk.Box(spacing=10)
+        brand.pack_start(icon(self.icon, 30), False, False, 0)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+        # «Nexum» en negrita y «Dev Stack» sin negrita, en azul
+        name = Gtk.Box(spacing=5)
+        name.pack_start(label("Nexum", "nv-titulo"), False, False, 0)
+        name.pack_start(label("Dev Stack", "nv-titulo", "nv-marca"), False, False, 0)
+        t.pack_start(name, False, False, 0)
+        # (con la versión del programa detrás, al leer los datos)
+        self.brand_sub = label("Entornos LAMPP y Docker", "nv-chico", "nv-tenue")
+        t.pack_start(self.brand_sub, False, False, 0)
+        brand.pack_start(t, False, False, 0)
+        hb.pack_start(brand)
+        # La version activa: al pulsarla, sus servicios (los de la pestaña Servicios de siempre)
+        # Menu con un icono en cada opcion (el de GTK 3 a partir de un Gio.Menu no los pone) y el tema.
+        # Sin recuadro, a la derecha del visor, con sus tres rayas mas anchas que las del tema
+        mb = css(Gtk.MenuButton(tooltip_text="Menú", relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER), "nv-hamburguesa")
+        mb.add(Hamburger())
+        pop = Gtk.Popover(relative_to=mb)
+        mbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1, margin=4)
+        self.theme_item = None
+        for n, section in enumerate([
+                [("@tema", None, lambda: self.nv_theme())],
+                [("Editar vhosts", "document-edit-symbolic", lambda: self.on_vhosts()),
+                 ("Editar /etc/hosts", "network-workgroup-symbolic", lambda: self.on_hosts())],
+                [("Volver a leer las versiones", "view-refresh-symbolic", lambda: self.on_refresh()),
+                 ("Buscar actualizaciones", "software-update-available-symbolic", lambda: self.check_package(manual=True)),
+                 ("Abrir el panel en la terminal", "utilities-terminal-symbolic", lambda: self.on_terminal()),
+                 ("Carpeta de registros", "folder-documents-symbolic", lambda: self.open_uri("file://" + LOG_DIR))],
+                [("Novedades", "starred-symbolic", lambda: self.on_changes()),
+                 ("Acerca de Nexum Dev Stack", "help-about-symbolic", lambda: self.on_about())]]):
+            if n:
+                mbox.pack_start(Gtk.Separator(margin_top=4, margin_bottom=4), False, False, 0)
+            for text, ic, fn in section:
+                b = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE), "nv-menuitem")
+                row = Gtk.Box(spacing=10)
+                img = symbol(ic or "weather-clear-night-symbolic", 16)
+                lbl = Gtk.Label(label=text, xalign=0)
+                row.pack_start(img, False, False, 0)
+                row.pack_start(lbl, True, True, 0)
+                b.add(row)
+                b.connect("clicked", lambda _b, fn=fn: (pop.popdown(), fn()))
+                if text == "@tema":
+                    self.theme_item = (img, lbl)
+                mbox.pack_start(b, False, False, 0)
+        mbox.show_all()
+        pop.add(mbox)
+        mb.set_popover(pop)
+        self.menu_btn = mb
+        # Recuadro de la version montada: el logotipo de PHP y su version, Apache y MariaDB con su punto
+        # (verde si estan en marcha), encender o apagar y, en la flecha, sus servicios
+        pill = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-pastilla")
+        pill.pack_start(Gtk.Box(), False, False, 4)
+        pill.pack_start(logo("php", 18), False, False, 0)
+        self.status_lbl = label("…")
+        pill.pack_start(self.status_lbl, False, False, 0)
+        self.status_sub = label("", "nv-tenue", "nv-mono", "nv-chico")
+        pill.pack_start(self.status_sub, False, False, 0)
+        pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
+        self.svc_dots = {}
+        for name in ("Apache", "MariaDB"):
+            dt = nv_dot(False)
+            self.svc_dots[name] = dt
+            pill.pack_start(dt, False, False, 0)
+            pill.pack_start(label(name, "nv-chico"), False, False, 0)
+        self.power_btn = nv_button("system-shutdown-symbolic", "…", None, lambda *_: self.nv_power())
+        pill.pack_start(self.power_btn, False, False, 2)
+        self.status_btn = Gtk.MenuButton(tooltip_text="Servicios de la versión activa")
+        self.status_btn.add(icon("pan-down-symbolic"))
+        self.services_pop = Gtk.Popover(relative_to=self.status_btn)
+        self.status_btn.set_popover(self.services_pop)
+        pill.pack_start(self.status_btn, False, False, 0)
+        self.warn_btn = Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE)
+        wb = Gtk.Box(spacing=4)
+        wb.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+        self.warn_num = label("0", "nv-aviso-num", valign=Gtk.Align.CENTER)
+        wb.pack_start(self.warn_num, False, False, 0)
+        self.warn_btn.add(wb)
+        # (el boton no se muestra con show_all: lo de dentro, si, o saldria vacio al aparecer)
+        wb.show_all()
+        pop = Gtk.Popover(relative_to=self.warn_btn)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                                max_content_height=560)
+        self.warn_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16, margin=12)
+        self.warn_box.set_size_request(560, -1)
+        sw.add(self.warn_box)
+        sw.show_all()
+        pop.add(sw)
+        self.warn_btn.set_popover(pop)
+        self.warn_btn.set_no_show_all(True)
+        # Los avisos, a la izquierda del visor, y el menu, justo a su derecha (antes de Localhost)
+        center = Gtk.Box(spacing=10, valign=Gtk.Align.CENTER)
+        center.pack_start(self.warn_btn, False, False, 0)
+        center.pack_start(pill, False, False, 0)
+        center.pack_start(self.menu_btn, False, False, 0)
+        hb.set_custom_title(center)
+        # (phpMyAdmin ya está en la pestaña Bases de datos)
+        hb.pack_end(nv_button("web-browser-symbolic", "Localhost", "Abrir http://localhost/",
+                              lambda *_: self.open_uri("http://localhost/"), flat=True))
+        # Correo de pruebas: la bandeja de Mailpit, plano como Localhost y con los correos sin leer (se
+        # pregunta solo con la ventana activa). Con el correo de pruebas apagado no sale
+        self.mail_btn = Gtk.Button(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER)
+        mbox = Gtk.Box(spacing=6)
+        mbox.pack_start(logo("mailpit", 18), False, False, 0)
+        mbox.pack_start(Gtk.Label(label="Correo"), False, False, 0)
+        self.mail_num = label("0", "nv-correo-num", valign=Gtk.Align.CENTER)
+        mbox.pack_start(self.mail_num, False, False, 0)
+        mbox.show_all()
+        self.mail_num.set_no_show_all(True)
+        self.mail_num.hide()
+        self.mail_btn.add(mbox)
+        self.mail_btn.connect("clicked", lambda *_: self.nv_open_mail())
+        self.mail_btn.set_no_show_all(True)
+        hb.pack_end(self.mail_btn)
+        return hb
+
+    def nv_theme(self):
+        """Claro u oscuro, solo en esta ventana (se recuerda). Con un tema que ya es oscuro de por si
+        (Yaru-...-dark), preferir el oscuro no cambia nada: se cambia a su variante clara."""
+        self.nv_apply_theme(not self.nv_is_dark())
+        # (se redibuja lo que lleva logotipos con el color del fondo)
+        if self.data:
+            self.build_versions()
+            self.build_databases()
+            self.build_tools()
+            self.nv_build_projects()
+        if self.docker is not None:
+            self.build_docker()
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(THEME_FILE, "w", encoding="utf-8") as f:
+                f.write("oscuro\n" if self.nv_is_dark() else "claro\n")
+        except OSError:
+            pass
+
+    def nv_is_dark(self):
+        s = Gtk.Settings.get_default()
+        return s.get_property("gtk-theme-name").lower().endswith("-dark") \
+            or s.get_property("gtk-application-prefer-dark-theme")
+
+    def nv_apply_theme(self, dark):
+        s = Gtk.Settings.get_default()
+        name = s.get_property("gtk-theme-name")
+        base = name[:-5] if name.lower().endswith("-dark") else name
+        if dark:
+            # (la variante -dark si el tema la tiene; si no, el oscuro del propio tema)
+            if theme_exists(base + "-dark"):
+                s.set_property("gtk-theme-name", base + "-dark")
+                s.set_property("gtk-application-prefer-dark-theme", False)
+            else:
+                s.set_property("gtk-theme-name", base)
+                s.set_property("gtk-application-prefer-dark-theme", True)
+        else:
+            s.set_property("gtk-theme-name", base if theme_exists(base) else "Adwaita")
+            s.set_property("gtk-application-prefer-dark-theme", False)
+        # (los logotipos que dependen del fondo, con su color de nuevo)
+        _logo_cache.clear()
+        if getattr(self, "theme_item", None):
+            img, lbl = self.theme_item
+            img.set_from_icon_name("weather-clear-symbolic" if dark else "weather-clear-night-symbolic",
+                                   Gtk.IconSize.BUTTON)
+            lbl.set_label("Tema claro" if dark else "Tema oscuro")
+
+    def nv_power(self):
+        d = self.data
+        if not d or not d["active"]:
+            self.show_tab("versiones")
+            return
+        self.on_control(None, "parar" if d["running"] else "arrancar",
+                        "Parar y desactivar" if d["running"] else "Arrancar")
+
+    def nv_sidebar(self):
+        box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4), "nv-lateral")
+        box.set_size_request(230, -1)
+        self.tabs, self.tab_lists = {}, []
+        for group_name, items in [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"),
+                                                ("versiones", "Versiones de PHP", "logo:php"),
+                                                ("bbdd", "Bases de datos", "drive-multidisk-symbolic"),
+                                                ("docker", "Docker", "logo:docker")]),
+                                  ("SISTEMA", [("dominios", "Dominios y hosts", "network-workgroup-symbolic"),
+                                               ("config", "Configuración", "emblem-system-symbolic")])]:
+            box.pack_start(label(group_name, "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2), False, False, 0)
+            lb = css(Gtk.ListBox(), "nv-nav")
+            for name, text, ic in items:
+                row = Gtk.ListBoxRow()
+                inner = Gtk.Box(spacing=12)
+                # (logo: de un color, como los iconos del tema; color: el logotipo en su color, como Docker)
+                inner.pack_start(MonoLogo(ic[5:], 20) if ic.startswith("logo:") else
+                                 logo(ic[6:], 20) if ic.startswith("color:") else symbol(ic, 20), False, False, 0)
+                inner.pack_start(label(text), False, False, 0)
+                row.add(inner)
+                row.tab_name = name
+                lb.add(row)
+                self.tabs[name] = (lb, row)
+            lb.connect("row-selected", self.nv_on_tab)
+            self.tab_lists.append(lb)
+            box.pack_start(lb, False, False, 0)
+        self.tab_lists[0].select_row(self.tabs["proyectos"][1])
+        self.foot = label("", "nv-chico", "nv-tenue", xalign=0.5, wrap=True, max_width_chars=26, margin=12)
+        box.pack_end(self.foot, False, False, 0)
+        return box
+
+    def nv_on_tab(self, lb, row):
+        if row is None:
+            return
+        for other in self.tab_lists:
+            if other is not lb:
+                other.unselect_all()
+        self.stack.set_visible_child_name(row.tab_name)
+        # Al entrar en una pestaña, sus apartados desplegables aparecen plegados
+        if any(k.startswith("@db") for k in self.expanded) or self.dk_open:
+            self.expanded.difference_update({k for k in self.expanded if k.startswith("@db")})
+            self.dk_open = set()
+            if self.data:
+                self.nv_db_table()
+            if self.docker is not None:
+                self.nv_dk_table()
+        if row.tab_name == "docker":
+            run_quick(["gui-docker"], self.on_docker_data)
+            run_quick(["gui-docker-estadisticas"], self.on_docker_stats)
+        elif row.tab_name == "bbdd":
+            run_quick(["gui-bbdd-tamanos"], self.on_db_sizes)
+
+    def on_tick(self):
+        res = super().on_tick()
+        if not self.busy and self.win.is_active() and self.stack.get_visible_child_name() == "docker":
+            run_quick(["gui-docker-estadisticas"], self.on_docker_stats)
+        if self.win.is_active():
+            self.nv_mail_poll()
+        return res
+
+    # ------------------------------------------------------------------ correo de pruebas (Mailpit)
+    def nv_mail(self):
+        return (self.data or {}).get("mail") or {}
+
+    def nv_mail_header(self):
+        """Botón Correo de arriba: oculto con el correo de pruebas apagado; sin Mailpit instalado o
+        parado, lleva a Configuración o lo explica."""
+        m = self.nv_mail()
+        self.mail_btn.set_visible(bool(m.get("on")))
+        if not m.get("installed"):
+            tip = "Mailpit no está instalado: instálalo en Configuración (sin él, el correo de las webs no sale)"
+        elif not m.get("running"):
+            tip = "Mailpit arranca con la versión activa: arráncala para ver el correo de las webs"
+        else:
+            n = self.mail_unread
+            tip = "Correo de las webs (Mailpit)%s" % (": %d sin leer" % n if n else "")
+        self.mail_btn.set_tooltip_text(tip)
+        if not m.get("running"):
+            self.nv_mail_count(None)
+        else:
+            self.nv_mail_poll()
+
+    def nv_mail_poll(self):
+        """Pregunta a Mailpit cuántos correos hay sin leer (en segundo plano, sin proxy)."""
+        m = self.nv_mail()
+        if not (m.get("on") and m.get("running")) or self.mail_polling:
+            return
+        self.mail_polling = True
+        url = m["url"] + "api/v1/info"
+
+        def work():
+            n = None
+            try:
+                import json
+                import urllib.request
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(url, timeout=3) as r:
+                    n = int(json.loads(r.read(100000).decode("utf-8", "replace")).get("Unread", 0))
+            except Exception:  # noqa: BLE001 - parado o sin responder: sin número
+                n = None
+            GLib.idle_add(self.nv_mail_count, n, True)
+        threading.Thread(target=work, daemon=True).start()
+
+    def nv_mail_count(self, n, polled=False):
+        if polled:
+            self.mail_polling = False
+        self.mail_unread = n
+        if n:
+            self.mail_num.set_label("99+" if n > 99 else str(n))
+            self.mail_num.show()
+        else:
+            self.mail_num.hide()
+        if self.nv_mail().get("running"):
+            self.mail_btn.set_tooltip_text("Correo de las webs (Mailpit)%s" % (": %d sin leer" % n if n else ""))
+        return False
+
+    def nv_open_mail(self):
+        m = self.nv_mail()
+        if not m.get("installed"):
+            self.show_tab("config")
+            self.toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
+        elif not m.get("running"):
+            self.toast("Mailpit arranca con la versión activa: arráncala arriba")
+        else:
+            self.open_uri(m["url"])
+            GLib.timeout_add_seconds(3, lambda: (self.nv_mail_poll(), False)[1])
+
+    def nv_mail_tools(self):
+        """Configuración, Correo de pruebas: encenderlo, el modo de WordPress y Mailpit."""
+        m = self.nv_mail()
+        if not m:
+            return
+        box, lb = group("Correo de pruebas (Mailpit)",
+                        "Lo que mandan las webs de este equipo (formularios, pedidos, contraseñas) no llega a "
+                        "nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, "
+                        "PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en "
+                        "las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con "
+                        "la versión activa y solo se ve desde este equipo.")
+        on = m["on"]
+        row = ActionRow("Correo de pruebas", "Encendido: el correo de las webs va a Mailpit" if on else
+                        "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+        row.add_prefix(logo("mailpit", 18))
+        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw.connect("notify::active", self.on_mail_switch)
+        row.add_suffix(sw)
+        lb.add(row)
+        texts = {"mailpit": "Siguen funcionando, con su correo a Mailpit (los que usan una API, como Brevo, se desactivan en la copia local)",
+                 "desactivar": "Se desactivan en la copia local: WordPress manda con mail(), a Mailpit",
+                 "nada": "⚠ No se tocan: lo que manden puede llegar de verdad a los clientes"}
+        row = ActionRow("WordPress con plugins de SMTP o Brevo", texts.get(m["wp"], ""))
+        row.add_prefix(logo("wordpress", 18))
+        if m["wp"] == "nada":
+            css(row.subtitle, "nv-correo-aviso")
+        combo = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        for key, text in (("mailpit", "Llevarlos a Mailpit"), ("desactivar", "Desactivarlos en la copia local"),
+                          ("nada", "No tocarlos")):
+            combo.append(key, text)
+        combo.set_active_id(m["wp"])
+        combo.set_tooltip_text("WP Mail SMTP, Easy WP SMTP, Post SMTP, FluentSMTP, Brevo…\n"
+                               "• Llevarlos a Mailpit: los de SMTP siguen funcionando, pero su correo va a Mailpit; "
+                               "los que mandan por una API (Brevo, FluentSMTP, Post SMTP…) se desactivan en la copia local.\n"
+                               "• Desactivarlos: todos fuera de la copia local; WordPress usa mail(), que va a Mailpit.\n"
+                               "• No tocarlos: como en producción; su correo puede llegar de verdad.\n"
+                               "Se aplica al cargar el proyecto o su BBDD.")
+        combo.set_sensitive(on and not self.busy)
+        combo.connect("changed", self.on_mail_wp)
+        row.add_suffix(combo)
+        lb.add(row)
+        if m["installed"]:
+            sub = "Mailpit %s · %s" % (m["version"] or "?", ("en marcha: %s" % m["url"]) if m["running"]
+                                       else "parado: arranca con la versión activa")
+            row = ActionRow("Bandeja de entrada", sub)
+            row.add_prefix(icon("mail-unread-symbolic", 16))
+            if m["offer"] and m["version"] and ver_tuple(m["offer"]) > ver_tuple(m["version"]):
+                b = css(Gtk.Button(label="Actualizar a %s" % m["offer"], valign=Gtk.Align.CENTER), "verde")
+                b.connect("clicked", lambda *_: self.on_mail_install())
+                b.set_sensitive(not self.busy)
+                row.add_suffix(b)
+            b = Gtk.Button(label="Vaciar la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"] and not self.busy)
+            b.connect("clicked", lambda *_: self.on_mail_clear())
+            row.add_suffix(b)
+            b = Gtk.Button(label="Abrir la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"])
+            b.connect("clicked", lambda *_: self.open_uri(m["url"]))
+            row.add_suffix(b)
+        else:
+            row = ActionRow("Mailpit no está instalado",
+                            "Sin él, el correo de las webs no sale ni se ve. Se descarga de GitHub (Mailpit %s) y se "
+                            "comprueba antes de instalarlo" % (m["offer"] or ""))
+            row.subtitle.set_line_wrap(True)
+            row.subtitle.set_ellipsize(0)
+            b = css(Gtk.Button(label="Instalar Mailpit", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            b.connect("clicked", lambda *_: self.on_mail_install())
+            row.add_suffix(b)
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 2)
+        box.show_all()
+
+    def on_mail_switch(self, sw, _p):
+        on = sw.get_active()
+        m = self.nv_mail()
+        if on == m.get("on"):
+            return
+        args = ["correo", "si" if on else "no"]
+        if on and not m.get("installed"):
+            # (la primera vez: se ofrece instalar Mailpit, que se descarga de GitHub)
+            if confirm(self.win, "¿Instalar Mailpit?",
+                       "El correo de las webs irá a Mailpit, que se descarga de GitHub (Mailpit %s, comprobado "
+                       "antes de instalarlo). Sin él, el correo no sale ni se ve." % (m.get("offer") or ""),
+                       "Instalar Mailpit"):
+                args.append("--instalar")
+        if not on and not confirm(self.win, "¿Apagar el correo de pruebas?",
+                                  "Lo que manden las webs (pedidos, formularios, contraseñas) podrá llegar de verdad "
+                                  "a los clientes de las BBDD copiadas.", "Apagarlo", destructive=True):
+            sw.set_active(True)
+            return
+        self.run_task("Encendiendo el correo de pruebas" if on else "Apagando el correo de pruebas", args,
+                      auto_close=True, done_text="Correo de pruebas %s" % ("encendido" if on else "apagado"),
+                      on_done=lambda *_: self.build_tools())
+
+    def on_mail_wp(self, combo):
+        mode = combo.get_active_id()
+        if not mode or mode == self.nv_mail().get("wp"):
+            return
+        names = {"mailpit": "llevados a Mailpit", "desactivar": "desactivados en la copia local", "nada": "sin tocar"}
+        self.run_task("Plugins de correo de WordPress: %s" % names[mode], ["correo", "wordpress", mode],
+                      auto_close=True, done_text="Plugins de correo de WordPress %s" % names[mode],
+                      on_done=lambda *_: self.build_tools())
+
+    def on_mail_install(self):
+        self.run_task("Instalando Mailpit", ["correo", "instalar"], auto_close=True,
+                      done_text="Mailpit instalado", on_done=lambda *_: self.build_tools())
+
+    def on_mail_clear(self):
+        if not confirm(self.win, "¿Vaciar la bandeja de Mailpit?", "Se borran todos los correos que han mandado "
+                       "las webs de este equipo.", "Vaciar la bandeja", destructive=True):
+            return
+
+        def done(rc, out):
+            self.toast("Bandeja de Mailpit vacía" if rc == 0 else (out.strip().splitlines() or ["No se ha podido vaciar"])[-1])
+            self.nv_mail_poll()
+            return False
+        run_quick(["correo", "vaciar"], done)
+
+    def show_tab(self, name):
+        name = {"hosts": "dominios", "herramientas": "config", "servicios": "versiones"}.get(name, name)
+        if name in self.tabs:
+            lb, row = self.tabs[name]
+            lb.select_row(row)
+
+    # ------------------------------------------------------------------ datos
+    def on_data(self, rc, out):
+        res = super().on_data(rc, out)
+        d = self.data
+        if d:
+            act = next((i for i in d["installs"] if i["folder"] == d["active"]), None)
+            self.status_lbl.set_label("PHP %s" % act["php"] if act else "Ninguna versión activa")
+            self.status_sub.set_label("lampp-%s" % d["active"] if act else "")
+            self.nv_power_state()
+            self.nv_build_projects()
+            self.nv_mail_header()
+        return res
+
+    def on_services_data(self, rc, out):
+        res = super().on_services_data(rc, out)
+        self.nv_power_state()
+        return res
+
+    def nv_power_state(self):
+        """Puntos de Apache y MariaDB (de gui-servicios) y el boton Encendidos / Parados."""
+        d = self.data
+        if not d:
+            return
+        svc = {s["name"]: s["running"] for s in (self.services or [])}
+        for name, dt in self.svc_dots.items():
+            on = svc.get(name.lower(), False) if svc else d["running"]
+            ctx = dt.get_style_context()
+            ctx.remove_class("nv-gris" if on else "nv-verde")
+            ctx.add_class("nv-verde" if on else "nv-gris")
+            (ctx.add_class if on else ctx.remove_class)("nv-latido")
+        on = d["running"]
+        ctx = self.power_btn.get_style_context()
+        ctx.remove_class("nv-off" if on else "nv-on")
+        ctx.add_class("nv-on" if on else "nv-off")
+        self.power_btn.get_child().get_children()[1].set_label("Encendidos" if on else "Parados")
+        self.power_btn.set_tooltip_text(("Parar y desactivar lampp-%s" if on else "Arrancar lampp-%s") % d["active"]
+                                        if d["active"] else "Activa una versión")
+
+    def update_project_search(self):
+        # (la busqueda de siempre sigue funcionando por detras: la usa el asistente de proyecto nuevo)
+        if getattr(self, "proj_results", None) is not None:
+            super().update_project_search()
+        self.nv_build_projects()
+
+    def on_docker_data(self, rc, out):
+        res = super().on_docker_data(rc, out)
+        self.nv_build_projects()
+        return res
+
+    # ------------------------------------------------------------------ versiones y avisos
+    def build_versions(self):
+        # Los de siempre se construyen en una caja que no se ve: de ahi salen los avisos (todo lo que
+        # va antes de Cargar proyecto), que pasan al boton de avisos de arriba
+        clear(self.legacy_box)
+        self.ver_box = self.legacy_box
+        super().build_versions()
+        clear(self.warn_box)
+        n = 0
+        for child in list(self.legacy_box.get_children()):
+            if child is getattr(self, "proj_box", None):
+                break
+            self.legacy_box.remove(child)
+            self.warn_box.pack_start(child, False, False, 0)
+            n += 1
+        self.warn_box.show_all()
+        self.warn_num.set_label(str(n))
+        self.warn_btn.set_visible(n > 0)
+        if self.inst_box.get_parent() is self.legacy_box:
+            self.legacy_box.remove(self.inst_box)
+        self.nv_build_versions()
+
+    def nv_branch(self, php):
+        """Linea B (de gui-ramas) de la rama de una version de PHP, o None si no se ha consultado."""
+        branch = ".".join(php.split(".")[:2])
+        return next((f for f in (self.branches or []) if f[0] == "B" and len(f) > 2 and f[1] == branch), None)
+
+    def on_branches(self, rc, out):
+        res = super().on_branches(rc, out)
+        if self.data:
+            self.nv_build_versions()
+        return res
+
+    def nv_build_versions(self):
+        clear(self.vers_page)
+        d = self.data
+        head = Gtk.Box(spacing=12)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(logo("php", 34), False, False, 0)
+        tl.pack_start(label("Versiones de PHP", "nv-titulo-grande"), False, False, 0)
+        t.pack_start(tl, False, False, 0)
+        t.pack_start(label("Cada versión con su Apache, MariaDB y sus propias BBDD. Soporte y parches, según php.net",
+                           "nv-chico", "nv-tenue"), False, False, 0)
+        head.pack_start(t, True, True, 0)
+        head.pack_end(nv_button("list-add-symbolic", "Instalar versión…", None, lambda *_: self.nv_install_dialog(),
+                                "nv-azul"), False, False, 0)
+        head.pack_end(nv_button(logo("apache", 16), "Componentes", "Apache, MariaDB, ProFTPD, Perl y phpMyAdmin de cada versión",
+                                lambda *_: self.nv_components_dialog()), False, False, 0)
+        self.vers_page.pack_start(head, False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        widths = [240, 90, 230, 200, 60, 0]
+        groups = [Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL) for _ in widths]
+
+        def row(cells, head_row=False):
+            r = Gtk.ListBoxRow(activatable=False)
+            b = css(Gtk.Box(spacing=14), "nv-fila", *(["nv-cab"] if head_row else []))
+            for n, c in enumerate(cells):
+                w = c if isinstance(c, Gtk.Widget) else label(c.upper() if head_row else c)
+                if widths[n]:
+                    w.set_size_request(widths[n], -1)
+                    groups[n].add_widget(w)
+                b.pack_start(w, n == len(cells) - 1, True, 0)
+            hover = getattr(cells[-1], "hover_button", None)
+            if hover is not None:
+                ev = Gtk.EventBox(above_child=False)
+                ev.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+                ev.connect("enter-notify-event", lambda *_, h=hover: (h.set_opacity(1), False)[1])
+                ev.connect("leave-notify-event", lambda _w, e, h=hover: (e.detail == Gdk.NotifyType.INFERIOR
+                                                                          or h.set_opacity(0), False)[1])
+                ev.add(b)
+                r.add(ev)
+            else:
+                r.add(b)
+            lb.add(r)
+        row(["Versión", "PHP", "Soporte", "Último parche", "BBDD", ""], True)
+        for inst in self.installs():
+            folder = inst["folder"]
+            act = folder == d["active"]
+            date = self.php_dates.get(folder)
+            name = Gtk.Box(spacing=8)
+            name.pack_start(nv_dot(act and d["running"]), False, False, 0)
+            nt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            tl = Gtk.Box(spacing=6)
+            tl.pack_start(label("lampp-%s" % folder, "nv-mono"), False, False, 0)
+            tl.pack_start(label({"XAMPP": "XAMPP", "propia": "propia"}.get(inst["kind"], "sobre XAMPP"),
+                                "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
+            nt.pack_start(tl, False, False, 0)
+            nt.pack_start(label(fmt_day(date[1]) if date and date[0] == inst["php"] else "/opt/lampp-%s" % folder,
+                                "nv-chico", "nv-tenue"), False, False, 0)
+            name.pack_start(nt, False, False, 0)
+            name.set_tooltip_text("/opt/lampp-%s" % folder)
+            # Soporte de su rama y su ultimo parche (de php.net: llegan aparte)
+            f = self.nv_branch(inst["php"])
+            sup = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+            patch = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+            newer = None
+            if f is not None:
+                st, a_end, s_end = branch_state(f)
+                pill = state_pill(st, a_end, s_end)
+                pill.set_halign(Gtk.Align.START)
+                sup.pack_start(pill, False, False, 0)
+                when = s_end if st == "security" else a_end if st == "stable" else ""
+                if when:
+                    sup.pack_start(label(("seguridad hasta %s" if st == "security" else "hasta %s") % fmt_month(when),
+                                         "nv-chico", "nv-tenue"), False, False, 0)
+                latest = f[2] if len(f) > 2 else ""
+                if latest == inst["php"]:
+                    patch.pack_start(label("Actualizado", "nv-verde", "nv-chico"), False, False, 0)
+                elif latest and ver_tuple(latest) > ver_tuple(inst["php"]):
+                    newer = latest
+                    patch.pack_start(label("PHP %s disponible" % latest, "nv-chico", "nv-enlace"), False, False, 0)
+                    ldate, _sec = branch_release(f)
+                    if ldate and ldate != "-":
+                        patch.pack_start(label(fmt_day(ldate), "nv-chico", "nv-tenue"), False, False, 0)
+                else:
+                    patch.pack_start(label("—", "nv-tenue"), False, False, 0)
+            else:
+                sup.pack_start(label("consultando php.net…" if self.branches is None else "—", "nv-chico", "nv-tenue"), False, False, 0)
+                patch.pack_start(label("—", "nv-tenue"), False, False, 0)
+            # PHP2Shell (gui-datos, R|): en rojo si no tiene el arreglo
+            p2s, p2s_why = d.get("php2shell", {}).get(folder, ("", ""))
+            if p2s == "vulnerable":
+                vul = label("Vulnerable (PHP2Shell)", "nv-chico", "error")
+                vul.set_halign(Gtk.Align.START)
+                vul.set_tooltip_text("%s.\nCVE-2026-109618 y CVE-2026-109619: una petición preparada puede ejecutar "
+                                     "código con tu usuario. Pasa a una versión con el arreglo en el menú ⋮ "
+                                     "(«Actualizar a PHP…»)." % p2s_why)
+                patch.pack_start(vul, False, False, 0)
+                patch.reorder_child(vul, 0)
+                # (vulnerable no está «Actualizado», aunque tenga el último parche de su rama)
+                for w in patch.get_children():
+                    if isinstance(w, Gtk.Label) and w.get_text() == "Actualizado":
+                        patch.remove(w)
+            php_cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+            php_cell.pack_start(label(inst["php"], "nv-mono"), False, False, 0)
+            if p2s == "parche":
+                ps = label("+ parche de seguridad (oct 2026)", "nv-chico", "nv-verde")
+                ps.set_tooltip_text("%s: el arreglo de PHP2Shell que publicó el equipo de seguridad de PHP "
+                                    "para esta rama (no es una versión nueva)" % p2s_why)
+                php_cell.pack_start(ps, False, False, 0)
+            right = Gtk.Box(spacing=2, halign=Gtk.Align.END)
+            if act:
+                b = css(Gtk.Button(label="Activa", sensitive=False), "nv-activa")
+            else:
+                # (como «Cargar» en Proyectos: solo en la version con el raton encima)
+                b = css(Gtk.Button(label="Activar", sensitive=not self.busy), "nv-azul")
+                b.connect("clicked", self.on_activate_version, folder)
+                b.set_opacity(0)
+            b.set_size_request(96, -1)
+            right.pack_start(b, False, False, 0)
+            right.pack_start(self.nv_version_menu(inst, newer), False, False, 0)
+            if not act:
+                right.hover_button = b
+            dbs = len(d["dbs"].get(folder, []))
+            row([name, php_cell, sup, patch,
+                 label(str(dbs) if inst["owner"] == folder else "→ %s" % inst["owner"], "nv-mono", "nv-tenue"), right])
+        if not self.installs():
+            row([label("Ninguna versión instalada: instala la primera")] + [label("") for _ in range(5)])
+        self.vers_page.pack_start(lb, False, False, 0)
+        self.vers_page.show_all()
+
+    def nv_version_menu(self, inst, newer=None):
+        folder = inst["folder"]
+        m = Gtk.MenuButton(relief=Gtk.ReliefStyle.NONE)
+        m.add(icon("view-more-symbolic"))
+        pop = Gtk.Popover(relative_to=m)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=4)
+        items = [("Componentes…", lambda: self.nv_components_dialog(inst))]
+        # Actualizar solo si hay un parche mas nuevo y la version se pone al dia en su carpeta (las
+        # lampp-X.Y de antes); sin datos de php.net, se comprueba al pulsar
+        updatable = inst["kind"] != "XAMPP" and inst["php"].rsplit(".", 1)[0] == folder
+        if updatable and (newer or self.nv_branch(inst["php"]) is None
+                          or self.data.get("php2shell", {}).get(folder, ("",))[0] == "vulnerable"):
+            items.append(("Actualizar a PHP %s" % newer if newer else "Buscar parches nuevos",
+                          lambda: self.nv_update(folder)))
+        elif not updatable:
+            # Las que no se ponen al dia en su carpeta (lampp-X.Y.Z y los XAMPP): la nueva, al lado
+            target = self.nv_fix_target(inst)
+            if target:
+                items.append(("Actualizar a PHP %s%s" % (target, " + parche de seguridad" if target in PHP2SHELL_BACKPORTS else ""),
+                              lambda: self.nv_upgrade_to(inst, target)))
+        if pma_outdated(inst["php"], inst["pma"]):
+            items.append(("Actualizar phpMyAdmin", lambda: self.on_update_pma(folder)))
+        items.append(("Desinstalar…", lambda: self.on_remove(None, inst) if not inst["blocker"]
+                      else message(self.win, "No se puede desinstalar", inst["blocker"], Gtk.MessageType.INFO)))
+        for text, fn in items:
+            b = Gtk.ModelButton(text=text)
+            b.connect("clicked", lambda *_, fn=fn: fn())
+            box.pack_start(b, False, False, 0)
+        box.show_all()
+        pop.add(box)
+        m.set_popover(pop)
+        return m
+
+    def nv_fix_target(self, inst):
+        """PHP al que se puede pasar una version que no se actualiza en su carpeta: el ultimo parche
+        de su rama si es mas nuevo o, si es un XAMPP o le falta el arreglo de PHP2Shell, aunque sea
+        el mismo (7.4.33 de XAMPP -> pila propia 7.4.33 con el parche de seguridad). None si no hay."""
+        f = self.nv_branch(inst["php"])
+        latest = f[2] if f is not None and len(f) > 2 else ""
+        if not re.fullmatch(r"\d+\.\d+\.\d+", latest):
+            return None
+        st = self.data.get("php2shell", {}).get(inst["folder"], ("",))[0]
+        if ver_tuple(latest) > ver_tuple(inst["php"]):
+            return latest
+        if latest == inst["php"] and (inst["kind"] == "XAMPP" or st == "vulnerable"):
+            return latest
+        return None
+
+    def nv_upgrade_to(self, inst, target):
+        folder = inst["folder"]
+        same = target == folder
+        dbs = len(self.data["dbs"].get(folder, [])) if inst["owner"] == folder else 0
+        fix = " con el parche de seguridad de PHP2Shell" if target in PHP2SHELL_BACKPORTS else ""
+        have = next((i["folder"] for i in self.installs() if i["php"] == target and i["kind"] != "XAMPP"
+                     and i["folder"] != folder), None)
+        if have and not same:
+            text = ("PHP %s ya está en lampp-%s: se le copian %s de lampp-%s con sus vínculos a las carpetas "
+                    "de los proyectos%s. lampp-%s no se toca: desinstálala cuando compruebes que todo va bien."
+                    % (target, have, plural(dbs, "BBDD", "BBDD") if dbs else "las BBDD (ahora no tiene ninguna)", folder,
+                       " y, como es la activa, se activa lampp-%s" % have if folder == self.data["active"] else "",
+                       folder))
+        elif same:
+            text = ("Se vuelve a compilar PHP %s%s en su carpeta, con la última pila de su rama. Conserva "
+                    "sus BBDD si su MariaDB sigue en la misma rama (si no, guarda antes una copia en "
+                    "~/lvm-copias). Tarda varios minutos." % (target, fix))
+        else:
+            text = ("Se instala PHP %s%s en lampp-%s, al lado de lampp-%s, que no se toca. Después se le copian "
+                    "%s con sus vínculos a las carpetas de los proyectos%s. Cuando compruebes que todo va bien "
+                    "con lampp-%s, desinstala lampp-%s (menú ⋮, Desinstalar). Tarda varios minutos."
+                    % (target, fix, target, folder, plural(dbs, "BBDD", "BBDD") if dbs else "sus BBDD (ahora no tiene ninguna)",
+                       " y, como es la activa, se activa la nueva" if folder == self.data["active"] else "",
+                       target, folder))
+        if not confirm(self.win, "¿Actualizar lampp-%s a PHP %s?" % (folder, target), text, "Actualizar"):
+            return
+        self.run_task("lampp-%s → PHP %s" % (folder, target), ["actualizar-a", folder, target],
+                      progress=True, reload_branches=True,
+                      done_text="PHP %s instalada%s" % (target, "" if same else " con las BBDD de lampp-%s" % folder))
+
+    def nv_update(self, folder):
+        """Actualizar una version (como on_update), diciendo en un mensaje si ya esta al dia."""
+        self.toast("Comprobando si hay una versión más nueva…")
+
+        def checked(_rc, out):
+            res = out.strip().splitlines()[-1].split("|") if out.strip() else ["error"]
+            if res[0] == "si":
+                message(self.win, "lampp-%s ya está actualizada" % folder,
+                        "Tiene el último parche de su rama (%s)." % (res[1] if len(res) > 1 else ""),
+                        Gtk.MessageType.INFO)
+            elif res[0] == "no" and len(res) > 1:
+                if confirm(self.win, "¿Actualizar lampp-%s?" % folder,
+                           "PHP %s con los últimos parches de su rama. La actual sigue funcionando "
+                           "mientras se compila (varios minutos)." % res[1], "Actualizar a PHP %s" % res[1]):
+                    self.run_task("Actualizando lampp-%s" % folder, ["actualizar", folder],
+                                  progress=True, reload_branches=True,
+                                  done_text="lampp-%s actualizada a PHP %s" % (folder, res[1]))
+            elif res[0] == "parche":
+                message(self.win, "lampp-%s no se actualiza en su carpeta" % folder,
+                        "Es un parche concreto: instala el nuevo aparte con «Instalar versión…».",
+                        Gtk.MessageType.INFO)
+            else:
+                message(self.win, "No se ha podido comprobar la versión",
+                        "No se ha podido consultar php.net. Comprueba la conexión a internet.",
+                        Gtk.MessageType.WARNING)
+            return False
+        run_quick(["gui-al-dia", folder], checked)
+
+    def nv_components_dialog(self, only=None):
+        """Componentes de cada version en una tabla, con el logotipo de cada uno en color."""
+        dlg = Gtk.Dialog(title="Componentes", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(900, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        dlg.get_content_area().add(box)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        widths = [150, 84, 84, 92, 78, 78, 92]
+        groups = [Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL) for _ in widths]
+
+        def row(cells, head_row=False):
+            r = Gtk.ListBoxRow(activatable=False)
+            b = css(Gtk.Box(spacing=14), "nv-fila", *(["nv-cab"] if head_row else []))
+            for n, w in enumerate(cells):
+                w.set_size_request(widths[n], -1)
+                groups[n].add_widget(w)
+                b.pack_start(w, n == len(cells) - 1, True, 0)
+            r.add(b)
+            lb.add(r)
+
+        def head(text, spec):
+            h = Gtk.Box(spacing=6)
+            h.pack_start(logo(spec, 16) if spec in LOGO_PATHS else icon(spec, 16), False, False, 0)
+            h.pack_start(label(text.upper()), False, False, 0)
+            return h
+        row([label("VERSIÓN"), head("PHP", "php"), head("Apache", "apache"), head("MariaDB", "mariadb"),
+             head("FTP", "folder-remote-symbolic"), head("Perl", "perl"), head("PMA", "phpmyadmin")], True)
+        for inst in self.installs():
+            if only is not None and inst["folder"] != only["folder"]:
+                continue
+            pma = label(inst["pma"], "nv-mono", "nv-chico")
+            if pma_outdated(inst["php"], inst["pma"]):
+                pma.get_style_context().add_class("error")
+                pma.set_tooltip_text("phpMyAdmin antiguo: actualízalo en el menú ⋮ de la versión")
+            row([label("lampp-%s" % inst["folder"], "nv-mono"), label(inst["php"], "nv-mono"),
+                 label(inst["apache"], "nv-mono", "nv-chico"), label(inst["mariadb"], "nv-mono", "nv-chico"),
+                 label(inst["ftp"], "nv-mono", "nv-chico"), label(inst["perl"], "nv-mono", "nv-chico"), pma])
+        box.pack_start(lb, False, False, 0)
+        dlg.add_button("Cerrar", Gtk.ResponseType.CLOSE)
+        box.show_all()
+        run_dialog(dlg)
+        dlg.destroy()
+
+    def nv_install_dialog(self):
+        dlg = Gtk.Dialog(title="Instalar versión", transient_for=self.win, modal=False, use_header_bar=True)
+        dlg.set_default_size(760, 680)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
+        if self.inst_box.get_parent():
+            self.inst_box.get_parent().remove(self.inst_box)
+        self.inst_box.set_margin_start(20)
+        self.inst_box.set_margin_end(20)
+        self.inst_box.set_margin_top(12)
+        sw.add(self.inst_box)
+        dlg.get_content_area().pack_start(sw, True, True, 0)
+        dlg.connect("destroy", lambda *_: self.inst_box.get_parent() and
+                    self.inst_box.get_parent().remove(self.inst_box))
+        dlg.show_all()
+
+    # ------------------------------------------------------------------ Proyectos
+    def nv_build_projects_shell(self):
+        self.hero_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.proj_page.pack_start(self.hero_box, False, False, 0)
+        head = Gtk.Box(spacing=10, margin_top=10)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        t.pack_start(label("Proyectos", "nv-titulo"), False, False, 0)
+        t.pack_start(label("Pulsa uno para verlo arriba; «Cargar» lo monta en el vhost con su versión y su BBDD.",
+                           "nv-chico", "nv-tenue"), False, False, 0)
+        head.pack_start(t, True, True, 0)
+        self.nv_search = Gtk.SearchEntry(placeholder_text="Buscar proyecto", width_chars=22, valign=Gtk.Align.CENTER)
+        self.nv_search.connect("search-changed", lambda *_: self.nv_list.invalidate_filter())
+        self.nv_kind = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        for k, v in [("all", "Todos"), ("wp", "WordPress"), ("ps", "PrestaShop"), ("", "Otros")]:
+            self.nv_kind.append(k or "otros", v)
+        self.nv_kind.set_active_id("all")
+        self.nv_kind.connect("changed", lambda *_: self.nv_list.invalidate_filter())
+        new = nv_button("list-add-symbolic", "Nuevo", "Montar un proyecto nuevo desde git", lambda *_: self.nv_new_project())
+        for w in (new, self.nv_kind, self.nv_search):
+            head.pack_end(w, False, False, 0)
+        self.proj_page.pack_start(head, False, False, 0)
+        self.nv_list = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        self.nv_list.set_filter_func(self.nv_filter)
+        self.nv_list.connect("row-activated", lambda _l, r: r.project is not None and self.nv_select(r.project))
+        self.proj_page.pack_start(self.nv_list, False, False, 0)
+        self.nv_count = label("", "nv-chico", "nv-tenue")
+        self.proj_page.pack_start(self.nv_count, False, False, 0)
+
+    def nv_filter(self, row):
+        x = row.project
+        if x is None:
+            return True
+        q = self.nv_search.get_text().strip().lower()
+        k = self.nv_kind.get_active_id()
+        # (por el nombre de la carpeta o por el de cualquiera de sus BBDD: «tienda» encuentra
+        # wordpress-ejemplo, cuya BBDD es wp_tienda)
+        found = not q or q in x["name"].lower() or any(q in db.lower() for db in row.dbs)
+        return found and (k == "all" or (k == "otros" and not x["kind"]) or x["kind"] == k)
+
+    def nv_docker_loaded(self, x):
+        """Botón Docker del proyecto cargado. Sin Docker, lo primero es instalarlo (o arrancarlo). Si el
+        proyecto no está en Docker, se monta (con la versión de PHP que se elija); si está con una
+        versión, se arranca; con varias, se pregunta cuál (o se monta con otra versión)."""
+        def got(rc, out):
+            self.on_docker_data(rc, out)
+            d = self.docker or {}
+            envs = self.nv_docker_of(x["name"])
+            if not d.get("ready") or not d.get("php"):
+                installed = d.get("installed")
+                if confirm(self.win, "Docker está apagado" if installed else "Docker no está instalado",
+                           "Se %s Docker sin root, con tu usuario. Pide la contraseña de administrador."
+                           % ("arranca" if installed else "instala"),
+                           "Arrancar Docker" if installed else "Instalar Docker"):
+                    self.run_task("Arrancando Docker sin root" if installed else "Instalando Docker sin root",
+                                  ["docker-instalar"], done_text="Docker sin root listo",
+                                  on_done=lambda ok, *_: ok and self.nv_docker_loaded(x))
+            elif not envs:
+                self.nv_docker_loaded_dialog(x)
+            elif len(envs) == 1:
+                self.nv_docker_mount(envs[0])
+            else:
+                self.nv_docker_choose(x, envs)
+            return False
+        run_quick(["gui-docker"], got)
+
+    def nv_docker_mount(self, dp):
+        """Monta (arranca) un proyecto de Docker y lleva a la pestaña Docker."""
+        if dp["state"] == "running":
+            self.show_tab("docker")
+            self.toast("%s ya está en marcha en Docker: https://%s" % (dp["folder"], dp["domain"]))
+            return
+
+        def done(ok, *_):
+            run_quick(["gui-docker"], self.on_docker_data)
+            if ok:
+                self.show_tab("docker")
+        self.run_task("Arrancando %s en Docker (PHP %s)" % (dp["folder"], dp["php"]), ["docker-arrancar", dp["slug"]],
+                      done_text="%s en Docker: https://%s" % (dp["folder"], dp["domain"]), auto_close=True, on_done=done)
+
+    def nv_docker_choose(self, x, envs):
+        """El proyecto está en Docker con varias versiones de PHP: cuál se monta, u otra nueva."""
+        dlg = Gtk.Dialog(title="Docker", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(480, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        box.pack_start(label("¿Qué versión de %s montas?" % x["name"], "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(label("Está en Docker con varias versiones de PHP.", "nv-tenue", wrap=True), False, False, 0)
+        group_rb, choice = None, {"v": envs[0]}
+        for dp in sorted(envs, key=lambda e: ver_tuple(e["php"]), reverse=True) + [None]:
+            opt = css(Gtk.Box(), "opcion")
+            text = ("PHP %s  ·  %s%s" % (dp["php"], dp["domain"], "  ·  en marcha" if dp["state"] == "running" else "")
+                    if dp else "Otra versión de PHP…")
+            rb = Gtk.RadioButton.new_with_label_from_widget(group_rb, text)
+            group_rb = group_rb or rb
+            rb.connect("toggled", lambda b, o=opt, dp=dp: (o.get_style_context().add_class("elegida"), choice.update(v=dp))
+                       if b.get_active() else o.get_style_context().remove_class("elegida"))
+            if dp is envs[0]:
+                css(opt, "elegida")
+            opt.pack_start(rb, True, True, 0)
+            box.pack_start(opt, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Montar", Gtk.ResponseType.OK), "nv-azul")
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        dlg.destroy()
+        if resp != Gtk.ResponseType.OK:
+            return
+        if choice["v"] is None:
+            self.nv_docker_loaded_dialog(x)
+        else:
+            self.nv_docker_mount(choice["v"])
+
+    def nv_docker_loaded_dialog(self, x):
+        d = self.docker
+        act = next((i for i in self.data["installs"] if i["folder"] == self.data["active"]), None) if self.data else None
+        # Por defecto, lo mismo que tiene en la versión activa: su rama de PHP, su MariaDB y su BBDD
+        php_now = ".".join((act or {}).get("php", "").split(".")[:2])
+        maria_now = (act or {}).get("mariadb", "")
+        php = php_now if php_now in d["php"] else d["php"][-1]
+        maria = next((m for m in d["maria"] if maria_now.startswith(m + ".") or maria_now == m), d["maria"][-1])
+        pairs = self.project_pairs(x) if self.data else []
+        sources = [("@vacia", "Ninguna: empieza vacía")] + \
+            [("%s|%s" % (i["folder"], db), "%s (lampp-%s)" % (db, i["folder"])) for i, db in pairs]
+        source = next((k for k, _t in sources if act and k.startswith(act["folder"] + "|")), sources[-1][0])
+
+        dlg = Gtk.Dialog(title="Docker", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(560, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        box.pack_start(label("Montar %s en Docker" % x["name"], "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(label("Se descargan las imágenes que falten y se abre por su dominio. La carpeta y su "
+                             "BBDD de LAMPP no se tocan.", "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        combos = {}
+        for key, title, items, current in [("php", "PHP", [(v, "PHP %s" % v) for v in d["php"]], php),
+                                           ("maria", "MariaDB", [(v, "MariaDB %s" % v) for v in d["maria"]], maria),
+                                           ("source", "BBDD que se copia", sources, source)]:
+            row = ActionRow(title)
+            c = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+            for k, text in items:
+                c.append(k, text)
+            c.set_active_id(current)
+            narrow(c)
+            row.add_suffix(c)
+            lb.add(row)
+            combos[key] = c
+        row = ActionRow("Dominio")
+        entry = Gtk.Entry(valign=Gtk.Align.CENTER, width_chars=26, max_length=80)
+        # (si ya está en Docker con otra versión, este va con otro nombre: <carpeta>-php84)
+        taken = {e["slug"] for e in (self.docker or {}).get("projects", [])}
+        base = docker_slug(x["name"])
+
+        def name_for(v):
+            n = base if base not in taken else "%s-php%s" % (base[:30], (v or "").replace(".", ""))
+            return n if n not in taken else None
+        entry.set_text((name_for(php) or base) + ".docker.local")
+        combos["php"].connect("changed", lambda c: name_for(c.get_active_id()) and base in taken
+                              and entry.set_text(name_for(c.get_active_id()) + ".docker.local"))
+        row.add_suffix(entry)
+        lb.add(row)
+        box.pack_start(lb, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Montar en Docker", Gtk.ResponseType.OK), "nv-azul")
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        php, maria, src = (combos[k].get_active_id() for k in ("php", "maria", "source"))
+        domain = entry.get_text().strip().lower()
+        dlg.destroy()
+        if resp != Gtk.ResponseType.OK or not (php and maria):
+            return
+        if not DOMAIN_RX.match(domain) or not domain.endswith(".local"):
+            message(self.win, "Dominio no válido", "Tiene que acabar en .local (por ejemplo %s.docker.local)."
+                    % docker_slug(x["name"]), Gtk.MessageType.WARNING)
+            return
+        name = name_for(php)
+        if name is None:
+            message(self.win, "Ya está en Docker con PHP %s" % php, "Elige otra versión de PHP.", Gtk.MessageType.WARNING)
+            return
+        args = ["docker-crear", x["name"], php, maria, "--dominio", domain]
+        if name != base:
+            args += ["--nombre", name]
+        if src and src != "@vacia" and "|" in src:
+            ver, db = src.split("|", 1)
+            args += ["--bd", db, "--desde", ver]
+
+        def done(ok, *_):
+            run_quick(["gui-docker"], self.on_docker_data)
+            if ok:
+                self.show_tab("docker")
+        self.run_task("Montando %s en Docker" % x["name"], args,
+                      done_text="%s en Docker: https://%s" % (x["name"], domain), on_done=done)
+
+    def nv_docker_copy_pass(self, p):
+        """Contraseña de root de la BBDD del contenedor (DB_ROOT_PASS de su .env, solo tuyo), al
+        portapapeles: su phpMyAdmin ya no entra solo."""
+        path = os.path.join(LOG_DIR, "docker", p["slug"], ".env")
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                pw = next((l.split("=", 1)[1].strip() for l in fh.read(4000).splitlines()
+                           if l.startswith("DB_ROOT_PASS=")), "")
+        except OSError:
+            pw = ""
+        if not pw:
+            self.toast("No se encuentra la contraseña de %s (%s)" % (p["folder"], path))
+            return
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(pw, -1)
+        self.toast("Contraseña de root de %s copiada: en su phpMyAdmin, usuario root" % p["folder"])
+
+    def nv_docker_update_image(self, p):
+        if not confirm(self.win, "¿Actualizar la imagen de PHP %s?" % p["php"],
+                       "Se rehace con los últimos parches de Docker Hub y se recrea el contenedor de PHP de "
+                       "%s. Su BBDD y su configuración no cambian." % p["folder"],
+                       "Actualizar la imagen"):
+            return
+        self.run_task("%s: imagen de PHP %s" % (p["folder"], p["php"]), ["docker-imagen", p["slug"]],
+                      done_text="%s ya usa la imagen nueva de PHP %s" % (p["folder"], p["php"]),
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_docker_of(self, name):
+        return [p for p in (self.docker or {}).get("projects", []) if p["folder"] == name]
+
+    def nv_select(self, x):
+        """Elegir un proyecto de la lista: solo el visor y la fila elegida (rehacer la lista entera
+        tarda un cuarto de segundo con muchos proyectos; esto, al momento)."""
+        self.selected_project = x["name"]
+        if not getattr(self, "nv_list", None) or not self.projects or not self.data:
+            return
+        loaded = self.loaded_project_entry()
+        shown = next((p for p in self.projects["list"] if p["name"] == x["name"]), None) or loaded
+        self.nv_hero(shown, loaded)
+        for row in self.nv_list.get_children():
+            proj = getattr(row, "project", None)
+            if proj is None:
+                continue
+            ctx = row.get_style_context()
+            if proj["name"] == x["name"] and not (loaded and proj["name"] == loaded["name"]):
+                ctx.add_class("nv-elegida")
+            else:
+                ctx.remove_class("nv-elegida")
+
+    def nv_build_projects(self):
+        if not getattr(self, "nv_list", None) or not self.projects or not self.data:
+            return
+        p = self.projects
+        loaded = self.loaded_project_entry()
+        names = [x["name"] for x in p["list"]]
+        if self.selected_project not in names:
+            self.selected_project = loaded["name"] if loaded else None
+        shown = next((x for x in p["list"] if x["name"] == self.selected_project), None) or loaded
+        self.nv_hero(shown, loaded)
+        clear(self.nv_list)
+        head = Gtk.ListBoxRow(activatable=False, selectable=False)
+        head.project, head.dbs = None, []
+        hb = css(Gtk.Box(spacing=12, margin_start=12, margin_end=8, margin_top=8, margin_bottom=8), "nv-cab")
+        for text, w in [("", 18), ("Proyecto", 260), ("BBDD", 190), ("Versiones", 0)]:
+            lbl = label(text.upper())
+            if w:
+                lbl.set_size_request(w, -1)
+            hb.pack_start(lbl, not w, True, 0)
+        head.add(hb)
+        self.nv_list.add(head)
+        for x in p["list"]:
+            self.nv_list.add(self.nv_row(x, loaded))
+        self.nv_list.show_all()
+        self.nv_count.set_label(plural(len(p["list"]), "proyecto", "proyectos") + " en /opt/htdocs")
+
+    def nv_row(self, x, loaded):
+        row = Gtk.ListBoxRow()
+        row.project = x
+        is_loaded = loaded is not None and x["name"] == loaded["name"]
+        # BBDD del proyecto para el buscador: las de cada version, la de su configuracion y la de Docker
+        row.dbs = {db for _i, db in self.project_pairs(x)} | ({x["db"]} if x["db"] else set()) | \
+            {dp["db"] for dp in self.nv_docker_of(x["name"])}
+        if is_loaded:
+            css(row, "nv-cargada")
+        elif x["name"] == self.selected_project:
+            css(row, "nv-elegida")
+        box = Gtk.Box(spacing=12, margin_start=12, margin_end=8, margin_top=6, margin_bottom=6)
+        box.pack_start(kind_icon(x["kind"]), False, False, 0)
+        name = label(x["name"], ellipsize=3, max_width_chars=30, tooltip_text=x["name"])
+        name.set_size_request(260, -1)
+        box.pack_start(name, False, False, 0)
+        pairs = self.project_pairs(x)
+        db = pairs[0][1] if pairs else self.project_base(x)
+        dbl = label(db or "sin BBDD", "nv-mono", "nv-chico", "nv-tenue", ellipsize=3, max_width_chars=24)
+        dbl.set_size_request(190, -1)
+        box.pack_start(dbl, False, False, 0)
+        chips = Gtk.Box(spacing=4, valign=Gtk.Align.CENTER)
+        for inst, _db in pairs:
+            chips.pack_start(label(inst["php"].rsplit(".", 1)[0] if inst["php"].count(".") == 2 else inst["php"],
+                                   "nv-chip", "nv-mono", tooltip_text="lampp-%s · %s" % (inst["folder"], _db)), False, False, 0)
+        for dp in self.nv_docker_of(x["name"]):
+            chips.pack_start(label("Docker %s" % dp["php"], "nv-chip", "nv-chip-docker", "nv-mono"), False, False, 0)
+        box.pack_start(chips, True, True, 0)
+        if is_loaded:
+            box.pack_end(label("Cargado", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER, margin_end=6), False, False, 0)
+        else:
+            # «Cargar» solo al pasar el raton por el proyecto (el hueco se guarda: la fila no salta)
+            b = css(Gtk.Button(label="Cargar", sensitive=not self.busy), "nv-azul")
+            b.connect("clicked", lambda *_: self.on_load_folder(x))
+            b.set_opacity(0)
+            box.pack_end(b, False, False, 0)
+            ev = Gtk.EventBox(above_child=False)
+            ev.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+            ev.connect("enter-notify-event", lambda *_: (b.set_opacity(1), False)[1])
+            ev.connect("leave-notify-event", lambda _w, e: (e.detail == Gdk.NotifyType.INFERIOR or b.set_opacity(0), False)[1])
+            ev.add(box)
+            row.add(ev)
+            return row
+        row.add(box)
+        return row
+
+    def nv_hero(self, x, loaded):
+        clear(self.hero_box)
+        p = self.projects
+        is_loaded = x is not None and loaded is not None and x["name"] == loaded["name"]
+        head = Gtk.Box(spacing=8)
+        head.pack_start(nv_dot(is_loaded), False, False, 0)
+        head.pack_start(label("PROYECTO CARGADO" if is_loaded else "PROYECTO ELEGIDO" if x else "NINGÚN PROYECTO CARGADO",
+                              "nv-seccion"), False, False, 0)
+        if p.get("link"):
+            head.pack_end(label(("en %s" % p["link"]) if is_loaded else "%s → %s" % (
+                p["link"], os.path.basename(p["current"].rstrip("/")) if p["current"] else "nada"), "nv-chico", "nv-tenue"), False, False, 0)
+        # (el correo de la web cargada va a Mailpit: discreto, al lado)
+        m = self.nv_mail()
+        if is_loaded and m.get("on") and m.get("installed"):
+            mail = Gtk.Box(spacing=5)
+            mail.pack_start(MonoLogo("mailpit", 13), False, False, 0)
+            mail.pack_start(label("su correo va a Mailpit", "nv-chico", "nv-tenue"), False, False, 0)
+            mail.set_tooltip_text("Lo que mande esta web (formularios, pedidos, contraseñas) no llega a nadie: se ve en "
+                                  "Correo, arriba%s" % ("" if m.get("wp") != "nada" or x.get("kind") != "wp" else
+                                                       ". Ojo: sus plugins de correo de WordPress no se tocan"))
+            head.pack_end(mail, False, False, 12)
+        self.hero_box.pack_start(head, False, False, 0)
+        card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16), "nv-tarjeta")
+        if x is None:
+            card.pack_start(label("Elige un proyecto de la lista para cargarlo.", "nv-tenue"), False, False, 0)
+            self.hero_box.pack_start(card, False, False, 0)
+            self.hero_box.show_all()
+            return
+        top = Gtk.Box(spacing=20)
+        av = css(Gtk.Box(), "nv-avatar")
+        av.set_size_request(68, 68)
+        img = kind_icon(x["kind"], 40)
+        img.set_halign(Gtk.Align.CENTER)
+        av.pack_start(img, True, True, 0)
+        top.pack_start(av, False, False, 0)
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)
+        tl = Gtk.Box(spacing=10)
+        # (los nombres largos, en dos lineas, no cortados)
+        tl.pack_start(label(x["name"], "nv-titulo-grande", wrap=True, wrap_mode=2, max_width_chars=44), False, False, 0)
+        if x["kind"]:
+            tl.pack_start(label(KIND_TEXT[x["kind"]], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
+        info.pack_start(tl, False, False, 0)
+        info.pack_start(label("%s/%s" % (HTDOCS, x["name"]), "nv-mono", "nv-chico", "nv-tenue", selectable=True,
+                              ellipsize=1, max_width_chars=40), False, False, 0)
+        top.pack_start(info, True, True, 0)
+        # Selectores: el entorno (version y su BBDD) y la BBDD de ese entorno
+        pairs = self.project_pairs(x)
+        dockers = self.nv_docker_of(x["name"])
+        sel = css(Gtk.Grid(column_spacing=12, row_spacing=6, valign=Gtk.Align.CENTER), "nv-selectores")
+        sel.attach(label("Entorno (versión de PHP)", "nv-chico", "nv-tenue"), 0, 0, 1, 1)
+        sel.attach(label("BBDD", "nv-chico", "nv-tenue"), 1, 0, 1, 1)
+        envs = [("lampp", inst, db) for inst, db in pairs] + [("docker", dp, dp["db"]) for dp in dockers]
+        env = Gtk.ComboBoxText()
+        env.set_size_request(230, -1)
+        for kind, obj, db in envs:
+            env.append_text("PHP %s · lampp-%s" % (obj["php"], obj["folder"]) if kind == "lampp"
+                            else "PHP %s · Docker" % obj["php"])
+        if not envs:
+            env.append_text("Sin entornos")
+        current = next((n for n, (k, o, _d) in enumerate(envs) if k == "lampp" and o["folder"] == self.data["active"]), 0)
+        env.set_active(current if is_loaded else 0)
+        env.set_sensitive(bool(envs) and not self.busy)
+        dbl = label("", "nv-mono", valign=Gtk.Align.CENTER)
+        dbl.set_size_request(180, -1)
+
+        def show_db(*_):
+            n = env.get_active()
+            dbl.set_label(envs[n][2] if envs and 0 <= n < len(envs) else "—")
+        show_db()
+        env.connect("changed", show_db)
+
+        def changed(*_):
+            n = env.get_active()
+            if not envs or n < 0:
+                return
+            kind, obj, db = envs[n]
+            if kind == "docker":
+                self.show_tab("docker")
+                self.toast("%s en Docker: https://%s" % (x["name"], obj["domain"]))
+            elif not (is_loaded and obj["folder"] == self.data["active"]):
+                self.do_load_project(x["name"], db, obj, p["link"], p["create"])
+        env.connect("changed", changed)
+        sel.attach(env, 0, 1, 1, 1)
+        sel.attach(dbl, 1, 1, 1, 1)
+        lk = nv_button("insert-link-symbolic", None, "Cambiar la BBDD de cada versión (vincular)",
+                       lambda *_: self.on_link_project(x), flat=True)
+        sel.attach(lk, 2, 1, 1, 1)
+        top.pack_end(sel, False, False, 0)
+        card.pack_start(top, False, False, 0)
+        card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
+        acts = Gtk.Box(spacing=8)
+        if is_loaded:
+            kind, admin = self.loaded_project_admin()
+            # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
+            acts.pack_start(nv_button(logo("globo", 18), "Abrir web", "Abrir http://%s/" % p["link"],
+                                      lambda *_: self.open_uri("http://%s/" % p["link"]), "nv-proyecto-btn"), False, False, 0)
+            code = vscode_app()
+            if code is not None:
+                img = None
+                if code.get_icon() is not None:
+                    img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                    img.set_pixel_size(18)
+                acts.pack_start(nv_button(img or "text-editor-symbolic", "VS Code",
+                                          "Abrir la carpeta en Visual Studio Code", lambda *_: self.open_in_vscode(),
+                                          "nv-proyecto-btn"), False, False, 0)
+            pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
+            pma.set_sensitive(bool(self.loaded_project_db()))
+            acts.pack_start(pma, False, False, 0)
+            adm = nv_button(logo("prestashop" if kind == "ps" else "wordpress", 18), "Panel",
+                            "Con el administrador de pruebas ya escrito: solo hay que pulsar Entrar",
+                            lambda *_: self.open_project_admin(), "nv-proyecto-btn")
+            adm.set_sensitive(bool(admin))
+            acts.pack_start(adm, False, False, 0)
+            acts.pack_start(nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
+                                      lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn"), False, False, 0)
+            acts.pack_start(nv_button("media-eject-symbolic", None, "Desmontar: %s deja de apuntar aquí" % p["link"],
+                                      lambda *_: self.on_unload_project(), flat=True), False, False, 0)
+        else:
+            acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
+                                      lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)
+        imp = nv_button("document-open-symbolic", "Importar SQL", "Subir un .sql, .sql.gz o .zip a su BBDD (pestaña Bases de datos)",
+                        lambda *_: self.nv_import(x), "nv-proyecto-btn", "nv-discontinuo")
+        acts.pack_end(imp, False, False, 0)
+        acts.pack_end(self.nv_more_menu(x), False, False, 0)
+        acts.pack_end(self.nv_add_env_menu(x), False, False, 0)
+        card.pack_start(acts, False, False, 0)
+        self.hero_box.pack_start(card, False, False, 0)
+        self.hero_box.show_all()
+
+    def nv_menu_button(self, text, icon_name, items, tip=None):
+        m = css(Gtk.MenuButton(tooltip_text=tip), "nv-proyecto-btn")
+        b = Gtk.Box(spacing=6)
+        b.pack_start(icon(icon_name), False, False, 0)
+        if text:
+            b.pack_start(Gtk.Label(label=text), False, False, 0)
+        m.add(b)
+        pop = Gtk.Popover(relative_to=m)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=4)
+        for t, fn in items:
+            mb = Gtk.ModelButton(text=t)
+            mb.connect("clicked", lambda *_, fn=fn: fn())
+            box.pack_start(mb, False, False, 0)
+        box.show_all()
+        pop.add(box)
+        m.set_popover(pop)
+        return m
+
+    def nv_add_env_menu(self, x):
+        return self.nv_menu_button("Añadir entorno…", "list-add-symbolic", [
+            ("En otra versión de PHP (copiar su BBDD)…", lambda: self.on_replicate()),
+            ("En Docker…", lambda: (self.docker_form.update(folder=x["name"], source=None, domain_set=False,
+                                                           domain=docker_slug(x["name"]) + ".docker.local"),
+                                    self.show_tab("docker"), self.docker is not None and self.build_docker()))],
+            "Llevar el proyecto a otra versión de PHP o a Docker")
+
+    def nv_more_menu(self, x):
+        items = [("Vincular la BBDD de cada versión…", lambda: self.on_link_project(x)),
+                 ("Abrir la carpeta", lambda: self.open_uri("file://%s/%s" % (HTDOCS, x["name"])))]
+        for dp in self.nv_docker_of(x["name"]):
+            items.append(("Eliminar de Docker…", lambda dp=dp: self.on_docker_delete(dp)))
+        db = self.project_base(x)
+        if x["kind"] == "ps" and db:
+            items.append(("Vaciar la caché de la tienda", lambda: self.run_task(
+                "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
+                done_text="Caché vaciada", auto_close=True)))
+        return self.nv_menu_button(None, "view-more-symbolic", items)
+
+    def nv_import(self, x):
+        pairs = self.project_pairs(x)
+        act = next((d for i, d in pairs if i["folder"] == self.data["active"]), None)
+        self.imp.update(project=x["name"], db=act or self.imp.get("db"))
+        self.build_databases()
+        self.show_tab("bbdd")
+        self.toast("Elige el fichero en «Subir o actualizar una BBDD»: proyecto %s" % x["name"])
+
+    def nv_new_project(self):
+        # El asistente de siempre (clonar de git, version y BBDD), en una ventana aparte
+        if getattr(self, "proj_box", None) is None:
+            return
+        if self.np_dialog is None:
+            self.np_dialog = Gtk.Window(title="Nuevo proyecto", transient_for=self.win, modal=False)
+            self.np_dialog.set_default_size(700, -1)
+            self.np_dialog.connect("delete-event", lambda w, *_: (self.toggle_new_project(False), w.hide(), True)[2])
+            if self.new_proj_rev.get_parent():
+                self.new_proj_rev.get_parent().remove(self.new_proj_rev)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=20)
+            box.pack_start(self.new_proj_rev, True, True, 0)
+            self.np_dialog.add(box)
+        self.toggle_new_project(True)
+        self.np_dialog.show_all()
+
+    def toggle_new_project(self, show):
+        super().toggle_new_project(show)
+        if not show and self.np_dialog is not None:
+            self.np_dialog.hide()
+
+    def nv_page_title(self, box, symbol_name, title, sub):
+        """Título grande arriba de una página hecha con los constructores de siempre (como el de las
+        demás pestañas)."""
+        head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(symbol(symbol_name, 26), False, False, 0)
+        tl.pack_start(label(title, "nv-titulo-grande"), False, False, 0)
+        head.pack_start(tl, False, False, 0)
+        head.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        box.reorder_child(head, 0)
+        head.show_all()
+
+    def build_hosts(self):
+        super().build_hosts()
+        # (en la ventana nueva hay sitio: los desplegables de Dominios, con el nombre entero)
+        for w in self.nv_walk(self.hosts_box):
+            if isinstance(w, Gtk.ComboBox):
+                narrow(w, 46)
+        self.nv_page_title(self.hosts_box, "network-workgroup-symbolic", "Dominios y hosts",
+                           "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts")
+
+    def build_tools(self):
+        super().build_tools()
+        # Barrera entre webs (lvm-instalador barrera-web): encendida si no existe el fichero
+        box, lb = group("Seguridad entre webs",
+                        "Otra web abierta en el navegador no puede mandar formularios ni peticiones "
+                        "a tus proyectos con tus sesiones. Una pasarela de pago que vuelve a la tienda "
+                        "con un POST (Redsys, PayPal…) no pasa: apágala mientras la pruebas.")
+        on = not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))
+        row = ActionRow("Barrera entre webs", "Encendida: solo se puede llegar a tus proyectos desde otra "
+                        "web con un enlace" if on else "Apagada: enciéndela cuando acabes de probar los pagos")
+        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw.connect("notify::active", self.on_cross_site)
+        row.add_suffix(sw)
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 1)
+        box.show_all()
+        self.nv_mail_tools()
+        self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
+                           "Ficheros de configuración, carpetas, registros y el programa")
+
+    def on_cross_site(self, sw, _p):
+        on = sw.get_active()
+        if on == (not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))):
+            return
+        self.run_task("Encendiendo la barrera entre webs" if on else "Apagando la barrera entre webs",
+                      ["barrera-web", "si" if on else "no"], auto_close=True,
+                      done_text="Barrera entre webs %s" % ("encendida" if on else "apagada"),
+                      on_done=lambda *_: self.build_tools())
+
+    # ------------------------------------------------------------------ Bases de datos (como Docker)
+    def update_db_search(self):
+        # (el buscador de siempre no esta en la ventana nueva: la tabla tiene el suyo)
+        pass
+
+    def on_db_sizes(self, rc, out):
+        sizes = {(f[1], f[2]): (int(f[3]), int(f[4])) for f in parse_lines(out)
+                 if f[0] == "Z" and len(f) >= 5 and f[3].isdigit() and f[4].isdigit()}
+        if sizes != self.db_sizes:
+            self.db_sizes = sizes
+            self.nv_db_table()
+        return False
+
+    def reload(self, branches=False):
+        super().reload(branches)
+        run_quick(["gui-bbdd-tamanos"], self.on_db_sizes)
+
+    def build_databases(self):
+        d = self.data
+        clear(self.db_box)
+        if not d:
+            self.loading(self.db_box)
+            return
+        box = self.db_box
+        act = next((i for i in self.installs() if i["folder"] == d["active"]), None)
+        head = Gtk.Box(spacing=12)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        t.pack_start(label("Bases de datos", "nv-titulo-grande"), False, False, 0)
+        t.pack_start(label("Cada versión con su MariaDB y sus BBDD (sin las del sistema)", "nv-chico", "nv-tenue"), False, False, 0)
+        head.pack_start(t, True, True, 0)
+        new = nv_button("list-add-symbolic", "Nueva BBDD…", "Crear una BBDD vacía en la versión activa%s"
+                        % (" (lampp-%s)" % act["folder"] if act else ""), self.on_create_db, "nv-azul")
+        new.set_sensitive(bool(act) and not self.busy)
+        head.pack_end(new, False, False, 0)
+        pma = nv_button(logo("phpmyadmin", 16), "phpMyAdmin", "phpMyAdmin de la versión activa",
+                        lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/"))
+        pma.set_sensitive(bool(act) and d["running"])
+        head.pack_end(pma, False, False, 0)
+        box.pack_start(head, False, False, 0)
+        # Tarjetas: cuantas hay, en la activa y la ultima que ha cambiado
+        all_dbs = [(f, db) for f, dbs in d["dbs"].items() for db in dbs
+                   if next((i for i in self.installs() if i["folder"] == f and i["owner"] == f), None)]
+        latest = max(((d["dbdate"].get(k, (0, ""))[0], k) for k in all_dbs), default=(0, None))
+        stats = Gtk.Box(spacing=12, homogeneous=True)
+        cards = [("BBDD", str(len(all_dbs)), plural(len({f for f, _ in all_dbs}), "versión", "versiones"), None),
+                 ("En la versión activa", str(len(d["dbs"].get(d["active"], []))) if act else "—",
+                  ("lampp-%s · MariaDB %s" % (act["folder"], act["mariadb"])) if act else "ninguna activa", None),
+                 ("La última que ha cambiado", latest[1][1] if latest[1] else "—",
+                  ("lampp-%s · %s" % (latest[1][0], fmt_age(max(0, int(time.time()) - latest[0])))) if latest[1] else "", None)]
+        for title, value, sub, extra in cards:
+            c = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4), "nv-stat")
+            top = Gtk.Box(spacing=6)
+            top.pack_start(label(title, "nv-chico", "nv-tenue", ellipsize=3), True, True, 0)
+            c.pack_start(top, False, False, 0)
+            c.pack_start(label(value, "nv-cifra", ellipsize=3), False, False, 0)
+            c.pack_start(label(sub, "nv-chico", "nv-tenue", ellipsize=3), False, False, 0)
+            stats.pack_start(c, True, True, 0)
+        box.pack_start(stats, False, False, 0)
+        tools = Gtk.Box(spacing=10)
+        only = Gtk.Switch(active=self.db_only_active, valign=Gtk.Align.CENTER)
+        only.connect("notify::active", lambda w, _p: (setattr(self, "db_only_active", w.get_active()), self.nv_db_table()))
+        tools.pack_end(only, False, False, 0)
+        tools.pack_end(label("Solo la versión activa", "nv-chico", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
+        search = Gtk.SearchEntry(placeholder_text="Buscar una BBDD o su proyecto", width_chars=30,
+                                 valign=Gtk.Align.CENTER, text=self.db_query)
+        search.connect("search-changed", lambda e: (setattr(self, "db_query", e.get_text().strip().lower()), self.nv_db_table()))
+        tools.pack_start(search, False, False, 0)
+        box.pack_start(tools, False, False, 0)
+        self.db_table = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.pack_start(self.db_table, False, False, 0)
+        self.nv_db_table()
+        # Subir o actualizar una BBDD: el formulario de siempre
+        box.pack_start(self.build_import(), False, False, 0)
+        box.show_all()
+
+    def nv_db_project(self, db, folder):
+        """Proyecto de una BBDD en una version: el vinculado o el que la usa en su configuracion."""
+        f = self.link_of(db, folder)
+        if f:
+            return f
+        if f == "":
+            return ""
+        users = [x["name"] for x in (self.projects or {}).get("list", []) if x["db"] == db]
+        return users[0] if len(users) == 1 else ""
+
+    def nv_db_toggle(self, key):
+        """Pliega o despliega una versión en Bases de datos: solo una desplegada a la vez (al abrir
+        otra, se cierra la anterior)."""
+        if key in self.expanded:
+            self.expanded.discard(key)
+        else:
+            self.expanded.difference_update({k for k in self.expanded if k.startswith("@db")})
+            self.expanded.add(key)
+        self.nv_db_table()
+
+    def nv_db_table(self):
+        if getattr(self, "db_table", None) is None:
+            return
+        clear(self.db_table)
+        d = self.data
+        q = self.db_query
+        used = self.loaded_project_db()
+        loaded = self.loaded_project_entry()
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        widths = [270, 210, 110, 230, 190]
+        groups = [Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL) for _ in widths]
+
+        def row(cells, head_row=False, indent=0, on_click=None):
+            r = Gtk.ListBoxRow(activatable=on_click is not None)
+            b = css(Gtk.Box(spacing=12), "nv-fila", *(["nv-cab"] if head_row else []))
+            for n, c in enumerate(cells):
+                w = c if isinstance(c, Gtk.Widget) else label(c.upper() if head_row else c)
+                if n == 0 and indent:
+                    cell = Gtk.Box()
+                    sp = Gtk.Box()
+                    sp.set_size_request(indent, -1)
+                    cell.pack_start(sp, False, False, 0)
+                    cell.pack_start(w, True, True, 0)
+                    w = cell
+                w.set_size_request(widths[n], -1)
+                groups[n].add_widget(w)
+                b.pack_start(w, n == len(cells) - 1, True, 0)
+            r.add(b)
+            r.on_click = on_click
+            lb.add(r)
+
+        def actions(items):
+            a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
+            for w in items:
+                if w is not None:
+                    a.pack_start(w, False, False, 0)
+            return a
+        lb.connect("row-activated", lambda _l, r: r.on_click and r.on_click())
+        row(["Nombre", "Proyecto", "Tamaño", "Cambiada", "Acciones"], True)
+
+        def size_label(owner, db):
+            got = self.db_sizes.get((owner, db))
+            if not got:
+                lbl = label("—", "nv-chico", "nv-tenue")
+                lbl.set_tooltip_text("Se mide cuando su versión está activa y en marcha")
+                return lbl
+            lbl = label(fmt_size(got[0]), "nv-chico", "nv-mono")
+            lbl.set_tooltip_text("Datos e índices, medido el %s"
+                                 % time.strftime("%d/%m/%Y a las %H:%M", time.localtime(got[1])))
+            return lbl
+        shown = 0
+        for inst in sorted(self.installs(), key=lambda i: ver_tuple(i["php"]), reverse=True):
+            folder = inst["folder"]
+            active = folder == d["active"]
+            if self.db_only_active and not active:
+                continue
+            dbs = d["dbs"].get(folder, []) if inst["owner"] == folder else []
+            rows = []
+            for db in dbs:
+                proj = self.nv_db_project(db, folder)
+                if q and q not in db.lower() and q not in proj.lower():
+                    continue
+                rows.append((db, proj))
+            if q and not rows:
+                continue
+            shown += 1
+            key = "@db" + folder
+            opened = key in self.expanded if not q else True
+            name = Gtk.Box(spacing=8)
+            name.pack_start(icon("pan-down-symbolic" if opened else "pan-end-symbolic"), False, False, 0)
+            ic = css(Gtk.Box(), "nv-dk-icono")
+            ic.pack_start(logo("mariadb", 14), False, False, 0)
+            name.pack_start(ic, False, False, 0)
+            name.pack_start(label("lampp-%s" % folder, "nv-dk-proyecto", "nv-mono"), False, False, 0)
+            if active:
+                name.pack_start(label("Activa", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER), False, False, 0)
+            sub = "PHP %s · MariaDB %s" % (inst["php"], inst["mariadb"])
+            count = plural(len(dbs), "BBDD", "BBDD") if inst["owner"] == folder else "usa las de lampp-%s" % inst["owner"]
+            grp_acts = []
+            if active:
+                b = nv_button("drive-multidisk-symbolic", None, "Abrir phpMyAdmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/"), flat=True)
+                b.set_sensitive(d["running"])
+                grp_acts.append(b)
+                b = nv_button("list-add-symbolic", None, "Crear una BBDD vacía aquí", self.on_create_db, flat=True)
+                b.set_sensitive(not self.busy)
+                grp_acts.append(b)
+            total = sum(self.db_sizes.get((inst["owner"], db), (0, 0))[0] for db in d["dbs"].get(inst["owner"], []))
+            row([name, label(sub, "nv-chico", "nv-tenue"),
+                 label(fmt_size(total) if total else "—", "nv-chico", "nv-mono" if total else "nv-tenue"),
+                 label(count, "nv-chico", "nv-tenue"), actions(grp_acts)],
+                on_click=lambda key=key: self.nv_db_toggle(key))
+            if not opened:
+                continue
+            for db, proj in rows:
+                when, kind = d["dbdate"].get((folder, db), (0, ""))
+                n = Gtk.Box(spacing=8)
+                is_used = active and loaded is not None and db == used
+                dt = label("●", "nv-verde" if is_used else "nv-gris")
+                dt.set_tooltip_text("La usa el proyecto cargado (%s)" % loaded["name"] if is_used else None)
+                if not is_used:
+                    dt.set_opacity(0.25)
+                n.pack_start(dt, False, False, 0)
+                if is_ps_db(db):
+                    n.pack_start(logo("prestashop", 14), False, False, 0)
+                elif db.lower().startswith("wp_"):
+                    n.pack_start(logo("wordpress", 14), False, False, 0)
+                n.pack_start(label(db, "nv-mono", "nv-chico", ellipsize=3, tooltip_text=db), False, False, 0)
+                pl = label(proj or "—", "nv-chico", "nv-tenue" if not proj else "", ellipsize=3)
+                # (la fecha del cambio: la de su carga con el gestor o la del ultimo cambio de sus tablas)
+                ch = label(("%s %s" % (time.strftime("%d/%m/%Y %H:%M", time.localtime(when)),
+                                       "· importada" if kind == "i" else ""))
+                           if when else "—", "nv-chico", "nv-mono" if when else "nv-tenue")
+                if when:
+                    ch.set_tooltip_text(db_date_text(when, kind))
+                acts = []
+                if is_ps_db(db):
+                    acts.append(self.cache_button(db))
+                cp = self.copy_button(db, inst)
+                if cp:
+                    acts.append(cp)
+                acts.append(self.download_button(db, folder))
+                ld = nv_button("folder-open-symbolic", None, "Cargar su proyecto (en lampp-%s)" % folder,
+                               lambda *_, db=db, inst=inst: self.on_load_project(db, inst), flat=True)
+                ld.set_sensitive(not self.busy)
+                acts.append(ld)
+                if active:
+                    rm = nv_button("user-trash-symbolic", None, "Borrar la BBDD %s" % db, lambda *_, db=db: self.on_drop_db(db), flat=True)
+                    rm.set_sensitive(not self.busy)
+                    acts.append(rm)
+                row([n, pl, size_label(inst["owner"], db), ch, actions(acts)], indent=26)
+        if not shown:
+            r = Gtk.ListBoxRow(activatable=False)
+            r.add(label("Ninguna BBDD con «%s»" % q if q else "No hay versiones con BBDD", "nv-tenue", margin=14))
+            lb.add(r)
+        self.db_table.pack_start(lb, False, False, 0)
+        self.db_table.show_all()
+
+    # ------------------------------------------------------------------ Docker (como Docker Desktop)
+    def build_docker(self):
+        d = self.docker
+        if d is None or not d["ready"]:
+            # (sin Docker en marcha: lo de siempre, con el boton de instalarlo o prepararlo)
+            return super().build_docker()
+        clear(self.docker_box)
+        box = self.docker_box
+        head = Gtk.Box(spacing=12)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(logo("docker", 28), False, False, 0)
+        tl.pack_start(label("Contenedores Docker", "nv-titulo-grande"), False, False, 0)
+        t.pack_start(tl, False, False, 0)
+        t.pack_start(label("Docker %s · sin root, con tu usuario" % d["version"], "nv-chico", "nv-tenue"), False, False, 0)
+        head.pack_start(t, True, True, 0)
+        new = nv_button("list-add-symbolic", "Proyecto en Docker…", None, lambda *_: self.nv_docker_new(), "nv-azul")
+        head.pack_end(new, False, False, 0)
+        box.pack_start(head, False, False, 0)
+        for text, sub, btn in ([("El Docker del sistema (con root) está en marcha", "No hace falta: el tuyo va sin root.",
+                                 ("Apagarlo", lambda *_: self.run_task("Apagando el Docker del sistema", ["docker-instalar"],
+                                                                         done_text="Docker del sistema apagado", auto_close=True,
+                                                                         on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))))]
+                               if d.get("rootful") else []) + \
+                              ([("La versión LAMPP activa está parada", "Los proyectos en Docker se abren por su Apache.",
+                                 ("Arrancarla", lambda *_: self.nv_power()))] if not d["lampp"] else []):
+            r = css(Gtk.Box(spacing=10), "nv-stat")
+            r.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+            tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            tt.pack_start(label(text), False, False, 0)
+            tt.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
+            r.pack_start(tt, True, True, 0)
+            r.pack_end(nv_button(None, btn[0], None, btn[1]), False, False, 0)
+            box.pack_start(r, False, False, 0)
+        # Tarjetas: CPU, memoria (docker stats, llegan aparte) y en marcha
+        cons = d.get("containers", [])
+        up = sum(1 for c in cons if c["state"] == "running")
+        stats = Gtk.Box(spacing=12, homogeneous=True)
+        self.dk_cards = {}
+        for key, title in [("cpu", "Uso de CPU de los contenedores"), ("mem", "Memoria de los contenedores"),
+                           ("up", "En marcha")]:
+            c = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "nv-stat")
+            c.pack_start(label(title, "nv-chico", "nv-tenue"), False, False, 0)
+            val = label("…", "nv-cifra")
+            bar = css(Gtk.ProgressBar(), "nv-barra")
+            sub = label("", "nv-chico", "nv-tenue")
+            for w in (val, bar, sub):
+                c.pack_start(w, False, False, 0)
+            stats.pack_start(c, True, True, 0)
+            self.dk_cards[key] = (val, bar, sub)
+        val, bar, sub = self.dk_cards["up"]
+        val.set_label("%d de %d" % (up, len(cons)))
+        bar.set_fraction(up / len(cons) if cons else 0)
+        sub.set_label(plural(len(d["projects"]), "proyecto", "proyectos"))
+        box.pack_start(stats, False, False, 0)
+        self.nv_show_stats()
+        # Pestañas, buscador y «solo en marcha»
+        tools = Gtk.Box(spacing=10)
+        seg = css(Gtk.Box(), "nv-segmentado")
+        first = None
+        for key, text in [("cont", "Contenedores"), ("img", "Imágenes"), ("vol", "Volúmenes")]:
+            rb = Gtk.RadioButton.new_with_label_from_widget(first, text)
+            rb.set_mode(False)
+            first = first or rb
+            rb.set_active(self.dk_view == key)
+            rb.connect("toggled", lambda r, k=key: r.get_active() and (setattr(self, "dk_view", k), self.nv_dk_table()))
+            seg.pack_start(rb, False, False, 0)
+        tools.pack_start(seg, False, False, 0)
+        only = Gtk.Switch(active=self.dk_only_up, valign=Gtk.Align.CENTER)
+        only.connect("notify::active", lambda w, _p: (setattr(self, "dk_only_up", w.get_active()), self.nv_dk_table()))
+        tools.pack_end(only, False, False, 0)
+        tools.pack_end(label("Solo en marcha", "nv-chico", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
+        search = Gtk.SearchEntry(placeholder_text="Buscar", width_chars=18, valign=Gtk.Align.CENTER, text=self.dk_query)
+        search.connect("search-changed", lambda e: (setattr(self, "dk_query", e.get_text().strip().lower()), self.nv_dk_table()))
+        tools.pack_end(search, False, False, 0)
+        box.pack_start(tools, False, False, 0)
+        self.dk_table = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.pack_start(self.dk_table, False, False, 0)
+        self.nv_dk_table()
+        box.pack_start(label("Para llevar un proyecto a Docker: «Proyecto en Docker…» o, en Proyectos, «Añadir entorno».",
+                             "nv-chico", "nv-tenue"), False, False, 0)
+        for w in self.nv_walk(box):
+            if isinstance(w, Gtk.Button) and not w.get_style_context().has_class("nv-azul"):
+                css(w, "nv-clasico")
+        box.show_all()
+
+    def nv_container_delete(self, c):
+        """Eliminar un contenedor suelto de un proyecto en Docker."""
+        if not confirm(self.win, "¿Eliminar el contenedor %s?" % c["name"],
+                       "Se vuelve a crear al arrancar el proyecto; los datos de la BBDD siguen en su volumen. "
+                       "Para quitar el proyecto entero, usa la papelera de su fila.",
+                       "Eliminar el contenedor", destructive=True):
+            return
+        self.run_task("Eliminando %s" % c["name"], ["docker-contenedor", "borrar", c["name"]],
+                      done_text="%s eliminado" % c["name"], auto_close=True,
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_docker_new(self):
+        """El formulario de siempre para crear un proyecto en Docker, en un dialogo."""
+        dlg = Gtk.Dialog(title="Proyecto en Docker", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(620, -1)
+        form = self.build_docker_new()
+        form.set_margin_start(18)
+        form.set_margin_end(18)
+        form.set_margin_bottom(18)
+        dlg.get_content_area().add(form)
+        # (al pulsar «Crear en Docker» se cierra: la tarea va en su ventana)
+        for w in self.nv_walk(form):
+            if isinstance(w, Gtk.Button) and w.get_label() == "Crear en Docker":
+                w.connect("clicked", lambda *_: dlg.destroy())
+        dlg.show_all()
+
+    def nv_walk(self, w):
+        yield w
+        if isinstance(w, Gtk.Container):
+            for c in w.get_children():
+                yield from self.nv_walk(c)
+
+    def docker_folder_changed(self):
+        f = self.docker_form
+        f["source"] = None
+        if not f.get("domain_set"):
+            f["domain"] = docker_slug(f["folder"] or "") + ".docker.local" if f.get("folder") else ""
+
+    def on_docker_stats(self, rc, out):
+        cores, total, cpu, mem = 1, 0, {}, {}
+        units = {"B": 1, "KiB": 1024, "MiB": 1024 ** 2, "GiB": 1024 ** 3, "TiB": 1024 ** 4,
+                 "kB": 1000, "KB": 1000, "MB": 1000 ** 2, "GB": 1000 ** 3}
+        for f in parse_lines(out):
+            if f[0] == "T" and len(f) >= 3 and f[1].isdigit() and f[2].isdigit():
+                cores, total = int(f[1]), int(f[2])
+            elif f[0] == "K" and len(f) >= 4:
+                try:
+                    cpu[f[1]] = float(f[2].rstrip("%"))
+                    m = re.match(r"([\d.]+)\s*([A-Za-z]+)", f[3].split("/")[0].strip())
+                    mem[f[1]] = float(m.group(1)) * units.get(m.group(2), 1) if m else 0
+                except ValueError:
+                    pass
+        self.dk_stats = {"cores": cores, "total": total, "cpu": cpu, "mem": mem}
+        self.nv_show_stats()
+        if getattr(self, "dk_table", None) is not None and self.dk_view == "cont":
+            self.nv_dk_table()
+        return False
+
+    def nv_show_stats(self):
+        s = self.dk_stats
+        if not getattr(self, "dk_cards", None) or s is None:
+            return
+        val, bar, sub = self.dk_cards["cpu"]
+        total_cpu = sum(s["cpu"].values())
+        val.set_label(("%.1f %%" % total_cpu).replace(".", ","))
+        bar.set_fraction(min(1, total_cpu / (100 * s["cores"])))
+        sub.set_label("de %d %% (%s)" % (100 * s["cores"], plural(s["cores"], "núcleo", "núcleos")))
+        val, bar, sub = self.dk_cards["mem"]
+        used = sum(s["mem"].values())
+        val.set_label(fmt_size(int(used)))
+        bar.set_fraction(min(1, used / s["total"]) if s["total"] else 0)
+        sub.set_label("de %s" % fmt_size(s["total"]) if s["total"] else "")
+
+    def nv_dk_toggle(self, proj):
+        """Despliega un proyecto de Docker (y pliega el que estuviera abierto) o lo pliega."""
+        self.dk_open = set() if proj in self.dk_open else {proj}
+        self.nv_dk_table()
+
+    def nv_dk_table(self):
+        if getattr(self, "dk_table", None) is None:
+            return
+        clear(self.dk_table)
+        d = self.docker
+        q = self.dk_query
+        if self.dk_view == "img":
+            rows = [i for i in d.get("images", []) if q in ("%s:%s %s" % (i["repo"], i["tag"], i["id"])).lower()]
+            used = {c["image"] for c in d.get("containers", [])}
+            self.dk_table.pack_start(self.nv_simple_table(
+                ["Imagen", "Etiqueta", "ID", "Tamaño", "Creada", "Acciones"], [300, 110, 120, 90, 120, 90],
+                [[label(i["repo"], "nv-mono", "nv-chico", ellipsize=3, tooltip_text=i["repo"]),
+                  label(i["tag"], "nv-mono", "nv-chico", "nv-enlace"),
+                  label(i["id"], "nv-mono", "nv-chico", "nv-tenue", selectable=True),
+                  label(i["size"], "nv-mono", "nv-tenue"),
+                  label(docker_status_text("Up " + i["created"].replace(" ago", "")).replace("en marcha · ", "hace "), "nv-tenue"),
+                  self.nv_image_actions(i, "%s:%s" % (i["repo"], i["tag"]) in used or i["id"] in used)] for i in rows],
+                "No hay imágenes"), False, False, 0)
+        elif self.dk_view == "vol":
+            rows = [v for v in d.get("volumes", []) if q in v["name"].lower()]
+            # (el de la BBDD de un proyecto lo usa su contenedor db, aunque esté parado)
+            used = {"%s_db" % c["project"] for c in d.get("containers", []) if c["project"]}
+            self.dk_table.pack_start(self.nv_simple_table(["Volumen", "Driver", "De", "Acciones"], [420, 120, 200, 90],
+                                     [[label(v["name"], "nv-mono", "nv-chico"), label(v["driver"], "nv-tenue"),
+                                       label(re.sub(r"^nexum-(.+)_db$", r"\1 (BBDD)", v["name"]) if v["name"].startswith("nexum-") else "—",
+                                             "nv-tenue"),
+                                       self.nv_volume_actions(v, v["name"] in used)] for v in rows], "No hay volúmenes"), False, False, 0)
+        else:
+            self.dk_table.pack_start(self.nv_containers_table(), False, False, 0)
+        for w in self.nv_walk(self.dk_table):
+            if isinstance(w, Gtk.Button):
+                css(w, "nv-clasico")
+        self.dk_table.show_all()
+
+    def nv_image_actions(self, i, in_use):
+        """Volver a descargar una imagen de Docker Hub y borrarla (si no la usa ningún contenedor)."""
+        a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
+        ref = "%s:%s" % (i["repo"], i["tag"])
+        pullable = i["tag"] != "<none>" and not i["repo"].startswith("nexum-")
+        pull = nv_button("folder-download-symbolic", None, "Volver a descargarla de Docker Hub (lo último de %s)" % ref
+                         if pullable else "Es del gestor: se rehace con «Actualizar imagen» de su proyecto"
+                         if i["repo"].startswith("nexum-") else "Sin etiqueta: no se puede volver a descargar",
+                         lambda *_: self.run_task("Descargando %s" % ref, ["docker-imagenes", "descargar", ref],
+                                                  done_text="%s descargada" % ref,
+                                                  on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+        pull.set_sensitive(pullable and not self.busy)
+        a.pack_start(pull, False, False, 0)
+        rm = nv_button("user-trash-symbolic", None, "La usa un contenedor: bórralo antes" if in_use else "Borrar la imagen",
+                       lambda *_: self.nv_image_delete(i, ref))
+        rm.set_sensitive(not in_use and not self.busy)
+        a.pack_start(rm, False, False, 0)
+        return a
+
+    def nv_image_delete(self, i, ref):
+        tagged = i["tag"] != "<none>"
+        if not confirm(self.win, "¿Borrar la imagen %s?" % (ref if tagged else i["id"]),
+                       "Ocupa %s. Si hace falta, se vuelve a descargar o a preparar." % i["size"],
+                       "Borrar la imagen", destructive=True):
+            return
+        self.run_task("Borrando %s" % (ref if tagged else i["id"]), ["docker-imagenes", "borrar", ref if tagged else i["id"]],
+                      done_text="Imagen borrada", auto_close=True,
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_volume_actions(self, v, in_use):
+        a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
+        rm = nv_button("user-trash-symbolic", None, "Lo usa un contenedor: bórralo antes (o el proyecto entero)"
+                       if in_use else "Borrar el volumen", lambda *_: self.nv_volume_delete(v))
+        rm.set_sensitive(not in_use and not self.busy)
+        a.pack_start(rm, False, False, 0)
+        return a
+
+    def nv_volume_delete(self, v):
+        if not confirm(self.win, "¿Borrar el volumen %s?" % v["name"],
+                       "Se pierden sus datos. No se puede deshacer.", "Borrar el volumen", destructive=True):
+            return
+        self.run_task("Borrando %s" % v["name"], ["docker-volumen-borrar", v["name"]],
+                      done_text="Volumen borrado", auto_close=True,
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_simple_table(self, headers, widths, rows, empty):
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        groups = [Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL) for _ in widths]
+        for n_row, cells in enumerate([[label(h.upper()) for h in headers]] + rows):
+            r = Gtk.ListBoxRow(activatable=False)
+            b = css(Gtk.Box(spacing=14), "nv-fila", *(["nv-cab"] if n_row == 0 else []))
+            for n, w in enumerate(cells):
+                w.set_size_request(widths[n], -1)
+                groups[n].add_widget(w)
+                b.pack_start(w, n == len(cells) - 1, True, 0)
+            r.add(b)
+            lb.add(r)
+        if not rows:
+            r = Gtk.ListBoxRow(activatable=False)
+            r.add(label(empty, "nv-tenue", margin=14))
+            lb.add(r)
+        return lb
+
+    def nv_containers_table(self):
+        d = self.docker
+        cons = d.get("containers", [])
+        stats = (self.dk_stats or {}).get("cpu", {})
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
+        widths = [270, 110, 150, 130, 60, 130]
+        groups = [Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL) for _ in widths]
+
+        def row(cells, head_row=False, indent=0, on_click=None):
+            r = Gtk.ListBoxRow(activatable=on_click is not None)
+            b = css(Gtk.Box(spacing=12), "nv-fila", *(["nv-cab"] if head_row else []))
+            for n, c in enumerate(cells):
+                w = c if isinstance(c, Gtk.Widget) else label(c.upper() if head_row else c)
+                if n == 0 and indent:
+                    cell = Gtk.Box()
+                    sp = Gtk.Box()
+                    sp.set_size_request(indent, -1)
+                    cell.pack_start(sp, False, False, 0)
+                    cell.pack_start(w, True, True, 0)
+                    w = cell
+                w.set_size_request(widths[n], -1)
+                groups[n].add_widget(w)
+                b.pack_start(w, n == len(cells) - 1, True, 0)
+            r.add(b)
+            r.on_click = on_click
+            lb.add(r)
+
+        def actions(items):
+            a = Gtk.Box(halign=Gtk.Align.START)
+            for ic, tip, fn, ok in items:
+                b = nv_button(ic, None, tip, lambda *_, fn=fn: fn(), "nv-clasico",
+                              *(["nv-stop"] if "stop" in ic else ["nv-play"] if "start" in ic else []))
+                b.set_sensitive(ok and not self.busy)
+                a.pack_start(b, False, False, 2)
+            return a
+
+        def cpu_text(names):
+            vals = [stats[n] for n in names if n in stats]
+            return ("%.1f %%" % sum(vals)).replace(".", ",") if vals else "—"
+        lb.connect("row-activated", lambda _l, r: r.on_click and r.on_click())
+        row(["Nombre", "ID", "Imagen", "Puertos", "CPU", "Acciones"], True)
+        projects = {p["slug"]: p for p in d["projects"]}
+        shown = 0
+        for proj in sorted({c["project"] for c in cons}):
+            items = sorted((c for c in cons if c["project"] == proj), key=lambda c: c["name"])
+            slug = proj[6:] if proj.startswith("nexum-") else ""
+            p = projects.get(slug)
+            title = p["folder"] if p else proj or "(sin proyecto)"
+            visible = [c for c in items if (not self.dk_only_up or c["state"] == "running")
+                       and (self.dk_query in c["name"].lower() or self.dk_query in title.lower())]
+            if not visible:
+                continue
+            shown += 1
+            up = all(c["state"] == "running" for c in items)
+            opened = proj in self.dk_open
+            name = Gtk.Box(spacing=8)
+            name.pack_start(icon("pan-down-symbolic" if opened else "pan-end-symbolic"), False, False, 0)
+            ic = css(Gtk.Box(), "nv-dk-icono")
+            ic.pack_start(logo("docker", 14), False, False, 0)
+            name.pack_start(ic, False, False, 0)
+            name.pack_start(label(title, "nv-dk-proyecto", ellipsize=3), False, False, 0)
+            # (en marcha: su punto verde que late; ya no hay columna Estado)
+            if up:
+                name.pack_start(label("●", "nv-verde", "nv-latido", valign=Gtk.Align.CENTER,
+                                      tooltip_text="En marcha"), False, False, 0)
+            if p:
+                php = Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                                 tooltip_text="Cambiar la versión de PHP (su BBDD y su configuración se quedan)")
+                php.connect("clicked", lambda *_, p=p: self.on_docker_php(p))
+                img_cell = Gtk.Box()
+                img_cell.pack_start(php, False, False, 0)
+                pma = label("%s:80" % p["pma"] if p["pma"].isdigit() else "—", "nv-mono", "nv-chico", "nv-enlace")
+                acts = actions([
+                    # (lo primero: arrancar o parar todos sus servicios a la vez)
+                    ("media-playback-stop-symbolic" if up else "media-playback-start-symbolic", "Parar todos sus servicios" if up else "Arrancar todos sus servicios",
+                     lambda p=p, up=up: self.run_task(("Parando %s" if up else "Arrancando %s") % p["folder"],
+                                                      ["docker-parar" if up else "docker-arrancar", p["slug"]],
+                                                      auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), True),
+                    ("web-browser-symbolic", "Abrir https://%s" % p["domain"], lambda p=p: self.open_uri("https://%s/" % p["domain"]), up),
+                    ("drive-multidisk-symbolic", "phpMyAdmin (entra con el usuario root y la contraseña de la llave)",
+                     lambda p=p: self.open_uri("http://127.0.0.1:%s/" % p["pma"]), up),
+                    ("dialog-password-symbolic", "Copiar la contraseña de root de su BBDD (para su phpMyAdmin)",
+                     lambda p=p: self.nv_docker_copy_pass(p), True),
+                    ("software-update-available-symbolic", "Actualizar la imagen de PHP %s con lo último de Docker Hub "
+                     "(parches de seguridad); la BBDD y la configuración no cambian" % p["php"],
+                     lambda p=p: self.nv_docker_update_image(p), True),
+                    ("text-x-generic-symbolic", "Registros", lambda p=p: self.run_task("Registros de %s" % p["folder"], ["docker-registros", p["slug"]]), True),
+                    ("user-trash-symbolic", "Eliminar el proyecto de Docker: sus contenedores y la copia de su BBDD "
+                     "(la carpeta y la BBDD de LAMPP no se tocan)", lambda p=p: self.on_docker_delete(p), True)])
+            else:
+                img_cell, pma, acts = label(plural(len(items), "contenedor", "contenedores"), "nv-chico", "nv-tenue"), label(""), label("")
+            row([name, label(""), img_cell, pma, label(cpu_text([c["name"] for c in items]), "nv-mono", "nv-chico", "nv-tenue"), acts],
+                on_click=lambda proj=proj: self.nv_dk_toggle(proj))
+            if not opened:
+                continue
+            for c in visible:
+                on = c["state"] == "running"
+                kn = Gtk.Box(spacing=8)
+                kn.pack_start(nv_dot(on), False, False, 0)
+                # (dentro de su proyecto, solo su parte: db-1, php-1, pma-1)
+                short = c["name"][len(proj) + 1:] if proj and c["name"].startswith(proj + "-") else c["name"]
+                kn.pack_start(label(short, "nv-mono", "nv-chico", ellipsize=3,
+                                    tooltip_text="%s · %s" % (c["name"], docker_status_text(c["status"]))), False, False, 0)
+                ports = ", ".join(pp.replace("/tcp", "").replace("127.0.0.1:", "").replace("->", ":")
+                                  for pp in c["ports"].split(", ") if "->" in pp) or "—"
+                own = bool(re.fullmatch(r"nexum-[a-z0-9-]+-(php|db|pma)-\d+", c["name"]))
+                row([kn, label(c["id"] or "—", "nv-mono", "nv-chico", "nv-tenue", selectable=True,
+                               tooltip_text="ID del contenedor"),
+                     label(c["image"], "nv-mono", "nv-chico", "nv-enlace", ellipsize=3),
+                     label(ports, "nv-mono", "nv-chico", "nv-enlace" if ports != "—" else "nv-tenue"),
+                     label(cpu_text([c["name"]]), "nv-mono", "nv-chico", "nv-tenue"),
+                     actions([("media-playback-stop-symbolic" if on else "media-playback-start-symbolic", "Parar" if on else "Arrancar",
+                               lambda c=c, on=on: self.run_task(("Parando %s" if on else "Arrancando %s") % c["name"],
+                                                                ["docker-contenedor", "parar" if on else "arrancar", c["name"]],
+                                                                auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), own),
+                              ("view-refresh-symbolic", "Reiniciar", lambda c=c: self.run_task("Reiniciando %s" % c["name"],
+                                                                                              ["docker-contenedor", "reiniciar", c["name"]], auto_close=True), own and on),
+                              ("text-x-generic-symbolic", "Registros", lambda c=c: self.run_task("Registros de %s" % c["name"],
+                                                                                                ["docker-contenedor", "registros", c["name"]]), own),
+                              ("user-trash-symbolic", "Eliminar este contenedor", lambda c=c: self.nv_container_delete(c), own)])],
+                    indent=26)
+        if not shown:
+            r = Gtk.ListBoxRow(activatable=False)
+            r.add(label("Ningún contenedor" + (" en marcha" if self.dk_only_up else "") + (" con «%s»" % self.dk_query if self.dk_query else ""),
+                        "nv-tenue", margin=14))
+            lb.add(r)
+        return lb
+
 if __name__ == "__main__":
     # Nadie con tu usuario puede leer la memoria de la ventana (donde pasa la contraseña) ni
     # engancharse a ella (PR_SET_DUMPABLE = 0)
@@ -16489,7 +23754,9 @@ if __name__ == "__main__":
     # Mismo identificador que StartupWMClass del acceso: asi el dock agrupa la ventana con su icono
     GLib.set_prgname(APP_ID)
     Gdk.set_program_class(APP_ID)
-    sys.exit(App().run([sys.argv[0]]))
+    # La ventana es App2 (desde la 1.54): App lleva toda la logica (datos, tareas y dialogos) y App2 la
+    # organizacion y el aspecto
+    sys.exit(App2().run([sys.argv[0]]))
 LVM_GUI_PY
 }
 
@@ -16580,7 +23847,8 @@ function cli_rebuild() {
         return 1
     fi
 
-    if is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ]; then
+    if is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] \
+            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; }; then
         if [ -t 1 ]; then
             echo -e "\033[1;32mEl paquete lampp-$version se encuentra actualizado.\033[0m No hay nada que actualizar."
         else
@@ -16592,6 +23860,86 @@ function cli_rebuild() {
 
     UI=text
     install_plan "rehacer:$full"
+}
+
+# actualizar-a <version> <php>: pasa una version a otro parche de PHP de su rama. Para las que no se
+# actualizan en su carpeta: una lampp-X.Y.Z (se queda en su parche) o un XAMPP (sus binarios no se
+# pueden arreglar). Instala PHP <php> con su pila propia en lampp-<php>, al lado (la de antes no se
+# toca), le copia todas las BBDD de la de antes con sus vinculos a las carpetas de los proyectos
+# (como copiar-bd: la de antes sigue igual) y, si la de antes era la activa, activa la nueva. La de
+# antes se queda hasta que la desinstales. Si <php> es el mismo parche de una pila propia sin el
+# parche de seguridad (7.4.33, 8.0.30, 8.1.34), se vuelve a compilar en su carpeta con el
+function upgrade_to() {
+    local from=$1 php=$2 to=$2 src dst old db link failed=() n=0 owner have
+    if [ -z "$from" ] || ! [[ "$php" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "Uso: lvm-instalador actualizar-a <version instalada> <version de PHP, como 8.3.36>"
+        return 1
+    fi
+    valid_version_name "$from" || { echo "Version no valida"; return 1; }
+    src=${TEST_DIR:-/opt}/lampp-$from dst=${TEST_DIR:-/opt}/lampp-$php
+    [ -d "$src" ] && [ ! -L "$src" ] || { echo "No existe la version lampp-$from"; return 1; }
+    old=$(stack_fields "$src" | cut -d'|' -f1)
+    if [ "${old%.*}" != "${php%.*}" ]; then
+        echo "lampp-$from es PHP $old: solo se pasa a otro parche de su rama (${old%.*}.x)"
+        return 1
+    fi
+    if [ "$(printf '%s\n' "$old" "$php" | sort -V | tail -1)" != "$php" ]; then
+        echo "PHP $php es anterior a PHP $old: no se actualiza hacia atras"
+        return 1
+    fi
+    if [ "$src" == "$dst" ]; then
+        if ! is_stack_install "$src" || ! php2shell_backport "$php" > /dev/null || [ -f "$src/$PHP2SHELL_MARK" ]; then
+            echo "lampp-$from ya es PHP $php: no hay nada que actualizar"
+            return 0
+        fi
+        echo "lampp-$from se vuelve a compilar con el parche de seguridad de PHP2Shell (conserva sus BBDD"
+        echo "si su MariaDB sigue en la misma rama; si no, guarda antes una copia en ~/lvm-copias)"
+        UI=text
+        install_plan "reparar:$php"
+        return
+    fi
+    # (si PHP <php> ya esta en otra carpeta, como lampp-8.2 con la 8.2.35, las BBDD van ahi)
+    have=$(php_installed_in "$php")
+    if [ -n "$have" ] && [ "$have" != "$src" ] && [ -z "$TEST_DIR" ]; then
+        dst=$have to=${have#/opt/lampp-}
+    fi
+    if [ -e "$dst" ]; then
+        if ! is_fpm_install "$dst" || [ "$(php_version "$dst")" != "$php" ]; then
+            echo "Ya existe $dst y no es PHP $php: no se cambia nada"
+            return 1
+        fi
+        echo "lampp-$to ya esta instalada: solo se le copian las BBDD de lampp-$from"
+    else
+        echo "Se instala PHP $php en lampp-$to, al lado de lampp-$from (que no se toca)"
+        UI=text
+        install_plan "php:$php" || return 1
+        [ "$DRY" -eq 1 ] && { echo "  [simulacion] copia de las BBDD de lampp-$from a lampp-$to y sus vinculos"; return 0; }
+    fi
+    owner=$(data_owner "$src")
+    if [ -n "$owner" ] && [ "$owner" != "$from" ]; then
+        echo "lampp-$from usa las BBDD de lampp-$owner: no se copia ninguna (copialas con copiar-bd si las quieres)"
+    else
+        for db in $(db_names "$src"); do
+            n=$((n + 1))
+            echo ""
+            echo "== BBDD $db =="
+            link=$(linked_folder "$db" "$from")
+            # (cada copia en un subproceso: copiar-bd usa trap y exit)
+            if ! ( copy_database "$db" "$from" "$to" ${link:+--carpeta "$link"} ); then
+                failed+=("$db")
+            fi
+        done
+    fi
+    echo ""
+    if [ "$(active_dir)" == "$src" ]; then
+        echo "lampp-$from era la activa: se activa lampp-$to"
+        ( use_lampp "$to" ) || echo "No se ha podido activar lampp-$to: activala en Versiones"
+    fi
+    echo "Copiadas $((n - ${#failed[@]})) de $n BBDD de lampp-$from a lampp-$to."
+    [ ${#failed[@]} -gt 0 ] && echo "No se han podido copiar: ${failed[*]} (copialas con copiar-bd)"
+    echo "lampp-$from se queda como estaba: cuando compruebes que todo va bien con lampp-$to,"
+    echo "desinstalala (Versiones, menu ⋮ de la version, Desinstalar)."
+    [ ${#failed[@]} -eq 0 ]
 }
 
 if [ "$1" == "--simular" ]; then
@@ -16691,7 +24039,7 @@ function update_pma() {
     fi
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-pma.XXXXXX") || return 1
     sum=$(pma_sum "$want")
-    if ! download "https://files.phpmyadmin.net/phpMyAdmin/$want/phpMyAdmin-$want-all-languages.tar.xz" "$tmp/pma.tar.xz" "$sum" \
+    if ! download_signed "https://files.phpmyadmin.net/phpMyAdmin/$want/phpMyAdmin-$want-all-languages.tar.xz" "$tmp/pma.tar.xz" "$sum" "$GPG_FPR_PMA" \
             || ! tar -xJf "$tmp/pma.tar.xz" -C "$tmp"; then
         rm -rf "$tmp"
         return 1
@@ -16775,7 +24123,7 @@ case "$1" in
     status|estado) echo -e "$(status_text)" ;;
     disable) disable_lampp ;;
     remove|desinstalar) cli_remove "$2" "$3" ;;
-    ventana|gui) gui_open ;;
+    ventana|gui|ventana-nueva) gui_open ;;
     arrancar|start) control_lampp start ;;
     parar|stop) control_lampp stop ;;
     reiniciar|restart) control_lampp restart ;;
@@ -16783,6 +24131,17 @@ case "$1" in
     gui-paquete) gui_package ;;
     gui-ramas) gui_branches ;;
     gui-fechas) gui_php_dates ;;
+    gui-docker) gui_docker ;;
+    docker-instalar) docker_install ;;
+    docker-crear) shift; docker_create "$@" ;;
+    docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" ;;
+    docker-php) docker_set_php "$2" "$3" ;;
+    docker-imagen) docker_update_image "$2" ;;
+    docker-contenedor) docker_container_action "$2" "$3" ;;
+    docker-imagenes) docker_image_action "$2" "$3" ;;
+    docker-volumen-borrar) docker_volume_remove "$2" ;;
+    gui-docker-estadisticas) gui_docker_stats ;;
+    gui-bbdd-tamanos) gui_db_sizes ;;
     gui-parches) gui_patches "$2" ;;
     gui-al-dia) gui_up_to_date "$2" ;;
     gui-crear-acceso) write_launcher ;;
@@ -16807,6 +24166,20 @@ case "$1" in
     gui-servicios) gui_services ;;
     servicio) service_control "$2" "$3" ;;
     asegurar) secure_command "$2" ;;
+    construir-pila)
+        # (solo lo lanza install_stack, con sudo -u nexum-build: las variables, en un fichero de root)
+        if [ "$(id -un)" != "$BUILD_USER" ] || [ ! -f "$2" ] || [ "$(stat -c %u "$2")" != 0 ]; then
+            echo "construir-pila solo lo usa install_stack"
+            exit 1
+        fi
+        . "$2"
+        cd "$build" || exit 1
+        function stack_fail() { stack_child_fail; }
+        STEP_LOG="" STEP_DESC=""
+        stack_build_phase
+        ;;
+    barrera-web|barrera-webs) cross_site_command "$2" ;;
+    correo) mail_command "$2" "$3" ;;
     reparar-bd-sistema) repair_db_system ;;
     arreglar-certificados) fix_certs ;;
     confiar-certificados) browser_trust "$2" ;;
@@ -16821,6 +24194,7 @@ case "$1" in
     add) register_lampp "$2" ;;
     add-php) UI=text; install_plan "php:$2" ;;
     rehacer|actualizar) cli_rebuild "$2" ;;
+    actualizar-a) upgrade_to "$2" "$3" ;;
     add-xampp) ( install_xampp "$2" ) ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;

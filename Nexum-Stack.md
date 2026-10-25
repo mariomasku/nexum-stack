@@ -1,13 +1,13 @@
-# Nexum Stack (lvm-instalador)
+# Nexum Dev Stack (lvm-instalador)
 
 **Gestor de entornos locales de desarrollo para Linux y Mac**
-Versión actual: **Linux 1.50.0** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
+Versión actual: **Linux 1.55.3** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
 
 ---
 
 ## 1. Resumen
 
-Nexum Stack es una aplicación con ventana propia (y también comandos para la terminal) que permite tener **varias versiones de PHP en el mismo equipo**, cada una con su servidor web, su base de datos y sus herramientas, y **cambiar de una a otra con un clic**.
+Nexum Dev Stack es una aplicación con ventana propia (y también comandos para la terminal) que permite tener **varias versiones de PHP en el mismo equipo**, cada una con su servidor web, su base de datos y sus herramientas, y **cambiar de una a otra con un clic**.
 
 Además automatiza todo lo que antes había que hacer a mano siguiendo el manual interno de XAMPP: dar de alta proyectos, crear certificados, editar los virtual hosts, falsear dominios en `/etc/hosts`, cargar y descargar bases de datos, ajustar permisos y revisar errores del servidor.
 
@@ -169,7 +169,7 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 - **Instalar:** el `.deb` de cada versión está en las [publicaciones del repositorio](https://github.com/mariomasku/nexum-stack/releases).
 - **Actualizar:** en la aplicación, pulsar **Buscar actualizaciones** (menú ☰ o Herramientas). Busca la última versión publicada en GitHub, comprueba su firma, muestra su fecha y su huella y la instala tras pedir la contraseña. Sin conexión, busca un `.deb` firmado en **Descargas**.
 - Algunas versiones cambian el programa que instala las actualizaciones y hay que instalarlas una vez en la terminal (`sudo apt install ./lvm-instalador_<versión>_all.deb`); la aplicación lo detecta y da la orden lista para copiar. La 1.50.0 es una de ellas.
-- Se abre desde el menú de aplicaciones: **Nexum Stack**.
+- Se abre desde el menú de aplicaciones: **Nexum Dev Stack**.
 
 ### Mac (Apple Silicon: M1 o posterior)
 
@@ -226,7 +226,7 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 
 ## 8. Estado y pendientes
 
-- **Linux:** versión 1.50.0, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
-- **Mac:** versión 1.36.0, con las mismas funciones que Linux. Se probó a fondo en un Mac real hasta la 1.12.0; las versiones posteriores pasan la batería de pruebas automáticas, pero quedan por comprobar en un Mac real "Apartar" con un XAMPP oficial de un compañero y que el navegador acepte los certificados de los proyectos. La versión de Mac todavía no lleva el nombre Nexum Stack.
+- **Linux:** versión 1.55.3, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
+- **Mac:** versión 1.36.0, con las mismas funciones que Linux. Se probó a fondo en un Mac real hasta la 1.12.0; las versiones posteriores pasan la batería de pruebas automáticas, pero quedan por comprobar en un Mac real "Apartar" con un XAMPP oficial de un compañero y que el navegador acepte los certificados de los proyectos. La versión de Mac todavía no lleva el nombre Nexum Dev Stack.
 - **Actualizaciones desde GitHub:** desde la 1.50.0. Pendiente de la primera prueba completa: publicar la 1.50.1 e instalarla con **Buscar actualizaciones**.
 - **Manual interactivo:** pendiente de rehacer con datos de ejemplo (las capturas actuales son de un equipo real).

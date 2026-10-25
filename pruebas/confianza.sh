@@ -11,7 +11,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-conf.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
-MAC=0; grep -q '^    BASE_DIR=/Applications$' "$SRC" && MAC=1
+MAC=0; grep -qE '^    BASE_DIR=(/Applications|/Library/Nexum)$' "$SRC" && MAC=1
 extract "$SRC" run valid_domain vhosts_info browser_trust || exit 1
 eval "$(sed -n "/^TRUST_PY='/,/^'\$/p" "$SRC")"
 [ -n "$TRUST_PY" ] || { echo "no esta TRUST_PY"; exit 1; }
@@ -148,7 +148,8 @@ if [ $MAC -eq 0 ]; then
     check "cert_audit --clave: sin ellas (arreglar no las usa)" '! HOME=$W/casa cert_audit --clave | grep -q "^T|"'
     check "la ventana recibe G|dominio de los que aun avisan" "grep -qF '\$1 == \"T\" && \$5 == \"0\" { print \"G|\" \$2 }' \"\$SRC\""
     check "ventana: aviso con el boton Confiar" 'grep -q "\"confiar-certificados\"\]" "$SRC" && grep -q "El navegador avisa al abrir estos proyectos" "$SRC"'
-    check "se confia solo al crear el vhost de web.local y el de una tienda" '[ "$(grep -c "^    browser_trust \"\$\(name\|domain\)\" || true$" "$SRC")" -eq 2 ]'
+    # (desde la 1.53, tambien el vhost de un proyecto en Docker: docker_create)
+    check "se confia solo al crear el vhost de web.local, el de una tienda y el de Docker" '[ "$(grep -c "^    browser_trust \"\$\(name\|domain\)\" || true$" "$SRC")" -eq $(grep -q "^function docker_create" "$SRC" && echo 3 || echo 2) ]'
 else
     # Mac: add-trusted-cert con tu usuario (sin sudo), solo ssl, al llavero de inicio de sesion
     security() { echo "SEC $*" >> "$W/sec.log"; }

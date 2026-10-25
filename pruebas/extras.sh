@@ -35,7 +35,7 @@ sed -i 's/^127.0.0.1 tienda.local$/#127.0.0.1 tienda.local/' "$W/h"
 hosts_fake cargar nueva.com > /dev/null
 check "hosts: un .local comentado a mano vuelve a añadirse al cargar otro proyecto" 'grep -q "^127.0.0.1 tienda.local$" "$W/h"'
 # Desde la 1.50.1 un .local se puede apagar en la pestaña Hosts (hosts-falsear): se recuerda, con su
-# www., y ya no se vuelve a añadir; al encenderlo se olvida (solo Linux: el Mac aun no lo tiene)
+# www., y ya no se vuelve a añadir; al encenderlo se olvida (Mac desde la 1.37.0)
 if grep -q '^function local_off() {' "$SRC"; then
 extract "$SRC" local_off hosts_fake_one || exit 1
 DRY=0 LOCAL_OFF_FILE=$W/apagados
@@ -100,7 +100,9 @@ DRY=0
 
 # --- vhosts: certificados solo del gestor y registros sin nombres de control ---
 VC=$(getvar VHOSTS_CHECK_PY); VC=${VC%.}
-if grep -q "XAMPP-compartido/ssl/" <<< "$VC"; then SSLD=/Applications/XAMPP-compartido/ssl; else SSLD=/opt/config/ssl; fi
+# (en el Mac, desde la 1.39.3, en /Library/Nexum)
+if grep -q "Library/Nexum/XAMPP-compartido/ssl/" <<< "$VC"; then SSLD=/Library/Nexum/XAMPP-compartido/ssl
+elif grep -q "XAMPP-compartido/ssl/" <<< "$VC"; then SSLD=/Applications/XAMPP-compartido/ssl; else SSLD=/opt/config/ssl; fi
 vc() { printf '%b' "$1" > "$W/v.conf"; python3 -I -c "$VC" "$W/v.conf" > /dev/null; }
 check "vhosts: certificado del gestor pasa" 'vc "<VirtualHost *:443>\nSSLCertificateFile \"$SSLD/a.com.crt\"\nSSLCertificateKeyFile $SSLD/a.com.key\n</VirtualHost>\n"'
 check "vhosts: clave de otro servicio no pasa" '! vc "<VirtualHost *:443>\nSSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key\n</VirtualHost>\n"'

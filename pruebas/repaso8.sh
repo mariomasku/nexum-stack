@@ -8,7 +8,7 @@
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-r8.XXXX") || exit 1
-MAC=0; grep -q '^    BASE_DIR=/Applications$' "$SRC" && MAC=1
+MAC=0; grep -qE '^    BASE_DIR=(/Applications|/Library/Nexum)$' "$SRC" && MAC=1
 SOCKD=$W; [ ${#SOCKD} -gt 80 ] && SOCKD=$(mktemp -d /tmp/lvm-r8.XXXX)
 SLEEPER=""
 cleanup() {
@@ -195,7 +195,7 @@ imp=$(awk '/^function import_database\(\)/,/^}/' "$SRC")
 e=$(grep -n "information_schema.ENGINES" <<< "$imp" | head -1 | cut -d: -f1)
 d=$(grep -n "DROP DATABASE" <<< "$imp" | head -1 | cut -d: -f1)
 check "vaciar: los motores se miran antes de borrar la base" '[ -n "$e" ] && [ -n "$d" ] && [ "$e" -lt "$d" ]'
-# (desde la 1.50.1 de Linux un .local se puede apagar a mano: lo prueba extras.sh)
+# (desde la 1.50.1 de Linux y la 1.37.0 de Mac un .local se puede apagar a mano: lo prueba extras.sh)
 if ! grep -q '^function local_off() {' "$SRC"; then
 extract "$SRC" hosts_fake_one || exit 1
 valid_domain() { return 0; }

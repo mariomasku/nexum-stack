@@ -17,8 +17,9 @@ Por defecto prueba:
 
   - Linux: ../lvm-instalador.sh
     (es decir, el lvm-instalador.sh de la carpeta de arriba)
-  - Mac: el lvm-instalador.sh del zip más reciente de
-    ../macos/lvm-instalador-mac-*.zip (se saca a la carpeta temporal)
+  - Mac: ../macos/lvm-instalador.sh o, si no está, el lvm-instalador.sh
+    del zip más reciente de ../macos/lvm-instalador-mac-*.zip (se saca a
+    la carpeta temporal)
   - El empaquetador: ../empaquetar-deb.sh
   - El script xampp antiguo del Mac: datos/mac-1.27.1-xampp.sh
 
@@ -149,10 +150,10 @@ LOS FICHEROS
                       WordPress y PrestaShop 1.7 y 1.6, con un MariaDB
                       temporal: sin tocar a los de verdad ni duplicarse.
   vinculos.sh         BBDD vinculadas a la carpeta de su proyecto en cada
-                      versión (1.51.0): vincular-bd, --unica, gui-proyectos
-                      (V|), copiar-bd --como/--carpeta en simulación,
-                      carpetas con la versión completa, gui-fechas y el
-                      nombre propuesto en la ventana.
+                      versión (1.51.0 / Mac 1.38.0): vincular-bd, --unica,
+                      gui-proyectos (V|), copiar-bd --como/--carpeta en
+                      simulación, carpetas con la versión completa,
+                      gui-fechas y (Linux) el nombre propuesto en la ventana.
 
   Solo Linux:
   ayudante.sh         lvm-actualizar: paquetes buenos y manipulados (con una
@@ -167,11 +168,26 @@ LOS FICHEROS
                       exportadas, SHELLOPTS, PS4 ni variables de prueba).
   raiz.sh             Lo que hace root sobre carpetas tuyas: enlaces de lo
                       compilado, .pid del MariaDB temporal, secure_lampp.
+  correo.sh           Correo de pruebas con Mailpit (1.55.0): sendmail_path
+                      y auto_prepend_file en las pilas propias y el php.ini
+                      de XAMPP (y como estaba al apagarlo), mail() de PHP y
+                      el fichero de WordPress (de mentira y, si hay uno en
+                      /opt/htdocs, con su plugin.php) contra un Mailpit
+                      falso, arrancar y parar con la versión, instalar con
+                      su sha256, la orden correo y, con un MariaDB
+                      temporal, los plugins de WordPress y el correo de
+                      PrestaShop en la copia local y que no salen en las
+                      copias (exportar-bd). Sin red.
 
   Solo Mac:
   mac-xampp.sh        El parche de SECURE_PY al script xampp de la 1.27 y el
                       script xampp nuevo.
   mac-procesos.sh     lampp_processes del Mac con una salida de ps inventada.
+  mac-actualizar.sh   Buscar actualizaciones del Mac (1.38.0): elegir la
+                      versión de Mac más nueva de las publicaciones de
+                      GitHub (JSON inventado), la firma con una clave de
+                      prueba y actualizar-gestor (firma mala, versión vieja,
+                      zip raro, simulación). Sin red.
 
   Aparte (no está en todas.sh):
   real-secure.sh      Qué cambiaría SECURE_PY en las versiones instaladas

@@ -1,16 +1,16 @@
-# lvm-instalador · Nexum Stack
+# lvm-instalador · Nexum Dev Stack
 
 Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP y Perl) para Linux. Todo va en un solo archivo: `lvm-instalador.sh`.
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
-**Versión actual: 1.52.0** · [Novedades de todas las versiones](CHANGELOG.md)
+**Versión actual: 1.55.3** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe
 
 XAMPP ya no saca versiones con los PHP nuevos: la última es la 8.2. Muchos proyectos ya necesitan PHP 8.3, 8.4 o 8.5, y otros siguen necesitando PHP 7.x.
 
-Nexum Stack monta por su cuenta un LAMPP para **cada versión de PHP que existe**. Cada uno funciona como un **XAMPP virtual**: tiene su propio Apache, PHP, MariaDB, Perl, ProFTPD y phpMyAdmin en su carpeta `/opt/lampp-X.Y`, con sus propias bases de datos y la misma forma de uso que un XAMPP (`/opt/lampp/lampp start`, `http://127.0.0.1/phpmyadmin`…).
+Nexum Dev Stack monta por su cuenta un LAMPP para **cada versión de PHP que existe**. Cada uno funciona como un **XAMPP virtual**: tiene su propio Apache, PHP, MariaDB, Perl, ProFTPD y phpMyAdmin en su carpeta `/opt/lampp-X.Y`, con sus propias bases de datos y la misma forma de uso que un XAMPP (`/opt/lampp/lampp start`, `http://127.0.0.1/phpmyadmin`…).
 
 ## Qué hace
 
@@ -76,7 +76,7 @@ chmod +x lvm-instalador.sh
 
 La primera vez pregunta si quieres crear los **accesos directos**. Responde **Sí** y escribe tu contraseña de `sudo` (no se ve al escribirla; es normal). Se crean:
 
-- El icono **«Nexum Stack»** en el menú de aplicaciones, que abre la [ventana gráfica](#la-ventana).
+- El icono **«Nexum Dev Stack»** en el menú de aplicaciones, que abre la [ventana gráfica](#la-ventana).
 - El comando **`lvm-instalador`**, para abrirlo desde cualquier terminal.
 - El comando corto **`lvm`** (`lvm use 8.4`…), solo si el equipo no tiene ya otro comando con ese nombre.
 
@@ -90,7 +90,7 @@ Si vienes de una versión anterior con el comando `pvm-instalador`, el instalado
 
 ### 4. Instalar la primera versión de PHP
 
-1. Abre **«Nexum Stack»** desde el menú de aplicaciones y ve a la pestaña **Instalar** (en la terminal: `lvm-instalador instalador`).
+1. Abre **«Nexum Dev Stack»** desde el menú de aplicaciones y ve a la pestaña **Instalar** (en la terminal: `lvm-instalador instalador`).
 2. Marca la versión de PHP que necesites, por ejemplo **PHP 8.4.x**. Si también tienes proyectos antiguos, marca además **XAMPP 8.2.4-0** (dentro de «XAMPP oficiales»). Las versiones de PHP no necesitan ningún XAMPP.
 3. Pulsa **Instalar** y escribe la contraseña de `sudo` cuando la pida. A partir de ahí todo es automático: cada versión de PHP tarda entre 7 y 20 minutos en compilarse, según el equipo.
 4. Al terminar, pulsa **Activar lampp-8.4** (en la terminal, el panel pregunta si quieres activarla).
@@ -126,7 +126,7 @@ Lo que no cambia, a propósito: MariaDB con root sin contraseña y Apache con tu
 
 ## Uso diario
 
-Abre la ventana desde el menú de aplicaciones (**«Nexum Stack»**) o usa la terminal:
+Abre la ventana desde el menú de aplicaciones (**«Nexum Dev Stack»**) o usa la terminal:
 
 ```bash
 lvm-instalador ventana         # ventana gráfica (la que abre el icono del menú)
@@ -150,7 +150,7 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
 
 ## La ventana
 
-![Ventana de Nexum Stack](capturas/ventana.png)
+![Ventana de Nexum Dev Stack](capturas/ventana.png)
 
 `lvm-instalador ventana` (o el icono del menú) abre una ventana con cuatro pestañas. Las explicaciones de cada bloque están en el símbolo de información (ⓘ) junto a su título: se ven al pasar el ratón por encima.
 

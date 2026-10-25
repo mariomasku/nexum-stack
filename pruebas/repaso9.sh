@@ -11,7 +11,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-r9.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
-MAC=0; grep -q '^    BASE_DIR=/Applications$' "$SRC" && MAC=1
+MAC=0; grep -qE '^    BASE_DIR=(/Applications|/Library/Nexum)$' "$SRC" && MAC=1
 getvar() { ( eval "$(sed -n "/^$1='/,/^'\$/p" "$SRC")"; printf '%s.' "${!1}" ); }
 
 # --- El cliente de MariaDB y mysqldump, sin ~/.my.cnf ni $MYSQL_HOME/my.cnf
@@ -289,7 +289,10 @@ if [ $MAC -eq 1 ]; then
     vc() { printf '<VirtualHost *:80>\n    ServerName a.local\n    %s\n</VirtualHost>\n' "$1" > "$W/v.conf"; python3 -I -c "$VHOSTS_CHECK_PY" "$W/v.conf" > /dev/null; }
     check "Mac: registro por /Applications/XAMPP/... (el enlace): no" '! vc "ErrorLog \"/Applications/XAMPP/xamppfiles/logs/a-error_log\""'
     check "Mac: certificado por /Applications/XAMPP/... (el enlace): no" '! vc "SSLCertificateFile /Applications/XAMPP/xamppfiles/etc/ssl.crt/a.crt"'
-    check "Mac: registro por logs/ o por una version: si" 'vc "ErrorLog logs/a-error_log" && vc "CustomLog /Applications/XAMPP-8.4/xamppfiles/logs/a common"'
+    # (las versiones, desde la 1.39.3 en /Library/Nexum: por /Applications, que lo puede cambiar el grupo admin, no)
+    VB=/Applications; grep -q '^    BASE_DIR=/Library/Nexum$' "$SRC" && VB=/Library/Nexum
+    check "Mac: registro por logs/ o por una version: si" 'vc "ErrorLog logs/a-error_log" && vc "CustomLog $VB/XAMPP-8.4/xamppfiles/logs/a common"'
+    [ "$VB" == /Library/Nexum ] && check "Mac: registro por /Applications/XAMPP-8.4 (el enlace de antes de la 1.39.3): no" '! vc "CustomLog /Applications/XAMPP-8.4/xamppfiles/logs/a common"'
     OLD_LOGS_SED=$(getvar OLD_LOGS_SED); OLD_LOGS_SED=${OLD_LOGS_SED%.}
     printf '    ErrorLog "/Applications/XAMPP/xamppfiles/logs/a-error_log"\n  CustomLog /Applications/XAMPP/xamppfiles/logs/b common\n  SSLCertificateKeyFile "/Applications/XAMPP/xamppfiles/etc/ssl.key/s.key"\n' > "$W/viejo.conf"
     sed -E "$OLD_LOGS_SED" "$W/viejo.conf" > "$W/nuevo.conf"

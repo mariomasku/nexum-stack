@@ -79,6 +79,12 @@ check "parada de reserva: un pid raro o sin socket no hace nada" 'db_temp_kill_l
 eval "$(sed -n "/^SECURE_PY='/,/^'\$/p;/^UNKNOWN_HOST_VHOST='/,/^'\$/p;/^UNKNOWN_HOST_SSL='/,/^'\$/p" "$SRC")"
 UNKNOWN_HOST_CONF=$(grep -m1 '^UNKNOWN_HOST_CONF=' "$SRC" | cut -d= -f2)
 extract "$SRC" secure_lampp || exit 1
+# (1.54.1: el texto de lvm-dominio-desconocido.conf segun la barrera entre webs)
+if grep -q '^function host_vhost() {' "$SRC"; then
+    extract "$SRC" host_vhost cross_site_on || exit 1
+    CROSS_SITE_OFF=$W/sin-barrera
+    eval "$(sed -n '/^PHP_SECURE_INI=/,/^PHP_SECURE_INI_85=/p' "$SRC")"
+fi
 has_ipv6_loopback() { return 0; }
 V=$W/lampp-9.9; mkdir -p "$V/etc/extra"
 printf 'Listen 80\nInclude etc/extra/httpd-vhosts.conf\n' > "$V/etc/httpd.conf"; : > "$V/etc/extra/httpd-vhosts.conf"
@@ -97,7 +103,7 @@ check "simulacion: dice lo que cambiaria sin sudo" '[ $rc = 0 ] && grep -q "secu
 check "simulacion: no cambia nada" '! grep -q "secure-file-priv" "$V/etc/my.cnf" && [ ! -d "$V/etc/lvm-sin-ficheros" ]'
 DRY=0
 out=$(secure_lampp "$V"); rc=$?
-check "secure_lampp: SECURE_PY lo ejecuta root (sudo env ... python3)" 'grep -q "^SUDO env LVM_SECURE_APPLY=1 LVM_FTP_USER=$(id -un) /usr/bin/python3 -I -c" "$W/sudo.log"'
+check "secure_lampp: SECURE_PY lo ejecuta root (sudo env ... python3)" 'grep -q "^SUDO env LVM_SECURE_APPLY=1 LVM_FTP_USER=$(id -un) .*/usr/bin/python3 -I -c" "$W/sudo.log"'
 check "secure_lampp: en una carpeta de root (sudo mktemp)" 'grep -q "^SUDO mktemp -d /tmp/lvm-seguridad" "$W/sudo.log"'
 check "secure_lampp: root copia con sh -c cat (no lee tu usuario la carpeta)" 'grep -q "^SUDO sh -c cat \"\$1\" > \"\$2\" sh /tmp/lvm-seguridad" "$W/sudo.log"'
 check "secure_lampp: carpeta vacia creada antes que el my.cnf" '[ -d "$V/etc/lvm-sin-ficheros" ] && [ "$(grep -n "^SUDO install -d" "$W/sudo.log" | cut -d: -f1)" -lt "$(grep -n "^SUDO sh -c .*etc/my.cnf$" "$W/sudo.log" | cut -d: -f1)" ]'

@@ -41,7 +41,7 @@ pulsa "Instalar" y escribe tu contraseña.
 El paquete de cada versión está en las publicaciones (Releases) del
 repositorio: https://github.com/mariomasku/nexum-stack/releases
 
-ACTUALIZAR: abre "Nexum Stack" y pulsa "Buscar actualizaciones" (menú
+ACTUALIZAR: abre "Nexum Dev Stack" y pulsa "Buscar actualizaciones" (menú
 ☰ o Herramientas). Desde la 1.50.0 busca la última versión publicada
 en GitHub, comprueba que está firmada por quien hace el programa y te
 ofrece "Actualizar a la <versión>". Pide tu contraseña en una ventana,
@@ -53,7 +53,7 @@ También puedes actualizar desde una terminal, con el .deb descargado:
       sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
 
 - Se instala en /opt/lvm-instalador. El comando lvm-instalador y el
-  icono "Nexum Stack" del menú apuntan ahí, también si ya
+  icono "Nexum Dev Stack" del menú apuntan ahí, también si ya
   tenías una versión anterior descomprimida en otra carpeta.
 - Si el doble clic abre otro programa: botón derecho > "Abrir con" >
   "Centro de aplicaciones", o usa el comando de la terminal de arriba.
@@ -108,7 +108,7 @@ La primera vez te pregunta si quieres crear los accesos directos.
 Responde "Si" y escribe tu contraseña (al escribirla no se ve nada en
 pantalla; es normal). Se crean:
 
-  - El icono "Nexum Stack" en el menú de aplicaciones.
+  - El icono "Nexum Dev Stack" en el menú de aplicaciones.
   - El comando "lvm-instalador" para abrirlo desde cualquier terminal.
 
 A partir de ahora puedes abrirlo desde el menú de aplicaciones, sin
@@ -153,7 +153,7 @@ https y su línea en /etc/hosts) y te pide la contraseña de sudo.
 PASO 5. INSTALAR TU PRIMERA VERSIÓN DE PHP
 ------------------------------------------
 
-Con la ventana gráfica (icono "Nexum Stack" del menú):
+Con la ventana gráfica (icono "Nexum Dev Stack" del menú):
 
 1. Ve a la pestaña "Instalar".
 2. Marca la versión que quieras (por ejemplo PHP 8.4) y pulsa

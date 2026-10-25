@@ -1,5 +1,5 @@
 #!/bin/bash
-# Crea el paquete .deb de Nexum Stack a partir de lvm-instalador.sh (la version sale de
+# Crea el paquete .deb de Nexum Dev Stack a partir de lvm-instalador.sh (la version sale de
 # su APP_VERSION, el icono de su ICON_PNG_B64 y la clave de las firmas de su UPDATE_KEY_B64).
 # Doble clic sobre el .deb = instalar o actualizar.
 #
@@ -253,7 +253,7 @@ sed -i "s/@UPDATE_KEY_FPR@/$KEY_FPR/" "$ROOT$DEST/lvm-actualizar"
 cat > "$ROOT/usr/share/applications/lampp-version-manager.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Nexum Stack
+Name=Nexum Dev Stack
 Comment=Instalar, cambiar y desinstalar versiones de XAMPP y PHP
 Exec=$DEST/lvm-instalador.sh ventana
 Terminal=false
@@ -272,7 +272,7 @@ Depends: bash, curl, python3, sudo, openssl, binutils, gpgv
 Recommends: python3-gi, gir1.2-gtk-3.0, whiptail
 Installed-Size: $(du -ks "$ROOT" | cut -f1)
 Maintainer: M.Mascuñano - HEXER <soporte@hexer.dev>
-Description: Nexum Stack: varias versiones de PHP con su LAMPP
+Description: Nexum Dev Stack: varias versiones de PHP con su LAMPP
  Gestor e instalador de versiones LAMPP y PHP para Linux. Monta un LAMPP
  (Apache, PHP-FPM, MariaDB, ProFTPD, Perl y phpMyAdmin) por cada version de
  PHP en /opt/lampp-X.Y, cambia la version activa, carga y descarga bases de

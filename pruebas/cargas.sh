@@ -5,7 +5,7 @@
 # Uso: cargas.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
-MAC=0; grep -q '^    BASE_DIR=/Applications$' "$SRC" && MAC=1
+MAC=0; grep -qE '^    BASE_DIR=(/Applications|/Library/Nexum)$' "$SRC" && MAC=1
 MDB=$(mktemp -d "$TMPBASE/w-carga.XXXX") || exit 1
 SOCKD=$MDB; [ ${#SOCKD} -gt 80 ] && SOCKD=$(mktemp -d /tmp/lvm-mdb.XXXX)
 trap 'kill "$(cat "$MDB/pid" 2> /dev/null)" 2> /dev/null; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
