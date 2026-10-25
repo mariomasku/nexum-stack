@@ -4,6 +4,18 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.55.3 · 25 oct 2026
+
+- **Cargar un proyecto es todo o nada:** la contraseña se pide antes de cambiar nada y, si se cancela o falla un paso, se queda el proyecto que había (el enlace del vhost, la versión activa y Apache, como estaban). Antes podía quedar a medias: cargado en la ventana y la web sin estilos.
+
+## 1.55.2 · 25 oct 2026
+
+- Al cargar un proyecto, el visor pasa a él en cuanto termina la carga, con sus botones, sin esperar a volver a leer todo. Elegir un proyecto de la lista es instantáneo (antes se rehacía la lista entera).
+
+## 1.55.1 · 25 oct 2026
+
+- **Mailpit:** se instala aunque el paquete cambie de forma; si no se puede, dice por qué y desde dónde descargarlo a mano.
+
 ## 1.55.0 · 25 oct 2026
 
 - **Correo de pruebas con Mailpit:** lo que mandan las webs de este equipo (formularios, pedidos, contraseñas) no llega a nadie, se ve en su bandeja (botón Correo, arriba, con los correos sin leer). Encendido por defecto; se apaga en Configuración. Mailpit arranca y para con la versión activa, con tu usuario y solo en 127.0.0.1.
@@ -13,6 +25,8 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 - Lo que se cambia en las BBDD para el correo no va en las copias (exportar-bd, copiar-bd, Docker): llevan el correo de producción. Al apagarlo o elegir «No tocarlos», se deshace al cargar el proyecto.
 - **En la terminal:** lvm-instalador correo (estado, si, no, wordpress mailpit|desactivar|nada, instalar, vaciar y bd <base>).
 - **Docker:** sus proyectos aún no mandan a Mailpit.
+- La versión del programa va arriba, detrás de «Entornos LAMPP y Docker» (abajo de la barra lateral ya no va la firma: está en Acerca de).
+- **Versiones de PHP:** una versión vulnerable ya no sale también como «Actualizada», y los tres puntos ya no enseñan «Más» al pasar el ratón.
 
 ## 1.54.3 · 25 oct 2026
 
