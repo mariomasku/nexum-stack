@@ -4,6 +4,42 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.55.10 · 26 oct 2026
+
+- **PrestaShop 1.7+ en Docker y en LAMPP a la vez:** la tienda ya no deja de funcionar en LAMPP (error 500, «Link to database cannot be established») después de abrirla en Docker. Su caché (var/cache), que guarda la BBDD, va en Docker en un volumen del contenedor; y al cargarla, una caché con otra BBDD (la de Docker o la de producción) se aparta a `~/lvm-copias` y se rehace sola.
+
+## 1.55.9 · 26 oct 2026
+
+- **Docker:** cada proyecto, al desplegar su fila, tiene su visor, como el del proyecto cargado: su nombre, versiones, dominio y si está en marcha, con «Abrir web», «Panel», «phpMyAdmin», «VS Code», «Log» (los errores de su PHP) y Arrancar o Parar. Parado, la web, el panel y phpMyAdmin se apagan.
+- **Docker, Panel:** entra en el WordPress o la tienda PrestaShop del contenedor con el administrador de pruebas ya escrito (local@local.test, contraseña local). Se pone en su BBDD al crearlo con una copia y, si falta, al pulsar Panel (lvm-instalador docker-usuario-pruebas <nombre>). Las copias que salen de LAMPP siguen sin él.
+- **Docker, phpMyAdmin:** al pulsarlo se copia la contraseña de root.
+- En la lista de proyectos, «Montar en Docker» en la fila de los que tienen contenedores.
+- **Tema claro:** texto blanco sobre el azul al pasar el ratón.
+
+## 1.55.8 · 26 oct 2026
+
+- **Proyecto cargado:** «Añadir entorno…» e «Importar SQL» pasan al recuadro del entorno y la BBDD; la fila de abajo queda para los accesos directos del proyecto, con ⋮ a la derecha. El logotipo de WordPress o PrestaShop, sin recuadro. Sin la explicación debajo de «Proyectos».
+
+## 1.55.7 · 26 oct 2026
+
+- **Proyecto cargado:** botón «Log» junto a sus botones, con el final del registro de errores de su web (el de su vhost), para ver al momento por qué da un error 500.
+
+## 1.55.6 · 26 oct 2026
+
+- Al abrir el programa busca solo si hay una versión nueva y la ofrece. Si se dice que no, no vuelve a preguntar por esa versión al abrirlo (solo avisa); sigue en el menú, Buscar actualizaciones.
+- **Proyectos:** arriba se queda siempre el proyecto cargado, con sus botones; pulsar otro en la lista solo lo marca. Cada fila, al pasar el ratón, tiene «Cargar» y un menú ⋮ (añadir entorno en otra versión o en Docker, importar SQL, vincular sus BBDD, abrir la carpeta…).
+- **Tema claro:** «Encendidos» en azul (el verde no se veía sobre el gris).
+- **Docker:** el aviso del Docker de Ubuntu (el que va como administrador) explica qué es y por qué conviene apagarlo.
+
+## 1.55.5 · 26 oct 2026
+
+- Copiar una BBDD a una versión con un MariaDB antiguo (como de la 8.2 a la 7.4) ya no falla con «Unknown command '\-'»: la descarga lleva una sola línea del modo sandbox y la carga las quita todas.
+
+## 1.55.4 · 26 oct 2026
+
+- Interruptores que piden la contraseña de administrador (barrera entre webs, correo de pruebas y su modo de WordPress, los .local de Dominios y hosts): si se cancela, no cambia nada y el interruptor vuelve a su sitio. Si no se puede aplicar, se deja como estaba.
+- **Proyectos:** el asistente de proyecto nuevo (clonar de git, con su versión y su BBDD) se abre con el botón azul «Nuevo proyecto…» de la lista.
+
 ## 1.55.3 · 25 oct 2026
 
 - **Cargar un proyecto es todo o nada:** la contraseña se pide antes de cambiar nada y, si se cancela o falla un paso, se queda el proyecto que había (el enlace del vhost, la versión activa y Apache, como estaban). Antes podía quedar a medias: cargado en la ventana y la web sin estilos.
