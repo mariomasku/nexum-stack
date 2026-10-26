@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>NexumDevStack.Core</RootNamespace>
+    <AssemblyName>NexumDevStack.Core</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Claves públicas de quienes publican lo que se descarga (las de lvm-instalador y la de Apache Lounge) -->
+    <EmbeddedResource Include="claves-firmas.gpg" LogicalName="NexumDevStack.Core.claves-firmas.gpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NexumDevStack.Core.Tests" />
+  </ItemGroup>
+</Project>

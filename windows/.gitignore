@@ -1,0 +1,11 @@
+# Compilación de .NET
+bin/
+obj/
+out/
+publicado/
+*.user
+.vs/
+TestResults/
+# Paquetes que genera empaquetar-windows.sh
+nexum-dev-stack-windows-*.zip
+*.exe

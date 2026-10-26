@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- Versión del programa: solo aquí (la lee AppInfo.Version de NexumDevStack.Core) -->
+    <Version>0.1.0</Version>
+    <Authors>M.Mascuñano - HEXER</Authors>
+    <Product>Nexum Dev Stack</Product>
+    <Copyright>© M.Mascuñano - HEXER</Copyright>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>es</SatelliteResourceLanguages>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

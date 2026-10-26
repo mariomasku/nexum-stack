@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>NexumDevStack.Windows</RootNamespace>
+    <AssemblyName>NexumDevStack.Windows</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NexumDevStack.Core\NexumDevStack.Core.csproj" />
+  </ItemGroup>
+</Project>

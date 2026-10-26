@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>NexumDevStack.App</RootNamespace>
+    <AssemblyName>NexumDevStack</AssemblyName>
+    <ApplicationIcon>nexum.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(SelfContained)' == ''">false</SelfContained>
+    <!-- Sin «startup hooks» (DOTNET_STARTUP_HOOKS): una variable de tu sesión no puede meter código en el
+         proceso que corre con permisos de administrador -->
+    <StartupHookSupport>false</StartupHookSupport>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="nexum.png" />
+    <Resource Include="nexum.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NexumDevStack.Core\NexumDevStack.Core.csproj" />
+    <ProjectReference Include="..\NexumDevStack.Windows\NexumDevStack.Windows.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,131 @@
+{
+ "spdxVersion": "SPDX-2.3",
+ "dataLicense": "CC0-1.0",
+ "SPDXID": "SPDXRef-DOCUMENT",
+ "name": "php-8.2.33",
+ "documentNamespace": "https://downloads.php.net/~windows/releases/php-8.2.33-Win32-vs16-x64.zip.spdx.json",
+ "creationInfo": {
+  "created": "2026-07-28T10:50:10Z",
+  "creators": [
+   "Organization: PHP Group",
+   "Tool: php-8.2.33"
+  ],
+  "licenseListVersion": "3.28"
+ },
+ "documentDescribes": [
+  "SPDXRef-PHP"
+ ],
+ "packages": [
+  {
+   "name": "php",
+   "SPDXID": "SPDXRef-PHP",
+   "versionInfo": "8.2.33",
+   "downloadLocation": "https://downloads.php.net/~windows/releases/php-8.2.33-Win32-vs16-x64.zip",
+   "filesAnalyzed": false,
+   "licenseConcluded": "PHP-3.01",
+   "licenseDeclared": "PHP-3.01",
+   "copyrightText": "Copyright (c) 1999 - 2024 The PHP Group. All rights reserved.",
+   "supplier": "Organization: PHP Group",
+   "originator": "Organization: PHP Group",
+   "primaryPackagePurpose": "APPLICATION",
+   "externalRefs": [
+    {
+     "referenceCategory": "PACKAGE-MANAGER",
+     "referenceType": "purl",
+     "referenceLocator": "pkg:generic/php@8.2.33"
+    },
+    {
+     "referenceCategory": "SECURITY",
+     "referenceType": "cpe23Type",
+     "referenceLocator": "cpe:2.3:a:php:php:8.2.33:*:*:*:*:*:*:*"
+    }
+   ],
+   "annotations": [
+    {
+     "annotationDate": "2026-07-28T10:50:10Z",
+     "annotationType": "OTHER",
+     "annotator": "Tool: php-8.2.33",
+     "comment": "php:dependency-sbom-status=present"
+    }
+   ],
+   "packageFileName": "php-8.2.33-Win32-vs16-x64.zip",
+   "checksums": [
+    {
+     "algorithm": "SHA256",
+     "checksumValue": "7d2568dfaad6ac1391e57994f52c8aed835baf9e6d89f4328770e2843311291c"
+    }
+   ]
+  },
+  {
+   "name": "Berkeley uuencode",
+   "SPDXID": "SPDXRef-Source-Berkeley-uuencode-snapshot-25636b9321c2-1",
+   "versionInfo": "snapshot-25636b9321c2",
+   "downloadLocation": "https://github.com/php/php-src/tree/php-8.2.33/ext/standard/uuencode.c",
+   "filesAnalyzed": false,
+   "licenseConcluded": "BSD-4-Clause-UC",
+   "licenseDeclared": "BSD-4-Clause-UC",
+   "copyrightText": "See accompanying license and notice files.",
+   "supplier": "Organization: PHP Group",
+   "originator": "NOASSERTION",
+   "primaryPackagePurpose": "LIBRARY",
+   "sourceInfo": "Bundled in php-8.2.33 source tree at ext/standard/uuencode.c; source digest SHA-256 (file-content-v1): 25636b9321c2859ac28ee4ad7148270ebccaa79143777b623d84985622875597",
+   "checksums": [
+    {
+     "algorithm": "SHA256",
+     "checksumValue": "25636b9321c2859ac28ee4ad7148270ebccaa79143777b623d84985622875597"
+    }
+   ],
+   "externalRefs": [
+    {
+     "referenceCategory": "PACKAGE-MANAGER",
+     "referenceType": "purl",
+     "referenceLocator": "pkg:generic/berkeley-uuencode"
+    }
+   ]
+  },
+  {
+   "name": "Boost.Context assembly",
+   "SPDXID": "SPDXRef-Source-Boost.Context-assembly-snapshot-20b96f6ebcd9-2",
+   "versionInfo": "snapshot-20b96f6ebcd9",
+   "downloadLocation": "https://github.com/php/php-src/tree/php-8.2.33/Zend/asm",
+   "filesAnalyzed": false,
+   "licenseConcluded": "BSL-1.0",
+   "licenseDeclared": "BSL-1.0",
+   "copyrightText": "See accompanying license and notice files.",
+   "supplier": "Organization: PHP Group",
+   "originator": "NOASSERTION",
+   "primaryPackagePurpose": "LIBRARY",
+   "sourceInfo": "Bundled in php-8.2.33 source tree at Zend/asm; source digest SHA-256 (relative-path-and-file-sha256-v1): 20b96f6ebcd9fe672464b5ff24d28eeb529afedd12fedc3fef835db5094621a8",
+   "checksums": [
+    {
+     "algorithm": "SHA256",
+     "checksumValue": "20b96f6ebcd9fe672464b5ff24d28eeb529afedd12fedc3fef835db5094621a8"
+    }
+   ],
+   "externalRefs": [
+    {
+     "referenceCategory": "PACKAGE-MANAGER",
+     "referenceType": "purl",
+     "referenceLocator": "pkg:generic/boost-context-assembly"
+    }
+   ]
+  }
+ ],
+ "relationships": [
+  {
+   "spdxElementId": "SPDXRef-DOCUMENT",
+   "relationshipType": "DESCRIBES",
+   "relatedSpdxElement": "SPDXRef-PHP"
+  },
+  {
+   "spdxElementId": "SPDXRef-PHP",
+   "relationshipType": "DEPENDS_ON",
+   "relatedSpdxElement": "SPDXRef-Source-Berkeley-uuencode-snapshot-25636b9321c2-1"
+  },
+  {
+   "spdxElementId": "SPDXRef-PHP",
+   "relationshipType": "DEPENDS_ON",
+   "relatedSpdxElement": "SPDXRef-Source-Boost.Context-assembly-snapshot-20b96f6ebcd9-2"
+  }
+ ]
+}
