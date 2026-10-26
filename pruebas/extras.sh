@@ -37,7 +37,7 @@ check "hosts: un .local comentado a mano vuelve a añadirse al cargar otro proye
 # Desde la 1.50.1 un .local se puede apagar en la pestaña Hosts (hosts-falsear): se recuerda, con su
 # www., y ya no se vuelve a añadir; al encenderlo se olvida (Mac desde la 1.37.0)
 if grep -q '^function local_off() {' "$SRC"; then
-extract "$SRC" local_off hosts_fake_one || exit 1
+extract "$SRC" local_off hosts_fake_one sudo_first || exit 1
 DRY=0 LOCAL_OFF_FILE=$W/apagados
 valid_domain() { [[ "$1" =~ ^[a-z0-9.-]+$ ]]; }
 printf '127.0.0.1 localhost\n127.0.0.1 web.local\n127.0.0.1 ejemplo.local\n127.0.0.1 www.ejemplo.local\n' > "$W/h"

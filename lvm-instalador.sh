@@ -121,8 +121,10 @@
 #   lvm-instalador docker-php <nombre> <version de PHP>
 #   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
 #   lvm-instalador docker-imagen <nombre>
+#   lvm-instalador docker-usuario-pruebas <nombre>
 #       Proyectos en Docker sin root (pestaña Docker): docker-php cambia su version de PHP;
-#       docker-imagen rehace su imagen de PHP con lo ultimo de Docker Hub (parches de seguridad)
+#       docker-imagen rehace su imagen de PHP con lo ultimo de Docker Hub (parches de seguridad);
+#       docker-usuario-pruebas pone el administrador de pruebas en la BBDD de su contenedor
 #   lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
 #   lvm-instalador docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
@@ -715,7 +717,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.55.3"
+APP_VERSION="1.55.10"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -2628,10 +2630,46 @@ function load_project() {
     return $rc
 }
 
+# PrestaShop 1.7+ guarda su configuracion (con la BBDD) en var/cache: si es la de otro sitio (la del
+# contenedor de Docker, db, o la de produccion), la tienda no conecta con su BBDD en LAMPP (error 500).
+# Se aparta (a ~/lvm-copias) la cache cuya BBDD no es la de app/config/parameters.php: se rehace sola
+function ps_stale_cache() {
+    local root=$HTDOCS_DIR/$1 env
+    [ -f "$root/app/config/parameters.php" ] || return 0
+    for env in $(python3 -I - "$root" <<'EOF'
+import glob, os, re, sys
+root = sys.argv[1]
+def db(path):
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read(200000)
+    except OSError:
+        return None
+    return tuple((re.search(r"""['"]%s['"]\s*=>\s*['"]([^'"]*)['"]""" % k, text) or [None, ""])[1]
+                 for k in ("database_host", "database_name", "database_user"))
+want = db(os.path.join(root, "app/config/parameters.php"))
+for cached in glob.glob(os.path.join(root, "var/cache/*/appParameters.php")):
+    env = os.path.basename(os.path.dirname(cached))
+    if want and re.fullmatch(r"[A-Za-z0-9_-]+", env) and db(cached) not in (None, want):
+        print(env)
+EOF
+    ); do
+        [ -L "$root/var/cache/$env" ] && continue
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] se aparta var/cache/$env de $1 (lleva otra BBDD)"
+            continue
+        fi
+        mkdir -p -m 700 "$HOME/lvm-copias"
+        mv "$root/var/cache/$env" "$HOME/lvm-copias/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
+            && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/lvm-copias, se rehace sola"
+    done
+    return 0
+}
+
 # Los cambios de load_project (ver arriba): <carpeta> <version> <enlace> <base>
 function load_project_steps() {
     local folder=$1 version=$2 link=$3 sudo="" secured=1
     htdocs_close_world "$HTDOCS_DIR/$folder"
+    ps_stale_cache "$folder"
 
     [ -w "$HTDOCS_DIR" ] || sudo=sudo
     if [ -L "$HTDOCS_DIR/$link" ]; then
@@ -3742,6 +3780,8 @@ function hosts_fake_one() {
 
         return 1
     fi
+    # La contraseña antes de cambiar nada: cancelarla deja el dominio como estaba
+    sudo_first || return 1
     # Un .local se queda siempre en hosts (sin su linea, el equipo lo preguntaria a la red y
     # cualquiera de la misma wifi podria contestar), salvo que se apague aqui: se recuerda en
     # LOCAL_OFF_FILE, con su www., y al encenderlo se olvida
@@ -4550,8 +4590,17 @@ function mail_wp_text() {
 }
 
 # correo [estado] | si | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>
+# Un ajuste que se aplica como root (interruptores de la ventana): la contraseña antes de cambiar
+# nada. Cancelarla deja el ajuste como estaba
+function sudo_first() {
+    { [ "$DRY" -eq 1 ] || [ -z "$SUDO" ]; } && return 0
+    sudo -v && return 0
+    echo "Cancelado: no se ha cambiado nada"
+    return 1
+}
+
 function mail_command() {
-    local mode
+    local mode old
     case $1 in
         ""|estado)
             if mail_on; then
@@ -4570,6 +4619,7 @@ function mail_command() {
             mkdir -p -m 700 "$LOG_DIR" || return 1
             if [ "$1" == si ] || [ "$1" == on ]; then
                 mail_on && { echo "El correo de pruebas ya estaba encendido"; return 0; }
+                sudo_first || return 1
                 # (--instalar: y Mailpit, si no lo esta; lo ofrece la ventana la primera vez)
                 if [ "$2" == --instalar ] && ! mailpit_installed; then
                     mailpit_install || return 1
@@ -4578,13 +4628,20 @@ function mail_command() {
                 mailpit_installed || echo "Aviso: Mailpit no esta instalado (lvm-instalador correo instalar): hasta entonces mail() falla"
             else
                 mail_on || { echo "El correo de pruebas ya estaba apagado"; return 0; }
+                sudo_first || return 1
                 [ "$DRY" -eq 0 ] && { : > "$MAIL_OFF_FILE" || return 1; }
             fi
             if [ "$DRY" -eq 1 ]; then
                 echo "  [simulacion] correo de pruebas $([[ "$1" =~ ^(si|on)$ ]] && echo encendido || echo apagado) en todas las versiones"
                 return 0
             fi
-            mail_apply || return 1
+            if ! mail_apply; then
+                # (no se ha podido aplicar: el interruptor vuelve a como estaba)
+                if [ "$1" == si ] || [ "$1" == on ]; then : > "$MAIL_OFF_FILE"; else rm -f "$MAIL_OFF_FILE"; fi
+                mail_apply > /dev/null 2>&1
+                echo "No se ha cambiado el correo de pruebas"
+                return 1
+            fi
             mail_on && echo "Correo de pruebas encendido: lo que manden las webs va a Mailpit" \
                 || echo "Correo de pruebas apagado: lo que manden las webs puede llegar de verdad"
             return 0 ;;
@@ -4598,8 +4655,15 @@ function mail_command() {
                 echo "  [simulacion] WordPress: $(mail_wp_text "$mode")"
                 return 0
             fi
+            sudo_first || return 1
+            old=$(mail_wp_mode)
             mkdir -p -m 700 "$LOG_DIR" && echo "$mode" > "$MAIL_WP_FILE" || return 1
-            mail_apply || return 1
+            if ! mail_apply; then
+                echo "$old" > "$MAIL_WP_FILE"
+                mail_apply > /dev/null 2>&1
+                echo "No se ha cambiado el modo de WordPress"
+                return 1
+            fi
             echo "WordPress: $(mail_wp_text "$mode")"
             return 0 ;;
         instalar)
@@ -5321,6 +5385,7 @@ function cross_site_command() {
         echo "  [simulacion] barrera entre webs $([ "$1" == si ] || [ "$1" == on ] && echo encendida || echo apagada) en todas las versiones"
         return 0
     fi
+    sudo_first || return 1
     mkdir -p -m 700 "$LOG_DIR" || return 1
     if [ "$1" == si ] || [ "$1" == on ]; then
         rm -f "$CROSS_SITE_OFF"
@@ -5330,7 +5395,10 @@ function cross_site_command() {
     secure_all
     rc=$?
     if [ $rc -eq 2 ]; then
-        echo "No se ha podido cambiar en todas las versiones: prueba con lvm-instalador asegurar --todas"
+        # (no se ha podido aplicar: el interruptor vuelve a como estaba)
+        if [ "$1" == si ] || [ "$1" == on ]; then : > "$CROSS_SITE_OFF"; else rm -f "$CROSS_SITE_OFF"; fi
+        secure_all > /dev/null 2>&1
+        echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
         return 1
     fi
     if [ $rc -eq 0 ] && lampp_running; then
@@ -5571,7 +5639,7 @@ function ps_table_prefix() {
     local pref=$2
     [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
     [[ "$pref" =~ ^[A-Za-z0-9_]+$ ]] || pref=""
-    "${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 8) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%shop\\_url' ORDER BY TABLE_NAME = '${pref}shop_url' DESC, LENGTH(TABLE_NAME) LIMIT 1" < /dev/null 2> /dev/null \
+    db_root_sql -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 8) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%shop\\_url' ORDER BY TABLE_NAME = '${pref}shop_url' DESC, LENGTH(TABLE_NAME) LIMIT 1" < /dev/null 2> /dev/null \
         | grep -E '^[A-Za-z0-9_]+$'
 }
 
@@ -5886,6 +5954,18 @@ TEST_ADMIN_PASS="local"
 # la contraseña, y WordPress acepta md5 y la cambia por la suya al entrar)
 TEST_ADMIN_BCRYPT='$2y$12$IqVkFsJq4UhjbzLfagfW9eU5V6iIauQCbfMJDY26MoM8ETz6ZKgxG'
 
+# Cliente de MariaDB como root para el administrador de pruebas (test_admin, wp_table_prefixes y
+# ps_table_prefix): el de LAMPP (DB_CLIENT) o, si DB_ROOT_CLIENT (un array) tiene algo, ese. Asi
+# test_admin sirve tambien para la BBDD de un contenedor de Docker (docker_test_admin)
+DB_ROOT_CLIENT=()
+function db_root_sql() {
+    if [ ${#DB_ROOT_CLIENT[@]} -gt 0 ]; then
+        "${DB_ROOT_CLIENT[@]}" "$@"
+    else
+        "${DB_SAFE[@]}" "$DB_CLIENT" -uroot "$@"
+    fi
+}
+
 # usuario-pruebas <base> [carpeta]: crea o deja al dia el administrador de pruebas en los WordPress y
 # la tienda PrestaShop de la base. Dice A|wp|usuario|contraseña y/o A|ps|... por cada uno (para la
 # ventana); sale con 1 si no hay ninguno. La carpeta (o la recordada para la base) solo hace falta en
@@ -5898,7 +5978,8 @@ function test_admin() {
     fi
     [ -z "$folder" ] && folder=$(linked_folder "$db" "${DB_TARGET_FOLDER:-}")
     [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && [ -d "$HTDOCS_DIR/$folder" ] || folder=""
-    local mysql=("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N --default-character-set=utf8mb4)
+    # (el cliente de root de LAMPP o, con DB_ROOT_CLIENT, otro: el de la MariaDB de un contenedor)
+    local mysql=(db_root_sql -N --default-character-set=utf8mb4)
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] administrador de pruebas $TEST_ADMIN_USER / $TEST_ADMIN_PASS en $db"
         return 0
@@ -5992,7 +6073,7 @@ SELECT CAST(IF(@src IS NULL, 0, @id) AS UNSIGNED);"
 function wp_table_prefixes() {
     [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
     # Solo prefijos de letras, numeros y _ (los nombres de las tablas los trae la base)
-    "${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7) AS p FROM information_schema.TABLES
+    db_root_sql -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7) AS p FROM information_schema.TABLES
         WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%options' AND CONCAT(LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7), 'users')
         IN (SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE') ORDER BY LENGTH(p)" < /dev/null 2> /dev/null \
         | grep -E '^[A-Za-z0-9_]*$'
@@ -11023,6 +11104,66 @@ QUE HACE
 
 VERSIONES
 
+1.55.10 (26 oct 2026)
+- PrestaShop 1.7+ en Docker y en LAMPP a la vez: la tienda ya no deja de
+  funcionar en LAMPP (error 500, «Link to database cannot be
+  established») después de abrirla en Docker. Su caché (var/cache), que
+  guarda la BBDD, va en Docker en un volumen del contenedor; y al cargarla,
+  una caché con otra BBDD (la de Docker o la de producción) se aparta a
+  ~/lvm-copias y se rehace sola.
+
+1.55.9 (26 oct 2026)
+- Docker: cada proyecto, al desplegar su fila, tiene su visor, como el del
+  proyecto cargado: su nombre, versiones, dominio y si está en marcha, con
+  «Abrir web», «Panel», «phpMyAdmin», «VS Code», «Log» (los errores de su
+  PHP) y Arrancar o Parar. Parado, la web, el panel y phpMyAdmin se
+  apagan.
+- Docker, Panel: entra en el WordPress o la tienda PrestaShop del
+  contenedor con el administrador de pruebas ya escrito (local@local.test,
+  contraseña local). Se pone en su BBDD al crearlo con una copia y, si
+  falta, al pulsar Panel (lvm-instalador docker-usuario-pruebas <nombre>).
+  Las copias que salen de LAMPP siguen sin él.
+- Docker, phpMyAdmin: al pulsarlo se copia la contraseña de root.
+- En la lista de proyectos, «Montar en Docker» en la fila de los que tienen
+  contenedores.
+- Tema claro: texto blanco sobre el azul al pasar el ratón.
+
+1.55.8 (26 oct 2026)
+- Proyecto cargado: «Añadir entorno…» e «Importar SQL» pasan al recuadro
+  del entorno y la BBDD; la fila de abajo queda para los accesos directos
+  del proyecto, con ⋮ a la derecha. El logotipo de WordPress o PrestaShop,
+  sin recuadro. Sin la explicación debajo de «Proyectos».
+
+1.55.7 (26 oct 2026)
+- Proyecto cargado: botón «Log» junto a sus botones, con el final del
+  registro de errores de su web (el de su vhost), para ver al momento por
+  qué da un error 500.
+
+1.55.6 (26 oct 2026)
+- Al abrir el programa busca solo si hay una versión nueva y la ofrece. Si
+  se dice que no, no vuelve a preguntar por esa versión al abrirlo (solo
+  avisa); sigue en el menú, Buscar actualizaciones.
+- Proyectos: arriba se queda siempre el proyecto cargado, con sus botones;
+  pulsar otro en la lista solo lo marca. Cada fila, al pasar el ratón,
+  tiene «Cargar» y un menú ⋮ (añadir entorno en otra versión o en Docker,
+  importar SQL, vincular sus BBDD, abrir la carpeta…).
+- Tema claro: «Encendidos» en azul (el verde no se veía sobre el gris).
+- Docker: el aviso del Docker de Ubuntu (el que va como administrador)
+  explica qué es y por qué conviene apagarlo.
+
+1.55.5 (26 oct 2026)
+- Copiar una BBDD a una versión con un MariaDB antiguo (como de la 8.2 a la
+  7.4) ya no falla con «Unknown command '\-'»: la descarga lleva una sola
+  línea del modo sandbox y la carga las quita todas.
+
+1.55.4 (26 oct 2026)
+- Interruptores que piden la contraseña de administrador (barrera entre
+  webs, correo de pruebas y su modo de WordPress, los .local de Dominios y
+  hosts): si se cancela, no cambia nada y el interruptor vuelve a su sitio.
+  Si no se puede aplicar, se deja como estaba.
+- Proyectos: el asistente de proyecto nuevo (clonar de git, con su versión
+  y su BBDD) se abre con el botón azul «Nuevo proyecto…» de la lista.
+
 1.55.3 (25 oct 2026)
 - Cargar un proyecto es todo o nada: la contraseña se pide antes de cambiar
   nada y, si se cancela o falla un paso, se queda el proyecto que había
@@ -12839,6 +12980,40 @@ function docker_fix_restart() {
             | xargs -r "$DOCKER_BIN" -H "$(docker_sock)" update --restart=no > /dev/null 2>&1
     done
     docker_fix_pma
+    docker_fix_cache
+    return 0
+}
+
+# Hasta la 1.55.9 la cache de una tienda PrestaShop 1.7+ en Docker (var/cache) iba en la carpeta del
+# proyecto, la misma que usa LAMPP: guardaba alli la BBDD del contenedor (db) y la tienda dejaba de
+# funcionar en LAMPP. Se pasa a un volumen del contenedor; se aplica al volver a crear su contenedor
+# de PHP (al arrancar el proyecto, o ya, si esta en marcha)
+function docker_fix_cache() {
+    local p dir folder
+    for p in $(docker_projects); do
+        dir=$DOCKER_DIR/$p
+        folder=$(docker_conf "$p" CARPETA)
+        grep -q '/app/config/parameters.php:ro"$' "$dir/compose.yaml" 2> /dev/null || continue
+        grep -q '/var/cache"$' "$dir/compose.yaml" && continue
+        [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: la cache de PrestaShop en su volumen"; continue; }
+        python3 -I - "$dir/compose.yaml" "$folder" <<'PY' || continue
+import sys
+path, folder = sys.argv[1], sys.argv[2]
+lines = open(path, encoding="utf-8").read().split("\n")
+out = []
+for line in lines:
+    out.append(line)
+    if line.endswith('/app/config/parameters.php:ro"'):
+        out.append('      - "cache:/opt/lampp/htdocs/%s/var/cache"' % folder)
+    if line == "  db: {}":
+        out.append("  cache: {}")
+open(path + ".nuevo", "w", encoding="utf-8").write("\n".join(out))
+PY
+        mv -f "$dir/compose.yaml.nuevo" "$dir/compose.yaml" || continue
+        if [ "$(docker_state "$p")" == marcha ]; then
+            dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d php > /dev/null 2>&1
+        fi
+    done
     return 0
 }
 
@@ -13228,6 +13403,10 @@ function docker_create() {
         printf '      - "%s:/opt/lampp/htdocs/%s"\n' "$HTDOCS_DIR/$folder" "$folder"
         printf '      - "%s:/run/nexum"\n' "$(dirname "$sock")"
         [ -n "$rel" ] && printf '      - "./config.php:/opt/lampp/htdocs/%s/%s:ro"\n' "$folder" "$rel"
+        # PrestaShop 1.7 y posteriores guardan su configuracion (con la BBDD del contenedor: db y su
+        # usuario) en var/cache: aparte, en un volumen del contenedor, no en la carpeta que comparte
+        # con LAMPP (que la leeria y no encontraria la BBDD)
+        [ "$rel" == app/config/parameters.php ] && printf '      - "cache:/opt/lampp/htdocs/%s/var/cache"\n' "$folder"
         printf '    depends_on: [db]\n'
         printf '  db:\n    image: mariadb:%s\n    restart: "no"\n    environment:\n' "$maria"
         printf '      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_DATABASE: %s\n      MARIADB_USER: %s\n      MARIADB_PASSWORD: ${DB_PASS}\n' "$dbname" "$user"
@@ -13237,6 +13416,7 @@ function docker_create() {
         printf '  pma:\n    image: %s\n    restart: "no"\n    environment:\n      PMA_HOST: db\n      UPLOAD_LIMIT: 64M\n' "$DOCKER_PMA_IMAGE"
         printf '    ports:\n      - "127.0.0.1:%s:80"\n    depends_on: [db]\n' "$pma_port"
         printf 'volumes:\n  db: {}\n'
+        if [ "$rel" == app/config/parameters.php ]; then printf '  cache: {}\n'; fi
     } > "$dir/compose.yaml" || return 1
 
     echo "1/4 Imagen de PHP $php"
@@ -13267,6 +13447,11 @@ function docker_create() {
                 || echo "Aviso: la carga de $db ha dado errores (mira el registro)."
             rm -f "$tmp"
             docker_ps_domain "$dir" "$dbname" "$domain" "$root_pass"
+            # (la copia va sin el administrador de pruebas: se le pone el de este equipo para el Panel)
+            local admin
+            admin=$(docker_test_admin "$slug")
+            grep -v '^A|' <<< "$admin" | grep .
+            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
     echo "4/4 Vhost de $domain"
@@ -13300,6 +13485,22 @@ UPDATE \`${prefix}shop_url\` SET domain = '$domain', domain_ssl = '$domain';
 UPDATE \`${prefix}configuration\` SET value = '$domain' WHERE name IN ('PS_SHOP_DOMAIN', 'PS_SHOP_DOMAIN_SSL');
 UPDATE \`${prefix}configuration\` SET value = '1' WHERE name IN ('PS_SSL_ENABLED', 'PS_SSL_ENABLED_EVERYWHERE');
 EOF
+}
+
+# docker-usuario-pruebas <nombre>: el administrador de pruebas (usuario-pruebas) en la BBDD del
+# contenedor del proyecto. La copia que se lleva de LAMPP no lo tiene (exportar-bd lo deja fuera) y
+# sin el no entra el Panel. Es el mismo test_admin, por el cliente de la MariaDB del contenedor como
+# root: la contraseña la toma dentro del contenedor (MARIADB_ROOT_PASSWORD), nunca en una orden. Dice
+# A|wp|... y/o A|ps|... como usuario-pruebas; con el proyecto parado, nada (sale con 1)
+function docker_test_admin() {
+    local slug=$1 dir db folder
+    docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    db=$(docker_conf "$slug" BBDD) folder=$(docker_conf "$slug" CARPETA)
+    db_valid_name "$db" > /dev/null || { echo "$slug no tiene una BBDD valida en su proyecto.conf"; return 1; }
+    local DB_ROOT_CLIENT=(dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db
+        sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb)
+    test_admin "$db" "$folder"
 }
 
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>
@@ -14004,9 +14205,11 @@ function export_database() {
         ( umask 077; set -o pipefail
           { "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick \
                 $routines --triggers --max-allowed-packet=1G "${skip[@]}" "$db" || exit 1
+            # (sin la linea del modo sandbox de cada volcado: solo la del primero, al principio, que la
+            # carga sabe quitar para los MariaDB antiguos)
             for i in "${!only[@]}"; do
                 "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick --triggers \
-                    --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" || exit 1
+                    --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" | LC_ALL=C sed '/^\/\*M!999999\\-/d' || exit 1
             done
             [ -z "$mail_sql" ] || printf '%s\n' "$mail_sql"; } < /dev/null 2> "$errors" | "${out[@]}" > "$part" ) &
         pid=$!
@@ -14801,7 +15004,7 @@ function import_database() {
         gz) source=(gzip -dc) ;;
         zip) source=(python3 -I -c "$ZIP_SQL_PY" extraer -) ;;
     esac
-    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '1{/^\/\*M!999999\\-/d}' -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
+    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '/^\/\*M!999999\\-/d' -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     local definer=(python3 -I -c "$INVOKER_PY")
     local start=$(date +%s)
 
@@ -16476,6 +16679,24 @@ def run_quick(args, callback, env=None):
     threading.Thread(target=work, daemon=True).start()
 
 
+def project_admin(folder):
+    """(tipo, carpeta del panel) de un proyecto: wp-admin en WordPress y, en PrestaShop, su carpeta de
+    administración (cada tienda la llama de una forma; se reconoce por lo que tiene)."""
+    if os.path.isfile(os.path.join(folder, "wp-config.php")) and os.path.isdir(os.path.join(folder, "wp-admin")):
+        return "wp", "wp-admin"
+    try:
+        names = sorted(os.listdir(folder), key=lambda n: (not n.lower().startswith("admin"), n))
+    except OSError:
+        return "", ""
+    for n in names:
+        d = os.path.join(folder, n)
+        if re.fullmatch(r"[A-Za-z0-9_-]+", n) and not os.path.islink(d) and os.path.isdir(d) \
+                and os.path.isfile(os.path.join(d, "index.php")) \
+                and any(os.path.isfile(os.path.join(d, f)) for f in ("ajax-tab.php", "get-file-admin.php")):
+            return "ps", n
+    return "", ""
+
+
 def login_page(title, project, action, fields, panel):
     """Página de acceso al panel de un proyecto con el administrador de pruebas ya escrito: un
     formulario que va a la pantalla de acceso del proyecto; solo hay que pulsar Entrar."""
@@ -17468,13 +17689,18 @@ class App(Gtk.Application):
             GLib.timeout_add(2500, self.capture_all)
 
     # ------------------------------------------- paquete .deb nuevo en Descargas
-    def check_package(self, manual=False):
+    def check_package(self, manual=False, auto=False):
+        """Buscar una versión nueva (menú) o, con auto, al abrir la ventana: sin avisar si no hay y, si
+        se dijo que no a una, sin volver a preguntar por ella (solo un aviso breve)."""
         def got(_rc, out):
             found, notes = False, []
             for f in parse_lines(out):
                 if f[0] == "N" and len(f) >= 5:
                     found = True
-                    self.offer_package(f[1], f[2], f[3], "|".join(f[4:]))
+                    if auto and f[1] == self.declined_update():
+                        self.toast("Hay una versión nueva (%s): menú ☰ → Buscar actualizaciones" % f[1])
+                    elif not self.offer_package(f[1], f[2], f[3], "|".join(f[4:])) and auto:
+                        self.declined_update(f[1])
                 elif f[0] == "I" and len(f) >= 2:
                     notes.append("|".join(f[1:]))
             if manual and not found:
@@ -17484,9 +17710,28 @@ class App(Gtk.Application):
                 else:
                     self.toast("Tienes la última versión (%s)" % self.data["version"])
             return False
-        self.toast("Buscando actualizaciones…")
+        if not auto:
+            self.toast("Buscando actualizaciones…")
         run_quick(["gui-paquete"], got)
         return False
+
+    def declined_update(self, version=None):
+        """La versión nueva a la que se ha dicho que no al abrir la ventana (para no preguntar en cada
+        arranque); con version, la apunta."""
+        path = os.path.join(LOG_DIR, "actualizacion-rechazada")
+        if version is None:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return f.read(40).strip()
+            except OSError:
+                return ""
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(version + "\n")
+        except OSError:
+            pass
+        return version
 
     def offer_package(self, version, when, sha, path):
         current = (self.data or {}).get("version", "")
@@ -17499,10 +17744,10 @@ class App(Gtk.Application):
                        "se vuelve a abrir. Tus versiones, proyectos y BBDD no se tocan.\n\nHuella SHA-256:\n%s"
                        % (current, version, where, sha),
                        "Actualizar a la %s" % version):
-            return
+            return False
         if SIMULATE:
             self.toast("[simulación] pkexec apt-get install -y %s" % path)
-            return
+            return True
 
         dlg = Gtk.Dialog(title="Actualizando", transient_for=self.win, modal=True, deletable=False)
         box = Gtk.Box(spacing=12, margin=24)
@@ -17545,6 +17790,7 @@ class App(Gtk.Application):
                 rc, out = 1, str(exc)
             GLib.idle_add(done, rc, out)
         threading.Thread(target=work, daemon=True).start()
+        return True
 
     def terminal_install(self, version, path):
         """La versión nueva cambia el ayudante de actualización (o su acción de polkit): el ayudante
@@ -17701,24 +17947,9 @@ class App(Gtk.Application):
         return db if re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db or "") else ""
 
     def loaded_project_admin(self):
-        """(tipo, carpeta del panel) del proyecto cargado: wp-admin en WordPress y, en PrestaShop, su
-        carpeta de administración (cada tienda la llama de una forma; se reconoce por lo que tiene)."""
+        """(tipo, carpeta del panel) del proyecto cargado (project_admin)."""
         folder = self.loaded_project_folder()
-        if folder is None:
-            return "", ""
-        if os.path.isfile(os.path.join(folder, "wp-config.php")) and os.path.isdir(os.path.join(folder, "wp-admin")):
-            return "wp", "wp-admin"
-        try:
-            names = sorted(os.listdir(folder), key=lambda n: (not n.lower().startswith("admin"), n))
-        except OSError:
-            return "", ""
-        for n in names:
-            d = os.path.join(folder, n)
-            if re.fullmatch(r"[A-Za-z0-9_-]+", n) and not os.path.islink(d) and os.path.isdir(d) \
-                    and os.path.isfile(os.path.join(d, "index.php")) \
-                    and any(os.path.isfile(os.path.join(d, f)) for f in ("ajax-tab.php", "get-file-admin.php")):
-                return "ps", n
-        return "", ""
+        return project_admin(folder) if folder is not None else ("", "")
 
     def open_project_pma(self):
         """phpMyAdmin con la BBDD del proyecto cargado (en http://127.0.0.1/phpmyadmin/)."""
@@ -17739,10 +17970,17 @@ class App(Gtk.Application):
         kind, admin = self.loaded_project_admin()
         if not (admin and self.projects and self.projects["link"]):
             return
-        link = self.projects["link"]
-        base = "http://%s/%s/" % (link, admin)
         db, folder = self.loaded_project_db(), self.loaded_project_folder()
-        if not db or SIMULATE:
+        self.open_admin_login(kind, admin, "http://%s" % self.projects["link"], os.path.basename(folder or ""),
+                              ["usuario-pruebas", db, os.path.basename(folder or "")] if db else None)
+
+    def open_admin_login(self, kind, admin, site, name, cmd):
+        """Panel (wp-admin o el de la tienda) de la web <site> (http://web.local, https://x.docker.local)
+        con el administrador de pruebas: cmd lo deja al día (usuario-pruebas o docker-usuario-pruebas,
+        que dicen A|tipo|usuario|contraseña) y se abre una página con el usuario y la contraseña ya
+        escritos. Sin cmd, o si no sale, el panel como siempre."""
+        base = "%s/%s/" % (site, admin)
+        if not cmd or SIMULATE:
             self.open_uri(base)
             return
 
@@ -17753,7 +17991,7 @@ class App(Gtk.Application):
                 return False
             user, password = mine[0][2], mine[0][3]
             if kind == "wp":
-                action = "http://%s/wp-login.php" % link
+                action = "%s/wp-login.php" % site
                 fields = [("log", user, "Usuario o correo"), ("pwd", password, "Contraseña"),
                           ("rememberme", "forever", None), ("redirect_to", base, None)]
                 title = "Panel de WordPress"
@@ -17763,15 +18001,15 @@ class App(Gtk.Application):
                           ("stay_logged_in", "1", None), ("submitLogin", "1", None),
                           ("redirect", "AdminDashboard", None)]
                 title = "Back office de PrestaShop"
-            url = serve_once(login_page(title, os.path.basename(folder or ""), action, fields, base))
+            url = serve_once(login_page(title, name, action, fields, base))
             self.open_uri(url) if url else self.open_uri(base)
             return False
-        run_quick(["usuario-pruebas", db, os.path.basename(folder or "")], done)
+        run_quick(cmd, done)
 
-    def open_in_vscode(self):
-        """Abre el proyecto cargado en Visual Studio Code. Si ya tiene una ventana con esa carpeta,
-        VS Code la trae delante en lugar de abrir otra."""
-        folder, app = self.loaded_project_folder(), vscode_app()
+    def open_in_vscode(self, folder=None):
+        """Abre el proyecto cargado (u otra carpeta de htdocs) en Visual Studio Code. Si ya tiene una
+        ventana con esa carpeta, VS Code la trae delante en lugar de abrir otra."""
+        folder, app = folder or self.loaded_project_folder(), vscode_app()
         if folder is None:
             message(self.win, "No se encuentra la carpeta del proyecto cargado",
                     "El enlace del vhost no apunta a una carpeta de %s." % HTDOCS, Gtk.MessageType.WARNING)
@@ -18426,11 +18664,11 @@ class App(Gtk.Application):
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.show_all()
 
-    def project_error_log(self):
-        """Registro de errores del vhost de los proyectos (web.local), sacado de su ErrorLog: con
-        PHP-FPM, los errores de PHP de la web cargada (el «error crítico» de WordPress) van ahí y no
-        al error_log general de Apache."""
-        link = (self.projects or {}).get("link") or ""
+    def project_error_log(self, link=None):
+        """Registro de errores del vhost de los proyectos (web.local) o del dominio que se diga,
+        sacado de su ErrorLog: con PHP-FPM, los errores de PHP de la web cargada (el «error
+        crítico» de WordPress) van ahí y no al error_log general de Apache."""
+        link = link or (self.projects or {}).get("link") or ""
         if not link:
             return None
         try:
@@ -18448,6 +18686,19 @@ class App(Gtk.Application):
         # (sin ErrorLog propio, sus errores van al general: no hay otro registro que enseñar)
         path = os.path.join("/opt/lampp/logs", link + "-error_log")
         return path if os.path.isfile(path) else None
+
+    def loaded_project_log(self):
+        """El registro de errores de la web cargada: el de su vhost (web.local) o, si es una tienda
+        con su dominio falseado, el de ese dominio; el que haya cambiado más tarde."""
+        folder = self.loaded_project_folder()
+        paths = [self.project_error_log()]
+        if folder:
+            name = os.path.basename(folder)
+            for h in self.hosts or []:
+                if h.get("folder") == name and h.get("fake"):
+                    paths.append(self.project_error_log(h["name"]))
+        paths = [x for x in paths if x and os.path.isfile(x)]
+        return max(paths, key=os.path.getmtime) if paths else None
 
     def log_row(self, title, path, note=""):
         """Fila de un registro: dónde está, cuánto ocupa y cuándo se cambió."""
@@ -18508,21 +18759,28 @@ class App(Gtk.Application):
         except OSError as exc:
             message(self.win, "No se ha podido leer %s" % path, str(exc), Gtk.MessageType.ERROR)
             return
+        self.show_text(os.path.basename(path), "Últimas %d líneas de %s" % (lines, path),
+                       text, lambda: self.show_log_tail(path, lines), lines)
+
+    def show_text(self, title, subtitle, text, reload=None, lines=400):
+        """Las últimas líneas de un registro (lo más reciente al final) en un diálogo, con «Copiar
+        todo» y, con reload, «Actualizar» (lo vuelve a leer)."""
         # (los de PHP-FPM llegan en una sola línea con \n escritos: se separan para leerlos)
         text = "\n".join(text.splitlines()[-lines:]).replace("\\n", "\n    ") or "(vacío)"
-        dlg = Gtk.Dialog(title=os.path.basename(path), transient_for=self.win, modal=True,
+        dlg = Gtk.Dialog(title=title, transient_for=self.win, modal=True,
                          use_header_bar=True)
         dlg.set_default_size(980, 620)
         hb = dlg.get_header_bar()
-        hb.set_subtitle("Últimas %d líneas de %s" % (lines, path))
+        hb.set_subtitle(subtitle)
         copy = Gtk.Button(label="Copiar todo")
         copy.connect("clicked", lambda *_: (
             Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1),
             self.toast("Copiado al portapapeles")))
         hb.pack_start(copy)
-        reload_btn = Gtk.Button(label="Actualizar")
-        reload_btn.connect("clicked", lambda *_: (dlg.destroy(), self.show_log_tail(path, lines)))
-        hb.pack_end(reload_btn)
+        if reload is not None:
+            reload_btn = Gtk.Button(label="Actualizar")
+            reload_btn.connect("clicked", lambda *_: (dlg.destroy(), reload()))
+            hb.pack_end(reload_btn)
         tv = css(Gtk.TextView(editable=False, cursor_visible=False, monospace=True,
                               wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=12, right_margin=12,
                               top_margin=8, bottom_margin=8), "log")
@@ -20158,7 +20416,7 @@ class App(Gtk.Application):
         self.run_task("Copiando %s a lampp-%s" % (db, dst), args,
                       done_text="%s copiada a lampp-%s" % (db, dst), auto_close=True)
 
-    def on_replicate(self):
+    def on_replicate(self, project=None):
         """Replicar un proyecto en otra versión de PHP: copia su BBDD de una versión a otra con el
         nombre que se elija (se propone el de la versión de destino: wp_x_8_4 → wp_x_8_5) y la
         vincula allí a la carpeta que se elija (la misma, otra o ninguna)."""
@@ -20175,7 +20433,8 @@ class App(Gtk.Application):
                     "Instala otra versión de PHP (con sus propias BBDD) para replicar un proyecto en ella.",
                     Gtk.MessageType.INFO)
             return
-        loaded = self.loaded_project_entry()
+        # (el de la fila desde la que se pide o, si no, el cargado)
+        loaded = project or self.loaded_project_entry()
         dlg = Gtk.Dialog(title="Replicar proyecto", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(600, -1)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
@@ -20652,9 +20911,10 @@ class App(Gtk.Application):
             lb.add(row)
             if d.get("rootful"):
                 # (lo deja en marcha el paquete de Ubuntu: corre como root y no hace falta)
-                row = ActionRow("El Docker del sistema (con root) está en marcha",
-                                "Lo deja en marcha el paquete de Ubuntu y no hace falta: el tuyo va sin "
-                                "root. Apagarlo pide la contraseña de administrador.")
+                row = ActionRow("Hay otro Docker en marcha: el de Ubuntu, como administrador",
+                                "Este programa usa el suyo, con tu usuario. El de Ubuntu arranca solo con el equipo, "
+                                "no hace falta y quien lo use puede hacerse con el equipo. Apágalo salvo que lo uses "
+                                "fuera de este programa (pide la contraseña; tus proyectos no se tocan).")
                 row.add_prefix(css(icon("dialog-warning-symbolic"), "error"))
                 b = css(Gtk.Button(label="Apagarlo", sensitive=not self.busy), "verde")
                 b.connect("clicked", lambda *_: self.run_task(
@@ -21477,6 +21737,9 @@ button.verde:disabled, .nv-azul:disabled { background-color: alpha(%(b)s, 0.35);
 popover { border-radius: 12px; padding: 5px; }
 popover modelbutton { border-radius: 7px; padding: 6px 12px; min-height: 26px; }
 popover modelbutton:hover { background-color: %(b)s; color: white; }
+/* Con el fondo azul al pasar el raton, la letra y los iconos en blanco (en el tema claro, la letra
+   oscura del tema no se veia sobre el azul) */
+popover modelbutton:hover label, popover modelbutton:hover image, popover modelbutton:hover arrow { color: white; }
 /* El boton del menu: sin recuadro (tampoco al pasar el raton: solo un fondo suave) */
 button.flat.nv-hamburguesa:not(.titlebutton), button.flat.nv-hamburguesa:not(.titlebutton):hover,
 button.flat.nv-hamburguesa:not(.titlebutton):checked {
@@ -21495,7 +21758,6 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-fila { padding: 8px 14px; }
 .nv-cab label { font-size: 0.76em; font-weight: bold; color: alpha(@theme_fg_color, 0.45); }
 .nv-tarjeta { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 14px; padding: 20px 22px; }
-.nv-avatar { border-radius: 10px; background-color: alpha(@theme_fg_color, 0.06); }
 .nv-etiqueta { font-size: 0.78em; padding: 1px 8px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.07); color: alpha(@theme_fg_color, 0.75); }
 .nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
 .nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
@@ -21504,7 +21766,8 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
                  padding: 12px 14px; box-shadow: inset 0 1px 3px alpha(black, 0.22), 0 1px 0 alpha(white, 0.05); }
 /* El boton de vincular (cambiar la BBDD de cada version): azul al pasar el raton */
 .nv-selectores button:hover { background-image: none; background-color: %(b)s; border-color: %(b)s; }
-.nv-selectores button:hover image { color: white; }
+.nv-selectores button:hover image, .nv-selectores button:hover label, .nv-selectores button:hover cellview,
+.nv-selectores button:hover arrow { color: white; }
 .nv-pie { border-top: 1px solid alpha(@theme_fg_color, 0.08); }
 .nv-cargada { background-color: alpha(%(b)s, 0.10); }
 .nv-elegida { background-color: alpha(@theme_fg_color, 0.06); }
@@ -21518,6 +21781,8 @@ switch:checked { background-color: %(g)s; border-color: transparent; }
 .nv-exited { font-size: 0.8em; padding: 1px 9px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.08); color: alpha(@theme_fg_color, 0.6); }
 .nv-enlace { color: #4c8dff; }
 .nv-dk-icono { border-radius: 8px; background-color: alpha(#1d63ed, 0.14); padding: 5px; }
+/* Visor de un proyecto en Docker (al desplegar su fila): como el del proyecto cargado, más pequeño */
+.nv-dk-visor { padding: 14px 18px; margin: 4px 12px 10px 38px; }
 .nv-stat { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.07); border-radius: 12px; padding: 14px 16px; }
 .nv-cifra { font-size: 1.5em; font-weight: bold; }
 /* Botones de siempre (los de la pestaña Docker): borde gris claro y azul al pasar el raton */
@@ -21545,6 +21810,9 @@ menu menuitem:hover label, menu menuitem:hover cellview, .menu menuitem:hover la
 .nv-on { color: %(g)s; background-image: none; background-color: alpha(%(g)s, 0.14); border-color: transparent; }
 .nv-off { color: #ff453a; background-image: none; background-color: alpha(#ff453a, 0.14); border-color: transparent; }
 .nv-on label, .nv-on image { color: %(g)s; }
+/* Tema claro: «Encendidos» en azul (el verde no se ve sobre el gris claro) */
+.nv-claro .nv-on { color: %(b)s; background-color: alpha(%(b)s, 0.12); }
+.nv-claro .nv-on label, .nv-claro .nv-on image { color: %(b)s; }
 .nv-off label, .nv-off image { color: #ff453a; }
 /* Dialogos: como las pestañas (mismo fondo, botones redondeados con borde) y en azul, no en verde */
 dialog, messagedialog { background-color: @theme_bg_color; }
@@ -21761,8 +22029,16 @@ class App2(App):
         self.toast_rev.set_reveal_child(False)
         self.reload(branches=True)
         GLib.timeout_add_seconds(20, self.on_tick)
+        # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
+        GLib.timeout_add_seconds(6, self.auto_check_package)
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+
+    def auto_check_package(self):
+        if self.data is None or self.busy:
+            return True
+        self.check_package(auto=True)
+        return False
 
     def nv_header(self):
         hb = css(Gtk.HeaderBar(show_close_button=True), "nv-cabecera")
@@ -21921,6 +22197,10 @@ class App2(App):
         else:
             s.set_property("gtk-theme-name", base if theme_exists(base) else "Adwaita")
             s.set_property("gtk-application-prefer-dark-theme", False)
+        # (lo que cambia de color con el tema claro: .nv-claro en la ventana)
+        if getattr(self, "win", None) is not None:
+            ctx = self.win.get_style_context()
+            (ctx.remove_class if dark else ctx.add_class)("nv-claro")
         # (los logotipos que dependen del fondo, con su color de nuevo)
         _logo_cache.clear()
         if getattr(self, "theme_item", None):
@@ -22569,8 +22849,6 @@ class App2(App):
         head = Gtk.Box(spacing=10, margin_top=10)
         t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         t.pack_start(label("Proyectos", "nv-titulo"), False, False, 0)
-        t.pack_start(label("Pulsa uno para verlo arriba; «Cargar» lo monta en el vhost con su versión y su BBDD.",
-                           "nv-chico", "nv-tenue"), False, False, 0)
         head.pack_start(t, True, True, 0)
         self.nv_search = Gtk.SearchEntry(placeholder_text="Buscar proyecto", width_chars=22, valign=Gtk.Align.CENTER)
         self.nv_search.connect("search-changed", lambda *_: self.nv_list.invalidate_filter())
@@ -22579,7 +22857,9 @@ class App2(App):
             self.nv_kind.append(k or "otros", v)
         self.nv_kind.set_active_id("all")
         self.nv_kind.connect("changed", lambda *_: self.nv_list.invalidate_filter())
-        new = nv_button("list-add-symbolic", "Nuevo", "Montar un proyecto nuevo desde git", lambda *_: self.nv_new_project())
+        # (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
+        new = nv_button("list-add-symbolic", "Nuevo proyecto…", "Clonar un repositorio de git y montarlo con su "
+                        "versión de PHP y su BBDD", lambda *_: self.nv_new_project(), "nv-azul")
         for w in (new, self.nv_kind, self.nv_search):
             head.pack_end(w, False, False, 0)
         self.proj_page.pack_start(head, False, False, 0)
@@ -22629,7 +22909,7 @@ class App2(App):
 
     def nv_docker_mount(self, dp):
         """Monta (arranca) un proyecto de Docker y lleva a la pestaña Docker."""
-        if dp["state"] == "running":
+        if dp["state"] in ("marcha", "running"):
             self.show_tab("docker")
             self.toast("%s ya está en marcha en Docker: https://%s" % (dp["folder"], dp["domain"]))
             return
@@ -22790,8 +23070,8 @@ class App2(App):
         if not getattr(self, "nv_list", None) or not self.projects or not self.data:
             return
         loaded = self.loaded_project_entry()
-        shown = next((p for p in self.projects["list"] if p["name"] == x["name"]), None) or loaded
-        self.nv_hero(shown, loaded)
+        if loaded is None:
+            self.nv_hero(next((p for p in self.projects["list"] if p["name"] == x["name"]), None), None)
         for row in self.nv_list.get_children():
             proj = getattr(row, "project", None)
             if proj is None:
@@ -22810,7 +23090,9 @@ class App2(App):
         names = [x["name"] for x in p["list"]]
         if self.selected_project not in names:
             self.selected_project = loaded["name"] if loaded else None
-        shown = next((x for x in p["list"] if x["name"] == self.selected_project), None) or loaded
+        # (arriba, siempre el cargado, con sus botones: elegir otro en la lista no lo cambia. Sin
+        # ninguno cargado, el elegido)
+        shown = loaded or next((x for x in p["list"] if x["name"] == self.selected_project), None)
         self.nv_hero(shown, loaded)
         clear(self.nv_list)
         head = Gtk.ListBoxRow(activatable=False, selectable=False)
@@ -22856,22 +23138,40 @@ class App2(App):
         for dp in self.nv_docker_of(x["name"]):
             chips.pack_start(label("Docker %s" % dp["php"], "nv-chip", "nv-chip-docker", "nv-mono"), False, False, 0)
         box.pack_start(chips, True, True, 0)
+        # Al pasar el raton: Cargar (si no es el cargado), Montar en Docker (si tiene contenedores: con varios
+        # pregunta cual) y su menu ⋮ (el hueco se guarda: la fila no salta)
+        hover, dk = [], None
+        if self.nv_docker_of(x["name"]):
+            dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker (con varias versiones, "
+                           "pregunta cuál)" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
+            dk.set_sensitive(not self.busy)
+            hover.append(dk)
         if is_loaded:
             box.pack_end(label("Cargado", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER, margin_end=6), False, False, 0)
         else:
-            # «Cargar» solo al pasar el raton por el proyecto (el hueco se guarda: la fila no salta)
             b = css(Gtk.Button(label="Cargar", sensitive=not self.busy), "nv-azul")
             b.connect("clicked", lambda *_: self.on_load_folder(x))
-            b.set_opacity(0)
+            menu = self.nv_row_menu(x)
+            menu.set_valign(Gtk.Align.CENTER)
+            menu.set_sensitive(not self.busy)
+            box.pack_end(menu, False, False, 0)
             box.pack_end(b, False, False, 0)
-            ev = Gtk.EventBox(above_child=False)
-            ev.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
-            ev.connect("enter-notify-event", lambda *_: (b.set_opacity(1), False)[1])
-            ev.connect("leave-notify-event", lambda _w, e: (e.detail == Gdk.NotifyType.INFERIOR or b.set_opacity(0), False)[1])
-            ev.add(box)
-            row.add(ev)
+            hover += [b, menu]
+        if dk is not None:
+            box.pack_end(dk, False, False, 0)
+        if not hover:
+            row.add(box)
             return row
-        row.add(box)
+        for w in hover:
+            w.set_opacity(0)
+        menus = [w for w in hover if isinstance(w, Gtk.MenuButton)]
+        ev = Gtk.EventBox(above_child=False)
+        ev.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        ev.connect("enter-notify-event", lambda *_: ([w.set_opacity(1) for w in hover], False)[1])
+        ev.connect("leave-notify-event", lambda _w, e: (e.detail == Gdk.NotifyType.INFERIOR or any(m.get_active() for m in menus)
+                                                         or [w.set_opacity(0) for w in hover], False)[1])
+        ev.add(box)
+        row.add(ev)
         return row
 
     def nv_hero(self, x, loaded):
@@ -22903,12 +23203,10 @@ class App2(App):
             self.hero_box.show_all()
             return
         top = Gtk.Box(spacing=20)
-        av = css(Gtk.Box(), "nv-avatar")
-        av.set_size_request(68, 68)
-        img = kind_icon(x["kind"], 40)
-        img.set_halign(Gtk.Align.CENTER)
-        av.pack_start(img, True, True, 0)
-        top.pack_start(av, False, False, 0)
+        # (el logotipo solo, sin recuadro: con el visor de la derecha más alto, el recuadro se estiraba)
+        img = kind_icon(x["kind"], 48)
+        img.set_valign(Gtk.Align.CENTER)
+        top.pack_start(img, False, False, 0)
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)
         tl = Gtk.Box(spacing=10)
         # (los nombres largos, en dos lineas, no cortados)
@@ -22961,6 +23259,14 @@ class App2(App):
         lk = nv_button("insert-link-symbolic", None, "Cambiar la BBDD de cada versión (vincular)",
                        lambda *_: self.on_link_project(x), flat=True)
         sel.attach(lk, 2, 1, 1, 1)
+        # Llevarlo a otro entorno e importar su SQL, aquí con el entorno y la BBDD (la fila de abajo
+        # queda para los accesos directos del proyecto)
+        envb = Gtk.Box(spacing=8, margin_top=4)
+        envb.pack_start(self.nv_add_env_menu(x), False, False, 0)
+        envb.pack_start(nv_button("document-open-symbolic", "Importar SQL", "Subir un .sql, .sql.gz o .zip a su BBDD "
+                                  "(pestaña Bases de datos)", lambda *_: self.nv_import(x), "nv-proyecto-btn",
+                                  "nv-discontinuo"), False, False, 0)
+        sel.attach(envb, 0, 2, 3, 1)
         top.pack_end(sel, False, False, 0)
         card.pack_start(top, False, False, 0)
         card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
@@ -22989,16 +23295,20 @@ class App2(App):
             acts.pack_start(adm, False, False, 0)
             acts.pack_start(nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
                                       lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn"), False, False, 0)
+            # El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
+            log = self.loaded_project_log()
+            logb = nv_button("text-x-generic-symbolic", "Log", "Ver el final del registro de errores de la web (%s)"
+                             % os.path.basename(log) if log else "Esta web aún no tiene registro de errores",
+                             lambda *_: self.show_log_tail(self.loaded_project_log() or log), "nv-proyecto-btn")
+            logb.set_sensitive(bool(log))
+            acts.pack_start(logb, False, False, 0)
             acts.pack_start(nv_button("media-eject-symbolic", None, "Desmontar: %s deja de apuntar aquí" % p["link"],
                                       lambda *_: self.on_unload_project(), flat=True), False, False, 0)
         else:
             acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
                                       lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)
-        imp = nv_button("document-open-symbolic", "Importar SQL", "Subir un .sql, .sql.gz o .zip a su BBDD (pestaña Bases de datos)",
-                        lambda *_: self.nv_import(x), "nv-proyecto-btn", "nv-discontinuo")
-        acts.pack_end(imp, False, False, 0)
+        # (⋮, pegado a la derecha)
         acts.pack_end(self.nv_more_menu(x), False, False, 0)
-        acts.pack_end(self.nv_add_env_menu(x), False, False, 0)
         card.pack_start(acts, False, False, 0)
         self.hero_box.pack_start(card, False, False, 0)
         self.hero_box.show_all()
@@ -23029,7 +23339,18 @@ class App2(App):
                                     self.show_tab("docker"), self.docker is not None and self.build_docker()))],
             "Llevar el proyecto a otra versión de PHP o a Docker")
 
+    def nv_row_menu(self, x):
+        """Menú ⋮ de una fila de la lista (aparece al pasar el ratón, con Cargar): llevar el proyecto a
+        otra versión o a Docker, importar su SQL y lo del menú Más, sin cambiar el proyecto de arriba."""
+        items = [("Añadir entorno en otra versión de PHP…", lambda: self.on_replicate(x)),
+                 ("Añadir entorno en Docker…", lambda: self.nv_docker_loaded(x)),
+                 ("Importar SQL…", lambda: self.nv_import(x))] + self.nv_more_items(x)
+        return self.nv_menu_button(None, "view-more-symbolic", items)
+
     def nv_more_menu(self, x):
+        return self.nv_menu_button(None, "view-more-symbolic", self.nv_more_items(x))
+
+    def nv_more_items(self, x):
         items = [("Vincular la BBDD de cada versión…", lambda: self.on_link_project(x)),
                  ("Abrir la carpeta", lambda: self.open_uri("file://%s/%s" % (HTDOCS, x["name"])))]
         for dp in self.nv_docker_of(x["name"]):
@@ -23039,7 +23360,7 @@ class App2(App):
             items.append(("Vaciar la caché de la tienda", lambda: self.run_task(
                 "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
                 done_text="Caché vaciada", auto_close=True)))
-        return self.nv_menu_button(None, "view-more-symbolic", items)
+        return items
 
     def nv_import(self, x):
         pairs = self.project_pairs(x)
@@ -23373,7 +23694,9 @@ class App2(App):
         new = nv_button("list-add-symbolic", "Proyecto en Docker…", None, lambda *_: self.nv_docker_new(), "nv-azul")
         head.pack_end(new, False, False, 0)
         box.pack_start(head, False, False, 0)
-        for text, sub, btn in ([("El Docker del sistema (con root) está en marcha", "No hace falta: el tuyo va sin root.",
+        for text, sub, btn in ([("Hay otro Docker en marcha: el de Ubuntu, como administrador",
+                                 "Este programa usa el suyo, con tu usuario: el de Ubuntu no hace falta y quien lo use "
+                                 "puede hacerse con el equipo. Apágalo salvo que lo uses fuera de este programa.",
                                  ("Apagarlo", lambda *_: self.run_task("Apagando el Docker del sistema", ["docker-instalar"],
                                                                          done_text="Docker del sistema apagado", auto_close=True,
                                                                          on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))))]
@@ -23548,7 +23871,7 @@ class App2(App):
         else:
             self.dk_table.pack_start(self.nv_containers_table(), False, False, 0)
         for w in self.nv_walk(self.dk_table):
-            if isinstance(w, Gtk.Button):
+            if isinstance(w, Gtk.Button) and not w.get_style_context().has_class("nv-proyecto-btn"):
                 css(w, "nv-clasico")
         self.dk_table.show_all()
 
@@ -23614,6 +23937,101 @@ class App2(App):
             r.add(label(empty, "nv-tenue", margin=14))
             lb.add(r)
         return lb
+
+    def nv_docker_visor(self, p, items):
+        """Visor de un proyecto en Docker, como el del proyecto cargado: su nombre y su logotipo, sus
+        versiones, su dominio, si está en marcha y sus accesos directos (la web, su panel con el
+        administrador de pruebas, su phpMyAdmin, VS Code, el registro de PHP y arrancar o parar)."""
+        folder = os.path.join(HTDOCS, p["folder"])
+        kind = project_kind(p["folder"])
+        akind, admin = project_admin(folder)
+        up = bool(items) and all(c["state"] == "running" for c in items)
+        some = any(c["state"] == "running" for c in items)
+        php_c = next((c["name"] for c in items if re.fullmatch(r"nexum-[a-z0-9-]+-php-\d+", c["name"])), None)
+        card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12), "nv-tarjeta", "nv-dk-visor")
+        top = Gtk.Box(spacing=14)
+        # (el logotipo solo, sin recuadro, como arriba en Proyectos)
+        img = kind_icon(kind, 36)
+        img.set_valign(Gtk.Align.CENTER)
+        top.pack_start(img, False, False, 0)
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, valign=Gtk.Align.CENTER)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(label(p["folder"], "nv-titulo", ellipsize=3, max_width_chars=48, tooltip_text=p["folder"]),
+                      False, False, 0)
+        if kind:
+            tl.pack_start(label(KIND_TEXT[kind], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
+        info.pack_start(tl, False, False, 0)
+        info.pack_start(label("PHP %s · MariaDB %s · https://%s" % (p["php"], p["maria"], p["domain"]),
+                              "nv-mono", "nv-chico", "nv-tenue", selectable=True, ellipsize=3), False, False, 0)
+        top.pack_start(info, True, True, 0)
+        st = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+        st.pack_start(label("●", "nv-verde", "nv-latido") if up else nv_dot(False), False, False, 0)
+        st.pack_start(label("En marcha" if up else "A medias" if some else "Parado", "nv-chico",
+                            *([] if up else ["nv-tenue"])), False, False, 0)
+        top.pack_end(st, False, False, 0)
+        card.pack_start(top, False, False, 0)
+        card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
+        acts = Gtk.Box(spacing=8)
+        stopped = "Está parado: arráncalo antes (Arrancar, a la derecha)"
+        web = nv_button(logo("globo", 18), "Abrir web", "Abrir https://%s/" % p["domain"] if up else stopped,
+                        lambda *_: self.open_uri("https://%s/" % p["domain"]), "nv-proyecto-btn")
+        web.set_sensitive(up)
+        acts.pack_start(web, False, False, 0)
+        adm = nv_button(logo("prestashop" if akind == "ps" else "wordpress", 18), "Panel",
+                        stopped if not up else "Abrir https://%s/%s/ con el administrador de pruebas ya escrito "
+                        "(%s, contraseña local): solo hay que pulsar Entrar" % (p["domain"], admin, "local@local.test")
+                        if admin else "%s no es un WordPress ni una tienda PrestaShop con su carpeta de "
+                        "administración" % p["folder"],
+                        lambda *_: self.open_admin_login(akind, admin, "https://%s" % p["domain"], p["folder"],
+                                                         ["docker-usuario-pruebas", p["slug"]]), "nv-proyecto-btn")
+        adm.set_sensitive(up and bool(admin))
+        acts.pack_start(adm, False, False, 0)
+        pma_ok = p["pma"].isdigit()
+        pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin",
+                        stopped if not up else "Abrir su phpMyAdmin (http://127.0.0.1:%s/): usuario root; la "
+                        "contraseña se copia al pulsar, para pegarla" % p["pma"] if pma_ok else "Sin puerto de phpMyAdmin",
+                        lambda *_: (self.nv_docker_copy_pass(p), self.open_uri("http://127.0.0.1:%s/" % p["pma"])),
+                        "nv-proyecto-btn")
+        pma.set_sensitive(up and pma_ok)
+        acts.pack_start(pma, False, False, 0)
+        code = vscode_app()
+        if code is not None:
+            cimg = None
+            if code.get_icon() is not None:
+                cimg = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                cimg.set_pixel_size(18)
+            vs = nv_button(cimg or "text-editor-symbolic", "VS Code", "Abrir %s en Visual Studio Code" % folder,
+                           lambda *_: self.open_in_vscode(folder), "nv-proyecto-btn")
+            vs.set_sensitive(os.path.isdir(folder))
+            acts.pack_start(vs, False, False, 0)
+        lg = nv_button("text-x-generic-symbolic", "Log", "Ver lo último de su PHP (los errores de la web: el "
+                       "registro de su contenedor %s)" % php_c if php_c else "Aún no tiene contenedor de PHP: arráncalo",
+                       lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
+        lg.set_sensitive(bool(php_c))
+        acts.pack_start(lg, False, False, 0)
+        power = nv_button("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
+                          "Parar" if up else "Arrancar",
+                          "Parar sus contenedores (su BBDD se queda)" if up else "Arrancar sus contenedores",
+                          lambda *_: self.run_task(("Parando %s" if up else "Arrancando %s") % p["folder"],
+                                                   ["docker-parar" if up else "docker-arrancar", p["slug"]], auto_close=True,
+                                                   on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
+                          "nv-proyecto-btn", "nv-stop" if up else "nv-play")
+        power.set_sensitive(not self.busy)
+        acts.pack_end(power, False, False, 0)
+        card.pack_start(acts, False, False, 0)
+        return card
+
+    def nv_docker_log(self, p, name):
+        """Lo último del contenedor de PHP de un proyecto en Docker: ahí van los errores de PHP de su web
+        (PHP-FPM los manda a su salida de errores) y los avisos del propio PHP-FPM."""
+        def done(rc, out):
+            if rc != 0 and not out.strip():
+                message(self.win, "No se han podido leer los registros de %s" % name, "", Gtk.MessageType.ERROR)
+                return False
+            self.show_text("PHP de %s" % p["folder"], "Últimas líneas del contenedor %s (los errores de PHP de "
+                           "https://%s)" % (name, p["domain"]), out, lambda: self.nv_docker_log(p, name))
+            return False
+        run_quick(["docker-contenedor", "registros", name], done)
 
     def nv_containers_table(self):
         d = self.docker
@@ -23710,6 +24128,12 @@ class App2(App):
                 on_click=lambda proj=proj: self.nv_dk_toggle(proj))
             if not opened:
                 continue
+            # (desplegado: su visor, con sus accesos directos, encima de sus contenedores)
+            if p:
+                vr = Gtk.ListBoxRow(activatable=False, selectable=False)
+                vr.on_click = None
+                vr.add(self.nv_docker_visor(p, items))
+                lb.add(vr)
             for c in visible:
                 on = c["state"] == "running"
                 kn = Gtk.Box(spacing=8)
@@ -24136,6 +24560,7 @@ case "$1" in
     docker-crear) shift; docker_create "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" ;;
     docker-php) docker_set_php "$2" "$3" ;;
+    docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;

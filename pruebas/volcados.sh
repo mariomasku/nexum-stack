@@ -19,6 +19,8 @@ for i in $(seq 50); do "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 && bre
 "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 || { echo "  FALLA el MariaDB temporal no arranca"; exit 1; }
 trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
 extract "$SRC" db_neutralize_invoker db_neutralize_extras db_lock_import_user db_kill_user db_root_cleanup wp_table_prefixes ps_table_prefix || exit 1
+# (1.55.9 / Mac 1.39.19: el cliente de root, por db_root_sql, que tambien vale para un contenedor)
+grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || exit 1; DB_ROOT_CLIENT=(); }
 eval "$(sed -n "/^DB_DIRECTORY_PY='/,/^'\$/p" "$SRC")"
 [ -n "$DB_DIRECTORY_PY" ] || { echo "  FALLA no esta DB_DIRECTORY_PY"; exit 1; }
 mysql=("$DB_CLIENT" -uroot)

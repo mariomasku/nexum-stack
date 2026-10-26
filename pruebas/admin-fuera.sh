@@ -21,6 +21,8 @@ for i in $(seq 50); do "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 && bre
 trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
 "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 || { echo "  FALLA el MariaDB temporal no arranca"; exit 1; }
 extract "$SRC" test_admin test_admin_filter wp_table_prefixes ps_table_prefix linked_folder || exit 1
+# (1.55.9 / Mac 1.39.19: el cliente de root, por db_root_sql, que tambien vale para un contenedor)
+grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || exit 1; DB_ROOT_CLIENT=(); }
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
 DRY=0 DB_SAFE=() HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos
@@ -48,7 +50,7 @@ SQL
 out=$(test_admin tienda)
 check "el administrador de pruebas esta en la BBDD de trabajo (WordPress y PrestaShop)" 'grep -q "^A|wp|" <<< "$out" && grep -q "^A|ps|" <<< "$out"'
 before=$(m tienda -e "CHECKSUM TABLE xy_users, xy_usermeta, ps_employee, ps_employee_shop")
-# Lo mismo que hace export_database con el MariaDB de la version
+# Lo mismo que hace export_database con el MariaDB de la version (Linux 1.54.1, Mac 1.39.20)
 query=("$DB_CLIENT" -uroot -N) dump=("$MDB/dump" -uroot)
 skip=() only=() wheres=()
 test_admin_filter tienda
@@ -67,5 +69,9 @@ check "la BBDD de trabajo no cambia (sigue con el de pruebas)" '[ "$(m tienda -e
 skip=() only=() wheres=()
 test_admin_filter copia
 check "una BBDD sin el administrador de pruebas: se descarga como siempre" '[ ${#only[@]} -eq 0 ] && [ ${#skip[@]} -eq 0 ]'
-check "export_database usa el filtro en las dos formas (MariaDB en marcha y temporal)" 'grep -q "test_admin_filter \"\$db\"" "$SRC" && grep -q "query=(env LD_LIBRARY_PATH=" "$SRC" && grep -q "query=(\"\${DB_SAFE\[@\]}\" \"\$DB_CLIENT\" -uroot -N)" "$SRC"'
+check "export_database usa el filtro en las dos formas (MariaDB en marcha y temporal)" 'f=$(awk "/^function export_database\\(\\) \\{/,/^}/" "$SRC"); grep -q "test_admin_filter \"\$db\"" <<< "$f" && [ "$(grep -c "query=(" <<< "$f")" -ge 2 ]'
+# (1.55.4) Los volcados de las tablas aparte, sin su linea del modo sandbox (los MariaDB antiguos no la
+# entienden y la carga solo quitaba la primera); y la carga las quita todas
+check "los volcados aparte, sin la linea del modo sandbox" 'grep -q -- "--where=\"\${wheres\[\$i\]}\" \"\$db\" \"\${only\[\$i\]}\" | LC_ALL=C sed .\/^\\\\/\\\\\*M!999999" "$SRC"'
+check "la carga quita todas las lineas del modo sandbox, no solo la primera" 'grep -qF "filter=(env LC_ALL=C sed -E -e '"'"'/^\/\*M!999999\\\\-/d'"'"'" "$SRC" && ! grep -qF "1{/^\/\*M!999999" "$SRC"'
 exit $fail

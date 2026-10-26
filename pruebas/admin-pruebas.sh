@@ -19,6 +19,8 @@ for i in $(seq 50); do "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 && bre
 "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 || { echo "  FALLA el MariaDB temporal no arranca"; exit 1; }
 trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
 extract "$SRC" test_admin wp_table_prefixes ps_table_prefix || exit 1
+# (1.55.9 / Mac 1.39.19: el cliente de root, por db_root_sql, que tambien vale para un contenedor)
+grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || exit 1; DB_ROOT_CLIENT=(); }
 # (la carpeta de la base: linked_folder desde la 1.51; antes, una linea de awk dentro de test_admin)
 grep -q "^function linked_folder" "$SRC" && { extract "$SRC" linked_folder || exit 1; active_name() { :; }; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"

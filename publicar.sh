@@ -14,7 +14,7 @@
 #      de Mac y su firma (si va) y las novedades de esa version
 # Necesita gh con la sesion iniciada (gh auth login) y la clave privada de las firmas en gpg.
 #
-# Uso: ./publicar.sh
+# Uso: ./publicar.sh [--solo-linux]   (--solo-linux: sin la version de Mac, aunque sea nueva)
 
 set -e -o pipefail
 
@@ -27,6 +27,8 @@ REPO=$(grep -m1 '^UPDATE_REPO=' "$SRC" | cut -d'"' -f2)
 TAG=v$VERSION
 DIST=$HERE/dist
 DEB=$DIST/lvm-instalador_${VERSION}_all.deb
+SOLO_LINUX=0
+[ "$1" == --solo-linux ] && SOLO_LINUX=1
 
 function fail() {
     echo "No se publica: $*" >&2
@@ -55,7 +57,9 @@ echo "   Ultima publicada: ${LATEST:-ninguna}"
 # Version de Mac: solo si aun no esta en ninguna publicacion (el Mac busca la mas nueva en todas)
 MAC_SRC=$HERE/macos/lvm-instalador.sh
 MAC_ZIP="" MAC_DMG=""
-if [ -f "$MAC_SRC" ]; then
+if [ $SOLO_LINUX -eq 1 ]; then
+    echo "   Mac: no se sube (--solo-linux)"
+elif [ -f "$MAC_SRC" ]; then
     MAC_VERSION=$(grep -m1 '^APP_VERSION=' "$MAC_SRC" | cut -d'"' -f2)
     [ -n "$MAC_VERSION" ] || fail "falta APP_VERSION en $MAC_SRC"
     [ "$(grep -m1 '^UPDATE_KEY_FPR=' "$MAC_SRC" | cut -d'"' -f2)" == "$FPR" ] \

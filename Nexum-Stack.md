@@ -1,7 +1,7 @@
 # Nexum Dev Stack (lvm-instalador)
 
 **Gestor de entornos locales de desarrollo para Linux y Mac**
-Versión actual: **Linux 1.55.3** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
+Versión actual: **Linux 1.55.10** · **Mac 1.36.0** · Autor: M. Mascuñano – HEXER
 
 ---
 
@@ -226,7 +226,7 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 
 ## 8. Estado y pendientes
 
-- **Linux:** versión 1.55.3, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
+- **Linux:** versión 1.55.10, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
 - **Mac:** versión 1.36.0, con las mismas funciones que Linux. Se probó a fondo en un Mac real hasta la 1.12.0; las versiones posteriores pasan la batería de pruebas automáticas, pero quedan por comprobar en un Mac real "Apartar" con un XAMPP oficial de un compañero y que el navegador acepte los certificados de los proyectos. La versión de Mac todavía no lleva el nombre Nexum Dev Stack.
 - **Actualizaciones desde GitHub:** desde la 1.50.0. Pendiente de la primera prueba completa: publicar la 1.50.1 e instalarla con **Buscar actualizaciones**.
 - **Manual interactivo:** pendiente de rehacer con datos de ejemplo (las capturas actuales son de un equipo real).

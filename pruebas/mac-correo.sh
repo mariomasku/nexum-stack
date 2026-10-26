@@ -215,7 +215,7 @@ rm -f "$MAILPIT_DATA"; mv "$W/mailpit-mio" "$MAILPIT_DATA"
 lampp_running() { false; }
 
 # --- Instalar Mailpit (sin red: un .tar.gz de prueba) y la orden correo
-extract "$SRC" mailpit_install mail_wp_text mail_command || exit 1
+extract "$SRC" mailpit_install mail_wp_text mail_command sudo_first || exit 1
 mkdir -p "$W/tar" "$W/prueba"
 cp "$FAKE" "$W/tar/mailpit"; echo "MIT" > "$W/tar/LICENSE"; echo "readme" > "$W/tar/README.md"
 tar -czf "$W/mailpit.tar.gz" -C "$W/tar" mailpit LICENSE README.md

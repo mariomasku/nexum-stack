@@ -240,6 +240,9 @@
 #   lvm-instalador docker-clave <nombre>
 #       Usuario y contraseña de su phpMyAdmin (ya no entra solo como root)
 #
+#   lvm-instalador docker-usuario-pruebas <nombre>
+#       El administrador de pruebas del Panel (local@local.test) en la BBDD de su contenedor
+#
 #   lvm-instalador docker-migrar <nombre> | --todos
 #       Los proyectos de antes de la 1.39.2 (PHP-FPM abierto en 127.0.0.1) pasan a la web del
 #       contenedor con clave. Se hace solo al arrancarlos
@@ -2080,7 +2083,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano - HEXER"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.39.13"
+APP_VERSION="1.39.21"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -3940,10 +3943,46 @@ function load_project() {
     return $rc
 }
 
+# PrestaShop 1.7+ guarda su configuracion (con la BBDD) en var/cache: si es la de otro sitio (la del
+# contenedor de Docker, db, o la de produccion), la tienda no conecta con su BBDD en LAMPP (error 500).
+# Se aparta (a ~/lvm-copias) la cache cuya BBDD no es la de app/config/parameters.php: se rehace sola
+function ps_stale_cache() {
+    local root=$HTDOCS_DIR/$1 env
+    [ -f "$root/app/config/parameters.php" ] || return 0
+    for env in $(/usr/bin/python3 -I - "$root" <<'EOF'
+import glob, os, re, sys
+root = sys.argv[1]
+def db(path):
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read(200000)
+    except OSError:
+        return None
+    return tuple((re.search(r"""['"]%s['"]\s*=>\s*['"]([^'"]*)['"]""" % k, text) or [None, ""])[1]
+                 for k in ("database_host", "database_name", "database_user"))
+want = db(os.path.join(root, "app/config/parameters.php"))
+for cached in glob.glob(os.path.join(root, "var/cache/*/appParameters.php")):
+    env = os.path.basename(os.path.dirname(cached))
+    if want and re.fullmatch(r"[A-Za-z0-9_-]+", env) and db(cached) not in (None, want):
+        print(env)
+EOF
+    ); do
+        [ -L "$root/var/cache/$env" ] && continue
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] se aparta var/cache/$env de $1 (lleva otra BBDD)"
+            continue
+        fi
+        mkdir -p -m 700 "$HOME/lvm-copias"
+        mv "$root/var/cache/$env" "$HOME/lvm-copias/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
+            && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/lvm-copias, se rehace sola"
+    done
+    return 0
+}
+
 # Los cambios de load_project (ver arriba): <carpeta> <version> <enlace> <base>
 function load_project_steps() {
     local folder=$1 version=$2 link=$3 sudo="" secured=1
     htdocs_close_world "$HTDOCS_DIR/$folder"
+    ps_stale_cache "$folder"
 
     [ -w "$HTDOCS_DIR" ] || sudo=$SUDO
     if [ -L "$HTDOCS_DIR/$link" ]; then
@@ -5017,6 +5056,8 @@ function hosts_fake_one() {
 
         return 1
     fi
+    # La contraseña antes de cambiar nada: cancelarla deja el dominio como estaba
+    sudo_first || return 1
     # Un .local se queda siempre en hosts (sin su linea, el equipo lo preguntaria a la red y
     # cualquiera de la misma wifi podria contestar), salvo que se apague aqui: se recuerda en
     # LOCAL_OFF_FILE, con su www., y al encenderlo se olvida
@@ -5422,6 +5463,10 @@ function unknown_host_vhost() {
 # barrera-web si|no: pone o quita la barrera entre webs en todas las versiones (y reinicia Apache
 # de la activa si esta en marcha). Sin argumento, dice como esta
 function web_barrier_command() {
+    # (si hay que cambiarla: la contraseña antes de nada; cancelarla la deja como estaba)
+    if { [ "$1" == si ] && ! web_barrier_on; } || { [ "$1" == no ] && web_barrier_on; }; then
+        sudo_first || return 1
+    fi
     case "$1" in
         "")
             web_barrier_on && echo "Barrera entre webs: puesta" || echo "Barrera entre webs: apagada"
@@ -5445,7 +5490,18 @@ function web_barrier_command() {
     fi
     [ "$DRY" -eq 1 ] && return 0
     secure_all
-    [ $? -eq 2 ] && return 1
+    if [ $? -eq 2 ]; then
+        # (no se ha podido aplicar: el interruptor vuelve a como estaba)
+        if [ "$1" == si ]; then
+            echo "Apagada con lvm-instalador barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null
+            [ -z "$SUDO" ] || $SUDO chmod 644 "$WEB_BARRIER_OFF"
+        else
+            $SUDO rm -f "$WEB_BARRIER_OFF"
+        fi
+        secure_all > /dev/null 2>&1
+        echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
+        return 1
+    fi
     if [ -n "$(active_dir)" ] && [ -f "$LINK/xamppfiles/logs/httpd.pid" ]; then
         echo "Recargando Apache de la version activa..."
         xampp_ctl reloadapache > /dev/null || { echo "No se ha podido recargar Apache: reinicia la version activa."; return 1; }
@@ -5838,8 +5894,17 @@ function mail_wp_text() {
 }
 
 # correo [estado] | si | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>
+# Un ajuste que se aplica como root (interruptores de la ventana): la contraseña antes de cambiar
+# nada. Cancelarla deja el ajuste como estaba
+function sudo_first() {
+    { [ "$DRY" -eq 1 ] || [ -z "$SUDO" ]; } && return 0
+    sudo -v && return 0
+    echo "Cancelado: no se ha cambiado nada"
+    return 1
+}
+
 function mail_command() {
-    local mode
+    local mode old
     case $1 in
         ""|estado)
             if mail_on; then
@@ -5858,6 +5923,7 @@ function mail_command() {
             mkdir -p -m 700 "$LOG_DIR" || return 1
             if [ "$1" == si ] || [ "$1" == on ]; then
                 mail_on && { echo "El correo de pruebas ya estaba encendido"; return 0; }
+                sudo_first || return 1
                 # (--instalar: y Mailpit, si no lo esta; lo ofrece la ventana la primera vez)
                 if [ "$2" == --instalar ] && ! mailpit_installed; then
                     mailpit_install || return 1
@@ -5866,13 +5932,20 @@ function mail_command() {
                 mailpit_installed || echo "Aviso: Mailpit no esta instalado (lvm-instalador correo instalar): hasta entonces mail() falla"
             else
                 mail_on || { echo "El correo de pruebas ya estaba apagado"; return 0; }
+                sudo_first || return 1
                 [ "$DRY" -eq 0 ] && { : > "$MAIL_OFF_FILE" || return 1; }
             fi
             if [ "$DRY" -eq 1 ]; then
                 echo "  [simulacion] correo de pruebas $([[ "$1" =~ ^(si|on)$ ]] && echo encendido || echo apagado) en todas las versiones"
                 return 0
             fi
-            mail_apply || return 1
+            if ! mail_apply; then
+                # (no se ha podido aplicar: el interruptor vuelve a como estaba)
+                if [ "$1" == si ] || [ "$1" == on ]; then : > "$MAIL_OFF_FILE"; else rm -f "$MAIL_OFF_FILE"; fi
+                mail_apply > /dev/null 2>&1
+                echo "No se ha cambiado el correo de pruebas"
+                return 1
+            fi
             mail_on && echo "Correo de pruebas encendido: lo que manden las webs va a Mailpit" \
                 || echo "Correo de pruebas apagado: lo que manden las webs puede llegar de verdad"
             return 0 ;;
@@ -5886,8 +5959,15 @@ function mail_command() {
                 echo "  [simulacion] WordPress: $(mail_wp_text "$mode")"
                 return 0
             fi
+            sudo_first || return 1
+            old=$(mail_wp_mode)
             mkdir -p -m 700 "$LOG_DIR" && echo "$mode" > "$MAIL_WP_FILE" || return 1
-            mail_apply || return 1
+            if ! mail_apply; then
+                echo "$old" > "$MAIL_WP_FILE"
+                mail_apply > /dev/null 2>&1
+                echo "No se ha cambiado el modo de WordPress"
+                return 1
+            fi
             echo "WordPress: $(mail_wp_text "$mode")"
             return 0 ;;
         instalar)
@@ -7927,7 +8007,7 @@ function ps_table_prefix() {
     local pref=$2
     [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
     [[ "$pref" =~ ^[A-Za-z0-9_]+$ ]] || pref=""
-    "${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 8) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%shop\\_url' ORDER BY TABLE_NAME = '${pref}shop_url' DESC, LENGTH(TABLE_NAME) LIMIT 1" < /dev/null 2> /dev/null \
+    db_root_sql -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 8) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%shop\\_url' ORDER BY TABLE_NAME = '${pref}shop_url' DESC, LENGTH(TABLE_NAME) LIMIT 1" < /dev/null 2> /dev/null \
         | grep -E '^[A-Za-z0-9_]+$'
 }
 
@@ -8242,6 +8322,18 @@ TEST_ADMIN_PASS="local"
 # la contraseña, y WordPress acepta md5 y la cambia por la suya al entrar)
 TEST_ADMIN_BCRYPT='$2y$12$IqVkFsJq4UhjbzLfagfW9eU5V6iIauQCbfMJDY26MoM8ETz6ZKgxG'
 
+# Cliente de MariaDB como root para el administrador de pruebas (test_admin, wp_table_prefixes y
+# ps_table_prefix): el de XAMPP-X (DB_CLIENT) o, si DB_ROOT_CLIENT (un array) tiene algo, ese. Asi
+# test_admin sirve tambien para la BBDD de un contenedor de Docker (docker_test_admin)
+DB_ROOT_CLIENT=()
+function db_root_sql() {
+    if [ ${#DB_ROOT_CLIENT[@]} -gt 0 ]; then
+        "${DB_ROOT_CLIENT[@]}" "$@"
+    else
+        "${DB_SAFE[@]}" "$DB_CLIENT" -uroot "$@"
+    fi
+}
+
 # usuario-pruebas <base> [carpeta]: crea o deja al dia el administrador de pruebas en los WordPress y
 # la tienda PrestaShop de la base. Dice A|wp|usuario|contraseña y/o A|ps|... por cada uno (para la
 # ventana); sale con 1 si no hay ninguno. La carpeta (o la recordada para la base) solo hace falta en
@@ -8254,7 +8346,8 @@ function test_admin() {
     fi
     [ -z "$folder" ] && folder=$(linked_folder "$db" "${DB_TARGET_FOLDER:-}")
     [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && [ -d "$HTDOCS_DIR/$folder" ] || folder=""
-    local mysql=("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N --default-character-set=utf8mb4)
+    # (el cliente de root de XAMPP-X o, con DB_ROOT_CLIENT, otro: el de la MariaDB de un contenedor)
+    local mysql=(db_root_sql -N --default-character-set=utf8mb4)
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] administrador de pruebas $TEST_ADMIN_USER / $TEST_ADMIN_PASS en $db"
         return 0
@@ -8348,7 +8441,7 @@ SELECT CAST(IF(@src IS NULL, 0, @id) AS UNSIGNED);"
 function wp_table_prefixes() {
     [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
     # Solo prefijos de letras, numeros y _ (los nombres de las tablas los trae la base)
-    "${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7) AS p FROM information_schema.TABLES
+    db_root_sql -N -e "SELECT LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7) AS p FROM information_schema.TABLES
         WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE' AND TABLE_NAME LIKE '%options' AND CONCAT(LEFT(TABLE_NAME, LENGTH(TABLE_NAME) - 7), 'users')
         IN (SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='$1' AND TABLE_TYPE='BASE TABLE') ORDER BY LENGTH(p)" < /dev/null 2> /dev/null \
         | grep -E '^[A-Za-z0-9_]*$'
@@ -12794,6 +12887,43 @@ function mail_export_filter() {
 # (estructura, datos, rutinas, disparadores y eventos) que se puede volver a cargar con importar-bd.
 # Sin version, de la activa. Si es la activa y esta en marcha se usa su MariaDB; si no, uno
 # temporal (pide la contraseña de administrador).
+# Tablas del administrador de pruebas en una base (para exportar-bd): deja en skip los --ignore-table
+# del volcado de siempre y en only/wheres cada tabla con su condicion (sin las filas de
+# local@local.test). Solo las tablas de verdad que lo tienen. Usa query (el cliente de la base)
+function test_admin_filter() {
+    local db=$1 t c p n
+    local -A cols=()
+    while IFS=$'\t' read -r t c; do
+        [[ "$t" =~ ^[A-Za-z0-9_]+$ ]] && cols[$t]=$c
+    done < <("${query[@]}" -e "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c
+        JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+        WHERE c.TABLE_SCHEMA = '$db' AND t.TABLE_TYPE = 'BASE TABLE' AND (
+            (c.TABLE_NAME LIKE '%users' AND c.COLUMN_NAME = 'user_login')
+            OR (c.TABLE_NAME LIKE '%employee' AND c.COLUMN_NAME = 'email'))" < /dev/null 2> /dev/null)
+    for t in "${!cols[@]}"; do
+        if [ "${cols[$t]}" == user_login ]; then
+            p=${t%users}
+            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
+            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
+            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (user_login <=> '$TEST_ADMIN_USER')")
+            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}usermeta' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
+                skip+=(--ignore-table="$db.${p}usermeta") only+=("${p}usermeta")
+                wheres+=("user_id IS NULL OR user_id NOT IN (SELECT ID FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER')")
+            fi
+        else
+            p=${t%employee}
+            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE email = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
+            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
+            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (email <=> '$TEST_ADMIN_USER')")
+            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}employee_shop' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
+                skip+=(--ignore-table="$db.${p}employee_shop") only+=("${p}employee_shop")
+                wheres+=("id_employee IS NULL OR id_employee NOT IN (SELECT id_employee FROM \`$t\` WHERE email = '$TEST_ADMIN_USER')")
+            fi
+        fi
+    done
+    return 0
+}
+
 function export_database() {
     local db=$1 dest=$2 folder=$3
     if [ -z "$db" ] || [ -z "$dest" ]; then
@@ -12843,9 +12973,14 @@ function export_database() {
         dump=("$dir/xamppfiles/mysql/bin/mariadb-dump" --no-defaults -S "$DB_TMP_SOCK" -uroot)
         query=("$dir/xamppfiles/mysql/bin/mariadb" --no-defaults -S "$DB_TMP_SOCK" -uroot -N)
     fi
-    # Lo que cambio el correo de pruebas (plugins de WordPress, correo de PrestaShop) no va en la copia:
+    # El administrador de pruebas (test_admin) no sale en la copia: sus filas de los usuarios de
+    # WordPress y de los empleados de PrestaShop se quedan fuera del volcado (la BBDD de trabajo no
+    # se toca). Esas tablas van aparte, con --where
+    local skip=() only=() wheres=() mail_sql=""
+    test_admin_filter "$db"
+    [ ${#only[@]} -gt 0 ] && echo "El administrador de pruebas ($TEST_ADMIN_USER) no va en la copia"
+    # Lo que cambio el correo de pruebas (plugins de WordPress, correo de PrestaShop) tampoco: la copia
     # lleva lo que habia antes (al final del volcado) y sin la tabla donde se apunto
-    local skip=() mail_sql=""
     mail_export_filter "$db"
     [ -n "$mail_sql" ] && echo "Los cambios del correo de pruebas no van en la copia: lleva el correo como estaba"
 
@@ -12869,6 +13004,12 @@ function export_database() {
     ( umask 077; set -o pipefail
       { "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick \
             --routines --triggers --events --max-allowed-packet=1G "${skip[@]}" "$db" || exit 1
+        # (las tablas del administrador de pruebas, aparte y sin sus filas; sin la linea del modo
+        # sandbox de cada volcado: solo la del primero, que la carga sabe quitar)
+        for i in "${!only[@]}"; do
+            "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick --triggers \
+                --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" | LC_ALL=C sed '/^\/\*M!999999\\-/d' || exit 1
+        done
         [ -z "$mail_sql" ] || printf '%s\n' "$mail_sql"; } < /dev/null 2> "$errors" | "${out[@]}" > "$part" ) &
     pid=$!
     while kill -0 $pid 2> /dev/null; do
@@ -13076,7 +13217,7 @@ function import_database() {
         gz) source=(gzip -dc) ;;
         zip) source=(python3 -I -c "$ZIP_SQL_PY" extraer -) ;;
     esac
-    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '1{/^\/\*M!999999\\-/d;}' -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
+    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '/^\/\*M!999999\\-/d' -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     local definer=(python3 -I -c "$INVOKER_PY")
     local start=$(date +%s)
 
@@ -14851,16 +14992,25 @@ func openURL(_ s: String) {
 /// al día su administrador de pruebas (usuario-pruebas) y abre una página con el usuario y la
 /// contraseña ya escritos: basta con pulsar Entrar. Si no se puede, el panel como siempre.
 func openProjectAdmin(kind: String, admin: String, link: String, db: String, folder: String?) {
-    let base = "http://\(link)/\(admin)/"
-    guard !db.isEmpty, !SIMULATE else { openURL(base); return }
     let name = folder.map { ($0 as NSString).lastPathComponent } ?? ""
-    runQuick(["usuario-pruebas", db, name]) { rc, out in
+    openAdminLogin(kind: kind, admin: admin, site: "http://\(link)", name: name,
+                   command: db.isEmpty ? nil : ["usuario-pruebas", db, name])
+}
+
+/// Panel (wp-admin o el de la tienda) de la web site (http://web.local, https://x.docker.local) con el
+/// administrador de pruebas: command lo deja al día (usuario-pruebas o docker-usuario-pruebas, que dicen
+/// A|tipo|usuario|contraseña) y se abre una página con el usuario y la contraseña ya escritos. Sin
+/// command, o si no sale, el panel como siempre
+func openAdminLogin(kind: String, admin: String, site: String, name: String, command: [String]?) {
+    let base = "\(site)/\(admin)/"
+    guard let cmd = command, !SIMULATE else { openURL(base); return }
+    runQuick(cmd) { rc, out in
         let mine = out.components(separatedBy: "\n").filter { $0.hasPrefix("A|\(kind)|") }
             .map { $0.components(separatedBy: "|") }
         guard rc == 0, let f = mine.first, f.count >= 4 else { openURL(base); return }
         let page: String
         if kind == "wp" {
-            page = loginPage(title: "Panel de WordPress", project: name, action: "http://\(link)/wp-login.php",
+            page = loginPage(title: "Panel de WordPress", project: name, action: "\(site)/wp-login.php",
                              fields: [("log", f[2], "Usuario o correo"), ("pwd", f[3], "Contraseña"),
                                       ("rememberme", "forever", nil), ("redirect_to", base, nil)], panel: base)
         } else {
@@ -16361,6 +16511,30 @@ final class AppModel: ObservableObject {
         // (al volver a la ventana, los correos sin leer al momento)
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
                                                queue: .main) { [weak self] _ in self?.pollMail() }
+        // Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
+        autoCheckUpdates()
+    }
+
+    func autoCheckUpdates() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+            guard let self = self else { return }
+            if self.data == nil || self.busy { self.autoCheckUpdates(); return }
+            self.checkUpdates(auto: true)
+        }
+    }
+
+    /// La versión nueva a la que se ha dicho que no al abrir la ventana (para no preguntar en cada
+    /// arranque); con una versión, la apunta
+    @discardableResult
+    func declinedUpdate(_ version: String? = nil) -> String {
+        let path = LOG_DIR + "/actualizacion-rechazada"
+        guard let v = version else {
+            return ((try? String(contentsOfFile: path, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? (v + "\n").write(toFile: path, atomically: true, encoding: .utf8)
+        return v
     }
 
     func toast(_ text: String) {
@@ -16518,17 +16692,26 @@ final class AppModel: ObservableObject {
 
     /// Busca una versión nueva: en GitHub (firmada; se instala desde aquí y la ventana se vuelve a
     /// abrir) o, si no se puede, un .dmg más nuevo en Descargas (se abre para ejecutar su instalador)
-    func checkUpdates() {
-        toast("Buscando actualizaciones…")
+    /// Buscar una versión nueva (menú) o, con auto, al abrir la ventana: sin avisar si no hay, solo la
+    /// firmada de GitHub y, si se dijo que no a una, sin volver a preguntar por ella (solo un aviso)
+    func checkUpdates(auto: Bool = false) {
+        if !auto { toast("Buscando actualizaciones…") }
         runQuick(["gui-paquete"]) { _, out in
             let current = self.data?.version ?? ""
             let lines = parseLines(out)
             let notes = lines.filter { $0[0] == "I" && $0.count >= 2 }.map { $0[1...].joined(separator: "|") }
             if let u = lines.first(where: { $0[0] == "U" && $0.count >= 5 }) {
                 let path = u[4...].joined(separator: "|")
+                if auto && u[1] == self.declinedUpdate() {
+                    self.toast("Hay una versión nueva (\(u[1])): menú Gestor → Buscar actualizaciones")
+                    return
+                }
                 guard confirm("Hay una versión nueva de Nexum Dev Stack",
                               "Tienes la \(current); en GitHub está la \(u[1]) (\(u[2])), firmada por quien hace el programa. Huella SHA-256:\n\(u[3])\n\nSe cambia el gestor y la ventana se vuelve a abrir. Tus versiones de PHP, proyectos y BBDD no se tocan.",
-                              "Actualizar a la \(u[1])") else { return }
+                              "Actualizar a la \(u[1])") else {
+                    if auto { self.declinedUpdate(u[1]) }
+                    return
+                }
                 self.runTask("Actualizando Nexum Dev Stack a la \(u[1])", ["actualizar-gestor", path],
                              doneText: "Instalada la \(u[1])", autoClose: true) { ok, _, _ in
                     if !ok { self.toast("No se ha actualizado"); return }
@@ -16536,6 +16719,8 @@ final class AppModel: ObservableObject {
                 }
                 return
             }
+            // (al abrir, solo la firmada de GitHub: la de Descargas, sin firma, solo desde el menú)
+            if auto { return }
             guard let f = lines.first(where: { $0[0] == "N" && $0.count >= 5 }) else {
                 if notes.isEmpty {
                     self.toast("Tienes la última versión (\(current))")
@@ -17770,7 +17955,7 @@ final class AppModel: ObservableObject {
     /// Replicar un proyecto en otra versión de PHP: copia su BBDD de una versión a otra con el nombre
     /// que se elija (se propone el de la de destino: wp_x_8_4 → wp_x_8_5) y la vincula allí a la
     /// carpeta que se elija (la misma, otra o ninguna)
-    func replicate() {
+    func replicate(_ project: Project? = nil) {
         guard let d = data, let p = projects, !busy else { return }
         let list = p.list.filter { !projectPairs($0).isEmpty }
         if list.isEmpty {
@@ -17877,7 +18062,8 @@ final class AppModel: ObservableObject {
             pop.action = #selector(DialogValidator.changed(_:))
         }
         field.delegate = fieldAct
-        if let x = loadedEntry(), let n = list.firstIndex(where: { $0.name == x.name }) { pPop.selectItem(at: n) } else { pPop.selectItem(at: 0) }
+        // (el de la fila desde la que se pide o, si no, el cargado)
+        if let x = project ?? loadedEntry(), let n = list.firstIndex(where: { $0.name == x.name }) { pPop.selectItem(at: n) } else { pPop.selectItem(at: 0) }
         onProject()
         let views: [NSView] = [
             dialogLabel("Se copia su BBDD a otra versión, con el nombre y la carpeta que elijas, y Cargar proyecto ya lo monta con ella. La de origen no se toca.", color: .secondaryLabelColor),
@@ -18722,13 +18908,17 @@ struct OutlineBody: View {
     let compact: Bool
     var big = false
     @Environment(\.isEnabled) var enabled
+    @Environment(\.colorScheme) var scheme
     @State private var hover = false
 
     var body: some View {
         let on = hover && enabled
         let primary = kind == "primary"
-        let colored = kind == "stop" || kind == "play"
-        let tint: Color = kind == "stop" ? RED : (kind == "play" ? GREEN : ACCENT)
+        // («encendido», el de los servicios de arriba: verde, salvo en el tema claro, donde el verde no se
+        // ve sobre el gris: azul)
+        let colored = kind == "stop" || kind == "play" || kind == "encendido"
+        let tint: Color = kind == "stop" ? RED : (kind == "play" ? GREEN
+            : (kind == "encendido" ? (scheme == .dark ? GREEN : ACCENT) : ACCENT))
         let text: Color = primary ? Color.white : (colored ? tint : (on ? ACCENT : Color.primary))
         let fill: Color = primary ? ACCENT.opacity(configuration.isPressed ? 0.75 : (on ? 0.88 : 1))
             : Color.primary.opacity(configuration.isPressed ? 0.10 : 0.03)
@@ -19088,7 +19278,9 @@ struct PageTitle: View {
                 }
                 Text(title).font(.system(size: 22, weight: .bold))
             }
-            Text(sub).font(.caption).foregroundColor(.secondary)
+            if !sub.isEmpty {
+                Text(sub).font(.caption).foregroundColor(.secondary)
+            }
         }
     }
 }
@@ -19626,6 +19818,41 @@ extension AppModel {
         }
     }
 
+    /// phpMyAdmin de un proyecto en Docker (el visor): antes copia la contraseña de root, que pide
+    func dockerOpenPma(_ p: DockerProject) {
+        runQuick(["docker-clave", p.slug]) { rc, out in
+            if rc == 0, let k = parseLines(out).first(where: { $0[0] == "K" && $0.count >= 4 }) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(k[2], forType: .string)
+                self.toast("Contraseña de root de \(p.folder) copiada: en su phpMyAdmin, usuario root")
+            }
+            openURL("http://127.0.0.1:\(p.pma)/")
+        }
+    }
+
+    /// Panel del WordPress o la tienda de un proyecto en Docker, por su dominio, con el administrador de
+    /// pruebas en la BBDD del contenedor (docker-usuario-pruebas lo pone si falta: la copia no lo lleva)
+    func dockerPanel(_ p: DockerProject, kind: String, admin: String) {
+        openAdminLogin(kind: kind, admin: admin, site: "https://\(p.domain)", name: p.folder,
+                       command: ["docker-usuario-pruebas", p.slug])
+    }
+
+    /// Lo último del contenedor de la web de un proyecto en Docker (Apache con PHP: ahí van los errores
+    /// de PHP de la web)
+    func dockerWebLog(_ p: DockerProject, _ name: String) {
+        runQuick(["docker-contenedor", "registros", name]) { rc, out in
+            if rc != 0 && out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                message("No se han podido leer los registros de \(name)", "", error: true)
+                return
+            }
+            let tail = out.components(separatedBy: "\n").suffix(400).joined(separator: "\n")
+                .replacingOccurrences(of: "\\n", with: "\n    ")
+            showLongText("PHP de \(p.folder)", tail.isEmpty ? "(vacío)" : tail,
+                         subtitle: "Últimas líneas del contenedor \(name) (los errores de PHP de https://\(p.domain))",
+                         toEnd: true)
+        }
+    }
+
     // MARK: Docker desde el proyecto cargado
 
     /// Botón Docker del proyecto cargado. Sin Docker Desktop en marcha, primero se abre (o se explica
@@ -19913,7 +20140,7 @@ struct TopBar: View {
             Button(action: { model.power() }) {
                 Label(running ? "Encendidos" : "Parados", systemImage: "power")
             }
-            .buttonStyle(OutlineButton(kind: running ? "play" : "", compact: true))
+            .buttonStyle(OutlineButton(kind: running ? "encendido" : "", compact: true))
             .disabled(model.busy)
             .tip(act.map { (running ? "Parar y desactivar XAMPP-" : "Arrancar XAMPP-") + $0.folder }
                  ?? "Activa una versión en Versiones de PHP")
@@ -20248,6 +20475,33 @@ struct NavRow: View {
 
 // MARK: - Proyectos
 
+/// Registro de errores del vhost de los proyectos (web.local), sacado de su ErrorLog: con PHP-FPM,
+/// los errores de PHP de la web cargada van ahí y no al error_log general de Apache
+func projectErrorLogPath(link: String, vhosts: String) -> String? {
+    guard !link.isEmpty else { return nil }
+    let text = (try? String(contentsOfFile: vhosts, encoding: .utf8)) ?? ""
+    let ns = text as NSString
+    let blocks = (try? NSRegularExpression(pattern: "(?is)<VirtualHost\\b[^>]*>(.*?)</VirtualHost>"))?
+        .matches(in: text, range: NSRange(location: 0, length: ns.length)) ?? []
+    for b in blocks {
+        let body = ns.substring(with: b.range(at: 1))
+        let bns = body as NSString
+        let names = ((try? NSRegularExpression(pattern: "(?im)^[ \\t]*Server(?:Name|Alias)[ \\t]+(.+)$"))?
+            .matches(in: body, range: NSRange(location: 0, length: bns.length)) ?? [])
+            .flatMap { bns.substring(with: $0.range(at: 1)).lowercased().split(separator: " ").map(String.init) }
+        if names.contains(link.lowercased()),
+           let e = (try? NSRegularExpression(pattern: "(?im)^[ \\t]*ErrorLog[ \\t]+\"?([^\"\\s]+)\"?"))?
+            .firstMatch(in: body, range: NSRange(location: 0, length: bns.length)) {
+            let path = bns.substring(with: e.range(at: 1))
+            if path.hasPrefix("|") || path.hasPrefix("syslog") { continue }
+            return path.hasPrefix("/") ? path : "/Applications/XAMPP/xamppfiles/" + path
+        }
+    }
+    // (sin ErrorLog propio, sus errores van al general: no hay otro registro que enseñar)
+    let path = "/Applications/XAMPP/xamppfiles/logs/\(link)-error_log"
+    return FileManager.default.fileExists(atPath: path) ? path : nil
+}
+
 struct ProjectsView: View {
     @EnvironmentObject var model: AppModel
 
@@ -20267,10 +20521,12 @@ struct ProjectsView: View {
 
     // MARK: el proyecto de arriba
 
-    /// El elegido en la lista o, si no hay, el cargado
+    /// Arriba, siempre el cargado, con sus botones: elegir otro en la lista no lo cambia. Sin ninguno
+    /// cargado, el elegido
     func shown(_ p: ProjectsData) -> Project? {
+        if let x = model.loadedEntry() { return x }
         if let n = model.selProject, let x = p.list.first(where: { $0.name == n }) { return x }
-        return model.loadedEntry()
+        return nil
     }
 
     func hero(_ p: ProjectsData, _ d: AppData) -> some View {
@@ -20316,9 +20572,8 @@ struct ProjectsView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let x = x {
                 HStack(alignment: .center, spacing: 18) {
-                    KindIcon(kind: x.kind, size: 40)
-                        .frame(width: 68, height: 68)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.primary.opacity(0.05)))
+                    // (el logotipo solo, sin recuadro: con el visor de la derecha más alto, se estiraba)
+                    KindIcon(kind: x.kind, size: 48)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 10) {
                             // (los nombres largos, en dos líneas, no cortados)
@@ -20355,7 +20610,8 @@ struct ProjectsView: View {
         let active = pairs.first(where: { $0.0.folder == d.active }).map { "x:" + $0.0.folder }
         let current = (isLoaded ? active : nil) ?? envs.first?.0 ?? ""
         let db = envs.first(where: { $0.0 == current })?.2 ?? ""
-        return HStack(alignment: .bottom, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 8) {
+          HStack(alignment: .bottom, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
                 Picker("", selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) })) {
@@ -20377,6 +20633,20 @@ struct ProjectsView: View {
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.busy || model.data == nil)
                 .tip("Cambiar la BBDD de cada versión (vincular)")
+          }
+          // Llevarlo a otro entorno e importar su SQL, aquí con el entorno y la BBDD (la fila de abajo
+          // queda para los accesos directos del proyecto)
+          HStack(spacing: 8) {
+            OutlineMenu("Añadir entorno…", symbol: "plus") {
+                Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
+                Button("En Docker…") { model.openDockerForm(folder: x.name) }
+            }
+            .disabled(model.busy)
+            .tip("Llevar el proyecto a otra versión de PHP o a Docker")
+            Button(action: { model.importFor(x) }) { Label("Importar SQL", systemImage: "square.and.arrow.down") }
+                .buttonStyle(OutlineButton(kind: "dashed"))
+                .tip("Subir un .sql, .sql.gz o .zip a su BBDD (en Bases de datos)")
+          }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -20394,16 +20664,8 @@ struct ProjectsView: View {
                     .tip("Apunta \(p.link.isEmpty ? "el vhost" : p.link) a \(x.name) y monta la versión de PHP donde está su BBDD")
             }
             Spacer(minLength: 8)
-            OutlineMenu("Añadir entorno…", symbol: "plus") {
-                Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate() }
-                Button("En Docker…") { model.openDockerForm(folder: x.name) }
-            }
-            .disabled(model.busy)
-            .tip("Llevar el proyecto a otra versión de PHP o a Docker")
+            // (⋮, pegado a la derecha)
             moreMenu(x)
-            Button(action: { model.importFor(x) }) { Label("Importar SQL", systemImage: "square.and.arrow.down") }
-                .buttonStyle(OutlineButton(kind: "dashed"))
-                .tip("Subir un .sql, .sql.gz o .zip a su BBDD (en Bases de datos)")
         }
     }
 
@@ -20462,6 +20724,15 @@ struct ProjectsView: View {
         .disabled(model.busy)
         .tip(model.dockerOf(x.name).isEmpty ? "Montar \(x.name) en Docker (con la versión de PHP que elijas)"
              : "Arrancar \(x.name) en Docker y abrir la pestaña Docker")
+        // El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
+        let log = model.data.flatMap { projectErrorLogPath(link: link, vhosts: $0.vhosts) }
+        Button(action: { if let l = log { model.showLogTail(l) } }) {
+            Label("Log", systemImage: "doc.text")
+        }
+        .buttonStyle(OutlineButton())
+        .disabled(log == nil)
+        .tip(log.map { "Ver el final del registro de errores de la web (\(($0 as NSString).lastPathComponent))" }
+             ?? "Esta web aún no tiene registro de errores")
         Button(action: { model.unloadProject() }) { Image(systemName: "eject.fill") }
             .buttonStyle(LinkHoverButton())
             .disabled(model.busy)
@@ -20500,7 +20771,7 @@ struct ProjectsView: View {
 
     func listHead() -> some View {
         HStack(spacing: 10) {
-            PageTitle(title: "Proyectos", sub: "Pulsa uno para verlo arriba; «Cargar» lo monta en el vhost con su versión y su BBDD.")
+            PageTitle(title: "Proyectos", sub: "")
             Spacer(minLength: 8)
             SearchField(text: $model.projQuery, placeholder: "Buscar proyecto o BBDD").frame(width: 220)
             Picker("", selection: $model.projKind) {
@@ -20511,8 +20782,9 @@ struct ProjectsView: View {
             }
             .labelsHidden()
             .frame(width: 120)
-            Button(action: { model.newProject(true) }) { Label("Nuevo", systemImage: "plus") }
-                .buttonStyle(OutlineButton())
+            // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
+            Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
+                .buttonStyle(OutlineButton(kind: "primary"))
                 .disabled(model.busy)
                 .tip("Montar un proyecto nuevo: se clona de GitHub, se elige su versión de PHP y se le crea su BBDD")
         }
@@ -20552,6 +20824,8 @@ struct ProjectsView: View {
         let pairs = model.projectPairs(x)
         let db = pairs.first?.1 ?? model.projectBase(x)
         let dockers = model.dockerOf(x.name)
+        // (con algún proyecto en Docker, hueco para «Montar en Docker»: las filas no cambian de ancho)
+        let anyDocker = !(model.docker?.projects.isEmpty ?? true)
         return HoverRow(selected: isLoaded || model.selProject == x.name, action: { model.selProject = x.name }) { hover in
             KindIcon(kind: x.kind).col(20)
             Text(x.name).lineLimit(1).truncationMode(.middle).col(260).tip(x.name)
@@ -20568,6 +20842,21 @@ struct ProjectsView: View {
             .col(0)
             HStack {
                 Spacer(minLength: 0)
+                // Al pasar el ratón: Montar en Docker (si tiene contenedores: con varios pregunta cuál),
+                // Cargar y su menú ⋮
+                if !dockers.isEmpty {
+                    Button(action: { model.dockerForLoaded(x) }) {
+                        HStack(spacing: 5) {
+                            LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 14, height: 14)
+                            Text("Montar en Docker").lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(OutlineButton(compact: true))
+                    .disabled(model.busy)
+                    .tip("Arrancar \(x.name) en Docker (con varias versiones, pregunta cuál)")
+                    .opacity(hover ? 1 : 0)
+                    .allowsHitTesting(hover)
+                }
                 if isLoaded {
                     SmallTag(text: "Cargado", blue: true)
                 } else {
@@ -20577,9 +20866,26 @@ struct ProjectsView: View {
                         .disabled(model.busy)
                         .opacity(hover ? 1 : 0)
                         .allowsHitTesting(hover)
+                    // (lo que antes solo se hacía arriba con el proyecto elegido, sin cambiar el de arriba)
+                    OutlineMenu(nil, symbol: "ellipsis") {
+                        Button("Añadir entorno en otra versión de PHP…") { model.replicate(x) }
+                        Button("Añadir entorno en Docker…") { model.dockerForLoaded(x) }
+                        Button("Importar SQL…") { model.importFor(x) }
+                        Button("Vincular la BBDD de cada versión…") { model.linkProject(x) }
+                        Button("Abrir la carpeta") { showFolder(HTDOCS + "/" + x.name) }
+                        ForEach(model.dockerOf(x.name)) { dp in
+                            Button("Eliminar de Docker…") { model.dockerDelete(dp) }
+                        }
+                        if x.kind == "ps" && !model.projectBase(x).isEmpty {
+                            Button("Vaciar la caché de la tienda") { model.clearCache(model.projectBase(x)) }
+                        }
+                    }
+                    .disabled(model.busy)
+                    .opacity(hover ? 1 : 0)
+                    .allowsHitTesting(hover)
                 }
             }
-            .frame(width: 90)
+            .frame(width: anyDocker ? 270 : 130)
         }
     }
 }
@@ -20996,6 +21302,11 @@ struct DockerView: View {
                 Divider()
                 groupRow(g)
                 if dkIsOpen(g) {
+                    // (desplegado: su visor, con sus accesos directos, encima de sus contenedores)
+                    if let p = g.project {
+                        Divider()
+                        visor(p, g)
+                    }
                     ForEach(g.visible) { c in
                         Divider()
                         containerRow(c, g)
@@ -21071,6 +21382,111 @@ struct DockerView: View {
             }
             .col(DK_ACTIONS_WIDTH, align: .trailing)
         }
+    }
+
+    /// Visor de un proyecto en Docker, como el del proyecto cargado: su nombre y su logotipo, sus
+    /// versiones, su dominio, si está en marcha y sus accesos directos (la web, su panel con el
+    /// administrador de pruebas, su phpMyAdmin, VS Code, el registro de su web y arrancar o parar)
+    func visor(_ p: DockerProject, _ g: DockerGroup) -> some View {
+        let up = !g.items.isEmpty && g.items.allSatisfy { $0.state == "running" }
+        let some = g.items.contains { $0.state == "running" }
+        let folder = HTDOCS + "/" + p.folder
+        let kind = model.projects?.list.first(where: { $0.name == p.folder })?.kind ?? ""
+        let admin = projectAdmin(folder)
+        let adminLogo = admin.0 == "ps" ? "prestashop" : "wordpress"
+        let webC = g.items.first(where: { $0.name.range(of: "^nexum-[a-z0-9-]+-php-[0-9]+$", options: .regularExpression) != nil })?.name
+        let stopped = "Está parado: arráncalo antes (Arrancar, a la derecha)"
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 14) {
+                // (el logotipo solo, sin recuadro, como arriba en Proyectos)
+                KindIcon(kind: kind, size: 36)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 10) {
+                        Text(p.folder).font(.system(size: 16, weight: .bold)).lineLimit(1).truncationMode(.middle)
+                        if kind == "wp" {
+                            SmallTag(text: "WordPress")
+                        } else if kind == "ps" {
+                            SmallTag(text: "PrestaShop")
+                        }
+                    }
+                    Text("PHP \(p.php) · MariaDB \(p.maria) · https://\(p.domain)")
+                        .font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 6) {
+                    StatusDot(on: up, size: 7)
+                    Text(up ? "En marcha" : (some ? "A medias" : "Parado")).font(.caption)
+                        .foregroundColor(up ? Color.primary : Color.secondary)
+                }
+            }
+            Divider()
+            HStack(spacing: 8) {
+                Button(action: { openURL("https://\(p.domain)/") }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe").foregroundColor(.blue)
+                        Text("Abrir web")
+                    }
+                }
+                .buttonStyle(OutlineButton())
+                .disabled(!up)
+                .tip(up ? "Abrir https://\(p.domain)/" : stopped)
+                Button(action: { model.dockerPanel(p, kind: admin.0, admin: admin.1) }) {
+                    HStack(spacing: 6) {
+                        LogoShape(d: LOGO_PATHS[adminLogo] ?? "").fill(brand(adminLogo)).frame(width: 16, height: 16)
+                        Text("Panel")
+                    }
+                }
+                .buttonStyle(OutlineButton())
+                .disabled(!up || admin.1.isEmpty)
+                .tip(!up ? stopped : (admin.1.isEmpty
+                     ? "\(p.folder) no es un WordPress ni una tienda PrestaShop con su carpeta de administración"
+                     : "Abrir https://\(p.domain)/\(admin.1)/ con el administrador de pruebas ya escrito (local@local.test, contraseña local): solo hay que pulsar Entrar"))
+                Button(action: { model.dockerOpenPma(p) }) {
+                    HStack(spacing: 6) {
+                        LogoShape(d: LOGO_PATHS["phpmyadmin"] ?? "").fill(brand("phpmyadmin")).frame(width: 16, height: 16)
+                        Text("phpMyAdmin")
+                    }
+                }
+                .buttonStyle(OutlineButton())
+                .disabled(!up || p.pma.isEmpty)
+                .tip(!up ? stopped : "Abrir su phpMyAdmin (http://127.0.0.1:\(p.pma)/): usuario root; la contraseña se copia al pulsar, para pegarla")
+                if let code = vscodeURL() {
+                    Button(action: { openInVSCode(folder) }) {
+                        HStack(spacing: 6) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: code.path)).resizable().frame(width: 16, height: 16)
+                            Text("VS Code")
+                        }
+                    }
+                    .buttonStyle(OutlineButton())
+                    .tip("Abrir \(p.folder) en Visual Studio Code (si ya está abierto, se trae su ventana delante)")
+                }
+                Button(action: { if let n = webC { model.dockerWebLog(p, n) } }) {
+                    Label("Log", systemImage: "doc.text")
+                }
+                .buttonStyle(OutlineButton())
+                .disabled(webC == nil)
+                .tip(webC.map { "Ver lo último de su web (los errores de PHP: el registro de su contenedor \($0))" }
+                     ?? "Aún no tiene contenedor de la web: arráncalo")
+                Spacer(minLength: 8)
+                Button(action: { model.dockerAction(p, start: !up) }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: up ? "stop.fill" : "play.fill").foregroundColor(up ? RED : GREEN)
+                        Text(up ? "Parar" : "Arrancar")
+                    }
+                }
+                .buttonStyle(OutlineButton())
+                .disabled(model.busy)
+                .tip(up ? "Parar sus contenedores (su BBDD se queda)" : "Arrancar sus contenedores")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        .padding(.leading, 38)
+        .padding(.trailing, 14)
+        .padding(.vertical, 8)
     }
 
     func containerRow(_ c: DockerContainer, _ g: DockerGroup) -> some View {
@@ -22563,28 +22979,7 @@ struct ToolsView: View {
     /// Registro de errores del vhost de los proyectos (web.local), sacado de su ErrorLog: con
     /// PHP-FPM, los errores de PHP de la web cargada van ahí y no al error_log general de Apache
     func projectErrorLog(_ d: AppData) -> String? {
-        guard let link = model.projects?.link, !link.isEmpty else { return nil }
-        let text = (try? String(contentsOfFile: d.vhosts, encoding: .utf8)) ?? ""
-        let ns = text as NSString
-        let blocks = (try? NSRegularExpression(pattern: "(?is)<VirtualHost\\b[^>]*>(.*?)</VirtualHost>"))?
-            .matches(in: text, range: NSRange(location: 0, length: ns.length)) ?? []
-        for b in blocks {
-            let body = ns.substring(with: b.range(at: 1))
-            let bns = body as NSString
-            let names = ((try? NSRegularExpression(pattern: "(?im)^[ \\t]*Server(?:Name|Alias)[ \\t]+(.+)$"))?
-                .matches(in: body, range: NSRange(location: 0, length: bns.length)) ?? [])
-                .flatMap { bns.substring(with: $0.range(at: 1)).lowercased().split(separator: " ").map(String.init) }
-            if names.contains(link.lowercased()),
-               let e = (try? NSRegularExpression(pattern: "(?im)^[ \\t]*ErrorLog[ \\t]+\"?([^\"\\s]+)\"?"))?
-                .firstMatch(in: body, range: NSRange(location: 0, length: bns.length)) {
-                let path = bns.substring(with: e.range(at: 1))
-                if path.hasPrefix("|") || path.hasPrefix("syslog") { continue }
-                return path.hasPrefix("/") ? path : "/Applications/XAMPP/xamppfiles/" + path
-            }
-        }
-        // (sin ErrorLog propio, sus errores van al general: no hay otro registro que enseñar)
-        let path = "/Applications/XAMPP/xamppfiles/logs/\(link)-error_log"
-        return FileManager.default.fileExists(atPath: path) ? path : nil
+        return projectErrorLogPath(link: model.projects?.link ?? "", vhosts: d.vhosts)
     }
 
     /// Fila de un registro de errores: dónde está, cuánto ocupa y cuándo se cambió
@@ -23463,6 +23858,10 @@ function docker_compose_file() {
     printf '    ports:\n      - "127.0.0.1:%s:80"\n    volumes:\n' "$web"
     printf '      - "%s:%s/xamppfiles/htdocs/%s"\n' "$HTDOCS_DIR/$folder" "$LINK" "$folder"
     [ -n "$rel" ] && printf '      - "./config.php:%s/xamppfiles/htdocs/%s/%s:ro"\n' "$LINK" "$folder" "$rel"
+    # PrestaShop 1.7 y posteriores guardan su configuracion (con la BBDD del contenedor: db y su
+    # usuario) en var/cache: aparte, en un volumen del contenedor, no en la carpeta que comparte con
+    # XAMPP-X (que la leeria y no encontraria la BBDD)
+    [ "$rel" == app/config/parameters.php ] && printf '      - "cache:%s/xamppfiles/htdocs/%s/var/cache"\n' "$LINK" "$folder"
     printf '    depends_on: [db]\n'
     printf '  db:\n    image: mariadb:%s\n    restart: "no"\n    environment:\n' "$maria"
     printf '      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_DATABASE: %s\n      MARIADB_USER: nexum\n      MARIADB_PASSWORD: ${DB_PASS}\n' "$db"
@@ -23470,6 +23869,8 @@ function docker_compose_file() {
     printf '  pma:\n    image: %s\n    restart: "no"\n    environment:\n      PMA_HOST: db\n      UPLOAD_LIMIT: 64M\n' "$DOCKER_PMA_IMAGE"
     printf '    ports:\n      - "127.0.0.1:%s:80"\n    depends_on: [db]\n' "$pma"
     printf 'volumes:\n  db: {}\n'
+    [ "$rel" == app/config/parameters.php ] && printf '  cache: {}\n'
+    return 0
 }
 
 # Una orden SQL en la MariaDB del contenedor como root: la contraseña la tiene el contenedor en su
@@ -23592,6 +23993,11 @@ function docker_create() {
                 || echo "Aviso: la carga de $db ha dado errores (mira el registro)."
             rm -f "$tmp"
             docker_ps_domain "$dir" "$dbname" "$domain"
+            # (la copia va sin el administrador de pruebas: se le pone el de este Mac para el Panel)
+            local admin
+            admin=$(docker_test_admin "$slug")
+            grep -v '^A|' <<< "$admin" | grep .
+            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
     echo "4/4 Vhost de $domain"
@@ -23747,6 +24153,21 @@ UPDATE \`${prefix}configuration\` SET value = '1' WHERE name IN ('PS_SSL_ENABLED
 EOF
 }
 
+# docker-usuario-pruebas <nombre>: el administrador de pruebas (usuario-pruebas) en la BBDD del
+# contenedor del proyecto. La copia que se lleva de XAMPP-X no lo tiene (exportar-bd lo deja fuera) y
+# sin el no entra el Panel. Es el mismo test_admin, por el cliente de la MariaDB del contenedor como
+# root (docker_sql: la contraseña la toma dentro del contenedor, nunca en una orden). Dice A|wp|... y/o
+# A|ps|... como usuario-pruebas; con el proyecto parado, nada (sale con 1)
+function docker_test_admin() {
+    local slug=$1 dir db folder
+    docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    db=$(docker_conf "$slug" BBDD) folder=$(docker_conf "$slug" CARPETA)
+    db_valid_name "$db" > /dev/null || { echo "$slug no tiene una BBDD valida en su proyecto.conf"; return 1; }
+    local DB_ROOT_CLIENT=(docker_sql "$dir" 'exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb)
+    test_admin "$db" "$folder"
+}
+
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>
 function docker_action() {
     local action=$1 slug=$2 dir
@@ -23755,7 +24176,15 @@ function docker_action() {
     local c=(dk compose --project-directory "$dir" -f "$dir/compose.yaml")
     case $action in
         # (los de antes de la 1.39.2, con PHP-FPM abierto, pasan antes a la web con clave)
-        arrancar) docker_migrate "$slug" && run "${c[@]}" up -d ;;
+        # (y, hasta la 1.39.20, las tiendas PrestaShop 1.7+ tenian su cache en la carpeta compartida con
+        # XAMPP-X: su compose.yaml se rehace con la cache en su volumen)
+        arrancar)
+            docker_migrate "$slug" || return 1
+            if [ "$(docker_conf "$slug" CONFIG)" == app/config/parameters.php ] && ! grep -q '/var/cache"$' "$dir/compose.yaml" \
+                    && [ "$DRY" -eq 0 ]; then
+                docker_compose_file "$slug" > "$dir/compose.yaml.nuevo" && mv -f "$dir/compose.yaml.nuevo" "$dir/compose.yaml"
+            fi
+            run "${c[@]}" up -d ;;
         parar) run "${c[@]}" stop ;;
         registros) "${c[@]}" logs --no-color --tail 200 ;;
         borrar)
@@ -23895,6 +24324,69 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.39.21 (26 oct 2026)
+- PrestaShop 1.7+ en Docker y en LAMPP a la vez: la tienda ya no deja de
+  funcionar en LAMPP (error 500, «Link to database cannot be
+  established») después de abrirla en Docker. Su caché (var/cache), que
+  guarda la BBDD, va en Docker en un volumen del contenedor; y al cargarla,
+  una caché con otra BBDD (la de Docker o la de producción) se aparta a
+  ~/lvm-copias y se rehace sola.
+
+1.39.20 (26 oct 2026)
+- Al descargar o copiar una BBDD, el administrador de pruebas
+  (local@local.test) ya no va en la copia, como en Linux: sus filas de
+  usuarios de WordPress y empleados de PrestaShop se quedan fuera (la BBDD
+  de trabajo no se toca).
+
+1.39.19 (26 oct 2026)
+- Docker: cada proyecto, al desplegar su fila, tiene su visor, como el del
+  proyecto cargado: su nombre, versiones, dominio y si está en marcha, con
+  «Abrir web», «Panel», «phpMyAdmin», «VS Code», «Log» (los errores de su
+  PHP) y Arrancar o Parar. Parado, la web, el panel y phpMyAdmin se
+  apagan.
+- Docker, Panel: entra en el WordPress o la tienda PrestaShop del
+  contenedor con el administrador de pruebas ya escrito (local@local.test,
+  contraseña local). Se pone en su BBDD al crearlo con una copia y, si
+  falta, al pulsar Panel (lvm-instalador docker-usuario-pruebas <nombre>).
+  Las copias que salen de XAMPP-X siguen sin él.
+- Docker, phpMyAdmin: al pulsarlo se copia la contraseña de root.
+- En la lista de proyectos, «Montar en Docker» en la fila de los que tienen
+  contenedores.
+
+1.39.18 (26 oct 2026)
+- Proyecto cargado: «Añadir entorno…» e «Importar SQL» pasan al recuadro
+  del entorno y la BBDD; la fila de abajo queda para los accesos directos
+  del proyecto, con ⋮ a la derecha. El logotipo de WordPress o PrestaShop,
+  sin recuadro. Sin la explicación debajo de «Proyectos».
+
+1.39.17 (26 oct 2026)
+- Proyecto cargado: botón «Log» junto a sus botones, con el final del
+  registro de errores de su web (el de su vhost), para ver al momento por
+  qué da un error 500.
+
+1.39.16 (26 oct 2026)
+- Al abrir el programa busca solo si hay una versión nueva y la ofrece. Si
+  se dice que no, no vuelve a preguntar por esa versión al abrirlo (solo
+  avisa); sigue en el menú, Buscar actualizaciones.
+- Proyectos: arriba se queda siempre el proyecto cargado, con sus botones;
+  pulsar otro en la lista solo lo marca. Cada fila, al pasar el ratón,
+  tiene «Cargar» y un menú ⋮ (añadir entorno en otra versión o en Docker,
+  importar SQL, vincular sus BBDD, abrir la carpeta…).
+- Tema claro: «Encendidos» en azul (el verde no se veía sobre el gris).
+
+1.39.15 (26 oct 2026)
+- Copiar una BBDD a una versión con un MariaDB antiguo (como de la 8.2 a la
+  7.4) ya no falla con «Unknown command '\-'»: la descarga lleva una sola
+  línea del modo sandbox y la carga las quita todas.
+
+1.39.14 (26 oct 2026)
+- Interruptores que piden la contraseña de administrador (barrera entre
+  webs, correo de pruebas y su modo de WordPress, los .local de Dominios y
+  hosts): si se cancela, no cambia nada y el interruptor vuelve a su sitio.
+  Si no se puede aplicar, se deja como estaba.
+- Proyectos: el asistente de proyecto nuevo (clonar de git, con su versión
+  y su BBDD) se abre con el botón azul «Nuevo proyecto…» de la lista.
 
 1.39.13 (25 oct 2026)
 - Igual que la 1.39.12, sin datos de ejemplo de proyectos reales en el
@@ -25454,6 +25946,7 @@ case "$1" in
     docker-migrar) docker_migrate_command "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
     docker-clave) docker_db_password "$2" ;;
+    docker-usuario-pruebas) docker_test_admin "$2" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
     usuario-pruebas) test_admin "$2" "$3" ;;
