@@ -51,4 +51,26 @@ out=$(load_project nuevo "" wp_x 2>&1); rc=$?
 check "sin fallos, cargado (y sin deshacer)" '[ $rc -eq 0 ] && [ "$(readlink "$HTDOCS_DIR/web.local")" == nuevo/ ] && ! grep -q "Se deja como estaba" <<< "$out"'
 check "despues, una señal ya no deshace nada" '[ -z "$(trap -p TERM)" ]'
 check "la contraseña se pide antes de cambiar nada" 'awk "/^function load_project\\(\\) \\{/,/^}/" "$SRC" | grep "sudo -v\|load_project_steps" | head -1 | grep -q "sudo -v"'
+
+# Desmontar (Linux 1.55.12 / Mac 1.39.23): la contraseña antes de nada y todo o nada
+if grep -q '^function unload_project_steps() {' "$SRC"; then
+    extract "$SRC" unload_project unload_project_steps sudo_first || exit 1
+    EMPTY_PROJECT=sin-proyecto PROJECT_VHOST=web.local LINK=$W/sin-version
+    mkdir -p "$HTDOCS_DIR/$EMPTY_PROJECT"
+    project_write() { cp "$1" "$2"; }
+    ln -sfn nuevo/ "$HTDOCS_DIR/web.local"
+    SUDO=sudo
+    sudo() { return 1; }
+    out=$(unload_project 2>&1); rc=$?
+    check "desmontar, cancelada la contraseña: no se desmonta y lo dice" '[ $rc -ne 0 ] && grep -q "no se ha cambiado nada" <<< "$out" && [ "$(readlink "$HTDOCS_DIR/web.local")" == nuevo/ ]'
+    sudo() { return 0; }
+    hosts_fake() { return 1; }
+    out=$(unload_project 2>&1); rc=$?
+    check "desmontar, si un paso falla: el proyecto sigue cargado" '[ $rc -ne 0 ] && grep -q "Se deja como estaba" <<< "$out" && [ "$(readlink "$HTDOCS_DIR/web.local")" == nuevo/ ]'
+    hosts_fake() { :; }
+    out=$(unload_project 2>&1); rc=$?
+    check "desmontar sin fallos: desmontado" '[ $rc -eq 0 ] && [ "$(readlink "$HTDOCS_DIR/web.local")" == sin-proyecto/ ]'
+    SUDO=""
+fi
+check "tareas de la ventana: lo que cambia algo pide la contraseña antes de empezar" 'grep -q "env\[\"LVM_TAREA\"\] = \"1\"\|extra\[\"LVM_TAREA\"\] = \"1\"" "$SRC" && sed -n "/^if \[ \"\${LVM_TAREA:-}\" == 1 \]; then/,/^fi/p" "$SRC" | grep -q "\*) sudo_first || exit 130 ;;"'
 exit $fail

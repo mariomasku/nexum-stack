@@ -248,6 +248,7 @@ check "no queda nada de la descarga" '[ -z "$(ls -d "$W"/home2/.lvm-instalador/m
 o=$(LVM_MAILPIT_SHA=$SHA cli instalar)
 check "otra vez: ya esta instalado" 'grep -q "ya esta instalado" <<< "$o"'
 check "en el Mac: fuera los atributos extendidos y la firma comprobada (codesign), solo sin LVM_PRUEBA" 'sed -n "/^function mailpit_install() {/,/^}/p" "$SRC" | grep -q "\$SUDO /usr/bin/xattr -c \"\$bin\"" && sed -n "/^function mailpit_install() {/,/^}/p" "$SRC" | grep -q "/usr/bin/codesign --verify \"\$bin\""'
+check "en el Mac: la firma se comprueba como root (la carpeta temporal solo es de root) y, sin ninguna, se le pone una local (1.39.26)" 'f=$(sed -n "/^function mailpit_install() {/,/^}/p" "$SRC"); ! grep -qE "^[[:space:]]*if ! /usr/bin/codesign" <<< "$f" && grep -qF "\$SUDO /usr/bin/codesign --verify \"\$bin\"" <<< "$f" && grep -qF "\$SUDO /usr/bin/codesign --force --sign - \"\$bin\"" <<< "$f"'
 check "como root, solo programas del sistema (root_command): tar, shasum, install, xattr..." '! sed -n "/^function mailpit_install() {/,/^}/p" "$SRC" | grep -E "\\\$SUDO +(/opt/homebrew|brew|gtar|sha256sum)"'
 check "la carpeta de encima (/Library/Nexum) y la suya, de root (stat -f del Mac)" 'sed -n "/^function mailpit_install() {/,/^}/p" "$SRC" | grep -q "stat -f %u \"\$BASE_DIR\""'
 o=$(cli si)

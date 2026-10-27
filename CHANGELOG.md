@@ -4,6 +4,28 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.55.14 · 27 oct 2026
+
+- **Proyectos, menú ⋮:** «Borrar el proyecto…» borra el proyecto entero: su carpeta, sus vhosts, las líneas de sus dominios en `/etc/hosts` (un dominio real no se queda falseado) y lo que tenga en Docker. Pregunta si se borra también su BBDD de la versión activa (la de phpMyAdmin), con copia antes por defecto. Hay que escribir el nombre de la carpeta para confirmar. Si un paso falla no sigue: la carpeta, lo último. En la terminal: borrar-proyecto <carpeta> [--bd <base> --copia].
+- **Imágenes de producción:** uploads e img no van en git, así que lo que falte en local se trae de la web real. En WordPress, menú ⋮ «Imágenes de producción…» (propone el dominio de su BBDD): mientras esté cargado, lo que falte de wp-content/uploads se pide a la web real, sin descargar nada. En PrestaShop, que se ve con su dominio real falseado, «Descargar de producción las imágenes que faltan…»: las de productos, categorías y marcas que dice su BBDD, por https con DNS cifrado y comprobando el certificado real. Solo imágenes, vídeos y PDF; nunca un .php ni fuera de img. En Dominios y hosts, cada .local tiene también su botón de imagen. En la terminal: media-produccion, media-proyecto y ps-imagenes.
+- **Docker:** al crear un proyecto o montarlo desde Proyectos, los desplegables y el dominio enseñan el nombre entero.
+
+## 1.55.13 · 27 oct 2026
+
+- **Cancelar ya no deja nada a medias:** desde la ventana, lo que cambia algo pide la contraseña de administrador al empezar, no a mitad. Si se cancela, no se ha hecho nada. Antes, al desmontar el proyecto y cancelar la contraseña, se desmontaba igual. Desmontar es ahora todo o nada, como cargar: si un paso falla, el proyecto sigue cargado.
+- **Cabecera:** «Dev Stack» vuelve a la letra de antes.
+- **Acerca de:** más corto («Herramientas de desarrollo web en local») y la firma sin HEXER.
+
+## 1.55.12 · 27 oct 2026
+
+- **Proyectos:** columna «Tamaño», con lo que ocupa cada proyecto en el disco (se mide en segundo plano, de 10 en 10, y cada uno se vuelve a medir cada 6 horas). La columna Proyecto, con el nombre entero de la carpeta. La etiqueta de Docker de Versiones, con su logotipo.
+- **Cabecera:** «NEXUM» en mayúsculas y en Goldman (Google Fonts, licencia SIL Open Font License; va dentro del programa).
+
+## 1.55.11 · 26 oct 2026
+
+- **Bases de datos:** tarjeta nueva «Ocupan las BBDD», con lo que ocupan las de todas las versiones y una barra del disco con lo que queda libre.
+- **Proyecto cargado:** «Añadir entorno» pasa a un botón + a la izquierda del entorno, en su misma fila. Sin el botón «Importar SQL»: para importar, la pestaña Bases de datos (o el menú ⋮ de la fila del proyecto).
+
 ## 1.55.10 · 26 oct 2026
 
 - **PrestaShop 1.7+ en Docker y en LAMPP a la vez:** la tienda ya no deja de funcionar en LAMPP (error 500, «Link to database cannot be established») después de abrirla en Docker. Su caché (var/cache), que guarda la BBDD, va en Docker en un volumen del contenedor; y al cargarla, una caché con otra BBDD (la de Docker o la de producción) se aparta a `~/lvm-copias` y se rehace sola.

@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.39.21)
+# Prueba de la ventana nueva en un Mac (versión 1.39.26)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.39.21** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.39.26** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.39.21/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.39.26/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.39.21
+   lvm-instalador version                                                         # Nexum Dev Stack 1.39.26
    ```
 
 5. **Comprueba las versiones:**
@@ -175,6 +175,45 @@ Lo que mandan las webs (formularios, pedidos, contraseñas) tiene que llegar a M
 11. **Docker:** sus proyectos aún no mandan a Mailpit (queda para más adelante); su BBDD copiada lleva el correo de producción.
 
 Si algo falla, pasa la salida de la tarea, `lvm-instalador correo`, `cat ~/.lvm-instalador/mailpit/mailpit.log ~/.lvm-instalador/mailpit/salida.log` y `ps -axo user,pid,command | grep mailpit`.
+
+## Paso 8: imágenes de producción, borrar un proyecto y Docker (1.39.25)
+
+El código Swift de estas pantallas **no se ha compilado** (en Linux no hay SwiftUI ni AppKit): si `compilar.log` da un error, pásamelo tal cual. La parte de bash se ha probado desde Linux con las pruebas de siempre.
+
+1. **Docker, nombres enteros:** en la pestaña Docker, **Nuevo proyecto**: los desplegables «Carpeta» y «BBDD que se copia» y el campo «Dominio» se ensanchan hasta el nombre más largo (hasta unos 520 puntos). En Proyectos, menú ⋮ de una fila, **Añadir entorno en Docker…**: lo mismo en el diálogo.
+2. **Dominios y hosts:** cada `.local` tiene un botón con una foto. Pulsado, propone el dominio real de su carpeta (`tienda.es` para `tienda.local`). **Guardar** pide la contraseña; después, la fila dice «imágenes que faltan de …» y:
+
+   ```bash
+   grep -n -A6 'nexum-media' /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf   # en los vhosts de ese .local (80 y 443), en ningún otro
+   curl -sk -o /dev/null -w '%{http_code} %{redirect_url}\n' https://tienda.local/img/p/no/existe.jpg   # 302 a https://tienda.es/img/...
+   curl -sk -o /dev/null -w '%{http_code}\n' https://tienda.local/img/logo.jpg                          # 200 si está en local
+   ```
+
+   Con el campo vacío, **Guardar** quita la regla (el `grep` ya no dice nada). Con un dominio que no es `.local` (`tienda.es`) el botón no sale.
+3. **WordPress cargado,** menú ⋮: **Imágenes de producción…** propone el dominio de su BBDD (el `home` de `wp_options`). Al guardar, `web.local` pide a ese dominio lo que falte de `wp-content/uploads` (el `grep` del paso 2 lo enseña en el vhost de `web.local`). Carga otro proyecto: la regla cambia a la suya o desaparece. Las imágenes que faltaban se ven en la web.
+4. **Tienda PrestaShop,** menú ⋮: **Descargar de producción las imágenes que faltan…** (su BBDD tiene que estar en la versión activa). La tarea dice cuántas faltan y va contando «Descargadas X de N». Si la web tiene protección contra robots, para enseguida y dice «La web de … no deja descargar»: entonces hay que dar permiso en su servidor al agente `Nexum-Dev-Stack/<versión>` o copiar `img` a mano.
+5. **Borrar un proyecto** (con uno **de prueba**: la carpeta no se recupera). Crea uno con **Nuevo proyecto** (carpeta y BBDD vacía) y, si quieres, móntalo en Docker. Menú ⋮ → **Borrar el proyecto…**: hay que escribir su nombre. Después pregunta si se borra también su BBDD («Solo el proyecto» la deja). Comprueba:
+
+   ```bash
+   ls /Library/Nexum/XAMPP-compartido/htdocs | grep <carpeta>        # nada
+   grep -n '<carpeta>' /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf /etc/hosts   # nada (ni 127.0.0.1 ni ::1)
+   ls ~/lvm-copias | tail -2                                         # la copia de la BBDD, si la pediste
+   ```
+
+   En Proyectos ya no sale; en Docker, tampoco.
+
+## Paso 9: la ventana, Bases de datos y Mailpit (1.39.26)
+
+1. **La ventana no se rompe:** hazla todo lo estrecha que deje. En Proyectos, el nombre del proyecto cargado sale en una o dos líneas (no letra a letra), «BBDD» en horizontal, las etiquetas de versión («8.5», «Docker 8.4») en una línea y «Cargar» y el menú ⋮ dentro de la tabla. Con un proyecto en Docker el mínimo es algo mayor (su botón «Montar en Docker»). Haz lo mismo en Versiones de PHP, Bases de datos y Docker: nada se monta encima de nada.
+2. **Bases de datos:** cuatro tarjetas (sin «Copias de seguridad»); «La última que ha cambiado» y el disco de «Ocupan las BBDD» se leen enteros. Las copias siguen en Configuración, con **Abrir**.
+3. **Mailpit:** en Configuración, **Instalar** el correo de pruebas. Tiene que acabar con «Mailpit 1.32.0 instalado», sin «no lleva una firma válida». Comprueba:
+
+   ```bash
+   codesign --verify --verbose /Library/Nexum/mailpit/mailpit       # «valid on disk»
+   ls -l /Library/Nexum/mailpit/mailpit                              # root wheel, rwxr-xr-x
+   ```
+
+   Y sigue con el paso 7 (correo de pruebas) si no lo habías podido probar.
 
 ## Qué apuntar
 

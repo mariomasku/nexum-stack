@@ -164,6 +164,17 @@
 #       siempre en /etc/hosts salvo que se apague aqui (no): se recuerda en
 #       ~/.lvm-instalador/locales-apagados y con si se vuelve a mantener
 #
+#   lvm-instalador media-produccion <dominio .local> <dominio de produccion>|quitar
+#       Lo que falte en local de wp-content/uploads o img (no van en git) se pide a la web de
+#       produccion (redireccion 302). Solo en vhosts .local
+#
+#   lvm-instalador media-proyecto <carpeta> <dominio de produccion>|quitar
+#       Lo mismo para un WordPress, en el vhost de los proyectos (web.local) mientras este cargado
+#
+#   lvm-instalador ps-imagenes <carpeta>
+#       Descarga de la web real las imagenes de una tienda PrestaShop que faltan en img (productos,
+#       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts)
+#
 #   lvm-instalador vhosts
 #       Edita una copia de XAMPP-compartido/httpd-vhosts.conf y la aplica con sudo: se
 #       comprueba antes, se guarda el anterior en ~/lvm-copias y se recarga Apache
@@ -2080,10 +2091,10 @@ DRY=0
 PROGRESS=""
 
 # Firma del panel principal
-SIGNATURE="By M.Mascuñano - HEXER"
+SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.39.21"
+APP_VERSION="1.39.26"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -3705,7 +3716,7 @@ EMPTY_PROJECT=.lvm-sin-proyecto
 # gestor ya no reconoceria el vhost y al cargar otro proyecto intentaria crearlo de nuevo. Los
 # dominios falseados de una tienda PrestaShop dejan de estarlo (vuelven a llevar a la web real)
 function unload_project() {
-    local link sudo="" dir=$HTDOCS_DIR/$EMPTY_PROJECT page
+    local link sudo="" dir=$HTDOCS_DIR/$EMPTY_PROJECT page rc
 
     link=$(project_link)
     if [ -z "$link" ]; then
@@ -3718,6 +3729,8 @@ function unload_project() {
 
         return 0
     fi
+    # La contraseña antes de cambiar nada: cancelarla deja el proyecto cargado
+    sudo_first || return 1
     if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
         echo "$dir no es una carpeta: borrala o cambiale el nombre y vuelve a intentarlo"
 
@@ -3740,6 +3753,22 @@ HTML
         project_write "$page" "$dir/index.html"
         rm -f "$page"
     fi
+    # Todo o nada (como al cargar): si un paso falla o se cancela la tarea, el enlace vuelve al proyecto
+    LOAD_UNDO_LINK=$link LOAD_UNDO_TARGET=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null)
+    LOAD_UNDO_ACTIVE=$(active_name)
+    [ "$DRY" -eq 0 ] && trap 'load_project_undo; exit 130' TERM INT HUP
+    unload_project_steps "$link" "$sudo"
+    rc=$?
+    if [ $rc -ne 0 ] && [ "$DRY" -eq 0 ]; then
+        load_project_undo
+    fi
+    trap - TERM INT HUP
+    LOAD_UNDO_LINK=""
+    return $rc
+}
+
+function unload_project_steps() {
+    local link=$1 sudo=$2
     run $sudo rm "$HTDOCS_DIR/$link" || return 1
     run $sudo ln -s "$EMPTY_PROJECT/" "$HTDOCS_DIR/$link" || return 1
     # (sin dominios falseados: los de una tienda PrestaShop vuelven a llevar a la web real)
@@ -3749,7 +3778,162 @@ HTML
         echo "Recargando Apache para que PHP deje de servir el proyecto..."
         run xampp_ctl reloadapache > /dev/null || { echo "No se ha podido recargar Apache. Reinicia la version activa."; return 1; }
     fi
+    media_sync || echo "Aviso: $link sigue pidiendo a produccion las imagenes del proyecto anterior"
     echo "Proyecto desmontado: $link ya no apunta a ningun proyecto"
+}
+
+# borrar-proyecto <carpeta> [--bd <base> [--copia]]: borra un proyecto entero. Por orden, y si un paso
+# falla no se sigue (la carpeta, lo ultimo): lo desmonta si es el cargado, lo borra de Docker (sus
+# contenedores y su copia de la BBDD), borra su BBDD de la version activa si se pide (con --copia,
+# antes un volcado en ~/lvm-copias; si la copia falla no se borra nada), quita sus vhosts y las lineas
+# de sus dominios de /etc/hosts (un dominio real no se queda falseado), lo que el gestor recordaba de
+# el y su carpeta de htdocs. Las BBDD de las otras versiones no se tocan
+function delete_project() {
+    local folder=${1%/} db="" backup="" dir conf slug vhosts copy domains
+    shift 2> /dev/null
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --bd) [ -n "$2" ] || { echo "Falta el nombre de la base de --bd"; return 1; }; db=$2; shift 2 ;;
+            --copia) backup=--copia; shift ;;
+            *) echo "Opcion desconocida: $1"; return 1 ;;
+        esac
+    done
+    if [ -z "$folder" ]; then
+        echo "Uso: lvm-instalador borrar-proyecto <carpeta> [--bd <base> [--copia]]"
+
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    if [ "$folder" == "$EMPTY_PROJECT" ] || [ "$folder" == "$PROJECT_VHOST" ] || [ "$folder" == "$(project_link)" ]; then
+        echo "$folder no es un proyecto: es del gestor"
+
+        return 1
+    fi
+    if [ -n "$db" ]; then
+        db_valid_name "$db" || return 1
+        db_connect || return $?
+        db_exists "$db" || { echo "No hay ninguna base de datos $db en lampp-$DB_FOLDER: no se ha borrado nada"; return 1; }
+    fi
+    dir=$HTDOCS_DIR/$folder
+    echo "Se borra el proyecto $folder ($dir)"
+    # La contraseña antes de cambiar nada: cancelarla deja el proyecto como estaba
+    sudo_first || return 1
+
+    if [ "$(readlink "$HTDOCS_DIR/$(project_link)" 2> /dev/null | sed 's:/*$::')" == "$folder" ]; then
+        echo "Es el proyecto cargado: se desmonta"
+        unload_project || return 1
+    fi
+    for conf in "$DOCKER_DIR"/*/proyecto.conf; do
+        [ -f "$conf" ] && grep -qxF "CARPETA=$folder" "$conf" || continue
+        slug=$(basename "$(dirname "$conf")")
+        echo "En Docker como $slug: se borra"
+        if [ "$DRY" -eq 0 ] && ! docker_ready; then
+            echo "Docker sin root no esta en marcha: arrancalo para borrar $slug (no se ha borrado nada mas)"
+
+            return 1
+        fi
+        docker_action borrar "$slug" || return 1
+    done
+    if [ -n "$db" ]; then
+        drop_database "$db" $backup || { echo "No se sigue: la carpeta y los vhosts de $folder no se han tocado"; return 1; }
+    fi
+
+    # Vhosts con su DocumentRoot en la carpeta (o dentro de ella) y los dominios que llevaban
+    vhosts=$(realpath_f "$ACTIVE_VHOSTS")
+    copy=$(mktemp "$LOG_DIR/vhosts-borrar-XXXXXX") || return 1
+    domains=$(python3 -I - "$vhosts" "$copy" "$folder" << 'EOF'
+import re, sys
+src, dst, folder = sys.argv[1:4]
+lines = open(src, encoding="utf-8", errors="surrogateescape", newline="").read().split("\n")
+root = re.compile(r'^\s*DocumentRoot\s+"?[^"\s]*/htdocs/%s(/[^"\s]*)?"?\s*$' % re.escape(folder), re.I)
+out, block, names = [], None, set()
+for line in lines:
+    if block is None:
+        if re.match(r"^\s*<VirtualHost\b", line, re.I):
+            block = [line]
+        else:
+            out.append(line)
+        continue
+    block.append(line)
+    if re.match(r"^\s*</VirtualHost>", line, re.I):
+        if any(root.match(l) for l in block):
+            for l in block:
+                w = l.split("#", 1)[0].split()
+                if len(w) >= 2 and w[0].lower() in ("servername", "serveralias"):
+                    names |= {n.lower().split(":")[0] for n in w[1:]}
+            # (sin la linea en blanco que lo separaba del anterior)
+            while out and not out[-1].strip():
+                out.pop()
+        else:
+            out += block
+        block = None
+if block:
+    out += block
+with open(dst, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+    f.write("\n".join(out))
+print(" ".join(sorted(names)))
+EOF
+) || { rm -f "$copy"; return 1; }
+    if ! cmp -s "$copy" "$vhosts"; then
+        echo "Vhosts de $folder: ${domains:-sin dominio}"
+        edit_vhosts --aplicar "$copy" || { rm -f "$copy"; echo "No se sigue: la carpeta de $folder no se ha tocado"; return 1; }
+    fi
+    rm -f "$copy"
+    if [ -n "$domains" ]; then
+        # Las lineas de esos dominios (falseadas o comentadas); de una linea con otros, solo los suyos
+        copy=$(mktemp "$LOG_DIR/hosts-borrar-XXXXXX") || return 1
+        python3 -I - "$HOSTS_FILE" "$copy" "$domains" << 'EOF'
+import re, sys
+src, dst, names = sys.argv[1], sys.argv[2], set(sys.argv[3].split())
+rx = re.compile(r"^(\s*#*\s*)(127\.0\.0\.1|::1)(\s+)(.*?)\s*$")
+out = []
+for line in open(src).read().splitlines():
+    m = rx.match(line)
+    if m:
+        body, sep, comment = m.group(4).partition("#")
+        keep = [n for n in body.split() if n.lower() not in names]
+        if len(keep) != len(body.split()):
+            if not keep:
+                continue
+            line = m.group(1) + m.group(2) + m.group(3) + " ".join(keep) + (" " + sep + comment if sep else "")
+    out.append(line)
+open(dst, "w").write("\n".join(out) + "\n")
+EOF
+        if ! cmp -s "$copy" "$HOSTS_FILE"; then
+            echo "Lineas de $HOSTS_FILE de: $domains"
+            edit_hosts --aplicar "$copy" || { rm -f "$copy"; echo "No se sigue: la carpeta de $folder no se ha tocado"; return 1; }
+        fi
+        rm -f "$copy"
+        [ "$DRY" -eq 1 ] || local_off si $domains
+    fi
+
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se olvida $folder en $PROJECTS_FILE y $REPO_PROJECTS_FILE y se borra $dir"
+
+        return 0
+    fi
+    if [ -f "$PROJECTS_FILE" ]; then
+        awk -v f="$folder" '{ split($0, a, "="); split(a[2], b, " ") } !(index($0, "=") && b[1] == f)' "$PROJECTS_FILE" > "$PROJECTS_FILE.tmp" \
+            && mv -f "$PROJECTS_FILE.tmp" "$PROJECTS_FILE"
+    fi
+    if [ -f "$REPO_PROJECTS_FILE" ]; then
+        grep -vxF -- "$folder" "$REPO_PROJECTS_FILE" > "$REPO_PROJECTS_FILE.tmp"
+        mv -f "$REPO_PROJECTS_FILE.tmp" "$REPO_PROJECTS_FILE"
+    fi
+    echo "Borrando la carpeta $dir..."
+    # Con tu usuario; lo que haya dejado Apache con otro (daemon), con sudo y sin salir de la carpeta
+    # (rm no sigue enlaces; -x: un disco montado dentro no se toca)
+    rm -rfx -- "$dir" 2> /dev/null
+    if [ -e "$dir" ]; then
+        [ "$(realpath_f "$dir")" == "$(realpath_f "$HTDOCS_DIR")/$folder" ] && [ ! -L "$dir" ] \
+            && sudo rm -rfx -- "$dir"
+    fi
+    if [ -e "$dir" ]; then
+        echo "No se ha podido borrar del todo $dir: borra a mano lo que queda"
+
+        return 1
+    fi
+    echo "Proyecto $folder borrado"
 }
 
 # ¿Direccion de un repositorio que se puede clonar? Solo https:// o ssh (git@servidor:ruta o
@@ -4028,6 +4212,8 @@ function load_project_steps() {
     mailpit_sync
     local mdb
     mdb=$(mail_project_db "$folder" "$4") && db_names "$(active_dir)" | grep -qxF "$mdb" && mail_db "$mdb"
+    # Imagenes de produccion (media-proyecto): las de este proyecto en el vhost de los proyectos
+    media_sync || echo "Aviso: no se han podido poner en $link las imagenes de produccion de $folder"
 
     echo "Proyecto cargado: $link -> $folder$([ -n "$(active_dir)" ] && echo " ($(basename "$(active_dir)"))")"
 }
@@ -5086,6 +5272,355 @@ function hosts_fake_one() {
     fi
 }
 
+# media-produccion <dominio .local> <dominio de produccion>|quitar: lo que falte en local de
+# wp-content/uploads o img (imagenes, videos y pdf; uploads e img no van en git) se pide a la web
+# de produccion con una redireccion 302, en los vhosts de ese dominio (http y https). Solo en los
+# .local: con el dominio real falseado, la redireccion volveria a este equipo. Y el de produccion no
+# puede ser un .local: si se falsea, la peticion cae en su propio vhost, sin la regla (404, sin bucle)
+# Solo GET y HEAD, y solo esas extensiones: un .php de uploads no se manda a ningun sitio
+MEDIA_EXT="jpe?g|png|gif|webp|avif|svg|ico|bmp|mp4|webm|pdf"
+function media_proxy() {
+    local domain=$(tr 'A-Z' 'a-z' <<< "$1") prod=$(tr 'A-Z' 'a-z' <<< "$2") copy rc
+    if [ -z "$domain" ] || [ -z "$prod" ]; then
+        echo "Uso: lvm-instalador media-produccion <dominio .local> <dominio de produccion>|quitar"
+
+        return 1
+    fi
+    domain=${domain#www.}
+    if ! valid_domain "$domain" || [[ "$domain" != *.local ]]; then
+        echo "$domain no es un dominio .local: el proxy de imagenes solo va en los vhosts .local"
+        echo "(con el dominio real falseado, la redireccion volveria a este equipo)"
+
+        return 1
+    fi
+    if [ "$prod" != quitar ]; then
+        prod=${prod#https://}; prod=${prod#http://}; prod=${prod%/}
+        if ! valid_domain "$prod" || [[ "$prod" == *.local || "$prod" == localhost || "$prod" == *.localhost ]]; then
+            echo "El dominio de produccion no es valido: $prod (solo el dominio, como ejemplo.com)"
+
+            return 1
+        fi
+    fi
+    if ! vhosts_info | awk -F'|' -v d="$domain" '$3 == d || index(" " $4 " ", " " d " ") { f = 1 } END { exit !f }'; then
+        echo "$domain no es el dominio de ningun vhost de $VHOSTS_FILE"
+
+        return 1
+    fi
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    copy=$(mktemp "$LOG_DIR/vhosts-media-XXXXXX") || return 1
+    python3 -I - "$(realpath_f "$ACTIVE_VHOSTS")" "$copy" "$domain" "$prod" "$MEDIA_EXT" << 'EOF'
+import re, sys
+src, dst, domain, prod, ext = sys.argv[1:6]
+lines = open(src, encoding="utf-8", errors="surrogateescape", newline="").read().split("\n")
+rule = ["    # nexum-media %s: lo que falte aqui de wp-content/uploads o img se pide a produccion (no se edita a mano: lvm-instalador media-produccion)" % prod,
+        "    <IfModule rewrite_module>",
+        "        RewriteEngine On",
+        "        RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$",
+        "        RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} !-f",
+        "        RewriteRule ^/((wp-content/uploads|img)/.+\\.(%s))$ https://%s/$1 [NC,R=302,L]" % (ext, prod),
+        "    </IfModule>",
+        "    # /nexum-media"]
+found = 0
+def fix(block):
+    global found
+    names = set()
+    for l in block:
+        w = l.split("#", 1)[0].split()
+        if len(w) >= 2 and w[0].lower() in ("servername", "serveralias"):
+            names |= {n.lower().split(":")[0] for n in w[1:]}
+    if domain not in names and "www." + domain not in names:
+        return block
+    found += 1
+    # (la regla anterior, si la habia, se quita: se pone la nueva o ninguna)
+    out, skip = [], False
+    for l in block:
+        s = l.strip()
+        if s.startswith("# nexum-media "):
+            skip = True
+        elif skip and s == "# /nexum-media":
+            skip = False
+        elif not skip:
+            out.append(l)
+    if prod != "quitar":
+        out[-1:-1] = rule
+    return out
+out, block = [], None
+for line in lines:
+    if block is None:
+        if re.match(r"^\s*<VirtualHost\b", line, re.I):
+            block = [line]
+        else:
+            out.append(line)
+        continue
+    block.append(line)
+    if re.match(r"^\s*</VirtualHost>", line, re.I):
+        out += fix(block)
+        block = None
+if block:
+    out += block
+if not found:
+    sys.exit(2)
+with open(dst, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+    f.write("\n".join(out))
+sys.exit(0 if out != lines else 3)
+EOF
+    rc=$?
+    if [ $rc -eq 3 ]; then
+        rm -f "$copy"
+        [ "$prod" == quitar ] && echo "$domain no pedia nada a produccion" || echo "$domain ya pide a $prod lo que falte"
+
+        return 0
+    fi
+    if [ $rc -ne 0 ]; then
+        rm -f "$copy"
+        echo "No se encuentra el vhost de $domain en $(realpath_f "$ACTIVE_VHOSTS")"
+
+        return 1
+    fi
+    if [ "$prod" == quitar ]; then
+        echo "$domain: lo que falte de uploads e img ya no se pide a produccion"
+    else
+        echo "$domain: lo que falte de wp-content/uploads o img se pide a https://$prod"
+    fi
+    edit_vhosts --aplicar "$copy" || { rm -f "$copy"; return 1; }
+    rm -f "$copy"
+}
+
+# Dominio de produccion de cada WordPress para sus imagenes (media-proyecto): carpeta|dominio. Se
+# aplica al vhost de los proyectos (web.local) mientras ese proyecto este cargado (media_sync)
+MEDIA_PROJECTS_FILE="$HOME/.lvm-instalador/media-produccion"
+function media_saved() {
+    awk -F'|' -v f="$1" '$1 == f { d = $2 } END { if (d != "") print d }' "$MEDIA_PROJECTS_FILE" 2> /dev/null
+}
+
+# media-proyecto <carpeta> <dominio de produccion>|quitar: lo que le falte a un WordPress de
+# wp-content/uploads se pide a su web real mientras este cargado (por web.local, que es un .local:
+# sin bucles). Las tiendas PrestaShop se ven con su dominio real falseado: para ellas, ps-imagenes
+function media_project() {
+    local folder=${1%/} prod=$(tr 'A-Z' 'a-z' <<< "$2") rest
+    if [ -z "$folder" ] || [ -z "$prod" ]; then
+        echo "Uso: lvm-instalador media-proyecto <carpeta> <dominio de produccion>|quitar"
+
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    if is_prestashop "$folder"; then
+        echo "$folder es una tienda PrestaShop: se ve con su dominio real falseado y una redireccion volveria"
+        echo "a este equipo. Descarga las imagenes que faltan: lvm-instalador ps-imagenes $folder"
+
+        return 1
+    fi
+    if [ "$prod" != quitar ]; then
+        prod=${prod#https://}; prod=${prod#http://}; prod=${prod%/}
+        if ! valid_domain "$prod" || [[ "$prod" == *.local || "$prod" == localhost || "$prod" == *.localhost ]]; then
+            echo "El dominio de produccion no es valido: $prod (solo el dominio, como ejemplo.com)"
+
+            return 1
+        fi
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $folder: $([ "$prod" == quitar ] && echo "se olvida su dominio de produccion" || echo "imagenes de $prod") en $MEDIA_PROJECTS_FILE"
+    else
+        mkdir -p -m 700 "$(dirname "$MEDIA_PROJECTS_FILE")" || return 1
+        rest=$(awk -F'|' -v f="$folder" '$1 != f' "$MEDIA_PROJECTS_FILE" 2> /dev/null)
+        [ "$prod" != quitar ] && rest+=$'\n'"$folder|$prod"
+        ( umask 077; sed '/^$/d' <<< "$rest" > "$MEDIA_PROJECTS_FILE" ) || return 1
+    fi
+    if [ "$prod" == quitar ]; then
+        echo "$folder ya no pide a produccion las imagenes que le faltan"
+    else
+        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado)"
+    fi
+    media_sync
+}
+
+# Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
+# dominio de produccion (media-proyecto) si es un WordPress que lo tiene, si no ninguna. Solo cambia
+# los vhosts si hace falta
+function media_sync() {
+    local link folder name want="" now
+    link=$(project_link) || return 0
+    folder=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null | sed 's:/*$::')
+    name=$(vhosts_info | awk -F'|' -v l="$link" '$2 == l { print $3; exit }')
+    [[ "$name" == *.local ]] || return 0
+    if [ -n "$folder" ] && [ "$folder" != "$EMPTY_PROJECT" ] && [ -d "$HTDOCS_DIR/$folder" ] && ! is_prestashop "$folder"; then
+        want=$(media_saved "$folder")
+    fi
+    now=$(awk -v n="$name" '
+        /^[ \t]*<VirtualHost/ { hit = 0 }
+        tolower($1) == "servername" || tolower($1) == "serveralias" { for (i = 2; i <= NF; i++) if (tolower($i) == n) hit = 1 }
+        hit && $1 == "#" && $2 == "nexum-media" { sub(/:$/, "", $3); print $3; exit }' "$(realpath_f "$ACTIVE_VHOSTS")" 2> /dev/null)
+    [ "$want" == "$now" ] && return 0
+    media_proxy "$name" "${want:-quitar}"
+}
+
+# Para la ventana: G|dominio guardado de un WordPress (media-proyecto) y D|el de su base (home o
+# siteurl de la tabla options, que el gestor no cambia: el local va en WP_HOME de wp-config.php)
+function gui_wp_prod() {
+    local folder=$1 cfg db prefix url
+    valid_project "$folder" > /dev/null || return 1
+    echo "G|$(media_saved "$folder")"
+    cfg=$(wp_config_read "$HTDOCS_DIR/$folder/wp-config.php") || return 0
+    db=$(sed -n 1p <<< "$cfg") prefix=$(sed -n 4p <<< "$cfg")
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] && [ -x "$DB_CLIENT" ] || return 0
+    db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}options" || return 0
+    url=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT option_value FROM \`$db\`.\`${prefix}options\`
+        WHERE option_name IN ('home', 'siteurl') ORDER BY option_name = 'home' DESC LIMIT 1" < /dev/null 2> /dev/null)
+    url=$(tr 'A-Z' 'a-z' <<< "$url" | sed -E 's|^https?://||; s|[/:?#].*$||')
+    valid_domain "$url" && [[ "$url" != *.local && "$url" != localhost && "$url" != *.localhost ]] && echo "D|$url"
+    return 0
+}
+
+# ps-imagenes <carpeta>: descarga de la web real las imagenes de una tienda PrestaShop que faltan en
+# img (productos, categorias y marcas, con sus miniaturas; la lista sale de su base). La tienda se ve
+# con su dominio real falseado, asi que una redireccion no sirve: se descargan por https resolviendo
+# el dominio con DNS cifrado (PS_IMAGES_DOH, sin /etc/hosts) y comprobando su certificado de
+# verdad. Cada fichero va a una carpeta temporal y solo pasa a img si ha llegado entero (200); sin
+# seguir redirecciones y como mucho 30 MB por fichero. Lo que ya esta en local no se toca
+PS_IMAGES_DOH="https://cloudflare-dns.com/dns-query"
+function ps_images() {
+    local folder=${1%/} config db prefix domain t list total
+    if [ -z "$folder" ]; then
+        echo "Uso: lvm-instalador ps-imagenes <carpeta>"
+
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    is_prestashop "$folder" || { echo "$folder no es una tienda PrestaShop"; return 1; }
+    command -v curl > /dev/null || { echo "Hace falta curl: sudo apt install curl"; return 1; }
+    config=$(ps_config "$folder")
+    db=${config%%|*} prefix=${config#*|}
+    [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "No se puede leer la BBDD de $folder (su parameters.php o settings.inc.php)"; return 1; }
+    db_connect || return $?
+    if ! db_exists "$db"; then
+        echo "La BBDD de $folder ($db) no esta en lampp-$DB_FOLDER, la version activa: carga el proyecto"
+        echo "en su version (o importa su BBDD en esta) y vuelve a intentarlo"
+
+        return 1
+    fi
+    domain=$(ps_domain "$folder")
+    if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == localhost || "$domain" == *.localhost ]]; then
+        echo "No se sabe el dominio de produccion de $folder (el de su tabla ${prefix}shop_url): ${domain:-ninguno}"
+
+        return 1
+    fi
+    # (solo tablas de verdad: una vista del volcado ejecutaria sus funciones como root)
+    for t in image image_type; do
+        db_base_table root "${MYSQL_PWD:-}" "$db" "$prefix$t" || { echo "La BBDD $db no tiene la tabla $prefix$t"; return 1; }
+    done
+    local sql=(db_root_sql -N -B)
+    list=$( {
+        "${sql[@]}" -e "SELECT 'I', id_image FROM \`$db\`.\`${prefix}image\`" < /dev/null
+        "${sql[@]}" -e "SELECT 'T', name, products, categories, manufacturers FROM \`$db\`.\`${prefix}image_type\`" < /dev/null
+        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}category" \
+            && "${sql[@]}" -e "SELECT 'C', id_category FROM \`$db\`.\`${prefix}category\` WHERE id_category > 2" < /dev/null
+        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}manufacturer" \
+            && "${sql[@]}" -e "SELECT 'M', id_manufacturer FROM \`$db\`.\`${prefix}manufacturer\`" < /dev/null
+    } 2> /dev/null | python3 -I -c '
+import os, re, sys
+root = sys.argv[1]
+ids, types = {"I": [], "C": [], "M": []}, {"I": [], "C": [], "M": []}
+for line in sys.stdin:
+    f = line.rstrip("\n").split("\t")
+    if f[0] in ids and len(f) == 2 and f[1].isdigit():
+        ids[f[0]].append(int(f[1]))
+    elif f[0] == "T" and len(f) == 5 and re.match(r"^[A-Za-z0-9_-]{1,64}$", f[1]):
+        for k, col in (("I", 2), ("C", 3), ("M", 4)):
+            if f[col] == "1":
+                types[k].append(f[1])
+for k, base in (("I", "img/p"), ("C", "img/c"), ("M", "img/m")):
+    for i in sorted(set(ids[k])):
+        d = base + "/" + "/".join(str(i)) if k == "I" else base
+        for t in [""] + types[k]:
+            rel = "%s/%d%s.jpg" % (d, i, "-" + t if t else "")
+            if not os.path.isfile(os.path.join(root, rel)):
+                print(rel)
+' "$HTDOCS_DIR/$folder")
+    total=$(grep -c . <<< "$list")
+    if [ "$total" -eq 0 ]; then
+        echo "A $folder no le falta ninguna imagen de productos, categorias ni marcas"
+
+        return 0
+    fi
+    echo "A $folder le faltan $total imagenes: se descargan de https://$domain"
+    echo "($domain se resuelve con DNS cifrado, sin /etc/hosts, y se comprueba su certificado)"
+    if [ "$DRY" -eq 1 ]; then
+        head -3 <<< "$list" | sed 's/^/  [simulacion] /'
+
+        return 0
+    fi
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    local file rc
+    file=$(mktemp "$LOG_DIR/ps-imagenes-lista-XXXXXX") || return 1
+    printf '%s\n' "$list" > "$file"
+    python3 -I - "$HTDOCS_DIR/$folder" "$domain" "$PS_IMAGES_DOH" "$LOG_DIR" "$file" "$APP_NAME/$APP_VERSION" << 'EOF'
+import os, shutil, signal, subprocess, sys, tempfile
+root, domain, doh, logdir, listfile, agent = sys.argv[1:7]
+rels = [l for l in open(listfile).read().split("\n") if l]
+# (al cancelar la tarea se borra la carpeta temporal)
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(130))
+img = os.path.realpath(os.path.join(root, "img"))
+got = gone = moved = blocked = 0
+# El programa dice quien es (sin hacerse pasar por un navegador): si la web lo bloquea, se le da
+# permiso en su servidor
+agent = "%s (imagenes que faltan en una copia local)" % agent.replace(" ", "-")
+with tempfile.TemporaryDirectory(dir=logdir, prefix="ps-imagenes-") as tmp:
+    for start in range(0, len(rels), 300):
+        batch = rels[start:start + 300]
+        cfg = os.path.join(tmp, "curl.conf")
+        with open(cfg, "w") as f:
+            for n, rel in enumerate(batch):
+                f.write('url = "https://%s/%s"\noutput = "%s/%d"\n' % (domain, rel, tmp, n))
+        cmd = ["curl", "-s", "--parallel", "--parallel-max", "8", "-A", agent,
+               "--proto", "=https", "--fail", "--max-redirs", "0", "--max-filesize", "30000000",
+               "--connect-timeout", "15", "--max-time", "120", "-K", cfg,
+               "-w", "%{exitcode} %{http_code} %{filename_effective}\n"]
+        if doh:
+            cmd[2:2] = ["--doh-url", doh]
+        out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True).stdout
+        for line in out.splitlines():
+            code, http, name = (line.split(" ", 2) + ["", ""])[:3]
+            n = os.path.basename(name)
+            if not n.isdigit() or int(n) >= len(batch):
+                continue
+            src = os.path.join(tmp, n)
+            dest = os.path.join(root, batch[int(n)])
+            # (sin salir de img: una carpeta de la ruta podria ser un enlace a otro sitio. Se mira
+            # antes de crear nada)
+            real = os.path.realpath(os.path.dirname(dest))
+            if code == "0" and http == "200" and os.path.isfile(src) and os.path.getsize(src) > 0 \
+                    and real.startswith(img + os.sep) and not os.path.lexists(dest):
+                os.makedirs(os.path.dirname(dest), mode=0o755, exist_ok=True)
+                shutil.move(src, dest)
+                got += 1
+            elif http in ("301", "302", "307", "308"):
+                moved += 1
+            elif http in ("000", "401", "403", "429", "503"):
+                blocked += 1
+            else:
+                gone += 1
+            if os.path.lexists(src):
+                os.remove(src)
+        notes = [t % c for t, c in (("%d no estan en produccion", gone), ("%d bloqueadas por la web", blocked),
+                                     ("%d con redireccion", moved)) if c]
+        print("Descargadas %d de %d%s" % (got, len(rels), " (" + ", ".join(notes) + ")" if notes else ""), flush=True)
+        # Lo primero, todo bloqueado: no se sigue llamando a la web
+        if not got and blocked == len(batch):
+            break
+if blocked:
+    print("La web de %s no deja descargar (cortafuegos o proteccion contra robots del servidor). Este" % domain)
+    print("programa se presenta como «%s»: dale permiso en el servidor (Plesk: ModSecurity" % agent)
+    print("o Imunify) o copia la carpeta img de produccion a mano")
+if moved:
+    print("Aviso: %d piden una redireccion (a www o a otro dominio): mira el dominio de la tienda" % moved)
+print("Listo: %d imagenes nuevas en %s/img" % (got, root))
+sys.exit(0 if got or not rels else 1)
+EOF
+    rc=$?
+    rm -f "$file"
+    return $rc
+}
+
 # Dominios .local apagados a mano en la pestaña Hosts: ya no se mantienen en /etc/hosts.
 # local_off si|no <dominio...>: no = apagado (se recuerda), si = encendido (se olvida)
 LOCAL_OFF_FILE="$HOME/.lvm-instalador/locales-apagados"
@@ -5112,9 +5647,25 @@ function local_off() {
 # Para la pestaña Hosts: F|dominio|alias|carpeta|falseado (1/0)|https (1/0)|certificado (1/0)|PrestaShop (1/0)|personalizado (1/0)
 function gui_hosts() {
     local info=$(vhosts_info) link=$(project_link)
-    LVM_INFO=$info python3 -I - "$HOSTS_FILE" "$HTDOCS_DIR" "$PROJECT_VHOST $link" "$PORT_HTTPS" "$CUSTOM_DOMAINS_FILE" <<'EOF'
+    LVM_INFO=$info python3 -I - "$HOSTS_FILE" "$HTDOCS_DIR" "$PROJECT_VHOST $link" "$PORT_HTTPS" "$CUSTOM_DOMAINS_FILE" "$VHOSTS_FILE" <<'EOF'
 import os, re, sys
-hosts, htdocs, links, https_port, custom_file = sys.argv[1:6]
+hosts, htdocs, links, https_port, custom_file, vhosts = sys.argv[1:7]
+# Dominio de produccion al que se piden las imagenes que faltan (media-produccion), por dominio
+media, names = {}, []
+try:
+    for line in open(vhosts, errors="replace"):
+        s = line.strip()
+        if re.match(r"(?i)<VirtualHost\b", s):
+            names = []
+        w = s.split()
+        if len(w) >= 2 and w[0].lower() in ("servername", "serveralias"):
+            names += [n.lower().split(":")[0] for n in w[1:]]
+        m = re.match(r"# nexum-media (\S+):", s)
+        if m:
+            for n in names:
+                media[n] = m.group(1)
+except OSError:
+    pass
 custom = set()
 try:
     custom = {l.split("=", 1)[0] for l in open(custom_file) if "=" in l}
@@ -5148,8 +5699,8 @@ for name in sorted(rows):
     r = rows[name]
     ps = any(os.path.isfile(os.path.join(htdocs, r["folder"], p))
              for p in ("app/config/parameters.php", "config/settings.inc.php")) if r["folder"] else False
-    print("F|%s|%s|%s|%d|%d|%d|%d|%d" % (name, r["alias"], r["folder"], name in active,
-                                         r["https"], r["crt"], ps, name in custom))
+    print("F|%s|%s|%s|%d|%d|%d|%d|%d|%s" % (name, r["alias"], r["folder"], name in active,
+                                            r["https"], r["crt"], ps, name in custom, media.get(name, "")))
 # El vhost de los proyectos (web.local) tiene que llevar a 127.0.0.1, donde escucha Apache: si en
 # hosts apunta a otra direccion (otra direccion de 127.x o de la red) o no esta, el
 # navegador da ERR_CONNECTION_REFUSED. L|nombre|direccion a la que apunta ahora (vacio si no esta)
@@ -5841,12 +6392,22 @@ function mailpit_install() {
         echo "El paquete de Mailpit no trae su programa: no se instala."
         return 1
     fi
+    # La firma se comprueba como root: la carpeta temporal es de root y solo suya (con tu usuario,
+    # codesign no podia leerlo y decia siempre que no tenia firma). Si viniera sin ninguna (los de Apple
+    # Silicon traen la local de Go), se le pone una local: su contenido ya esta comprobado con la
+    # sha256 de la descarga. Una firma que no cuadra (programa cambiado), no se instala
     if [ -z "$TEST_DIR" ]; then
         $SUDO /usr/bin/xattr -c "$bin" 2> /dev/null
-        if ! /usr/bin/codesign --verify "$bin" 2> /dev/null; then
-            $SUDO rm -rf "$rtmp"
-            echo "El programa de Mailpit no lleva una firma valida (macOS no lo ejecutaria): no se instala."
-            return 1
+        if ! err=$($SUDO /usr/bin/codesign --verify "$bin" 2>&1); then
+            if [[ "$err" == *"not signed at all"* ]] && $SUDO /usr/bin/codesign --force --sign - "$bin" > /dev/null 2>&1 \
+                    && $SUDO /usr/bin/codesign --verify "$bin" 2> /dev/null; then
+                echo "Mailpit viene sin firmar: se le pone una firma local (comprobado antes con su sha256)"
+            else
+                $SUDO rm -rf "$rtmp"
+                echo "El programa de Mailpit no lleva una firma valida (macOS no lo ejecutaria): no se instala."
+                [ -n "$err" ] && sed 's/^/  /' <<< "$err" | head -3
+                return 1
+            fi
         fi
     fi
     if ! { $SUDO install -d "${own[@]}" -m 755 "$MAILPIT_DIR" \
@@ -11785,6 +12346,45 @@ function human_size() {
     }'
 }
 
+# Lo que ocupa en el disco cada proyecto de htdocs (du), para la lista de Proyectos:
+# T|carpeta|bytes|cuando se midio. Se guarda y se vuelven a medir los que tienen la medida de hace mas
+# de 6 horas, de 10 en 10 (du tarda con miles de ficheros), los mas antiguos antes. Si quedan mas por
+# medir, lo dice al final (F|cuantos) y la ventana pide la siguiente tanda. Con "ya", sin esperar.
+# (bash 3.2 de macOS: sin arrays asociativos ni mapfile; du de BSD, en KB)
+function gui_project_sizes() {
+    local cache=$LOG_DIR/cache/proyectos-tamanos now dir name t k left=0 list batch
+    local -a dirs=()
+    now=$(date +%s)
+    mkdir -p -m 700 "$LOG_DIR/cache" || return 0
+    [ -f "$cache" ] || : > "$cache"
+    # Los que hay que medir, los mas antiguos antes («cuando|carpeta»)
+    list=$(for dir in "$HTDOCS_DIR"/*; do
+               name=${dir##*/}
+               [ -d "$dir" ] && [ ! -L "$dir" ] && [[ "$name" != *'|'* ]] || continue
+               t=$(awk -F'|' -v n="$name" '$1 == n { print $3; exit }' "$cache")
+               [[ "$t" =~ ^[0-9]+$ ]] || t=0
+               if [ "$1" == ya ] || [ $((now - t)) -ge 21600 ]; then echo "$t|$name"; fi
+           done | sort -t'|' -k1,1n)
+    if [ -n "$list" ]; then
+        left=$(( $(wc -l <<< "$list") - 10 ))
+        [ $left -lt 0 ] && left=0
+        batch=$(head -10 <<< "$list" | cut -d'|' -f2-)
+        while IFS= read -r name; do dirs+=("$HTDOCS_DIR/$name"); done <<< "$batch"
+        # (sin salir del disco ni seguir enlaces; lo que no se puede leer no cuenta)
+        { REDO=$batch awk -F'|' 'BEGIN { n = split(ENVIRON["REDO"], r, "\n"); for (i = 1; i <= n; i++) skip[r[i]] = 1 }
+                                 !($1 in skip)' "$cache" | while IFS='|' read -r name k t; do
+              [ -d "$HTDOCS_DIR/$name" ] && [ ! -L "$HTDOCS_DIR/$name" ] && echo "$name|$k|$t"
+          done
+          du -skx "${dirs[@]}" 2> /dev/null | while IFS=$'\t' read -r k dir; do
+              [[ "$k" =~ ^[0-9]+$ ]] && echo "${dir##*/}|$((k * 1024))|$now"
+          done
+        } > "$cache.nuevo" && mv -f "$cache.nuevo" "$cache"
+    fi
+    grep -E '^[^|]+\|[0-9]+\|[0-9]+$' "$cache" | sed 's/^/T|/'
+    [ "$left" -gt 0 ] && echo "F|$left"
+    return 0
+}
+
 # ¿Se puede entrar en el MariaDB de la version activa? ok|version|mariadb / clave|version / no|motivo
 function gui_db_check() {
     local active=$(active_dir)
@@ -14065,6 +14665,1381 @@ function panel_remove() {
 
 # Icono de la aplicacion: el de PHP (circulo magenta ".php", 256x256), el mismo que la version de
 # Linux. Va incrustado para que el instalador siga siendo un solo archivo
+# Fuente del nombre de la ventana: «NEXUM» en Goldman (Google Fonts), con la SIL Open Font License 1.1,
+# que va dentro del .ttf (y su texto, en fuentes/ del repositorio): Copyright 2018 The Goldman Project
+# Authors (https://github.com/magictype/goldman). Va en Resources/fuentes de la aplicacion
+# (ATSApplicationFontsPath): solo la usa la ventana
+FONT_GOLDMAN_B64='
+AAEAAAASAQAABAAgRFNJRwAAAAEAATB8AAAACEdERUaDLYAIAAD4ZAAAAi5HUE9TUhwFwgAA+pQA
+AC+IR1NVQueU8NUAASocAAAGYE9TLzJiFXbMAAABqAAAAGBjbWFw1Tm9SAAADBAAAAcGY3Z0IBLF
+CO4AACHkAAAAbGZwZ21iLv99AAATGAAADgxnYXNwAAAAEAAA+FwAAAAIZ2x5ZoaDS6wAACdYAAC7
+aGhlYWQkUwfhAAABLAAAADZoaGVhEjwRhgAAAWQAAAAkaG10eAgeN78AAAIIAAAKCGxvY2ErIvuc
+AAAiUAAABQZtYXhwBhURgQAAAYgAAAAgbmFtZVbPeZMAAOLAAAADtnBvc3TNTVKZAADmeAAAEeJw
+cmVwWrHfOwAAISQAAAC9AAEAAAABAAAs3sIFXw889QAPA+gAAAAA2zyh3AAAAADbPiOs/dr9WBDb
+BB4AAAAGAAIAAAAAAAAAAQAAA4T+1AAAEQ392v8iENsAAQAAAAAAAAAAAAAAAAAAAoIAAQAAAoIB
+9gARAH4ABQACAJgA/ACNAAACVA4MAAMAAwAEAowBkAAFAAACigJYAAAASwKKAlgAAAFeADIBDQAA
+AAAAAAAAAAAAAAAAAEUAAABDAAAAAAAAAABOT05FAMAADfsCA4T+1AAABEwCvCAAAZMAAAAAAcAC
+TAAAACAABAJAAAACWAAAAlgAAADcAAADDgAAA7EAFASsAAoErAAKAw4AAAMOAAADDgAAAw4AAAMO
+AAADDgAAAw4AAAMOAAADDgAAAw4AAAMOAAADDgAAAw4AAAMOAAADDgAAAw4AAAMOAAADDgAAAw4A
+AAMOAAADDgAAAw4AAAMOAAADDgAAAxwAUALzAEYC8wBGAvMARgLzAEYC8wBGAvMARgMmAFAF8ABQ
+BfAAUAMmAFADJv/+AuMACgWHAFAFhwBQAv4AUAL+AFAC/gBQAv4AUAL+AFAC/gBQAv4AUAL+AFAC
+/gBQAv4AUAL+AFAC/gBQAv4AUAL+AFAC/gBQAv4AUAL+AFAC/gBQAzoAUAL+AFADJv/+Av4AUALU
+AFADGwBGAxsARgMbAEYDGwBGAxsARgMbAEYDGwBQAzAAUAMwAFADMABQASQAUAO6AFABJABQAST/
+/AEkAAIBJP/FASQACAEkAFABJABQASQAMwEkACkBJP/8ASQACgEkADwBJP/nApYACgKWAAoDHgBQ
+Ax4AUAKuAFAFRABQAq4AUAKuAFACrgBQAlgAUAPBAFACrv/zA4sAUAM6AFAF0ABQAlgAAAM6AFAD
+OgBQAzoAUAOMAAoETQBQAzoAUAMdAEYFAQBGAx0ARgMdAEYDHQBGAx0ARgMdAEYDHQBGAx0ARgMd
+AEYDHQBGAx0ARgMdAEYDHQBGAx0ARgMdAEYDHQBGAx0ARgMdAEYDHQBGAx0ARgMdAEYDHQBGAx0A
+RgMdAEYDHQBGA28AKAMdAEYDHQBGAx0ARgMdAEYDHQBGAv0AUAMmAEYDPABQAzwAUAM8AFADPABQ
+AzwAUAM8AFAC9AA8AvQAPAL0ADwC9AA8As8AMgL0ADwC9AA8ArYAFAK2ABQCtgAUArYAFAK2ABQC
+/QBQAv4AQQL+AEEC/gBBAv4AQQL+AEEC/gBBAv4AQQL+AEEC/gBBAv4AQQL+AEEC/gBBAv4AQQL+
+AEEC/gBBAv4AQQL+AEEC/gBBAv4AQQL+AEEC/gBBAuAACgRXAAoEVwAKBFcACgRXAAoEVwAKAuIA
+CgLiAAoC4gAKAuIACgLiAAoC4gAKAuIACgLiAAoC4gAKAuIACgLcADIC3AAyAtwAMgLcADICiwAt
+AoAALQKLAC0CiwAtAosALQKLAC0CiwAtAosALQKLAC0CiwAtAosALQKLAC0CiwAtAosALQKLAC0A
+5v/EAAD+egKLAC0CiwAtAosALQQUAC0EFAAtAosALQKLAC0CiwAtAosALQMkAFACiwAtAMEAJhEN
+ABQCgABQAosALQKLAC0BkgAoAZIAHgIcAFADqwBQAosALQKKADwBfv/YAQAAUAFnACgBZwAoAXUA
+KAGdAFABVAAUAAD+cAAA/nAAAP5wAAD+cAAA/nAAAP5bAAD+cAEAAFABdwBQAXcAUAJOADICTgAy
+AUEAOQDBAFkAAP6VAk4AMgJOADICTgAyAk4AMgLzAEYA3gAAAAAAAAJbADIBQQAUAAD+cAAA/nAA
+AP5wAAD+cAAA/lUBLwBQAvMARgEqADoAAP7CAAD+2AJbAFADLgBQAqcAUAKUADICRABQAkQAUAAA
+/fgC3AAyApQAMgHMAFABnQA6AAD+NQAA/igCfwBQAQ7/kgK4ADwC1QAyAMAAJwAA/t0AAP7UAWoA
+KAT1ADIE9QAyAmwAMgJsADICbAAyAmwAMgJsADICbAAyAmwAMgJsADICbAAyAmwAMgJsADICbAAy
+AmwAMgJsADICbAAyAmwAMgK4ADIBXAAZAVwAGQJsADICqwBQAmwAMgPAAFACsAAoArwAUAKPADwC
+bAAyAjAAUAMnAB4CgAAyAmwAMgLjADwBTQBQAU0AUAHfABQDKwAUA9YAFAUNABQDswAUAmIAFAOC
+ABQB3wAUAl0AFAJiABQCWACCArUAKAFbABQBWwAUA8UAFAJdABQCdQAoAvYAKAGKAAUBewAUAa0A
+KAEO/5IDJABQAosAKAKLACgCiwAoAosAKAKLACgCiwAoArMAKADmABQAAP7KAoAAUAKAAFADGwBG
+AuIAUALiAFAB1ABQAdQAUAKPADwCj//7Ao8APAAA/tQAAP/zAYYAUAAA/mYB4ABQAeAAUAEHADwA
+8gA8APIAPADy/+MA8v/pAPL/rADy/+8A8gA8AQcAPADyADwA8gAaAPIAEADy/+MCBgA8APL/8QN0
+AAACGAAoAPIADgDy/84BE/+wAQj/sAEI/7ACagA8AmoAPAJqADwDXgA8APwAPAD8ADwBRAA8APwA
+OQGxADwBSgAoAoAAUAKJAFACpwA8ApoAKAI9ACgCDwA8AlgAHgJYACgA/P/VA5EAPAFMAB4AAP6s
+AAD+rANJAFACbAA8An8AUADKACgCgAA8AnMAUAKPADwCjwA8A2cAPADcAAACjwA8Ao8APAKl/7AC
+1AAyAWoAGQFqABkDogA8AlgAAAJEAGQCjwA8A2kAUAT/AFACgAAyAoAAMgKAADICgAAyAoAAMgKA
+ADICgAAyAoAAMgKAADICgAAyAoAAMgKAADICgAAyAoAAMgQMADIBBQAeAAD+1AKAADICgAAyAoAA
+MgKAADICgAAyAoAAMgKAADICgAAyAoAAMgKAADICgAAyAWcAFAC0AAoA5QAUA08AFAMxABQDfQAU
+AOUAFAKAADIBdwAtAXIAMgKAADICgAAyAoAAMgKAADICigA8AAD+swKuAFABJgAEATYAKAJeACgD
+gAA8AS8AUAEvAFABLwBQBNsAPANJAFADKwA8A3UAUAKBAFACgQBQAlgAKAK5ACgCigAyAnIAUAJz
+AFABXgAoAfwAOgHUAFAB1P/+ARYAeAEWACYBPgA6AMoAKAH1ADwB9QA8AyIAKAH1ADwB9QA8AfUA
+PAHnAFABPgAoASQAFAAA/o4B9QA8Au0APAJpAFACpQBQAn4AMgJ+ADICfgAyAn4AMgKQADICfgAy
+An4AMgFqACgCOQBQAT4AOgJpABQBNQAKAUwAFAO2ABQC1ABQAWoAKAFqACgBugAUAAD9+AAA/gwB
+4ABQAqcAPAAA/doAAP4WAuoAKAHEABQBxAAUAcQAFAHEABQBxAAUAqgAUAKzACgBWgAUAVoAFAPE
+ABQD8gAUAYYAKAGSACgAAP5mAlUAUAJ8ACgBPgAUAT4AFAFcACgCgAA8AoAAPAKAADwCgAA8AoAA
+PAKAADwCgAA8AoAAPAKAADwCgAA8AoAAPAKAADwCgAA8AoAAPAKAADwCgAA8AoAAPAKAADwCgABQ
+AoAAPAKAADwCgAA8Ak4ACgNdAAoDXQAKA10ACgNdAAoDXQAKAt4AKAQ3ADwCRAAKAk//2AJP/9gC
+T//YAk//2AJP/9gC9gAUAk//2AJP/9gCT//YAk//2AJhACgCYQAoAmEAKAJhACgC9ABQAXoAKAF6
+ADcCoQBQAvQAUAAAAAIAAAADAAAAFAADAAEAAAAUAAQG8gAAAKYAgAAGACYADQB+AUgBfgGPAZIB
+nQGhAbABzAHnAesB8wIbAi0CMwI3AlkCcgK6ArwCxwLJAt0DBAMMAw8DEgMbAyEDJAMoAy4DMQM4
+A5QDqQO8A8AehR6eHvkgECAUIBogHiAiICYgMCAzIDogRCBSIHQgoSCkIKkgrSCyILUguiC9IRMh
+FiEiIS4hXiICIgUiDyISIhUiGiIeIisiSCJgImUlyyfp+P/7Av//AAAADQAgAKABSgGPAZIBnQGg
+Aa8BxAHmAeoB8QH6AioCMAI3AlkCcgK5ArwCxgLJAtgDAAMGAw8DEQMbAyEDIwMmAy4DMQM1A5QD
+qQO8A8AegB6eHqAgECATIBggHCAgICYgMCAyIDkgRCBSIHQgoSCjIKYgqyCxILUguSC8IRMhFiEi
+IS4hWyICIgUiDyIRIhUiGSIeIisiSCJgImQlyifo+P/7Af////UAAAAAAAD/Ev/a/tUAAAAAAAAA
+AAAAAAAAAAAAAAD/av/P/1MAAP4zAAD+nQAAAAAAAP4aAAD+bP7ZAAAAAP3T/oYAAPyY/Ob+Af5G
+AADhrgAA4XsAAOH6AAAAAOEo4dMAAOFI4S3g0eD84H4AAAAAAAAAAOBfAAAAAOCd4LjhKeAoAADf
+/N9M3/sAAN8cAADffd9x3qnfawAAAAAAAAfxAAAAAQAAAKQBYAKwAAAAAAAAAxIDFAMWAyYDKAMq
+Ay4DcAN2AAAAAAAAA3YAAAN2AAADdgOAA4gAAAOSAAAAAAOQA5IAAAAAA5IAAAAAAAAAAAOQAAAD
+mAAABEgAAARIBEwAAAAABEwAAAAAAAAAAAAABEQERgRMBFAAAARQBFIAAAAAAAAAAARMAAAAAAAA
+BEwAAARMAAAAAAAAAAAERgRIBEoAAARKAAAAAwFaAg4BzQEyAf8A7QIVAfwB/QD2AgcBIAGKAgAC
+NQJ9AesCTAJDAW0BZwIyAi4BSgHGAR4CLQGsAVUBfAIMAPcABAAgACEAJwAvAEUARgBNAFAAXwBh
+AGMAawBsAHUAlQCWAJcAnQCkAKoAvwDAAMUAxgDPAP4A+gD/APQCYgF6ANMA+QELASYBOgFcAXMB
+gwGMAZ8BogGmAbUBvwHPAfkCCwIWAiQCPQJQAmYCZwJuAm8CeQD8APsA/QD1AcIBWwEXAjkBJQJ0
+AQgCLAEtASQB8wF/AbICOAIcAbYBLAIIAk8CSADiAboB+wIBARUB8QH0AYAB8AHvAkcCDQAYAAgA
+DwAfABYAHQAGACQAPQAwADMAOgBZAFIAVABWAEMAdACEAHcAeQCTAIABvgCRALEAqwCtAK8AxwCp
+AXkA6QDVANwA+ADlAPIA5wERAUgBOwE+AUUBlgGOAZABkgFXAcwB4AHQAdIB9wHZATAB9QJXAlEC
+UwJVAnACQgJyABsA7AAJANYAHADuACIBDAAlARIAJgETACMBEAAqASoAKwErAEABTwAxATwAOwFG
+AEIBVAAyAT0ASQF2AEcBdABLAXgASgF3AE8BhQBOAYQAXgGeAFwBmgBTAY8AXQGdAFcBlQBRAZkA
+YAGgAGIBowGkAGUBpwBnAakAZgGoAGgBqgBqAbQAbwHAAHEBxABwAcMAQQFTAI4B6gB4AdEAjAHo
+AHYB3QCYAhcAmgIaAJkCGQCeAiUAogIpAKACJwCfAiYApwJAAKYCPwClAj4AvgJlALsCYQCsAlIA
+vQJkALkCXwC8AmMAwgJpAMgCcQDJANACegDSAnwA0QJ7AIYB4gCzAlkAKQAuATkAZABpAbEAbQBz
+AckASAF1AJAB8gAoAC0BOAAeAPMABwDoAJIB9gAVAOQAGgDrADkBRAA/AU0AVQGRAFsBmAB/AdgA
+jQHpAJsCGwCcAiAArgJUALoCYACjAioAqAJBAIEB2gCUAfgAggHbAM0CdwIJATcBGAENAQABNAIe
+Ad4CSQGIAXsA4wEZAkoBuAECATUBLwGGAh8BiQEPAQcBIgE2AS4BIQEWAd8COwI6AjcCNgDEAmsA
+wQJoAMMCagAXAOYAGQDqABAA3QASAN8AEwDgABQA4QARAN4ACgDXAAwA2QANANoADgDbAAsA2AA8
+AUcAPgFJAEQBWAA0AT8ANgFBADcBQgA4AUMANQFAAFoBlwBYAZQAgwHcAIUB4QB6AdMAfAHVAH0B
+1gB+AdcAewHUAIcB4wCJAeUAigHmAIsB5wCIAeQAsAJWALICWAC0AloAtgJcALcCXQC4Al4AtQJb
+AMsCdQDKAnMAzAJ2AM4CeAFSAVACEAIRAg8BJwEoAQkBvAIrAXIBrgHBAgQCIgJtATMBWQGlAgUB
+fgIjAa8BuQIhAe4CRgFqAjECPAG7AQoCGAGtAX0BswJsAasCHQFlAWsAALAALCCwAFVYRVkgIEu4
+AA5RS7AGU1pYsDQbsChZYGYgilVYsAIlYbkIAAgAY2MjYhshIbAAWbAAQyNEsgABAENgQi2wASyw
+IGBmLbACLCMhIyEtsAMsIGSzAxQVAEJDsBNDIGBgQrECFENCsSUDQ7ACQ1R4ILAMI7ACQ0NhZLAE
+UHiyAgICQ2BCsCFlHCGwAkNDsg4VAUIcILACQyNCshMBE0NgQiOwAFBYZVmyFgECQ2BCLbAELLAD
+K7AVQ1gjISMhsBZDQyOwAFBYZVkbIGQgsMBQsAQmWrIoAQ1DRWNFsAZFWCGwAyVZUltYISMhG4pY
+ILBQUFghsEBZGyCwOFBYIbA4WVkgsQENQ0VjRWFksChQWCGxAQ1DRWNFILAwUFghsDBZGyCwwFBY
+IGYgiophILAKUFhgGyCwIFBYIbAKYBsgsDZQWCGwNmAbYFlZWRuwAiWwDENjsABSWLAAS7AKUFgh
+sAxDG0uwHlBYIbAeS2G4EABjsAxDY7gFAGJZWWRhWbABK1lZI7AAUFhlWVkgZLAWQyNCWS2wBSwg
+RSCwBCVhZCCwB0NQWLAHI0KwCCNCGyEhWbABYC2wBiwjISMhsAMrIGSxB2JCILAII0KwBkVYG7EB
+DUNFY7EBDUOwA2BFY7AFKiEgsAhDIIogirABK7EwBSWwBCZRWGBQG2FSWVgjWSFZILBAU1iwASsb
+IbBAWSOwAFBYZVktsAcssAlDK7IAAgBDYEItsAgssAkjQiMgsAAjQmGwAmJmsAFjsAFgsAcqLbAJ
+LCAgRSCwDkNjuAQAYiCwAFBYsEBgWWawAWNgRLABYC2wCiyyCQ4AQ0VCKiGyAAEAQ2BCLbALLLAA
+QyNEsgABAENgQi2wDCwgIEUgsAErI7AAQ7AEJWAgRYojYSBkILAgUFghsAAbsDBQWLAgG7BAWVkj
+sABQWGVZsAMlI2FERLABYC2wDSwgIEUgsAErI7AAQ7AEJWAgRYojYSBksCRQWLAAG7BAWSOwAFBY
+ZVmwAyUjYUREsAFgLbAOLCCwACNCsw0MAANFUFghGyMhWSohLbAPLLECAkWwZGFELbAQLLABYCAg
+sA9DSrAAUFggsA8jQlmwEENKsABSWCCwECNCWS2wESwgsBBiZrABYyC4BABjiiNhsBFDYCCKYCCw
+ESNCIy2wEixLVFixBGREWSSwDWUjeC2wEyxLUVhLU1ixBGREWRshWSSwE2UjeC2wFCyxABJDVVix
+EhJDsAFhQrARK1mwAEOwAiVCsQ8CJUKxEAIlQrABFiMgsAMlUFixAQBDYLAEJUKKiiCKI2GwECoh
+I7ABYSCKI2GwECohG7EBAENgsAIlQrACJWGwECohWbAPQ0ewEENHYLACYiCwAFBYsEBgWWawAWMg
+sA5DY7gEAGIgsABQWLBAYFlmsAFjYLEAABMjRLABQ7AAPrIBAQFDYEItsBUsALEAAkVUWLASI0Ig
+RbAOI0KwDSOwA2BCIGC3GBgBABEAEwBCQkKKYCCwFCNCsAFhsRQIK7CLKxsiWS2wFiyxABUrLbAX
+LLEBFSstsBgssQIVKy2wGSyxAxUrLbAaLLEEFSstsBsssQUVKy2wHCyxBhUrLbAdLLEHFSstsB4s
+sQgVKy2wHyyxCRUrLbArLCMgsBBiZrABY7AGYEtUWCMgLrABXRshIVktsCwsIyCwEGJmsAFjsBZg
+S1RYIyAusAFxGyEhWS2wLSwjILAQYmawAWOwJmBLVFgjIC6wAXIbISFZLbAgLACwDyuxAAJFVFiw
+EiNCIEWwDiNCsA0jsANgQiBgsAFhtRgYAQARAEJCimCxFAgrsIsrGyJZLbAhLLEAICstsCIssQEg
+Ky2wIyyxAiArLbAkLLEDICstsCUssQQgKy2wJiyxBSArLbAnLLEGICstsCgssQcgKy2wKSyxCCAr
+LbAqLLEJICstsC4sIDywAWAtsC8sIGCwGGAgQyOwAWBDsAIlYbABYLAuKiEtsDAssC8rsC8qLbAx
+LCAgRyAgsA5DY7gEAGIgsABQWLBAYFlmsAFjYCNhOCMgilVYIEcgILAOQ2O4BABiILAAUFiwQGBZ
+ZrABY2AjYTgbIVktsDIsALEAAkVUWLEOBkVCsAEWsDEqsQUBFUVYMFkbIlktsDMsALAPK7EAAkVU
+WLEOBkVCsAEWsDEqsQUBFUVYMFkbIlktsDQsIDWwAWAtsDUsALEOBkVCsAFFY7gEAGIgsABQWLBA
+YFlmsAFjsAErsA5DY7gEAGIgsABQWLBAYFlmsAFjsAErsAAWtAAAAAAARD4jOLE0ARUqIS2wNiwg
+PCBHILAOQ2O4BABiILAAUFiwQGBZZrABY2CwAENhOC2wNywuFzwtsDgsIDwgRyCwDkNjuAQAYiCw
+AFBYsEBgWWawAWNgsABDYbABQ2M4LbA5LLECABYlIC4gR7AAI0KwAiVJiopHI0cjYSBYYhshWbAB
+I0KyOAEBFRQqLbA6LLAAFrAXI0KwBCWwBCVHI0cjYbEMAEKwC0MrZYouIyAgPIo4LbA7LLAAFrAX
+I0KwBCWwBCUgLkcjRyNhILAGI0KxDABCsAtDKyCwYFBYILBAUVizBCAFIBuzBCYFGllCQiMgsApD
+IIojRyNHI2EjRmCwBkOwAmIgsABQWLBAYFlmsAFjYCCwASsgiophILAEQ2BkI7AFQ2FkUFiwBENh
+G7AFQ2BZsAMlsAJiILAAUFiwQGBZZrABY2EjICCwBCYjRmE4GyOwCkNGsAIlsApDRyNHI2FgILAG
+Q7ACYiCwAFBYsEBgWWawAWNgIyCwASsjsAZDYLABK7AFJWGwBSWwAmIgsABQWLBAYFlmsAFjsAQm
+YSCwBCVgZCOwAyVgZFBYIRsjIVkjICCwBCYjRmE4WS2wPCywABawFyNCICAgsAUmIC5HI0cjYSM8
+OC2wPSywABawFyNCILAKI0IgICBGI0ewASsjYTgtsD4ssAAWsBcjQrADJbACJUcjRyNhsABUWC4g
+PCMhG7ACJbACJUcjRyNhILAFJbAEJUcjRyNhsAYlsAUlSbACJWG5CAAIAGNjIyBYYhshWWO4BABi
+ILAAUFiwQGBZZrABY2AjLiMgIDyKOCMhWS2wPyywABawFyNCILAKQyAuRyNHI2EgYLAgYGawAmIg
+sABQWLBAYFlmsAFjIyAgPIo4LbBALCMgLkawAiVGsBdDWFAbUllYIDxZLrEwARQrLbBBLCMgLkaw
+AiVGsBdDWFIbUFlYIDxZLrEwARQrLbBCLCMgLkawAiVGsBdDWFAbUllYIDxZIyAuRrACJUawF0NY
+UhtQWVggPFkusTABFCstsEMssDorIyAuRrACJUawF0NYUBtSWVggPFkusTABFCstsEQssDsriiAg
+PLAGI0KKOCMgLkawAiVGsBdDWFAbUllYIDxZLrEwARQrsAZDLrAwKy2wRSywABawBCWwBCYgICBG
+I0dhsAwjQi5HI0cjYbALQysjIDwgLiM4sTABFCstsEYssQoEJUKwABawBCWwBCUgLkcjRyNhILAG
+I0KxDABCsAtDKyCwYFBYILBAUVizBCAFIBuzBCYFGllCQiMgR7AGQ7ACYiCwAFBYsEBgWWawAWNg
+ILABKyCKimEgsARDYGQjsAVDYWRQWLAEQ2EbsAVDYFmwAyWwAmIgsABQWLBAYFlmsAFjYbACJUZh
+OCMgPCM4GyEgIEYjR7ABKyNhOCFZsTABFCstsEcssQA6Ky6xMAEUKy2wSCyxADsrISMgIDywBiNC
+IzixMAEUK7AGQy6wMCstsEkssAAVIEewACNCsgABARUUEy6wNiotsEossAAVIEewACNCsgABARUU
+Ey6wNiotsEsssQABFBOwNyotsEwssDkqLbBNLLAAFkUjIC4gRoojYTixMAEUKy2wTiywCiNCsE0r
+LbBPLLIAAEYrLbBQLLIAAUYrLbBRLLIBAEYrLbBSLLIBAUYrLbBTLLIAAEcrLbBULLIAAUcrLbBV
+LLIBAEcrLbBWLLIBAUcrLbBXLLMAAABDKy2wWCyzAAEAQystsFksswEAAEMrLbBaLLMBAQBDKy2w
+WyyzAAABQystsFwsswABAUMrLbBdLLMBAAFDKy2wXiyzAQEBQystsF8ssgAARSstsGAssgABRSst
+sGEssgEARSstsGIssgEBRSstsGMssgAASCstsGQssgABSCstsGUssgEASCstsGYssgEBSCstsGcs
+swAAAEQrLbBoLLMAAQBEKy2waSyzAQAARCstsGosswEBAEQrLbBrLLMAAAFEKy2wbCyzAAEBRCst
+sG0sswEAAUQrLbBuLLMBAQFEKy2wbyyxADwrLrEwARQrLbBwLLEAPCuwQCstsHEssQA8K7BBKy2w
+ciywABaxADwrsEIrLbBzLLEBPCuwQCstsHQssQE8K7BBKy2wdSywABaxATwrsEIrLbB2LLEAPSsu
+sTABFCstsHcssQA9K7BAKy2weCyxAD0rsEErLbB5LLEAPSuwQistsHossQE9K7BAKy2weyyxAT0r
+sEErLbB8LLEBPSuwQistsH0ssQA+Ky6xMAEUKy2wfiyxAD4rsEArLbB/LLEAPiuwQSstsIAssQA+
+K7BCKy2wgSyxAT4rsEArLbCCLLEBPiuwQSstsIMssQE+K7BCKy2whCyxAD8rLrEwARQrLbCFLLEA
+PyuwQCstsIYssQA/K7BBKy2whyyxAD8rsEIrLbCILLEBPyuwQCstsIkssQE/K7BBKy2wiiyxAT8r
+sEIrLbCLLLILAANFUFiwBhuyBAIDRVgjIRshWVlCK7AIZbADJFB4sQUBFUVYMFktAEu4AMhSWLEB
+AY5ZsAG5CAAIAGNwsQAHQrQAKxsDACqxAAdCtzAEIAgSBwMKKrEAB0K3NAIoBhkFAwoqsQAKQrwM
+QAhABMAAAwALKrEADUK8AEAAQABAAAMACyq5AAMAAESxJAGIUViwQIhYuQADAGREsSgBiFFYuAgA
+iFi5AAMAAERZG7EnAYhRWLoIgAABBECIY1RYuQADAABEWVlZWVm3MgIiBhQFAw4quAH/hbAEjbEC
+AESzBWQGAEREAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAYABgAGAJMAAAC
+TP/r/1YCTAAAAkz/6/9WAHkAeQBWAFYCTAAAAnoBwAAA/0sCTAAAAoEBwAAA/0sAGAAYABgAGAIT
+AOgCEwDoAAAAKgAqACoAKgBcAJYA/gEQASIBNAFGAWABcgGEAZYBqAG6AdQB5gH4AgoCHAIuAkAC
+UgJkAnYCiAKaAqwCxgLYAzADeAOKA5wDqAO6A8wECAQUBCYEOARABGoEdgSCBLgEygTcBO4FAAUS
+BSwFPgVQBWIFdAWGBZgFqgW8Bc4F4AXyBkwGXgZwBoIGsAcGBxgHKgc8B0gHWge+B+gH+ggMCCYI
+MghECFYIaAh6CIwIngiwCMII1AjmCPgJCgkcCVQJZgnqCfwKJAowCkIKTgpaCmwKeAqKCsYK/gsK
+CwoLHAsuCzoLjguaC6wL9gxgDHIMhAyWDKgMwgzUDOYM+A0KDRwNNg1QDWINdA2GDZgNqg28Dc4N
+4A3yDgQOFg4oDpwOrg7ADtIO5A7+D0YPshBWEGgQehCGEJgQqhEiETQRRhFSEbIRxBHQEfQSBhIY
+EiQSMBJ8ErwSzhLgEvITBBMWEygTOhNME14TcBOCE5QTphO4E8oT3BPuFAAUEhQkFE4UjhSgFLIU
+xBTWFQwVOhVMFV4VcBWCFZQVphW4FcoV/hYQFiIWNBaeFyIXLhc6F0YXXBdoF3QXgBeMF5gXrhe6
+F8YX0hfcGAQYFhgoGDoZKBk0GUAZUhlkGXYalBqmGq4iRiK8Isgi3iMmIzYjeCRGJFgksCS8JNYk
+4iUqJTYlXCVmJXYlsCXCJdQl5iX4JgomNCZEJlQmnCaoJrIm4CbyJv4nCicWJygnxCfMKB4oyijU
+KQopHCkuKUApUilkKi4qWCpoKngqkiqkKyIreCuqK/IsAiwOLCAsaCxyLIIsnCy2LL4tZi3eLegt
++C4ILhQuIC4sLoYuki6eLqouti7CLtgu5C7wLvwvDi8gLzIvRC9QL2Iv2i/qL/owDDAcMC4wSjC6
+MNYxLDE+MVQxxjI0MkYysDMEM1ozsDO8M8gz1DPgNFA0XDS2NRI1GjUoNYI1jDWcNaw1tDYUNkw2
+VjZmNnY2kjbON0I3TjdaN2Y3cjeEN/o4BDgQOCY4PDjgOOw4+DkEOSQ5cDmCOZQ51jocOiY6PDpY
+OmA6lDqmOrI6vjrKOtw67jsAOxI7LDs4O0o7XDtoO3o8ADxoPII8lDziPO49Ij2oPbo+OD7GPuQ+
+9j8CPw4/ID8sPzg/Tj+wQAJAYEBsQJpAtkDIQRhBIkEyQWBBpkIGQiBCTkKOQqpC4kLuQzhDOENE
+Q1BDpkQQRCBEMEQ8RDxErkTARTJFTkWURaBFrEW4RcRF2kXmRfJF/kYQRiJGPEZWRmhG9kcAR1pH
+Zkd4R4pHlkeoR7RHxkfYR+RH9kgISCZIMEhASFBIYEhwSIBIkkiiSLJIxEjQSOJI/ElYSaBJ1Eng
+ShZKfEseS0BLTktWTDZMpE0gTWpNlE2qTbJN3k44TtBPak92T4JPkk+eT65P2k/iUBBQaFB6UK5Q
+wFDMUN5Q+FEaUSRRelGMUd5R5lJuUsxS2FLkUvBTUlNeU2pTdlPqU/xUJFQuVD5UTlS4VMJU0lTw
+VRBVIlUqVXxVnFW8VfpWPlZQVmJWblZ6VthXXFdmV3ZXhleWV6ZXsFf6WBRYaFhyWIJYkljOWNpY
+5ljyWQRZFlkoWTRZRllYWWRZdlmCWZRZplmyWcRZ1ln2WghaFFomWk5ajlqaWqZauFrEWxRbclum
+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
+AC8AAAEHARwClwCMAAixAQKwjLA1KwAA//8AUAAAAuoDwAImAC8AAAEHAR0ClwCMAAixAQKwjLA1
+KwAA//8AUAAAAuoDJgImAC8AAAEHASkCzgBuAAixAQKwbrA1KwAA//8AUAAAAuoC9gImAC8AAAEH
+AS8C4QBuAAixAQKwbrA1KwAA//8AUAAAAuoC9gImAC8AAAEHATUCewCCAAixAQGwgrA1KwAA//8A
+UP9XAuoCTAImAC8AAAEHATYCiv/2AAmxAQG4//awNSsA//8AUAAAAuoDJgImAC8AAAEHAXsCagCM
+AAixAQGwjLA1KwAA//8AUAAAAuoDSgImAC8AAAEHAYYCVgCCAAixAQGwgrA1KwAA//8AUAAAAuoD
+CAImAC8AAAEHAQcCjQBQAAixAQGwULA1KwAA//8AUAAAAuoC2gImAC8AAAEHAbgCXwB4AAixAQGw
+eLA1KwAAAAEAUP9QAuoCTAAfAExASRMBAgQEAQEDAwEAAQNMAAIEBQQCBYAABQMEBQN+BgEEBCJN
+AAMDI00AAQEAYgcBAAAnAE4BABoZGBcVFBIREA8IBgAfAR4ICBYrBSImJzcWFjMyNjU0JicBJyMR
+IxEnMwEXMxEzERQGBiMCOyVBEhUOLhkbIRkU/tMnCoQKkAFUJwuELkkrsBEKQgQJHB4ZKhQBOS/+
+ZwH8UP6cNgGa/ZY3QBsA//8AUP9dAuoCTAImAC8AAAEHAd8DNAAUAAixAQGwFLA1KwAA/////gAA
+AuoCTAImACcAAAEHAjsB6AA9AAixAgGwPbA1KwAA//8AUAAAAuoDDgImAC8AAAEHAkoCggCCAAix
+AQGwgrA1KwAAAAEAUAAAAsACTAAKAC9ALAEBAQABTAACAAMEAgNnAAEBAF8AAAAiTQUBBAQjBE4A
+AAAKAAoRERESBggaKzMRJyEVIRUhFSEVWgoCcP4eAXb+igH8UGCSY/cAAAAAAQBGAAAC3wJNACUA
+P0A8HgEDBCIhAgADAkwABQAEAwUEZwACAgFfAAEBIk0AAwMAXwYBAAAjAE4BACAfHRwbFhIOCgcA
+JQEkBwgWKzMiJiY1NTQ2MyEyFhUHJiYjIyIVFRQWMzMyNjc1Bwc1IREXFAYj/UdQIFZhAS1FSRQR
+p58zUCMtKWCEKzyDAUIKVGQoUDvfYFsPCFMDB0f/IiUDAYgBCmL+5xUIDQAA//8ARgAAAt8DHQIm
+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
+AoQAjAAIsQEBsIywNSsAAP//ADz+6QK4AkwCJgCdAAAABwEhAngAAAABABQAAAKiAk0ABwAhQB4C
+AQAAAV8AAQEiTQQBAwMjA04AAAAHAAcREREFCBkrIQMhNSEVIREBGQH+/AKO/vsB7WBg/hMAAP//
+ABQAAAKiAk0CJgCkAAABBwI7AnMAPQAIsQEBsD2wNSsAAP//ABQAAAKiAyECJgCkAAABBwEPAjcA
+jAAIsQEBsIywNSsAAP//ABT/JAKiAk0CJgCkAAAABwEWAOMAAP//ABT+6QKiAk0CJgCkAAAABwEh
+AlAAAAACAFAAAALBAnUAFQAfADlANgEBAQAUAQIEAkwAAQAFBAEFZwAEAAIDBAJnAAAAJE0GAQMD
+IwNOAAAfHRgWABUAFUkhEgcIGSszESczFSEyHgIVFRQOAiMjIiYnFTUhMjY1NTQmIyFaCo4BXzI2
+FwUFGDYxmD9tGwEvEh4fEf7RAiVQeBwqKw9uEiwoGgYCl+8UFF4UFAAAAAEAQf/2Ar0CTAAUAD5L
+sDJQWEASAwEBASJNAAICAGAEAQAAIwBOG0APAAIEAQACAGQDAQEBIgFOWUAPAQAPDgsIBQQAFAET
+BQgWKxciJjURMxEUFjMzMjY1ETMRFAYGI+RbSIQuItQgMIQeRj4KYlEBo/5ZLyAhLgGn/l02UC3/
+/wBB//YCvQMcAiYAqgAAAQcA4wLkAIIACLEBAbCCsDUrAAD//wBB//YCvQMTAiYAqgAAAQcBAgJ7
+AIIACLEBAbCCsDUrAAD//wBB//YCvQMIAiYAqgAAAQcBGQKBAIIACLEBAbCCsDUrAAD//wBB//YC
+vQMcAiYAqgAAAQcBKQK8AGQACLEBArBksDUrAAD//wBB//YCvQLsAiYAqgAAAQcBLwLPAGQACLEB
+ArBksDUrAAD//wBB/1cCvQJMAiYAqgAAAQcBNgJs//YACbEBAbj/9rA1KwD//wBB//YCvQMcAiYA
+qgAAAQcBewJYAIIACLEBAbCCsDUrAAD//wBB//YCvQNAAiYAqgAAAQcBhgJEAHgACLEBAbB4sDUr
+AAD//wBB//YDWwLQAiYAqgAAAQcBhwKPAOYACLEBAbDmsDUrAAD//wBB//YDWwMmAiYAswAAAQcA
+4wL7AIwACLECAbCMsDUrAAD//wBB/1cDWwLQAiYAswAAAQcBNgJx//YACbECAbj/9rA1KwD//wBB
+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
+IwEhNTQmJiMjIhUFMzI2NTU0JiMjIgYVFBa9TERHSTMyYUkORFAUSHEaDBFnWyAzViENNC3XQksf
+r1pxEwExMzZnVhooxcklMQ4xilABZQETCSw1eTD+gscdHzhLgBsVGEc+QUYEDg8lKy8HA08HChQV
+ERgZOC+UCAE3KAMFAkEfDw0PDQECQBQQBCjsCBURGiIaHBwYAAD//wAtAAAD7AKaAiYA5wAAAAcA
+4wN0AAD//wAtAAACVAKaAiYA0wAAAAcBewIxAAD//wAtAAACVAK+AiYA0wAAAQcBhgId//YACbEC
+Abj/9rA1KwD//wAtAAACVAJ8AiYA0wAAAQcBBwJU/8QACbECAbj/xLA1KwD//wAtAAACVAJOAiYA
+0wAAAQcBuAIm/+wACbECAbj/7LA1KwAAAgBQ//YDEAJNAEUAVQFMS7AVUFhADxABBQM/NgIHCAMB
+AAYDTBtADxABBQM/NgIHCAMBAQYDTFlLsA5QWEA7AAMEBQQDcgAIBQcFCAeAAAYHAAcGAIAABAQC
+XwACAiJNAAUFAGEBCQIAACNNCgEHBwBhAQkCAAAjAE4bS7AVUFhAPAADBAUEAwWAAAgFBwUIB4AA
+BgcABwYAgAAEBAJfAAICIk0ABQUAYQEJAgAAI00KAQcHAGEBCQIAACMAThtLsDJQWEA5AAMEBQQD
+BYAACAUHBQgHgAAGBwEHBgGAAAQEAl8AAgIiTQoBBwcBXwABASNNAAUFAGEJAQAAIwBOG0A2AAME
+BQQDBYAACAUHBQgHgAAGBwEHBgGAAAUJAQAFAGUABAQCXwACAiJNCgEHBwFfAAEBIwFOWVlZQB1I
+RgEAUE5GVUhVQkE4NykmIyEaFwkGAEUBRQsIFisFIiYnDgIjIyImJjU1NDY3JiY1NTQ2NjMzMh4C
+FRUUBiMjNTQmIyMiBhUUFhcWFhceAhc3NRcVFAYHBgYHFhYzBwYGJTMyNjcmJicmIyIGFRUUFgK7
+NEYjEjFSQlQ+Rx4+OgsVGz42aDI2FwUTEFUQFDEWExgfJEcfECYgBQqNCxEQIBAjTxoMCCf+QH0p
+IQIZRiwmIhohIAogHQwXDyhIMCJOVA0OLyIOGDMjFyQmDyURDzERExMRHCEXGTMcDiUgBgeyClQV
+IBEQIBAiHkgEB3gOAhhGJB8jHiolIQAAAP//AC3/UwJ6AcACJgDTAAABBwHfAtsACgAIsQIBsAqw
+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
+DAlpFAEQGR4QWSsBHgoZHlkgARktARYEGRZpRQEsABEXLBFpRy9GLiklBhcxQyQcGkAGEycXE2kA
+Ow85O1lJATQ/AQ9AGDA0D2lIATBEASY5MCZpADs7OWEAOTs5URtA/wACDAMMAgOAAAcDBgMHcgAG
+AQMGcCooAhgZIhkYIoAAIh4ZIh5+AAoeFh4KFoAABBYLFgQLgB8BCx0WCx1+AB0sFh0sfgAVLBEs
+FRGAABIXCBcSCIA1QiMhPg4NPQgIExcIE34AJxM0Eyc0gAAzNDI0MzKAADIbNDIbfkEBGzs0Gzt+
+ADcwJjA3JoAAOjk4OTo4gAA4Njk4Nn5KATY8OTY8fksBPDyEAAUAAwcFA2kAAAABCQABaQAMAAkQ
+DAlpFAEQGR4QWSsBHgoZHlkgARktARYEGRZpRQEsABEXLBFpRy9GLiklBhcxQyQcGkAGEycXE2kA
+Ow85O1lJATQ/AUAZDzA0D2lIATBEASY5MCZpADs7OWEAOTs5UVlZWVlBsQHmAeUBvQG8AbEBsAGX
+AZYBjQGMAXwBfAFvAW8BSAFHAS8BLgEiASIA5QDlAMQAwwCRAJAAWABYAB8AHwHlAfUB5gH1Ad4B
+3AHYAdYB1QHTAdABzwHKAcgBvAHkAb0B5AG2AbUBsAG7AbEBuwGrAakBqAGmAZ8BnQGWAa8BlwGv
+AYwBlQGNAZUBfAGLAXwBiwGEAYMBbwF7AW8BewF2AXQBZgFlAWIBYAFcAVsBTwFNAUcBbgFIAW4B
+QQFAAS4BRgEvAUYBIgEtASIBLQEpAScBHwEdARkBFwERAQ8BDAELAQcBBgD+AP0A5QD8AOUA+wD1
+APMA7gDsAOkA6ADgAN8A2QDYANIA0ADLAMkAwwDkAMQA5AC8ALoAtQCzAKoAqACQAMIAkQDCAFgA
+jwBYAI8AhgCFAH8AegBwAG4AawBqAGEAXgAfAFcAHwBXABIANwBaAC4AOwA1ACcAKABMAAYAHisB
+IiYnJjY3NjYzMhYXFhYVFAYjIiYmNzYmIyMGBhUUATcRNDY3NSImIyIGBwYGBxQWFxYWFw4CIyIm
+NTQ2NzY2NzY2MzIWFjM3FhYGBwYGIyIuAiMRFyE3ETQ2NzUjIgYHBgYHFBYXFhYzFAYGIyImNTQ2
+NzY2NzY2MzIWFhcVFxM3ERcjNxEjAwcDIxEXBSImNTQ2Njc2JicmJjU0NjcuAjU0NjY3FzIeAhUU
+BgcGBiMiBhUUFhYzMhYWFRQGBiUiJjU0NjYzMhYXFhYVIyImNzcuAiMGBhUUFhYzNxUGBgU3ESc3
+FzY2MzIWFhUUBiMiJicVFAYGIyUiJjU0Njc+AjM1NCYmIxUGBiMiJicmJjc3MzIWFRUXIyImJwU3
+EScyFjMyNjcRFwUiJjU0Njc2NjcWBgcGBhUUFhYzNxUOAgEiJiY1NDYzMhYXNiYnJiY1NTQ2NTMH
+FRQWMzI2NxEzBxUUBgYHBgYBNjY1NCYjIgcVFBYWBTM2NjU0JiYjBgYHFR4CITI2NzUnBhUUFgEy
+NjY1NQYGIyIGFxYWFRQGIyImIyIGFRQWJTI1NCYmIwYGFRQWASImJicmJicmNjc2NjMyFhYXFhYz
+NjYmIyIGIyM2Njc2MzIWFhUUBgYHIiY1NDc2NjMGFhcWFhcUBgcHBxcDCCAkFDwhDhoNKCM4KSAk
+BwsGBRECGzUDHggcCRQyGxgyFxogBRsTDiYNAxYmGyk6ExMXDQkSPiw9nKVIlggDBggLKSwfUE89
+DRP2PQgLBCkZOhQZIQUHEA0pDhEiHCsxERkXGQoRPi0dUlMfdoejFrIICFtKqQgVBLdabSErDgsD
+CxIbIAwQHRIeKxR7GzgwHh8WHFAsIBsNKy02WzZAbAmrfoc9Yzk1YBcYCLYNBQY1BiImDg8gJ0Am
+eQlA/LsXCGQlETArNlczbl8cLw4bJhD200lEEhMXR1MoHy0VBxcOEiULEAgCTHRcTxdbFxkFAosH
+BwIZEhY1FhYBFm11TDQNFQoFAw0ICyQ9I1oFLDsCgzNXNTw6ECEGCQMjIyIBjgkvHxcjB40IDB0a
+KXH6Yg0UJhocFholB+EIDh0cLhoLGwkOJSP2WRIqCGAUGgdrJzsiBTMpHxMdCAsLCw0PDgwTIvqS
+RCc4HAQIJAe5ID5QPDAvFAYDCw4jEhctQjNEZRkMAR0iGUIVDAUqHygzIjwmQmnRKCYcDhwGDBMX
+EhMDJwHoFBMsTh4QFAMFDTghLjYbIwsGDgEwNQj+GEMBgSgqCAcDBAYHFggSKhMOGgcRJRo0NiNC
+ExcuEiMVBwgXDSsqDBEZBQgF/jtZQwFvEh0EBwMGCBYHBBgPDQsVLSAzJRQ2GRcsEiMVAgICVvcB
+QA/9/FlDAUn+zVkBZf71WuI5MRchHA4LHgwSIRYXJQwRIzQnHTYtDgEMHjgtLTwTGRgVDwoPCBQ3
+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
+AB4bFiEYIQsIABUBFAYIFiszIiY1NTQ+AjMhMh4CFRUUDgIjJzMyNTU0IyMiFRUUtkNBBRc3MQEU
+MjYXBQUYNjHuyDExyDA2Pc0PKyocHCorD8ASLCgaVijEKCjEKAAA//8AMgAAAk4CmgImAc8AAAAH
+AOMCowAA//8AMgAAAk4CkQImAc8AAAAHAQICOgAA//8AMgAAAk4ChgImAc8AAAAHARkCQAAA//8A
+MgAAAk4DTAImAc8AAAAHARoCPQAA//8AMv9XAk4ChgImAc8AAAAnATYCLf/2AQcBGQJAAAAACbEC
+Abj/9rA1KwD//wAyAAACTgNMAiYBzwAAAAcBGwI9AAD//wAyAAACTgNwAiYBzwAAAAcBHAJEAAD/
+/wAyAAACTgM0AiYBzwAAAAcBHQJEAAD//wAyAAACTgKaAiYBzwAAAQcBKQJ7/+IACbECArj/4rA1
+KwD//wAyAAACTgJqAiYBzwAAAQcBLwKO/+IACbECArj/4rA1KwD//wAyAAACTgLmAiYBzwAAACcB
+LwKO/+IBBwG4AgwAhAARsQICuP/isDUrsQQBsISwNSsA//8AMgAAAk4C5gImAc8AAAAnATUCKP/2
+AQcBuAIKAIQAEbECAbj/9rA1K7EDAbCEsDUrAP//ADL/VwJOAcACJgHPAAABBwE2Ai3/9gAJsQIB
+uP/2sDUrAAADADIAAAPkAcAALgA9AEcAWEBVDwEHATQBCAczAQQDKyUCAAQETAAIAAMECANnCQEH
+BwFfAgEBASVNCwYCBAQAXwUKAgAAIwBOMS8BAEZDPz45Ni89MT0pJiMeHBgUEQ0KAC4BLQwIFisz
+Ii4CNTU0PgIzMzIWFzY2MzMyFhYVFSMiJicVBjMzMjY2NxcUIyMiJicGBiMnMzI2NzUmJiMjIgYV
+FQYlITU0JiYjIyIVtzI3FwUFFzcywCk+Fw8vI9dCSx+vWnETATEzNmdWGijFySIuDxdAKZuyIh4E
+BBwksRoWAQGgARMJLDV5MBooLBLADysqHA8MDA8ZOC+UCAE3KAMFAkEfDQsMDFYUF7sXFxQUxCis
+QBQQBCgA//8AHv9JAOkACwAHAd8BSgAAAAAAAf7U/0n/nwALABkAY7EGZES1CgEDAQFMS7AKUFhA
+HAABAwIBcAADAgOFAAIAAAJZAAICAGIEAQACAFIbQBsAAQMBhQADAgOFAAIAAAJZAAICAGIEAQAC
+AFJZQA8BABUTEhAJCAAZARkFCBYrsQYARAciJjU0NjY3NhYVFA4CFRQzMjYzMgYHBgbNLjEbJA0a
+KxYeFiUhIg8NBAsLLLc0Ih4pGQQIAgkHDBEaFB8TGxERHAD//wAyAAACTgKaAiYBzwAAAAcBewIX
+AAD//wAyAAACTgK+AiYBzwAAAQcBhgID//YACbECAbj/9rA1KwD//wAyAAAC2AHgAiYBzwAAAQcB
+hwIM//YACbECAbj/9rA1KwD//wAyAAAC2AKaAiYB4gAAAAcA4wKnAAD//wAy/1cC2AHgAiYB4gAA
+AQcBNgIt//YACbEDAbj/9rA1KwD//wAyAAAC2AKaAiYB4gAAAAcBewIbAAD//wAyAAAC2AK+AiYB
+4gAAAQcBhgIH//YACbEDAbj/9rA1KwD//wAyAAAC2AKCAiYB4gAAAQcCSgIz//YACbEDAbj/9rA1
+KwD//wAyAAACTgKQAiYBzwAAAAcBiQJnAAD//wAyAAACTgJ8AiYBzwAAAQcBBwI6/8QACbECAbj/
+xLA1KwD//wAyAAACTgJOAiYBzwAAAQcBuAIM/+wACbECAbj/7LA1KwAAAQAUAAABFwJWAAUAGUAW
+BAIBAwBKAQEAACMATgAAAAUABQIIFiszEQcnJRGTeAcBAwHsCVUe/aoAAAD//wAKAAAAjAErAA4B
+6wAAIAAAAP//ABQBHQCWAkgBDwHrAAoBHSAAAAmxAAG4AR2wNSsA//8AFP+wAzYCTAAmAe0AAAAn
+AXEA5QAAAAcBSwHzAAD//wAU/7ADJwJMACYB7QAAACcBcQDlAAAABwJNAfMAAP//ABT/sANBAkwA
+JgHtAAAAJwFxAOUAAAAHAW4B8wAA//8AFADoAJYCEwEPAesACgDoIAAACLEAAbDosDUrAAD//wAy
+/2MCXAHAAiYBzwAAAQcB3wK9ABoACLECAbAasDUrAAD//wAtAUoBQAIqAQ8A0wAWAUogAAAJsQAC
+uAFKsDUrAP//ADIBSgFAAioBDwHPABkBSiAAAAmxAAK4AUqwNSsA//8AMv+HAk4CIwImAc8AAAEH
+AjYCRv/XAAmxAgG4/9ewNSsA//8AMv+HAk4CmgImAfUAAAAHAOMCmQAA//8AMgAAAk4CggImAc8A
+AAEHAkoCL//2AAmxAgG4//awNSsA//8AMgAAAk4DDgImAc8AAAAnAkoCL//2AQcBuAIMAKwAEbEC
+Abj/9rA1K7EDAbCssDUrAAACADz/RgJYAcAAFwAnAEJAPwMBBQAkAQQFFgECBANMAAUFAGEBAQAA
+JU0HAQQEAmEAAgIjTQYBAwMnA04aGAAAIx8YJxonABcAF0lCEQgIGSsXETMXNjYzMzIeAhUVFA4C
+IyMiJicVEzMyNjU1NiYjIyIGBxUUFjxSGS19UDMyNhcFBRc2MjNMdikf2RMdARcaMkBjIwm6AnoN
+BQgaKCwSwA8rKhwIBMYBEBQUxBYSBQPtFgkAAAAAAf6z/0z/mQADABIAULEGZERLsApQWEAXAAIB
+AQJwAAEAAAFZAAEBAGIDAQABAFIbQBYAAgEChQABAAABWQABAQBiAwEAAQBSWUANAQAPDgoIABIB
+EgQIFiuxBgBEByImJyY2FxYWMzI2NjU1MxUUBtMmPw4HDQ8OJBsYEgJRPLQiGg4TAwMRHiwUEzs9
+PwAAAQBQ/7ACXgJMAA8ALkArCgEDAUsAAAMCAwACgAUEAgIChAADAwFfAAEBIgNOAAAADwAPERIl
+EQYIGisXESImNTU0NjMhBxEjESMRwzc8Nj0BmxSEf1ABfjRCMjc/YP3EAjz9xAAAAP//AAT/sADq
+ApsARwH9ARIAAMAAQAAAAAABACj/sAEOApsAFAAlQCIKAQIBAAFMAAABAQBZAAAAAWECAQEAAVEA
+AAAUABQbAwgXKxcnPgI1NC4CJzcyHgIVFA4COREbLBsRHCMSETtRMhcXMlFQMhpNf2dNaUUtEjI5
+ZYNLSIluQAAAAAACACj/9gI2AvQAIAAsAEdARBQBAQIMAQUBAkwAAwACAQMCaQABAAUEAQVpBwEE
+AAAEWQcBBAQAYQYBAAQAUSIhAQAoJiEsIiwZFxEPCQcAIAEgCAYWKxciJiY1NDY2MzIWFhc2JiYj
+IgYGBzQ2NjMyFhYVFA4CJzI2NTQmIyIGFRQW8zxbNEBtRSlBKAUGJltLKkcxDThgPViESS9Vdx43
+SkE7Nz9FCjtpRU1nNBogCkp1RBUXBSpJLFahc1aTbj1pT0QsRUg+OkQAAAAFADwAAANEAkwABQAZ
+ACkAPQBNAGVAYicfAgQFS0MCCAkCTAwBBAsBAgcEAmcABwAJCAcJagAFBQBfAwEAACJNDgEICAFf
+DQYKAwEBIwFOQD4rKhwaBwYAAEhFPk1ATTUyKj0rPCQhGikcKREOBhkHGAAFAAUSDwgXKzMBNzMB
+BwMiJiY1NTQ2NjMzMhYWFRUUBgYjJzMyNjU1NCYjIyIGFxUGFgEiJiY1NTQ2NjMzMhYWFRUUBgYj
+JzMyNjU1NCYjIyIGFxUGFt0BOAyD/sgMyCwnCQgmLm0sJwkJJyxZRQsJCQtFDAkBAQkB2ywnCQgm
+Lm0sJwkJJyxZRQsJCQtFDAkBAQkCGTP95TEBNRgoGGcUKRsbKRRnGCgYTQ0HVgcNDQdWBw3+fhgo
+GGcUKRsbKRRnGCgYTQ0HVgcNDQdWBw0AAAABAFAAAADfAIIACwAaQBcAAQEAYQIBAAAjAE4BAAcF
+AAsBCwMIFiszIiY1NDYzMhYVFAaXJSIhJiYiIh4jJB0dJCIf//8AUADcAN8BXgMHAgAAAADcAAix
+AAGw3LA1K///AFAA3ADfAV4CBgIBAAAABwA8AAAEiwJMAAUAGQApAD0AUQBhAHEAhkCDJx8CBAVX
+AQ0Lb2dfAwoNA0wQAQQPAQIHBAJnAAcACw0HC2oACQANCgkNaQAFBQBfAwEAACJNFAwTAwoKAV8S
+CBEGDgUBASMBTmRiVFI/PisqHBoHBgAAbGlicWRxXFlSYVRhSUY+UT9QNTIqPSs8JCEaKRwpEQ4G
+GQcYAAUABRIVCBcrMwE3MwEHAyImJjU1NDY2MzMyFhYVFRQGBiMnMzI2NTU0JiMjIgYXFQYWASIm
+JjU1NDY2MzMyFhYVFRQGBiMzIiYmNTU0NjYzMzIWFhUVFAYGIyUzMjY1NTQmIyMiBhcVBhYhMzI2
+NTU0JiMjIgYXFQYW3QE4DIP+yAzILCcJCCYubSwnCQknLFlFCwkJC0UMCQEBCQHbLCcJCCYubSwn
+CQknLO4sJwkIJi5ZLCcJCScs/mBFCwkJC0UMCQEBCQFnMQsJCQsxDAkBAQkCGTP95TEBNRgoGGcU
+KRsbKRRnGCgYTQ0HVgcNDQdWBw3+fhgoGGcUKRsbKRRnGCgYGCgYPxQpGxspFD8YKBhNDQdWBw0N
+B1YHDQ0HLgcNDQcuBw0AAAIAUAAAAxcCTQAZACMAdUAKBQEIAhgBBQcCTEuwHlBYQCUABwAFBgcF
+aQAICAJfAAICIk0EAQAAAV8DAQEBJU0JAQYGIwZOG0AjAwEBBAEABwEAZwAHAAUGBwVpAAgIAl8A
+AgIiTQkBBgYjBk5ZQBMAACMhHBoAGQAZRBEUIhERCggcKzMRIzUzNSchMh4CFzMVIw4DIyMiJicV
+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
+Anv/4gAJsQECuP/isDUrAP//ADwAAAJEAmoCJgJQAAABBwEvAo7/4gAJsQECuP/isDUrAP//ADz/
+VwJEAcACJgJQAAABBwE2Ai3/9gAJsQEBuP/2sDUrAP//ADwAAAJEApoCJgJQAAAABwF7AhcAAP//
+ADwAAAJEAr4CJgJQAAABBwGGAgP/9gAJsQEBuP/2sDUrAP//ADwAAALYAkQCJgJQAAABBwGHAgwA
+WgAIsQEBsFqwNSsAAP//ADwAAALYApoCJgJZAAAABwDjApkAAP//ADz/VwLYAkQCJgJZAAABBwE2
+AiP/9gAJsQIBuP/2sDUrAP//ADwAAALYApoCJgJZAAAABwF7Ag0AAP//ADwAAALYAr4CJgJZAAAB
+BwGGAfn/9gAJsQIBuP/2sDUrAP//ADwAAALYAoICJgJZAAABBwJKAiX/9gAJsQIBuP/2sDUrAP//
+ADwAAAJEApACJgJQAAAABwGJAmcAAP//ADwAAAJEAnwCJgJQAAABBwEHAjr/xAAJsQEBuP/EsDUr
+AP//ADwAAAJEAk4CJgJQAAABBwG4Agz/7AAJsQEBuP/ssDUrAAABAFD/sAIwAAAAAwAmsQZkREAb
+AAABAQBXAAAAAV8CAQEAAU8AAAADAAMRAwgXK7EGAEQXNSEVUAHgUFBQAAD//wA8/1MCbAHAAiYC
+UAAAAQcB3wLNAAoACLEBAbAKsDUrAAD//wA8AAACRAK5AiYCUAAAAAcCHwI0AAD//wA8AAACRAKC
+AiYCUAAAAQcCSgIv//YACbEBAbj/9rA1KwAAAQAKAAACRAHAAAoAIUAeAgEAACVNAAEBA18EAQMD
+IwNOAAAACgAKEhIRBQgZKzMDMxMXMzcTMwcD2M6McxoKGnWIELwBwP7sSEgBFD3+fQABAAoAAANT
+AcAAFgAtQCoABgYAXwQCAgAAJU0DAQEBBV8IBwIFBSMFTgAAABYAFhISEhISEhEJCB0rMwMzFxcz
+NxMzExczNzczBwMjAycjBwOroYxRGgoPRaBJDgobTIwQkKBTCgoMVQHA/llPAQj++E9b/D3+fQET
+Ly/+7QAA//8ACgAAA1MCmgImAmcAAAAHAOMDEgAA//8ACgAAA1MChgImAmcAAAAHARkCrwAA//8A
+CgAAA1MCagImAmcAAAEHAS8C/f/iAAmxAQK4/+KwNSsA//8ACgAAA1MCmgImAmcAAAAHAXsChgAA
+AAIAKAAAArYCTAAQACAAObEGZERALgABAAMCAQNnBQECAAACVwUBAgIAXwQBAAIATxMRAQAbGBEg
+EyAKBwAQAQ8GCBYrsQYARDMiJiY1ETQ2MyEyFhURFAYjJSEyNjURNCYjISIGFREUFso9Rx5HWwFG
+X0dOWP66AUZBKipB/ro+KCgmQysBGFBQUFD+6ENRPDImARgvNTIy/ugoMAAAAAABADwAAAP7AksA
+JABKQEcLAQEKAQIDAQJoCQEDCAEEBQMEZwAGBgBfDgwCAAAiTQ8BDQ0FXwcBBQUjBU4kIyEgHh0c
+GxoZGBcWFRESEhERERESEBAIHysBMwcHMxUjBzMVIwcjAycjBwMjJyM1MycjNTMnMxMzNxMzExcz
+A0CMCidgfxSTsS6WYAoKCV6WK6yPE35hN4x8Cg1SglkSCgJLPH1gQWCRAWE2Nv6fkWBBYLn+UUQB
+av6WRAAAAAEACgAAAjoBwAAPAC5AKwoCAgQBAUwAAQAEAwEEZwIBAAAlTQYFAgMDIwNOAAAADwAP
+ERMRERMHCBsrMzc3JzMXMzczBwcXIycjBwoUrcGYegp8mBC3x5l7Cnooud+bmyC/4ZaWAAAAAf/Y
+/zwCRQHAAB4AaEAKBAEBAgMBAAECTEuwIVBYQB8ABAMCAwQCgAUBAwMlTQACAiNNAAEBAGIGAQAA
+JwBOG0AcAAQDAgMEAoAAAQYBAAEAZgUBAwMlTQACAiMCTllAEwEAFBMREA4NDAsJBgAeAR0HCBYr
+FyImJzcWFjMzMjY3IwMzExczNxMzBw4DBw4CI2YwUA4eET8oCy5HEzLEjHMaChp1iBATMTQxEx1F
+WT3EFglaBxM3LgHA/uxISAEUPSdlbGQnPFgwAAD////Y/zwCRQKaAiYCbwAAAAcA4wKGAAD////Y
+/zwCRQKGAiYCbwAAAAcBGQIjAAD////Y/zwCRQJqAiYCbwAAAQcBLwJx/+IACbEBArj/4rA1KwD/
+///Y/zwCRQHAAiYCbwAAAQcBNgLO//YACbEBAbj/9rA1KwAAAQAUAAAC4gJMABsAP0A8BwEDCAEC
+AQMCaAkBAQoBAAsBAGcGAQQEIk0ABQULXwwBCwsjC04AAAAbABsaGRgXERISEhEREhERDQgfKyE1
+IzUzNScjNTMnMxcXMzc3MwcHMxUjBzMVIxUBN8zMNpZFnKCULgoulKAnbzyROcrNkmABQGC5vD4+
+vDx9YEFgkgD////Y/zwCRQKaAiYCbwAAAAcBewH6AAD////Y/zwCRQK+AiYCbwAAAQcBhgHm//YA
+CbEBAbj/9rA1KwD////Y/zwCRQJOAiYCbwAAAQcBuAHv/+wACbEBAbj/7LA1KwD////Y/zwCRQKC
+AiYCbwAAAQcCSgIS//YACbEBAbj/9rA1KwAAAQAoAAACTQHAAAwAMEAtBgEAAQkBAgMCAkwAAAAB
+XwABASVNAAICA18EAQMDIwNOAAAADAALEhESBQgZKzM1ASE1IRUBIRcUBiMoAUP+0QHq/rQBVR48
+RzwBLVc8/tJLBAcA//8AKAAAAk0CmgImAnkAAAAHAOMCngAA//8AKAAAAk0ClQImAnkAAAAHAQ8C
+FwAA//8AKAAAAk0CagImAnkAAAEHATUCI//2AAmxAQG4//awNSsAAAIAUAAAAqQCTAASACIALUAq
+AAMDAV8AAQEiTQUBAgIAXwQBAAAjAE4VEwEAHRoTIhUiCwgAEgERBggWKyEiJiY1NTQ2NjMzMhYW
+FRUUBiMnMzI2NTU0JiMjIgYVFRQWAQdGUCEgUEfnRk8hTmjKriUpKiSuJCwrKFA75zpPKSlPOudY
+W2AmIf8dKSYg/yIl//8AKAAAAVIBJgAOAn0AACAAAAD//wA3AR0BYQJDAQ8CfQAPAR0gAAAJsQAC
+uAEdsDUrAP//AFAAAAKkAkwAJgJ9AAABDwI3AwQAVk1xAAixAgGwVrA1K///AFAAAAKkAkwCJgJ9
+AAABDwI3Aw0AYU1xAAixAgGwYbA1KwAAAAwAlgADAAEECQAAAKIAAAADAAEECQABAA4AogADAAEE
+CQACAA4AsAADAAEECQADADQAvgADAAEECQAEAB4A8gADAAEECQAFAEYBEAADAAEECQAGAB4BVgAD
+AAEECQAJAB4BdAADAAEECQALABgBkgADAAEECQAMAB4BqgADAAEECQANASIByAADAAEECQAOADYC
+6gBDAG8AcAB5AHIAaQBnAGgAdAAgADIAMAAxADgAIABUAGgAZQAgAEcAbwBsAGQAbQBhAG4AIABQ
+AHIAbwBqAGUAYwB0ACAAQQB1AHQAaABvAHIAcwAgACgAaAB0AHQAcABzADoALwAvAGcAaQB0AGgA
+dQBiAC4AYwBvAG0ALwBtAGEAZwBpAGMAdAB5AHAAZQAvAGcAbwBsAGQAbQBhAG4AKQBHAG8AbABk
+AG0AYQBuAFIAZQBnAHUAbABhAHIAMQAuADAAMAAwADsATgBPAE4ARQA7AEcAbwBsAGQAbQBhAG4A
+LQBSAGUAZwB1AGwAYQByAEcAbwBsAGQAbQBhAG4AIABSAGUAZwB1AGwAYQByAFYAZQByAHMAaQBv
+AG4AIAAxAC4AMAAwADAAOwAgAHQAdABmAGEAdQB0AG8AaABpAG4AdAAgACgAdgAxAC4AOAAuADMA
+KQBHAG8AbABkAG0AYQBuAC0AUgBlAGcAdQBsAGEAcgBKAGEAaQBrAGkAcwBoAGEAbgAgAFAAYQB0
+AGUAbABtAGEAZwBpAGMAdAB5AHAAZQAuAGkAbgBoAHQAdABwADoALwAvAGoAYQBpAGsAaQAuAGkA
+bgBUAGgAaQBzACAARgBvAG4AdAAgAFMAbwBmAHQAdwBhAHIAZQAgAGkAcwAgAGwAaQBjAGUAbgBz
+AGUAZAAgAHUAbgBkAGUAcgAgAHQAaABlACAAUwBJAEwAIABPAHAAZQBuACAARgBvAG4AdAAgAEwA
+aQBjAGUAbgBzAGUALAAgAFYAZQByAHMAaQBvAG4AIAAxAC4AMQAuACAAVABoAGkAcwAgAGwAaQBj
+AGUAbgBzAGUAIABpAHMAIABhAHYAYQBpAGwAYQBiAGwAZQAgAHcAaQB0AGgAIABhACAARgBBAFEA
+IABhAHQAOgAgAGgAdAB0AHAAcwA6AC8ALwBzAGMAcgBpAHAAdABzAC4AcwBpAGwALgBvAHIAZwAv
+AE8ARgBMAGgAdAB0AHAAcwA6AC8ALwBzAGMAcgBpAHAAdABzAC4AcwBpAGwALgBvAHIAZwAvAE8A
+RgBMAAAAAgAAAAAAAP+cADIAAAAAAAAAAAAAAAAAAAAAAAAAAAKCAAAAAQECAAMAJAEDAJABBADJ
+AQUBBgEHAQgBCQEKAMcBCwEMAQ0BDgEPARAAYgERAK0BEgETARQBFQBjARYArgAlACYA/QD/AGQB
+FwEYACcBGQEaARsBHAEdAR4BHwAoAGUBIAEhAMgBIgEjASQBJQEmAScAygEoASkAywEqASsBLAEt
+AS4A6QEvACkAKgD4ATABMQEyATMBNAArATUBNgAsATcAzAE4AM0BOQDOAPoBOgDPATsBPAE9AT4B
+PwAtAUAALgFBAC8BQgFDAUQBRQFGAUcA4gAwADEBSAFJAUoBSwFMAU0BTgBmADIAsADQAU8A0QFQ
+AVEBUgFTAVQBVQBnAVYBVwFYANMBWQFaAVsBXAFdAV4BXwFgAWEBYgFjAWQAkQFlAK8BZgAzADQA
+NQFnAWgBaQFqAWsANgFsAOQA+wFtAW4BbwA3AXABcQFyAXMA7QA4ANQBdADVAXUAaAF2ANYBdwF4
+AXkBegF7AXwBfQF+AX8BgAGBAYIBgwA5ADoBhAGFAYYBhwA7ADwA6wGIALsBiQGKAYsBjAGNAD0B
+jgDmAY8ARAGQAGkBkQGSAZMBlAGVAZYAawGXAZgBmQGaAZsAjQGcAZ0AbAGeAKABnwBqAaABoQGi
+AAkBowGkAaUApwBuAaYAQQBhAA0AIwBtAEUAPwBfAF4AYAA+AEAA2wGnAagBqQGqAasBrAGtAOgA
+hwGuAEYA/gDhAa8BsAEAAG8BsQGyAbMA3gG0AIQA2AG1AbYBtwG4AbkAHQG6AA8BuwG8Ab0AiwC9
+AEcAggDCAb4BvwEBAIMAjgHAAcEAuAHCAAcBwwDcAcQBxQHGAccByABIAHAByQHKAHIBywHMAc0B
+zgHPAdAAcwHRAdIAcQHTABsB1AHVAdYAqwHXALMB2ACyAdkB2gAgAdsA6gHcAd0ABACjAEkB3gHf
+AeAB4QHiAeMB5AHlAMAB5gAYAecB6AHpAMEApgAXAeoB6wHsALwA9wBKAPkB7QHuAe8B8ACJAEMB
+8QAhAJUB8gCpAKoAvgC/AEsB8wH0AfUB9gDfAfcAEAH4AEwB+QB0AfoAdgH7AHcB/AH9ANcAdQH+
+Af8CAAIBAJIAnAICAgMATQIEAgUATgIGAgcCCABPAgkCCgILAgwCDQAfAJQCDgIPAhACEQCkALkA
+4wBQANoCEgITAhQCFQDvAhYCFwDwAFECGAIZAhoCGwIcAh0AHAIeAh8CIAACAI8AeAAGAiEAUgB5
+AiIAewIjAiQCJQImAicCKAB8AikCKgIrALEA4AIsAHoCLQIuAi8CMAIxAjICMwI0AjUCNgAUAjcC
+OAI5APQA9QI6AjsAnQCeAKECPAB9Aj0AUwI+AIgACwAMAJgACAARAMMCPwDGAkACQQCbAA4AkwJC
+AJoAVAAiAKIABQDFALQAtQC2ALcAxAAKAFUCQwClAkQCRQJGAIoCRwDdAkgCSQJKAksCTABWAk0A
+5QD8Ak4CTwJQAlEAhgAeABoCUgJTAlQAGQJVAlYAEgJXAlgCWQCFAloCWwCZAFcCXAJdAl4CXwDu
+ABYCYAJhAmIA9gJjANkCZACMABUCZQJmAmcAWAB+AmgAgAJpAIECagB/AmsCbAJtAm4CbwJwAnEC
+cgJzAnQAQgJ1AnYCdwBZAFoCeAJ5AnoCewJ8An0AWwBcAOwCfgC6An8AlgKAAoECggKDAF0ChADn
+AoUAEwKGAocCiAKJAkNSBUEuYWx0B0FFYWN1dGUGQWJyZXZlB3VuaTFFQUUHdW5pMUVCNgd1bmkx
+RUIwB3VuaTFFQjIHdW5pMUVCNAd1bmkxRUE0B3VuaTFFQUMHdW5pMUVBNgd1bmkxRUE4B3VuaTFF
+QUEHdW5pMDIwMAd1bmkxRUEwB3VuaTFFQTIHdW5pMDIwMgdBbWFjcm9uB0FvZ29uZWsKQXJpbmdh
+Y3V0ZQtDY2lyY3VtZmxleApDZG90YWNjZW50B3VuaTAxRjEHdW5pMDFDNAZEY2Fyb24GRGNyb2F0
+B3VuaTAzOTQHdW5pMDFGMgd1bmkwMUM1BkVicmV2ZQZFY2Fyb24HdW5pMUVCRQd1bmkxRUM2B3Vu
+aTFFQzAHdW5pMUVDMgd1bmkxRUM0B3VuaTAyMDQKRWRvdGFjY2VudAd1bmkxRUI4B3VuaTFFQkEH
+dW5pMDIwNgdFbWFjcm9uA0VuZwdFb2dvbmVrB3VuaTFFQkMGR2Nhcm9uC0djaXJjdW1mbGV4B3Vu
+aTAxMjIKR2RvdGFjY2VudAd1bmkxRTlFBEhiYXILSGNpcmN1bWZsZXgCSUoGSWJyZXZlB3VuaTAy
+MDgHdW5pMUVDQQd1bmkxRUM4B3VuaTAyMEEHSW1hY3JvbgdJb2dvbmVrBkl0aWxkZQtKY2lyY3Vt
+ZmxleAd1bmkwMTM2B3VuaTAxQzcGTGFjdXRlBkxjYXJvbgd1bmkwMTNCBExkb3QHdW5pMDFDOAd1
+bmkwMUNBBE5VTEwGTmFjdXRlBk5jYXJvbgd1bmkwMTQ1B3VuaTAxOUQHdW5pMDFDQgZPYnJldmUH
+dW5pMUVEMAd1bmkxRUQ4B3VuaTFFRDIHdW5pMUVENAd1bmkxRUQ2B3VuaTAyMEMHdW5pMDIyQQd1
+bmkwMjMwB3VuaTFFQ0MHdW5pMUVDRQVPaG9ybgd1bmkxRURBB3VuaTFFRTIHdW5pMUVEQwd1bmkx
+RURFB3VuaTFFRTANT2h1bmdhcnVtbGF1dAd1bmkwMjBFB09tYWNyb24HdW5pMDNBOQd1bmkwMUVB
+C09zbGFzaGFjdXRlB3VuaTAyMkMGUmFjdXRlBlJjYXJvbgd1bmkwMTU2B3VuaTAyMTAHdW5pMDIx
+MgZTYWN1dGUHdW5pMDE4RgtTY2lyY3VtZmxleAd1bmkwMjE4BFRiYXIGVGNhcm9uB3VuaTAxNjIH
+dW5pMDIxQQZVYnJldmUHdW5pMDIxNAd1bmkxRUU0B3VuaTFFRTYFVWhvcm4HdW5pMUVFOAd1bmkx
+RUYwB3VuaTFFRUEHdW5pMUVFQwd1bmkxRUVFDVVodW5nYXJ1bWxhdXQHdW5pMDIxNgdVbWFjcm9u
+B1VvZ29uZWsFVXJpbmcGVXRpbGRlBldhY3V0ZQtXY2lyY3VtZmxleAlXZGllcmVzaXMGV2dyYXZl
+C1ljaXJjdW1mbGV4B3VuaTFFRjQGWWdyYXZlB3VuaTFFRjYHdW5pMDIzMgd1bmkxRUY4BlphY3V0
+ZQpaZG90YWNjZW50BWEuYWx0BmFicmV2ZQd1bmkxRUFGB3VuaTFFQjcHdW5pMUVCMQd1bmkxRUIz
+B3VuaTFFQjUHdW5pMUVBNQd1bmkxRUFEB3VuaTFFQTcHdW5pMUVBOQd1bmkxRUFCCWFjdXRlY29t
+Ygd1bmkwMjAxB3VuaTFFQTEHYWVhY3V0ZQd1bmkxRUEzB3VuaTAyMDMHYW1hY3Jvbgdhb2dvbmVr
+B3VuaTAyQkMHdW5pRjhGRgphcmluZ2FjdXRlB3VuaTAzMkUHdW5pMDMwNgt1bmkwMzA2MDMwMQt1
+bmkwMzA2MDMwMAt1bmkwMzA2MDMwOQt1bmkwMzA2MDMwMwd1bmkwMzExB3VuaTIyMTkJY2Fyb24u
+YWx0B3VuaTAzMEMLY2NpcmN1bWZsZXgKY2RvdGFjY2VudAd1bmkyMEI1B3VuaTAzMjcHdW5pMDMw
+Mgt1bmkwMzAyMDMwMQt1bmkwMzAyMDMwMAt1bmkwMzAyMDMwOQt1bmkwMzAyMDMwMw1jb2xvbm1v
+bmV0YXJ5B3VuaTAzMjYHdW5pMDMxMgd1bmkyMDUyB3VuaTAzMEYGZGNhcm9uB3VuaTAzMjQHdW5p
+MDMwOAd1bmkyMjE1BGRvbmcHdW5pMDMwNwxkb3RiZWxvd2NvbWIHdW5pMDJCQQd1bmkwMUYzB3Vu
+aTAxQzYGZWJyZXZlBmVjYXJvbgd1bmkxRUJGB3VuaTFFQzcHdW5pMUVDMQd1bmkxRUMzB3VuaTFF
+QzUHdW5pMDIwNQplZG90YWNjZW50B3VuaTFFQjkHdW5pMUVCQgplaWdodC5kbm9tCmVpZ2h0Lm51
+bXIHdW5pMDIwNwdlbWFjcm9uCGVtcHR5c2V0A2VuZwdlb2dvbmVrCWVzdGltYXRlZAd1bmkxRUJE
+BEV1cm8DZl9mBWZfZl9pBmZfZl9pagVmX2ZfbANmX2kEZl9pagdmX2pvaW50A2ZfbAd1bmkwMkM5
+CWZpdmUuZG5vbQlmaXZlLm51bXILZml2ZWVpZ2h0aHMJZm91ci5kbm9tCWZvdXIubnVtcgd1bmky
+MDc0BmdjYXJvbgtnY2lyY3VtZmxleAd1bmkwMTIzCmdkb3RhY2NlbnQJZ3JhdmVjb21iB3VuaTIw
+QjIEaGJhcgtoY2lyY3VtZmxleA1ob29rYWJvdmVjb21iB3VuaTAzMUIHdW5pMDMwQgd1bmkyMDEw
+BWkuVFJLBmlicmV2ZQd1bmkwMjA5CWkubG9jbFRSSwd1bmkxRUNCB3VuaTFFQzkHdW5pMDIwQgJp
+agdpbWFjcm9uB2lvZ29uZWsGaXRpbGRlC2pjaXJjdW1mbGV4B3VuaTAyMzcHdW5pMDEzNwxrZ3Jl
+ZW5sYW5kaWMHdW5pMjBBRAZsYWN1dGUGbGNhcm9uB3VuaTAxM0MEbGRvdAd1bmkyN0U4BGxpcmEH
+dW5pMjBCQQd1bmkyMTEzB3VuaTAxQzkHdW5pMDMzMQd1bmkwMzA0B3VuaTIwQkMHdW5pMDBCNQZt
+aW51dGUHdW5pMDNCQwZuYWN1dGUHdW5pMjBBNgd1bmkwMEEwBm5jYXJvbgd1bmkwMTQ2B3VuaTAy
+NzIJbmluZS5kbm9tCW5pbmUubnVtcgd1bmkwMUNDB3VuaTIxMTYGb2JyZXZlB3VuaTFFRDEHdW5p
+MUVEOQd1bmkxRUQzB3VuaTFFRDUHdW5pMUVENwd1bmkwMjBEB3VuaTAyMkIHdW5pMDIzMQd1bmkx
+RUNEB3VuaTAzMjgHdW5pMUVDRgVvaG9ybgd1bmkxRURCB3VuaTFFRTMHdW5pMUVERAd1bmkxRURG
+B3VuaTFFRTENb2h1bmdhcnVtbGF1dAd1bmkwMjBGB29tYWNyb24Ib25lLmRub20Ib25lLm51bXIJ
+b25lZWlnaHRoB3VuaTAwQjkHdW5pMDFFQgtvc2xhc2hhY3V0ZQd1bmkwMjJEB3VuaTAzMjEWcGVy
+aW9kY2VudGVyZWQubG9jbENBVAZwZXNldGEHdW5pMjBCMQd1bmkwMkI5BnJhY3V0ZQZyY2Fyb24H
+dW5pMDE1Nwd1bmkwMjExB3VuaTI3RTkHdW5pMDMwQQd1bmkwMjEzB3VuaTIwQkQHdW5pMjBBOAd1
+bmkyMEI5BnNhY3V0ZQd1bmkwMjU5C3NjaXJjdW1mbGV4B3VuaTAyMTkGc2Vjb25kCnNldmVuLmRu
+b20Kc2V2ZW4ubnVtcgxzZXZlbmVpZ2h0aHMIc2l4LmRub20Ic2l4Lm51bXIHdW5pMDMzOAd1bmkw
+MzM3B3VuaTAwQUQHdW5pMDMzNgd1bmkwMzM1BHRiYXIGdGNhcm9uB3VuaTAxNjMHdW5pMDIxQgp0
+aHJlZS5kbm9tCnRocmVlLm51bXIMdGhyZWVlaWdodGhzB3VuaTAwQjMJdGlsZGVjb21iCHR3by5k
+bm9tCHR3by5udW1yB3VuaTAwQjIGdWJyZXZlB3VuaTAyMTUHdW5pMUVFNQd1bmkxRUU3BXVob3Ju
+B3VuaTFFRTkHdW5pMUVGMQd1bmkxRUVCB3VuaTFFRUQHdW5pMUVFRg11aHVuZ2FydW1sYXV0B3Vu
+aTAyMTcHdW1hY3Jvbgd1b2dvbmVrBXVyaW5nBnV0aWxkZQZ3YWN1dGULd2NpcmN1bWZsZXgJd2Rp
+ZXJlc2lzBndncmF2ZQZjaXJjbGUHdW5pMjBBOQt5Y2lyY3VtZmxleAd1bmkxRUY1BnlncmF2ZQd1
+bmkxRUY3B3VuaTAyMzMHdW5pMUVGOQZ6YWN1dGUKemRvdGFjY2VudAl6ZXJvLmRub20JemVyby5u
+dW1yCXplcm8uemVybwl6ZXJvc2xhc2gAAAABAAH//wAPAAEAAgAOAAAAAAAAAdQAAgBLAAQABAAB
+AAYAKwABAC0AQAABAEIASwABAE0AbQABAG8AcQABAHMAjgABAJAAoAABAKIAqAABAKoA0wABANUA
+4QABAOMA4wADAOQA7AABAO4A7gABAPIA8wABAPgA+QABAQEBBwADAQsBDAABAQ8BDwADARABEwAB
+ARYBFgADARkBHQADASEBIgADASQBJAABASYBJgABASkBKQADASoBKwABAS4BLwADATUBNgADATgB
+SQABAU0BTQABAU8BTwABAVQBVAABAVgBWAABAVwBXAABAV0BXQACAXMBeAABAXsBewADAYMBhQAB
+AYYBhwADAYkBiQADAYwBmgABAZ0BngABAaABowABAaYBqgABAbEBsQABAbQBtQABAbcBuAADAboB
+ugABAb0BvQABAb8BwAABAcMBxAABAckByQABAcwBzAABAc4B3QABAd8B3wADAeAB6gABAfIB+QAB
+AfoB+gADAgsCCwABAhYCFwABAhkCHAABAh8CHwADAiACIAABAiQCJwABAikCKgABAjYCNwADAjoC
+OwADAj0CQQABAkoCSgADAksCSwABAlACYQABAmMCawABAm4CcwABAnUCfAABAAEAAwAAABAAAAAi
+AAAAVAABAAcBAQEWASEBLgE2AbcB+gABABcA4wECAQMBBAEFAQYBBwEPARkBGgEbARwBHQEiASkB
+LwE1AXsBhgGJAbgCHwJKAAEAAQGHAAAAAQAAAAoAIgBOAAFERkxUAAgABAAAAAD//wADAAAAAQAC
+AANrZXJuABRtYXJrABxta21rACIAAAACAAAAAQAAAAEAAgAAAAMAAwAEAAUABgAOD+IRwiyeLUgv
+CAACAAgAAgAKADYAAQAMAAQAAAABABIAAQABAGYABgCk/84Apf/OAKb/zgCn/84AqP/OAL//zgAC
+Ci4ABAAAC1gNMAAjACUAAAAAAAAAAP/sAAAAAAAAAAAAAAAAAAD/3QAAAAAAAAAAAAAAAP/uAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/s/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAD/xAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAD/nAAAAAAAAP+m/4gAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAA/5UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAD/2AAAAAD/xAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2AAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAA/9gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAA/6b/4v+I/5z/2AAAAAAAAAAAAAAAAP/E/7D/7AAAAAAAAAAAAAAAAAAA/9gAAAAAAAAA
+AP/s/8T/7P/EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/YAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7P/EAAAAAAAA/9j/2AAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/ugAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/3QA
+AAAAAAD/dP9gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/nP+IAAAAAAAAAAD/5P/O
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/YAAD/sP/Y/+wAAP/sAAAAAP/sAAD/2AAAAAAA
+AAAA/+wAAAAAAAAAAAAAAAAAAAAAAAD/7P/s/+z/xAAAAAAAAAAAAAAAAAAA/9gAAP+I/7D/7AAA
+/+wAAAAA/+wAAP/YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/xP/s/8T/7P/E/8QAAAAA/+wA
+AAAAAAAAAAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAP+wAAAAAAAAAAD/dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAA/xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAP/YAAAAAP+w/+z/7P/s/8T/xAAAAAAAAP/OAAAAAAAA/8QAAAAo/+wA
+AAAAAAD/sAAA/8QAAAAAAAAAAAAAACgAAAAAAAAAAAAA/+wAAAAAAAAAAAAeAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/vAAAA
+AAAAAAAAAAAAAAAAAP/EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAP/sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAD/xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+wAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAA/8QAAAAAAAD/xP/EAAAAAAAAAAAAAAAA/8QAAAAAAAAA
+AAAAAAAAAAAAAAAAAP/EAAAAAAAAAAAAAP/sAAAAAAAAAAAAAAAAAAD/7AAAAAAAAP/s/+wAAAAA
+AAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAAAAAAA/+wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAP/sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP+wAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAD/7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2P/s/5X/2P/s/+z/7AAAAAD/7AAA/9j/
+2AAAAAAAAP/YAAAAAP/sAAAAAAAAAAAAAAAA/8T/xP/E/8QAAAAAAAAAAAAAAAAAAAAAAAD/xAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAA/9MAAP+w/8T/7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAD/7AAAAAAAAAAA/7AAAAAAAAAAAAAA/84AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAMQAEAB8AAAAnACwAHAAv
+AEAAIgBCAEUANABRAFEAOABfAGgAOQBqAGoAQwBtAG0ARAB1AI4ARQCQAKgAXwC/ANMAeADVAOEA
+jQDkAOwAmgDuAO8AowDyAPMApQD4APkApwEqASoAqQE6AUkAqgFNAU0AugFPAU8AuwFUAVQAvAFY
+AVgAvQFcAV0AvgFhAWEAwAFlAWUAwQFtAW0AwgF5AXkAwwF/AYUAxAGMAYwAywGUAZQAzAGiAaQA
+zQGoAagA0AG1AbUA0QG/AcAA0gHDAcQA1AHMAcwA1gHPAd0A1wHgAeoA5gHyAfIA8QH1AfkA8gIQ
+AhAA9wISAhMA+AIWAhcA+gIZAhsA/AIgAiAA/wIkAicBAAIpAioBBAJCAkIBBgJmAmsBBwACAE4A
+BAAEAAMABQAFACIABgAHAAUACAAfAAMAKAApAAwALAAsAAMALwBAAAUAQgBCAAUARABEAAUARQBF
+ACEAUQBRABAAXwBgABAAYQBiABYAYwBjAAsAZABkABAAZQBoAAsAagBqAAsAbQBtABAAdgB2AAUA
+lQCVACAAlwCcAAoAnQCgAAkAogCjAAkApACoAA8AvwC/AB8AwADEAA4AxQDFAB4AxgDOAAYAzwDS
+AAwA0wDTAAEA1QDhAAEA5ADmAAEA5wDoAAQA6QDsAAEA7gDuAAEA7wDvABEA8gDzAAEA+AD4AAEA
++QD5AAIBKgEqABUBOgFJAAQBTQFNAAQBTwFPAAQBVAFUAAQBWAFYAAQBXAFdABQBYQFhABIBZQFl
+ABIBbQFtAB0BeQF5ABwBfwF/ABsBgAGAABoBgQGBABkBggGCABgBgwGFAAEBjAGMABIBlAGUABIB
+ogGkABMBqAGoABUBtQG1AAEBvwHAAAEBwwHEAAEBzAHMAAEBzwHcAAIB3QHdAAQB4AHqAAIB8gHy
+AAIB9QH5AAICEAIQABECEgITABECFgIXAAgCGQIbAAgCIAIgAAgCJAInAAcCKQIqAAcCQgJCAAIC
+ZgJmABcCZwJrAA0AAgBnAAQABAAEAAUABQAkAAYAHwAEACAAIAABACEAJgADACcAKwABACwALAAE
+AC0AQAABAEIARQABAEYASwADAE0AXgABAF8AYAAYAGEAagABAGwAbQABAG8AcQABAHMAdAABAHUA
+jgADAJAAlAADAJUAlQABAJYAlgADAJcAnAABAKEAoQADAKQAqAARAKkAqQABAL8AvwAjAMAAxAAQ
+AMUAxQAiAMYAzgAMAM8A0gATANMA0wAFANUA4QAFAOQA7AAFAO4A7gAFAO8A7wAWAPIA8wAFAPYA
+9gAhAPgA+AAFAPkA+QAHAQsBDAACARABEwACARcBFwACASYBJgACASsBKwACATgBSQACAU0BTQAC
+AU8BTwACAVMBUwAIAVQBVAACAVgBWAACAVwBYQAKAWMBZQAKAWsBawAKAW0BbQAgAXMBeAAOAXkB
+eQAHAX8BfwAfAYABgAAeAYEBgQAdAYIBggAcAYMBhQAHAYwBjAAVAY0BkwAJAZQBlAAVAZUBmAAJ
+AZkBmQAVAZoBmgAJAZ0BngAJAZ8BnwAbAaIBpAAHAaYBpwAHAakBqgAHAbEBsQAHAbQBtAAHAbUB
+tQAIAb0BvQAXAb8BwAAIAcMBxAAIAckByQAIAcwBzAAIAc4BzgABAc8B3QACAeAB6gACAfIB8gAC
+AfUB+AACAfkB+QAXAgsCCwACAhACEAAUAhECEQAWAhICEwAUAhYCFwAIAhkCGwAIAiACIAAIAiQC
+JwANAikCKgANAi4CLgAaAjUCNQAZAj0CQQAPAkICQgAHAlACYQAGAmMCZQAGAm8CcwALAnUCeAAL
+AnkCfAASAAIAAAABAAgAAgCsAAQAAAEuAYwADQAGAAAAAP90/7D/dP+wAAD/xAAAAAAAAAAAAAD/
+dAAAAAAAAAAAAAD/xAAAAAAAAAAAAAD/xAAAAAAAAAAAAAD/sAAAAAAAAAAAAAD/sAAAAAAAAAAA
+AAD/sAAAAAAAAAAAAAD/xAAAAAAAAAAAAAD/iAAAAAAAAAAAAAD/sAAAAAAAAAAAAAD/xAAAAAAA
+AAAAAAD/xAAAAAAAAAAAAAEAPwBFAJUApAClAKYApwCoAL8AwADBAMIAwwDEAMYAxwDIAMkAygDL
+AMwAzQDOAR4BIAEhASMBLQEuAS8BNAE1ATYBTgFcAV0CAAIBAgICDwIUAhYCFwIZAhoCGwIgAi0C
+LgJmAmcCaAJpAmoCawJvAnACcQJyAnMCdQJ2AncCeAACAA8ARQBFAAwAlQCVAAsApACoAAYAvwC/
+AAoAwADEAAUAxgDOAAIBXAFdAAcCFgIXAAMCGQIbAAMCIAIgAAMCLgIuAAkCZgJmAAgCZwJrAAQC
+bwJzAAECdQJ4AAEAAgAMAKQAqAAEAL8AvwAFAMAAxAADAMYAzgACAR4BHgABASABIAABASMBIwAB
+AS8BLwABATUBNgABAU4BTgABAgACAQABAi0CLQABAAQAAAABAAgAAQAMAFgABQGmAlYAAQAkAOMB
+AQECAQMBBAEFAQYBBwEPARYBGQEaARsBHAEdASEBIgEpAS4BLwE1ATYBewGGAYcBiQG3AbgB3wH6
+Ah8CNgI3AjoCOwJKAAIANwAEAAQAAAAGACsAAQAtAEAAJwBCAEsAOwBNAGwARQBvAHEAZQBzAI4A
+aACQAKAAhACiAKgAlQCqANMAnADVAOEAxgDkAOwA0wDuAO4A3ADyAPMA3QD4APkA3wELAQwA4QEQ
+ARMA4wEkASQA5wEmASYA6AEqASsA6QE4AUkA6wFNAU0A/QFPAU8A/gFUAVQA/wFYAVgBAAFcAVwB
+AQFzAXgBAgGDAYUBCAGMAZoBCwGdAZ4BGgGgAaMBHAGmAaoBIAGxAbEBJQG0AbUBJgG6AboBKAG9
+Ab0BKQG/AcABKgHDAcQBLAHJAckBLgHMAcwBLwHOAd0BMAHgAeoBQAHyAfkBSwILAgsBUwIWAhcB
+VAIZAhwBVgIgAiABWgIkAicBWwIpAioBXwI9AkEBYQJLAksBZgJQAmEBZwJjAmsBeQJuAnMBggJ1
+AnwBiAAkAAAafgABGXQAABqKAAAahAAAGoQAABqKAAAaigAAGpAAABqWAAEZegAAGpwAABqiAAAa
+ogAAGqgAABqoAAEZgAAAGq4AABq0AAEZhgAAGroAABrAAAEZjAAAGsYAABrMAAIbugAAGtIAARmS
+AAAa2AADAJIAARmYAAAa3gAEAJgABACeAAQApAAEAKoAABrkAAH/awAAAAH++gEJAAH+ugCrAAH+
+1ADuAAH+6ADpAZAQCBAgAAAQJgAAD6IPrgAAD7QAAA+oD64AAA+0AAAPuhAgAAAQJgAAD8AQIAAA
+ECYAAA/GECAAABAmAAAPwA/wAAAQJgAAD8YQIAAAECYAAA/GECAAABAmAAAPzBAgAAAQJgAAD9IQ
+IAAAECYAAA/YECAAABAmAAAP0g/wAAAQJgAAD9gQIAAAECYAAA/YECAAABAmAAAP3hAgAAAQJgAA
+D+QQIAAAECYAAA/qECAAABAmAAAQCA/wAAAQJgAAEA4QIAAAECYAAA/2ECAAABAmAAAP/BAgAAAQ
+JgAAEAIQIAAAECYAABAIECAAABAmAAAQDhAgAAAQJgAAEBQQIAAAECYAABAaECAAABAmAAAQLBAy
+AAAAAAAAEooSkAAAAAAAABA4EpAAAAAAAAAQPhKQAAAAAAAAEooQRAAAAAAAABBKEpAAAAAAAAAQ
+UBKQAAAAAAAAEcQQwgAAAAAQthBWAAAAAAAAELYQXAAAAAAAABC2EbgQwgAAAAAQthHEEMIAAAAA
+ELYAAAAAAAAAABC2AAAAAAAAAAAQthCwEMIAABDIAAAQYhDCAAAQyAAAEGgQwgAAEMgAABBoEMIA
+ABDIAAAQbhDCAAAQyAAAEHQQwgAAEMgAABBuEJIAABDIAAAQdBDCAAAQyAAAEHQQwgAAEMgAABB6
+EMIAABDIAAAQgBDCAAAQyAAAEIYQwgAAEMgAABCMEMIAABDIAAAQsBCSAAAQyAAAEJgQwgAAEMgA
+ABCeEMIAABDIAAAQpBDCAAAQyAAAEKoQwgAAEMgAABCwEMIAABDIAAARxBDCAAAAABC2ELwQwgAA
+EMgAABDOENQAAAAAAAAQ5hD4AAAAAAAAENoQ+AAAAAAAABDaEPgAAAAAAAAQ4BD4AAAAAAAAEOYQ
+7AAAAAAAABDyEPgAAAAAAAATMhEEAAAAABEKEzIRBAAAAAARChD+EQQAAAAAEQoRUhFeAAARZAAA
+AAAAAAAAEWQAABEQEV4AABFkAAARFhFeAAARZAAAERwRXgAAEWQAABEiEV4AABFkAAARKBFeAAAR
+ZAAAES4RXgAAEWQAABFSETQAABFkAAAROhFeAAARZAAAEUARXgAAEWQAABFGEV4AABFkAAARTBFe
+AAARZAAAEVIRXgAAEWQAABFYEV4AABFkAAARahF2AAAAAAAAEXARdgAAAAAAABKKEXwAAAAAAAAS
+ihGCAAAAAAAAEZQRmhGgAAARpgAAAAARoAAAEaYRiBGaEaAAABGmEZQRmhGgAAARphGUEY4RoAAA
+EaYRlBGaEaAAABGmEZQRmhGgAAARphGUEZoRoAAAEaYRrBX8AAAAAAAAEcQSkAAAAAAAABGyEpAA
+AAAAAAARuBKQAAAAAAAAEcQRvgAAAAAAABHEEpAAAAAAAAARyhKQAAAAAAAAEk4SchJ4En4ShBHQ
+EdYAABHcAAASGBJyEngSfhKEEeISchJ4En4ShBHoEnISeBJ+EoQR7hJyEngSfhKEEegSEhJ4En4S
+hBHuEnISeBJ+EoQR7hJyEngSfhKEEfQSchJ4En4ShBH6EnISeBJ+EoQSABJyEngSfhKEEgYSchJ4
+En4ShBIMEnISeBJ+EoQSThISEngSfhKEEiQSchJ4En4ShBIqEnISeBJ+EoQSThIwEjYSfhKEEhgS
+MBI2En4ShBJOEh4SNhJ+EoQSJBIwEjYSfhKEEioSMBI2En4ShBJmEjASNhJ+EoQSPBJyEngSfhKE
+EkISchJ4En4ShBJIEnISeBJ+EoQSThJyEngSfhKEElQSYBJ4En4ShBJaEmASeBJ+EoQSZhJyEngS
+fhKEEmwSchJ4En4ShBLYE1AAAAAAAAASihKQAAAAAAAAEqISugAAAAAAABKWEroAAAAAAAASnBK6
+AAAAAAAAEqISqAAAAAAAABKuEroAAAAAAAAStBK6AAAAAAAAEtgTUAAAAAAAABLAE1AAAAAAAAAS
+xhNQAAAAAAAAEtgSzAAAAAAAABLSE1AAAAAAAAAS2BLeAAAAAAAAE4wS6gAAAAAS/BOMEuoAAAAA
+EvwS5BLqAAAAABL8E4wS8AAAAAAS/BOMEvYAAAAAEvwTbhQQE4AThgAAEwIUEBOAE4YAABMIFBAT
+gBOGAAATDhQQE4AThgAAExQUEBOAE4YAABMaFBATgBOGAAATbhMgE4AThgAAE3QUEBOAE4YAABMm
+FBATgBOGAAATMhNQE1YThgAAEywTUBNWE4YAABMyEzgTVhOGAAATPhNQE1YThgAAE0QTUBNWE4YA
+ABNKE1ATVhOGAAATXBQQE4AThgAAE2IUEBOAE4YAABNoFBATgBOGAAATbhQQE4AThgAAE3QUEBOA
+E4YAABN6FBATgBOGAAATjBOSAAAAAAAAE5gTtgAAAAAAABOeE7YAAAAAAAATpBO2AAAAAAAAE6oT
+tgAAAAAAABOwE7YAAAAAAAATzhPyAAAAAAAAE84T8gAAAAAAABO8E/IAAAAAAAATwhPyAAAAAAAA
+E8gT8gAAAAAAABPOE9QAAAAAAAAT2hPyAAAAAAAAE+AT8gAAAAAAABPmE/IAAAAAAAAT7BPyAAAA
+AAAAE/gUEAAAAAAAABP+FBAAAAAAAAAUBBQQAAAAAAAAFAoUEAAAAAAAABR2FI4AABSUAAAUFhSO
+AAAUlAAAFBwUjgAAFJQAABQiFI4AABSUAAAUHBRMAAAUlAAAFCIUjgAAFJQAABQiFI4AABSUAAAU
+KBSOAAAUlAAAFC4UjgAAFJQAABQ0FI4AABSUAAAULhRMAAAUlAAAFDQUjgAAFJQAABQ0FI4AABSU
+AAAUOhSOAAAUlAAAFEAUjgAAFJQAABRGFI4AABSUAAAUdhRMAAAUlAAAFFIUXgAAAAAAABRYFF4A
+AAAAAAAUfBSOAAAUlAAAFGQUjgAAFJQAABRqFI4AABSUAAAUcBSOAAAUlAAAFHYUjgAAFJQAABR8
+FI4AABSUAAAUghSOAAAUlAAAFIgUjgAAFJQAABfEF9YAAAAAAAAXxBSmAAAAAAAAF1gUpgAAAAAA
+ABdeFKYAAAAAAAAXxBSaAAAAAAAAF2QUpgAAAAAAABSgFKYAAAAAAAAUrBSyAAAAAAAAFLgWyBS+
+AAAUxBS4FsgUvgAAFMQUuBbIFL4AABTEAAAAABS+AAAUxAAAAAAUvgAAFMQYYBUMAAAVEgAAGGYV
+DAAAFRIAABhsFQwAABUSAAAYbBUMAAAVEgAAFMoVDAAAFRIAABTQFQwAABUSAAAUyhToAAAVEgAA
+FNAVDAAAFRIAABTQFQwAABUSAAAU1hUMAAAVEgAAFNwVDAAAFRIAABTiFQwAABUSAAAYchUMAAAV
+EgAAGGAU6AAAFRIAABTuFQwAABUSAAAU9BUMAAAVEgAAFPoVDAAAFRIAABUAFQwAABUSAAAYYBUM
+AAAVEgAAFQYVDAAAFRIAABUYFR4AAAAAAAAVJBVCAAAAAAAAFSoVQgAAAAAAABUqFUIAAAAAAAAV
+MBVCAAAAAAAAFTYVQgAAAAAAABU8FUIAAAAAAAAVSBVUAAAAABVaFUgVVAAAAAAVWhVOFVQAAAAA
+FVoAABXkAAAAAAAAFaIYygAAFa4AABVgGMoAABWuAAAVZhjKAAAVrgAAFWwYygAAFa4AABVyGMoA
+ABWuAAAVeBjKAAAVrgAAFaIYygAAFa4AAAAAFX4AAAAAAAAVhBjKAAAVrgAAFYoYygAAFa4AABWQ
+GMoAABWuAAAVlhjKAAAVrgAAAAAV5AAAAAAAABWcGMoAABWuAAAVohjKAAAVrgAAFagYygAAFa4A
+ABW0FcAAAAAAAAAVuhXAAAAAAAAAF4gVxgAAAAAAABeIFcwAAAAAAAAV3hXkFeoAABXwFdIV5BXq
+AAAV8BXeFeQV6gAAFfAV3hXYFeoAABXwFd4V5BXqAAAV8BXeFeQV6gAAFfAV3hXkFeoAABXwFfYV
+/AAAAAAAABfEF9YX3BfiAAAXxBfWF9wX4gAAFsIXpgAAAAAAABYCF6YAAAAAAAAWCBemAAAAAAAA
+FsIWDgAAAAAAABbCF6YAAAAAAAAWFBemAAAAAAAAAAAAABYaFiAWJhfEF9YWsBa2FrwXWBfWFrAW
+tha8F14X1hawFrYWvBdkF9YWsBa2FrwWLBfWFrAWtha8F2QXdhawFrYWvBYsF9YWsBa2FrwWLBfW
+FrAWtha8FjIX1hawFrYWvBdqF9YWsBa2FrwXcBfWFrAWtha8FjgX1hawFrYWvBY+F9YWsBa2FrwX
+xBd2FrAWtha8FkQWSgAAFlAAABfKF9YWsBa2FrwXfBfWFrAWtha8FlwX1hZ0FrYWvBZWF9YWdBa2
+FrwWXBd2FnQWtha8FmIX1hZ0FrYWvBZoF9YWdBa2FrwWbhfWFnQWtha8F7IX1hawFrYWvBe4F9YW
+sBa2FrwXvhfWFrAWtha8F8QX1hawFrYWvBZ6FoAAABaGAAAWjBaSFpgWnhakF4gX1hawFrYWvBeC
+F9YWsBa2FrwX0BfWFrAWtha8FqoX1hawFrYWvBfEF9YAAAAAAAAWwhbIAAAAAAAAFtoW/gAAAAAA
+ABbOFv4AAAAAAAAW1Bb+AAAAAAAAFtoW4AAAAAAAABbmFv4AAAAAAAAW7BbyAAAAAAAAFvgW/gAA
+AAAAABciFxwAAAAAAAAXBBccAAAAAAAAFwoXHAAAAAAAABciFxAAAAAAAAAXFhccAAAAAAAAFyIX
+KAAAAAAAABc6Fy4XRgAAF0wXOhcuF0YAABdMFzoXLhdGAAAXTBc6FzQXRgAAF0wXOhdAF0YAABdM
+AAAAAAAAAAAXUhfEF9YX3BfiAAAXWBfWF9wX4gAAF14X1hfcF+IAABdkF9YX3BfiAAAXahfWF9wX
+4gAAF3AX1hfcF+IAABfEF3YX3BfiAAAXyhfWF9wX4gAAF3wX1hfcF+IAABeIF6YXrBfiAAAXghem
+F6wX4gAAF4gXjhesF+IAABeUF6YXrBfiAAAXmhemF6wX4gAAF6AXphesF+IAABeyF9YX3BfiAAAX
+uBfWF9wX4gAAF74X1hfcF+IAABfEF9YX3BfiAAAXyhfWF9wX4gAAF9AX1hfcF+IAABfoF+4AAAAA
+AAAX9BgSAAAAAAAAF/oYEgAAAAAAABgAGBIAAAAAAAAYBhgSAAAAAAAAGAwYEgAAAAAAABgYGB4A
+AAAAAAAYNhhaAAAAAAAAGCQYWgAAAAAAABgqGFoAAAAAAAAYMBhaAAAAAAAAGDYYPAAAAAAAABhC
+GFoAAAAAAAAYSBhaAAAAAAAAGE4YWgAAAAAAABhUGFoAAAAAAAAYYBh4AAAAAAAAGGYYeAAAAAAA
+ABhsGHgAAAAAAAAYchh4AAAAAAAAAAECTAJMAAECYAMwAAECTAAAAAEETQAUAAEBnAMwAAEBiAMI
+AAEBiARuAAEBiAReAAEBiAL+AAEBiASWAAEBiAQiAAEBnAMQAAEBiALkAAEBhf9bAAEBiANOAAEB
+iAL3AAEBiALuAAEBiAJMAAEBiANEAAEBnAQoAAEBiAMMAAEBhQBQAAEC1AAQAAEB3gJMAAEB3gAA
+AAEBuwMwAAEBpwMIAAEBnf8kAAEBpwL+AAEBpQLkAAEDCAJMAAEDCAMIAAEBpwMwAAEBkwMIAAEB
+kwL+AAEBkwSWAAEBkwQiAAEBpwMQAAEBkwLkAAEBkQLkAAEBnf8LAAEBkwNEAAEBkwNOAAEBkwL3
+AAEBkwLuAAEBkwJMAAEA0AEmAAEBkwMMAAEBnQAAAAECnwAUAAEBfgJMAAEBfgAAAAEBxQMIAAEB
+xQL+AAEBxQJMAAEBz/7KAAEBwwLkAAEBxQAAAAEBmAL+AAEBmAAAAAEBmAHGAAEApgMwAAEAkgMI
+AAEAkgL+AAEApgMQAAEAkgLkAAEAkALkAAEAkv8LAAEAkgNEAAEAkgNOAAEAkgL3AAEAkgLuAAEA
+kgJMAAEAkgMMAAEAkgAAAAEA0wAOAAEB+gJMAAEB+gL+AAEBPAAAAAEBfwBGAAEBif8QAAEBiQMw
+AAEBnf7KAAEBdQJMAAEBkwAAAAEBuAJMAAEAoQE6AAEBxgJMAAEBsQMwAAEBnQMIAAEBsf7KAAEB
+nQJMAAEBnQMMAAEDlgJMAAEDoAAAAAEEogAUAAEBjwMIAAEBjwL+AAEBjwSWAAEBjwQiAAEBowMQ
+AAEBjwLkAAEBjwOGAAEBjQOGAAEBmf8LAAEBowMwAAEBj/8LAAEBjwNEAAEBjwNOAAEBjwAAAAED
+CQIuAAEBjwMwAAEBjwL3AAEBjwLuAAEBjwJMAAEBhQJMAAEBmQMwAAEBhQAAAAEBjwMMAAEBjwOu
+AAEBmQAAAAEC9QHUAAEBywAVAAEBlAEsAAEBpwJMAAEBpwAAAAEBlAMwAAEBgAMIAAEBgAJMAAEB
+sv7KAAEBlAMQAAEBgAL3AAEBqAAAAAEBmAMwAAEBhAMIAAEBev8kAAEBhAL+AAEBhAJMAAEBjv7K
+AAEBWwMIAAEBXAAAAAEBUv8kAAEBZv7KAAEBWwEmAAEBlQMmAAEBgQL+AAEBgQL0AAEBlQMGAAEB
+gQLaAAEBf/8LAAEBgQNEAAEBrAMwAAEBmAJMAAEBhP8LAAEBmANEAAEBmANOAAEBmAMMAAEBhAAA
+AAEC+QKmAAEBgQMmAAEBgQLtAAEBgQLkAAEBgQJCAAEBgQM6AAEBgQMCAAEC5QJMAAEBxAAIAAEB
+WwJMAAEBWwAAAAECLAJMAAECQAMwAAECLAL+AAECLALkAAECLANEAAECLAAAAAEBhQMwAAEBcQL+
+AAEBcQLkAAEBcQJMAAEBcf8LAAEBcQNEAAEBcQNOAAEBcQLuAAEBcQMMAAEBcQAAAAEBfwJMAAEB
+kwMwAAEBfwMIAAEBfQLkAAEBfwAAAAEBbgKkAAEBWgJ8AAEBWgPiAAEBWgPSAAEBWgJyAAEBWgQK
+AAEBWgOWAAEBbgKEAAEBWgJYAAEBWv8LAAECEQHAAAECJQKkAAECEQAAAAEBWgLCAAEBWgJrAAEB
+WgJiAAEBWgHAAAEBWgK4AAEBbgOcAAEBWgKAAAEBWgAAAAECRgAKAAEBIv8kAAEBPgJYAAEBLAAA
+AAEBnQGtAAEBkQCdAAEBDgHKAAECcwJMAAEB6gIWAAEBOwJyAAEBOwQKAAEBOwOWAAEBTwKEAAEB
+OwJYAAEBO/8LAAEBOwK4AAEBOwLCAAEBOwJrAAEBOwJiAAEBOwKAAAEBOwAAAAECDgAXAAEA8AHA
+AAEA8AAAAAEBQQHAAAEBQQJ8AAEBQQJyAAEBNwL3AAEBPwJYAAEBQQAAAAEBlQH8AAEBlQKuAAEB
+RQAAAAEAzQIiAAEAjQKkAAEAeQJ8AAEAeQJyAAEAjQKEAAEAeQJYAAEAg/8LAAEAeQHAAAEAeQK4
+AAEAeQLCAAEAeQJrAAEAeQJiAAEAdwJYAAEAeQKAAAEApQAPAAEAjgJyAAEAjgHAAAEAhAAAAAEB
+LAAKAAEBNv7UAAEAlwNYAAEAjf7KAAEAgwJ0AAEAgwAAAAEA5QJMAAEAgwE6AAEBxgHAAAEBxgAA
+AAEBXgKkAAEBSgJ8AAEBQP7KAAEBSgKAAAEEvQF+AAEElgCnAAED+wErAAEBQAQKAAEBQAOWAAEB
+QAL6AAEBPgL6AAEC2wHAAAEC2wAAAAEDrgAXAAEBWAKkAAEBRAHAAAEBRAK4AAEBRALCAAEBRAKA
+AAECdgG2AAEAwwIqAAEAwwFKAAEBOQFPAAEAuQIqAAEAuQFKAAEBSgH4AAEBLQFXAAEAuQG6AAEB
+QAMiAAECYgFcAAECKAAaAAEBQADgAAEBSgHAAAEBSgAAAAEBMgKuAAEBHgKGAAEBHgHKAAEBCv7K
+AAEBMgKOAAEA7wIXAAEA+AGUAAEBHgJ1AAEBAAAAAAEBZwKkAAEBUwJ8AAEBNf8kAAEBUwJyAAEB
+PwAAAAEBUwHAAAEBSf7KAAEA2QAAAAEAz/8kAAEAsQJCAAEA4/7KAAEBEALGAAEA5wEIAAEAswH0
+AAEBVAKkAAEBQAJ8AAEBQAJyAAEBVAKEAAEBQAJYAAEBQP8LAAEBQALCAAEBSgKkAAEBNgHAAAEB
+Nv8LAAEBNgK4AAEBNgLCAAEBNgKAAAEBNgAAAAECdgIaAAEBQAKkAAEBQAJrAAEBQAJiAAEBQAHA
+AAEBQAK4AAEBQAKAAAEBQAAAAAECYgHAAAECOAAKAAEBJwHAAAEBJwAAAAEBrwHAAAEBwwKkAAEB
+rwJyAAEBrwJYAAEBrwK4AAEBrwAAAAEBIgHAAAEBIgAAAAEBNwKkAAEBIwJyAAEBIwJYAAEBIwHA
+AAEB4f8LAAEBIwK4AAEBIwLCAAEBIwJiAAEBIwKAAAEB4QAAAAEBOwHAAAEBTwKkAAEBOwJ8AAEB
+OQJYAAEBMQAAAAYAEAABAAoAAAABAAwADAABAB4AZgABAAcBAQEWASEBLgE2AbcB+gAHAAAAHgAA
+ACQAAAAqAAAAMAAAADYAAAA8AAAAQgAB/wYAAAABAHkAAAAB/wwAAAAB/rIAAAAB/xMACgAB/zQA
+AAAB/ygAAAAHABAAFgAcACIAKAAuADQAAf8G/0IAAQBv/yQAAf8W/soAAf6y/0wAAf8T/xUAAf80
+/2AAAf8o/0wABgAQAAEACgABAAEADAAMAAEAPgEIAAEAFwDjAQIBAwEEAQUBBgEHAQ8BGQEaARsB
+HAEdASIBKQEvATUBewGGAYkBuAIfAkoAFwAAAF4AAABqAAAAZAAAAGQAAABqAAAAagAAAHAAAAB2
+AAAAfAAAAIIAAACCAAAAiAAAAIgAAACOAAAAlAAAAJoAAACgAAAApgAAAKwAAACyAAAAuAAAAL4A
+AADEAAH+nQHAAAH/CAHAAAH/BgHAAAH/BgH8AAH/JAHAAAH/AAHAAAH/AwHAAAH+/AHAAAH/FgHA
+AAH+xQHeAAH+sgHeAAH/GAHKAAH/KQHAAAH/PQHKAAH+2QHAAAH/NAHUAAH/DAHAAAH/EQHKABcA
+MAA2ADwAPABCAEgATgBUAFoAYABgAGYAbAByAHgAfgCEAIoAkACWAJwAogCoAAH+sQKkAAH/BgJ8
+AAH/CAPiAAH/BgPiAAH/BgPSAAH/BgKnAAH/JAJ8AAH/AAJyAAH/AwQKAAH+/AQKAAH+/AOWAAH/
+DAL3AAH+2QKiAAH+sgJ2AAH/FgJiAAH/KQK4AAH/PQLMAAH+2QKkAAH/NAJ2AAH/DAK4AAH/EQKK
+AAYAEAABAAoAAgABAAwADAABABIAHgABAAEBhwABAAAABgABAFYBZgABAAQAAQBqAcAAAQAAAAoA
+rAGcAAJERkxUAA5sYXRuAC4ABAAAAAD//wALAAAAAQACAAMABAAFAAYADwAQABEAEgAAAAhBWkUg
+ADRDQVQgADxDUlQgAERLQVogAExNT0wgAFRST00gAFxUQVQgAGRUUksgAGwAAP//AAEABwAA//8A
+AQAIAAD//wABAAkAAP//AAEACgAA//8AAQALAAD//wABAAwAAP//AAEADQAA//8AAQAOABNhYWx0
+AHRjYWx0AHxjY21wAIJkbGlnAIpkbm9tAJBmcmFjAJZsaWdhAKBsb2NsAKZsb2NsAKxsb2NsALJs
+b2NsALhsb2NsAL5sb2NsAMRsb2NsAMpsb2NsANBudW1yANZvcmRuANxzdXBzAOR6ZXJvAOoAAAAC
+AAAAAQAAAAEAHgAAAAIAAgAFAAAAAQAbAAAAAQASAAAAAwATABQAFQAAAAEAHAAAAAEADwAAAAEA
+BgAAAAEADgAAAAEACwAAAAEACgAAAAEACQAAAAEADAAAAAEADQAAAAEAEQAAAAIAGAAaAAAAAQAQ
+AAAAAQAdACAAQgCkATgBpAGkAb4CHAJaAloCbgJuApACkAKQApACkAKkAugCxgLUAugC9gNCA0ID
+aAO+A+AEAgQmBGoEfgSwAAEAAAABAAgAAgAuABQB9ACjAKgB8wFLAWgBbgGhAccB9AHsAgICKgIv
+AjMBcQJBAkQCTQJ+AAEAFAB1AKAApwDTAUwBaQFvAZ8ByAHPAe0CAQInAjACNAI1AkACRQJOAn8A
+AwAAAAEACAABAHAADAAeACQAKgAwADgAPgBEAEwAUgBYAGAAaAACAAUB8wACAUsBTAACAWgBaQAD
+AW4BbwFwAAIBkwGVAAIBxwHIAAMB7AHtAfEAAgIvAjAAAgIzAjQAAwJEAkUCSAADAk0CTgJPAAMC
+fgJ/AoAAAQAMAAQBSgFnAW0BjAHGAesCLgIyAkMCTAJ9AAYAAAACAAoAHAADAAAAAQB0AAEAQAAB
+AAAAAwADAAAAAQBiAAIAFAAuAAEAAAAEAAEACwEBARYBLgE2AYcBtwHfAjYCNwI6AjsAAQAPAOMB
+AgEHAQ8BGQEiASkBLwE1AXsBhgGJAbgCHwJKAAEAAAABAAgAAgAKAAIBlQGhAAEAAgGMAZ8ABAAA
+AAEACAABAE4AAgAKACwABAAKABAAFgAcAQMAAgDjAQQAAgF7AQUAAgGGAQYAAgJKAAQACgAQABYA
+HAEaAAIA4wEbAAIBewEcAAIBhgEdAAICSgABAAIBAgEZAAYAAAACAAoAJAADAAEAFAABAEIAAQAU
+AAEAAAAHAAEAAQGmAAMAAQAUAAEAKAABABQAAQAAAAgAAQABAGMAAQAAAAEACAABAAYAAQABAAEC
+AQABAAAAAQAIAAIADgAEAKMAqAIqAkEAAQAEAKAApwInAkAAAQAAAAEACAABAAYABwABAAEBjAAB
+AAAAAQAIAAIADgAEAXAB8QJIAk8AAQAEAW0B6wJDAkwAAQAAAAEACAABANAAAQABAAAAAQAIAAEA
+Bv88AAEAAQI1AAEAAAABAAgAAQCuAAIABgAAAAIACgAiAAMAAQASAAEAUAAAAAEAAAAWAAEAAQFx
+AAMAAQASAAEAOAAAAAEAAAAXAAEACgFLAWgBbgHHAewCLwIzAkQCTQJ+AAEAAAABAAgAAQAG//8A
+AQAKAUwBaQFvAcgB7QIwAjQCRQJOAn8ABgAAAAIACgAkAAMAAQAsAAEAEgAAAAEAAAAZAAEAAgAE
+ANMAAwABABIAAQAqAAAAAQAAABkAAQAKAUoBZwFtAcYB6wIuAjICQwJMAn0AAQACAHUBzwABAAAA
+AQAIAAIADgAEAfMB9AHzAfQAAQAEAAQAdQDTAc8ABAAAAAEACAABABQAAQAIAAEABAHOAAMBzwIA
+AAEAAQBsAAQAAAABAAgAAQBaAAEACAACAAYADgFfAAMBXAGZAWIAAgGZAAQAAAABAAgAAQA2AAEA
+CAAFAAwAFAAcACIAKAFeAAMBXAGMAWAAAwFcAaYBXQACAVwBYQACAYwBZAACAaYAAQABAVwAAQAA
+AAEACAABAAYAAwABAAECfQAGAAAAAQAIAAMAAQAYAAEAOAADACQAHgAkAAEAAAAfAAEAAQBfAAEA
+AQBhAAEAAQBQAAEAAAABAAgAAQAGAAEAAQABAAQAAAABAAAAAA==
+'
+
 ICON_PNG_B64='
 iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAABHNCSVQICAgIfAhkiAAAIABJREFUeJzsvXecJUd57/19qrr7hMlp
 Z3NQWFAAIQQSksASwWQwItrXluEaAcZgwsXGgC8Xrs177QsGbMBgjDGYZEww2NiAA+Y6ALZJMiAESEhotUEbZ3YnnHO6q+p5/6g+
@@ -14581,11 +16556,14 @@ function create_app() {
     <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
     <key>LSMinimumSystemVersion</key><string>12.0</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>ATSApplicationFontsPath</key><string>fuentes</string>
     <key>LVMScript</key><string>$SELF</string>
 </dict>
 </plist>
 EOF
     printf '#!/bin/bash\nexec open -a Terminal "%s"\n' "$APP_OPENER" > "$contents/MacOS/lvm"
+    mkdir -p "$contents/Resources/fuentes"
+    tr -d ' \n' <<< "$FONT_GOLDMAN_B64" | base64 --decode > "$contents/Resources/fuentes/Goldman-Regular.ttf" 2> /dev/null
     chmod 755 "$contents/MacOS/lvm"
 
     # Icono: el PNG se amplia a los tamaños que pide macOS y se convierte a .icns
@@ -14821,6 +16799,15 @@ func parseLines(_ out: String) -> [[String]] {
 }
 
 func field(_ f: [String], _ i: Int) -> String { return i < f.count ? f[i] : "" }
+
+/// Lo que queda libre y el total del disco donde está la ruta (lo libre como lo cuenta el Finder,
+/// con lo que macOS puede liberar)
+func diskSpace(_ path: String) -> (free: Int64, total: Int64)? {
+    guard let v = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey,
+                                                                          .volumeTotalCapacityKey]),
+          let free = v.volumeAvailableCapacityForImportantUsage, let total = v.volumeTotalCapacity, total > 0 else { return nil }
+    return (free, Int64(total))
+}
 
 func fmtSize(_ n: Int64) -> String {
     let units = ["B", "KB", "MB", "GB", "TB"]
@@ -15236,6 +17223,14 @@ final class RadioGroup: NSObject {
     }
 }
 
+/// Ancho de un desplegable o un campo para que se vea entero el texto más largo (con la flecha y
+/// los márgenes), entre min y max
+func fitWidth(_ texts: [String], min lo: CGFloat, max hi: CGFloat) -> CGFloat {
+    let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    let widest = texts.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+    return Swift.min(hi, Swift.max(lo, (widest + 48).rounded(.up)))
+}
+
 struct DialogResult {
     var ok = false
     var checked = false
@@ -15257,7 +17252,7 @@ final class DialogValidator: NSObject, NSTextFieldDelegate {
 func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Style = .informational,
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
-               secure: Bool = false, cancelLabel: String = "Cancelar",
+               value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -15311,6 +17306,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
         f.controlSize = .large
         f.font = NSFont.systemFont(ofSize: 13)
         f.placeholderString = placeholder
+        f.stringValue = value
         f.delegate = validator
         f.translatesAutoresizingMaskIntoConstraints = false
         f.widthAnchor.constraint(equalToConstant: width).isActive = true
@@ -15929,6 +17925,8 @@ final class TaskRunner: ObservableObject, Identifiable {
                        + "echo \"@@LVM-FIN-$LVM_FIN 97@@\"; exit 97; }; "
                        + "/bin/bash \"$0\" \"$@\"; echo \"@@LVM-FIN-$LVM_FIN $?@@\""] + scriptArgs(args)
         extra["LVM_FIN"] = FIN_TOKEN
+        // (lo que cambia algo pide la contraseña al empezar: cancelarla no deja nada a medias)
+        extra["LVM_TAREA"] = "1"
         p.environment = scriptEnv(extra)
         p.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
         let inPipe = Pipe(), out = Pipe()
@@ -16465,6 +18463,10 @@ final class AppModel: ObservableObject {
     @Published var backups: [Int64]? = nil
     /// Lo que ocupa cada BBDD («versión|base» → [bytes, cuándo se midió]; gui-bbdd-tamanos)
     @Published var dbSizes: [String: [Int64]] = [:]
+    /// Lo que ocupa cada proyecto en el disco: carpeta → [bytes, cuándo se midió]
+    @Published var projectSizes: [String: [Int64]] = [:]
+    var projSizesBusy = false
+    var projSizesAt = Date.distantPast
     // Docker (gui-docker): nil hasta leerlo. Uso de CPU y memoria, vista, filtros y proyectos plegados
     @Published var docker: DockerData? = nil
     @Published var dkStats: DockerStats? = nil
@@ -16552,6 +18554,7 @@ final class AppModel: ObservableObject {
         reloadProjects()
         reloadDocker()
         reloadDbSizes()
+        reloadProjectSizes()
         if withBranches {
             branches = nil
             branchesError = nil
@@ -16978,7 +18981,7 @@ final class AppModel: ObservableObject {
         let rows = parseLines(out).filter { $0[0] == "F" && $0.count >= 8 }.map { f in
             HostEntry(name: f[1], alias: f[2], folder: f[3], fake: f[4] == "1",
                       https: f[5] == "1", crt: f[6] == "1", ps: f[7] == "1",
-                      custom: f.count >= 9 && f[8] == "1")
+                      custom: f.count >= 9 && f[8] == "1", media: f.count >= 10 ? f[9] : "")
         }
         if hosts == nil || rows != hosts! { hosts = rows }
         let fix = parseLines(out).filter { $0[0] == "L" && $0.count >= 3 }.map { [$0[1], $0[2]] }
@@ -17894,6 +19897,128 @@ final class AppModel: ObservableObject {
                 doneText: "Caché vaciada", autoClose: true)
     }
 
+    /// Dominio de producción para las imágenes que faltan: el campo con el que había o el propuesto;
+    /// vacío (si ya había uno), deja de pedirlas. done(dominio o "" para quitar)
+    private func askMedia(_ title: String, _ text: String, saved: String, value: String,
+                          _ done: (String) -> Void) {
+        func clean(_ s: String) -> String {
+            var d = s.trimmingCharacters(in: .whitespaces).lowercased()
+            for p in ["https://", "http://"] where d.hasPrefix(p) { d = String(d.dropFirst(p.count)) }
+            while d.hasSuffix("/") { d = String(d.dropLast()) }
+            return d
+        }
+        let r = runDialog(title: title, text: text, okLabel: "Guardar", hasField: true,
+                          fieldLabel: "Dominio de la web real (ejemplo.com)", placeholder: "ejemplo.com", value: value,
+                          validate: { _, typed in
+                              let d = clean(typed)
+                              if d.isEmpty {
+                                  return (!saved.isEmpty, saved.isEmpty ? "Dominio de la web real (ejemplo.com)"
+                                          : "Vacío: deja de pedir nada a producción", false)
+                              }
+                              let ok = matches(DOMAIN_RX, d) && !d.hasSuffix(".local") && d != saved
+                              return (ok, ok || d == saved ? "Dominio de la web real (ejemplo.com)" : "No es un dominio de la web real", !ok && d != saved)
+                          })
+        if r.ok { done(clean(r.text)) }
+    }
+
+    /// media-produccion: lo que falte en un .local de wp-content/uploads o img se pide a la web real
+    /// (uploads e img no van en git). Se propone el dominio real del vhost de su carpeta
+    func mediaProxy(_ h: HostEntry) {
+        if busy { return }
+        let guess = h.media.isEmpty
+            ? ((hosts ?? []).first(where: { !h.folder.isEmpty && $0.folder == h.folder
+                                            && !$0.name.lowercased().hasSuffix(".local") })?.name ?? "")
+            : h.media
+        askMedia("Imágenes de producción en \(h.name)",
+                 "Las imágenes, vídeos y PDF de wp-content/uploads o img que no estén en la carpeta se piden a la web real (redirección 302): no hace falta descargarlas. Solo en los .local; lo que ya está en local se sigue sirviendo desde aquí.",
+                 saved: h.media, value: guess) { prod in
+            if prod.isEmpty {
+                runTask("Quitando las imágenes de producción de \(h.name)", ["media-produccion", h.name, "quitar"],
+                        doneText: "\(h.name) ya no pide nada a producción", autoClose: true)
+            } else {
+                runTask("Imágenes de producción en \(h.name)", ["media-produccion", h.name, prod],
+                        doneText: "\(h.name) pide a \(prod) las imágenes que faltan", autoClose: true)
+            }
+        }
+    }
+
+    /// media-proyecto: lo que le falte a un WordPress de wp-content/uploads se pide a su web real
+    /// mientras esté cargado (por web.local). Se propone el dominio de su base (home o siteurl)
+    func wpMedia(_ x: Project) {
+        if busy { return }
+        runQuick(["gui-wp-produccion", x.name], env: dbEnv()) { _, out in
+            var f: [String: String] = [:]
+            for l in parseLines(out) where l.count >= 2 { f[l[0]] = l[1] }
+            let saved = f["G"] ?? "", guess = f["D"] ?? ""
+            self.askMedia("Imágenes de producción de \(x.name)",
+                          "Mientras esté cargado, lo que falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde aquí."
+                              + (saved.isEmpty && !guess.isEmpty ? "\n\n\(guess) es el dominio de su BBDD: compruébalo antes de guardar." : ""),
+                          saved: saved, value: saved.isEmpty ? guess : saved) { prod in
+                if prod.isEmpty {
+                    self.runTask("Quitando las imágenes de producción de \(x.name)", ["media-proyecto", x.name, "quitar"],
+                                 doneText: "\(x.name) ya no pide nada a producción", autoClose: true)
+                } else {
+                    self.runTask("Imágenes de producción de \(x.name)", ["media-proyecto", x.name, prod],
+                                 doneText: "\(x.name) pide a \(prod) las imágenes que le faltan", autoClose: true)
+                }
+            }
+        }
+    }
+
+    /// ps-imagenes: una tienda se ve con su dominio real falseado (una redirección volvería aquí), así
+    /// que las imágenes que faltan se descargan de la web real, con la lista de su BBDD
+    func psImages(_ x: Project) {
+        if busy { return }
+        guard confirm("¿Descargar las imágenes que le faltan a \(x.name)?",
+                      "Se descargan de su web real las imágenes de productos, categorías y marcas que no están en su carpeta img (la lista sale de su BBDD, en la versión activa). Lo que ya está en local no se toca. Con muchos productos puede tardar y ocupar bastante.\n\nSu dominio está falseado en este Mac: se busca con DNS cifrado (Cloudflare) y se comprueba su certificado real.",
+                      "Descargar") else { return }
+        checkDbAccess {
+            _ = self.runTask("Descargando las imágenes de \(x.name)", ["ps-imagenes", x.name],
+                             doneText: "Imágenes de \(x.name) descargadas", env: self.dbEnv())
+        }
+    }
+
+    /// borrar-proyecto: su carpeta, sus vhosts y dominios, lo de Docker y, si se quiere, su BBDD de la
+    /// versión activa (la de phpMyAdmin), con copia por defecto. Hay que escribir el nombre de la carpeta
+    /// para confirmar: la carpeta no se puede recuperar
+    func deleteProject(_ x: Project) {
+        guard let d = data, !busy else { return }
+        let db = projectPairs(x).first(where: { $0.0.folder == d.active })?.1
+        let docker = dockerOf(x.name)
+        var what = ["su carpeta \(HTDOCS)/\(x.name)", "sus vhosts y las líneas de sus dominios en /etc/hosts"]
+        if !docker.isEmpty {
+            what.append("sus contenedores de Docker (\(docker.map { $0.domain }.joined(separator: ", ")))")
+        }
+        let r = runDialog(title: "¿Borrar el proyecto «\(x.name)»?",
+                          text: "Se borran " + what.dropLast().joined(separator: ", ") + " y " + (what.last ?? "")
+                              + ". La carpeta no se puede recuperar.",
+                          okLabel: "Borrar el proyecto", style: .critical, destructive: true, hasField: true,
+                          fieldLabel: "Escribe \(x.name) para confirmar:",
+                          validate: { _, typed in (typed.trimmingCharacters(in: .whitespaces) == x.name, nil, false) })
+        if !r.ok { return }
+        var args = ["borrar-proyecto", x.name]
+        var withDb = false, copy = false
+        if let db = db {
+            let r2 = runDialog(title: "¿Borrar también su BBDD «\(db)»?",
+                               text: "Es la de XAMPP-\(d.active), la que se ve en phpMyAdmin. Si no, solo se borra el proyecto y la BBDD se queda.",
+                               okLabel: "Borrar también la BBDD", style: .critical, destructive: true,
+                               checkbox: "Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)", checked: true,
+                               cancelLabel: "Solo el proyecto")
+            if r2.ok {
+                withDb = true
+                copy = r2.checked
+                args += ["--bd", db] + (copy ? ["--copia"] : [])
+            }
+        }
+        let finalArgs = args, useDb = withDb
+        let done = "Proyecto «\(x.name)» borrado" + (useDb ? " con su BBDD" : "") + (useDb && copy ? " (copia en ~/lvm-copias)" : "")
+        let go: () -> Void = {
+            _ = self.runTask("Borrando el proyecto \(x.name)", finalArgs, doneText: done,
+                             env: useDb ? self.dbEnv() : [:])
+        }
+        if useDb { checkDbAccess { go() } } else { go() }
+    }
+
     /// Versiones a las que se puede copiar una base: las que no la tienen
     /// Versiones a las que se puede copiar la base: todas las demás (las que ya la tienen también:
     /// se sustituye, con copia antes)
@@ -18204,7 +20329,7 @@ final class AppModel: ObservableObject {
         stack.spacing = 12
         let lines: [(String, NSFont, NSColor)] = [
             ("Versión \(d.version)", NSFont.systemFont(ofSize: NSFont.systemFontSize), .secondaryLabelColor),
-            ("Gestor de paquetes Apache, MariaDB, PHP, Perl, phpMyAdmin y ProFTPD al estilo XAMPP de forma independiente.",
+            ("Herramientas de desarrollo web en local.",
              NSFont.systemFont(ofSize: NSFont.systemFontSize + 1), .labelColor),
             ("\(d.signature)\n© \(Calendar.current.component(.year, from: Date()))",
              NSFont.systemFont(ofSize: NSFont.systemFontSize), .secondaryLabelColor),
@@ -19078,7 +21203,12 @@ struct Chip: View {
     let text: String
     var docker = false
     var body: some View {
-        Text(text)
+        HStack(spacing: 4) {
+            if docker {
+                LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 11, height: 11)
+            }
+            Text(text)
+        }
             .font(.system(size: 10.5, weight: .medium, design: .monospaced))
             .foregroundColor(docker ? brand("docker") : Color.primary)
             .padding(.horizontal, 6)
@@ -19550,6 +21680,28 @@ extension AppModel {
     }
 
     /// Proyectos en Docker de una carpeta de htdocs
+    /// Columna Proyecto de la tabla de proyectos: tan ancha como el nombre más largo (se ve entero),
+    /// entre 260 y 320 (uno más largo se corta con «…» y se ve entero al pasar el ratón)
+    func projectNameWidth() -> CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let widest = (projects?.list ?? []).map { ceil(($0.name as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
+        return Swift.min(320, Swift.max(260, widest + 8))
+    }
+
+    /// Lo que necesita la tabla de proyectos para que no se apriete nada: los márgenes y los espacios
+    /// de la fila, sus columnas fijas y, en Versiones, sitio para dos versiones y una de Docker
+    var projectsTableWidth: CGFloat {
+        let anyDocker = !(docker?.projects.isEmpty ?? true)
+        return 28 + 5 * 12 + 20 + projectNameWidth() + 80 + 190 + 170 + (anyDocker ? 270 : 130)
+    }
+
+    /// Ancho mínimo de la ventana: la barra lateral (220 y su línea), los márgenes de la página (24 a
+    /// cada lado), la barra de desplazamiento y la tabla de proyectos. Así no se puede hacer tan
+    /// estrecha que se rompan los textos y las etiquetas (como mucho unos 1425: cabe en un portátil de 13")
+    var minWindowWidth: CGFloat {
+        return Swift.max(1140, 220 + 1 + 48 + 16 + projectsTableWidth)
+    }
+
     func dockerOf(_ folder: String) -> [DockerProject] {
         return (docker?.projects ?? []).filter { $0.folder == folder }
     }
@@ -19598,6 +21750,25 @@ extension AppModel {
                 }
             }
             DispatchQueue.main.async { self.backups = [size, Int64(n)] }
+        }
+    }
+
+    /// Lo que ocupa cada proyecto en el disco: du en segundo plano, de 10 en 10 proyectos y como mucho una
+    /// vez por minuto (cada uno se vuelve a medir cada 6 horas). Si quedan por medir, la siguiente tanda
+    func reloadProjectSizes(now: Bool = false) {
+        if projSizesBusy || (!now && Date().timeIntervalSince(projSizesAt) < 60) { return }
+        projSizesBusy = true
+        runQuick(["gui-proyectos-tamanos"]) { _, out in
+            var sizes: [String: [Int64]] = [:]
+            var more = false
+            for f in parseLines(out) {
+                if f.count >= 4 && f[0] == "T", let bytes = Int64(f[2]), let when = Int64(f[3]) { sizes[f[1]] = [bytes, when] }
+                if f[0] == "F" { more = true }
+            }
+            self.projSizesBusy = false
+            self.projSizesAt = Date()
+            if sizes != self.projectSizes { self.projectSizes = sizes }
+            if more { self.reloadProjectSizes(now: true) }
         }
     }
 
@@ -19945,7 +22116,9 @@ extension AppModel {
         alert.messageText = "Montar \(x.name) en Docker"
         alert.addButton(withTitle: "Montar en Docker")
         alert.addButton(withTitle: "Cancelar")
-        let width: CGFloat = 300
+        // (ancho del nombre más largo: la BBDD con su versión y el dominio, enteros)
+        let width = fitWidth(pairs.map { "\($0.1) (XAMPP-\($0.0.folder))" } + ["\(base)-php00.docker.local"],
+                             min: 300, max: 520)
         func popup(_ items: [String], _ selected: Int) -> NSPopUpButton {
             let b = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
             b.addItems(withTitles: items)
@@ -20091,13 +22264,14 @@ struct TopBar: View {
         .padding(.vertical, 9)
     }
 
-    /// El nombre: «Nexum» en negrita y lo demás («Dev Stack») normal y en azul, que se lea sobre el
-    /// gris de la ventana (más claro en el tema oscuro, más oscuro en el claro)
+    /// El nombre: «NEXUM» en Goldman y lo demás («Dev Stack») normal y en azul, que se lea sobre el
+    /// gris de la ventana (más claro en el tema oscuro, más oscuro en el claro). Goldman va en la
+    /// aplicación (Resources/fuentes); sin ella, la del sistema
     func title(_ name: String) -> Text {
         guard name.hasPrefix("Nexum "), name.count > 6 else { return Text(name).font(.system(size: 14, weight: .bold)) }
         let blue = scheme == .dark ? hexColor(0x4C9DFF) : hexColor(0x0A6FD6)
-        return (Text("Nexum").bold() + Text(String(name.dropFirst(5))).fontWeight(.regular).foregroundColor(blue))
-            .font(.system(size: 14))
+        return Text("NEXUM").font(.custom("Goldman", size: 15)).kerning(1)
+            + Text(String(name.dropFirst(5))).font(.system(size: 14)).foregroundColor(blue)
     }
 
     /// Menú (☰), sin recuadro, con un icono en cada opción y el tema claro u oscuro
@@ -20506,7 +22680,8 @@ struct ProjectsView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        WidePage {
+        // (al menos tan ancha como la tabla de proyectos: si no, se aprietan el proyecto cargado y la tabla)
+        WidePage(width: Swift.max(980, model.projectsTableWidth)) {
             if let p = model.projects, let d = model.data {
                 hero(p, d)
                 listHead()
@@ -20612,6 +22787,14 @@ struct ProjectsView: View {
         let db = envs.first(where: { $0.0 == current })?.2 ?? ""
         return VStack(alignment: .leading, spacing: 8) {
           HStack(alignment: .bottom, spacing: 12) {
+            // Llevarlo a otro entorno: el +, a la izquierda del entorno (su SQL se importa en la
+            // pestaña Bases de datos; la fila de abajo queda para los accesos directos del proyecto)
+            OutlineMenu(nil, symbol: "plus") {
+                Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
+                Button("En Docker…") { model.openDockerForm(folder: x.name) }
+            }
+            .disabled(model.busy)
+            .tip("Añadir entorno: llevar el proyecto a otra versión de PHP o a Docker")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
                 Picker("", selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) })) {
@@ -20633,19 +22816,6 @@ struct ProjectsView: View {
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.busy || model.data == nil)
                 .tip("Cambiar la BBDD de cada versión (vincular)")
-          }
-          // Llevarlo a otro entorno e importar su SQL, aquí con el entorno y la BBDD (la fila de abajo
-          // queda para los accesos directos del proyecto)
-          HStack(spacing: 8) {
-            OutlineMenu("Añadir entorno…", symbol: "plus") {
-                Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
-                Button("En Docker…") { model.openDockerForm(folder: x.name) }
-            }
-            .disabled(model.busy)
-            .tip("Llevar el proyecto a otra versión de PHP o a Docker")
-            Button(action: { model.importFor(x) }) { Label("Importar SQL", systemImage: "square.and.arrow.down") }
-                .buttonStyle(OutlineButton(kind: "dashed"))
-                .tip("Subir un .sql, .sql.gz o .zip a su BBDD (en Bases de datos)")
           }
         }
         .padding(.horizontal, 14)
@@ -20750,6 +22920,12 @@ struct ProjectsView: View {
             if x.kind == "ps" && !db.isEmpty {
                 Button("Vaciar la caché de la tienda") { model.clearCache(db) }
             }
+            if x.kind == "ps" {
+                Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
+            } else if x.kind == "wp" {
+                Button("Imágenes de producción…") { model.wpMedia(x) }
+            }
+            Button("Borrar el proyecto…") { model.deleteProject(x) }
         }
         .disabled(model.busy)
     }
@@ -20804,12 +22980,14 @@ struct ProjectsView: View {
         let loaded = model.loadedEntry()?.name
         let q = model.projQuery.trimmingCharacters(in: .whitespaces).lowercased()
         let rows = p.list.filter { shows($0, q) }
+        // (la columna Proyecto, tan ancha como el nombre más largo: se ve entero)
+        let nameW = model.projectNameWidth()
         return TableBox {
-            TableHead(cols: [("", 20), ("Proyecto", 260), ("BBDD", 190), ("Versiones", 0), ("", 90)])
+            TableHead(cols: [("", 20), ("Proyecto", nameW), ("Tamaño", 80), ("BBDD", 190), ("Versiones", 0), ("", 90)])
             LazyVStack(spacing: 0) {
                 ForEach(rows, id: \.name) { x in
                     Divider()
-                    projectRow(x, x.name == loaded)
+                    projectRow(x, x.name == loaded, nameW)
                 }
             }
             if rows.isEmpty {
@@ -20820,7 +22998,7 @@ struct ProjectsView: View {
         }
     }
 
-    func projectRow(_ x: Project, _ isLoaded: Bool) -> some View {
+    func projectRow(_ x: Project, _ isLoaded: Bool, _ nameW: CGFloat) -> some View {
         let pairs = model.projectPairs(x)
         let db = pairs.first?.1 ?? model.projectBase(x)
         let dockers = model.dockerOf(x.name)
@@ -20828,7 +23006,11 @@ struct ProjectsView: View {
         let anyDocker = !(model.docker?.projects.isEmpty ?? true)
         return HoverRow(selected: isLoaded || model.selProject == x.name, action: { model.selProject = x.name }) { hover in
             KindIcon(kind: x.kind).col(20)
-            Text(x.name).lineLimit(1).truncationMode(.middle).col(260).tip(x.name)
+            Text(x.name).lineLimit(1).col(nameW).tip(x.name)
+            Text(model.projectSizes[x.name].map { fmtSize($0[0]) } ?? "…")
+                .font(.system(size: 11.5, design: .monospaced)).foregroundColor(.secondary).lineLimit(1).col(80)
+                .tip(model.projectSizes[x.name].map { "Lo que ocupa la carpeta en el disco, medido " + fmtAge(max(0, Int(Date().timeIntervalSince1970) - Int($0[1]))) }
+                     ?? "Midiendo lo que ocupa en el disco…")
             Text(db.isEmpty ? "sin BBDD" : db).font(.system(size: 11.5, design: .monospaced)).foregroundColor(.secondary)
                 .lineLimit(1).truncationMode(.middle).col(190)
             HStack(spacing: 4) {
@@ -20839,6 +23021,8 @@ struct ProjectsView: View {
                     Chip(text: "Docker \(dp.php)", docker: true).tip("https://\(dp.domain) · \(dp.db)")
                 }
             }
+            // (cada etiqueta en una línea: nunca «8», «.», «5» una encima de otra)
+            .fixedSize()
             .col(0)
             HStack {
                 Spacer(minLength: 0)
@@ -20879,6 +23063,12 @@ struct ProjectsView: View {
                         if x.kind == "ps" && !model.projectBase(x).isEmpty {
                             Button("Vaciar la caché de la tienda") { model.clearCache(model.projectBase(x)) }
                         }
+                        if x.kind == "ps" {
+                            Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
+                        } else if x.kind == "wp" {
+                            Button("Imágenes de producción…") { model.wpMedia(x) }
+                        }
+                        Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }
                     .disabled(model.busy)
                     .opacity(hover ? 1 : 0)
@@ -21643,6 +23833,9 @@ struct DockerNewPanel: View {
         let folders = projectFolders().filter { !taken.contains($0) }
         let x = model.projects?.list.first(where: { $0.name == model.dkForm.folder })
         let pairs = x.map { model.projectPairs($0) } ?? []
+        // (ancho del nombre más largo, para verlo entero al elegirlo)
+        let wide = fitWidth(folders + pairs.map { "\($0.1) (XAMPP-\($0.0.folder))" } + [model.dkForm.domain],
+                            min: 320, max: 520)
         return VStack(alignment: .leading, spacing: 12) {
             Text("Su configuración (wp-config.php o la de PrestaShop) cambia solo dentro del contenedor: la carpeta sigue sirviendo con XAMPP-X.")
                 .font(.callout).foregroundColor(.secondary).multilineTextAlignment(.center)
@@ -21656,7 +23849,7 @@ struct DockerNewPanel: View {
                     ForEach(folders, id: \.self) { Text($0).tag($0) }
                 }
                 .labelsHidden()
-                .frame(width: 320)
+                .frame(width: wide)
             }
             formRow("PHP") {
                 Picker("", selection: $model.dkForm.php) {
@@ -21685,7 +23878,7 @@ struct DockerNewPanel: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 320)
+                .frame(width: wide)
             }
             formRow("Dominio") {
                 TextField("carpeta.docker.local", text: Binding(get: { model.dkForm.domain }, set: { v in
@@ -21693,7 +23886,7 @@ struct DockerNewPanel: View {
                     model.dkForm.domainSet = true
                 }))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(width: 320)
+                .frame(width: wide)
             }
             if folders.isEmpty {
                 Text("Todas las carpetas de htdocs están ya en Docker.").font(.callout).foregroundColor(.secondary)
@@ -21982,14 +24175,16 @@ struct DatabasesView: View {
         }
     }
 
-    /// Cuántas hay, en la activa, la última que ha cambiado y lo que ocupan las copias de seguridad
+    /// Cuántas hay, en la activa, la última que ha cambiado y lo que ocupan (y lo libre del disco). Las
+    /// copias de seguridad, en Configuración
     func cards(_ d: AppData) -> some View {
         let act = d.installs.first(where: { $0.folder == d.active })
         let all = d.installs.flatMap { i in (d.dbs[i.folder] ?? []).map { (i.folder, $0) } }
         let latest = all.max { (d.dbDates[$0.0 + "|" + $0.1]?.when ?? 0) < (d.dbDates[$1.0 + "|" + $1.1]?.when ?? 0) }
         let latestWhen = latest.flatMap { d.dbDates[$0.0 + "|" + $0.1]?.when } ?? 0
         let now = Int(Date().timeIntervalSince1970)
-        let b = model.backups
+        let dbTotal = all.compactMap { model.dbSizes[$0.0 + "|" + $0.1]?.first }
+        let disk = diskSpace("/Applications")
         return HStack(spacing: 12) {
             StatCard(title: "BBDD", value: "\(all.count)",
                      sub: "en " + plural(Set(all.map { $0.0 }).count, "versión", "versiones"))
@@ -21997,13 +24192,13 @@ struct DatabasesView: View {
                      sub: act.map { "XAMPP-\($0.folder) · MariaDB \($0.mariadb)" } ?? "ninguna activa")
             StatCard(title: "La última que ha cambiado", value: latestWhen > 0 ? (latest?.1 ?? "—") : "—",
                      sub: latestWhen > 0 ? "XAMPP-\(latest?.0 ?? "") · \(fmtAge(max(0, now - latestWhen)))" : "")
-            StatCard(title: "Copias de seguridad", value: b.map { fmtSize($0[0]) } ?? "…",
-                     sub: b.map { plural(Int($0[1]), "fichero", "ficheros") + " en ~/lvm-copias" } ?? "~/lvm-copias",
-                     action: ("Abrir", {
-                         let path = NSHomeDirectory() + "/lvm-copias"
-                         try? FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-                         showFolder(path)
-                     }))
+            // Lo que ocupan las BBDD de todas las versiones y lo que queda libre en el disco de /Applications
+            StatCard(title: "Ocupan las BBDD", value: dbTotal.isEmpty ? "—" : fmtSize(dbTotal.reduce(0, +)),
+                     sub: disk.map { "Disco: \(fmtSize($0.free)) libres de \(fmtSize($0.total))" } ?? "",
+                     progress: disk.map { 1 - Double($0.free) / Double($0.total) })
+                .tip(dbTotal.count < all.count
+                      ? plural(all.count - dbTotal.count, "BBDD", "BBDD") + " sin medir: cada BBDD se mide cuando su versión está activa y en marcha"
+                      : "Datos e índices de las BBDD de todas las versiones")
         }
     }
 
@@ -22554,6 +24749,7 @@ struct HostEntry: Equatable {
     var crt: Bool
     var ps: Bool
     var custom: Bool
+    var media: String = ""
 }
 
 /// Dominios de los vhosts y si están falseados en /etc/hosts (llevan a este Mac). Al cargar una
@@ -22814,6 +25010,7 @@ struct HostsView: View {
         var parts = [h.folder.isEmpty ? "sin carpeta en htdocs" : h.folder]
         if h.ps { parts.append("PrestaShop") } else if h.custom { parts.append("Proyecto nuevo") }
         if !h.https { parts.append("sin https") } else if !h.crt { parts.append("falta el certificado") }
+        if !h.media.isEmpty { parts.append("imágenes que faltan de \(h.media)") }
         return parts.joined(separator: "  ·  ")
     }
 
@@ -22828,6 +25025,12 @@ struct HostsView: View {
                     }
                 }
                 .tip("\(h.https ? "https" : "http")://\(h.name)")
+            }
+            if h.name.lowercased().hasSuffix(".local") {
+                Button(action: { model.mediaProxy(h) }) { Image(systemName: "photo") }
+                    .disabled(model.busy)
+                    .tip("Imágenes de producción: lo que falte aquí de wp-content/uploads o img se pide a la web real"
+                         + (h.media.isEmpty ? "" : " (ahora, a \(h.media))"))
             }
             Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
                 .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
@@ -23151,7 +25354,7 @@ struct GestorApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 1140, minHeight: 680)
+                .frame(minWidth: model.minWindowWidth, minHeight: 680)
         }
         .commands {
             CommandGroup(replacing: .appInfo) {
@@ -24301,8 +26504,7 @@ function cli_remove() {
 }
 
 # Acerca de: que hace el instalador y la lista de versiones con sus cambios (la ultima, arriba)
-ABOUT_TEXT="Gestor de paquetes Apache, MariaDB, PHP, Perl, phpMyAdmin y ProFTPD al
-estilo XAMPP de forma independiente. Para Mac con Apple Silicon.
+ABOUT_TEXT="Herramientas de desarrollo web en local. Para Mac con Apple Silicon.
 
 QUE HACE
 - Instala varias versiones de PHP, de la 7.4 a la 8.5, cada una con su
@@ -24324,6 +26526,68 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.39.26 (27 oct 2026)
+- Ventana: ya no se puede hacer tan estrecha que se rompa. Su ancho
+  mínimo sale de la tabla de proyectos (la columna Proyecto, la de las
+  versiones y los botones), y la página de Proyectos ya no se queda en
+  980 puntos: el nombre del proyecto cargado, «BBDD» y las etiquetas de
+  versión («8.5») ya no se parten. Un nombre de carpeta muy largo se
+  corta con «…» y se ve entero al pasar el ratón.
+- Bases de datos: sin la tarjeta «Copias de seguridad» (están en
+  Configuración, con su botón Abrir).
+- Correo de pruebas: Mailpit ya se instala. Decía siempre «no lleva una
+  firma válida» porque la firma se comprobaba con tu usuario en una
+  carpeta que solo puede abrir root. Ahora se comprueba como root (y,
+  si alguna versión viniera sin firmar, se le pone una firma local: su
+  contenido ya está comprobado con la sha256 de la descarga).
+
+1.39.25 (27 oct 2026)
+- Proyectos, menú ⋮: «Borrar el proyecto…» borra el proyecto entero:
+  su carpeta, sus vhosts, las líneas de sus dominios en /etc/hosts (un
+  dominio real no se queda falseado) y lo que tenga en Docker. Pregunta
+  si se borra también su BBDD de la versión activa (la de phpMyAdmin),
+  con copia antes por defecto. Hay que escribir el nombre de la carpeta
+  para confirmar. Si un paso falla no sigue: la carpeta, lo último.
+  En la terminal: borrar-proyecto <carpeta> [--bd <base> --copia].
+- Imágenes de producción: uploads e img no van en git, así que lo que
+  falte en local se trae de la web real. En WordPress, menú ⋮
+  «Imágenes de producción…» (propone el dominio de su BBDD): mientras
+  esté cargado, lo que falte de wp-content/uploads se pide a la web
+  real, sin descargar nada. En PrestaShop, que se ve con su dominio real
+  falseado, «Descargar de producción las imágenes que faltan…»: las de
+  productos, categorías y marcas que dice su BBDD, por https con DNS
+  cifrado y comprobando el certificado real. Solo imágenes, vídeos y
+  PDF; nunca un .php ni fuera de img. En Dominios y hosts, cada .local
+  tiene también su botón de imagen. En la terminal: media-produccion,
+  media-proyecto y ps-imagenes.
+- Docker: al crear un proyecto o montarlo desde Proyectos, los
+  desplegables y el dominio enseñan el nombre entero.
+
+1.39.24 (27 oct 2026)
+- Cancelar ya no deja nada a medias: desde la ventana, lo que cambia
+  algo pide la contraseña de administrador al empezar, no a mitad. Si se
+  cancela, no se ha hecho nada. Antes, al desmontar el proyecto y cancelar
+  la contraseña, se desmontaba igual. Desmontar es ahora todo o nada,
+  como cargar: si un paso falla, el proyecto sigue cargado.
+- Cabecera: «Dev Stack» vuelve a la letra de antes.
+- Acerca de: más corto («Herramientas de desarrollo web en local») y
+  la firma sin HEXER.
+
+1.39.23 (27 oct 2026)
+- Proyectos: columna «Tamaño», con lo que ocupa cada proyecto en el
+  disco (se mide en segundo plano, de 10 en 10, y cada uno se vuelve a
+  medir cada 6 horas). La columna Proyecto, con el nombre entero de la
+  carpeta. La etiqueta de Docker de Versiones, con su logotipo.
+- Cabecera: «NEXUM» en mayúsculas y en Goldman (Google Fonts, licencia
+  SIL Open Font License; va dentro del programa).
+
+1.39.22 (26 oct 2026)
+- Bases de datos: tarjeta nueva «Ocupan las BBDD», con lo que ocupan las
+  de todas las versiones y una barra del disco con lo que queda libre.
+- Proyecto cargado: «Añadir entorno» pasa a un botón + a la izquierda del
+  entorno, en su misma fila. Sin el botón «Importar SQL»: para importar,
+  la pestaña Bases de datos (o el menú ⋮ de la fila del proyecto).
 
 1.39.21 (26 oct 2026)
 - PrestaShop 1.7+ en Docker y en LAMPP a la vez: la tienda ya no deja de
@@ -25886,6 +28150,16 @@ if [ -z "$TEST_DIR" ] && [ "$DRY" -eq 0 ] && [[ "$1" != gui-* ]] && [ "$1" != mi
     fi
 fi
 
+# Tareas de la ventana (LVM_TAREA=1): lo que cambia algo pide la contraseña de administrador antes de
+# empezar, no a mitad. Si se cancela, no se ha hecho nada (antes, lo hecho hasta el primer sudo se
+# quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
+if [ "${LVM_TAREA:-}" == 1 ]; then
+    case "$1" in
+        gui-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
+        *) sudo_first || exit 130 ;;
+    esac
+fi
+
 case "$1" in
     "")
         # Abierto desde una aplicacion de la 1.1.0 o anterior (abria el panel en Terminal): se pone
@@ -25933,6 +28207,7 @@ case "$1" in
     gui-bd-comprobar) gui_db_check ;;
     gui-bd-info) gui_db_info "$2" ;;
     gui-bbdd-tamanos) gui_db_sizes ;;
+    gui-proyectos-tamanos) gui_project_sizes "$2" ;;
     gui-proyectos) gui_projects ;;
     gui-docker) gui_docker ;;
     gui-docker-estadisticas) gui_docker_stats ;;
@@ -25949,6 +28224,7 @@ case "$1" in
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
+    borrar-proyecto) shift; delete_project "$@" ;;
     usuario-pruebas) test_admin "$2" "$3" ;;
     montar-proyecto) mount_project "$2" "$3" "$4" "$5" "$6" ;;
     vaciar-cache)
@@ -25970,6 +28246,10 @@ case "$1" in
     confiar-certificados) browser_trust "$2" ;;
     actualizar-phpmyadmin) update_pma "$2" ;;
     hosts-falsear) hosts_fake_one "$2" "$3" ;;
+    media-produccion) media_proxy "$2" "$3" ;;
+    media-proyecto) media_project "$2" "$3" ;;
+    gui-wp-produccion) gui_wp_prod "$2" ;;
+    ps-imagenes) ps_images "$2" ;;
     hosts-enlace) hosts_fix_link ;;
     nuevo-dominio) new_custom_domain "$2" "$3" "$4" ;;
     cerrar-procesos) close_processes "$2" ;;

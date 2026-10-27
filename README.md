@@ -4,7 +4,7 @@ Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
-**Versión actual: 1.55.10** · [Novedades de todas las versiones](CHANGELOG.md)
+**Versión actual: 1.55.14** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe
 
@@ -490,4 +490,4 @@ En [`macos/`](macos/README.md) está la versión para Mac con Apple Silicon (M1 
 
 ---
 
-By M.Mascuñano - HEXER
+By M.Mascuñano
