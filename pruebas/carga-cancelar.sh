@@ -55,6 +55,8 @@ check "la contraseña se pide antes de cambiar nada" 'awk "/^function load_proje
 # Desmontar (Linux 1.55.12 / Mac 1.39.23): la contraseña antes de nada y todo o nada
 if grep -q '^function unload_project_steps() {' "$SRC"; then
     extract "$SRC" unload_project unload_project_steps sudo_first || exit 1
+    grep -q '^function empty_page() {' "$SRC" && { extract "$SRC" empty_page || exit 1; }
+    ICON_PNG_B64=$(printf 'png' | base64) LOG_DIR=$W/log
     EMPTY_PROJECT=sin-proyecto PROJECT_VHOST=web.local LINK=$W/sin-version
     mkdir -p "$HTDOCS_DIR/$EMPTY_PROJECT"
     project_write() { cp "$1" "$2"; }
@@ -70,6 +72,18 @@ if grep -q '^function unload_project_steps() {' "$SRC"; then
     hosts_fake() { :; }
     out=$(unload_project 2>&1); rc=$?
     check "desmontar sin fallos: desmontado" '[ $rc -eq 0 ] && [ "$(readlink "$HTDOCS_DIR/web.local")" == sin-proyecto/ ]'
+    # (Linux 1.56.0) La pagina sin proyecto: logotipo y nombre de Nexum Dev Stack, sin nada de fuera
+    if grep -q '^function empty_page() {' "$SRC"; then
+        page=$HTDOCS_DIR/$EMPTY_PROJECT/index.html
+        check "pagina sin proyecto: con el logotipo y el nombre de Nexum Dev Stack" 'grep -q "<img src=\"data:image/png;base64,$ICON_PNG_B64\"" "$page" && grep -q "Abre <b>Nexum Dev Stack</b>" "$page" && ! grep -q lvm-instalador "$page"'
+        check "pagina sin proyecto: no pide nada a otro sitio" '! grep -qE "(src|href)=\"(https?:)?//" "$page"'
+        echo antigua > "$page"
+        DRY=0 empty_page "$HTDOCS_DIR/$EMPTY_PROJECT"
+        check "pagina sin proyecto: la de una version anterior se cambia por la nueva" 'grep -q "NEXUM" "$page"'
+        before=$(stat -c %Y "$page"); touch -d "2000-01-01" "$page"
+        DRY=0 empty_page "$HTDOCS_DIR/$EMPTY_PROJECT"
+        check "pagina sin proyecto: si no ha cambiado, no se vuelve a escribir" '[ "$(stat -c %Y "$page")" == "$(date -d 2000-01-01 +%s)" ]'
+    fi
     SUDO=""
 fi
 check "tareas de la ventana: lo que cambia algo pide la contraseña antes de empezar" 'grep -q "env\[\"LVM_TAREA\"\] = \"1\"\|extra\[\"LVM_TAREA\"\] = \"1\"" "$SRC" && sed -n "/^if \[ \"\${LVM_TAREA:-}\" == 1 \]; then/,/^fi/p" "$SRC" | grep -q "\*) sudo_first || exit 130 ;;"'

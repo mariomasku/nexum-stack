@@ -71,6 +71,8 @@ suite "Docker: visor y Panel con el admin de pruebas (1.55.9)" "$HERE/docker-pan
 suite "PrestaShop: cache con otra BBDD (1.55.10)" "$HERE/ps-cache.sh" "$L"
 suite "Proyectos: lo que ocupa cada uno (1.55.12)" "$HERE/proyectos-tamanos.sh" "$L"
 suite "imágenes de producción y borrar un proyecto (1.55.14)" "$HERE/media-borrar.sh" "$L"
+suite "Docker con su propio Apache (1.56.0)" "$HERE/docker-web.sh" "$L"
+suite "túnel de Cloudflare (1.56.0)" "$HERE/tunel.sh" "$L"
 echo "Mac ($M, $(grep -m1 '^APP_VERSION=' "$M" | cut -d'"' -f2))"
 suite "volcados (MariaDB temporal)" "$HERE/volcados.sh" "$M"
 suite "certificados y dominios" "$HERE/certs.sh" "$M"

@@ -117,6 +117,22 @@
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
 #       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
 #
+#   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]
+#   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
+#   lvm-instalador docker-pasar <nombre>
+#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
+#       Proyectos en Docker con el Apache de Docker (desde la 1.56): no necesitan LAMPP y un proyecto
+#       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
+#       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
+#       Su BBDD va en una MariaDB comun por version y phpMyAdmin en https://pma.docker.local.
+#       docker-pasar lleva al Apache de Docker un proyecto de antes (con LAMPP delante). docker-web:
+#       su direccion y sus puertos (127.0.0.2, 80 y 443) y permitir que Docker sin root use los de
+#       menos de 1024
+#   lvm-instalador tunel-abrir <direccion local> [carpeta] | tunel-cerrar | tunel | tunel-instalar
+#   lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir
+#       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
+#       direccion https://<algo>.trycloudflare.com, con contraseña, el admin bloqueado y que se
+#       cierra solo (2 h). La web no se toca: el dominio local se cambia por el del tunel al pasar
 #   lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   lvm-instalador docker-php <nombre> <version de PHP>
 #   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
@@ -692,7 +708,7 @@ TEST_DIR=${LVM_PRUEBA:-}
 if [ -z "$TEST_DIR" ]; then
     unset LVM_HTDOCS LVM_VHOSTS LVM_VHOSTS_ACTIVO LVM_SSL_CERTS LVM_SSL_KEYS LVM_HOSTS LVM_BD_CLIENTE \
         LVM_BD_VOLCADO LVM_ENLACE LVM_PS LVM_PRUEBA_CAS LVM_PRUEBA_CLAVES LVM_PRUEBA_SSL LVM_MAILPIT_URL \
-        LVM_MAILPIT_SHA
+        LVM_MAILPIT_SHA LVM_DOCKER_SYSCTL LVM_PORT_START_FILE LVM_CLOUDFLARED_URL LVM_CLOUDFLARED_SHA
 fi
 # Proyectos y vhosts compartidos por todas las versiones (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-/opt/htdocs}
@@ -728,7 +744,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.55.14"
+APP_VERSION="1.56.0"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -2398,12 +2414,43 @@ function project_write() {
 # hay ninguno cargado: una pagina que lo dice (no sale en la lista de proyectos)
 EMPTY_PROJECT=.lvm-sin-proyecto
 
+# empty_page <carpeta>: su index.html, con el logotipo y el nombre de Nexum Dev Stack (en Goldman si
+# la ventana ya ha dejado la fuente en la cache; si no, la del navegador). Todo va dentro de la
+# pagina: sin nada que pedir a otro sitio. Solo se escribe si ha cambiado (una version anterior)
+function empty_page() {
+    local dir=$1 page font="$LOG_DIR/cache/fuentes/Goldman-Regular.ttf" face=""
+    [ "$DRY" -eq 1 ] && return 0
+    page=$(mktemp) || return 1
+    [ -f "$font" ] && face="@font-face{font-family:Goldman;src:url(data:font/ttf;base64,$(base64 -w0 "$font")) format('truetype')}"
+    cat > "$page" << HTML
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sin proyecto · Nexum Dev Stack</title>
+<link rel="icon" href="data:image/png;base64,$(tr -d ' \n' <<< "$ICON_PNG_B64")">
+<style>$face
+body{font-family:system-ui,sans-serif;background:#1e1e1e;color:#ddd;display:flex;align-items:center;
+justify-content:center;min-height:100vh;margin:0;padding:16px;box-sizing:border-box}main{text-align:center;max-width:34em}
+img{width:120px;height:120px}.marca{font-size:2.2em;margin:18px 0 34px;white-space:nowrap}
+.nexum{font-family:Goldman,system-ui,sans-serif;letter-spacing:2px;color:#fff}.stack{color:#62a0ea;margin-left:.3em}
+h1{font-size:1.4em;font-weight:500;margin:0 0 10px}p{color:#9a9a9a;line-height:1.5;margin:0}b{color:#ddd;font-weight:600}</style>
+</head><body><main>
+<img src="data:image/png;base64,$(tr -d ' \n' <<< "$ICON_PNG_B64")" alt="">
+<div class="marca"><span class="nexum">NEXUM</span><span class="stack">Dev Stack</span></div>
+<h1>No hay ningún proyecto cargado</h1>
+<p>Abre <b>Nexum Dev Stack</b> y, en <b>Proyectos</b>, pulsa <b>Cargar</b> en el que quieras ver aquí.</p>
+</main></body></html>
+HTML
+    chmod 644 "$page"
+    cmp -s "$page" "$dir/index.html" || project_write "$page" "$dir/index.html"
+    rm -f "$page"
+}
+
 # desmontar-proyecto: el vhost de los proyectos (web.local) deja de apuntar al proyecto cargado y
 # apunta a una pagina que dice que no hay ninguno. El enlace sigue existiendo: si se borrara, el
 # gestor ya no reconoceria el vhost y al cargar otro proyecto intentaria crearlo de nuevo. Los
 # dominios falseados de una tienda PrestaShop dejan de estarlo (vuelven a llevar a la web real)
 function unload_project() {
-    local link sudo="" dir=$HTDOCS_DIR/$EMPTY_PROJECT page rc
+    local link sudo="" dir=$HTDOCS_DIR/$EMPTY_PROJECT rc
 
     link=$(project_link)
     if [ -z "$link" ]; then
@@ -2427,19 +2474,7 @@ function unload_project() {
     if [ ! -d "$dir" ]; then
         run $sudo mkdir -m 755 "$dir" || return 1
     fi
-    if [ ! -f "$dir/index.html" ] && [ "$DRY" -eq 0 ]; then
-        page=$(mktemp) || return 1
-        cat > "$page" <<'HTML'
-<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Sin proyecto</title>
-<style>body{font-family:sans-serif;background:#2b2b2b;color:#ddd;display:flex;align-items:center;
-justify-content:center;height:90vh;margin:0}div{text-align:center}h1{font-weight:500}p{color:#999}</style>
-</head><body><div><h1>No hay ningún proyecto cargado</h1>
-<p>Carga uno en lvm-instalador: Versiones, Cargar proyecto.</p></div></body></html>
-HTML
-        project_write "$page" "$dir/index.html"
-        rm -f "$page"
-    fi
+    empty_page "$dir"
     # Todo o nada (como al cargar): si un paso falla o se cancela la tarea, el enlace vuelve al proyecto
     LOAD_UNDO_LINK=$link LOAD_UNDO_TARGET=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null)
     LOAD_UNDO_ACTIVE=$(readlink /opt/lampp 2> /dev/null)
@@ -11654,6 +11689,46 @@ QUE HACE
 
 VERSIONES
 
+1.56.0 (27 oct 2026)
+- Docker con su propio Apache: los proyectos de Docker ya no necesitan
+  LAMPP (funcionan con LAMPP parado o con cualquier versión activa). Un
+  Apache en un contenedor, en otra dirección de este equipo (127.0.0.2,
+  nunca abierta a la red), con las mismas reglas de seguridad que LAMPP
+  (los ficheros que no se sirven y la barrera entre webs) y los .htaccess
+  de cada proyecto. Las imágenes de PHP son las de siempre: ninguna más.
+- Docker, varias versiones de PHP a la vez: con la misma BBDD. En un
+  WordPress, cada una con su dominio (proyecto-php83.docker.local); una
+  tienda PrestaShop guarda su dominio en la BBDD, así que va con uno
+  (proyecto.docker.local) y la versión que elijas, con un clic. Botón
+  «Versiones de PHP…» del proyecto: añadir, quitar y elegir.
+- Docker, BBDD: una MariaDB común por versión de MariaDB, cada proyecto
+  con su BBDD y su usuario, y un solo phpMyAdmin en
+  https://pma.docker.local (con su pantalla de acceso). Un certificado
+  propio para *.docker.local (solo vale para esos dominios) que Chrome y
+  Firefox aceptan sin aviso.
+- Configuración, Docker: la dirección y los puertos del Apache de Docker
+  (80 y 443; con otros, las direcciones llevan el puerto), «Permitir»
+  para que Docker sin root use los de menos de 1024 (pide la contraseña
+  una vez) y «Confiar» en el certificado.
+- Los proyectos que ya estaban en Docker siguen igual (con LAMPP
+  delante) hasta que pulses «Pasar al Apache de Docker»: se guarda antes
+  una copia de su BBDD en ~/lvm-copias y se carga en la MariaDB común.
+- En la terminal: docker-nuevo, docker-php-añadir, docker-php-quitar,
+  docker-php-elegir, docker-pasar y docker-web.
+- Túnel de Cloudflare: «Compartir» en el visor del proyecto (y en el
+  de Docker) enseña la web a un cliente o a un compañero con una
+  dirección https://….trycloudflare.com, sin cuenta de Cloudflare y
+  sin abrir puertos. Con contraseña (al azar, para copiar y mandar),
+  el panel de administración bloqueado (tus BBDD llevan el
+  administrador de pruebas) y phpMyAdmin y lo de LAMPP siempre
+  bloqueados, y se cierra solo (2 h; de 1 a 12 en Configuración). La
+  web no se toca: su dominio local se cambia por el del túnel al pasar.
+  cloudflared se descarga de GitHub la primera vez (comprobado con su
+  sha256). En la terminal: tunel-abrir, tunel-cerrar y tunel-config.
+- web.local sin proyecto cargado: la página lleva el logotipo y el
+  nombre de Nexum Dev Stack, y dice dónde cargar uno (Proyectos,
+  Cargar). Todo va dentro de la página, sin pedir nada a otra web.
+
 1.55.14 (27 oct 2026)
 - Proyectos, menú ⋮: «Borrar el proyecto…» borra el proyecto entero:
   su carpeta, sus vhosts, las líneas de sus dominios en /etc/hosts (un
@@ -13232,6 +13307,9 @@ function gui_open() {
     rm -f "$GUI_FILE" "$GUI_FILE.tmp"
     cmp -s "$ICON_FILE" <(base64 -d <<< "$ICON_PNG_B64" 2> /dev/null) || install_icon
     [ "$DRY" -eq 0 ] && update_launchers
+    # La pagina de web.local sin proyecto, al dia tras una actualizacion (solo si se puede escribir
+    # sin contraseña: si no, al desmontar el proximo proyecto)
+    [ -w "$HTDOCS_DIR/$EMPTY_PROJECT/index.html" ] && empty_page "$HTDOCS_DIR/$EMPTY_PROJECT" > /dev/null 2>&1
 
     # Abierta desde el menu no hay terminal donde ver los errores: van a ventana.log
     [ -t 2 ] || exec 2> "$LOG_DIR/ventana.log"
@@ -13477,7 +13555,9 @@ function docker_state() {
 #   S|instalado (1/0)|Docker sin root responde (1/0)|version|LAMPP activa en marcha (1/0)|Docker o
 #     containerd del sistema (con root) en marcha (1/0)
 #   V|versiones de PHP|versiones de MariaDB
-#   P|nombre|carpeta|php|mariadb|dominio|estado|bbdd|puerto de phpMyAdmin
+#   P|nombre|carpeta|php|mariadb|dominio|estado|bbdd|puerto de phpMyAdmin (de antes; en los del Apache de
+#     Docker: web)|modo (web o nada)|version elegida (tienda)|tipo (wp, ps u otro)|versiones de PHP (espacios)
+#   W|direccion|http|https|estado del Apache de Docker (marcha, parado, nuevo)|puertos permitidos (1/0)
 #   C|contenedor|imagen|estado (running, exited...)|estado en texto|puertos|proyecto de compose
 #     (todos los contenedores de tu Docker, para la consola de la pestaña)
 #   I|imagen:etiqueta|tamaño|creada  y  O|volumen|driver   (imagenes y volumenes de tu Docker)
@@ -13492,9 +13572,13 @@ function gui_docker() {
     echo "S|$installed|$ready|$version|$(lampp_running && echo 1 || echo 0)|$(systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null && echo 1 || echo 0)"
     echo "V|$DOCKER_PHP_VERSIONS|$DOCKER_MARIADB_VERSIONS"
     for p in $(docker_projects); do
-        echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" PHP)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|$(docker_conf "$p" PUERTO_PMA)" \
-            | tr -d '\000-\010\013-\037'
+        if docker_web_project "$p"; then
+            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|web|web|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" TIPO)|$(docker_conf "$p" PHP)"
+        else
+            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" PHP)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|$(docker_conf "$p" PUERTO_PMA)"
+        fi | tr -d '\000-\010\013-\037'
     done
+    echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$([ $ready -eq 1 ] && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)"
     if [ $ready -eq 1 ]; then
         # (al final, el ID corto del contenedor)
         dk ps -a --format '{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}|{{.ID}}' 2> /dev/null \
@@ -13522,7 +13606,9 @@ function gui_docker_stats() {
 # un proyecto del gestor (nexum-<proyecto>-php|db|pma-N), no cualquiera de tu Docker
 function docker_container_action() {
     local action=$1 name=$2
-    if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ ]]; then
+    if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ \
+            || "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-php[0-9]{2}$ \
+            || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$ ]]; then
         echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
         return 1
     fi
@@ -13570,6 +13656,7 @@ function docker_fix_restart() {
     local p dir
     for p in $(docker_projects); do
         dir=$DOCKER_DIR/$p
+        docker_web_project "$p" && continue
         grep -q '^    restart: unless-stopped$' "$dir/compose.yaml" 2> /dev/null || continue
         [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: sin arranque automatico"; continue; }
         sed -i 's/^    restart: unless-stopped$/    restart: "no"/' "$dir/compose.yaml"
@@ -13590,6 +13677,7 @@ function docker_fix_cache() {
     for p in $(docker_projects); do
         dir=$DOCKER_DIR/$p
         folder=$(docker_conf "$p" CARPETA)
+        docker_web_project "$p" && continue
         grep -q '/app/config/parameters.php:ro"$' "$dir/compose.yaml" 2> /dev/null || continue
         grep -q '/var/cache"$' "$dir/compose.yaml" && continue
         [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: la cache de PrestaShop en su volumen"; continue; }
@@ -13622,6 +13710,7 @@ function docker_fix_pma() {
     local p dir
     for p in $(docker_projects); do
         dir=$DOCKER_DIR/$p
+        docker_web_project "$p" && continue
         grep -qE '^      PMA_(USER|PASSWORD):' "$dir/compose.yaml" 2> /dev/null || continue
         [ "$DRY" -eq 1 ] && { echo "  [simulacion] $p: phpMyAdmin con su pantalla de acceso"; continue; }
         sed -i -E '/^      PMA_(USER|PASSWORD):/d' "$dir/compose.yaml" || continue
@@ -13643,6 +13732,20 @@ function docker_update_image() {
         return 1
     fi
     dir=$DOCKER_DIR/$slug
+    if docker_web_project "$slug"; then
+        local v running
+        echo "$slug: imagenes de PHP $(docker_conf "$slug" PHP) de nuevo, con lo ultimo de Docker Hub (la BBDD y la configuracion no cambian)"
+        [ "$DRY" -eq 1 ] && return 0
+        docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+        for v in $(docker_conf "$slug" PHP); do
+            docker_php_image "$v" --nueva || { echo "No se ha podido rehacer la imagen de PHP $v: sigue con la anterior"; return 1; }
+        done
+        running=$(dk ps --filter "label=com.docker.compose.project=nexum-$slug" --format '{{.Label "com.docker.compose.service"}}' 2> /dev/null)
+        [ -n "$running" ] && { dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate $running || return 1; }
+        dk image prune -f > /dev/null 2>&1
+        echo "$slug ya funciona con las imagenes nuevas"
+        return 0
+    fi
     php=$(docker_conf "$slug" PHP)
     [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "$slug usa una version de PHP que no se ofrece: $php"; return 1; }
     echo "$slug: imagen de PHP $php de nuevo, con lo ultimo de Docker Hub (la BBDD y la configuracion no cambian)"
@@ -13668,6 +13771,10 @@ function docker_set_php() {
         return 1
     fi
     [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "PHP $php no se ofrece en Docker ($DOCKER_PHP_VERSIONS)"; return 1; }
+    if docker_web_project "$slug"; then
+        echo "$slug va con el Apache de Docker: añade la version (docker-php-añadir $slug $php) y, si quieres, quita otra (docker-php-quitar)"
+        return 1
+    fi
     dir=$DOCKER_DIR/$slug
     old=$(docker_conf "$slug" PHP)
     if [ "$old" == "$php" ]; then
@@ -13852,23 +13959,24 @@ EOF
 
 # Configuracion del proyecto para el contenedor: copia de su wp-config.php (o parameters.php /
 # settings.inc.php) con la BBDD del contenedor y, en WordPress, su dominio. Imprime la ruta relativa
-# del fichero dentro del proyecto (la que se sustituye en el contenedor), nada si no tiene
+# del fichero dentro del proyecto (la que se sustituye en el contenedor), nada si no tiene. El
+# servidor de la BBDD es db (el contenedor del proyecto) o el septimo argumento (la MariaDB comun)
 function docker_project_config() {
-    local folder=$1 dir=$2 domain=$3 db=$4 user=$5 pass=$6 rel
+    local folder=$1 dir=$2 domain=$3 db=$4 user=$5 pass=$6 host=${7:-db} rel
     for rel in wp-config.php app/config/parameters.php config/settings.inc.php; do
         [ -f "$HTDOCS_DIR/$folder/$rel" ] && [ ! -L "$HTDOCS_DIR/$folder/$rel" ] && break
         rel=""
     done
     [ -z "$rel" ] && return 0
-    python3 -I - "$HTDOCS_DIR/$folder/$rel" "$dir/config.php" "$rel" "$domain" "$db" "$user" "$pass" << 'EOF' || return 1
+    python3 -I - "$HTDOCS_DIR/$folder/$rel" "$dir/config.php" "$rel" "$domain" "$db" "$user" "$pass" "$host" << 'EOF' || return 1
 import os, re, sys
-src, dst, rel, domain, db, user, pw = sys.argv[1:8]
+src, dst, rel, domain, db, user, pw, host = sys.argv[1:9]
 with open(src, encoding="utf-8", errors="surrogateescape", newline="") as f:
     text = f.read(2000000)
 def lit(v):
     return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
 if rel == "wp-config.php":
-    for name, val in (("DB_NAME", db), ("DB_USER", user), ("DB_PASSWORD", pw), ("DB_HOST", "db")):
+    for name, val in (("DB_NAME", db), ("DB_USER", user), ("DB_PASSWORD", pw), ("DB_HOST", host)):
         # (en cualquier sitio de la linea, salvo detras de un comentario // o #)
         text, n = re.subn(r"""(?m)^((?:(?!//|#)[^\n])*?\bdefine\(\s*['"]%s['"]\s*,\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")""" % name,
                           lambda m: m.group(1) + lit(val), text, count=1)
@@ -13880,12 +13988,12 @@ if rel == "wp-config.php":
     text = re.sub(r"(?m)^[ \t]*define\(\s*['\"](WP_HOME|WP_SITEURL)['\"].*$", "", text)
     text = re.sub(r"^<\?php", lambda m: "<?php" + extra, text, count=1)
 elif rel == "app/config/parameters.php":
-    for key, val in (("database_host", "db"), ("database_port", ""), ("database_name", db),
+    for key, val in (("database_host", host), ("database_port", ""), ("database_name", db),
                      ("database_user", user), ("database_password", pw)):
         text = re.sub(r"""(['"]%s['"]\s*=>\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|NULL|null|\d+)""" % key,
                       lambda m: m.group(1) + lit(val), text, count=1)
 else:
-    for name, val in (("_DB_SERVER_", "db"), ("_DB_NAME_", db), ("_DB_USER_", user), ("_DB_PASSWD_", pw)):
+    for name, val in (("_DB_SERVER_", host), ("_DB_NAME_", db), ("_DB_USER_", user), ("_DB_PASSWD_", pw)):
         text = re.sub(r"""(define\(\s*['"]%s['"]\s*,\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")""" % name,
                       lambda m: m.group(1) + lit(val), text, count=1)
 fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
@@ -14095,6 +14203,12 @@ function docker_test_admin() {
     dir=$DOCKER_DIR/$slug
     db=$(docker_conf "$slug" BBDD) folder=$(docker_conf "$slug" CARPETA)
     db_valid_name "$db" > /dev/null || { echo "$slug no tiene una BBDD valida en su proyecto.conf"; return 1; }
+    if docker_web_project "$slug"; then
+        local DB_ROOT_CLIENT=(dk exec -i "$(docker_maria_name "$(docker_conf "$slug" MARIADB)")"
+            sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb)
+        test_admin "$db" "$folder"
+        return
+    fi
     local DB_ROOT_CLIENT=(dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db
         sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb)
     test_admin "$db" "$folder"
@@ -14104,6 +14218,14 @@ function docker_test_admin() {
 function docker_action() {
     local action=$1 slug=$2 dir
     docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    # (los del Apache de Docker: lo suyo es distinto)
+    if docker_web_project "$slug"; then
+        case $action in
+            arrancar|parar|registros|borrar) docker_web_action "$action" "$slug" ;;
+            *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
+        esac
+        return
+    fi
     dir=$DOCKER_DIR/$slug
     local c=(dk compose --project-directory "$dir" -f "$dir/compose.yaml")
     case $action in
@@ -14134,6 +14256,1561 @@ function docker_action() {
         *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
     esac
 }
+
+# ===========================================================================
+# Docker con su propio Apache: un proyecto en varias versiones de PHP a la vez, sin LAMPP
+# ===========================================================================
+# Desde la 1.56 los proyectos nuevos en Docker no pasan por el Apache de LAMPP: Docker tiene el suyo
+# (nexum-web, la imagen oficial de Apache) en otra direccion de este equipo (127.0.0.2 por defecto:
+# DOCKER_WEB_FILE), asi que funcionan con LAMPP parado o con cualquier version activa. Lleva las mismas
+# reglas de seguridad que LAMPP (las de UNKNOWN_HOST_VHOST: los ficheros que no se sirven y la barrera
+# entre webs) y lee los .htaccess de cada proyecto. Los .php los pasa al contenedor de cada version de
+# PHP (nexum-<proyecto>-php83, con la imagen nexum-php de siempre: ninguna imagen mas) por la red
+# interna de Docker (nexum), sin puertos abiertos fuera. Las BBDD van en una MariaDB comun por version
+# de MariaDB (nexum-mariadb-11-8), cada proyecto con su BBDD y su usuario, y hay un solo phpMyAdmin
+# (https://pma.docker.local, con su pantalla de acceso). Un proyecto puede tener varias versiones de
+# PHP a la vez con la misma BBDD: en WordPress, cada una con su dominio (<proyecto>-php83.docker.local,
+# su wp-config.php del contenedor lo lleva); una tienda PrestaShop guarda su dominio en la BBDD, asi que
+# va con uno solo (<proyecto>.docker.local) y la version que se elija. Un certificado propio para
+# *.docker.local, que no es de una CA: no vale para ninguna otra web. Los proyectos de antes (con
+# LAMPP delante) siguen igual hasta que se pasan (docker-pasar)
+# (httpd fijado por su huella: la etiqueta 2.4 la puede mover cualquiera que llegue a esa cuenta de
+# Docker Hub. Es la 2.4.69, Debian trixie, del 21/10/2026; para otra: docker buildx imagetools inspect)
+DOCKER_WEB_IMAGE="httpd:2.4.69@sha256:a30cd4cd57f3f3c3be9b2d16384d2488839996bb14c67df2b51f1ecbb3e584a1"
+DOCKER_WEB_DIR=$DOCKER_DIR/web
+DOCKER_WEB_FILE="$DOCKER_DIR/web.conf"
+# (los puertos de menos de 1024 son de root: con Docker sin root hay que bajar ese limite una vez)
+DOCKER_SYSCTL=${LVM_DOCKER_SYSCTL:-/etc/sysctl.d/60-nexum-docker.conf}
+
+# Direccion (IP) y puertos (HTTP, HTTPS) del Apache de Docker. Siempre de 127.x: nunca abiertos a la red
+function docker_web_get() {
+    local v def
+    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; *) return 1 ;; esac
+    v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$DOCKER_WEB_FILE" 2> /dev/null)
+    if [ "$1" == IP ]; then
+        docker_web_valid_ip "$v" || v=$def
+    else
+        [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def
+    fi
+    echo "$v"
+}
+
+function docker_web_valid_ip() {
+    [[ "$1" =~ ^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
+        && [ "${BASH_REMATCH[1]}" -le 255 ] && [ "${BASH_REMATCH[2]}" -le 255 ] && [ "${BASH_REMATCH[3]}" -le 254 ] \
+        && [ "${BASH_REMATCH[3]}" -ge 1 ]
+}
+
+# Direccion de una web del Apache de Docker: https://<dominio>, con el puerto si no es el 443
+function docker_web_url() {
+    local port=$(docker_web_get HTTPS)
+    echo "https://$1$([ "$port" == 443 ] || echo ":$port")"
+}
+
+# ¿Puede Docker sin root abrir sus puertos? (el limite de los puertos de root, ip_unprivileged_port_start)
+function docker_web_ports_ok() {
+    local start low http https
+    start=$(cat "${LVM_PORT_START_FILE:-/proc/sys/net/ipv4/ip_unprivileged_port_start}" 2> /dev/null || echo 1024)
+    http=$(docker_web_get HTTP) https=$(docker_web_get HTTPS)
+    low=$http
+    [ "$https" -lt "$low" ] && low=$https
+    [ "$low" -ge "$start" ]
+}
+
+# Nombres de lo comun: la MariaDB de una version (nexum-mariadb-11-8) y el contenedor de PHP de una
+# version de un proyecto (nexum-<proyecto>-php83)
+function docker_maria_name() {
+    echo "nexum-mariadb-${1//./-}"
+}
+function docker_web_container() {
+    echo "nexum-$1-php${2//./}"
+}
+
+# ¿Es un proyecto del sistema nuevo (con el Apache de Docker)?
+function docker_web_project() {
+    docker_valid_slug "$1" && [ "$(docker_conf "$1" MODO)" == web ]
+}
+
+# Dominio de una version de PHP de un proyecto: el de la tienda (uno solo) o <proyecto>-php83.docker.local
+function docker_web_domain() {
+    if [ "$(docker_conf "$1" TIPO)" == ps ]; then
+        echo "$1.docker.local"
+    else
+        echo "$1-php${2//./}.docker.local"
+    fi
+}
+
+# Dominios de un proyecto (todas sus versiones)
+function docker_web_domains() {
+    local v
+    for v in $(docker_conf "$1" PHP); do docker_web_domain "$1" "$v"; done | awk '!seen[$0]++'
+}
+
+# Proyectos del sistema nuevo
+function docker_web_projects() {
+    local p
+    for p in $(docker_projects); do
+        [ "$(docker_conf "$p" MODO)" == web ] && echo "$p"
+    done
+}
+
+# La red interna de Docker que comparten el Apache, las MariaDB y los PHP (sin puertos fuera)
+function docker_net() {
+    dk network inspect nexum > /dev/null 2>&1 || dk network create nexum > /dev/null
+}
+
+# SQL como root en la MariaDB comun de una version: docker_maria_sql <version> [argumentos de mariadb].
+# La contraseña no va en ninguna orden (se ve en ps): el cliente la toma dentro del contenedor
+function docker_maria_sql() {
+    local v=$1
+    shift
+    dk exec -i "$(docker_maria_name "$v")" \
+        sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb "$@"
+}
+
+# La MariaDB comun de una version: la crea (su compose.yaml y su contraseña de root al azar, en
+# ficheros solo tuyos) si no existe, la arranca y espera a que responda
+function docker_maria_up() {
+    local v=$1 name dir i
+    [[ " $DOCKER_MARIADB_VERSIONS " == *" $v "* ]] || { echo "MariaDB $v no se ofrece en Docker ($DOCKER_MARIADB_VERSIONS)"; return 1; }
+    name=$(docker_maria_name "$v") dir=$DOCKER_DIR/mariadb-$v
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] MariaDB $v comun ($name) en marcha"
+        return 0
+    fi
+    if [ ! -f "$dir/compose.yaml" ]; then
+        mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
+        ( umask 077
+          printf 'DB_ROOT_PASS=%s\n' "$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')" > "$dir/.env"
+          { printf 'name: %s\nservices:\n  db:\n    image: mariadb:%s\n    container_name: %s\n    restart: "no"\n' "$name" "$v" "$name"
+            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n'
+            printf '    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-allowed-packet=512M"]\n'
+            printf '    volumes:\n      - "datos:/var/lib/mysql"\n    networks: [nexum]\n'
+            printf 'volumes:\n  datos:\n    name: %s\n' "$name"
+            printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$dir/compose.yaml" ) || return 1
+    fi
+    docker_net || return 1
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d || return 1
+    for i in $(seq 90); do
+        docker_maria_sql "$v" -e "SELECT 1" < /dev/null > /dev/null 2>&1 && return 0
+        sleep 1
+    done
+    echo "La MariaDB $v de Docker no responde (mira sus registros en la pestaña Docker)"
+    return 1
+}
+
+# MariaDB comunes que hay (sus versiones)
+function docker_maria_versions() {
+    local d
+    for d in "$DOCKER_DIR"/mariadb-*/; do
+        d=$(basename "$d")
+        d=${d#mariadb-}
+        [[ " $DOCKER_MARIADB_VERSIONS " == *" $d "* ]] && [ -f "$DOCKER_DIR/mariadb-$d/compose.yaml" ] && echo "$d"
+    done
+}
+
+# Certificado propio de *.docker.local (no es de una CA: solo vale para esos dominios), en una carpeta
+# solo tuya: el Apache del contenedor lo lee como el root del contenedor, que en Docker sin root eres tu
+function docker_web_cert() {
+    local c=$DOCKER_WEB_DIR/certs
+    [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ] && return 0
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] certificado propio de *.docker.local en $c"
+        return 0
+    fi
+    mkdir -p -m 700 "$DOCKER_DIR" "$DOCKER_WEB_DIR" "$c" || return 1
+    if ! ( umask 077; openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=docker.local" \
+            -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth" \
+            -addext "subjectAltName=DNS:docker.local,DNS:*.docker.local" \
+            -keyout "$c/docker.local.key" -out "$c/docker.local.crt" > /dev/null 2>&1 ); then
+        rm -f "$c/docker.local.key" "$c/docker.local.crt"
+        echo "No se ha podido crear el certificado de *.docker.local"
+        return 1
+    fi
+    echo "Certificado propio de *.docker.local (solo vale para esos dominios)"
+}
+
+# Chrome, Chromium y Firefox aceptan sin aviso el certificado de *.docker.local: va a sus almacenes
+# con confianza P (la de un servidor, no la de una CA), como los de los proyectos de LAMPP
+function docker_web_trust() {
+    local crt=$DOCKER_WEB_DIR/certs/docker.local.crt nick="lvm-instalador docker.local" d i n=0
+    # (en las pruebas, nunca en los navegadores de verdad)
+    [ -n "$TEST_DIR" ] && return 0
+    [ -f "$crt" ] || [ "$DRY" -eq 1 ] || return 0
+    if ! command -v certutil > /dev/null; then
+        echo "Para que Chrome y Firefox acepten *.docker.local sin aviso falta certutil: sudo apt install libnss3-tools"
+        return 0
+    fi
+    for d in "$HOME/.pki/nssdb" "$HOME"/snap/chromium/current/.pki/nssdb "$HOME"/.mozilla/firefox/*/ \
+             "$HOME"/snap/firefox/common/.mozilla/firefox/*/; do
+        d=${d%/}
+        [ -f "$d/cert9.db" ] || continue
+        # (el de antes, si el certificado se ha rehecho: con el mismo nombre)
+        for i in 1 2 3 4 5; do
+            no_tty certutil -L -d "sql:$d" -n "$nick" > /dev/null 2>&1 || break
+            run no_tty certutil -D -d "sql:$d" -n "$nick" || break
+            [ "$DRY" -eq 0 ] || break
+        done
+        run no_tty certutil -A -d "sql:$d" -n "$nick" -t "P,," -i "$crt" && n=$((n + 1))
+    done
+    [ $n -gt 0 ] && echo "El navegador acepta el certificado de *.docker.local (si Chrome estaba abierto, cierralo y vuelve a abrirlo)"
+    return 0
+}
+
+# Lineas de /etc/hosts de los dominios de Docker: docker_web_hosts poner|quitar <dominio...>. poner: a la
+# direccion del Apache de Docker (y fuera de cualquier otra linea); quitar: fuera. Solo esos dominios
+function docker_web_hosts() {
+    local mode=$1 copy rc
+    shift
+    [ $# -gt 0 ] || return 0
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
+    python3 -I - "$HOSTS_FILE" "$copy" "$mode" "$(docker_web_get IP)" "$@" << 'EOF'
+import re, sys
+src, dst, mode, ip = sys.argv[1:5]
+names = [n.lower() for n in sys.argv[5:]]
+lines = open(src).read().splitlines()
+now = {}
+for line in lines:
+    w = line.split("#", 1)[0].split()
+    for n in w[1:]:
+        now.setdefault(n.lower(), w[0])
+if mode == "poner" and all(now.get(n) == ip for n in names):
+    out = lines
+else:
+    out = []
+    for line in lines:
+        body, sep, comment = line.partition("#")
+        w = body.split()
+        if len(w) >= 2 and re.match(r"^(127\.\d+\.\d+\.\d+|::1)$", w[0]):
+            keep = [n for n in w[1:] if n.lower() not in names]
+            if len(keep) != len(w) - 1:
+                if not keep:
+                    continue
+                line = w[0] + " " + " ".join(keep) + (" " + sep + comment if sep else "")
+        out.append(line)
+    if mode == "poner":
+        out.append(ip + " " + " ".join(names))
+open(dst, "w").write("\n".join(out) + "\n")
+EOF
+    if cmp -s "$copy" "$HOSTS_FILE"; then
+        rm -f "$copy"
+        return 0
+    fi
+    edit_hosts --aplicar "$copy"
+    rc=$?
+    rm -f "$copy"
+    return $rc
+}
+
+# Reglas de seguridad de todas las webs, las mismas que en LAMPP (de UNKNOWN_HOST_VHOST: ficheros que
+# no se sirven, CORS y la barrera entre webs, si esta encendida)
+function docker_web_security() {
+    local text="# Configuracion, repositorios${UNKNOWN_HOST_VHOST#*$'\n'# Configuracion, repositorios}"
+    if cross_site_on; then
+        printf '%s\n' "$text"
+    else
+        awk '/^# >>> barrera entre webs/ { s = 1 } !s { print } /^# <<< barrera entre webs/ { s = 0 }' <<< "$text"
+    fi
+}
+
+# Vhosts de un proyecto en el Apache de Docker: http lleva a https, y en https la carpeta del proyecto
+# (la misma ruta que en su contenedor de PHP) con los .php a su version de PHP. Una tienda, solo la
+# version elegida (ACTIVA)
+function docker_web_site() {
+    local slug=$1 folder versions v dom
+    folder=$(docker_conf "$slug" CARPETA)
+    versions=$(docker_conf "$slug" PHP)
+    [ "$(docker_conf "$slug" TIPO)" == ps ] && versions=$(docker_conf "$slug" ACTIVA)
+    printf '# %s (%s)\n' "$slug" "$folder"
+    for v in $versions; do
+        dom=$(docker_web_domain "$slug" "$v")
+        printf '<VirtualHost *:80>\n    ServerName %s\n    Redirect permanent / %s/\n</VirtualHost>\n' "$dom" "$(docker_web_url "$dom")"
+        printf '<VirtualHost *:443>\n    ServerName %s\n    DocumentRoot "/opt/lampp/htdocs/%s"\n' "$dom" "$folder"
+        printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
+        printf '    <FilesMatch "\\.php$">\n        SetHandler "proxy:fcgi://%s:9000"\n    </FilesMatch>\n' "$(docker_web_container "$slug" "$v")"
+        printf '</VirtualHost>\n'
+    done
+}
+
+# Configuracion del Apache de Docker (httpd.conf, las reglas, un vhost por proyecto y el de phpMyAdmin,
+# en DOCKER_WEB_DIR/conf) y su compose.yaml. Se escribe entera cada vez (lo sabe todo de proyecto.conf).
+# La carpeta conf va montada en el contenedor: se cambia lo de dentro, nunca la carpeta (el contenedor
+# seguiria viendo la de antes)
+DOCKER_WEB_CONF=/usr/local/apache2/conf/nexum/httpd.conf
+function docker_web_write() {
+    local d=$DOCKER_WEB_DIR p tmp pma_hosts="" v
+    [ "$DRY" -eq 1 ] && return 0
+    mkdir -p -m 700 "$DOCKER_DIR" "$d" || return 1
+    tmp=$(mktemp -d "$d/.nexum-XXXXXX") || return 1
+    mkdir -p "$tmp/sitios" || return 1
+    docker_web_security > "$tmp/seguridad.conf" || return 1
+    cat > "$tmp/httpd.conf" << 'EOF'
+# Apache de Docker de lvm-instalador (se rehace solo: no se edita a mano)
+ServerRoot "/usr/local/apache2"
+Listen 80
+Listen 443
+LoadModule mpm_event_module modules/mod_mpm_event.so
+LoadModule unixd_module modules/mod_unixd.so
+LoadModule authz_core_module modules/mod_authz_core.so
+LoadModule authz_host_module modules/mod_authz_host.so
+LoadModule authz_user_module modules/mod_authz_user.so
+LoadModule authn_core_module modules/mod_authn_core.so
+LoadModule authn_file_module modules/mod_authn_file.so
+LoadModule auth_basic_module modules/mod_auth_basic.so
+LoadModule access_compat_module modules/mod_access_compat.so
+LoadModule mime_module modules/mod_mime.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule env_module modules/mod_env.so
+LoadModule setenvif_module modules/mod_setenvif.so
+LoadModule headers_module modules/mod_headers.so
+LoadModule expires_module modules/mod_expires.so
+LoadModule filter_module modules/mod_filter.so
+LoadModule deflate_module modules/mod_deflate.so
+LoadModule rewrite_module modules/mod_rewrite.so
+LoadModule dir_module modules/mod_dir.so
+LoadModule alias_module modules/mod_alias.so
+LoadModule version_module modules/mod_version.so
+LoadModule socache_shmcb_module modules/mod_socache_shmcb.so
+LoadModule ssl_module modules/mod_ssl.so
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+# (los procesos que sirven las webs, con un usuario sin privilegios del contenedor: leen los ficheros
+# del proyecto, no los cambian. El PHP va en su contenedor, que si los puede cambiar)
+User daemon
+Group daemon
+ServerName docker.local
+ServerSignature Off
+ServerTokens Prod
+ErrorLog /proc/self/fd/2
+LogLevel warn
+LogFormat "%v %h %t \"%r\" %>s %b" nexum
+CustomLog /proc/self/fd/1 nexum
+TypesConfig conf/mime.types
+DirectoryIndex index.php index.html index.htm
+Timeout 300
+ProxyTimeout 300
+SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1
+SSLSessionCache "shmcb:/usr/local/apache2/logs/ssl_scache(512000)"
+<Directory />
+    AllowOverride None
+    Require all denied
+</Directory>
+<Directory "/opt/lampp/htdocs">
+    Options FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
+Include conf/nexum/seguridad.conf
+IncludeOptional conf/nexum/sitios/*.conf
+EOF
+    # (el primero: los dominios sin proyecto, con un 403)
+    { printf '# Dominios sin ningun proyecto en Docker\n'
+      for p in 80 443; do
+          printf '<VirtualHost *:%s>\n    ServerName docker.local\n' "$p"
+          [ $p == 443 ] && printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
+          printf '    <Location />\n        Require all denied\n        ErrorDocument 403 "Este dominio no tiene ningun proyecto en Docker (lvm-instalador)"\n    </Location>\n</VirtualHost>\n'
+      done; } > "$tmp/sitios/000-defecto.conf"
+    # phpMyAdmin: su contenedor, por https://pma.docker.local (con su pantalla de acceso)
+    { printf '<VirtualHost *:80>\n    ServerName pma.docker.local\n    Redirect permanent / %s/\n</VirtualHost>\n' "$(docker_web_url pma.docker.local)"
+      printf '<VirtualHost *:443>\n    ServerName pma.docker.local\n'
+      printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
+      printf '    ProxyPass / http://nexum-pma/\n    ProxyPassReverse / http://nexum-pma/\n</VirtualHost>\n'; } > "$tmp/sitios/001-phpmyadmin.conf"
+    for p in $(docker_web_projects); do
+        docker_web_site "$p" > "$tmp/sitios/$p.conf" || return 1
+    done
+    for v in $(docker_maria_versions); do pma_hosts+=",$(docker_maria_name "$v")"; done
+    pma_hosts=${pma_hosts#,}
+    { printf 'name: nexum-web\nservices:\n'
+      printf '  web:\n    image: %s\n    container_name: nexum-web\n    restart: "no"\n' "$DOCKER_WEB_IMAGE"
+      printf '    ports:\n      - "%s:%s:80"\n      - "%s:%s:443"\n' "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get IP)" "$(docker_web_get HTTPS)"
+      printf '    volumes:\n      - "%s:/opt/lampp/htdocs:ro"\n' "$HTDOCS_DIR"
+      printf '      - "./conf:/usr/local/apache2/conf/nexum:ro"\n      - "./certs:/certs:ro"\n'
+      printf '    command: ["httpd-foreground", "-f", "%s"]\n    networks: [nexum]\n' "$DOCKER_WEB_CONF"
+      printf '  pma:\n    image: %s\n    container_name: nexum-pma\n    restart: "no"\n    environment:\n' "$DOCKER_PMA_IMAGE"
+      printf '      PMA_HOSTS: "%s"\n      PMA_ABSOLUTE_URI: "%s/"\n      UPLOAD_LIMIT: 64M\n    networks: [nexum]\n' \
+          "${pma_hosts:-$(docker_maria_name 11.8)}" "$(docker_web_url pma.docker.local)"
+      printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$tmp/compose.yaml"
+    chmod -R go-rwx "$tmp"
+    # (dentro de conf, que no se cambia: los ficheros y, de golpe, la carpeta de los vhosts)
+    mkdir -p -m 700 "$d/conf" || return 1
+    rm -rf "$d/conf/sitios.antes"
+    [ -d "$d/conf/sitios" ] && mv "$d/conf/sitios" "$d/conf/sitios.antes"
+    mv "$tmp/sitios" "$d/conf/sitios" && mv -f "$tmp/seguridad.conf" "$tmp/httpd.conf" "$d/conf/" \
+        && mv -f "$tmp/compose.yaml" "$d/compose.yaml" || return 1
+    rm -rf "$tmp" "$d/conf/sitios.antes"
+}
+
+# Estado del Apache de Docker: marcha, parado o nuevo (sin contenedor)
+function docker_web_state() {
+    local s
+    s=$(dk ps -a --filter name='^nexum-web$' --format '{{.State}}' 2> /dev/null | head -1)
+    case $s in running) echo marcha ;; "") echo nuevo ;; *) echo parado ;; esac
+}
+
+# Arranca el Apache de Docker y su phpMyAdmin (con su configuracion al dia, su certificado y la linea de
+# pma.docker.local en hosts). Si ya estaba en marcha, recarga su configuracion sin cortar nada
+function docker_web_up() {
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] Apache de Docker (nexum-web) en $(docker_web_get IP), puertos $(docker_web_get HTTP) y $(docker_web_get HTTPS)"
+        return 0
+    fi
+    if ! docker_web_ports_ok; then
+        echo "Docker sin root aun no puede usar los puertos $(docker_web_get HTTP) y $(docker_web_get HTTPS)."
+        echo "Pulsa «Permitir» en Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otros puertos."
+        return 1
+    fi
+    docker_web_cert && docker_web_write && docker_net || return 1
+    docker_web_hosts poner pma.docker.local || return 1
+    local was
+    was=$(docker_web_state)
+    dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" up -d || return 1
+    [ "$was" == marcha ] && docker_web_reload --sin-escribir
+    return 0
+}
+
+# Vuelve a escribir la configuracion del Apache de Docker y, si esta en marcha, la recarga sin cortar las
+# conexiones (si Apache no la acepta, lo dice y sigue con la de antes)
+function docker_web_reload() {
+    local out
+    [ "$DRY" -eq 1 ] && return 0
+    [ "$1" == --sin-escribir ] || docker_web_write || return 1
+    [ "$(docker_web_state)" == marcha ] || return 0
+    if ! out=$(dk exec nexum-web httpd -f "$DOCKER_WEB_CONF" -t 2>&1); then
+        echo "El Apache de Docker no acepta su configuracion nueva: sigue con la de antes"
+        sed 's/^/  /' <<< "$out" | tail -5
+        return 1
+    fi
+    dk exec nexum-web httpd -f "$DOCKER_WEB_CONF" -k graceful > /dev/null 2>&1
+}
+
+# docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
+#   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
+function docker_web_command() {
+    case ${1:-estado} in
+        estado)
+            echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$(docker_ready && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)" ;;
+        puertos) docker_web_set "$2" "$3" "$4" ;;
+        permitir) docker_web_allow ;;
+        arrancar)
+            docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+            docker_web_up ;;
+        parar)
+            [ "$DRY" -eq 1 ] && { echo "  [simulacion] Apache de Docker y phpMyAdmin parados"; return 0; }
+            run dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" stop ;;
+        confiar) docker_web_trust ;;
+        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar"; return 1 ;;
+    esac
+}
+
+# docker-web puertos <ip> <http> <https>: otra direccion (siempre de 127.x) u otros puertos. Con los de
+# siempre (80 y 443) no puede ser 127.0.0.1: los usa el Apache de LAMPP. Los dominios de Docker pasan a
+# la direccion nueva en /etc/hosts y el Apache de Docker se vuelve a crear. (Docker sin root no deja que
+# dos contenedores publiquen el mismo numero de puerto aunque sea en otra direccion: no puede coincidir
+# con el de un phpMyAdmin de un proyecto de antes, 28080 en adelante)
+function docker_web_set() {
+    local ip=$1 http=$2 https=$3 p domains=()
+    if ! docker_web_valid_ip "$ip"; then
+        echo "Direccion no valida: $ip (tiene que ser de este equipo: 127.x.x.x, como 127.0.0.2)"
+        return 1
+    fi
+    for p in "$http" "$https"; do
+        [[ "$p" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$p" -le 65535 ] || { echo "Puerto no valido: $p"; return 1; }
+    done
+    [ "$http" != "$https" ] || { echo "Los puertos HTTP y HTTPS tienen que ser distintos"; return 1; }
+    if [ "$ip" == 127.0.0.1 ] && { [ "$http" == 80 ] || [ "$https" == 443 ] || [ "$http" == 443 ] || [ "$https" == 80 ]; }; then
+        echo "En 127.0.0.1 los puertos 80 y 443 son del Apache de LAMPP: usa otra direccion (127.0.0.2) u otros puertos"
+        return 1
+    fi
+    echo "Apache de Docker: $ip, puertos $http (http) y $https (https)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se guarda en $DOCKER_WEB_FILE y los dominios de Docker pasan a $ip en $HOSTS_FILE"
+        return 0
+    fi
+    mkdir -p -m 700 "$DOCKER_DIR" || return 1
+    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\n' "$ip" "$http" "$https" > "$DOCKER_WEB_FILE" ) || return 1
+    docker_web_ports_ok || echo "Aviso: Docker sin root aun no puede usar esos puertos: pulsa «Permitir» (lvm-instalador docker-web permitir)"
+    [ -d "$DOCKER_WEB_DIR" ] || return 0
+    sudo_first || return 1
+    for p in $(docker_web_projects); do
+        mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
+    done
+    docker_web_hosts poner pma.docker.local "${domains[@]}" || return 1
+    if docker_ready && [ "$(docker_web_state)" != nuevo ] && docker_web_ports_ok; then
+        docker_web_up || return 1
+    else
+        docker_web_write
+    fi
+    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.local")"
+}
+
+# docker-web permitir: Docker sin root puede abrir los puertos del Apache de Docker. Linux deja los de
+# menos de 1024 solo a root; se baja ese limite (net.ipv4.ip_unprivileged_port_start, en DOCKER_SYSCTL)
+# hasta el mas bajo de los dos. Desde entonces cualquier programa del equipo puede abrir esos puertos
+# (en un equipo de desarrollo, como cualquier puerto alto): pide la contraseña de administrador
+function docker_web_allow() {
+    local http https low
+    http=$(docker_web_get HTTP) https=$(docker_web_get HTTPS)
+    low=$http
+    [ "$https" -lt "$low" ] && low=$https
+    if docker_web_ports_ok; then
+        echo "Docker sin root ya puede usar los puertos $http y $https"
+        return 0
+    fi
+    echo "Docker sin root podra usar los puertos desde el $low (net.ipv4.ip_unprivileged_port_start en $DOCKER_SYSCTL)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] sudo tee $DOCKER_SYSCTL y sudo sysctl -p $DOCKER_SYSCTL"
+        return 0
+    fi
+    sudo_first || return 1
+    printf '# lvm-instalador: Docker sin root puede usar los puertos del Apache de Docker\nnet.ipv4.ip_unprivileged_port_start = %s\n' "$low" \
+        | sudo tee "$DOCKER_SYSCTL" > /dev/null && sudo sysctl -q -p "$DOCKER_SYSCTL" || return 1
+    docker_web_ports_ok || { echo "No se ha podido cambiar el limite de los puertos"; return 1; }
+    echo "Listo: Docker sin root ya puede usar los puertos $http y $https"
+}
+
+# Configuracion de una version de PHP de un proyecto para su contenedor (config-83.php: su BBDD en la
+# MariaDB comun y, en WordPress, el dominio de esa version). Nada si el proyecto no la tiene
+function docker_web_config() {
+    local slug=$1 v=$2 dir=$DOCKER_DIR/$1 rel
+    # (el dominio, con el puerto si no es el 443: WordPress lo pone en sus enlaces)
+    local url
+    url=$(docker_web_url "$(docker_web_domain "$slug" "$v")")
+    rel=$(docker_project_config "$(docker_conf "$slug" CARPETA)" "$dir" "${url#https://}" \
+        "$(docker_conf "$slug" BBDD)" "$(docker_conf "$slug" USUARIO)" "$(sed -n 's/^DB_PASS=//p' "$dir/.env")" \
+        "$(docker_maria_name "$(docker_conf "$slug" MARIADB)")") || return 1
+    [ -n "$rel" ] && mv -f "$dir/config.php" "$dir/config-${v//./}.php"
+    return 0
+}
+
+# compose.yaml de un proyecto: un servicio por version de PHP (php83...), con la imagen nexum-php de esa
+# version, PHP-FPM en el puerto 9000 de la red interna (fpm.conf), la carpeta en la misma ruta que ve
+# el Apache de Docker, su configuracion de solo lectura encima de la del proyecto y, en PrestaShop 1.7
+# o posterior, su cache en un volumen propio de cada version
+function docker_web_compose() {
+    local slug=$1 dir=$DOCKER_DIR/$1 folder rel v vv vols=""
+    folder=$(docker_conf "$slug" CARPETA) rel=$(docker_conf "$slug" CONFIG)
+    { printf 'name: nexum-%s\nservices:\n' "$slug"
+      for v in $(docker_conf "$slug" PHP); do
+          vv=${v//./}
+          printf '  php%s:\n    image: nexum-php:%s\n    container_name: %s\n    restart: "no"\n' "$vv" "$v" "$(docker_web_container "$slug" "$v")"
+          printf '    command: ["php-fpm", "-R", "-F"]\n    volumes:\n'
+          printf '      - "%s:/opt/lampp/htdocs/%s"\n' "$HTDOCS_DIR/$folder" "$folder"
+          printf '      - "./fpm.conf:/usr/local/etc/php-fpm.d/zz-nexum.conf:ro"\n'
+          [ -n "$rel" ] && [ -f "$dir/config-$vv.php" ] && printf '      - "./config-%s.php:/opt/lampp/htdocs/%s/%s:ro"\n' "$vv" "$folder" "$rel"
+          if [ "$rel" == app/config/parameters.php ]; then
+              printf '      - "cache-%s:/opt/lampp/htdocs/%s/var/cache"\n' "$vv" "$folder"
+              vols+="  cache-$vv: {}"$'\n'
+          fi
+          printf '    networks: [nexum]\n'
+      done
+      [ -n "$vols" ] && printf 'volumes:\n%s' "$vols"
+      printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$dir/compose.yaml.nuevo" \
+        && mv -f "$dir/compose.yaml.nuevo" "$dir/compose.yaml"
+}
+
+# Servicios que van en marcha: todas las versiones o, en una tienda, la elegida
+function docker_web_services() {
+    local v
+    if [ "$(docker_conf "$1" TIPO)" == ps ]; then
+        v=$(docker_conf "$1" ACTIVA)
+        echo "php${v//./}"
+    else
+        for v in $(docker_conf "$1" PHP); do echo "php${v//./}"; done
+    fi
+}
+
+# Cambia una clave de proyecto.conf
+function docker_conf_set() {
+    local f=$DOCKER_DIR/$1/proyecto.conf
+    [ -f "$f" ] && [ ! -L "$f" ] || return 1
+    awk -F= -v k="$2" -v v="$3" 'BEGIN { done = 0 } $1 == k { print k "=" v; done = 1; next } { print } END { if (!done) print k "=" v }' \
+        "$f" > "$f.nuevo" && chmod 600 "$f.nuevo" && mv -f "$f.nuevo" "$f"
+}
+
+# Tienda PrestaShop en la MariaDB comun: su dominio pasa a ser el de Docker (la BBDD es una copia)
+function docker_web_ps_domain() {
+    local slug=$1 v db dom prefix
+    v=$(docker_conf "$slug" MARIADB) db=$(docker_conf "$slug" BBDD)
+    dom=$(docker_web_domain "$slug" "")
+    [ "$(docker_web_get HTTPS)" == 443 ] || dom+=":$(docker_web_get HTTPS)"
+    prefix=$(docker_maria_sql "$v" -N -e "SELECT LEFT(table_name, LENGTH(table_name) - 8) FROM information_schema.tables
+        WHERE table_schema = '$db' AND table_name LIKE '%shop\\_url' AND table_type = 'BASE TABLE' LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
+    [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || return 0
+    echo "Tienda PrestaShop: su dominio pasa a $dom en la BBDD de Docker"
+    docker_maria_sql "$v" "$db" << EOF
+UPDATE \`${prefix}shop_url\` SET domain = '$dom', domain_ssl = '$dom';
+UPDATE \`${prefix}configuration\` SET value = '$dom' WHERE name IN ('PS_SHOP_DOMAIN', 'PS_SHOP_DOMAIN_SSL');
+UPDATE \`${prefix}configuration\` SET value = '1' WHERE name IN ('PS_SSL_ENABLED', 'PS_SSL_ENABLED_EVERYWHERE');
+EOF
+}
+
+# docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version LAMPP> | --volcado <fichero>]:
+# proyecto en Docker con el Apache de Docker. Su BBDD (vacia, la de una version LAMPP o un volcado) va en
+# la MariaDB comun de esa version, con su propio usuario. Mas versiones de PHP: docker-php-añadir
+function docker_web_create() {
+    local folder=${1%/} php=$2 maria=$3 db="" from="" dump="" slug dir tipo dbname user pass rel p
+    shift 3 2> /dev/null
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --bd|--desde|--volcado)
+                [ -n "$2" ] || { echo "Falta el valor de $1"; return 1; }
+                case $1 in --bd) db=$2 ;; --desde) from=$2 ;; --volcado) dump=$2 ;; esac
+                shift 2 ;;
+            *) echo "Opcion desconocida: $1"; return 1 ;;
+        esac
+    done
+    if [ -z "$folder" ] || [ -z "$php" ] || [ -z "$maria" ]; then
+        echo "Uso: lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]"
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "PHP $php no se ofrece en Docker ($DOCKER_PHP_VERSIONS)"; return 1; }
+    [[ " $DOCKER_MARIADB_VERSIONS " == *" $maria "* ]] || { echo "MariaDB $maria no se ofrece en Docker ($DOCKER_MARIADB_VERSIONS)"; return 1; }
+    if [ -n "$db" ]; then
+        db_valid_name "$db" || return 1
+    fi
+    if [ -n "$from" ]; then
+        [ -n "$db" ] && valid_version_name "$from" && [ -d "${TEST_DIR:-/opt}/lampp-$from" ] \
+            || { echo "Con --desde hay que decir la base (--bd) y una version LAMPP que exista"; return 1; }
+    elif [ -n "$db" ] && [ -z "$dump" ]; then
+        echo "Con --bd hay que decir de que version LAMPP se copia (--desde)"
+        return 1
+    fi
+    if [ -n "$dump" ] && { [ ! -f "$dump" ] || [ -L "$dump" ] || [ -n "$from" ]; }; then
+        echo "El volcado tiene que ser un fichero (y sin --desde): $dump"
+        return 1
+    fi
+    slug=$(docker_slug "$folder") && docker_valid_slug "$slug" || { echo "No se puede sacar un nombre corto de $folder"; return 1; }
+    # (los nombres de lo comun no: la carpeta del Apache de Docker, las de las MariaDB y las del gestor)
+    case $slug in web|bin|imagenes|mariadb-*) slug=$(cut -c1-31 <<< "$slug" | sed 's/-*$//')-proyecto ;; esac
+    for p in $(docker_web_projects); do
+        if [ "$(docker_conf "$p" CARPETA)" == "$folder" ]; then
+            echo "$folder ya esta en Docker ($p): para otra version de PHP, lvm-instalador docker-php-añadir $p $php"
+            return 1
+        fi
+    done
+    dir=$DOCKER_DIR/$slug
+    if [ -e "$dir" ]; then
+        echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con LAMPP delante): pasalo con lvm-instalador docker-pasar $slug"
+        return 1
+    fi
+    if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
+    dbname=${db:-$(tr '-' '_' <<< "$slug")}
+    user=$(cut -c1-32 <<< "nx_$dbname")
+    echo "Proyecto en Docker: $folder con PHP $php y MariaDB $maria comun (BBDD $dbname)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $dir con la imagen nexum-php:$php, la BBDD $dbname en $(docker_maria_name "$maria") y $(docker_web_url "$( [ $tipo == ps ] && echo "$slug" || echo "$slug-php${php//./}").docker.local")"
+        [ -n "$db" ] && echo "  [simulacion] copia de $db ${from:+de lampp-$from}${dump:+de $dump}"
+        return 0
+    fi
+    docker_ready || { echo "Docker sin root no esta en marcha: instalalo o arrancalo en la pestaña Docker."; return 1; }
+    if ! docker_web_ports_ok; then
+        echo "Docker sin root aun no puede usar los puertos $(docker_web_get HTTP) y $(docker_web_get HTTPS): pulsa «Permitir» en"
+        echo "Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otros puertos."
+        return 1
+    fi
+    # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba
+    sudo_first || return 1
+    echo "1/5 MariaDB $maria comun"
+    docker_maria_up "$maria" || return 1
+    if [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$dbname'" < /dev/null 2> /dev/null | tr -d '\r')" != 0 ]; then
+        echo "Ya hay una BBDD $dbname en la MariaDB $maria de Docker (de otro proyecto): elige otra o borra aquel proyecto"
+        return 1
+    fi
+    mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
+    pass=$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')
+    for rel in wp-config.php app/config/parameters.php config/settings.inc.php; do
+        [ -f "$HTDOCS_DIR/$folder/$rel" ] && [ ! -L "$HTDOCS_DIR/$folder/$rel" ] && break
+        rel=""
+    done
+    ( umask 077
+      printf 'DB_PASS=%s\n' "$pass" > "$dir/.env"
+      printf 'MODO=web\nCARPETA=%s\nTIPO=%s\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=%s\n' \
+          "$folder" "$tipo" "$php" "$php" "$maria" "$dbname" "$user" "$rel" > "$dir/proyecto.conf"
+      printf '[global]\nerror_log = /proc/self/fd/2\ndaemonize = no\n[www]\nuser = root\ngroup = root\nlisten = 9000\nclear_env = no\ncatch_workers_output = yes\npm.max_requests = 50\n' > "$dir/fpm.conf" ) || return 1
+    # (el dominio: el de la tienda o el de la version)
+    docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
+    docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    echo "2/5 Imagen de PHP $php"
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    echo "3/5 BBDD $dbname"
+    docker_maria_sql "$maria" << EOF || return 1
+CREATE DATABASE \`$dbname\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$user'@'%' IDENTIFIED BY '$pass';
+ALTER USER '$user'@'%' IDENTIFIED BY '$pass';
+GRANT ALL PRIVILEGES ON \`$dbname\`.* TO '$user'@'%';
+EOF
+    if [ -n "$from" ] || [ -n "$dump" ]; then
+        local tmp=$dump
+        if [ -n "$from" ]; then
+            mkdir -p -m 700 "$LOG_DIR" || return 1
+            tmp=$(mktemp "$LOG_DIR/docker-$slug-XXXXXX") && mv -f "$tmp" "$tmp.sql.gz" && tmp=$tmp.sql.gz || return 1
+            echo "Copiando $db de lampp-$from..."
+            export_database "$db" "$tmp" "$from" || { rm -f "$tmp"; tmp=""; echo "No se ha podido descargar $db de lampp-$from: la BBDD queda vacia."; }
+            db_temp_stop
+        fi
+        if [ -n "$tmp" ]; then
+            { if [[ "$tmp" == *.gz ]]; then gzip -dc "$tmp"; else cat "$tmp"; fi; } \
+                | docker_maria_sql "$maria" --binary-mode "$dbname" \
+                || echo "Aviso: la carga de la BBDD ha dado errores (mira el registro)."
+            [ -n "$from" ] && rm -f "$tmp"
+            [ $tipo == ps ] && docker_web_ps_domain "$slug"
+            local admin
+            admin=$(docker_test_admin "$slug")
+            grep -v '^A|' <<< "$admin" | grep .
+            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+        fi
+    fi
+    echo "4/5 Apache de Docker y $(docker_web_domain "$slug" "$php")"
+    docker_web_hosts poner pma.docker.local "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_web_up || return 1
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    echo "5/5 Certificado en el navegador"
+    docker_web_trust
+    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url pma.docker.local)"
+}
+
+# docker-php-añadir <nombre> <php>: otra version de PHP del mismo proyecto, con la misma carpeta y la
+# misma BBDD. En WordPress va a la vez que las demas, con su dominio; en una tienda pasa a ser la elegida
+function docker_web_add() {
+    local slug=$1 php=$2 dir list
+    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
+    [[ " $DOCKER_PHP_VERSIONS " == *" $php "* ]] || { echo "PHP $php no se ofrece en Docker ($DOCKER_PHP_VERSIONS)"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    list=$(docker_conf "$slug" PHP)
+    [[ " $list " == *" $php "* ]] && { echo "$slug ya tiene PHP $php"; return 0; }
+    echo "$slug: añade PHP $php (la misma carpeta y la misma BBDD)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] contenedor $(docker_web_container "$slug" "$php") y $(docker_web_url "$(docker_web_domain "$slug" "$php")")"
+        return 0
+    fi
+    docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    sudo_first || return 1
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    docker_conf_set "$slug" PHP "$(tr ' ' '\n' <<< "$list $php" | sort -t. -k1,1nr -k2,2nr | tr '\n' ' ' | sed 's/ $//')" || return 1
+    docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    if [ "$(docker_conf "$slug" TIPO)" == ps ]; then
+        docker_web_switch "$slug" "$php"
+        return
+    fi
+    docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_maria_up "$(docker_conf "$slug" MARIADB)" && docker_web_up || return 1
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    echo "Listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php)"
+}
+
+# docker-php-quitar <nombre> <php>: quita una version de PHP de un proyecto (su contenedor, su
+# configuracion y su dominio). La ultima no: para eso, borrar el proyecto de Docker
+function docker_web_remove() {
+    local slug=$1 php=$2 dir list rest dom
+    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    list=$(docker_conf "$slug" PHP)
+    [[ " $list " == *" $php "* ]] || { echo "$slug no tiene PHP $php"; return 1; }
+    rest=$(tr ' ' '\n' <<< "$list" | grep -vxF "$php" | tr '\n' ' ' | sed 's/ $//')
+    [ -n "$rest" ] || { echo "PHP $php es la unica version de $slug: para quitarla, borra el proyecto de Docker"; return 1; }
+    dom=$(docker_web_domain "$slug" "$php")
+    echo "$slug: se quita PHP $php (la carpeta y la BBDD se quedan)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] fuera el contenedor $(docker_web_container "$slug" "$php")"
+        return 0
+    fi
+    sudo_first || return 1
+    if [ "$(docker_conf "$slug" TIPO)" == ps ] && [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
+        docker_web_switch "$slug" "${rest%% *}" || return 1
+    fi
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" rm -sf "php${php//./}" > /dev/null 2>&1
+    dk volume rm "nexum-${slug}_cache-${php//./}" > /dev/null 2>&1
+    rm -f "$dir/config-${php//./}.php"
+    docker_conf_set "$slug" PHP "$rest" && docker_web_compose "$slug" || return 1
+    # (la que se enseña como suya, si era esa: la siguiente)
+    if [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
+        docker_conf_set "$slug" ACTIVA "${rest%% *}" && docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "${rest%% *}")"
+    fi
+    [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_hosts quitar "$dom"
+    docker_web_reload
+    echo "Listo: $slug sigue con PHP $rest"
+}
+
+# docker-php-elegir <nombre> <php>: la version de PHP con la que va una tienda PrestaShop (va con un
+# solo dominio): se arranca esa, el dominio pasa a ella y se para la de antes
+function docker_web_switch() {
+    local slug=$1 php=$2 dir old
+    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
+    [[ " $(docker_conf "$slug" PHP) " == *" $php "* ]] || { echo "$slug no tiene PHP $php: añadela antes (docker-php-añadir)"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    old=$(docker_conf "$slug" ACTIVA)
+    echo "$slug: $(docker_web_domain "$slug" "$php") pasa a PHP $php"
+    [ "$DRY" -eq 1 ] && return 0
+    docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    docker_conf_set "$slug" ACTIVA "$php" || return 1
+    docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_maria_up "$(docker_conf "$slug" MARIADB)" || return 1
+    if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}"; then
+        echo "No arranca con PHP $php: sigue con PHP $old"
+        docker_conf_set "$slug" ACTIVA "$old"
+        return 1
+    fi
+    docker_web_up || return 1
+    if [ -n "$old" ] && [ "$old" != "$php" ]; then
+        dk compose --project-directory "$dir" -f "$dir/compose.yaml" rm -sf "php${old//./}" > /dev/null 2>&1
+    fi
+    echo "Listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") con PHP $php"
+}
+
+# Acciones de un proyecto del sistema nuevo (las de docker_action): arrancar (con su MariaDB y el Apache
+# de Docker), parar (sus PHP: lo comun se queda), registros y borrar (sus contenedores, su BBDD y su
+# usuario de la MariaDB comun, sus dominios de hosts y su carpeta del gestor; la del proyecto, no)
+function docker_web_action() {
+    local action=$1 slug=$2 dir=$DOCKER_DIR/$2 maria
+    local c=(dk compose --project-directory "$dir" -f "$dir/compose.yaml")
+    maria=$(docker_conf "$slug" MARIADB)
+    case $action in
+        arrancar)
+            [ "$DRY" -eq 1 ] && { echo "  [simulacion] MariaDB $maria, Apache de Docker y $(docker_web_services "$slug" | tr '\n' ' ')"; return 0; }
+            docker_maria_up "$maria" && docker_web_up || return 1
+            run "${c[@]}" up -d $(docker_web_services "$slug") ;;
+        parar) run "${c[@]}" stop ;;
+        registros) "${c[@]}" logs --no-color --tail 200 ;;
+        borrar)
+            local db user domains
+            db=$(docker_conf "$slug" BBDD) user=$(docker_conf "$slug" USUARIO)
+            mapfile -t domains < <(docker_web_domains "$slug")
+            echo "Se borran los contenedores de $slug y su BBDD $db de la MariaDB $maria de Docker (la de LAMPP no se toca)"
+            [ "$DRY" -eq 1 ] && return 0
+            run "${c[@]}" down -v || return 1
+            if db_valid_name "$db" > /dev/null && [[ "$user" =~ ^[A-Za-z0-9_]{1,32}$ ]] && docker_maria_up "$maria" > /dev/null; then
+                printf 'DROP DATABASE IF EXISTS `%s`;\nDROP USER IF EXISTS '"'"'%s'"'"'@'"'"'%%'"'"';\n' "$db" "$user" | docker_maria_sql "$maria"
+            fi
+            docker_web_hosts quitar "${domains[@]}"
+            rm -rf "$dir"
+            docker_web_reload
+            echo "Proyecto en Docker $slug borrado" ;;
+    esac
+}
+
+# docker-pasar <nombre>: un proyecto de antes (PHP-FPM con LAMPP delante, con su MariaDB y su phpMyAdmin)
+# pasa al Apache de Docker. Su BBDD se guarda antes en ~/lvm-copias (si algo falla, ahi esta) y se carga
+# en la MariaDB comun; despues se quitan sus contenedores, su vhost de LAMPP y su linea de hosts. Si la
+# carpeta ya esta en el sistema nuevo (otra version de PHP del mismo proyecto), solo se le añade su PHP
+function docker_pass() {
+    local slug=$1 dir folder php maria db target="" p backup
+    if ! docker_valid_slug "$slug" || [ ! -f "$DOCKER_DIR/$slug/proyecto.conf" ] || docker_web_project "$slug"; then
+        echo "No hay ningun proyecto de antes (con LAMPP delante) con el nombre $slug"
+        return 1
+    fi
+    dir=$DOCKER_DIR/$slug
+    folder=$(docker_conf "$slug" CARPETA) php=$(docker_conf "$slug" PHP) maria=$(docker_conf "$slug" MARIADB) db=$(docker_conf "$slug" BBDD)
+    db_valid_name "$db" > /dev/null || { echo "$slug no tiene una BBDD valida en su proyecto.conf"; return 1; }
+    for p in $(docker_web_projects); do
+        [ "$(docker_conf "$p" CARPETA)" == "$folder" ] && target=$p
+    done
+    echo "$slug pasa al Apache de Docker${target:+ (como PHP $php de $target)}"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] copia de $db en ~/lvm-copias, fuera sus contenedores, su vhost y su linea de hosts"
+        return 0
+    fi
+    docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    docker_web_ports_ok || { echo "Docker sin root aun no puede usar los puertos del Apache de Docker: pulsa «Permitir» en Configuracion"; return 1; }
+    sudo_first || return 1
+    echo "Copia de su BBDD ($db)"
+    mkdir -p -m 700 "$HOME/lvm-copias" || return 1
+    backup="$HOME/lvm-copias/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d db > /dev/null || return 1
+    local i
+    for i in $(seq 60); do
+        dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+            sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot -e "SELECT 1"' < /dev/null > /dev/null 2>&1 && break
+        sleep 1
+    done
+    ( umask 077
+      set -o pipefail
+      dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
+          sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb-dump || command -v mysqldump) -uroot --single-transaction --routines --triggers --events "$0"' "$db" \
+          < /dev/null | gzip > "$backup" )
+    if [ $? -ne 0 ] || [ "$(gzip -dc "$backup" 2> /dev/null | head -c 4096 | wc -c)" -lt 100 ]; then
+        echo "No se ha podido copiar su BBDD: no se cambia nada"
+        rm -f "$backup"
+        return 1
+    fi
+    echo "Copia de $db: $backup"
+    docker_action borrar "$slug" || { echo "No se ha podido quitar el proyecto de antes (la copia de su BBDD esta en $backup)"; return 1; }
+    if [ -n "$target" ]; then
+        docker_web_add "$target" "$php" || return 1
+        echo "$folder ya tenia BBDD en el sistema nuevo: la de $slug no se carga (esta en $backup)"
+    else
+        docker_web_create "$folder" "$php" "$maria" --bd "$db" --volcado "$backup" \
+            || { echo "La copia de su BBDD sigue en $backup"; return 1; }
+    fi
+    echo "$slug ya funciona con el Apache de Docker"
+}
+
+# Tunel de Cloudflare: una web de este equipo, a la vista de un cliente o de un compañero con una
+# direccion publica (https://<algo>.trycloudflare.com, sin cuenta: cambia cada vez). cloudflared abre
+# una conexion de salida a Cloudflare, sin abrir puertos, y lo que llega por ella pasa por un proxy
+# del programa (TUNNEL_PY, solo en 127.0.0.1) antes de llegar a Apache:
+#  - pide una contraseña (la de TUNNEL_CONF, al azar) y se cierra solo pasadas unas horas
+#  - el admin de WordPress o PrestaShop, bloqueado (las BBDD llevan el administrador de pruebas, con
+#    contraseña conocida), y siempre lo de LAMPP para este equipo (phpMyAdmin...): Apache ve las
+#    peticiones del proxy como de 127.0.0.1
+#  - cambia el dominio local (web.local, el de la tienda...) por el del tunel en lo que devuelve la web:
+#    no se toca ni wp-config.php ni la BBDD, y al cerrarlo no hay nada que deshacer
+# Un tunel cada vez. cloudflared va en ~/.lvm-instalador/tunel, con tu usuario (sin root): version fijada
+# y sha256 de la publicacion en GitHub (sus digest, iguales a los de sus notas, el 27/10/2026)
+TUNNEL_VERSION="2026.10.0"
+TUNNEL_SHA_AMD64="d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99db"
+TUNNEL_SHA_ARM64="e6422b9d4f72d3194bc5a38676f13667c06666523217b842a877d72a80b5ac08"
+TUNNEL_DIR=$LOG_DIR/tunel
+TUNNEL_BIN=$TUNNEL_DIR/cloudflared
+# CLAVE=, HORAS= (1 a 12) y ADMIN= (bloquear o permitir)
+TUNNEL_CONF=$TUNNEL_DIR/config
+# El tunel abierto (lo escribe TUNNEL_PY al tener su direccion): JSON con pid, url, destino, carpeta y fin
+TUNNEL_STATE=$TUNNEL_DIR/estado
+TUNNEL_LOG=$TUNNEL_DIR/registro
+
+function tunnel_installed() {
+    [ -f "$TUNNEL_BIN" ] && [ -x "$TUNNEL_BIN" ] && [ ! -L "$TUNNEL_BIN" ]
+}
+
+function tunnel_installed_version() {
+    tunnel_installed && head -c 40 "$TUNNEL_DIR/version" 2> /dev/null | tr -cd '0-9.'
+}
+
+# tunel-instalar: descarga cloudflared de GitHub y comprueba su sha256 antes de dejarlo en su sitio
+function tunnel_install() {
+    local arch sha url tmp got tls=(--proto '=https' --tlsv1.2)
+    case $(uname -m) in
+        x86_64|amd64) arch=amd64 sha=$TUNNEL_SHA_AMD64 ;;
+        aarch64|arm64) arch=arm64 sha=$TUNNEL_SHA_ARM64 ;;
+        *) echo "Cloudflare no publica cloudflared para este equipo ($(uname -m))"; return 1 ;;
+    esac
+    url=https://github.com/cloudflare/cloudflared/releases/download/$TUNNEL_VERSION/cloudflared-linux-$arch
+    # (las pruebas, sin red: otro fichero y su suma)
+    if [ -n "$TEST_DIR" ]; then
+        url=${LVM_CLOUDFLARED_URL:-$url} sha=${LVM_CLOUDFLARED_SHA:-$sha} tls=()
+    fi
+    if [ "$(tunnel_installed_version)" == "$TUNNEL_VERSION" ]; then
+        echo "cloudflared $TUNNEL_VERSION ya esta instalado en $TUNNEL_DIR"
+        return 0
+    fi
+    echo "Instalando cloudflared $TUNNEL_VERSION (tunel de Cloudflare) en $TUNNEL_DIR"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] descarga de $url y comprobacion de su sha256"
+        return 0
+    fi
+    if [ -L "$TUNNEL_DIR" ] || [ -L "$TUNNEL_BIN" ]; then
+        echo "$TUNNEL_DIR o su cloudflared son un enlace: no se instala"
+        return 1
+    fi
+    mkdir -p -m 700 "$TUNNEL_DIR" || return 1
+    tmp=$(mktemp "$TUNNEL_DIR/cloudflared-descarga.XXXXXX") || return 1
+    echo "Descargando cloudflared-linux-$arch (unos 40 MB)..."
+    if ! curl -fsSL "${tls[@]}" --retry 2 --max-time 900 -o "$tmp" "$url"; then
+        rm -f "$tmp"
+        echo "No se ha podido descargar cloudflared ($url)"
+        return 1
+    fi
+    got=$(sha256sum "$tmp" 2> /dev/null | cut -d' ' -f1)
+    if [ "$got" != "$sha" ]; then
+        rm -f "$tmp"
+        echo "La descarga de cloudflared no coincide con su suma sha256 (${got:-ninguna}): no se instala."
+        return 1
+    fi
+    chmod 755 "$tmp" && mv -f "$tmp" "$TUNNEL_BIN" && echo "$TUNNEL_VERSION" > "$TUNNEL_DIR/version" || { rm -f "$tmp"; return 1; }
+    echo "cloudflared $TUNNEL_VERSION instalado: $TUNNEL_BIN"
+}
+
+# Valor de TUNNEL_CONF (o el de por defecto, si no esta o no vale)
+function tunnel_conf() {
+    local v
+    v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$TUNNEL_CONF" 2> /dev/null)
+    case $1 in
+        CLAVE) [[ "$v" =~ ^[A-Za-z0-9-]{8,64}$ ]] || v="" ;;
+        HORAS) [[ "$v" =~ ^([1-9]|1[0-2])$ ]] || v=2 ;;
+        ADMIN) [ "$v" == permitir ] || v=bloquear ;;
+    esac
+    echo "$v"
+}
+
+# Contraseña nueva, facil de dictar: tres grupos de cuatro letras y numeros sin los que se confunden
+function tunnel_new_pass() {
+    local s
+    s=$(LC_ALL=C tr -dc 'abcdefghjkmnpqrstuvwxyz23456789' < /dev/urandom | head -c 12)
+    echo "${s:0:4}-${s:4:4}-${s:8:4}"
+}
+
+function tunnel_conf_write() {
+    local clave=$1 horas=$2 admin=$3
+    mkdir -p -m 700 "$TUNNEL_DIR" || return 1
+    ( umask 077; printf 'CLAVE=%s\nHORAS=%s\nADMIN=%s\n' "$clave" "$horas" "$admin" > "$TUNNEL_CONF.nuevo" ) \
+        && mv -f "$TUNNEL_CONF.nuevo" "$TUNNEL_CONF"
+}
+
+# tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir: vale para el siguiente tunel
+function tunnel_config() {
+    local clave horas admin
+    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
+    [ -n "$clave" ] || clave=$(tunnel_new_pass)
+    case $1 in
+        clave-nueva) clave=$(tunnel_new_pass); echo "Contraseña nueva para los visitantes del tunel" ;;
+        horas)
+            [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }
+            horas=$2; echo "El tunel se cierra solo a las $horas h de abrirlo" ;;
+        admin)
+            [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "Uso: lvm-instalador tunel-config admin bloquear|permitir"; return 1; }
+            admin=$2; [ "$admin" == bloquear ] && echo "El admin no se puede abrir por el tunel" \
+                || echo "Aviso: el admin se puede abrir por el tunel (y el administrador de pruebas tiene una contraseña conocida)" ;;
+        *) echo "Uso: lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir"; return 1 ;;
+    esac
+    tunnel_conf_write "$clave" "$horas" "$admin"
+}
+
+# PID del tunel abierto (el de TUNNEL_PY, si sigue vivo y es el)
+function tunnel_pid() {
+    local pid
+    pid=$(python3 -I -c 'import json, sys
+try:
+    print(int(json.load(open(sys.argv[1]))["pid"]))
+except Exception:
+    pass' "$TUNNEL_STATE" 2> /dev/null)
+    [[ "$pid" =~ ^[0-9]+$ ]] && tr '\0' ' ' < "/proc/$pid/cmdline" 2> /dev/null | grep -q "nexum-tunel" && echo "$pid"
+}
+
+# tunel-cerrar
+function tunnel_close() {
+    local pid n
+    pid=$(tunnel_pid)
+    if [ -z "$pid" ]; then
+        rm -f "$TUNNEL_STATE"
+        echo "No hay ningun tunel abierto"
+
+        return 0
+    fi
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se cierra el tunel ($pid)"; return 0; }
+    kill -TERM "$pid" 2> /dev/null
+    for n in $(seq 20); do
+        kill -0 "$pid" 2> /dev/null || break
+        sleep 0.25
+    done
+    kill -0 "$pid" 2> /dev/null && kill -KILL "$pid" 2> /dev/null
+    rm -f "$TUNNEL_STATE"
+    echo "Tunel cerrado: la direccion ya no lleva a ningun sitio"
+}
+
+# tunel-abrir <direccion local> [carpeta del proyecto]: la direccion, de una web de este equipo
+# (http://web.local, https://proyecto-php83.docker.local:8443...); la carpeta, para saber que admin
+# bloquear y el dominio de una tienda PrestaShop. Cierra el que hubiera
+function tunnel_open() {
+    local url=$1 folder=${2%/} scheme host port ip clave horas admin params dir="" domains n url_t
+    if [ -z "$url" ]; then
+        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta del proyecto]"
+
+        return 1
+    fi
+    if ! [[ "$url" =~ ^(https?)://([A-Za-z0-9.-]+)(:([0-9]{1,5}))?/?$ ]]; then
+        echo "$url no es una direccion valida (como http://web.local)"
+
+        return 1
+    fi
+    scheme=${BASH_REMATCH[1]} host=$(tr 'A-Z' 'a-z' <<< "${BASH_REMATCH[2]}") port=${BASH_REMATCH[4]}
+    [ -n "$port" ] || { [ "$scheme" == https ] && port=443 || port=80; }
+    # Solo webs de este equipo: el proxy no lleva a ningun otro sitio
+    ip=$(getent ahostsv4 "$host" 2> /dev/null | awk '{ print $1; exit }')
+    if ! valid_domain "$host" || [[ ! "$ip" =~ ^127\. ]]; then
+        echo "$host no es una web de este equipo (no lleva a 127.x en /etc/hosts): no se comparte"
+
+        return 1
+    fi
+    if [ -n "$folder" ]; then
+        [[ "$folder" == /* ]] || folder=$HTDOCS_DIR/$folder
+        dir=$(realpath -e "$folder" 2> /dev/null)
+        if [ -z "$dir" ] || [ ! -d "$dir" ] || [[ "$dir" != "$(realpath -e "$HTDOCS_DIR")"/* ]]; then
+            echo "$folder no es la carpeta de un proyecto de $HTDOCS_DIR"
+
+            return 1
+        fi
+    fi
+    if ! tunnel_installed; then
+        echo "Falta cloudflared: lvm-instalador tunel-instalar (o en Configuracion, Tunel de Cloudflare)"
+
+        return 1
+    fi
+    # Los dominios de la web que se cambian por el del tunel: el suyo y, en una tienda, el de su BBDD
+    # (va con el dominio real falseado: la direccion local lleva a el)
+    domains=$host
+    if [ -n "$dir" ] && is_prestashop "$(basename "$dir")" 2> /dev/null; then
+        n=$(ps_domain "$(basename "$dir")" 2> /dev/null)
+        valid_domain "$n" && domains+=" $n"
+    fi
+    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
+    if [ -z "$clave" ]; then
+        clave=$(tunnel_new_pass)
+        tunnel_conf_write "$clave" "$horas" "$admin" || return 1
+    fi
+    echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
+    echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $horas h)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] cloudflared tunnel --url http://127.0.0.1:<puerto del proxy>"
+
+        return 0
+    fi
+    tunnel_close > /dev/null
+    mkdir -p -m 700 "$TUNNEL_DIR" || return 1
+    # (lo que necesita el proxy, en un fichero solo tuyo que borra al leerlo: la contraseña no va en
+    # la linea de ordenes)
+    params=$(mktemp "$TUNNEL_DIR/abrir.XXXXXX") || return 1
+    T_SCHEME=$scheme T_HOST=$host T_PORT=$port T_DOMAINS=$domains T_FOLDER=$dir T_CLAVE=$clave T_HORAS=$horas \
+        T_ADMIN=$admin T_BIN=$TUNNEL_BIN T_STATE=$TUNNEL_STATE T_DIR=$TUNNEL_DIR T_ICON=$(tr -d ' \n' <<< "$ICON_PNG_B64") \
+        python3 -I -c 'import json, os, sys
+e = os.environ
+json.dump({"scheme": e["T_SCHEME"], "host": e["T_HOST"], "port": int(e["T_PORT"]), "domains": e["T_DOMAINS"].split(),
+           "folder": e["T_FOLDER"], "password": e["T_CLAVE"], "hours": int(e["T_HORAS"]), "admin": e["T_ADMIN"],
+           "cloudflared": e["T_BIN"], "state": e["T_STATE"], "dir": e["T_DIR"], "icon": e["T_ICON"]}, open(sys.argv[1], "w"))' \
+        "$params" || { rm -f "$params"; return 1; }
+    rm -f "$TUNNEL_STATE"
+    : > "$TUNNEL_LOG" && chmod 600 "$TUNNEL_LOG"
+    # (aparte de esta tarea: sigue abierto al cerrar la ventana, hasta su hora o tunel-cerrar)
+    setsid python3 -I -c "$TUNNEL_PY" nexum-tunel "$params" >> "$TUNNEL_LOG" 2>&1 < /dev/null &
+    for n in $(seq 120); do
+        [ -s "$TUNNEL_STATE" ] && break
+        kill -0 $! 2> /dev/null || break
+        sleep 0.5
+    done
+    url_t=$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["url"])' "$TUNNEL_STATE" 2> /dev/null)
+    if [ -z "$url_t" ]; then
+        kill -TERM $! 2> /dev/null
+        rm -f "$params" "$TUNNEL_STATE"
+        echo "No se ha podido abrir el tunel. Lo ultimo de cloudflared:"
+        grep -v '^\s*$' "$TUNNEL_LOG" | tail -6 | sed 's/^/  /'
+        echo "(sin conexion a Internet, o Cloudflare no da tuneles rapidos ahora mismo: prueba en un rato)"
+
+        return 1
+    fi
+    echo "Tunel abierto: $url_t"
+    echo "Contraseña para entrar: $clave"
+    echo "URL|$url_t"
+}
+
+# tunel [estado]: para la ventana y la terminal
+#   I|instalado (1/0)|version instalada|version del programa
+#   C|horas|admin
+#   T|url|direccion local|carpeta|fin (epoch)   (si hay uno abierto)
+function tunnel_status() {
+    local pid
+    echo "I|$(tunnel_installed && echo 1 || echo 0)|$(tunnel_installed_version)|$TUNNEL_VERSION"
+    echo "C|$(tunnel_conf HORAS)|$(tunnel_conf ADMIN)"
+    pid=$(tunnel_pid)
+    [ -n "$pid" ] && python3 -I -c 'import json, sys
+s = json.load(open(sys.argv[1]))
+print("T|%s|%s|%s|%d" % (s["url"], s["target"], s["folder"], s["expires"]))' "$TUNNEL_STATE" 2> /dev/null
+    return 0
+}
+
+TUNNEL_PY=$(cat <<'PYEOF'
+import base64, hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
+import socketserver, ssl, subprocess, sys, threading, time, urllib.parse
+
+params_path = sys.argv[2]
+P = json.load(open(params_path))
+os.remove(params_path)
+STATE, DIR = P["state"], P["dir"]
+EXPIRES = int(time.time() + int(P["hours"]) * 3600)
+PASSWORD = P["password"].encode()
+KEY = secrets.token_bytes(32)
+COOKIE = "nexum_tunel"
+TOKEN = hmac.new(KEY, b"dentro", hashlib.sha256).hexdigest()
+DOMAINS = [d.lower() for d in P["domains"]]
+TEXT = re.compile(r"^(text/|application/(javascript|x-javascript|json|ld\+json|xml|rss\+xml|atom\+xml|"
+                  r"manifest\+json)|image/svg\+xml)", re.I)
+HOP = {"connection", "keep-alive", "proxy-connection", "transfer-encoding", "te", "trailer", "upgrade",
+       "proxy-authorization", "proxy-authenticate"}
+tunnel_host = None
+
+
+def log(text):
+    print(time.strftime("%H:%M:%S"), text, flush=True)
+
+
+def loopback(host):
+    try:
+        return all(a[4][0].startswith("127.") for a in socket.getaddrinfo(host, None, socket.AF_INET))
+    except OSError:
+        return False
+
+
+# A donde van las peticiones: el destino y, si la web redirige a otro de sus dominios de este equipo
+# (web.local a https://tienda.es, http a https), ese desde entonces
+origin = {"scheme": P["scheme"], "host": P["host"], "port": int(P["port"])}
+origin_lock = threading.Lock()
+
+
+def host_header(o):
+    default = 443 if o["scheme"] == "https" else 80
+    return o["host"] if o["port"] == default else "%s:%d" % (o["host"], o["port"])
+
+
+# Lo que nunca va por el tunel: lo de LAMPP para este equipo (Apache ve el proxy como 127.0.0.1) y los
+# ficheros ocultos. Y el admin, salvo que se permita
+BLOCKED = ["/phpmyadmin", "/cgi-bin", "/server-status", "/server-info", "/dashboard", "/xampp", "/webalizer",
+           "/licenses", "/__nexum"]
+ADMIN = []
+if P["admin"] != "permitir":
+    ADMIN = ["/wp-login.php", "/wp-admin", "/xmlrpc.php"]
+    folder = P["folder"]
+    if folder:
+        try:
+            for n in os.listdir(folder):
+                d = os.path.join(folder, n)
+                if re.fullmatch(r"[A-Za-z0-9_-]+", n) and os.path.isdir(d) and os.path.isfile(os.path.join(d, "index.php")) \
+                        and any(os.path.isfile(os.path.join(d, f)) for f in ("ajax-tab.php", "get-file-admin.php")):
+                    ADMIN.append("/" + n.lower())
+        except OSError:
+            pass
+# (wp-admin/admin-ajax.php lo usan las webs de cara al publico)
+ALLOWED = ["/wp-admin/admin-ajax.php"]
+
+
+def blocked(path):
+    p = urllib.parse.unquote(path.split("?", 1)[0]).lower()
+    p = re.sub(r"/+", "/", p)
+    # (cualquier /../ o /./ se rechaza entero: Apache los normaliza y saltaria la lista)
+    if re.search(r"(^|/)\.\.?(/|$)", p) or "\\" in p or "\x00" in p:
+        return "ruta"
+    if re.search(r"/\.(?!well-known/)", p):
+        return "oculto"
+    if any(p == a for a in ALLOWED):
+        return None
+    for b in BLOCKED:
+        if p == b or p.startswith(b + "/"):
+            return "local"
+    for b in ADMIN:
+        if p == b or p.startswith(b + "/") or p.startswith(b + "?"):
+            return "admin"
+    return None
+
+
+def pattern():
+    names = b"|".join(re.escape(d.encode()) for d in DOMAINS)
+    return (re.compile(rb"(?:https?:)?(\\?/\\?/)(?:www\.)?(?:" + names + rb")(?::\d+)?(?![A-Za-z0-9.-])", re.I),
+            re.compile(rb"https?%3A%2F%2F(?:www\.)?(?:" + names + rb")(?:%3A\d+)?(?![A-Za-z0-9.-])", re.I))
+
+
+URL_RE, ENC_RE = pattern()
+
+
+def to_tunnel(data):
+    t = tunnel_host.encode()
+    data = URL_RE.sub(lambda m: (b"https:\\/\\/" if b"\\" in m.group(1) else b"https://") + t, data)
+    return ENC_RE.sub(b"https%3A%2F%2F" + t, data)
+
+
+def to_local(text):
+    """Al reves, en lo que manda el visitante (Origin, Referer, la consulta y los formularios)."""
+    if not tunnel_host:
+        return text
+    o = origin
+    local = "%s://%s" % (o["scheme"], host_header(o))
+    text = re.sub(r"https?://" + re.escape(tunnel_host), local, text, flags=re.I)
+    return re.sub(r"https?%3A%2F%2F" + re.escape(tunnel_host), urllib.parse.quote(local, safe=""), text, flags=re.I)
+
+
+class HTTPS(http.client.HTTPSConnection):
+    """A la direccion de este equipo del dominio, con su nombre en el certificado (SNI)."""
+
+    def __init__(self, ip, host, port, timeout):
+        ctx = ssl.create_default_context()
+        # (los certificados de este equipo son propios: el que importa es el de Cloudflare)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        super().__init__(ip, port, timeout=timeout, context=ctx)
+        self.sni = host
+
+    def connect(self):
+        sock = socket.create_connection((self.host, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.sni)
+
+
+def connect(o):
+    ip = socket.getaddrinfo(o["host"], None, socket.AF_INET)[0][4][0]
+    if not ip.startswith("127."):
+        raise OSError("%s ya no es de este equipo" % o["host"])
+    if o["scheme"] == "https":
+        return HTTPS(ip, o["host"], o["port"], 120)
+    return http.client.HTTPConnection(ip, o["port"], timeout=120)
+
+
+fails, fails_lock = {}, threading.Lock()
+
+
+def page(title, body, status_note=""):
+    return ("""<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>%s</title><style>body{font-family:system-ui,sans-serif;background:#1e1e1e;color:#ddd;display:flex;
+align-items:center;justify-content:center;min-height:100vh;margin:0;padding:16px;box-sizing:border-box}
+main{text-align:center;max-width:26em;width:100%%}img{width:72px;height:72px}h1{font-size:1.3em;font-weight:500}
+p{color:#9a9a9a;line-height:1.5}input{width:100%%;box-sizing:border-box;font-size:1.1em;padding:10px 12px;
+border-radius:8px;border:1px solid #555;background:#2a2a2a;color:#fff;margin:6px 0 12px}
+button{width:100%%;font-size:1.05em;padding:10px;border:0;border-radius:8px;background:#3584e4;color:#fff;
+cursor:pointer}.err{color:#f66}small{color:#777}</style></head><body><main>
+<img src="data:image/png;base64,%s" alt=""><h1>%s</h1>%s<p><small>Nexum Dev Stack · una web en pruebas</small></p>
+</main></body></html>""" % (html.escape(title), P["icon"], html.escape(title), body)).encode()
+
+
+class Proxy(http.server.BaseHTTPRequestHandler):
+    server_version = "Nexum"
+    sys_version = ""
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def visitor(self):
+        return self.headers.get("Cf-Connecting-IP", "")[:64] or self.client_address[0]
+
+    def send_page(self, status, data, extra=()):
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Robots-Tag", "noindex, nofollow")
+        for k, v in extra:
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
+    def logged_in(self):
+        for part in self.headers.get("Cookie", "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == COOKIE and hmac.compare_digest(v, TOKEN):
+                return True
+        return False
+
+    def login(self):
+        back = self.path if self.path.startswith("/") and not self.path.startswith("//") else "/"
+        if self.command == "POST" and self.path.split("?")[0] == "/__nexum-tunel/entrar":
+            ip = self.visitor()
+            with fails_lock:
+                recent = [t for t in fails.get(ip, []) if t > time.time() - 600]
+                fails[ip] = recent
+            if len(recent) >= 8:
+                log("%s: demasiados intentos" % ip)
+                return self.send_page(429, page("Demasiados intentos", "<p>Espera unos minutos y vuelve a probar.</p>"))
+            n = int(self.headers.get("Content-Length") or 0)
+            form = urllib.parse.parse_qs(self.rfile.read(min(n, 4096)).decode("utf-8", "replace"))
+            given = (form.get("clave") or [""])[0].strip().encode()
+            back = (form.get("volver") or ["/"])[0]
+            if not back.startswith("/") or back.startswith("//") or "\\" in back:
+                back = "/"
+            if hmac.compare_digest(given, PASSWORD):
+                log("%s: entra" % ip)
+                self.send_response(303)
+                self.send_header("Location", back)
+                self.send_header("Set-Cookie", "%s=%s; Path=/; Secure; HttpOnly; SameSite=Lax" % (COOKIE, TOKEN))
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            with fails_lock:
+                fails.setdefault(ip, []).append(time.time())
+            log("%s: contraseña equivocada" % ip)
+            err = '<p class="err">Esa no es la contraseña.</p>'
+        else:
+            err = ""
+        body = ('<p>Esta web está en pruebas. Escribe la contraseña que te han dado.</p>%s'
+                '<form method="post" action="/__nexum-tunel/entrar"><input type="hidden" name="volver" value="%s">'
+                '<input type="password" name="clave" autocomplete="current-password" autofocus placeholder="Contraseña">'
+                '<button type="submit">Entrar</button></form>' % (err, html.escape(back, quote=True)))
+        self.send_page(401, page("Web en pruebas", body))
+
+    def handle_any(self):
+        if not self.logged_in():
+            return self.login()
+        why = blocked(self.path)
+        if why:
+            log("%s: %s %s (bloqueado: %s)" % (self.visitor(), self.command, self.path[:200], why))
+            text = ("El panel de administración no se puede abrir desde aquí." if why == "admin"
+                    else "Esto no se puede abrir desde aquí.")
+            return self.send_page(403, page("No disponible", "<p>%s</p>" % text))
+        body = self.read_body()
+        if body is None:
+            return self.send_page(400, page("Petición no válida", ""))
+        ctype = self.headers.get("Content-Type", "")
+        if body and len(body) < 10_000_000 and ctype.startswith(("application/x-www-form-urlencoded", "text/", "application/json")):
+            body = to_local(body.decode("latin-1")).encode("latin-1")
+        path = to_local(self.path)
+        for hop in range(4):
+            with origin_lock:
+                o = dict(origin)
+            headers = {}
+            for k, v in self.headers.items():
+                lk = k.lower()
+                if lk in HOP or lk in ("host", "content-length", "accept-encoding") or lk.startswith("cf-") \
+                        or lk.startswith("x-forwarded-") or lk == "cdn-loop":
+                    continue
+                if lk == "cookie":
+                    v = "; ".join(c for c in (x.strip() for x in v.split(";")) if c and not c.startswith(COOKIE + "="))
+                    if not v:
+                        continue
+                elif lk in ("origin", "referer"):
+                    v = to_local(v)
+                headers[k] = v
+            headers["Host"] = host_header(o)
+            headers["Accept-Encoding"] = "identity"
+            if body or self.command in ("POST", "PUT", "PATCH"):
+                headers["Content-Length"] = str(len(body))
+            try:
+                conn = connect(o)
+                conn.request(self.command, path, body=body or None, headers=headers)
+                res = conn.getresponse()
+            except OSError as exc:
+                log("Sin respuesta de %s: %s" % (host_header(o), exc))
+                return self.send_page(502, page("La web no responde", "<p>La web de este equipo no contesta. "
+                                                "Puede que se haya parado: vuelve a probar en un momento.</p>"))
+            # Redirige a otro de sus dominios de este equipo: se sigue aqui y desde entonces va ahi
+            loc = res.getheader("Location", "")
+            if res.status in (301, 302, 307, 308) and self.command in ("GET", "HEAD") and loc:
+                u = urllib.parse.urlsplit(loc)
+                new = {"scheme": (u.scheme or o["scheme"]).lower(), "host": (u.hostname or "").lower(),
+                       "port": u.port or (443 if (u.scheme or o["scheme"]).lower() == "https" else 80)}
+                if u.hostname and new != o and re.sub(r"^www\.", "", new["host"]) in [re.sub(r"^www\.", "", d) for d in DOMAINS] \
+                        and new["scheme"] in ("http", "https") and new["port"] in (80, 443, int(P["port"])) and loopback(new["host"]):
+                    res.read()
+                    conn.close()
+                    with origin_lock:
+                        origin.update(new)
+                    log("La web va a %s://%s" % (new["scheme"], host_header(new)))
+                    path = urllib.parse.urlunsplit(("", "", u.path or "/", u.query, ""))
+                    continue
+            return self.relay(res, conn)
+        return self.send_page(508, page("Demasiadas redirecciones", ""))
+
+    def read_body(self):
+        if "chunked" in self.headers.get("Transfer-Encoding", "").lower():
+            out = b""
+            while True:
+                line = self.rfile.readline(65537)
+                try:
+                    size = int(line.split(b";")[0].strip(), 16)
+                except ValueError:
+                    return None
+                if size == 0:
+                    while self.rfile.readline(65537).strip():
+                        pass
+                    return out
+                out += self.rfile.read(size)
+                self.rfile.readline(3)
+                if len(out) > 512_000_000:
+                    return None
+        n = self.headers.get("Content-Length")
+        if not n:
+            return b""
+        if not n.isdigit() or int(n) > 512_000_000:
+            return None
+        return self.rfile.read(int(n))
+
+    def relay(self, res, conn):
+        ctype = res.getheader("Content-Type", "")
+        rewrite = bool(TEXT.match(ctype)) and self.command != "HEAD"
+        length = res.getheader("Content-Length")
+        if rewrite and length and length.isdigit() and int(length) > 30_000_000:
+            rewrite = False
+        self.send_response(res.status, res.reason)
+        for k, v in res.getheaders():
+            lk = k.lower()
+            if lk in HOP or lk == "content-length" or (rewrite and lk == "content-encoding"):
+                continue
+            if lk == "set-cookie":
+                # (sin Domain: la cookie es del dominio del tunel)
+                v = re.sub(r";\s*domain=[^;]*", "", v, flags=re.I)
+            elif lk in ("location", "refresh", "link", "content-location", "content-security-policy"):
+                v = to_tunnel(v.encode("latin-1")).decode("latin-1")
+            self.send_header(k, v)
+        self.send_header("X-Robots-Tag", "noindex, nofollow")
+        if rewrite:
+            data = to_tunnel(res.read())
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        else:
+            if length and length.isdigit():
+                self.send_header("Content-Length", length)
+            self.end_headers()
+            if self.command != "HEAD" and res.status not in (204, 304):
+                while True:
+                    chunk = res.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        conn.close()
+
+    do_GET = do_POST = do_HEAD = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = handle_any
+
+
+class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+
+
+server = Server(("127.0.0.1", 0), Proxy)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+port = server.server_address[1]
+# (sin la configuracion de ~/.cloudflared, que haria otro tipo de tunel, ni actualizarse solo)
+proc = subprocess.Popen([P["cloudflared"], "tunnel", "--no-autoupdate", "--config", os.devnull,
+                         "--url", "http://127.0.0.1:%d" % port],
+                        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+stop = threading.Event()
+
+
+def finish(*_):
+    stop.set()
+
+
+signal.signal(signal.SIGTERM, finish)
+signal.signal(signal.SIGINT, finish)
+signal.signal(signal.SIGHUP, finish)
+
+
+def write_state(url):
+    tmp = STATE + ".nuevo"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"pid": os.getpid(), "url": url, "target": "%s://%s" % (P["scheme"], host_header(
+            {"scheme": P["scheme"], "host": P["host"], "port": int(P["port"])})), "folder": P["folder"],
+            "expires": EXPIRES, "started": int(time.time())}, f)
+    os.replace(tmp, STATE)
+
+
+def read_output():
+    global tunnel_host
+    for raw in proc.stdout:
+        line = raw.decode("utf-8", "replace").rstrip()
+        print("cloudflared:", line, flush=True)
+        m = re.search(r"https://([a-z0-9-]+\.trycloudflare\.com)", line)
+        if m and not tunnel_host:
+            tunnel_host = m.group(1)
+            write_state("https://" + tunnel_host)
+            log("Tunel abierto: https://%s (hasta las %s)" % (tunnel_host, time.strftime("%H:%M", time.localtime(EXPIRES))))
+    stop.set()
+
+
+threading.Thread(target=read_output, daemon=True).start()
+while not stop.wait(5):
+    if time.time() >= EXPIRES:
+        log("Se ha cumplido su hora: se cierra")
+        break
+proc.terminate()
+try:
+    proc.wait(10)
+except subprocess.TimeoutExpired:
+    proc.kill()
+try:
+    if json.load(open(STATE)).get("pid") == os.getpid():
+        os.remove(STATE)
+except (OSError, ValueError):
+    pass
+log("Tunel cerrado")
+PYEOF
+)
 
 # Parches de una rama: P|version|fecha|carpeta|estado (nueva, instalada o existe)|seguridad (1/0)
 function gui_patches() {
@@ -16085,6 +17762,7 @@ import codecs
 import fcntl
 import html
 import http.server
+import json
 import os
 import pty
 import re
@@ -16263,6 +17941,14 @@ def docker_slug(folder):
     """Nombre corto de un proyecto en Docker (como docker_slug del script)."""
     s = re.sub(r"[^a-z0-9]+", "-", folder.lower()).strip("-")[:40].rstrip("-")
     return s or "proyecto"
+
+
+def docker_web_domain(p, v):
+    """Dominio de una versión de PHP de un proyecto del Apache de Docker (docker_web_domain del script):
+    el de la tienda (uno solo) o <proyecto>-php83.docker.local."""
+    if p.get("kind") == "ps":
+        return "%s.docker.local" % p["slug"]
+    return "%s-php%s.docker.local" % (p["slug"], v.replace(".", ""))
 
 
 def copy_name(db, php):
@@ -16506,6 +18192,21 @@ def icon(name, size=16):
 # Logotipos de los paquetes (Simple Icons, CC0: un solo trazo en una caja de 24x24). Cada marca
 # es de su dueño; se usan solo para identificar cada paquete
 LOGO_PATHS = {
+    # Cloudflare (Simple Icons 13.21.0, CC0)
+    "cloudflare": (
+        "M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8."
+        "6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1"
+        "484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561."
+        "0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3"
+        ".8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.00"
+        "69.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844."
+        "1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.161"
+        "1 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164"
+        ".2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074."
+        "0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-."
+        "1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.175"
+        "7-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"
+    ),
     # Docker (Simple Icons 13.21.0, CC0)
     "docker": (
         "M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.18"
@@ -16730,7 +18431,7 @@ LOGO_COLORS = {"php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
                "globo": ("#1C71D8", "#62A0EA"), "docker": ("#2496ED", "#4FAEF2"),
-               "mailpit": ("#00A87B", "#2FD3A4")}
+               "mailpit": ("#00A87B", "#2FD3A4"), "cloudflare": ("#F38020", "#F6A35A")}
 _logo_cache = {}
 
 
@@ -16882,6 +18583,9 @@ ROW_ICONS = [
     # Correo de pruebas: el logotipo de Mailpit en todas sus filas
     ("Mailpit", ("logo", "mailpit")),
     ("Bandeja de entrada", ("logo", "mailpit")),
+    # Tunel de Cloudflare
+    ("cloudflared", ("logo", "cloudflare")),
+    ("Túnel", ("logo", "cloudflare")),
 ]
 
 
@@ -17319,6 +19023,36 @@ def run_quick(args, callback, env=None, timeout=180):
         except Exception as exc:  # noqa: BLE001 - cualquier fallo se muestra como error
             GLib.idle_add(callback, 1, "ERROR|%s" % exc)
     threading.Thread(target=work, daemon=True).start()
+
+
+def tunnel_state():
+    """El túnel de Cloudflare abierto (tunel-abrir): url, target (la dirección local), folder y expires.
+    None si no hay ninguno o su proceso ya no está."""
+    try:
+        with open(os.path.join(LOG_DIR, "tunel", "estado"), encoding="utf-8") as fh:
+            st = json.load(fh)
+        pid = int(st["pid"])
+        with open("/proc/%d/cmdline" % pid, "rb") as fh:
+            if b"nexum-tunel" not in fh.read():
+                return None
+        return st if st.get("url") and int(st.get("expires", 0)) > time.time() else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def tunnel_conf():
+    """CLAVE, HORAS y ADMIN del túnel (tunel-config); la contraseña, vacía hasta el primero."""
+    conf = {"CLAVE": "", "HORAS": "2", "ADMIN": "bloquear"}
+    try:
+        with open(os.path.join(LOG_DIR, "tunel", "config"), encoding="utf-8", errors="replace") as fh:
+            for line in fh.read(2000).splitlines():
+                k, _, v = line.partition("=")
+                if k == "CLAVE" and re.fullmatch(r"[A-Za-z0-9-]{8,64}", v) or k == "HORAS" and re.fullmatch(r"[1-9]|1[0-2]", v) \
+                        or k == "ADMIN" and v in ("bloquear", "permitir"):
+                    conf[k] = v
+    except OSError:
+        pass
+    return conf
 
 
 def project_admin(folder):
@@ -21545,8 +23279,12 @@ class App(Gtk.Application):
             elif f[0] == "V" and len(f) >= 3:
                 d["php"], d["maria"] = f[1].split(), f[2].split()
             elif f[0] == "P" and len(f) >= 9 and re.fullmatch(r"[a-z0-9-]{1,40}", f[1]):
+                web = len(f) >= 13 and f[9] == "web"
                 d["projects"].append({"slug": f[1], "folder": f[2], "php": f[3], "maria": f[4],
-                                      "domain": f[5], "state": f[6], "db": f[7], "pma": f[8]})
+                                      "domain": f[5], "state": f[6], "db": f[7], "pma": f[8], "web": web,
+                                      "kind": f[11] if web else "", "versions": f[12].split() if web else [f[3]]})
+            elif f[0] == "W" and len(f) >= 6:
+                d["web"] = {"ip": f[1], "http": f[2], "https": f[3], "state": f[4], "ports_ok": f[5] == "1"}
             elif f[0] == "C" and len(f) >= 7:
                 d["containers"].append({"name": f[1], "image": f[2], "state": f[3], "status": f[4],
                                         "ports": f[5], "project": f[6], "id": f[7][:12] if len(f) > 7 else ""})
@@ -21569,12 +23307,11 @@ class App(Gtk.Application):
         if d["ready"]:
             self.docker_box.pack_start(self.build_docker_console(), False, False, 0)
         box, lb = group("Docker sin root",
-                        "Cada proyecto en Docker lleva su propio PHP (cualquier versión, también 7.1 o "
-                        "7.4), su MariaDB con una copia de su BBDD y su phpMyAdmin, en contenedores. "
-                        "Docker corre sin root, con tu usuario: ni un proyecto ni Docker pueden hacerse "
-                        "administradores del equipo. La web la sirve el Apache de la versión LAMPP "
-                        "activa por su dominio (carpeta.docker.local), con sus .htaccess, así que LAMPP "
-                        "y Docker funcionan a la vez.")
+                        "Cada proyecto en Docker va con el PHP que quieras (de la 5.6 a la 8.5), también "
+                        "con varias versiones a la vez y la misma BBDD, en una MariaDB común. Docker tiene "
+                        "su propio Apache, con las mismas reglas de seguridad y los .htaccess de cada "
+                        "proyecto, así que no necesita LAMPP y funcionan a la vez. Docker corre sin root, "
+                        "con tu usuario: ni un proyecto ni Docker pueden hacerse administradores del equipo.")
         if not d["installed"]:
             row = ActionRow("Docker no está instalado",
                             "Se instala Docker de Ubuntu en modo sin root (el Docker del sistema, con "
@@ -21795,14 +23532,11 @@ class App(Gtk.Application):
         combo_row("BBDD que se copia", [("@vacia", "— Ninguna: vacía —")] +
                   [("%s|%s" % (i["folder"], db), "%s (lampp-%s)" % (db, i["folder"])) for i, db in pairs],
                   "source")
-        row = ActionRow("Dominio", "Se abre por https, con su certificado")
-        entry = Gtk.Entry(valign=Gtk.Align.CENTER, max_length=80)
-        entry.set_text(f.get("domain") or (docker_slug(f["folder"]) + ".docker.local" if f.get("folder") else ""))
-        entry.set_width_chars(min(56, max(24, len(entry.get_text()) + 2)))
-        f["domain"] = entry.get_text()
-        entry.connect("changed", lambda e: f.update(domain=e.get_text().strip().lower(), domain_set=True))
-        row.add_suffix(entry)
-        lb.add(row)
+        # (el dominio sale solo: el de la tienda o el de la version de PHP)
+        if f.get("folder"):
+            dom = docker_web_domain({"slug": docker_slug(f["folder"]), "kind": project_kind(f["folder"])}, f.get("php") or "")
+            row = ActionRow("Dominio", "Con el Apache de Docker (sin LAMPP), por https: " + dom)
+            lb.add(row)
         row = ActionRow("")
         b = css(Gtk.Button(label="Crear en Docker", sensitive=bool(folders) and not self.busy), "verde")
         b.connect("clicked", lambda *_: self.on_docker_create())
@@ -21819,15 +23553,11 @@ class App(Gtk.Application):
 
     def on_docker_create(self):
         f = self.docker_form
-        folder, php, maria, domain = f.get("folder"), f.get("php"), f.get("maria"), f.get("domain") or ""
+        folder, php, maria = f.get("folder"), f.get("php"), f.get("maria")
         if not (folder and php and maria):
             return
-        if not DOMAIN_RX.match(domain) or not domain.endswith(".local"):
-            message(self.win, "Dominio no válido",
-                    "El dominio de un proyecto en Docker tiene que acabar en .local "
-                    "(por ejemplo %s.docker.local)." % docker_slug(folder), Gtk.MessageType.WARNING)
-            return
-        args = ["docker-crear", folder, php, maria, "--dominio", domain]
+        domain = docker_web_domain({"slug": docker_slug(folder), "kind": project_kind(folder)}, php)
+        args = ["docker-nuevo", folder, php, maria]
         src = f.get("source")
         text = "PHP %s y MariaDB %s, en https://%s." % (php, maria, domain)
         if src and src != "@vacia" and "|" in src:
@@ -22470,6 +24200,8 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
                                            border: 1px solid alpha(@theme_fg_color, 0.22); }
 .nv-proyecto-btn:hover, .nv-proyecto-btn button:hover { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
 .nv-proyecto-btn.nv-discontinuo { border-style: dashed; }
+/* (un túnel abierto: la web se ve desde fuera) */
+.nv-proyecto-btn.nv-compartiendo { border-color: #F38020; background-color: alpha(#F38020, 0.10); }
 switch:checked { background-color: %(g)s; border-color: transparent; }
 .nv-running { font-size: 0.86em; color: %(g)s; }
 .nv-exited { font-size: 0.8em; padding: 1px 9px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.08); color: alpha(@theme_fg_color, 0.6); }
@@ -23601,6 +25333,14 @@ class App2(App):
             return False
         run_quick(["gui-docker"], got)
 
+    def nv_docker_add_env(self, x):
+        """Añadir entorno en Docker: si ya va con el Apache de Docker, otra versión de PHP; si no, montarlo."""
+        web = next((e for e in self.nv_docker_of(x["name"]) if e.get("web")), None)
+        if web is not None:
+            self.nv_docker_versions(web)
+        else:
+            self.nv_docker_loaded(x)
+
     def nv_docker_mount(self, dp):
         """Monta (arranca) un proyecto de Docker y lleva a la pestaña Docker."""
         if dp["state"] in ("marcha", "running"):
@@ -23681,21 +25421,16 @@ class App2(App):
             row.add_suffix(c)
             lb.add(row)
             combos[key] = c
-        row = ActionRow("Dominio")
-        entry = Gtk.Entry(valign=Gtk.Align.CENTER, width_chars=26, max_length=80)
-        # (si ya está en Docker con otra versión, este va con otro nombre: <carpeta>-php84)
-        taken = {e["slug"] for e in (self.docker or {}).get("projects", [])}
+        # (el dominio sale solo: el de la tienda o el de la version de PHP elegida)
         base = docker_slug(x["name"])
+        dom_row = ActionRow("Dominio", "…")
+        lb.add(dom_row)
 
-        def name_for(v):
-            n = base if base not in taken else "%s-php%s" % (base[:30], (v or "").replace(".", ""))
-            return n if n not in taken else None
-        entry.set_text((name_for(php) or base) + ".docker.local")
-        entry.set_width_chars(min(56, max(26, len(entry.get_text()) + 2)))
-        combos["php"].connect("changed", lambda c: name_for(c.get_active_id()) and base in taken
-                              and entry.set_text(name_for(c.get_active_id()) + ".docker.local"))
-        row.add_suffix(entry)
-        lb.add(row)
+        def show_domain(*_):
+            dom_row.subtitle.set_label("Con el Apache de Docker (sin LAMPP), por https: " + docker_web_domain(
+                {"slug": base, "kind": project_kind(x["name"])}, combos["php"].get_active_id() or ""))
+        combos["php"].connect("changed", show_domain)
+        show_domain()
         box.pack_start(lb, False, False, 0)
         dlg.get_content_area().add(box)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
@@ -23703,21 +25438,11 @@ class App2(App):
         dlg.show_all()
         resp = run_dialog(dlg)
         php, maria, src = (combos[k].get_active_id() for k in ("php", "maria", "source"))
-        domain = entry.get_text().strip().lower()
         dlg.destroy()
         if resp != Gtk.ResponseType.OK or not (php and maria):
             return
-        if not DOMAIN_RX.match(domain) or not domain.endswith(".local"):
-            message(self.win, "Dominio no válido", "Tiene que acabar en .local (por ejemplo %s.docker.local)."
-                    % docker_slug(x["name"]), Gtk.MessageType.WARNING)
-            return
-        name = name_for(php)
-        if name is None:
-            message(self.win, "Ya está en Docker con PHP %s" % php, "Elige otra versión de PHP.", Gtk.MessageType.WARNING)
-            return
-        args = ["docker-crear", x["name"], php, maria, "--dominio", domain]
-        if name != base:
-            args += ["--nombre", name]
+        domain = docker_web_domain({"slug": base, "kind": project_kind(x["name"])}, php)
+        args = ["docker-nuevo", x["name"], php, maria]
         if src and src != "@vacia" and "|" in src:
             ver, db = src.split("|", 1)
             args += ["--bd", db, "--desde", ver]
@@ -23729,10 +25454,18 @@ class App2(App):
         self.run_task("Montando %s en Docker" % x["name"], args,
                       done_text="%s en Docker: https://%s" % (x["name"], domain), on_done=done)
 
+    def dk_url(self, domain):
+        """Dirección de una web del Apache de Docker: con el puerto si no es el 443."""
+        port = ((self.docker or {}).get("web") or {}).get("https", "443")
+        return "https://%s%s" % (domain, "" if port == "443" else ":" + port)
+
+    def dk_pma_url(self, p):
+        return self.dk_url("pma.docker.local") + "/" if p.get("web") else "http://127.0.0.1:%s/" % p["pma"]
+
     def nv_docker_copy_pass(self, p):
         """Contraseña de root de la BBDD del contenedor (DB_ROOT_PASS de su .env, solo tuyo), al
-        portapapeles: su phpMyAdmin ya no entra solo."""
-        path = os.path.join(LOG_DIR, "docker", p["slug"], ".env")
+        portapapeles: su phpMyAdmin ya no entra solo. En los del Apache de Docker, la de su MariaDB comun."""
+        path = os.path.join(LOG_DIR, "docker", ("mariadb-%s" % p["maria"]) if p.get("web") else p["slug"], ".env")
         try:
             with open(path, encoding="utf-8", errors="replace") as fh:
                 pw = next((l.split("=", 1)[1].strip() for l in fh.read(4000).splitlines()
@@ -23743,7 +25476,117 @@ class App2(App):
             self.toast("No se encuentra la contraseña de %s (%s)" % (p["folder"], path))
             return
         Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(pw, -1)
-        self.toast("Contraseña de root de %s copiada: en su phpMyAdmin, usuario root" % p["folder"])
+        if p.get("web"):
+            self.toast("Contraseña de root de la MariaDB %s de Docker copiada: en phpMyAdmin, usuario root" % p["maria"])
+        else:
+            self.toast("Contraseña de root de %s copiada: en su phpMyAdmin, usuario root" % p["folder"])
+
+    def nv_docker_versions(self, p):
+        """Versiones de PHP de un proyecto del Apache de Docker: la misma carpeta y la misma BBDD. En
+        WordPress van a la vez, cada una con su dominio; una tienda va con un dominio y la que se elija."""
+        d = self.docker or {}
+        ps = p.get("kind") == "ps"
+        dlg = Gtk.Dialog(title="Versiones de PHP", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(560, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        box.pack_start(label("Versiones de PHP de %s" % p["folder"], "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(label(("La tienda guarda su dominio en la BBDD: va con %s y la versión que elijas." % self.dk_url(p["domain"]))
+                             if ps else "Todas a la vez, cada una con su dominio, con la misma carpeta y la misma BBDD.",
+                             "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        choice = {}
+
+        def act(args, title, done):
+            choice.update(args=args, title=title, done=done)
+            dlg.response(Gtk.ResponseType.OK)
+        for v in p["versions"]:
+            on = v == p["php"]
+            row = ActionRow("PHP %s" % v, (self.dk_url(p["domain"]) + ("  ·  la elegida" if on else ""))
+                            if ps else self.dk_url(docker_web_domain(p, v)))
+            if ps and not on:
+                b = Gtk.Button(label="Elegir", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b.connect("clicked", lambda *_, v=v: act(["docker-php-elegir", p["slug"], v], "%s con PHP %s" % (p["folder"], v),
+                                                          "%s ya va con PHP %s" % (p["folder"], v)))
+                row.add_suffix(b)
+            if len(p["versions"]) > 1:
+                b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                               tooltip_text="Quitar PHP %s (su contenedor; la carpeta y la BBDD se quedan)" % v)
+                b.add(icon("user-trash-symbolic"))
+                b.connect("clicked", lambda *_, v=v: act(["docker-php-quitar", p["slug"], v], "Quitando PHP %s de %s" % (v, p["folder"]),
+                                                          "PHP %s quitado de %s" % (v, p["folder"])))
+                row.add_suffix(b)
+            lb.add(row)
+        rest = [v for v in d.get("php", []) if v not in p["versions"]]
+        if rest:
+            row = ActionRow("Añadir otra", "Se prepara su imagen la primera vez (unos minutos)")
+            c = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+            for v in rest:
+                c.append(v, "PHP %s" % v)
+            c.set_active(0)
+            row.add_suffix(c)
+            b = css(Gtk.Button(label="Añadir", valign=Gtk.Align.CENTER, sensitive=not self.busy), "nv-azul")
+            b.connect("clicked", lambda *_: c.get_active_id() and act(
+                ["docker-php-añadir", p["slug"], c.get_active_id()], "Añadiendo PHP %s a %s" % (c.get_active_id(), p["folder"]),
+                "%s con PHP %s" % (p["folder"], c.get_active_id())))
+            row.add_suffix(b)
+            lb.add(row)
+        box.pack_start(lb, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cerrar", Gtk.ResponseType.CANCEL)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        dlg.destroy()
+        if resp == Gtk.ResponseType.OK and choice:
+            self.run_task(choice["title"], choice["args"], done_text=choice["done"],
+                          on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_docker_pass(self, p):
+        """Un proyecto de antes (con LAMPP delante) pasa al Apache de Docker (docker-pasar)."""
+        new = "https://%s.docker.local" % p["slug"] if project_kind(p["folder"]) == "ps" else \
+            "https://%s-php%s.docker.local" % (p["slug"], p["php"].replace(".", ""))
+        if not confirm(self.win, "¿Pasar %s al Apache de Docker?" % p["folder"],
+                       "Ya no necesitará LAMPP y podrás añadirle más versiones de PHP. Antes se guarda una copia de "
+                       "su BBDD (%s) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus "
+                       "contenedores de ahora, su vhost de LAMPP y su línea de /etc/hosts. Se abrirá en %s. "
+                       "Pide la contraseña de administrador." % (p["db"], new), "Pasarlo"):
+            return
+        self.run_task("Pasando %s al Apache de Docker" % p["folder"], ["docker-pasar", p["slug"]],
+                      done_text="%s ya va con el Apache de Docker" % p["folder"],
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
+    def nv_docker_web_strip(self, box):
+        """El Apache de Docker: si está en marcha, su dirección y arrancarlo o pararlo; y si Docker sin root
+        aún no puede usar sus puertos, el aviso con «Permitir»."""
+        d = self.docker or {}
+        w = d.get("web")
+        if not w or not any(p.get("web") for p in d.get("projects", [])):
+            return
+        if not w["ports_ok"]:
+            r = css(Gtk.Box(spacing=10), "nv-stat")
+            r.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+            tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            tt.pack_start(label("Docker sin root aún no puede usar los puertos %s y %s" % (w["http"], w["https"])), False, False, 0)
+            tt.pack_start(label("Los puertos de menos de 1024 son de root: se permite una vez (pide la contraseña). "
+                                "O elige otros en Configuración.", "nv-chico", "nv-tenue"), False, False, 0)
+            r.pack_start(tt, True, True, 0)
+            r.pack_end(nv_button(None, "Permitir", None, lambda *_: self.run_task(
+                "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
+                done_text="Docker ya puede usar sus puertos", on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))),
+                False, False, 0)
+            box.pack_start(r, False, False, 0)
+        r = css(Gtk.Box(spacing=10), "nv-stat")
+        up = w["state"] == "marcha"
+        r.pack_start(label("●", "nv-verde", "nv-latido") if up else nv_dot(False), False, False, 0)
+        tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tt.pack_start(label("Apache de Docker %s" % ("en marcha" if up else "parado")), False, False, 0)
+        tt.pack_start(label("En %s (http %s, https %s): sirve los proyectos de Docker sin LAMPP, con las mismas reglas "
+                            "de seguridad. phpMyAdmin: %s" % (w["ip"], w["http"], w["https"], self.dk_url("pma.docker.local")),
+                            "nv-chico", "nv-tenue", ellipsize=3), False, False, 0)
+        r.pack_start(tt, True, True, 0)
+        r.pack_end(nv_button(None, "Parar" if up else "Arrancar", None, lambda *_: self.run_task(
+            ("Parando" if up else "Arrancando") + " el Apache de Docker", ["docker-web", "parar" if up else "arrancar"],
+            auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))), False, False, 0)
+        box.pack_start(r, False, False, 0)
 
     def nv_docker_update_image(self, p):
         if not confirm(self.win, "¿Actualizar la imagen de PHP %s?" % p["php"],
@@ -24028,6 +25871,8 @@ class App2(App):
             acts.pack_start(adm, False, False, 0)
             acts.pack_start(nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
                                       lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn"), False, False, 0)
+            acts.pack_start(self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"]),
+                            False, False, 0)
             # El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
             log = self.loaded_project_log()
             logb = nv_button("text-x-generic-symbolic", "Log", "Ver el final del registro de errores de la web (%s)"
@@ -24049,7 +25894,7 @@ class App2(App):
     def nv_menu_button(self, text, icon_name, items, tip=None):
         m = css(Gtk.MenuButton(tooltip_text=tip), "nv-proyecto-btn")
         b = Gtk.Box(spacing=6)
-        b.pack_start(icon(icon_name), False, False, 0)
+        b.pack_start(icon_name if isinstance(icon_name, Gtk.Widget) else icon(icon_name), False, False, 0)
         if text:
             b.pack_start(Gtk.Label(label=text), False, False, 0)
         m.add(b)
@@ -24076,7 +25921,7 @@ class App2(App):
         """Menú ⋮ de una fila de la lista (aparece al pasar el ratón, con Cargar): llevar el proyecto a
         otra versión o a Docker, importar su SQL y lo del menú Más, sin cambiar el proyecto de arriba."""
         items = [("Añadir entorno en otra versión de PHP…", lambda: self.on_replicate(x)),
-                 ("Añadir entorno en Docker…", lambda: self.nv_docker_loaded(x)),
+                 ("Añadir entorno en Docker…", lambda: self.nv_docker_add_env(x)),
                  ("Importar SQL…", lambda: self.nv_import(x))] + self.nv_more_items(x)
         return self.nv_menu_button(None, "view-more-symbolic", items)
 
@@ -24294,9 +26139,257 @@ class App2(App):
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 1)
         box.show_all()
+        self.nv_docker_tools()
+        self.nv_tunnel_tools()
         self.nv_mail_tools()
         self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
                            "Ficheros de configuración, carpetas, registros y el programa")
+
+    def nv_docker_tools(self):
+        """Configuración del Apache de Docker (docker-web): su dirección y sus puertos, permitir que Docker
+        sin root use los de menos de 1024 y que el navegador acepte el certificado de *.docker.local."""
+        w = {"IP": "127.0.0.2", "HTTP": "80", "HTTPS": "443"}
+        try:
+            for line in open(os.path.join(LOG_DIR, "docker", "web.conf"), encoding="utf-8", errors="replace"):
+                k, _, v = line.strip().partition("=")
+                if k in w and re.fullmatch(r"[0-9.]{1,15}", v):
+                    w[k] = v
+        except OSError:
+            pass
+        try:
+            start = int(open("/proc/sys/net/ipv4/ip_unprivileged_port_start").read().strip())
+        except (OSError, ValueError):
+            start = 1024
+        ports_ok = min(int(w["HTTP"]), int(w["HTTPS"])) >= start
+        box, lb = group("Docker",
+                        "Los proyectos de Docker van con su propio Apache, en otra dirección de este equipo (nunca "
+                        "abierta a la red): funcionan sin LAMPP y a la vez que él, con las mismas reglas de seguridad. "
+                        "Con los puertos 80 y 443, las direcciones van sin puerto.")
+        entries = {}
+        for key, title, sub, width in [("IP", "Dirección", "De este equipo (127.x.x.x). 127.0.0.1 con 80 y 443 es la de LAMPP", 15),
+                                       ("HTTP", "Puerto HTTP", "Lleva siempre a https", 6),
+                                       ("HTTPS", "Puerto HTTPS", "Si no es el 443, las direcciones lo llevan (https://…:8443)", 6)]:
+            row = ActionRow(title, sub)
+            e = Gtk.Entry(text=w[key], width_chars=width, max_length=15, valign=Gtk.Align.CENTER)
+            row.add_suffix(e)
+            lb.add(row)
+            entries[key] = e
+
+        def save(*_):
+            ip, http, https = (entries[k].get_text().strip() for k in ("IP", "HTTP", "HTTPS"))
+            if not re.fullmatch(r"127\.\d{1,3}\.\d{1,3}\.\d{1,3}", ip) or not http.isdigit() or not https.isdigit():
+                message(self.win, "Dirección o puertos no válidos",
+                        "La dirección tiene que ser de este equipo (127.x.x.x, como 127.0.0.2) y los puertos, números.",
+                        Gtk.MessageType.WARNING)
+                return
+            self.run_task("Dirección y puertos del Apache de Docker", ["docker-web", "puertos", ip, http, https],
+                          done_text="Apache de Docker en %s (%s y %s)" % (ip, http, https), auto_close=True,
+                          on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
+        row = ActionRow("Puertos", "Docker sin root ya puede usarlos" if ports_ok else
+                        "Docker sin root aún no puede usarlos (los de menos de 1024 son de root): se permite una vez")
+        if not ports_ok:
+            b = Gtk.Button(label="Permitir", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                           tooltip_text="Baja el límite de los puertos de root hasta el %s (pide la contraseña)"
+                           % min(int(w["HTTP"]), int(w["HTTPS"])))
+            b.connect("clicked", lambda *_: self.run_task(
+                "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
+                done_text="Docker ya puede usar sus puertos",
+                on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools())))
+            row.add_suffix(b)
+        b = css(Gtk.Button(label="Guardar", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+        b.connect("clicked", save)
+        row.add_suffix(b)
+        lb.add(row)
+        row = ActionRow("Certificado de *.docker.local",
+                        "Chrome y Firefox lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)")
+        b = Gtk.Button(label="Confiar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b.connect("clicked", lambda *_: self.run_task("Certificado de *.docker.local en el navegador", ["docker-web", "confiar"],
+                                                      done_text="El navegador acepta *.docker.local", auto_close=True))
+        row.add_suffix(b)
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 2)
+        box.show_all()
+
+    def nv_tunnel_tools(self):
+        """Configuración, Túnel de Cloudflare: cloudflared, la contraseña de los visitantes, cuándo se
+        cierra solo, si el admin se bloquea y el túnel abierto (con Cerrar)."""
+        box, lb = group("Túnel de Cloudflare",
+                        "Para enseñar una web de este equipo a un cliente o a un compañero: una dirección "
+                        "https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, "
+                        "que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se "
+                        "cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto.")
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 3)
+        conf = tunnel_conf()
+
+        def fill(rc, out):
+            info = next((f for f in parse_lines(out) if f[0] == "I" and len(f) >= 4), None)
+            row = ActionRow("cloudflared", "Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)"
+                            if not info or info[1] != "1" else "Versión %s, en ~/.lvm-instalador/tunel" % info[2])
+            if info and (info[1] != "1" or info[2] != info[3]):
+                b = Gtk.Button(label="Instalar" if info[1] != "1" else "Actualizar a la %s" % info[3],
+                               valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b.connect("clicked", lambda *_: self.run_task("Instalando cloudflared", ["tunel-instalar"], auto_close=True,
+                                                              done_text="cloudflared instalado",
+                                                              on_done=lambda *a: self.build_tools()))
+                row.add_suffix(b)
+            lb.insert(row, 0)
+            row.show_all()
+            return False
+        run_quick(["tunel"], fill)
+        row = ActionRow("Contraseña para los visitantes", "La piden al entrar: pásasela con la dirección. "
+                        "Vale para el siguiente túnel" if conf["CLAVE"] else "Se crea al compartir la primera vez")
+        if conf["CLAVE"]:
+            row.add_suffix(label(conf["CLAVE"], "nv-mono", selectable=True))
+            row.add_suffix(nv_button("edit-copy-symbolic", None, "Copiar la contraseña",
+                                     lambda *_: (Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(conf["CLAVE"], -1),
+                                                 self.toast("Contraseña del túnel copiada")), flat=True))
+        b = Gtk.Button(label="Nueva", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                       tooltip_text="Otra contraseña al azar (el túnel abierto sigue con la suya)")
+        b.connect("clicked", lambda *_: run_quick(["tunel-config", "clave-nueva"], lambda *a: (self.build_tools(), False)[1]))
+        row.add_suffix(b)
+        lb.add(row)
+        row = ActionRow("Se cierra solo", "Horas desde que se abre (de 1 a 12)")
+        spin = Gtk.SpinButton.new_with_range(1, 12, 1)
+        spin.set_value(int(conf["HORAS"]))
+        spin.set_valign(Gtk.Align.CENTER)
+        spin.set_sensitive(not self.busy)
+        spin.connect("value-changed", lambda w: run_quick(["tunel-config", "horas", str(w.get_value_as_int())], lambda *a: False))
+        row.add_suffix(spin)
+        row.add_suffix(label("h", "nv-tenue"))
+        lb.add(row)
+        on = conf["ADMIN"] != "permitir"
+        row = ActionRow("Bloquear el panel de administración", "wp-admin y el admin de PrestaShop no se abren por el túnel "
+                        "(tus BBDD llevan el administrador de pruebas, con una contraseña conocida)" if on else
+                        "⚠ Se pueden abrir por el túnel: cualquiera con la contraseña del túnel puede probar a entrar")
+        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw.connect("notify::active", lambda w, _p: run_quick(["tunel-config", "admin", "bloquear" if w.get_active() else "permitir"],
+                                                               lambda *a: (self.build_tools(), False)[1]))
+        row.add_suffix(sw)
+        lb.add(row)
+        st = tunnel_state()
+        if st:
+            row = ActionRow("Túnel abierto", "%s → %s, hasta las %s" % (st["url"], st["target"],
+                                                                       time.strftime("%H:%M", time.localtime(st["expires"]))))
+            row.add_suffix(Gtk.Button(label="Ver", valign=Gtk.Align.CENTER))
+            row.suffix.get_children()[-1].connect("clicked", lambda *_: self.nv_share_dialog())
+            b = css(Gtk.Button(label="Cerrar", valign=Gtk.Align.CENTER), "destructive-action")
+            b.connect("clicked", lambda *_: self.nv_tunnel_close())
+            row.add_suffix(b)
+            lb.add(row)
+        reg = os.path.join(LOG_DIR, "tunel", "registro")
+        if os.path.isfile(reg):
+            row = ActionRow("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)")
+            row.add_suffix(nv_button("text-x-generic-symbolic", "Ver", None, lambda *_: self.show_log_tail(reg)))
+            lb.add(row)
+        box.show_all()
+
+    def nv_share_button(self, url, folder, name, tip_extra=""):
+        """«Compartir» del visor de un proyecto: abre un túnel de Cloudflare a esa dirección; si ya lo
+        está, «Compartiendo» (en verde) enseña la dirección y la contraseña."""
+        st = tunnel_state()
+        mine = bool(st) and st["target"] == url.rstrip("/")
+        b = nv_button(logo("cloudflare", 18), "Compartiendo" if mine else "Compartir",
+                      ("Abierta en %s: ver la dirección y la contraseña" % st["url"]) if mine else
+                      "Enseñar %s a otros con un túnel de Cloudflare (con contraseña)%s" % (url, tip_extra),
+                      lambda *_: self.nv_share_dialog() if mine else self.nv_share(url, folder, name), "nv-proyecto-btn")
+        if mine:
+            css(b, "nv-compartiendo")
+        return b
+
+    def nv_share(self, url, folder, name):
+        conf = tunnel_conf()
+        st = tunnel_state()
+        hours = int(conf["HORAS"])
+        text = ("Cualquiera que tenga la dirección y la contraseña verá %s tal y como está en este equipo (lo que cambies, "
+                "al momento) mientras el túnel esté abierto. Se cierra solo en %s; también al pulsar «Cerrar el túnel». "
+                "%s" % (url, plural(hours, "hora", "horas"),
+                        "El panel de administración va bloqueado." if conf["ADMIN"] != "permitir" else
+                        "⚠ El panel de administración NO va bloqueado (Configuración, Túnel de Cloudflare)."))
+        if st:
+            text += " Se cierra el que hay abierto (%s)." % st["target"]
+        if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
+            text += " La primera vez se descarga cloudflared, el programa de Cloudflare (unos 40 MB)."
+        if not confirm(self.win, "¿Compartir %s?" % name, text, "Compartir"):
+            return
+        args = ["tunel-abrir", url, folder]
+
+        def opened(ok, *_):
+            self.nv_tunnel_refresh()
+            if ok and tunnel_state():
+                self.nv_share_dialog()
+        if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
+            self.run_task("Instalando cloudflared", ["tunel-instalar"], auto_close=True, done_text="cloudflared instalado",
+                          on_done=lambda ok, *a: ok and GLib.idle_add(
+                              lambda: self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True,
+                                                    done_text="Túnel abierto", on_done=opened) and False))
+            return
+        self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True, done_text="Túnel abierto", on_done=opened)
+
+    def nv_share_dialog(self):
+        """La dirección del túnel abierto y su contraseña, para copiarlas y mandarlas."""
+        st = tunnel_state()
+        if not st:
+            self.toast("El túnel ya está cerrado")
+            self.nv_tunnel_refresh()
+            return
+        conf = tunnel_conf()
+        until = time.strftime("%H:%M", time.localtime(st["expires"]))
+        clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        dlg = Gtk.Dialog(title="Túnel de Cloudflare", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(560, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        head = Gtk.Box(spacing=10)
+        head.pack_start(logo("cloudflare", 30), False, False, 0)
+        head.pack_start(label("Compartiendo %s" % st["target"], "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        grid = Gtk.Grid(column_spacing=14, row_spacing=8, margin_top=4)
+        for n, (title, value) in enumerate((("Dirección", st["url"]), ("Contraseña", conf["CLAVE"]))):
+            grid.attach(label(title, "nv-tenue", xalign=0), 0, n, 1, 1)
+            grid.attach(label(value, "nv-mono", selectable=True, xalign=0, hexpand=True), 1, n, 1, 1)
+            grid.attach(nv_button("edit-copy-symbolic", None, "Copiar", lambda *_, v=value, w=title: (
+                clip.set_text(v, -1), self.toast("%s copiada" % w)), flat=True), 2, n, 1, 1)
+        box.pack_start(grid, False, False, 0)
+        box.pack_start(label("Se cierra solo a las %s. %s Quién entra y lo que se bloquea queda en el registro del "
+                             "túnel (Configuración, Túnel de Cloudflare)." % (
+                                 until, "El panel de administración va bloqueado." if conf["ADMIN"] != "permitir"
+                                 else "⚠ El panel de administración no va bloqueado."),
+                             "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
+        acts = Gtk.Box(spacing=8)
+        msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], conf["CLAVE"], until))
+        acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "La dirección, la contraseña y hasta cuándo, "
+                                  "en un texto para pegar en un correo o un mensaje",
+                                  lambda *_: (clip.set_text(msg, -1), self.toast("Texto para enviar copiado")), "nv-azul"),
+                        False, False, 0)
+        acts.pack_start(nv_button("web-browser-symbolic", "Abrir", "Abrirla tú en el navegador",
+                                  lambda *_: self.open_uri(st["url"])), False, False, 0)
+        box.pack_start(acts, False, False, 0)
+        dlg.get_content_area().add(box)
+        close = dlg.add_button("Cerrar el túnel", Gtk.ResponseType.REJECT)
+        css(close, "destructive-action")
+        dlg.add_button("Listo", Gtk.ResponseType.CLOSE)
+        dlg.set_default_response(Gtk.ResponseType.CLOSE)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        dlg.destroy()
+        if resp == Gtk.ResponseType.REJECT:
+            self.nv_tunnel_close()
+
+    def nv_tunnel_close(self):
+        def done(rc, out):
+            self.toast("Túnel cerrado: la dirección ya no lleva a ningún sitio" if rc == 0 else "No se ha podido cerrar el túnel")
+            self.nv_tunnel_refresh()
+            return False
+        run_quick(["tunel-cerrar"], done)
+
+    def nv_tunnel_refresh(self):
+        """Los botones de Compartir y Configuración, con el túnel como esté ahora."""
+        for fn in (self.nv_build_projects, self.nv_dk_table, self.build_tools):
+            try:
+                fn()
+            except Exception:  # noqa: BLE001 - una pestaña aún sin datos
+                pass
 
     def on_cross_site(self, sw, _p):
         on = sw.get_active()
@@ -24602,8 +26695,9 @@ class App2(App):
                                                                          done_text="Docker del sistema apagado", auto_close=True,
                                                                          on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))))]
                                if d.get("rootful") else []) + \
-                              ([("La versión LAMPP activa está parada", "Los proyectos en Docker se abren por su Apache.",
-                                 ("Arrancarla", lambda *_: self.nv_power()))] if not d["lampp"] else []):
+                              ([("La versión LAMPP activa está parada", "Los proyectos en Docker de antes se abren por su "
+                                 "Apache (los del Apache de Docker, no).", ("Arrancarla", lambda *_: self.nv_power()))]
+                               if not d["lampp"] and any(not p.get("web") for p in d["projects"]) else []):
             r = css(Gtk.Box(spacing=10), "nv-stat")
             r.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
             tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -24612,6 +26706,7 @@ class App2(App):
             r.pack_start(tt, True, True, 0)
             r.pack_end(nv_button(None, btn[0], None, btn[1]), False, False, 0)
             box.pack_start(r, False, False, 0)
+        self.nv_docker_web_strip(box)
         # Tarjetas: CPU, memoria (docker stats, llegan aparte) y en marcha
         cons = d.get("containers", [])
         up = sum(1 for c in cons if c["state"] == "running")
@@ -24848,7 +26943,11 @@ class App2(App):
         akind, admin = project_admin(folder)
         up = bool(items) and all(c["state"] == "running" for c in items)
         some = any(c["state"] == "running" for c in items)
-        php_c = next((c["name"] for c in items if re.fullmatch(r"nexum-[a-z0-9-]+-php-\d+", c["name"])), None)
+        web = p.get("web")
+        if web:
+            php_c = next((c["name"] for c in items if c["name"] == "nexum-%s-php%s" % (p["slug"], p["php"].replace(".", ""))), None)
+        else:
+            php_c = next((c["name"] for c in items if re.fullmatch(r"nexum-[a-z0-9-]+-php-\d+", c["name"])), None)
         card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12), "nv-tarjeta", "nv-dk-visor")
         top = Gtk.Box(spacing=14)
         # (el logotipo solo, sin recuadro, como arriba en Proyectos)
@@ -24862,7 +26961,8 @@ class App2(App):
         if kind:
             tl.pack_start(label(KIND_TEXT[kind], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
         info.pack_start(tl, False, False, 0)
-        info.pack_start(label("PHP %s · MariaDB %s · https://%s" % (p["php"], p["maria"], p["domain"]),
+        info.pack_start(label(("PHP %s · MariaDB %s común · %s" % (" · ".join(p["versions"]), p["maria"], self.dk_url(p["domain"])))
+                              if web else "PHP %s · MariaDB %s · https://%s" % (p["php"], p["maria"], p["domain"]),
                               "nv-mono", "nv-chico", "nv-tenue", selectable=True, ellipsize=3), False, False, 0)
         top.pack_start(info, True, True, 0)
         st = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
@@ -24874,24 +26974,43 @@ class App2(App):
         card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
         acts = Gtk.Box(spacing=8)
         stopped = "Está parado: arráncalo antes (Arrancar, a la derecha)"
-        web = nv_button(logo("globo", 18), "Abrir web", "Abrir https://%s/" % p["domain"] if up else stopped,
-                        lambda *_: self.open_uri("https://%s/" % p["domain"]), "nv-proyecto-btn")
-        web.set_sensitive(up)
-        acts.pack_start(web, False, False, 0)
+        if web and p.get("kind") != "ps" and len(p["versions"]) > 1:
+            # (varias versiones a la vez: cada una con su dominio)
+            wb = self.nv_menu_button("Abrir web", "web-browser-symbolic",
+                                     [("PHP %s  ·  %s" % (v, docker_web_domain(p, v)),
+                                       lambda v=v: self.open_uri(self.dk_url(docker_web_domain(p, v)) + "/")) for v in p["versions"]],
+                                     "Abrir una de sus versiones de PHP" if up else stopped)
+        else:
+            wb = nv_button(logo("globo", 18), "Abrir web", "Abrir %s/" % self.dk_url(p["domain"]) if up else stopped,
+                           lambda *_: self.open_uri(self.dk_url(p["domain"]) + "/"), "nv-proyecto-btn")
+        wb.set_sensitive(up)
+        acts.pack_start(wb, False, False, 0)
+        st = tunnel_state()
+        targets = [(v, self.dk_url(docker_web_domain(p, v))) for v in p["versions"]] \
+            if web and p.get("kind") != "ps" and len(p["versions"]) > 1 else [(p["php"], self.dk_url(p["domain"]))]
+        if len(targets) > 1 and not (st and st["target"] in [t for _v, t in targets]):
+            sb = self.nv_menu_button("Compartir", logo("cloudflare", 18), [("PHP %s  ·  %s" % (v, t), lambda t=t: self.nv_share(t, folder, p["folder"]))
+                                                         for v, t in targets],
+                                     "Enseñar una de sus versiones a otros con un túnel de Cloudflare" if up else stopped)
+        else:
+            mine = next((t for _v, t in targets if st and st["target"] == t), targets[0][1])
+            sb = self.nv_share_button(mine, folder, p["folder"])
+        sb.set_sensitive(up)
+        acts.pack_start(sb, False, False, 0)
         adm = nv_button(logo("prestashop" if akind == "ps" else "wordpress", 18), "Panel",
                         stopped if not up else "Abrir https://%s/%s/ con el administrador de pruebas ya escrito "
                         "(%s, contraseña local): solo hay que pulsar Entrar" % (p["domain"], admin, "local@local.test")
                         if admin else "%s no es un WordPress ni una tienda PrestaShop con su carpeta de "
                         "administración" % p["folder"],
-                        lambda *_: self.open_admin_login(akind, admin, "https://%s" % p["domain"], p["folder"],
+                        lambda *_: self.open_admin_login(akind, admin, self.dk_url(p["domain"]), p["folder"],
                                                          ["docker-usuario-pruebas", p["slug"]]), "nv-proyecto-btn")
         adm.set_sensitive(up and bool(admin))
         acts.pack_start(adm, False, False, 0)
-        pma_ok = p["pma"].isdigit()
+        pma_ok = web or p["pma"].isdigit()
         pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin",
-                        stopped if not up else "Abrir su phpMyAdmin (http://127.0.0.1:%s/): usuario root; la "
-                        "contraseña se copia al pulsar, para pegarla" % p["pma"] if pma_ok else "Sin puerto de phpMyAdmin",
-                        lambda *_: (self.nv_docker_copy_pass(p), self.open_uri("http://127.0.0.1:%s/" % p["pma"])),
+                        stopped if not up else "Abrir phpMyAdmin (%s): usuario root; la contraseña se copia al pulsar, "
+                        "para pegarla" % self.dk_pma_url(p) if pma_ok else "Sin puerto de phpMyAdmin",
+                        lambda *_: (self.nv_docker_copy_pass(p), self.open_uri(self.dk_pma_url(p))),
                         "nv-proyecto-btn")
         pma.set_sensitive(up and pma_ok)
         acts.pack_start(pma, False, False, 0)
@@ -24910,6 +27029,15 @@ class App2(App):
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))
         acts.pack_start(lg, False, False, 0)
+        if web:
+            vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Añadir otra versión de PHP, quitarla%s"
+                           % (" o elegir con cuál va la tienda" if p.get("kind") == "ps" else " (todas a la vez, cada una con su dominio)"),
+                           lambda *_: self.nv_docker_versions(p), "nv-proyecto-btn")
+        else:
+            vb = nv_button("go-up-symbolic", "Pasar al Apache de Docker", "Sin LAMPP y con varias versiones de PHP a la vez",
+                           lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
+        vb.set_sensitive(not self.busy)
+        acts.pack_start(vb, False, False, 0)
         power = nv_button("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                           "Parar" if up else "Arrancar",
                           "Parar sus contenedores (su BBDD se queda)" if up else "Arrancar sus contenedores",
@@ -24982,6 +27110,11 @@ class App2(App):
             slug = proj[6:] if proj.startswith("nexum-") else ""
             p = projects.get(slug)
             title = p["folder"] if p else proj or "(sin proyecto)"
+            # (lo comun del Apache de Docker)
+            if not p and proj == "nexum-web":
+                title = "Apache de Docker y phpMyAdmin"
+            elif not p and re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or ""):
+                title = "MariaDB %s (común)" % proj[len("nexum-mariadb-"):].replace("-", ".")
             visible = [c for c in items if (not self.dk_only_up or c["state"] == "running")
                        and (self.dk_query in c["name"].lower() or self.dk_query in title.lower())]
             if not visible:
@@ -25000,21 +27133,28 @@ class App2(App):
                 name.pack_start(label("●", "nv-verde", "nv-latido", valign=Gtk.Align.CENTER,
                                       tooltip_text="En marcha"), False, False, 0)
             if p:
-                php = Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                                 tooltip_text="Cambiar la versión de PHP (su BBDD y su configuración se quedan)")
-                php.connect("clicked", lambda *_, p=p: self.on_docker_php(p))
+                web = p.get("web")
+                php = Gtk.Button(label="PHP %s" % " · ".join(p["versions"]) if web else "PHP %s" % p["php"],
+                                 valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                                 tooltip_text="Sus versiones de PHP: añadir otra, quitarla%s" % (" o elegir con cuál va la tienda"
+                                                                                                  if p.get("kind") == "ps" else "")
+                                 if web else "Cambiar la versión de PHP (su BBDD y su configuración se quedan)")
+                php.connect("clicked", lambda *_, p=p: self.nv_docker_versions(p) if p.get("web") else self.on_docker_php(p))
                 img_cell = Gtk.Box()
                 img_cell.pack_start(php, False, False, 0)
-                pma = label("%s:80" % p["pma"] if p["pma"].isdigit() else "—", "nv-mono", "nv-chico", "nv-enlace")
-                acts = actions([
+                pma = label("pma.docker.local" if web else "%s:80" % p["pma"] if p["pma"].isdigit() else "—",
+                            "nv-mono", "nv-chico", "nv-enlace")
+                acts = actions(([] if web else [
+                    ("go-up-symbolic", "Pasarlo al Apache de Docker: sin LAMPP y con varias versiones de PHP a la vez",
+                     lambda p=p: self.nv_docker_pass(p), True)]) + [
                     # (lo primero: arrancar o parar todos sus servicios a la vez)
                     ("media-playback-stop-symbolic" if up else "media-playback-start-symbolic", "Parar todos sus servicios" if up else "Arrancar todos sus servicios",
                      lambda p=p, up=up: self.run_task(("Parando %s" if up else "Arrancando %s") % p["folder"],
                                                       ["docker-parar" if up else "docker-arrancar", p["slug"]],
                                                       auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), True),
-                    ("web-browser-symbolic", "Abrir https://%s" % p["domain"], lambda p=p: self.open_uri("https://%s/" % p["domain"]), up),
+                    ("web-browser-symbolic", "Abrir %s" % self.dk_url(p["domain"]), lambda p=p: self.open_uri(self.dk_url(p["domain"]) + "/"), up),
                     ("drive-multidisk-symbolic", "phpMyAdmin (entra con el usuario root y la contraseña de la llave)",
-                     lambda p=p: self.open_uri("http://127.0.0.1:%s/" % p["pma"]), up),
+                     lambda p=p: self.open_uri(self.dk_pma_url(p)), up),
                     ("dialog-password-symbolic", "Copiar la contraseña de root de su BBDD (para su phpMyAdmin)",
                      lambda p=p: self.nv_docker_copy_pass(p), True),
                     ("software-update-available-symbolic", "Actualizar la imagen de PHP %s con lo último de Docker Hub "
@@ -26541,6 +28681,18 @@ case "$1" in
     docker-instalar) docker_install ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" ;;
+    docker-nuevo) shift; docker_web_create "$@" ;;
+    docker-php-anadir) docker_web_add "$2" "$3" ;;
+    docker-php-añadir) docker_web_add "$2" "$3" ;;
+    docker-php-quitar) docker_web_remove "$2" "$3" ;;
+    docker-php-elegir) docker_web_switch "$2" "$3" ;;
+    docker-pasar) docker_pass "$2" ;;
+    docker-web) shift; docker_web_command "$@" ;;
+    tunel) tunnel_status ;;
+    tunel-instalar) tunnel_install ;;
+    tunel-abrir) tunnel_open "$2" "$3" ;;
+    tunel-cerrar) tunnel_close ;;
+    tunel-config) shift; tunnel_config "$@" ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;

@@ -4,6 +4,17 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.0 · 27 oct 2026
+
+- **Docker con su propio Apache:** los proyectos de Docker ya no necesitan LAMPP (funcionan con LAMPP parado o con cualquier versión activa). Un Apache en un contenedor, en otra dirección de este equipo (127.0.0.2, nunca abierta a la red), con las mismas reglas de seguridad que LAMPP (los ficheros que no se sirven y la barrera entre webs) y los .htaccess de cada proyecto. Las imágenes de PHP son las de siempre: ninguna más.
+- **Docker, varias versiones de PHP a la vez:** con la misma BBDD. En un WordPress, cada una con su dominio (proyecto-php83.docker.local); una tienda PrestaShop guarda su dominio en la BBDD, así que va con uno (proyecto.docker.local) y la versión que elijas, con un clic. Botón «Versiones de PHP…» del proyecto: añadir, quitar y elegir.
+- **Docker, BBDD:** una MariaDB común por versión de MariaDB, cada proyecto con su BBDD y su usuario, y un solo phpMyAdmin en https:/`/pma.docker.local` (con su pantalla de acceso). Un certificado propio para *.docker.local (solo vale para esos dominios) que Chrome y Firefox aceptan sin aviso.
+- **Configuración, Docker:** la dirección y los puertos del Apache de Docker (80 y 443; con otros, las direcciones llevan el puerto), «Permitir» para que Docker sin root use los de menos de 1024 (pide la contraseña una vez) y «Confiar» en el certificado.
+- Los proyectos que ya estaban en Docker siguen igual (con LAMPP delante) hasta que pulses «Pasar al Apache de Docker»: se guarda antes una copia de su BBDD en `~/lvm-copias` y se carga en la MariaDB común.
+- **En la terminal:** docker-nuevo, docker-php-añadir, docker-php-quitar, docker-php-elegir, docker-pasar y docker-web.
+- **Túnel de Cloudflare:** «Compartir» en el visor del proyecto (y en el de Docker) enseña la web a un cliente o a un compañero con una dirección https://….trycloudflare.com, sin cuenta de Cloudflare y sin abrir puertos. Con contraseña (al azar, para copiar y mandar), el panel de administración bloqueado (tus BBDD llevan el administrador de pruebas) y phpMyAdmin y lo de LAMPP siempre bloqueados, y se cierra solo (2 h; de 1 a 12 en Configuración). La web no se toca: su dominio local se cambia por el del túnel al pasar. cloudflared se descarga de GitHub la primera vez (comprobado con su sha256). En la terminal: tunel-abrir, tunel-cerrar y tunel-config.
+- **web.local sin proyecto cargado:** la página lleva el logotipo y el nombre de Nexum Dev Stack, y dice dónde cargar uno (Proyectos, Cargar). Todo va dentro de la página, sin pedir nada a otra web.
+
 ## 1.55.14 · 27 oct 2026
 
 - **Proyectos, menú ⋮:** «Borrar el proyecto…» borra el proyecto entero: su carpeta, sus vhosts, las líneas de sus dominios en `/etc/hosts` (un dominio real no se queda falseado) y lo que tenga en Docker. Pregunta si se borra también su BBDD de la versión activa (la de phpMyAdmin), con copia antes por defecto. Hay que escribir el nombre de la carpeta para confirmar. Si un paso falla no sigue: la carpeta, lo último. En la terminal: borrar-proyecto <carpeta> [--bd <base> --copia].

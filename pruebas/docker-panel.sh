@@ -113,7 +113,7 @@ if [ $MAC -eq 1 ]; then
     check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "func visor(_ p: DockerProject, _ g: DockerGroup)" "$SRC" && grep -q "\"docker-usuario-pruebas\", p.slug" "$SRC" && grep -q "site: \"https://\\\\(p.domain)\"" "$SRC"'
     check "ventana: «Montar en Docker» en la fila de los proyectos con contenedores" 'grep -q "Text(\"Montar en Docker\")" "$SRC"'
 else
-    check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "def nv_docker_visor(self, p, items):" "$SRC" && grep -q "\"docker-usuario-pruebas\", p\[\"slug\"\]" "$SRC" && grep -q "\"https://%s\" % p\[\"domain\"\]" "$SRC"'
-    check "ventana: los botones del visor se apagan con el proyecto parado" 'grep -q "web.set_sensitive(up)" "$SRC" && grep -q "adm.set_sensitive(up and bool(admin))" "$SRC" && grep -q "pma.set_sensitive(up and pma_ok)" "$SRC"'
+    check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "def nv_docker_visor(self, p, items):" "$SRC" && grep -q "\"docker-usuario-pruebas\", p\[\"slug\"\]" "$SRC" && grep -q "self.open_admin_login(akind, admin, self.dk_url(p\[\"domain\"\])" "$SRC"'
+    check "ventana: los botones del visor se apagan con el proyecto parado" 'grep -q "wb.set_sensitive(up)" "$SRC" && grep -q "adm.set_sensitive(up and bool(admin))" "$SRC" && grep -q "pma.set_sensitive(up and pma_ok)" "$SRC"'
 fi
 exit $fail
