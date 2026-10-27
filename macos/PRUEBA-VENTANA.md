@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.39.26)
+# Prueba de la ventana nueva en un Mac (versión 1.40.0)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.39.26** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.0** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.39.26/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.0/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.39.26
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.0
    ```
 
 5. **Comprueba las versiones:**
@@ -214,6 +214,28 @@ El código Swift de estas pantallas **no se ha compilado** (en Linux no hay Swif
    ```
 
    Y sigue con el paso 7 (correo de pruebas) si no lo habías podido probar.
+
+## Paso 10: Docker con su propio Apache, el túnel, los botones y el consumo (1.40.0)
+
+Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/app/compilar.log` entero: esta versión cambia mucho la ventana y no se ha podido compilar fuera de un Mac.
+
+1. **Consumo, arriba:** en el recuadro de la versión sale «CPU x % · RAM y %». Al pasar el ratón, cada parte (la ventana, XAMPP-X, Docker Desktop, Mailpit y el túnel). Arranca y para XAMPP-X: los números cambian.
+2. **Apache de Docker:** en Docker sale la franja «La dirección 127.0.0.2 del Apache de Docker aún no está en este Mac» con **Permitir** (pide la contraseña). Después:
+
+   ```bash
+   ifconfig lo0 | grep 127.0.0.2                                   # inet 127.0.0.2 netmask 0xff000000
+   ls -l /Library/LaunchDaemons/dev.hexer.nexum-direccion.plist      # root wheel, rw-r--r--
+   ```
+
+   Reinicia el Mac y vuelve a mirar `ifconfig lo0`: tiene que seguir.
+3. **Proyecto nuevo en Docker:** «Proyecto en Docker…» (ya sin dominio) con un WordPress y su BBDD. Se abre en `https://<carpeta>-php85.docker.local` **con XAMPP-X parado**. Prueba **Confiar** (Configuración, Docker) si el navegador avisa del certificado. phpMyAdmin: `https://pma.docker.local` (la llave copia la contraseña de root).
+4. **Varias versiones:** «Versiones de PHP…» → Añadir otra (por ejemplo 8.3): las dos webs a la vez, cada una con su dominio y la misma BBDD. Con una tienda, «Elegir» cambia la versión con el mismo dominio.
+5. **Parar:** en la tabla, la fila «MariaDB 11.8 (común)» y «Apache de Docker y phpMyAdmin» tienen su botón. Para la MariaDB con un proyecto en marcha: avisa de cuál se queda sin BBDD. «Parar todos» lo para todo. Parar un proyecto para también lo común que ya nadie usa.
+6. **Pasar uno de antes:** en el visor de un proyecto de antes, «Pasar al Apache de Docker»: guarda su BBDD en `~/lvm-copias` y queda con el Apache de Docker.
+7. **Túnel:** carga un proyecto y pulsa **Compartir** (logotipo de Cloudflare). La primera vez descarga cloudflared. Sale la dirección `https://….trycloudflare.com` y la contraseña. Ábrela **desde el móvil con datos**: pide la contraseña, se ve la web, `/wp-admin` da «No disponible», `/phpmyadmin` también. El botón pasa a «Compartiendo» (borde naranja). **Cerrar el túnel** y la dirección deja de funcionar.
+8. **Botones:** menú ⋮ → «Personalizar los botones…»: quita uno, cambia el orden, prueba «Solo el icono» y «Icono y nombre» con el deslizador (la vista previa cambia). Guarda: el visor del proyecto cargado y el de Docker quedan igual, con Desmontar, ⋮, Versiones de PHP y Parar del mismo tamaño.
+9. **Al cargar un proyecto** desde la lista de abajo, la página sube sola hasta el visor.
+10. **web.local sin proyecto:** desmonta el proyecto y abre `http://web.local`: el logotipo de Nexum y «Abre Nexum Dev Stack y, en Proyectos, pulsa Cargar».
 
 ## Qué apuntar
 

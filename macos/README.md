@@ -4,7 +4,7 @@ Versión para Mac del instalador de Linux. Instala varias versiones de PHP en un
 
 Todo va en un solo archivo: `lvm-instalador.sh`.
 
-**Versión 1.39.26.** La lista de cambios de cada versión está en «Novedades» (menú ☰ de la ventana, menú Gestor y Configuración) y en `lvm-instalador novedades`.
+**Versión 1.40.0.** La lista de cambios de cada versión está en «Novedades» (menú ☰ de la ventana, menú Gestor y Configuración) y en `lvm-instalador novedades`.
 
 ## Qué instala
 

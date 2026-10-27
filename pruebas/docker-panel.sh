@@ -30,6 +30,8 @@ trap 'm -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB
 extract "$SRC" docker_test_admin docker_valid_slug docker_conf db_valid_name db_root_sql test_admin \
     wp_table_prefixes ps_table_prefix linked_folder || exit 1
 [ $MAC -eq 1 ] && { extract "$SRC" docker_sql || exit 1; }
+# (desde la 1.40 del Mac, docker_test_admin mira si es del Apache de Docker)
+grep -q "^function docker_web_project() {" "$SRC" && { extract "$SRC" docker_web_project || exit 1; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
@@ -110,7 +112,7 @@ check "orden docker-usuario-pruebas" 'grep -q "^    docker-usuario-pruebas) dock
 # (en Linux, exportar-bd lo deja fuera desde la 1.54.1; el Mac no lo filtra)
 [ $MAC -eq 0 ] && check "exportar-bd sigue dejando fuera al administrador de pruebas" 'sed -n "/^function export_database() {/,/^}/p" "$SRC" | grep -q "test_admin_filter \"\$db\""'
 if [ $MAC -eq 1 ]; then
-    check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "func visor(_ p: DockerProject, _ g: DockerGroup)" "$SRC" && grep -q "\"docker-usuario-pruebas\", p.slug" "$SRC" && grep -q "site: \"https://\\\\(p.domain)\"" "$SRC"'
+    check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "func visor(_ p: DockerProject, _ g: DockerGroup)" "$SRC" && grep -q "\"docker-usuario-pruebas\", p.slug" "$SRC" && grep -q "site: dockerSite(p)" "$SRC" && grep -q "return p.isWeb ? dockerWebURL(docker, p.domain) : \"https://\\\\(p.domain)\"" "$SRC"'
     check "ventana: «Montar en Docker» en la fila de los proyectos con contenedores" 'grep -q "Text(\"Montar en Docker\")" "$SRC"'
 else
     check "ventana: visor de cada proyecto en Docker, con su Panel por docker-usuario-pruebas" 'grep -q "def nv_docker_visor(self, p, items):" "$SRC" && grep -q "\"docker-usuario-pruebas\", p\[\"slug\"\]" "$SRC" && grep -q "self.open_admin_login(akind, admin, self.dk_url(p\[\"domain\"\])" "$SRC"'

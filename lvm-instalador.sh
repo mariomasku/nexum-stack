@@ -120,6 +120,7 @@
 #   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]
 #   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
 #   lvm-instalador docker-pasar <nombre>
+#   lvm-instalador docker-parar-todo
 #   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.56): no necesitan LAMPP y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
@@ -744,7 +745,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.0"
+APP_VERSION="1.56.2"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -11689,6 +11690,41 @@ QUE HACE
 
 VERSIONES
 
+1.56.2 (27 oct 2026)
+- Botones del proyecto: «Solo el icono» y «Icono y nombre» son
+  cuadrados, del tamaño que elijas con un deslizador (sin nombre, igual
+  de alto que de ancho: desde pequeños hasta grandes), con una vista
+  previa en el diálogo. Desmontar, ⋮, «Versiones de PHP…» y Arrancar o
+  Parar van con el mismo estilo y el mismo tamaño que los demás.
+- Al cargar un proyecto, la página sube sola hasta su visor.
+- Arriba, en el recuadro de la versión: lo que gastan Nexum y sus
+  servicios juntos (la ventana, LAMPP, Docker sin root con sus
+  contenedores, Mailpit y el túnel), en % de la CPU de todo el equipo
+  y de su RAM. Al pasar el ratón, cada parte con sus MB.
+- Docker: se pueden parar todos los contenedores de Nexum a mano,
+  también la MariaDB común, el Apache de Docker, su phpMyAdmin y los
+  PHP de cada versión (antes sus botones no se podían pulsar). La fila
+  de una MariaDB común y la del Apache de Docker tienen su Parar o
+  Arrancar, y arriba hay un «Parar todos» (los de otros programas no
+  se tocan). Si lo que paras es común y lo usa un proyecto en marcha,
+  avisa de cuáles se quedan sin él antes de pararlo.
+- Docker: al parar un proyecto del Apache de Docker, lo común que ya
+  no usa nadie se para también (su MariaDB y, si no queda ninguno en
+  marcha, el Apache de Docker). En la terminal: docker-parar-todo.
+
+1.56.1 (27 oct 2026)
+- Botones del proyecto a tu gusto: cuáles se ven, en qué orden y cómo
+  (con su nombre, solo el icono o grandes, cuadrados con el icono y el
+  nombre). En el menú ⋮ del proyecto, «Personalizar los botones…», y
+  en Configuración, Visor de los proyectos. Vale para el visor del
+  proyecto cargado y para el de Docker. Por defecto, «Compartir» va
+  detrás de «Docker» y antes de «Log».
+- Actualizaciones: se buscan al abrir la ventana la primera vez de
+  cada día y, después, cada 4 veces que la abres. Si dices que no a
+  una versión, se vuelve a ofrecer la próxima vez que toque buscar.
+- Novedades: las direcciones como https://pma.docker.local ya no salen
+  partidas.
+
 1.56.0 (27 oct 2026)
 - Docker con su propio Apache: los proyectos de Docker ya no necesitan
   LAMPP (funcionan con LAMPP parado o con cualquier versión activa). Un
@@ -12973,8 +13009,8 @@ CHANGES_MD_PY='
 import re, sys
 
 VERSION = re.compile(r"^(\d+\.\d+\.\d+) \((.+)\)$")
-# Rutas (/opt/..., ~/...) y nombres de fichero: en letra de codigo
-CODE = re.compile(r"(?<![\w`])((?:~/|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
+# Rutas (/opt/..., ~/...) y nombres de fichero: en letra de codigo (no lo de detras de https://)
+CODE = re.compile(r"(?<![\w`:/])((?:~/|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
                   r"\.(?:php|conf|cnf|deb|dmg|sql|zip|gz|desktop|policy|md|py|sh|log|pid|run|sha256)\b)")
 
 
@@ -13614,7 +13650,9 @@ function docker_container_action() {
     fi
     case $action in
         arrancar) run dk start "$name" ;;
-        parar) run dk stop "$name" ;;
+        parar)
+            docker_shared_warn "$name"
+            run dk stop "$name" ;;
         reiniciar) run dk restart "$name" ;;
         registros) dk logs --tail 200 "$name" ;;
         # (se quita el contenedor; los datos de la BBDD siguen en su volumen y, al arrancar el
@@ -15072,7 +15110,7 @@ function docker_web_action() {
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] MariaDB $maria, Apache de Docker y $(docker_web_services "$slug" | tr '\n' ' ')"; return 0; }
             docker_maria_up "$maria" && docker_web_up || return 1
             run "${c[@]}" up -d $(docker_web_services "$slug") ;;
-        parar) run "${c[@]}" stop ;;
+        parar) run "${c[@]}" stop && docker_web_idle_stop ;;
         registros) "${c[@]}" logs --no-color --tail 200 ;;
         borrar)
             local db user domains
@@ -15089,6 +15127,63 @@ function docker_web_action() {
             docker_web_reload
             echo "Proyecto en Docker $slug borrado" ;;
     esac
+}
+
+# Lo comun que ya no usa nadie, parado: una MariaDB comun sin ningun PHP en marcha de los proyectos
+# que van con ella y, sin ningun PHP del Apache de Docker en marcha, el Apache de Docker y su phpMyAdmin.
+# (Nada de Nexum arranca solo: restart "no". Lo comun se queda al parar un proyecto por si lo usa otro)
+function docker_web_idle_stop() {
+    local up p v name used=() web_used=0
+    [ "$DRY" -eq 1 ] && return 0
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null) || return 0
+    for p in $(docker_web_projects); do
+        if grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up"; then
+            web_used=1
+            used+=("$(docker_conf "$p" MARIADB)")
+        fi
+    done
+    for name in $(grep -E '^nexum-mariadb-[0-9]{1,2}-[0-9]{1,2}$' <<< "$up"); do
+        v=${name#nexum-mariadb-} v=${v/-/.}
+        if ! printf '%s\n' "${used[@]}" | grep -qxF "$v"; then
+            echo "MariaDB $v de Docker: ya no la usa ningun proyecto en marcha, se para"
+            run dk stop "$name" > /dev/null
+        fi
+    done
+    if [ "$web_used" -eq 0 ] && grep -qxE 'nexum-(web|pma)' <<< "$up"; then
+        echo "Apache de Docker: ya no hay ningun proyecto en marcha con el, se para (y su phpMyAdmin)"
+        run dk stop $(grep -xE 'nexum-(web|pma)' <<< "$up") > /dev/null
+    fi
+    return 0
+}
+
+# Aviso al parar algo comun (una MariaDB comun, el Apache de Docker o su phpMyAdmin) que usa algun
+# proyecto en marcha: cuales se quedan sin el
+function docker_shared_warn() {
+    local name=$1 up p v="" users=()
+    [[ "$name" =~ ^nexum-(web|pma|mariadb-([0-9]{1,2})-([0-9]{1,2}))$ ]] || return 0
+    [ -n "${BASH_REMATCH[2]}" ] && v=${BASH_REMATCH[2]}.${BASH_REMATCH[3]}
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null) || return 0
+    for p in $(docker_web_projects); do
+        [ -n "$v" ] && [ "$(docker_conf "$p" MARIADB)" != "$v" ] && continue
+        grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up" && users+=("$(docker_conf "$p" CARPETA)")
+    done
+    [ ${#users[@]} -eq 0 ] && return 0
+    echo "Aviso: $name es comun y lo usan ahora: ${users[*]}. $([ -n "$v" ] && echo "Se quedan sin BBDD" || echo "Dejan de verse") hasta que lo arranques"
+}
+
+# docker-parar-todo: todos los contenedores de Nexum en marcha (los de los proyectos, las MariaDB
+# comunes, el Apache de Docker y su phpMyAdmin), parados. Los de otros programas no se tocan
+function docker_stop_all() {
+    local up names=()
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null) || { echo "Docker no responde"; return 1; }
+    mapfile -t names < <(grep -E '^nexum-([a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})|web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$' <<< "$up")
+    if [ ${#names[@]} -eq 0 ]; then
+        echo "No hay ningun contenedor de Nexum en marcha"
+        return 0
+    fi
+    echo "Parando ${#names[@]} contenedores de Nexum: ${names[*]}"
+    run dk stop "${names[@]}" > /dev/null || return 1
+    echo "Todos parados"
 }
 
 # docker-pasar <nombre>: un proyecto de antes (PHP-FPM con LAMPP delante, con su MariaDB y su phpMyAdmin)
@@ -19025,6 +19120,191 @@ def run_quick(args, callback, env=None, timeout=180):
     threading.Thread(target=work, daemon=True).start()
 
 
+# Botones del visor de un proyecto (el cargado y los de Docker) que se pueden ocultar y ordenar:
+# clave, nombre e icono. «Desmontar», ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar)
+# se ven siempre
+VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", ("vscode", "text-editor-symbolic")),
+                 ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
+                 ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
+                 ("log", "Log", ("icono", "text-x-generic-symbolic"))]
+BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
+                 ("grande", "Icono y nombre (cuadrado)")]
+# Lado del cuadrado (px) de los estilos icono y grande: el de cada uno si no se ha elegido otro
+BUTTON_SIZES = {"icono": 44, "grande": 88}
+BUTTON_SIZE_MIN, BUTTON_SIZE_MAX = 32, 128
+# (con el nombre debajo hace falta algo más de sitio)
+BUTTON_SIZE_NAMED = 72
+BUTTONS_FILE = os.path.join(LOG_DIR, "botones-visor")
+# Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
+UPDATE_EVERY = 4
+# (en la simulacion no se escribe nada: lo elegido vale mientras la ventana siga abierta)
+_buttons_sim = {}
+
+
+def buttons_conf():
+    """order (todas las claves, en su orden), hidden (las que no se ven) y style (BUTTON_STYLES)."""
+    keys = [k for k, _n, _i in VISOR_BUTTONS]
+    conf = dict(_buttons_sim)
+    if not conf:
+        try:
+            with open(BUTTONS_FILE, encoding="utf-8") as fh:
+                conf = json.loads(fh.read(4000))
+        except (OSError, ValueError):
+            conf = {}
+    if not isinstance(conf, dict):
+        conf = {}
+    order = [k for k in conf.get("order", []) if k in keys] if isinstance(conf.get("order"), list) else []
+    order += [k for k in keys if k not in order]
+    hidden = {k for k in conf.get("hidden", []) if k in keys} if isinstance(conf.get("hidden"), list) else set()
+    style = conf.get("style") if conf.get("style") in [k for k, _t in BUTTON_STYLES] else "nombre"
+    size = conf.get("size")
+    if not isinstance(size, int) or not BUTTON_SIZE_MIN <= size <= BUTTON_SIZE_MAX:
+        size = BUTTON_SIZES.get(style, BUTTON_SIZES["icono"])
+    return {"order": order, "hidden": hidden, "style": style, "size": size}
+
+
+def buttons_save(conf):
+    data = {"order": conf["order"], "hidden": sorted(conf["hidden"]), "style": conf["style"], "size": conf["size"]}
+    if SIMULATE:
+        _buttons_sim.clear()
+        _buttons_sim.update(data)
+        return
+    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+    with open(BUTTONS_FILE + ".nuevo", "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.replace(BUTTONS_FILE + ".nuevo", BUTTONS_FILE)
+
+
+def button_icon(spec, size):
+    if spec[0] == "logo":
+        return logo(spec[1], size)
+    if spec[0] == "vscode":
+        code = vscode_app()
+        if code is not None and code.get_icon() is not None:
+            img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+            img.set_pixel_size(size)
+            return img
+    return icon(spec[1], size)
+
+
+# Consumo de Nexum y sus servicios (el visor de arriba): los procesos de cada parte, leídos de /proc
+USAGE_GROUPS = [("ventana", "Nexum Dev Stack (la ventana y sus tareas)"), ("lampp", "LAMPP (Apache, MariaDB y PHP-FPM)"),
+                ("docker", "Docker sin root y sus contenedores"), ("mailpit", "Mailpit (correo de pruebas)"),
+                ("tunel", "Túnel de Cloudflare")]
+
+
+def usage_group(pid, argv, cgroup, own):
+    """A qué parte de Nexum es un proceso (None: a ninguna). Sin los hijos: esos van con su padre."""
+    first = argv[0] if argv else ""
+    if pid == own:
+        return "ventana"
+    if first.startswith("/opt/lampp") or (first in ("/bin/sh", "sh") and len(argv) > 1 and argv[1].startswith("/opt/lampp")):
+        return "lampp"
+    if os.path.basename(first) == "mailpit" and "/mailpit/" in first:
+        return "mailpit"
+    if "nexum-tunel" in argv or first == os.path.join(LOG_DIR, "tunel", "cloudflared"):
+        return "tunel"
+    # Docker sin root: dockerd y los suyos en su servicio de usuario y cada contenedor en su scope
+    if "user@%d.service" % os.getuid() in cgroup and ("/docker.service" in cgroup or "/docker-" in cgroup):
+        return "docker"
+    return None
+
+
+class UsageMeter:
+    """CPU y memoria de Nexum y sus servicios juntos: la CPU, en % de todo el equipo (todos los núcleos
+    son el 100 %), entre una lectura y la anterior; la memoria, la PSS de cada proceso (lo que de verdad
+    ocupa, sin contar dos veces lo compartido) o, si no se puede leer (los de root), lo suyo sin lo
+    compartido."""
+
+    def __init__(self):
+        self.prev, self.when = {}, None
+        self.tick = os.sysconf("SC_CLK_TCK")
+        self.page = os.sysconf("SC_PAGE_SIZE")
+        self.cpus = os.cpu_count() or 1
+        self.total = 0
+        try:
+            with open("/proc/meminfo") as fh:
+                self.total = int(next(l for l in fh if l.startswith("MemTotal:")).split()[1]) * 1024
+        except (OSError, StopIteration, ValueError):
+            pass
+
+    @staticmethod
+    def read(path, mode="r"):
+        try:
+            with open(path, mode) as fh:
+                return fh.read()
+        except OSError:
+            return None
+
+    def sample(self):
+        own = os.getpid()
+        procs = {}
+        for name in os.listdir("/proc"):
+            if not name.isdigit():
+                continue
+            pid = int(name)
+            stat = self.read("/proc/%d/stat" % pid)
+            raw = self.read("/proc/%d/cmdline" % pid, "rb")
+            if stat is None or raw is None:
+                continue
+            f = stat[stat.rfind(")") + 2:].split()
+            argv = [a.decode("utf-8", "replace") for a in raw.split(b"\0") if a]
+            procs[pid] = {"ppid": int(f[1]), "cpu": int(f[11]) + int(f[12]), "argv": argv,
+                          "group": usage_group(pid, argv, self.read("/proc/%d/cgroup" % pid) or "", own)}
+        # Los hijos van con su padre (los PHP-FPM de LAMPP, las tareas de la ventana: solo las suyas)
+        for pid, pr in procs.items():
+            q, depth = pr["ppid"], 0
+            while pr["group"] is None and q in procs and depth < 6:
+                g = procs[q]["group"]
+                if g and (g != "ventana" or any("lvm-instalador" in a for a in pr["argv"])):
+                    pr["group"] = g
+                q, depth = procs[q]["ppid"], depth + 1
+        now = time.monotonic()
+        out = {k: [0.0, 0] for k, _t in USAGE_GROUPS}
+        for pid, pr in procs.items():
+            if not pr["group"]:
+                continue
+            if self.when is not None and pid in self.prev:
+                out[pr["group"]][0] += max(0, pr["cpu"] - self.prev[pid])
+            mem = None
+            roll = self.read("/proc/%d/smaps_rollup" % pid)
+            if roll:
+                m = re.search(r"^Pss:\s+(\d+) kB", roll, re.M)
+                mem = int(m.group(1)) * 1024 if m else None
+            if mem is None:
+                # (residente sin lo compartido: los hijos de Apache comparten casi todo con su padre)
+                statm = self.read("/proc/%d/statm" % pid)
+                mem = max(0, int(statm.split()[1]) - int(statm.split()[2])) * self.page if statm else 0
+            out[pr["group"]][1] += mem
+        span = (now - self.when) if self.when else 0
+        self.prev = {pid: pr["cpu"] for pid, pr in procs.items() if pr["group"]}
+        self.when = now
+        for k in out:
+            out[k][0] = 100.0 * out[k][0] / self.tick / span / self.cpus if span > 0 else None
+        return out
+
+
+def docker_own(name):
+    """¿Es un contenedor de Nexum (los que acepta docker-contenedor)? Los de los proyectos (de antes y
+    del Apache de Docker), las MariaDB comunes, el Apache de Docker y su phpMyAdmin."""
+    return bool(re.fullmatch(r"nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-\d{1,3}|php\d{2})", name)
+                or re.fullmatch(r"nexum-(web|pma|mariadb-\d{1,2}-\d{1,2})", name))
+
+
+def smooth_scroll(sw, target=0.0, ms=320):
+    """Lleva una ventana con desplazamiento a esa altura poco a poco (como al deslizar)."""
+    adj = sw.get_vadjustment()
+    start, t0 = adj.get_value(), time.monotonic()
+    if abs(start - target) < 1:
+        return
+
+    def step():
+        k = min(1.0, (time.monotonic() - t0) * 1000 / ms)
+        adj.set_value(start + (target - start) * (1 - (1 - k) ** 3))
+        return k < 1.0
+    GLib.timeout_add(15, step)
+
+
 def tunnel_state():
     """El túnel de Cloudflare abierto (tunel-abrir): url, target (la dirección local), folder y expires.
     None si no hay ninguno o su proceso ya no está."""
@@ -20068,17 +20348,15 @@ class App(Gtk.Application):
 
     # ------------------------------------------- paquete .deb nuevo en Descargas
     def check_package(self, manual=False, auto=False):
-        """Buscar una versión nueva (menú) o, con auto, al abrir la ventana: sin avisar si no hay y, si
-        se dijo que no a una, sin volver a preguntar por ella (solo un aviso breve)."""
+        """Buscar una versión nueva (menú) o, con auto, al abrir la ventana (update_check_due): sin
+        avisar si no hay."""
         def got(_rc, out):
             found, notes = False, []
             for f in parse_lines(out):
                 if f[0] == "N" and len(f) >= 5:
                     found = True
-                    if auto and f[1] == self.declined_update():
-                        self.toast("Hay una versión nueva (%s): menú ☰ → Buscar actualizaciones" % f[1])
-                    elif not self.offer_package(f[1], f[2], f[3], "|".join(f[4:])) and auto:
-                        self.declined_update(f[1])
+                    # (si se dice que no, se vuelve a ofrecer la próxima vez que toque buscar)
+                    self.offer_package(f[1], f[2], f[3], "|".join(f[4:]))
                 elif f[0] == "I" and len(f) >= 2:
                     notes.append("|".join(f[1:]))
             if manual and not found:
@@ -20092,24 +20370,6 @@ class App(Gtk.Application):
             self.toast("Buscando actualizaciones…")
         run_quick(["gui-paquete"], got)
         return False
-
-    def declined_update(self, version=None):
-        """La versión nueva a la que se ha dicho que no al abrir la ventana (para no preguntar en cada
-        arranque); con version, la apunta."""
-        path = os.path.join(LOG_DIR, "actualizacion-rechazada")
-        if version is None:
-            try:
-                with open(path, encoding="utf-8") as f:
-                    return f.read(40).strip()
-            except OSError:
-                return ""
-        try:
-            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(version + "\n")
-        except OSError:
-            pass
-        return version
 
     def offer_package(self, version, when, sha, path):
         current = (self.data or {}).get("version", "")
@@ -23193,6 +23453,8 @@ class App(Gtk.Application):
             if self.data is not None and target != self.data["active"]:
                 self.data = dict(self.data, active=target)
             self.update_project_search()
+            # (la página sube sola hasta el visor, arriba: sin desplazarla a mano)
+            GLib.timeout_add(120, lambda: smooth_scroll(self.page_projects) and False)
 
             def got(_rc, out):
                 # Tienda PrestaShop: su dominio queda falseado (se ve en la pestaña Hosts)
@@ -24201,6 +24463,7 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-proyecto-btn:hover, .nv-proyecto-btn button:hover { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
 .nv-proyecto-btn.nv-discontinuo { border-style: dashed; }
 /* (un túnel abierto: la web se ve desde fuera) */
+.nv-proyecto-btn.nv-boton-cuadrado { padding: 4px; border-radius: 12px; }
 .nv-proyecto-btn.nv-compartiendo { border-color: #F38020; background-color: alpha(#F38020, 0.10); }
 switch:checked { background-color: %(g)s; border-color: transparent; }
 .nv-running { font-size: 0.86em; color: %(g)s; }
@@ -24463,8 +24726,33 @@ class App2(App):
     def auto_check_package(self):
         if self.data is None or self.busy:
             return True
-        self.check_package(auto=True)
+        if self.update_check_due():
+            self.check_package(auto=True)
         return False
+
+    def update_check_due(self):
+        """¿Toca buscar una versión nueva al abrir? El primer arranque de cada día y, después, cada
+        UPDATE_EVERY arranques. Se lleva en ~/.lvm-instalador/actualizaciones-arranques: fecha y los
+        arranques desde la última vez que se buscó."""
+        path = os.path.join(LOG_DIR, "actualizaciones-arranques")
+        today = time.strftime("%Y-%m-%d")
+        if SIMULATE:
+            return True
+        try:
+            with open(path, encoding="utf-8") as fh:
+                day, _, n = fh.read(40).strip().partition(" ")
+            n = int(n)
+        except (OSError, ValueError):
+            day, n = "", 0
+        due = day != today or n + 1 >= UPDATE_EVERY
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(path + ".nuevo", "w", encoding="utf-8") as fh:
+                fh.write("%s %d\n" % (today, 0 if due else n + 1))
+            os.replace(path + ".nuevo", path)
+        except OSError:
+            pass
+        return due
 
     def nv_header(self):
         hb = css(Gtk.HeaderBar(show_close_button=True), "nv-cabecera")
@@ -24533,6 +24821,14 @@ class App2(App):
             self.svc_dots[name] = dt
             pill.pack_start(dt, False, False, 0)
             pill.pack_start(label(name, "nv-chico"), False, False, 0)
+        # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
+        pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
+        self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,
+                               tooltip_text="Lo que gastan Nexum Dev Stack y sus servicios juntos")
+        pill.pack_start(self.usage_lbl, False, False, 0)
+        self.usage = UsageMeter()
+        self.nv_usage_tick()
+        GLib.timeout_add_seconds(3, self.nv_usage_tick)
         self.power_btn = nv_button("system-shutdown-symbolic", "…", None, lambda *_: self.nv_power())
         pill.pack_start(self.power_btn, False, False, 2)
         self.status_btn = Gtk.MenuButton(tooltip_text="Servicios de la versión activa")
@@ -25850,43 +26146,49 @@ class App2(App):
         if is_loaded:
             kind, admin = self.loaded_project_admin()
             # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
-            acts.pack_start(nv_button(logo("globo", 18), "Abrir web", "Abrir http://%s/" % p["link"],
-                                      lambda *_: self.open_uri("http://%s/" % p["link"]), "nv-proyecto-btn"), False, False, 0)
+            # (los que se ven, su orden y su estilo, como se haya elegido: nv_place_buttons)
+            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir http://%s/" % p["link"],
+                                     lambda *_: self.open_uri("http://%s/" % p["link"]), "nv-proyecto-btn")}
             code = vscode_app()
             if code is not None:
                 img = None
                 if code.get_icon() is not None:
                     img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
                     img.set_pixel_size(18)
-                acts.pack_start(nv_button(img or "text-editor-symbolic", "VS Code",
-                                          "Abrir la carpeta en Visual Studio Code", lambda *_: self.open_in_vscode(),
-                                          "nv-proyecto-btn"), False, False, 0)
+                btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
+                                           "Abrir la carpeta en Visual Studio Code", lambda *_: self.open_in_vscode(),
+                                           "nv-proyecto-btn")
             pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
             pma.set_sensitive(bool(self.loaded_project_db()))
-            acts.pack_start(pma, False, False, 0)
+            btns["pma"] = pma
             adm = nv_button(logo("prestashop" if kind == "ps" else "wordpress", 18), "Panel",
                             "Con el administrador de pruebas ya escrito: solo hay que pulsar Entrar",
                             lambda *_: self.open_project_admin(), "nv-proyecto-btn")
             adm.set_sensitive(bool(admin))
-            acts.pack_start(adm, False, False, 0)
-            acts.pack_start(nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
-                                      lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn"), False, False, 0)
-            acts.pack_start(self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"]),
-                            False, False, 0)
+            adm.nv_logo = "prestashop" if kind == "ps" else "wordpress"
+            btns["panel"] = adm
+            btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
+                                       lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
+            btns["compartir"] = self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"])
             # El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
             log = self.loaded_project_log()
             logb = nv_button("text-x-generic-symbolic", "Log", "Ver el final del registro de errores de la web (%s)"
                              % os.path.basename(log) if log else "Esta web aún no tiene registro de errores",
                              lambda *_: self.show_log_tail(self.loaded_project_log() or log), "nv-proyecto-btn")
             logb.set_sensitive(bool(log))
-            acts.pack_start(logb, False, False, 0)
-            acts.pack_start(nv_button("media-eject-symbolic", None, "Desmontar: %s deja de apuntar aquí" % p["link"],
-                                      lambda *_: self.on_unload_project(), flat=True), False, False, 0)
+            btns["log"] = logb
+            eject = nv_button("media-eject-symbolic", None, "Desmontar: %s deja de apuntar aquí" % p["link"],
+                              lambda *_: self.on_unload_project(), flat=True)
+            self.nv_place_buttons(acts, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
+            acts.pack_start(eject, False, False, 0)
         else:
             acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
                                       lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)
-        # (⋮, pegado a la derecha)
-        acts.pack_end(self.nv_more_menu(x), False, False, 0)
+        # (⋮, pegado a la derecha; con un proyecto cargado, del tamaño de los demás botones)
+        more = self.nv_more_menu(x)
+        if is_loaded:
+            self.nv_restyle(more, buttons_conf(), ("icono", "view-more-symbolic"), "Más")
+        acts.pack_end(more, False, False, 0)
         card.pack_start(acts, False, False, 0)
         self.hero_box.pack_start(card, False, False, 0)
         self.hero_box.show_all()
@@ -25942,6 +26244,7 @@ class App2(App):
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
         elif x["kind"] == "wp":
             items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
+        items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
 
@@ -26141,6 +26444,7 @@ class App2(App):
         box.show_all()
         self.nv_docker_tools()
         self.nv_tunnel_tools()
+        self.nv_buttons_tools()
         self.nv_mail_tools()
         self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
                            "Ficheros de configuración, carpetas, registros y el programa")
@@ -26283,6 +26587,194 @@ class App2(App):
             row = ActionRow("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)")
             row.add_suffix(nv_button("text-x-generic-symbolic", "Ver", None, lambda *_: self.show_log_tail(reg)))
             lb.add(row)
+        box.show_all()
+
+    def nv_place_buttons(self, acts, btns, fixed=(), conf=None):
+        """Los botones del visor (clave: botón) en acts: los que se ven, en su orden y con su estilo. fixed:
+        los que van siempre (botón, icono, nombre), ya colocados: con el mismo estilo y el mismo tamaño."""
+        conf = conf or buttons_conf()
+        specs = dict((k, i) for k, _n, i in VISOR_BUTTONS)
+        for key in conf["order"]:
+            if key in btns and key not in conf["hidden"]:
+                b = btns[key]
+                self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else specs[key],
+                                dict((k, n) for k, n, _i in VISOR_BUTTONS)[key])
+                acts.pack_start(b, False, False, 0)
+        for b, spec, name in fixed:
+            self.nv_restyle(b, conf, spec, name)
+
+    def nv_restyle(self, b, conf, spec, name):
+        """Un botón de nv_button (o un menú de nv_menu_button) como dice conf: con su nombre (como está),
+        solo el icono o con el icono y el nombre debajo, en un cuadrado de conf["size"] de lado."""
+        if conf["style"] == "nombre":
+            return
+        old = b.get_child()
+        texts = [w.get_text() for w in old.get_children() if isinstance(w, Gtk.Label)] \
+            if isinstance(old, Gtk.Container) else []
+        name = texts[0] if texts else name
+        tip = b.get_tooltip_text()
+        b.remove(old)
+        side = conf["size"]
+        if isinstance(b, Gtk.Button):
+            b.set_relief(Gtk.ReliefStyle.NORMAL)
+        css(b, "nv-proyecto-btn", "nv-boton-cuadrado")
+        if conf["style"] == "icono":
+            b.add(button_icon(spec, max(16, side // 2)))
+            b.set_tooltip_text("%s: %s" % (name, tip) if tip and not tip.startswith(name) else tip or name)
+        else:
+            side = max(side, BUTTON_SIZE_NAMED)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)
+            box.pack_start(button_icon(spec, max(18, side * 2 // 5)), False, False, 0)
+            box.pack_start(label(name, "nv-chico", xalign=0.5, ellipsize=3, max_width_chars=max(6, side // 8)),
+                           False, False, 0)
+            b.add(box)
+        b.set_size_request(side, side)
+        b.set_valign(Gtk.Align.CENTER)
+        b.show_all()
+
+    def nv_buttons_dialog(self):
+        """Personalizar los botones del visor: cuáles se ven, en qué orden y cómo."""
+        conf = buttons_conf()
+        names = dict((k, (n, i)) for k, n, i in VISOR_BUTTONS)
+        dlg = Gtk.Dialog(title="Botones del proyecto", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(480, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        box.pack_start(label("Botones del visor del proyecto", "nv-titulo"), False, False, 0)
+        box.pack_start(label("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ "
+                             "y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.",
+                             "nv-tenue", wrap=True, max_width_chars=56), False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        box.pack_start(lb, False, False, 0)
+
+        def fill():
+            for row in lb.get_children():
+                lb.remove(row)
+            for n, key in enumerate(conf["order"]):
+                name, spec = names[key]
+                row = ActionRow(name)
+                row.prefix.foreach(row.prefix.remove)
+                chk = Gtk.CheckButton(active=key not in conf["hidden"], tooltip_text="Verlo en el visor")
+                chk.connect("toggled", lambda w, k=key: (conf["hidden"].discard(k) if w.get_active() else conf["hidden"].add(k),
+                                                         show_preview()))
+                row.add_prefix(chk)
+                row.add_prefix(button_icon(spec, 18))
+                for icon_name, step, tip in (("go-up-symbolic", -1, "Antes"), ("go-down-symbolic", 1, "Después")):
+                    b = nv_button(icon_name, None, tip, lambda *_, i=n, d=step: move(i, d), flat=True)
+                    b.set_sensitive(0 <= n + step < len(conf["order"]))
+                    row.add_suffix(b)
+                lb.add(row)
+            lb.show_all()
+
+        def move(i, d):
+            o = conf["order"]
+            o[i], o[i + d] = o[i + d], o[i]
+            fill()
+        fill()
+        grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+        grid.attach(label("Estilo", valign=Gtk.Align.CENTER), 0, 0, 1, 1)
+        combo = Gtk.ComboBoxText(hexpand=True)
+        for key, text in BUTTON_STYLES:
+            combo.append(key, text)
+        combo.set_active_id(conf["style"])
+        grid.attach(combo, 1, 0, 2, 1)
+        grid.attach(label("Tamaño", valign=Gtk.Align.CENTER), 0, 1, 1, 1)
+        scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, BUTTON_SIZE_MIN, BUTTON_SIZE_MAX, 4)
+        scale.set_draw_value(False)
+        scale.set_hexpand(True)
+        scale.set_value(conf["size"])
+        grid.attach(scale, 1, 1, 1, 1)
+        size_lbl = label("", "nv-mono", "nv-tenue", width_chars=9)
+        grid.attach(size_lbl, 2, 1, 1, 1)
+        box.pack_start(grid, False, False, 0)
+        # Vista previa: los botones que se ven, como quedarán (con Desmontar y ⋮)
+        box.pack_start(label("Así quedan", "nv-chico", "nv-tenue"), False, False, 0)
+        # (en varias filas si no caben: se ven todos, del tamaño que tendrán)
+        preview = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8, row_spacing=8,
+                              max_children_per_line=12, homogeneous=False, margin=4)
+        box.pack_start(preview, False, False, 0)
+        touched = {"size": False}
+
+        def show_preview(*_):
+            conf["style"] = combo.get_active_id() or "nombre"
+            conf["size"] = int(scale.get_value())
+            square = conf["style"] != "nombre"
+            scale.set_sensitive(square)
+            side = max(conf["size"], BUTTON_SIZE_NAMED) if conf["style"] == "grande" else conf["size"]
+            size_lbl.set_label("%d×%d px" % (side, side) if square else "—")
+            preview.foreach(preview.remove)
+            btns = {}
+            for key, name, spec in VISOR_BUTTONS:
+                btns[key] = nv_button(button_icon(spec, 18), name, None, None, "nv-proyecto-btn")
+            fixed = [(nv_button("media-eject-symbolic", None, "Desmontar", None, flat=True),
+                      ("icono", "media-eject-symbolic"), "Desmontar"),
+                     (self.nv_menu_button(None, "view-more-symbolic", []), ("icono", "view-more-symbolic"), "Más")]
+            row = Gtk.Box()
+            self.nv_place_buttons(row, btns, fixed, conf)
+            for b in row.get_children() + [b for b, _spec, _name in fixed]:
+                if b.get_parent():
+                    b.get_parent().remove(b)
+                b.set_can_focus(False)
+                preview.add(b)
+            preview.show_all()
+
+        def style_changed(*_):
+            if not touched["size"]:
+                scale.set_value(BUTTON_SIZES.get(combo.get_active_id(), conf["size"]))
+            show_preview()
+
+        def size_changed(*_):
+            touched["size"] = True
+            show_preview()
+        combo.connect("changed", style_changed)
+        scale.connect("value-changed", size_changed)
+        refill = fill
+
+        def fill():
+            refill()
+            show_preview()
+        show_preview()
+
+        def reset(*_):
+            conf.update(order=[k for k, _n, _i in VISOR_BUTTONS], hidden=set())
+            touched["size"] = False
+            combo.set_active_id("nombre")
+            fill()
+        rb = css(Gtk.Button(label="Como al principio", halign=Gtk.Align.START,
+                            tooltip_text="Todos, en el orden de siempre y con su nombre (se aplica al guardar)"), "flat")
+        rb.connect("clicked", reset)
+        box.pack_start(rb, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        conf["style"] = combo.get_active_id() or "nombre"
+        conf["size"] = int(scale.get_value())
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT:
+            return
+        try:
+            buttons_save(conf)
+        except OSError as exc:
+            message(self.win, "No se han podido guardar los botones", str(exc), Gtk.MessageType.ERROR)
+            return
+        self.nv_tunnel_refresh()
+        self.toast("Botones del proyecto guardados")
+
+    def nv_buttons_tools(self):
+        """Configuración, Visor de los proyectos: sus botones (cuáles, en qué orden y cómo)."""
+        conf = buttons_conf()
+        box, lb = group("Visor de los proyectos")
+        shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]
+        row = ActionRow("Botones", "%s · %s" % (", ".join(shown) or "ninguno",
+                                                dict(BUTTON_STYLES)[conf["style"]].split(":")[0].lower()))
+        b = Gtk.Button(label="Personalizar…", valign=Gtk.Align.CENTER)
+        b.connect("clicked", lambda *_: self.nv_buttons_dialog())
+        row.add_suffix(b)
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 4)
         box.show_all()
 
     def nv_share_button(self, url, folder, name, tip_extra=""):
@@ -26687,6 +27179,18 @@ class App2(App):
         head.pack_start(t, True, True, 0)
         new = nv_button("list-add-symbolic", "Proyecto en Docker…", None, lambda *_: self.nv_docker_new(), "nv-azul")
         head.pack_end(new, False, False, 0)
+        # Parar todo lo de Nexum de una vez (proyectos, MariaDB comunes y el Apache de Docker)
+        running = [c for c in d.get("containers", []) if c["state"] == "running" and docker_own(c["name"])]
+        stop = nv_button("media-playback-stop-symbolic", "Parar todos",
+                         "Parar los %d contenedores de Nexum en marcha (los proyectos, las MariaDB comunes y el Apache "
+                         "de Docker); los de otros programas no se tocan" % len(running) if running else
+                         "No hay ningún contenedor de Nexum en marcha",
+                         lambda *_: self.run_task("Parando todos los contenedores de Nexum", ["docker-parar-todo"],
+                                                  auto_close=True, done_text="Contenedores de Nexum parados",
+                                                  on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
+                         "nv-proyecto-btn", "nv-stop")
+        stop.set_sensitive(bool(running) and not self.busy)
+        head.pack_end(stop, False, False, 0)
         box.pack_start(head, False, False, 0)
         for text, sub, btn in ([("Hay otro Docker en marcha: el de Ubuntu, como administrador",
                                  "Este programa usa el suyo, con tu usuario: el de Ubuntu no hace falta y quien lo use "
@@ -26984,7 +27488,7 @@ class App2(App):
             wb = nv_button(logo("globo", 18), "Abrir web", "Abrir %s/" % self.dk_url(p["domain"]) if up else stopped,
                            lambda *_: self.open_uri(self.dk_url(p["domain"]) + "/"), "nv-proyecto-btn")
         wb.set_sensitive(up)
-        acts.pack_start(wb, False, False, 0)
+        btns = {"web": wb}
         st = tunnel_state()
         targets = [(v, self.dk_url(docker_web_domain(p, v))) for v in p["versions"]] \
             if web and p.get("kind") != "ps" and len(p["versions"]) > 1 else [(p["php"], self.dk_url(p["domain"]))]
@@ -26996,7 +27500,7 @@ class App2(App):
             mine = next((t for _v, t in targets if st and st["target"] == t), targets[0][1])
             sb = self.nv_share_button(mine, folder, p["folder"])
         sb.set_sensitive(up)
-        acts.pack_start(sb, False, False, 0)
+        btns["compartir"] = sb
         adm = nv_button(logo("prestashop" if akind == "ps" else "wordpress", 18), "Panel",
                         stopped if not up else "Abrir https://%s/%s/ con el administrador de pruebas ya escrito "
                         "(%s, contraseña local): solo hay que pulsar Entrar" % (p["domain"], admin, "local@local.test")
@@ -27005,7 +27509,8 @@ class App2(App):
                         lambda *_: self.open_admin_login(akind, admin, self.dk_url(p["domain"]), p["folder"],
                                                          ["docker-usuario-pruebas", p["slug"]]), "nv-proyecto-btn")
         adm.set_sensitive(up and bool(admin))
-        acts.pack_start(adm, False, False, 0)
+        adm.nv_logo = "prestashop" if akind == "ps" else "wordpress"
+        btns["panel"] = adm
         pma_ok = web or p["pma"].isdigit()
         pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin",
                         stopped if not up else "Abrir phpMyAdmin (%s): usuario root; la contraseña se copia al pulsar, "
@@ -27013,7 +27518,7 @@ class App2(App):
                         lambda *_: (self.nv_docker_copy_pass(p), self.open_uri(self.dk_pma_url(p))),
                         "nv-proyecto-btn")
         pma.set_sensitive(up and pma_ok)
-        acts.pack_start(pma, False, False, 0)
+        btns["pma"] = pma
         code = vscode_app()
         if code is not None:
             cimg = None
@@ -27023,12 +27528,13 @@ class App2(App):
             vs = nv_button(cimg or "text-editor-symbolic", "VS Code", "Abrir %s en Visual Studio Code" % folder,
                            lambda *_: self.open_in_vscode(folder), "nv-proyecto-btn")
             vs.set_sensitive(os.path.isdir(folder))
-            acts.pack_start(vs, False, False, 0)
+            btns["vscode"] = vs
         lg = nv_button("text-x-generic-symbolic", "Log", "Ver lo último de su PHP (los errores de la web: el "
                        "registro de su contenedor %s)" % php_c if php_c else "Aún no tiene contenedor de PHP: arráncalo",
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))
-        acts.pack_start(lg, False, False, 0)
+        btns["log"] = lg
+        self.nv_place_buttons(acts, btns)
         if web:
             vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Añadir otra versión de PHP, quitarla%s"
                            % (" o elegir con cuál va la tienda" if p.get("kind") == "ps" else " (todas a la vez, cada una con su dominio)"),
@@ -27037,6 +27543,9 @@ class App2(App):
             vb = nv_button("go-up-symbolic", "Pasar al Apache de Docker", "Sin LAMPP y con varias versiones de PHP a la vez",
                            lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
         vb.set_sensitive(not self.busy)
+        conf = buttons_conf()
+        self.nv_restyle(vb, conf, ("icono", "list-add-symbolic" if web else "go-up-symbolic"),
+                        "Versiones de PHP" if web else "Pasar")
         acts.pack_start(vb, False, False, 0)
         power = nv_button("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                           "Parar" if up else "Arrancar",
@@ -27046,9 +27555,78 @@ class App2(App):
                                                    on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
                           "nv-proyecto-btn", "nv-stop" if up else "nv-play")
         power.set_sensitive(not self.busy)
+        self.nv_restyle(power, conf, ("icono", "media-playback-stop-symbolic" if up else "media-playback-start-symbolic"),
+                        "Parar" if up else "Arrancar")
         acts.pack_end(power, False, False, 0)
         card.pack_start(acts, False, False, 0)
         return card
+
+    def nv_usage_tick(self):
+        """Cada 3 s, en segundo plano (leer /proc lleva unos milisegundos): CPU y RAM de Nexum y sus servicios."""
+        if getattr(self, "usage_busy", False):
+            return True
+        self.usage_busy = True
+
+        def work():
+            try:
+                out = self.usage.sample()
+            except Exception:  # noqa: BLE001 - un proceso que desaparece a mitad: la siguiente vez
+                out = None
+            GLib.idle_add(self.nv_usage_show, out)
+        threading.Thread(target=work, daemon=True).start()
+        return True
+
+    def nv_usage_show(self, out):
+        self.usage_busy = False
+        if not out:
+            return False
+        total = self.usage.total or 1
+        cpu = [v[0] for v in out.values() if v[0] is not None]
+        mem = sum(v[1] for v in out.values())
+        fmt = lambda x: ("%.1f" % x).replace(".", ",")
+        self.usage_lbl.set_label("CPU %s %% · RAM %s %%" % (fmt(sum(cpu)) if cpu else "—", fmt(100.0 * mem / total)))
+        lines = ["Nexum Dev Stack y sus servicios: CPU %s %% de todo el equipo (%d núcleos) · RAM %s (%s %% de %s)"
+                 % (fmt(sum(cpu)) if cpu else "—", self.usage.cpus, fmt_size(mem), fmt(100.0 * mem / total),
+                    fmt_size(total)), ""]
+        for key, text in USAGE_GROUPS:
+            c, m = out[key]
+            if m or c:
+                lines.append("%s: CPU %s %% · %s" % (text, fmt(c) if c is not None else "—", fmt_size(m)))
+        self.usage_lbl.set_tooltip_text("\n".join(lines))
+        return False
+
+    def nv_shared_users(self, name):
+        """Proyectos del Apache de Docker en marcha que usan un contenedor común: el Apache de Docker o
+        su phpMyAdmin (todos) o una MariaDB común (los que van con esa versión). Vacío si no es común."""
+        d = self.docker or {}
+        up = {c["name"] for c in d.get("containers", []) if c["state"] == "running"}
+        m = re.fullmatch(r"nexum-mariadb-(\d+)-(\d+)", name)
+        if not m and name not in ("nexum-web", "nexum-pma"):
+            return []
+        users = []
+        for p in d.get("projects", []):
+            if not p.get("web") or (m and p["maria"] != "%s.%s" % m.groups()):
+                continue
+            if any(re.fullmatch(r"nexum-%s-php\d{2}" % re.escape(p["slug"]), n) for n in up):
+                users.append(p["folder"])
+        return users
+
+    def nv_stop_shared_ok(self, names, what):
+        """Antes de parar algo común: si lo usa algún proyecto en marcha, se dice cuáles y se pregunta."""
+        users = sorted({u for n in names for u in self.nv_shared_users(n)})
+        if not users:
+            return True
+        many = len(users) > 1
+        if "mariadb" in " ".join(names):
+            text = ("Es común: ahora %s %s. %s sin BBDD (errores de conexión) hasta que la vuelvas a arrancar; "
+                    "al arrancar un proyecto que va con ella, se arranca sola."
+                    % ("la usan" if many else "la usa", ", ".join(users), "Se quedarán" if many else "Se quedará"))
+        else:
+            text = ("Es común: ahora %s %s. %s de verse hasta que lo vuelvas a arrancar; al arrancar un proyecto "
+                    "del Apache de Docker, se arranca solo."
+                    % ("lo usan" if many else "lo usa", ", ".join(users), "Dejarán" if many else "Dejará"))
+        return confirm(self.win, "¿Parar %s?" % what, text,
+                       "Pararla igualmente" if "mariadb" in " ".join(names) else "Pararlo igualmente", destructive=True)
 
     def nv_docker_log(self, p, name):
         """Lo último del contenedor de PHP de un proyecto en Docker: ahí van los errores de PHP de su web
@@ -27165,6 +27743,22 @@ class App2(App):
                      "(la carpeta y la BBDD de LAMPP no se tocan)", lambda p=p: self.on_docker_delete(p), True)])
             else:
                 img_cell, pma, acts = label(plural(len(items), "contenedor", "contenedores"), "nv-chico", "nv-tenue"), label(""), label("")
+                done = lambda *a: run_quick(["gui-docker"], self.on_docker_data)
+                if proj == "nexum-web":
+                    acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
+                                     "Parar el Apache de Docker y su phpMyAdmin (los proyectos del Apache de Docker dejan "
+                                     "de verse)" if up else "Arrancar el Apache de Docker y su phpMyAdmin",
+                                     lambda up=up: (not up or self.nv_stop_shared_ok(["nexum-web"], "el Apache de Docker")) and self.run_task(
+                                         "Parando el Apache de Docker" if up else "Arrancando el Apache de Docker",
+                                         ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])
+                elif re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or "") and len(items) == 1:
+                    acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
+                                     "Parar %s (los proyectos que van con ella se quedan sin BBDD)" % title if up else
+                                     "Arrancar %s" % title,
+                                     lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
+                                         ("Parando %s" if up else "Arrancando %s") % t,
+                                         ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
+                                         on_done=done), True)])
             row([name, label(""), img_cell, pma, label(cpu_text([c["name"] for c in items]), "nv-mono", "nv-chico", "nv-tenue"), acts],
                 on_click=lambda proj=proj: self.nv_dk_toggle(proj))
             if not opened:
@@ -27185,14 +27779,15 @@ class App2(App):
                                     tooltip_text="%s · %s" % (c["name"], docker_status_text(c["status"]))), False, False, 0)
                 ports = ", ".join(pp.replace("/tcp", "").replace("127.0.0.1:", "").replace("->", ":")
                                   for pp in c["ports"].split(", ") if "->" in pp) or "—"
-                own = bool(re.fullmatch(r"nexum-[a-z0-9-]+-(php|db|pma)-\d+", c["name"]))
+                own = docker_own(c["name"])
                 row([kn, label(c["id"] or "—", "nv-mono", "nv-chico", "nv-tenue", selectable=True,
                                tooltip_text="ID del contenedor"),
                      label(c["image"], "nv-mono", "nv-chico", "nv-enlace", ellipsize=3),
                      label(ports, "nv-mono", "nv-chico", "nv-enlace" if ports != "—" else "nv-tenue"),
                      label(cpu_text([c["name"]]), "nv-mono", "nv-chico", "nv-tenue"),
                      actions([("media-playback-stop-symbolic" if on else "media-playback-start-symbolic", "Parar" if on else "Arrancar",
-                               lambda c=c, on=on: self.run_task(("Parando %s" if on else "Arrancando %s") % c["name"],
+                               lambda c=c, on=on: (not on or self.nv_stop_shared_ok([c["name"]], c["name"])) and self.run_task(
+                                   ("Parando %s" if on else "Arrancando %s") % c["name"],
                                                                 ["docker-contenedor", "parar" if on else "arrancar", c["name"]],
                                                                 auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), own),
                               ("view-refresh-symbolic", "Reiniciar", lambda c=c: self.run_task("Reiniciando %s" % c["name"],
@@ -28687,6 +29282,7 @@ case "$1" in
     docker-php-quitar) docker_web_remove "$2" "$3" ;;
     docker-php-elegir) docker_web_switch "$2" "$3" ;;
     docker-pasar) docker_pass "$2" ;;
+    docker-parar-todo) docker_stop_all ;;
     docker-web) shift; docker_web_command "$@" ;;
     tunel) tunnel_status ;;
     tunel-instalar) tunnel_install ;;

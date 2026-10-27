@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tunel de Cloudflare (Linux 1.56.0): con un cloudflared falso (sin Internet) y una web falsa de este
+# Tunel de Cloudflare (Linux 1.56.0, Mac 1.40.0): con un cloudflared falso (sin Internet) y una web falsa de este
 # equipo, el proxy pide la contraseña, bloquea el admin y lo de LAMPP, cambia el dominio local por el
 # del tunel y se cierra del todo. Y solo comparte webs de este equipo. Uso: tunel.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -24,8 +24,13 @@ valid_domain() { [[ "$1" =~ ^[a-z0-9.-]+$ ]]; }
 is_prestashop() { [ "$1" == tienda ]; }
 ps_domain() { echo localhost; }
 
+# (el Mac: realpath_f y cloudflared en un .tgz)
+grep -q "function realpath_f() {" "$SRC" && realpath_f() { readlink -f "$1"; }
 # Instalar: solo si coincide su sha256
 printf '#!/bin/bash\necho falso\n' > "$W/bueno"
+if grep -q "cloudflared-darwin-" "$SRC"; then
+    mkdir -p "$W/tgz" && cp "$W/bueno" "$W/tgz/cloudflared" && tar -czf "$W/bueno.tgz" -C "$W/tgz" cloudflared && mv "$W/bueno.tgz" "$W/bueno"
+fi
 LVM_CLOUDFLARED_URL=file://$W/bueno LVM_CLOUDFLARED_SHA=0000
 out=$(tunnel_install 2>&1); rc=$?
 check "instalar: con otra sha256, no se instala" '[ $rc -ne 0 ] && grep -q "no coincide" <<< "$out" && ! tunnel_installed'
@@ -88,7 +93,7 @@ EOF
 chmod 755 "$TUNNEL_BIN"
 out=$(tunnel_open "http://localhost:$WP/" tienda 2>&1); rc=$?
 check "abrir: dice la direccion del tunel y la contraseña" '[ $rc -eq 0 ] && grep -q "^URL|https://prueba-uno-dos.trycloudflare.com$" <<< "$out" && grep -q "Contraseña para entrar: $k2" <<< "$out"'
-check "abrir: la contraseña no va en la linea de ordenes ni queda el fichero de datos" '! grep -rq -- "$k2" /proc/$(tunnel_pid)/cmdline && [ -z "$(ls "$TUNNEL_DIR"/abrir.* 2> /dev/null)" ]'
+check "abrir: la contraseña no va en la linea de ordenes ni queda el fichero de datos" '! ps -p "$(tunnel_pid)" -o command= | grep -q -- "$k2" && [ -z "$(ls "$TUNNEL_DIR"/abrir.* 2> /dev/null)" ]'
 check "abrir: cloudflared sin la configuracion de ~/.cloudflared y sin actualizarse solo" 'grep -q -- "--no-autoupdate --config /dev/null --url http://127.0.0.1:" "$W/args"'
 check "estado: el tunel abierto, con su hora de cierre" 'tunnel_status | grep -qE "^T\|https://prueba-uno-dos.trycloudflare.com\|http://localhost:$WP\|$HTDOCS_DIR/tienda\|[0-9]{10}$"'
 PX=$(grep -oP "127.0.0.1:\K[0-9]+" "$W/args")
@@ -143,8 +148,14 @@ printf '#!/bin/bash\necho "ERR failed to request quick Tunnel"\nexit 1\n' > "$TU
 out=$(tunnel_open "http://localhost:$WP/" 2>&1); rc=$?
 check "sin direccion de Cloudflare: lo dice, con lo ultimo de cloudflared" '[ $rc -ne 0 ] && grep -q "No se ha podido abrir el tunel" <<< "$out" && grep -q "failed to request quick Tunnel" <<< "$out" && [ ! -e "$TUNNEL_STATE" ]'
 
+if grep -q "LVM_SWIFT" "$SRC"; then
+    check "ventana (Mac): Compartir en el visor del proyecto cargado y en el de Docker" 'grep -q "items\[\"compartir\"\] = AnyView(model.shareButton(\"http://" "$SRC" && grep -q "model.share(t.1, folder: folder, name: p.folder)" "$SRC"'
+    check "ventana (Mac): el logotipo de Cloudflare (solo M, L, C y Z) y su apartado en Configuración" 'grep -qE "^    \"cloudflare\": \"M [0-9. LCMZ-]+\",$" "$SRC" && grep -q "tunnelCard()" "$SRC"'
+    check "ventana (Mac): pregunta antes de abrir un tunel" 'grep -q "guard confirm(\"¿Compartir \\\\(name)?\", text, \"Compartir\") else { return }" "$SRC"'
+else
 # La ventana: Compartir en los dos visores, con el logotipo de Cloudflare, y su apartado en Configuración
 check "ventana: Compartir en el visor del proyecto cargado y en el de Docker" '[ "$(grep -c "self.nv_share_button(" "$SRC")" -ge 2 ] && grep -q "self.nv_share(t, folder, p\[\"folder\"\])" "$SRC"'
 check "ventana: el logotipo de Cloudflare y su apartado en Configuración" 'grep -q "^    \"cloudflare\": ($" "$SRC" && grep -q "self.nv_tunnel_tools()" "$SRC"'
 check "ventana: pregunta antes de abrir un tunel" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" | grep -q "if not confirm(self.win"'
+fi
 exit $fail

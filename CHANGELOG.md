@@ -4,11 +4,25 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.2 · 27 oct 2026
+
+- **Botones del proyecto:** «Solo el icono» y «Icono y nombre» son cuadrados, del tamaño que elijas con un deslizador (sin nombre, igual de alto que de ancho: desde pequeños hasta grandes), con una vista previa en el diálogo. Desmontar, ⋮, «Versiones de PHP…» y Arrancar o Parar van con el mismo estilo y el mismo tamaño que los demás.
+- Al cargar un proyecto, la página sube sola hasta su visor.
+- **Arriba, en el recuadro de la versión:** lo que gastan Nexum y sus servicios juntos (la ventana, LAMPP, Docker sin root con sus contenedores, Mailpit y el túnel), en % de la CPU de todo el equipo y de su RAM. Al pasar el ratón, cada parte con sus MB.
+- **Docker:** se pueden parar todos los contenedores de Nexum a mano, también la MariaDB común, el Apache de Docker, su phpMyAdmin y los PHP de cada versión (antes sus botones no se podían pulsar). La fila de una MariaDB común y la del Apache de Docker tienen su Parar o Arrancar, y arriba hay un «Parar todos» (los de otros programas no se tocan). Si lo que paras es común y lo usa un proyecto en marcha, avisa de cuáles se quedan sin él antes de pararlo.
+- **Docker:** al parar un proyecto del Apache de Docker, lo común que ya no usa nadie se para también (su MariaDB y, si no queda ninguno en marcha, el Apache de Docker). En la terminal: docker-parar-todo.
+
+## 1.56.1 · 27 oct 2026
+
+- **Botones del proyecto a tu gusto:** cuáles se ven, en qué orden y cómo (con su nombre, solo el icono o grandes, cuadrados con el icono y el nombre). En el menú ⋮ del proyecto, «Personalizar los botones…», y en Configuración, Visor de los proyectos. Vale para el visor del proyecto cargado y para el de Docker. Por defecto, «Compartir» va detrás de «Docker» y antes de «Log».
+- **Actualizaciones:** se buscan al abrir la ventana la primera vez de cada día y, después, cada 4 veces que la abres. Si dices que no a una versión, se vuelve a ofrecer la próxima vez que toque buscar.
+- **Novedades:** las direcciones como https://pma.docker.local ya no salen partidas.
+
 ## 1.56.0 · 27 oct 2026
 
 - **Docker con su propio Apache:** los proyectos de Docker ya no necesitan LAMPP (funcionan con LAMPP parado o con cualquier versión activa). Un Apache en un contenedor, en otra dirección de este equipo (127.0.0.2, nunca abierta a la red), con las mismas reglas de seguridad que LAMPP (los ficheros que no se sirven y la barrera entre webs) y los .htaccess de cada proyecto. Las imágenes de PHP son las de siempre: ninguna más.
 - **Docker, varias versiones de PHP a la vez:** con la misma BBDD. En un WordPress, cada una con su dominio (proyecto-php83.docker.local); una tienda PrestaShop guarda su dominio en la BBDD, así que va con uno (proyecto.docker.local) y la versión que elijas, con un clic. Botón «Versiones de PHP…» del proyecto: añadir, quitar y elegir.
-- **Docker, BBDD:** una MariaDB común por versión de MariaDB, cada proyecto con su BBDD y su usuario, y un solo phpMyAdmin en https:/`/pma.docker.local` (con su pantalla de acceso). Un certificado propio para *.docker.local (solo vale para esos dominios) que Chrome y Firefox aceptan sin aviso.
+- **Docker, BBDD:** una MariaDB común por versión de MariaDB, cada proyecto con su BBDD y su usuario, y un solo phpMyAdmin en https://pma.docker.local (con su pantalla de acceso). Un certificado propio para *.docker.local (solo vale para esos dominios) que Chrome y Firefox aceptan sin aviso.
 - **Configuración, Docker:** la dirección y los puertos del Apache de Docker (80 y 443; con otros, las direcciones llevan el puerto), «Permitir» para que Docker sin root use los de menos de 1024 (pide la contraseña una vez) y «Confiar» en el certificado.
 - Los proyectos que ya estaban en Docker siguen igual (con LAMPP delante) hasta que pulses «Pasar al Apache de Docker»: se guarda antes una copia de su BBDD en `~/lvm-copias` y se carga en la MariaDB común.
 - **En la terminal:** docker-nuevo, docker-php-añadir, docker-php-quitar, docker-php-elegir, docker-pasar y docker-web.
@@ -333,7 +347,7 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.38.0 · 20 oct 2026
 
-- **phpMyAdmin tiene su propia dirección:** http:/`/127.0.0.1/phpmyadmin/` (los botones ya la abren). En 127.0.0.1 no hay nada más, y en localhost, web.local o los dominios falseados da 403. Así, un fallo XSS en un proyecto (que va en localhost/carpeta o en su dominio) no puede leer phpMyAdmin: para el navegador es otra web.
+- **phpMyAdmin tiene su propia dirección:** http://127.0.0.1/phpmyadmin/ (los botones ya la abren). En 127.0.0.1 no hay nada más, y en localhost, web.local o los dominios falseados da 403. Así, un fallo XSS en un proyecto (que va en localhost/carpeta o en su dominio) no puede leer phpMyAdmin: para el navegador es otra web.
 - **Actualizar phpMyAdmin:** botón Actualizar en su fila de cada versión y aviso en Versiones (Actualizarlos) cuando trae uno con fallos ya corregidos. Pone el más nuevo que admite su PHP (5.2.x desde PHP 7.2.5, 5.1.4 para PHP 7.1), comprobado con su sha256, con la misma configuración y una clave de cookies nueva si era la de fábrica. El anterior queda en phpmyadmin.anterior.
   - **En la terminal:** lvm-instalador actualizar-phpmyadmin <versión> o --todas.
 
@@ -452,8 +466,8 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.27.1 · 19 oct 2026
 
-- Tiendas PrestaShop, lo mismo que WordPress en la 1.27.0: al subirle una base con Proyecto elegido, y al cargarla si se ha volcado encima el código de produccion, su app/config/`parameters.php` (o config/`settings.inc.php` en las 1.6) pasa a usar la base de la carpeta y su prefijo; si sus datos no entran en el MariaDB local, root y localhost. El anterior queda en `~/lvm-copias` y se vacia la cache.
-- El `wp-config.php` que se crea o se rehace lleva WP_SITEURL y WP_HOME con la dirección local del proyecto: la del vhost de los proyectos tal y como este configurado (https:/`/web.local`, http:/`/localhost`...) o, si el proyecto tiene dominio propio (pestaña Hosts), su dominio. Si ya las tiene, se cambia su valor; si no, se añaden delante de los datos de la base.
+- Tiendas PrestaShop, lo mismo que WordPress en la 1.27.0: al subirle una base con Proyecto elegido, y al cargarla si se ha volcado encima el código de produccion, su app/config/parameters.php (o config/settings.`inc.php` en las 1.6) pasa a usar la base de la carpeta y su prefijo; si sus datos no entran en el MariaDB local, root y localhost. El anterior queda en `~/lvm-copias` y se vacia la cache.
+- El `wp-config.php` que se crea o se rehace lleva WP_SITEURL y WP_HOME con la dirección local del proyecto: la del vhost de los proyectos tal y como este configurado (https://web.local, http://localhost...) o, si el proyecto tiene dominio propio (pestaña Hosts), su dominio. Si ya las tiene, se cambia su valor; si no, se añaden delante de los datos de la base.
 
 ## 1.27.0 · 19 oct 2026
 
@@ -465,7 +479,7 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.26.0 · 19 oct 2026
 
-- **Tiendas PrestaShop recien clonadas:** su app/config/`parameters.php` no va en el repositorio y quedaba vacio ("install" directory is missing). Cargar proyecto lo crea con la base cargada en local (la del buscador, la recordada o ps_<final de la carpeta>), el prefijo de sus tablas y claves nuevas, y guarda una copia en `~/.lvm-instalador/prestashop` para reponerla igual si se pierde. Si ya tiene base, no se toca. Ahora se reconoce como tienda aunque no tenga configuración, por sus carpetas o por "prestashop" en el nombre.
+- **Tiendas PrestaShop recien clonadas:** su app/config/parameters.php no va en el repositorio y quedaba vacio ("install" directory is missing). Cargar proyecto lo crea con la base cargada en local (la del buscador, la recordada o ps_<final de la carpeta>), el prefijo de sus tablas y claves nuevas, y guarda una copia en `~/.lvm-instalador/prestashop` para reponerla igual si se pierde. Si ya tiene base, no se toca. Ahora se reconoce como tienda aunque no tenga configuración, por sus carpetas o por "prestashop" en el nombre.
 - La primera vez que se carga una tienda (y al crear su `parameters.php`) se vacia su var/cache, que en las 1.7 da error 500 con la cache de otro equipo. Si no tiene var/cache no pasa nada.
 - **Bases de datos:** botón para vaciar la cache de la tienda en las bases ps_ (lista y buscador). Comando: vaciar-cache <carpeta> | --bd <base>.
 - Los vhosts que se crean llevan ServerAdmin con tu correo (el de git, user.email; si no hay, usuario@localhost).
