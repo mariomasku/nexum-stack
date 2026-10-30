@@ -32,7 +32,10 @@ bash -n "$SRC"
 # ejecutarian parte del texto) y la lista de cambios no puede salir vacia
 ERRORS=$(bash "$SRC" version 2>&1 > /dev/null)
 [ -z "$ERRORS" ] || { echo "El script da errores al cargarse:"; echo "$ERRORS"; exit 1; }
-bash "$SRC" novedades | grep -q "^## $VERSION " || { echo "Novedades no empieza por la $VERSION"; exit 1; }
+# (la salida entera antes de mirarla: con «| grep -q» la lista se corta a medias en cuanto aparece la
+# linea, y con pipefail eso falla a veces, segun lo cargado que este el equipo)
+NOVEDADES=$(bash "$SRC" novedades)
+grep -q "^## $VERSION " <<< "$NOVEDADES" || { echo "Novedades no empieza por la $VERSION"; exit 1; }
 
 BUILD=$(mktemp -d)
 trap 'rm -rf "$BUILD"' EXIT
@@ -246,8 +249,8 @@ KEY_FPR=$(grep -m1 '^UPDATE_KEY_FPR=' "$SRC" | cut -d'"' -f2)
 sed -n "/^UPDATE_KEY_B64='/,/^'$/p" "$SRC" | sed '1s/^UPDATE_KEY_B64=.//; $d' | base64 -d \
     > "$ROOT$DEST/nexum-stack-firma.gpg"
 mkdir -m 700 "$BUILD/gnupg"
-gpg --homedir "$BUILD/gnupg" --show-keys --with-colons "$ROOT$DEST/nexum-stack-firma.gpg" 2> /dev/null \
-    | grep -qx "fpr:::::::::$KEY_FPR:" || { echo "La clave de UPDATE_KEY_B64 no es la de $KEY_FPR"; exit 1; }
+KEYS=$(gpg --homedir "$BUILD/gnupg" --show-keys --with-colons "$ROOT$DEST/nexum-stack-firma.gpg" 2> /dev/null)
+grep -qx "fpr:::::::::$KEY_FPR:" <<< "$KEYS" || { echo "La clave de UPDATE_KEY_B64 no es la de $KEY_FPR"; exit 1; }
 sed -i "s/@UPDATE_KEY_FPR@/$KEY_FPR/" "$ROOT$DEST/lvm-actualizar"
 
 cat > "$ROOT/usr/share/applications/lampp-version-manager.desktop" <<EOF

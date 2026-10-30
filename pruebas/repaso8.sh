@@ -38,7 +38,7 @@ P|-1|1|root|?|1|httpd" sleep 30) &
     out=$(lampp_processes)
     check "Linux: ninguna linea con un pid que no sea un numero" '! awk -F"|" "\$2 !~ /^[0-9]+\$/" <<< "$out" | grep -q .'
     check "Linux: el proceso trucado sale con su pid y el nombre limpio" 'grep -q "^P|$SLEEPER|" <<< "$out" && ! grep -q "P|-1|" <<< "$out"'
-    check "Linux: todas las lineas con 7 campos" '! awk -F"|" "NF != 7" <<< "$out" | grep -q .'
+    check "Linux: todas las lineas con 8 campos (el ultimo: si es la MariaDB de Docker)" '! awk -F"|" "NF != 8" <<< "$out" | grep -q .'
     kill "$SLEEPER" 2> /dev/null; wait "$SLEEPER" 2> /dev/null; SLEEPER=""
 else
     extract "$SRC" lampp_processes || exit 1

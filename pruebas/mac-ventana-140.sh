@@ -9,7 +9,7 @@ LINUX=$HERE/../lvm-instalador.sh
 grep -q "LVM_SWIFT" "$SRC" && grep -q "^func updateCheckDue() -> Bool {" "$SRC" || { echo "  ok    (sin la ventana 1.40 del Mac)"; exit 0; }
 
 # Actualizaciones
-check "actualizaciones: al abrir, solo si toca (y ya no se apunta la versión rechazada)" 'grep -q "if updateCheckDue() { self.checkUpdates(auto: true) }" "$SRC" && ! grep -q "declinedUpdate" "$SRC"'
+check "actualizaciones: al abrir, solo si toca (y ya no se apunta la versión rechazada)" 'grep -A1 "if updateCheckDue() {" "$SRC" | grep -q "self.checkUpdates(auto: true)" && ! grep -q "declinedUpdate" "$SRC"'
 check "actualizaciones: cada tantos arranques como en Linux, en el mismo fichero" '[ "$(grep -oP "^let UPDATE_EVERY = \K[0-9]+" "$SRC")" == "$(grep -oP "^UPDATE_EVERY = \K[0-9]+" "$LINUX")" ] && grep -q "\"/actualizaciones-arranques\"" "$SRC"'
 # Botones del visor
 mac_keys=$(grep -A2 "^let VISOR_BUTTONS:" "$SRC" | grep -oP '\("\K[a-z]+(?=", "[^"]+"\))' | tr '\n' ' ')
@@ -30,4 +30,7 @@ check "Docker: los proyectos nuevos, con el Apache de Docker (formulario y desde
 check "Docker: la franja del Apache de Docker (Permitir, Arrancar o Parar) y su apartado en Configuración" 'grep -q "webStrip(k)" "$SRC" && grep -q "dockerCard()" "$SRC" && grep -q "model.dockerWebCommand(\"permitir\")" "$SRC"'
 check "Docker: versiones de PHP y pasar los de antes" 'grep -q "\[\"docker-php-anadir\", p.slug, v\]" "$SRC" && grep -q "\[\"docker-pasar\", p.slug\]" "$SRC"'
 check "Docker: XAMPP-X parado solo avisa con proyectos de antes" 'grep -q "if !k.xampp && k.projects.contains(where: { !\$0.isWeb })" "$SRC"'
+check "Docker: el DNS de *.docker.test en Configuración y los dominios con su final (docker.local o docker.test)" 'grep -q "model.dockerDNS(!w.dns)" "$SRC" && grep -q "\[\"docker-web\", \"dns\", on ? \"activar\" : \"quitar\"\]" "$SRC" && grep -q "tld: field(f, 6) == \"docker.test\" ? \"docker.test\" : \"docker.local\", dns: field(f, 7) == \"1\")" "$SRC" && ! grep -q "\"pma.docker.local\"" "$SRC"'
+check "configuración: página ancha y sus apartados en tarjetas de dos en dos" 'grep -q "^struct TileCard<Content: View>: View {" "$SRC" && [ "$(grep -c "TileCard(" "$SRC")" -ge 10 ] && grep -q "Tile(\"Dirección y puertos\"" "$SRC"'
+check "botones: el panel en horizontal (cabe en un portátil)" 'grep -q "case .buttons: return 900" "$SRC" && grep -q "HStack(alignment: .top, spacing: 24) {" "$SRC"'
 exit $fail

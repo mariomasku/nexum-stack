@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.0)
+# Prueba de la ventana nueva en un Mac (versión 1.40.2)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.0** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.1** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.0/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.1/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.0
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.1
    ```
 
 5. **Comprueba las versiones:**
@@ -236,6 +236,23 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 8. **Botones:** menú ⋮ → «Personalizar los botones…»: quita uno, cambia el orden, prueba «Solo el icono» y «Icono y nombre» con el deslizador (la vista previa cambia). Guarda: el visor del proyecto cargado y el de Docker quedan igual, con Desmontar, ⋮, Versiones de PHP y Parar del mismo tamaño.
 9. **Al cargar un proyecto** desde la lista de abajo, la página sube sola hasta el visor.
 10. **web.local sin proyecto:** desmonta el proyecto y abre `http://web.local`: el logotipo de Nexum y «Abre Nexum Dev Stack y, en Proyectos, pulsa Cargar».
+
+## Paso 11: el DNS de *.docker.test (1.40.1)
+
+1. Configuración → Docker → **DNS de *.docker.test** → **Activar** (pide la contraseña). Tiene que acabar con «Listo: los proyectos de Docker se abren en https://<proyecto>.docker.test».
+2. Comprueba en Terminal:
+
+   ```bash
+   cat /etc/resolver/docker.test                          # nameserver 127.0.0.1 / port 5354
+   sudo launchctl print system/dev.hexer.nexum-dns | grep state   # state = running
+   dscacheutil -q host -a name loquesea.docker.test       # ip_address: 127.0.0.2
+   grep docker /etc/hosts                                 # ya sin las líneas .docker.local de Docker
+   ```
+
+3. Tus proyectos del Apache de Docker se abren ahora en `https://<proyecto>-php85.docker.test` (y las tiendas en `https://<proyecto>.docker.test`) sin aviso del certificado (si avisa: **Confiar**). phpMyAdmin, en `https://pma.docker.test`.
+4. **Añade otra versión de PHP** a un proyecto: ya no pide la contraseña.
+5. **`web.local` sigue igual:** carga un proyecto y ábrelo como siempre.
+6. Reinicia el Mac y vuelve a abrir un `*.docker.test`: el DNS arranca solo.
 
 ## Qué apuntar
 

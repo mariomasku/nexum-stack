@@ -53,7 +53,7 @@ out=$(docker_container_action parar nexum-web)
 check "parar el Apache de Docker en uso: avisa" 'grep -q "Aviso: nexum-web es comun y lo usan ahora: mi-tienda. Dejan de verse" <<< "$out"'
 
 if grep -q "LVM_SWIFT" "$SRC"; then
-    check "ventana (Mac): puede parar todos los de Nexum (MariaDB común y Apache de Docker incluidos)" 'grep -q "|php\[0-9\]{2})\$\"" "$SRC" && grep -q "\"^nexum-(web|pma|mariadb-\[0-9\]{1,2}-\[0-9\]{1,2})\$\"" "$SRC"'
+    check "ventana (Mac): puede parar todos los de Nexum (MariaDB común y Apache de Docker incluidos)" 'grep -q "|php\[0-9\]{2})\$\"" "$SRC" && grep -q "\"^nexum-(web|pma|mariadb-\[0-9\]{1,2}-\[0-9\]{1,2}|lampp-bd-" "$SRC"'
     check "ventana (Mac): pregunta antes de parar algo común en uso (contenedor, grupo y Apache)" '[ "$(grep -c "stopSharedOK(" "$SRC")" -ge 4 ] && grep -q "if action == \"parar\" \&\& !stopSharedOK(\[c.name\], c.name) { return }" "$SRC"'
     check "ventana (Mac): «Parar todos» en la pestaña Docker" 'grep -q "\"docker-parar-todo\"\]" "$SRC"'
 else

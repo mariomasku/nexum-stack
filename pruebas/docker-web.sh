@@ -1,5 +1,5 @@
 #!/bin/bash
-# Proyectos en Docker con el Apache de Docker (Linux 1.56.0), con un docker falso (sin Docker de verdad ni
+# Proyectos en Docker con el Apache de Docker (Linux 1.56.0; el DNS de *.docker.test, 1.56.3), con un docker falso (sin Docker de verdad ni
 # red): la direccion y los puertos (siempre de 127.x, sin los de LAMPP), el permiso de los puertos, los
 # vhosts (con las reglas de seguridad de LAMPP y la barrera entre webs), el compose.yaml de cada
 # proyecto con una version de PHP por servicio, la BBDD en la MariaDB comun sin contraseñas en las
@@ -16,10 +16,18 @@ extract "$SRC" docker_sock dk docker_config_dir docker_ready docker_slug docker_
     docker_web_project docker_web_domain docker_web_domains docker_web_projects docker_net docker_maria_sql \
     docker_maria_up docker_maria_versions docker_web_cert docker_web_trust docker_web_hosts docker_web_security \
     docker_web_site docker_web_write docker_web_state docker_web_up docker_web_reload docker_web_command \
-    docker_web_set docker_web_allow docker_web_config docker_web_compose docker_web_services docker_conf_set \
+    docker_web_set docker_web_allow docker_web_config docker_web_compose docker_web_services docker_fpm_conf docker_fpm_refresh docker_conf_set \
     docker_web_ps_domain docker_web_create docker_web_add docker_web_remove docker_web_switch docker_web_action \
     docker_test_admin gui_docker docker_fix_restart docker_fix_pma docker_fix_cache docker_pass db_valid_name \
     valid_version_name cross_site_on php_85_or_later || exit 1
+grep -q '^function docker_web_media() {' "$SRC" && { extract "$SRC" docker_web_media media_saved || exit 1; }
+MEDIA_PROJECTS_FILE=$W/media-produccion
+docker_idle_ensure() { :; }
+custom_domain() { [ "$1" == blog ] && echo blog.test; }
+PROJECT_VHOST=web.local
+grep -q '^function docker_dns_activate() {' "$SRC" && { extract "$SRC" docker_web_conf_write docker_web_tld docker_dns_on \
+    docker_web_pma docker_dns_install docker_dns_uninstall docker_dns_works docker_web_retld docker_dns_activate \
+    docker_dns_deactivate docker_dns_command || exit 1; eval "$(sed -n "/^DOCKER_DNS_PY=\$(cat <<'DNSPY'/,/^DNSPY/p; /^DOCKER_DNS_PORT=/p" "$SRC"; echo ')')"; }
 eval "$(sed -n "/^NO_TTY_PY='/,/^'\$/p" "$SRC")"
 eval "$(sed -n '/^PHP_SECURE_INI=/,/^PHP_SECURE_INI_85=/p; /^DOCKER_EXT_INSTALLER=/p; /^DOCKER_WEB_IMAGE=/p; /^DOCKER_WEB_CONF=/p' "$SRC")"
 eval "$(sed -n '/^DOCKER_PHP_VERSIONS=/p; /^DOCKER_MARIADB_VERSIONS=/p; /^DOCKER_PMA_IMAGE=/p; /^DOCKER_PHP_EXT=/p' "$SRC")"
@@ -50,6 +58,7 @@ case "$1" in
     ps) if [[ "$*" == *"name=^nexum-web\$"* ]]; then cat "$d/estado-web" 2> /dev/null; fi ;;
     exec)
         if [[ "$*" == *"SCHEMATA"* ]]; then cat "$d/bbdd-existe" 2> /dev/null || echo 0
+        elif [[ "$*" == *"SELECT domain FROM"* ]]; then echo tienda.es
         elif [[ "$*" == *"shop"*"url"* ]]; then echo ps_
         elif [[ "$*" == *" -i "* || "$2" == -i ]]; then cat >> "$d/sql.log"
         fi ;;
@@ -112,6 +121,18 @@ check "wp-config.php del proyecto sin tocar" 'cmp -s "$HTDOCS_DIR/blog/wp-config
 check "config de PHP 8.5: la MariaDB comun, su usuario y su dominio" 'grep -qF "'"'"'DB_HOST'"'"', '"'"'nexum-mariadb-11-8'"'"'" "$D/config-85.php" && grep -qF "'"'"'DB_USER'"'"', '"'"'nx_wp_blog'"'"'" "$D/config-85.php" && grep -qF "https://blog-php85.docker.local" "$D/config-85.php"'
 check "compose: PHP-FPM en la red interna, sin puertos fuera" 'grep -qx "  php85:" "$D/compose.yaml" && grep -qx "    container_name: nexum-blog-php85" "$D/compose.yaml" && grep -qF "./fpm.conf:/usr/local/etc/php-fpm.d/zz-nexum.conf:ro" "$D/compose.yaml" && ! grep -q "ports:" "$D/compose.yaml" && grep -qx "listen = 9000" "$D/fpm.conf"'
 check "compose: la carpeta en la ruta que ve el Apache de Docker y el wp-config del contenedor encima" 'grep -qF "\"$HTDOCS_DIR/blog:/opt/lampp/htdocs/blog\"" "$D/compose.yaml" && grep -qF "./config-85.php:/opt/lampp/htdocs/blog/wp-config.php:ro" "$D/compose.yaml"'
+check "config: las direcciones de la web en local (web.local y su dominio propio), en lo que devuelve, las del contenedor" 'grep -qF "ob_start(function (\$b) { return str_replace(array(" "$D"/config-*.php && grep -qF "https://web.local" "$D"/config-*.php && grep -qF "https://blog.test" "$D"/config-*.php'
+PHPBIN=$(command -v php || ls /opt/lampp/bin/php 2> /dev/null)
+if [ -n "$PHPBIN" ]; then
+    f=$(ls "$D"/config-*.php | head -1)
+    dom=$(sed -n "s/^define(.WP_HOME., .https:\/\/\([^\x27]*\).);$/\1/p" "$f" | head -1)
+    sed -n "/ob_start/p" "$f" > "$W/ob.php"
+    printf '<?php\ndefine("PHP_SAPI_X", 1);\n' > "$W/prueba.php"
+    sed 's/PHP_SAPI !== .cli./true/' "$W/ob.php" >> "$W/prueba.php"
+    printf 'echo "<img src=\\"https://web.local/wp-content/uploads/a.jpg\\"> {\\"u\\":\\"https:\\\\/\\\\/web.local\\\\/b.jpg\\"} web.local http://blog.test/c";\n' >> "$W/prueba.php"
+    out=$("$PHPBIN" -n "$W/prueba.php" 2>&1)
+    check "config: con PHP, las imagenes de web.local (normales y escapadas) salen del contenedor; el texto suelto, igual" '[[ "$out" == *"https://$dom/wp-content/uploads/a.jpg"* ]] && [[ "$out" == *"https:\\/\\/$dom\\/b.jpg"* ]] && [[ "$out" == *" web.local "* ]] && [[ "$out" == *"https://$dom/c"* ]]'
+fi
 check "compose: YAML valido" 'python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$D/compose.yaml" 2> /dev/null || ! python3 -c "import yaml" 2> /dev/null'
 check "BBDD: su base y su usuario, solo con permiso en ella" 'grep -qF "CREATE DATABASE \`wp_blog\`" "$W/sql.log" && grep -qF "GRANT ALL PRIVILEGES ON \`wp_blog\`.* TO '"'"'nx_wp_blog'"'"'@" "$W/sql.log" && ! grep -q "ON \*\.\*" "$W/sql.log"'
 check "BBDD: la copia de LAMPP cargada" 'grep -q "CREATE TABLE t" "$W/sql.log"'
@@ -123,6 +144,16 @@ check "Apache de Docker: sus puertos solo en 127.0.0.2 y la carpeta de proyectos
 check "Apache de Docker: imagen fijada por su huella" 'grep -qE "image: httpd:2\.4\.[0-9]+@sha256:[0-9a-f]{64}$" "$DOCKER_WEB_DIR/compose.yaml"'
 check "Apache de Docker: su configuracion en una carpeta que no se cambia (montada entera)" 'grep -qF "./conf:/usr/local/apache2/conf/nexum:ro" "$DOCKER_WEB_DIR/compose.yaml" && ! grep -q "httpd.conf:/usr" "$DOCKER_WEB_DIR/compose.yaml" && [ -f "$DOCKER_WEB_DIR/conf/httpd.conf" ]'
 check "Apache de Docker: trabaja con un usuario sin privilegios del contenedor" 'grep -qx "User daemon" "$DOCKER_WEB_DIR/conf/httpd.conf"'
+# Pocos recursos con varios proyectos a la vez (Linux 1.56.7, Mac 1.40.1)
+check "ligero: el Apache de Docker, con un proceso esperando (no tres)" 'grep -qx "StartServers 1" "$DOCKER_WEB_DIR/conf/httpd.conf" && grep -qx "MaxRequestWorkers 100" "$DOCKER_WEB_DIR/conf/httpd.conf"'
+check "ligero: PHP-FPM solo con peticiones (ondemand, se cierra a los 20 s sin trabajo)" 'grep -qx "pm = ondemand" "$D/fpm.conf" && grep -qx "pm.process_idle_timeout = 20s" "$D/fpm.conf" && grep -qx "listen = 9000" "$D/fpm.conf"'
+printf '[global]\n[www]\nlisten = 9000\npm.max_requests = 50\n' > "$D/fpm.conf"
+: > "$W/docker.log"
+docker_web_action arrancar blog > /dev/null 2>&1
+check "ligero: uno de antes se pone al dia al arrancar, y su contenedor se rehace" 'grep -qx "pm = ondemand" "$D/fpm.conf" && [ "$(stat -c %a "$D/fpm.conf")" == 600 ] && grep -q "compose.* up -d --force-recreate php85" "$W/docker.log"'
+: > "$W/docker.log"
+docker_web_action arrancar blog > /dev/null 2>&1
+check "ligero: si ya estaba al dia, no se rehace" 'grep -q "compose.* up -d php85" "$W/docker.log" && ! grep -q "force-recreate" "$W/docker.log"'
 check "vhost: http a https y los .php a su PHP 8.5" 'grep -qF "Redirect permanent / https://blog-php85.docker.local/" "$DOCKER_WEB_DIR/conf/sitios/blog.conf" && grep -qF "proxy:fcgi://nexum-blog-php85:9000" "$DOCKER_WEB_DIR/conf/sitios/blog.conf"'
 check "reglas: las de LAMPP (.env, .git, copias de wp-config, copias de seguridad)" 'grep -qF "<FilesMatch \"(?i)(^\\.(env" "$DOCKER_WEB_DIR/conf/seguridad.conf" && grep -qF "/\\.(git|svn" "$DOCKER_WEB_DIR/conf/seguridad.conf" && grep -q "^LimitRequestBody" "$DOCKER_WEB_DIR/conf/seguridad.conf"'
 check "reglas: con la barrera entre webs encendida" 'grep -q "^# >>> barrera entre webs" "$DOCKER_WEB_DIR/conf/seguridad.conf"'
@@ -156,7 +187,7 @@ check "añadir: la misma BBDD (sin otra copia)" '! grep -qE "CREATE (DATABASE|TA
 check "añadir: su dominio en hosts" 'grep -qE "^127\.0\.0\.2 .*blog-php74\.docker\.local" "$HOSTS_FILE"'
 check "añadir la que ya tiene: no hace nada" 'o=$(docker_web_add blog 7.4) && grep -q "ya tiene PHP 7.4" <<< "$o"'
 out=$(gui_docker)
-check "gui-docker: del Apache de Docker, con sus versiones" 'grep -qx "P|blog|blog|8.5|11.8|blog-php85.docker.local|[a-z?]*|wp_blog|web|web|8.5|wp|8.5 7.4" <<< "$out" && grep -qE "^W\|127\.0\.0\.2\|80\|443\|" <<< "$out"'
+check "gui-docker: del Apache de Docker, con sus versiones" 'grep -qx "P|blog|blog|8.5|11.8|blog-php85.docker.local|[a-z?]*|wp_blog|web|web|8.5|wp|8.5 7.4|" <<< "$out" && grep -qE "^W\|127\.0\.0\.2\|80\|443\|" <<< "$out"'
 reset
 o=$(docker_web_remove blog 8.5 2>&1)
 check "quitar PHP 8.5: su contenedor, su configuracion y su dominio" 'grep -qx "PHP=7.4" "$D/proyecto.conf" && ! grep -q "php85" "$D/compose.yaml" && [ ! -e "$D/config-85.php" ] && ! grep -q "blog-php85" "$HOSTS_FILE" && grep -q "rm -sf php85" "$W/docker.log"'
@@ -208,4 +239,93 @@ reset
 o=$(docker_action borrar blog 2>&1)
 check "borrar: sus contenedores, su BBDD y su usuario de la MariaDB comun" 'grep -q "compose .* down -v" "$W/docker.log" && grep -qF "DROP DATABASE IF EXISTS \`wp_blog\`" "$W/sql.log" && grep -qF "DROP USER IF EXISTS '"'"'nx_wp_blog'"'"'@'"'"'%'"'"'" "$W/sql.log"'
 check "borrar: sus dominios fuera de hosts, su vhost y su carpeta del gestor (la del proyecto, no)" '! grep -q "blog-php" "$HOSTS_FILE" && [ ! -e "$DOCKER_WEB_DIR/conf/sitios/blog.conf" ] && [ ! -e "$D" ] && [ -d "$HTDOCS_DIR/blog" ] && grep -q "tienda.docker.local" "$HOSTS_FILE"'
+
+# --- Imagenes de produccion (1.56.4) ---
+if grep -q '^function docker_web_media() {' "$SRC"; then
+    extract "$SRC" media_project ps_images || exit 1
+    eval "$(grep -m1 '^MEDIA_EXT=' "$SRC")"
+    MEDIA_PROJECTS_FILE=$LOG_DIR/media-produccion
+    media_sync() { :; }
+    check "imagenes: la tienda guarda su dominio de produccion al pasar a Docker" 'grep -qx PRODUCCION=tienda.es "$T/proyecto.conf"'
+    mkdir -p "$HTDOCS_DIR/wpmedia/wp-includes" && printf "<?php\ndefine( 'DB_NAME', 'wp_m' );\n" > "$HTDOCS_DIR/wpmedia/wp-config.php"
+    docker_web_create wpmedia 8.4 11.8 > /dev/null 2>&1
+    check "imagenes: sin dominio de produccion, ninguna regla" '! grep -q "nexum-media" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf"'
+    reset
+    o=$(media_project wpmedia ejemplo.es 2>&1)
+    check "imagenes: el dominio de media-proyecto vale tambien en el Apache de Docker (al momento)" 'grep -q "nexum-media ejemplo.es" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf" && grep -qF "RewriteCond /opt/lampp/htdocs/wpmedia%{REQUEST_URI} !-f" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf" && grep -qF "RewriteRule ^/(wp-content/uploads/.+\.(" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf" && grep -qF " https://ejemplo.es/\$1 [NC,R=302,L]" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf"'
+    check "imagenes: solo GET y HEAD" 'grep -qF "RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)\$" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf"'
+    check "imagenes: en la tienda, no (sus imagenes se descargan: ps-imagenes)" '! grep -q "nexum-media" "$DOCKER_WEB_DIR/conf/sitios/tienda.conf"'
+    o=$(media_project wpmedia quitar 2>&1)
+    check "imagenes: quitarlo, fuera tambien del Apache de Docker" '! grep -q "nexum-media" "$DOCKER_WEB_DIR/conf/sitios/wpmedia.conf"'
+    # ps-imagenes con la BBDD de la tienda solo en Docker (y su dominio de produccion guardado)
+    is_prestashop() { [ "$1" == tienda ]; }
+    ps_config() { echo "ps_tienda|ps_"; }
+    db_connect() { echo "XAMPP/LAMPP parado"; return 1; }
+    db_exists() { return 1; }
+    docker_ready() { return 0; }
+    o=$(DRY=1 ps_images tienda 2>&1)
+    check "ps-imagenes: con la BBDD de la tienda en Docker y su dominio de produccion" 'grep -q "Con la BBDD de la tienda en Docker" <<< "$o" && ! grep -q "no esta en" <<< "$o" && ! grep -q "No se sabe el dominio" <<< "$o"'
+    docker_conf_set tienda PRODUCCION ""
+    o=$(DRY=1 ps_images tienda 2>&1)
+    check "ps-imagenes: sin dominio de produccion, lo pide (como segundo argumento)" 'grep -q "lvm-instalador ps-imagenes tienda <dominio de produccion>" <<< "$o"'
+    o=$(DRY=1 ps_images tienda https://tienda.es/ 2>&1)
+    check "ps-imagenes: con el dominio dicho, sigue" '! grep -q "No se sabe el dominio" <<< "$o" && grep -q "Con la BBDD de la tienda en Docker" <<< "$o"'
+    docker_conf_set tienda PRODUCCION tienda.es
+    unset -f docker_ready
+    extract "$SRC" docker_ready
+fi
+
+# --- DNS comodin de *.docker.test (1.56.3) ---
+if declare -F docker_dns_activate > /dev/null; then
+    DOCKER_DNS_SCRIPT=$W/dns/nexum-dns.py DOCKER_DNS_UNIT=$W/dns/nexum-dns.service DOCKER_DNS_RESOLVED=$W/dns/resolved/60-nexum-docker.conf
+    systemctl() { echo "systemctl $*" >> "$W/hecho.log"; }
+    docker_ready() { return 0; }
+    # (la tienda, en marcha; su dominio sigue siendo el de antes)
+    docker_state() { echo marcha; }
+    printf 'IP=127.0.0.5\nHTTP=80\nHTTPS=443\n' > "$DOCKER_WEB_FILE"
+    docker_web_hosts poner pma.docker.local tienda.docker.local
+    check "dns: por defecto, *.docker.local en /etc/hosts" '[ "$(docker_web_tld)" == docker.local ] && ! docker_dns_on && [ "$(docker_web_domain tienda 8.1)" == tienda.docker.local ]'
+    reset
+    o=$( docker_dns_works() { return 1; }; docker_dns_activate 2>&1 ); rc=$?
+    check "dns: si no contesta, se quita y todo sigue como estaba" '[ $rc -ne 0 ] && grep -q "no contesta" <<< "$o" && [ ! -e "$DOCKER_DNS_UNIT" ] && [ ! -e "$DOCKER_DNS_RESOLVED" ] && [ "$(docker_web_tld)" == docker.local ] && grep -q "tienda.docker.local" "$HOSTS_FILE"'
+    reset
+    o=$( docker_dns_works() { return 0; }; docker_dns_activate 2>&1 ); rc=$?
+    check "dns: activar pide la contraseña y termina bien" '[ $rc -eq 0 ] && [ "$(head -1 "$W/hecho.log")" == sudo_first ] && grep -q "Listo" <<< "$o"'
+    check "dns: el servicio, sin privilegios, solo en 127.0.0.1, con la direccion del Apache de Docker" 'grep -qx "ExecStart=/usr/bin/python3 -I $DOCKER_DNS_SCRIPT 127.0.0.1 5354 docker.test 127.0.0.5" "$DOCKER_DNS_UNIT" && grep -qx "DynamicUser=yes" "$DOCKER_DNS_UNIT" && grep -qx "NoNewPrivileges=yes" "$DOCKER_DNS_UNIT" && grep -qx "CapabilityBoundingSet=" "$DOCKER_DNS_UNIT"'
+    check "dns: systemd-resolved le manda solo docker.test" 'grep -qx "DNS=127.0.0.1:5354" "$DOCKER_DNS_RESOLVED" && grep -qx "Domains=~docker.test" "$DOCKER_DNS_RESOLVED" && grep -q "systemctl restart systemd-resolved" "$W/hecho.log"'
+    check "dns: web.conf con docker.test y el DNS" '[ "$(docker_web_tld)" == docker.test ] && docker_dns_on && grep -qx IP=127.0.0.5 "$DOCKER_WEB_FILE"'
+    check "dns: la tienda pasa a tienda.docker.test (y su dominio en su BBDD)" 'grep -qx DOMINIO=tienda.docker.test "$T/proyecto.conf" && grep -qF "SET domain = '"'"'tienda.docker.test'"'"'" "$W/sql.log"'
+    check "dns: su PHP en marcha, rehecho con la configuracion nueva" 'grep -q "compose .* up -d --force-recreate php81" "$W/docker.log"'
+    check "dns: sus lineas de /etc/hosts fuera, sin poner otras (web.local y lo de siempre, igual)" '! grep -q "docker.local" "$HOSTS_FILE" && ! grep -q "docker.test" "$HOSTS_FILE" && grep -qx "127.0.0.1 tienda.es www.tienda.es" "$HOSTS_FILE"'
+    check "dns: el certificado vale tambien para *.docker.test" 'openssl x509 -in "$DOCKER_WEB_DIR/certs/docker.local.crt" -noout -text | grep -q "DNS:\*\.docker\.test" && openssl x509 -in "$DOCKER_WEB_DIR/certs/docker.local.crt" -noout -text | grep -q "DNS:\*\.docker\.local"'
+    check "dns: el Apache de Docker con los dominios nuevos (y phpMyAdmin en pma.docker.test)" 'grep -q "ServerName tienda.docker.test" "$DOCKER_WEB_DIR/conf/sitios/tienda.conf" && grep -q "ServerName pma.docker.test" "$DOCKER_WEB_DIR/conf/sitios/001-phpmyadmin.conf" && grep -qF "PMA_ABSOLUTE_URI: \"https://pma.docker.test/\"" "$DOCKER_WEB_DIR/compose.yaml"'
+    check "dns: gui-docker lo dice" 'gui_docker | grep -qE "^W\|127\.0\.0\.5\|80\|443\|[a-z?]*\|[01]\|docker\.test\|1$"'
+    reset
+    mkdir -p "$HTDOCS_DIR/nuevo" && printf "<?php\ndefine( 'DB_NAME', 'x' );\n" > "$HTDOCS_DIR/nuevo/wp-config.php"
+    o=$(docker_web_create nuevo 8.4 10.11 2>&1); rc=$?
+    check "dns: un proyecto nuevo, en .docker.test, sin contraseña ni /etc/hosts" '[ $rc -eq 0 ] && grep -qx DOMINIO=nuevo-php84.docker.test "$DOCKER_DIR/nuevo/proyecto.conf" && ! grep -qs "^sudo_first$\|^hosts$" "$W/hecho.log" && ! grep -q nuevo "$HOSTS_FILE"'
+    reset
+    o=$(docker_web_add nuevo 8.3 2>&1); rc=$?
+    check "dns: otra version de PHP, sin contraseña ni /etc/hosts" '[ $rc -eq 0 ] && ! grep -qs "^sudo_first$\|^hosts$" "$W/hecho.log" && grep -qF "https://nuevo-php83.docker.test" "$DOCKER_DIR/nuevo/config-83.php"'
+    reset
+    o=$(docker_dns_deactivate 2>&1); rc=$?
+    check "dns: quitarlo: fuera el servicio y los dominios .docker.test vuelven a /etc/hosts" '[ $rc -eq 0 ] && [ ! -e "$DOCKER_DNS_UNIT" ] && [ ! -e "$DOCKER_DNS_RESOLVED" ] && ! docker_dns_on && grep -qE "^127\.0\.0\.5 .*nuevo-php83\.docker\.test" "$HOSTS_FILE" && grep -qE "^127\.0\.0\.5 .*pma\.docker\.test" "$HOSTS_FILE"'
+    # El DNS de verdad, con tu usuario en un puerto alto: *.docker.test a la direccion, lo demas rechazado
+    printf '%s\n' "$DOCKER_DNS_PY" > "$W/nexum-dns.py"
+    PORT=$(python3 -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+    python3 -I "$W/nexum-dns.py" 127.0.0.1 "$PORT" docker.test 127.0.0.5 & DNSP=$!
+    sleep 0.6
+    ask() { python3 -c '
+import socket, struct, sys
+name, qtype, port = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+q = struct.pack(">HHHHHH", 0x1234, 0x0100, 1, 0, 0, 0) + b"".join(bytes([len(l)]) + l.encode() for l in name.split(".")) + b"\0" + struct.pack(">HH", qtype, 1)
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(q, ("127.0.0.1", port))
+r = s.recv(512)
+rcode, an = struct.unpack(">H", r[2:4])[0] & 15, struct.unpack(">H", r[6:8])[0]
+print(rcode, an, socket.inet_ntoa(r[-4:]) if an else "-")' "$1" "$2" "$PORT"; }
+    check "dns de verdad: <algo>.docker.test, a la direccion" '[ "$(ask blog-php83.docker.test 1)" == "0 1 127.0.0.5" ] && [ "$(ask PMA.Docker.Test 1)" == "0 1 127.0.0.5" ]'
+    check "dns de verdad: IPv6, sin datos (no se queda esperando)" '[ "$(ask blog.docker.test 28)" == "0 0 -" ]'
+    check "dns de verdad: lo demas, rechazado" '[ "$(ask google.com 1)" == "5 0 -" ] && [ "$(ask docker.testing.com 1)" == "5 0 -" ]'
+    kill $DNSP 2> /dev/null
+fi
 exit $fail

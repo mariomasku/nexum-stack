@@ -4,6 +4,74 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.15 · 30 oct 2026
+
+- **Instalar una versión de PHP:** un repositorio roto de otro programa (un PPA sin versión para tu Ubuntu, una clave caducada como la de Warp) ya no impide instalarla. Solo se instalan las librerías que faltan (si están todas, ni se llama a apt); si apt-get update no puede leer algún repositorio, se dice cuál y se sigue con las listas que ya había. Solo se para si de verdad falta un paquete, y entonces dice qué repositorio arreglar.
+- **Ventana:** al buscar los parches nuevos se quedaba dando vueltas a toda CPU (un núcleo entero) y, al cerrarla, su proceso seguía en marcha; con cada vez que se abría se sumaba otro. Ya no: al actualizar, cierra las que tengas abiertas y vuelve a abrirla.
+
+## 1.56.14 · 30 oct 2026
+
+- **Descargar una BBDD:** ya no falla («Unable to lock ibdata1») si la MariaDB de esa versión la tiene en marcha Docker (sin red). Se usa esa MariaDB en lugar de arrancar otra sobre los mismos datos, y al terminar sigue en marcha para Docker. Lo mismo al copiar una BBDD a otra versión.
+- **Visor de arriba:** sin el botón Encendidos. Al pulsar Apache o MariaDB se abren sus servicios (lo que antes salía en la flecha), con «Parar y desactivar» o «Arrancar» la versión entera arriba.
+- **Bases de datos:** «Subir o actualizar una BBDD» va antes de la tabla, más compacto (el fichero, la BBDD de destino, el proyecto y Cargar en columnas) y en un visor un poco hundido.
+- **Configuración:** a la izquierda, una columna con sus apartados (Parches nuevos, Vhosts y hosts, Correo de pruebas, Docker, GitHub, Carpetas…); a la derecha, solo lo que se puede cambiar del elegido.
+
+## 1.56.13 · 30 oct 2026
+
+- **Nuevo proyecto:** en el paso 1, el repositorio se elige de los de GitHub (los de la pestaña Repositorios, escribiendo parte de su nombre): se rellenan solos su dirección SSH y su carpeta. Se puede seguir escribiendo la dirección de otro. Un paso 4 pregunta si falsear su dominio de producción (ya puesto si el repositorio tiene su web en GitHub): al terminar de montarlo, se falsea como en Dominios y hosts.
+- **Terminal:** el mismo hueco arriba que abajo de su caja.
+
+## 1.56.12 · 30 oct 2026
+
+- **Terminal abajo de la ventana:** el botón Terminal de arriba (en lugar de Localhost) la enseña y la esconde. Con el aspecto del visor, un poco hundida; es la de la Terminal de GNOME (VTE), con tu shell, en la carpeta del proyecto cargado («Proyecto cargado» vuelve a ella; el borde se arrastra para cambiar su alto). Al esconderla sigue abierta. Si falta VTE, dice cómo ponerla: sudo apt install gir1.2-vte-2.91.
+
+## 1.56.11 · 30 oct 2026
+
+- **Pestaña Docker:** el puente hasta la BBDD de LAMPP en vivo sale con su nombre («Puente a la BBDD de lampp-8.4 (en vivo)»), dice qué proyectos lo usan y se puede parar o arrancar (antes salía como «(sin proyecto)» y sin botones). La MariaDB común de Docker ya no cuenta como usada por los proyectos que van en vivo con LAMPP.
+- **Repositorios:** detrás de «Clonar» o «Traer cambios», el logotipo de GitHub abre el repositorio en GitHub (sus cambios, ramas y pull requests). La carpeta de los ya clonados va debajo del nombre, y así todos los botones quedan a la misma altura.
+
+## 1.56.10 · 30 oct 2026
+
+- Docker con la BBDD de LAMPP en vivo (WordPress): un proyecto de Docker puede usar la BBDD de cualquier versión de PHP de LAMPP, la misma que web.local, sin copias: lo que cambias en un lado se ve en el otro. Si la MariaDB de esa versión no está en marcha, se arranca solo ella, sin red (no choca con la de la versión activa); se para sola cuando ningún proyecto de Docker la usa, y al activar esa versión en LAMPP pasa a la de siempre. Se elige al montar el proyecto en Docker («Cómo: en vivo») o después, en su fila de la pestaña Docker. Las tiendas PrestaShop siguen con su copia: guardan su dominio en la BBDD y una misma BBDD no puede servir a web.local y a Docker a la vez. En la terminal: docker-bd <proyecto> lampp <versión> | docker.
+
+## 1.56.9 · 30 oct 2026
+
+- **Docker:** las imágenes y enlaces que un WordPress guardó trabajando con LAMPP (https://web.local/wp-content/…, o su dominio propio) salen del contenedor: antes se pedían a LAMPP y, sin él en marcha o con otro proyecto en web.local, no se veían. La BBDD no se toca: se cambian en lo que devuelve la web (también escapadas, como las de Elementor). Los proyectos de antes se arreglan al arrancarlos.
+- **Configuración, GitHub:** la organización o cuenta se puede escribir también como su dirección (https://github.com/hexer-dev) o con @, se comprueba que existe, y si no vale se dice en una ventana y lo escrito se queda (antes volvía la de antes sin decir nada).
+
+## 1.56.8 · 29 oct 2026
+
+- Los proyectos de Docker sin visitas se paran solos (Configuración, Docker): uno que lleva las horas elegidas (3 de partida; de 1 a 24, o nunca) sin ninguna visita, tampoco por el túnel, se para, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker). Se mira cada 15 minutos, también con la ventana cerrada (un temporizador de systemctl --user). Al entrar en un proyecto parado, su web lo dice en vez de dar un error. En la terminal: docker-reposo.
+- **Pestaña Repositorios (como DevHub):** los repositorios de la organización o cuenta de GitHub que se elija en Configuración, solo los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se pueden añadir otros, como los de Shopify) o todos, con un buscador. «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos. Si ya está clonado en un proyecto, se pregunta si aplastarlo: se traen sus cambios con git pull y, si chocan con los tuyos, no se toca nada y se dice. La lista se lee con un token de GitHub (se guarda en el llavero de la sesión, no en un fichero) o con la sesión de gh, y la de la última vez sale al momento. En la terminal: github, github-conectar, repos y repo-traer.
+- **Parches nuevos (Configuración):** lo que tiene un parche publicado en cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin), en las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub, sin descargar nada), Mailpit y cloudflared, con «Actualizar todo». Se busca al abrir la ventana cuando toca buscar una versión nueva del programa y, si hay algo, se ofrece actualizarlo. Las MariaDB comunes de Docker se ponen al día solas al cambiar de parche. En la terminal: componentes y componentes-actualizar.
+- **Correo de pruebas (Configuración):** sus tres tarjetas en una fila.
+- **Configuración, Túnel de Cloudflare:** cloudflared y el registro, juntos en una fila, y el túnel abierto debajo, a lo ancho (antes cada uno quedaba suelto).
+
+## 1.56.7 · 29 oct 2026
+
+- **Túnel de Cloudflare:** cuánto dura y si se bloquea el admin se eligen al pulsar «Compartir», para ese proyecto y ese túnel. Cada túnel lleva una contraseña nueva al azar (se ve al abrirlo, para copiarla); la de un túnel no vale para el siguiente. Configuración, Túnel de Cloudflare deja solo cloudflared, el túnel abierto y su registro. En la terminal: tunel-abrir <dirección> [carpeta] [--horas 1-12] [--admin bloquear|permitir]; ya no hay tunel-config.
+- Menos memoria con varios proyectos de Docker a la vez: el PHP de cada contenedor abre sus procesos al llegar peticiones y los cierra a los 20 s sin trabajo (un proyecto en marcha sin usar pasa de unos 190 MB a unos 11 MB). Los de antes se ponen al día solos al arrancarlos. El Apache de Docker espera con un proceso, no con tres.
+- El consumo de arriba no lee nada con la ventana minimizada, y lee menos cada vez (lo que no cambia de cada proceso, una sola vez).
+
+## 1.56.6 · 28 oct 2026
+
+- **Imágenes de producción:** «Guardar» funciona también con el dominio que ya estaba guardado (antes solo se podía quitar o cancelar). Así se vuelve a aplicar, también en el Apache de Docker.
+
+## 1.56.5 · 28 oct 2026
+
+- **Imágenes de producción también en Docker:** en un WordPress del Apache de Docker, lo que falte de wp-content/uploads se pide a su web real (con el mismo dominio que con LAMPP: «Imágenes de producción…» vale para los dos). En una tienda, «Descargar las imágenes que faltan» usa la BBDD de Docker si no está en la versión activa (su dominio de producción se guarda al pasarla a Docker; si no se sabe, se pide). Botón «Imágenes de producción…» en el visor de Docker.
+
+## 1.56.4 · 28 oct 2026
+
+- **Configuración más clara:** cada ajuste en su tarjeta, de dos en dos (como los visores de las otras pestañas), con su explicación entera y sus botones en la tarjeta. Docker junta la dirección y los dos puertos en una sola; lo que va solo (la barrera entre webs, los botones del visor, el túnel abierto) va a lo ancho.
+- **Botones del proyecto:** el configurador va en horizontal (la lista a la izquierda; el estilo, el tamaño y la vista previa a la derecha), y cabe en la pantalla de un portátil: el botón Guardar ya no se queda fuera.
+
+## 1.56.3 · 28 oct 2026
+
+- **Proyecto nuevo desde un repositorio privado:** si su dirección https de GitHub, GitLab o Bitbucket no se puede clonar (pide usuario y contraseña), se prueba sola la misma por SSH (git@github.com:usuario/repositorio.git), con tu clave. Con otros servidores, como siempre: su dirección SSH a mano.
+- DNS de *.docker.test (Configuración, Docker, «Activar»): un DNS mínimo, solo en este equipo, que contesta a cualquier <algo>.docker.test. Los proyectos del Apache de Docker pasan a .docker.test (su configuración, el dominio de las tiendas en su BBDD y el certificado) y dejan de ir en `/etc/hosts`: añadir proyectos o versiones de Docker ya no pide la contraseña por los dominios. web.local, los proyectos de siempre y los dominios falseados de las tiendas no cambian (siguen en `/etc/hosts`, que se mira antes). Si el DNS no contesta al activarlo, se quita y todo sigue como estaba. .local es de mDNS (Bonjour, Avahi): un DNS para *.docker.local no se consultaría nunca. En la terminal: docker-web dns activar|quitar.
+- El certificado del Apache de Docker vale para *.docker.local y *.docker.test.
+
 ## 1.56.2 · 27 oct 2026
 
 - **Botones del proyecto:** «Solo el icono» y «Icono y nombre» son cuadrados, del tamaño que elijas con un deslizador (sin nombre, igual de alto que de ancho: desde pequeños hasta grandes), con una vista previa en el diálogo. Desmontar, ⋮, «Versiones de PHP…» y Arrancar o Parar van con el mismo estilo y el mismo tamaño que los demás.

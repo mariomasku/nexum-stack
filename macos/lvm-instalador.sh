@@ -68,6 +68,27 @@
 #       Vuelve a compilar una version con la ultima pila de su rama (y, en la 7.4, 8.0 y 8.1, con
 #       el parche de seguridad contra PHP2Shell; tambien XAMPP-7.4.33, XAMPP-8.0.30 y XAMPP-8.1.34)
 #
+#   lvm-instalador github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
+#   lvm-instalador github-conectar [--gh] | github-desconectar
+#   lvm-instalador repos [--todos] [--cache] | repo-traer <dueño/repo> [--actualizar]
+#       Repositorios de GitHub (pestaña Repositorios): los de una organizacion o cuenta (los de sus
+#       prefijos, o --todos), leidos con un token (por la entrada; se guarda en el llavero) o con la
+#       sesion de gh. repo-traer lo clona por SSH en htdocs o, si ya esta, trae sus cambios (git pull)
+#
+#   lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar
+#       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
+#       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
+#
+#   lvm-instalador docker-bd <nombre> lampp <version> | docker
+#       Un WordPress de Docker con la BBDD de esa version XAMPP-X en vivo, la misma que web.local (sin
+#       copias; su MariaDB se arranca sola en otro puerto si no esta en marcha). docker: vuelve a su
+#       copia en la MariaDB comun de Docker. Al crearlo: docker-nuevo ... --bd <base> --desde <v> --en-vivo
+#
+#   lvm-instalador componentes | componentes-actualizar
+#       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
+#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
+#       ponerlo todo al dia
+#
 #   lvm-instalador pasar-version <origen> <destino>
 #       Tras instalar el parche nuevo a su lado: copia a la nueva las BBDD de la anterior, con sus
 #       vinculos, y la activa si la anterior era la activa (la anterior no se toca)
@@ -242,18 +263,21 @@
 #   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
 #   lvm-instalador docker-pasar <nombre>
 #   lvm-instalador docker-parar-todo
-#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
+#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.40): no necesitan XAMPP-X y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
 #       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
 #       Su BBDD va en una MariaDB comun por version y phpMyAdmin en https://pma.docker.local.
 #       docker-pasar lleva al Apache de Docker un proyecto de antes (con XAMPP-X delante). docker-web:
-#       su direccion y sus puertos (127.0.0.2, 80 y 443) y dar de alta esa direccion en este Mac
-#   lvm-instalador tunel-abrir <direccion local> [carpeta] | tunel-cerrar | tunel | tunel-instalar
-#   lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir
+#       su direccion y sus puertos (127.0.0.2, 80 y 443) y dar de alta esa direccion en este Mac. dns
+#       activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test y dejan de ir en
+#       /etc/hosts; web.local y lo demas, igual)
+#   lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
+#   lvm-instalador tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
-#       direccion https://<algo>.trycloudflare.com, con contraseña, el admin bloqueado y que se
-#       cierra solo (2 h). La web no se toca: el dominio local se cambia por el del tunel al pasar
+#       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
+#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice). La web no se toca: el
+#       dominio local se cambia por el del tunel al pasar
 #   lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   lvm-instalador docker-php <nombre> <version de PHP>
 #   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
@@ -2070,7 +2094,7 @@ if [ -z "$TEST_DIR" ]; then
     unset LVM_HTDOCS LVM_VHOSTS LVM_VHOSTS_ACTIVO LVM_SSL_CERTS LVM_SSL_KEYS LVM_HOSTS LVM_BD_CLIENTE \
         LVM_BD_VOLCADO LVM_ENLACE LVM_PS LVM_PRUEBA_CAS LVM_PRUEBA_CLAVES LVM_PRUEBA_SSL LVM_DOCKER LVM_DOCKER_DIR \
         LVM_DOCKER_HOST LVM_MAILPIT_URL LVM_MAILPIT_SHA LVM_CLOUDFLARED_URL LVM_CLOUDFLARED_SHA LVM_LOOPBACK_PLIST \
-        LVM_LO0_FILE
+        LVM_LO0_FILE LVM_DNS_SCRIPT LVM_DNS_PLIST LVM_DNS_RESOLVER
 fi
 # Las versiones (XAMPP-X.Y.Z) y XAMPP-compartido van en /Library/Nexum, de root: en /Applications
 # puede escribir el grupo admin (tu usuario), y un programa tuyo podria cambiar una carpeta por otra
@@ -2111,7 +2135,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.0"
+APP_VERSION="1.40.2"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -3204,11 +3228,15 @@ function use_version() {
         sin-arreglo) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell y no tiene arreglo: usala solo con proyectos de confianza." ;;
     esac
 
+    local before
+    before=$(active_dir)
     [ -L "$LINK" ] && run xampp_ctl stop
     [ -L "$LINK" ] && run $SUDO rm "$LINK"
     # Lo que no se haya cerrado al parar (de esta version o de otras anteriores) no puede seguir en
     # memoria al montar la nueva
     close_processes --todos
+    # (la BBDD de la que se deja, si la usa en vivo un proyecto de Docker: su MariaDB sigue, en otro puerto)
+    [ -n "$before" ] && [ "$before" != "$dir" ] && lampp_bd_keep "$before"
     # Solo para este Mac (lo que falte), antes de arrancarla; tambien las demas versiones. Si no se
     # puede, no se arranca
     secure_all
@@ -3225,7 +3253,9 @@ function use_version() {
         echo "$LINK no es el enlace a $dir (algo lo ha cambiado): no se arranca."
         return 1
     fi
+    lampp_bd_handover "$dir"
     run xampp_ctl start
+    lampp_bd_retarget "$dir"
     # MariaDB: sin usuarios anonimos ni permisos de cualquiera en las bases test
     [ "$DRY" -eq 0 ] && wait_mariadb && secure_mariadb
     # (el correo de pruebas va con la version)
@@ -3247,8 +3277,10 @@ function use_version() {
 # Sin sudo, macOS no enseña la orden completa de los procesos de otros usuarios (root): por eso la
 # lista para cerrar se hace con sudo. (LVM_PS solo para pruebas: fichero con la salida de ps)
 
-# P|pid|padre|usuario|version|sobra (1/0)|nombre. Sobran los que no son de la version montada (todos
-# si no hay ninguna). Con --sudo, ps con sudo (orden completa de todos los procesos).
+# P|pid|padre|usuario|version|sobra (1/0)|nombre|de Docker (1/0). Sobran los que no son de la version
+# montada (todos si no hay ninguna), salvo la MariaDB de una version que usa en vivo un proyecto de
+# Docker (en su puerto, apuntada en LAMPP_BD_MARK_DIR): esa no se cierra ni al parar XAMPP-X. Con
+# --sudo, ps con sudo (orden completa de todos los procesos).
 function lampp_processes() {
     local out ids=""
     # ids: solo los numeros (sin la orden, que la elige cada proceso y puede llevar saltos de linea
@@ -3263,9 +3295,10 @@ function lampp_processes() {
         out=$(ps -axww -o pid=,ppid=,user=,lstart=,command=)
     fi
     # (con las carpetas donde puede haber versiones: BASE_DIR y, de antes de la 1.39.3, /Applications)
-    LVM_PS_IDS=$ids LVM_PS_OUT=$out python3 -I - "$LINK" "$BASE_DIR" "$APPS_DIR" "$LEGACY_DIR" <<'EOF'
+    LVM_PS_IDS=$ids LVM_PS_OUT=$out LVM_BD_MARCAS=$LAMPP_BD_MARK_DIR python3 -I - "$LINK" "$BASE_DIR" "$APPS_DIR" "$LEGACY_DIR" <<'EOF'
 import glob, os, re, sys, time
 link, base = sys.argv[1:3]
+marks = os.environ.get("LVM_BD_MARCAS", "")
 bases = []
 for b in [base] + sys.argv[3:]:
     if b and b not in bases:
@@ -3389,8 +3422,17 @@ for pid in sorted(lampp):
     v = version(pid)
     # El XAMPP oficial en su sitio (sin apartar) no sobra: es el que esta en uso
     extra = v != active and not (v == "oficial" and official)
-    print("P|%d|%d|%s|%s|%d|%s" % (pid, p["ppid"], clean(p["user"]), clean(v), int(extra),
-                                   clean(name_of(p["cmd"]))))
+    # La MariaDB que usa Docker: en el puerto apuntado para su version
+    port = ""
+    if marks and v not in ("", "?", "oficial"):
+        try:
+            port = open(os.path.join(marks, v)).read(10).strip()
+        except OSError:
+            port = ""
+    for_docker = (name_of(p["cmd"]) in ("mariadbd", "mysqld") and port.isdigit()
+                  and ("--port=%s" % port) in p["cmd"].split())
+    print("P|%d|%d|%s|%s|%d|%s|%d" % (pid, p["ppid"], clean(p["user"]), clean(v), int(extra and not for_docker),
+                                      clean(name_of(p["cmd"])), int(for_docker)))
 EOF
 }
 
@@ -3415,7 +3457,7 @@ function stray_summary() {
 function close_processes() {
     local all=$1 list pids wait
     function _stray() {
-        lampp_processes --sudo | awk -F'|' -v all="$all" '$6 == 1 || all == "--todos"'
+        lampp_processes --sudo | awk -F'|' -v all="$all" '$8 != 1 && ($6 == 1 || all == "--todos")'
     }
     list=$(_stray)
     [ -z "$list" ] && return 0
@@ -3972,6 +4014,324 @@ EOF
     echo "Proyecto $folder borrado"
 }
 
+# ===========================================================================
+# Repositorios de GitHub (pestaña Repositorios)
+# ===========================================================================
+# Los repositorios de una organizacion o cuenta de GitHub, para clonarlos por SSH en htdocs (o, si ya
+# estan, traer sus cambios con git pull). Como DevHub: un token de GitHub (o la sesion de gh) solo para
+# leer la lista, y los prefijos de los nombres que se ven (dob-wordpress-, dob-prestashop-...). El token
+# va en el Llavero, no en un fichero; GITHUB_CONF_FILE (solo tuyo) lleva:
+#   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
+#   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
+#   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
+GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
+GITHUB_KEYRING_SERVICE=nexum-dev-stack
+GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
+
+function github_conf() {
+    local v="" p ok=""
+    [ -f "$GITHUB_CONF_FILE" ] && v=$(sed -n "s/^$1=//p" "$GITHUB_CONF_FILE" | head -1)
+    case $1 in
+        CUENTA) [[ "$v" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || v="" ;;
+        ORIGEN) [[ "$v" =~ ^(llavero|gh)$ ]] || v="" ;;
+        PREFIJOS)
+            grep -q '^PREFIJOS=' "$GITHUB_CONF_FILE" 2> /dev/null || v=$GITHUB_DEFAULT_PREFIXES
+            for p in $v; do [[ "$p" =~ ^[A-Za-z0-9._-]{1,50}$ ]] && ok+=" $p"; done
+            v=${ok# } ;;
+    esac
+    echo "$v"
+}
+
+# github_conf_set <clave> <valor>
+function github_conf_set() {
+    local tmp
+    mkdir -p -m 700 "$(dirname "$GITHUB_CONF_FILE")" || return 1
+    tmp=$(mktemp "$GITHUB_CONF_FILE.XXXXXX") || return 1
+    { grep -v "^$1=" "$GITHUB_CONF_FILE" 2> /dev/null; printf '%s=%s\n' "$1" "$2"; } > "$tmp" && chmod 600 "$tmp" \
+        && mv -f "$tmp" "$GITHUB_CONF_FILE"
+}
+
+# El token con el que se lee la lista (nada si no hay)
+function github_token() {
+    case $(github_conf ORIGEN) in
+        llavero) security find-generic-password -s "$GITHUB_KEYRING_SERVICE" -a github -w 2> /dev/null ;;
+        gh) command -v gh > /dev/null && gh_token ;;
+    esac
+}
+
+# El token de la sesion de gh, sin esperar mas de 15 s (con el llavero bloqueado o sin el, gh se queda
+# esperandolo)
+function gh_token() {
+    local out pid
+    out=$(mktemp "${TMPDIR:-/tmp}/lvm-gh.XXXXXX") || return 1
+    gh auth token > "$out" 2> /dev/null < /dev/null &
+    pid=$!
+    ( sleep 15; kill $pid 2> /dev/null ) &
+    wait $pid 2> /dev/null
+    kill $! 2> /dev/null
+    cat "$out"
+    rm -f "$out"
+}
+
+# GET a la API de GitHub: github_api <ruta o direccion> [fichero para las cabeceras]. El token, por la
+# entrada de curl (-K -): en la linea de ordenes se veria con ps
+function github_api() {
+    local url=$1 hdr=${2:-/dev/null} token
+    token=$(github_token)
+    [ -n "$token" ] || return 2
+    [[ "$url" == https://api.github.com/* ]] || url=https://api.github.com$url
+    printf 'header = "Authorization: Bearer %s"\n' "$token" | curl -q --proto =https --proto-redir =https -fsS --max-time 30 -K - \
+        -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "User-Agent: nexum-dev-stack" \
+        -D "$hdr" "$url"
+}
+
+# github-conectar [--gh]: con el token que llega por la entrada (una linea), o con la sesion de gh.
+# Se comprueba con GitHub antes de guardarlo
+function github_connect() {
+    local token login
+    if [ "$1" == --gh ]; then
+        command -v gh > /dev/null && token=$(gh_token)
+        [ -n "$token" ] || { echo "No hay sesión de gh (gh auth login) en este equipo"; return 1; }
+    else
+        IFS= read -r token
+        token=${token//[[:space:]]/}
+        [[ "$token" =~ ^[A-Za-z0-9_]{20,255}$ ]] || { echo "Eso no parece un token de GitHub (ghp_…, github_pat_…)"; return 1; }
+    fi
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se comprobaria el token con GitHub y se guardaria en el Llavero"; return 0; }
+    login=$(printf 'header = "Authorization: Bearer %s"\n' "$token" | curl -q --proto =https -fsS --max-time 30 -K - \
+        -H "Accept: application/vnd.github+json" -H "User-Agent: nexum-dev-stack" https://api.github.com/user 2> /dev/null \
+        | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+    [ -n "$login" ] || { echo "GitHub no acepta ese token (¿caducado o sin permiso?)"; return 1; }
+    if [ "$1" == --gh ]; then
+        github_conf_set ORIGEN gh || return 1
+    else
+    # (al Llavero por la entrada de security: en la linea de ordenes se veria con ps)
+    printf 'add-generic-password -U -a github -s %s -l "Nexum Dev Stack (GitHub)" -w %s\n' "$GITHUB_KEYRING_SERVICE" "$token" \
+        | security -i > /dev/null 2>&1 || { echo "No se ha podido guardar el token en el Llavero"; return 1; }
+        github_conf_set ORIGEN llavero || return 1
+    fi
+    [ -n "$(github_conf CUENTA)" ] || github_conf_set CUENTA "$login"
+    echo "Conectado a GitHub como $login"
+}
+
+function github_disconnect() {
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token de el Llavero"; return 0; }
+    security delete-generic-password -s "$GITHUB_KEYRING_SERVICE" -a github > /dev/null 2>&1
+    github_conf_set ORIGEN ""
+    echo "Desconectado de GitHub (el token ya no está en el Llavero)"
+}
+
+# github [estado]: G|conectado (1/0)|usuario|origen|cuenta|prefijos
+# github cuenta <organizacion o cuenta> | prefijos "<p1> <p2>..."
+function github_command() {
+    local login=""
+    case $1 in
+        ""|estado)
+            [ -n "$(github_token)" ] && login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+            echo "G|$([ -n "$login" ] && echo 1 || echo 0)|$login|$(github_conf ORIGEN)|$(github_conf CUENTA)|$(github_conf PREFIJOS)" ;;
+        cuenta)
+            # (tambien su direccion de GitHub o con @: https://github.com/hexer-dev, @hexer-dev)
+            local a kind
+            a=$(printf "%s" "$2" | sed "s/^[[:space:]]*//; s/[[:space:]]*$//")
+            a=${a#http://} a=${a#https://} a=${a#www.} a=${a#github.com/} a=${a#@} a=${a%%/*}
+            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como hexer-dev)"; return 1; }
+            # (con la conexion hecha, que exista)
+            if [ -n "$(github_token)" ]; then
+                kind=$(github_api "/users/$a" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
+                [ -n "$kind" ] || { echo "En GitHub no hay ninguna organización ni cuenta $a (o el token no la ve)"; return 1; }
+            fi
+            github_conf_set CUENTA "$a" && echo "Repositorios de $a" ;;
+        prefijos)
+            local p ok=""
+            for p in $2; do
+                [[ "$p" =~ ^[A-Za-z0-9._-]{1,50}$ ]] || { echo "Prefijo no válido: $p (letras sin acentos, números, punto, _ y -)"; return 1; }
+                ok+=" $p"
+            done
+            github_conf_set PREFIJOS "${ok# }" && echo "Prefijos: ${ok# }" ;;
+        *) echo "Uso: lvm-instalador github [estado] | cuenta <nombre> | prefijos \"<p1> <p2>\""; return 1 ;;
+    esac
+}
+
+# Proyectos de htdocs que son un clon de un repositorio de GitHub: "dueño/repositorio carpeta" (en
+# minusculas el nombre, que GitHub no distingue). Su origin, por https o por SSH
+function repo_clones() {
+    python3 -I - "$HTDOCS_DIR" << 'EOF'
+import os, re, sys
+base = sys.argv[1]
+for name in sorted(os.listdir(base)):
+    cfg = os.path.join(base, name, ".git", "config")
+    if os.path.islink(os.path.join(base, name)) or not os.path.isfile(cfg):
+        continue
+    try:
+        text = open(cfg, encoding="utf-8", errors="replace").read(200000)
+    except OSError:
+        continue
+    m = re.search(r'\[remote "origin"\][^\[]*?\burl\s*=\s*(\S+)', text)
+    if not m:
+        continue
+    r = re.match(r"(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*?)(?:\.git)?/?$", m.group(1))
+    if r:
+        print(r.group(1).lower(), name)
+EOF
+}
+
+# repos [--todos] [--cache]: los repositorios de la cuenta (sin los archivados; sin --todos, solo los de
+# los prefijos), los mas recientes primero. Lo que da GitHub se guarda en REPOS_CACHE_FILE (solo tuyo):
+# con --cache, la lista de la ultima vez, sin preguntar a GitHub (al abrir la pestaña, al momento):
+#   C|usuario conectado|cuenta|Organization o User|cuantos|cuantos se ven
+#   R|dueño/repo|nombre|privado (1/0)|ultimo cambio (AAAA-MM-DD)|rama|prefijo|web|descripcion|estado|carpeta
+#     estado: clonado (en la carpeta), ocupado (hay una carpeta con su nombre que no es ese repositorio) o nuevo
+#   E|lo que ha fallado
+REPOS_CACHE_FILE=$HOME/.lvm-instalador/repos-github
+function repos_list() {
+    local account kind login path all="" hdr page=1 url next clones show_all=0 cached=0 a
+    for a in "$@"; do
+        case $a in --todos) show_all=1 ;; --cache) cached=1 ;; esac
+    done
+    account=$(github_conf CUENTA)
+    [ -n "$(github_token)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    [ -n "$account" ] || { echo "E|Falta la organización o cuenta (Configuración, GitHub)"; return 1; }
+    # (la primera linea de la cache: usuario, cuenta y tipo; si es de otra cuenta, no vale)
+    if [ $cached -eq 1 ]; then
+        IFS='|' read -r login a kind < "$REPOS_CACHE_FILE" 2> /dev/null
+        [ -n "$login" ] && [ "${a,,}" == "${account,,}" ] || return 0
+        all=$(tail -n +2 "$REPOS_CACHE_FILE")
+        clones=$(repo_clones)
+        repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
+        return
+    fi
+    login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+    [ -n "$login" ] || { echo "E|GitHub no acepta el token (¿caducado?): conéctalo de nuevo en Configuración"; return 1; }
+    kind=$(github_api "/users/$account" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
+    [ -n "$kind" ] || { echo "E|No existe en GitHub la organización o cuenta $account"; return 1; }
+    if [ "$kind" == Organization ]; then
+        path="/orgs/$account/repos?type=all&sort=pushed&per_page=100"
+    elif [ "${login,,}" == "${account,,}" ]; then
+        # (la tuya: tambien los privados)
+        path="/user/repos?affiliation=owner&sort=pushed&per_page=100"
+    else
+        path="/users/$account/repos?sort=pushed&per_page=100"
+    fi
+    hdr=$(mktemp "${TMPDIR:-/tmp}/lvm-github.XXXXXX") || return 1
+    url=$path
+    while [ -n "$url" ] && [ $page -le 30 ]; do
+        all+=$(github_api "$url" "$hdr") || { rm -f "$hdr"; echo "E|GitHub no ha dado la lista de $account"; return 1; }
+        all+=$'\n'
+        next=$(tr -d '\r' < "$hdr" | sed -n 's/^[Ll]ink: .*<\([^>]*\)>; rel="next".*/\1/p' | head -1)
+        url=$next page=$((page + 1))
+    done
+    rm -f "$hdr"
+    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.nuevo" \
+        && mv -f "$REPOS_CACHE_FILE.nuevo" "$REPOS_CACHE_FILE" )
+    clones=$(repo_clones)
+    repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
+}
+
+# Las filas de repos (C| y R|) de las paginas de GitHub (por la entrada):
+# repos_rows <usuario> <cuenta> <tipo> <todos (1/0)> <clones (repo_clones)>
+function repos_rows() {
+    python3 -I -c '
+import json, os, re, sys
+login, account, kind, prefixes, show_all, base, clones = sys.argv[1:8]
+sys.stdout.reconfigure(errors="replace")
+prefixes = prefixes.split()
+have = dict(l.split(" ", 1) for l in clones.splitlines() if " " in l)
+dec = json.JSONDecoder()
+text, i, repos = sys.stdin.read(), 0, []
+while True:
+    while i < len(text) and text[i].isspace():
+        i += 1
+    if i >= len(text):
+        break
+    page, i = dec.raw_decode(text, i)
+    repos += page
+clean = lambda v: re.sub(r"\s+", " ", re.sub(r"[|\r\n\t]", " ", v or "")).strip()
+rows = []
+for r in repos:
+    if r.get("archived") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*", r.get("full_name", "")):
+        continue
+    if kind != "Organization" and r["owner"]["login"].lower() != account.lower():
+        continue
+    pre = next((p for p in prefixes if r["name"].startswith(p)), "")
+    rows.append((r, pre))
+shown = [x for x in rows if show_all == "1" or not prefixes or x[1]]
+print("C|%s|%s|%s|%d|%d" % (login, account, kind, len(rows), len(shown)))
+for r, pre in shown:
+    name, full = r["name"], r["full_name"]
+    folder = have.get(full.lower(), "")
+    state = "clonado" if folder else ("ocupado" if os.path.lexists(os.path.join(base, name)) else "nuevo")
+    print("R|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % (full, name, 1 if r.get("private") else 0, (r.get("pushed_at") or "")[:10],
+          clean(r.get("default_branch")), pre, clean(r.get("homepage")), clean(r.get("description"))[:300], state, folder or (name if state == "ocupado" else "")))
+' "$1" "$2" "$3" "$(github_conf PREFIJOS)" "$4" "$HTDOCS_DIR" "$5"
+}
+
+# repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
+# su nombre. Si ya esta clonado en un proyecto, lo dice (EXISTE|carpeta, y sale con 3) y, con
+# --actualizar, trae sus cambios con git pull (si chocan con los tuyos, no se toca nada y se dice)
+function repo_fetch() {
+    local full=$1 name dir folder known ssh_url branch origin
+    [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
+    command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
+    name=${full#*/} ssh_url="git@github.com:$full.git"
+    folder=$(repo_clones | awk -v r="${full,,}" '$1 == r { print $2; exit }')
+    known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
+    printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
+    if [ -n "$folder" ]; then
+        dir=$HTDOCS_DIR/$folder
+        if [ "$2" != --actualizar ]; then
+            rm -f "$known"
+            echo "EXISTE|$folder"
+            echo "$full ya está clonado en $dir"
+            return 3
+        fi
+        echo "$full: se traen sus cambios a $dir (git pull)"
+        [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git pull en $dir"; return 0; }
+        branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { rm -f "$known"; echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
+        origin=$(git -C "$dir" config --get remote.origin.url)
+        # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
+        local from=() up
+        if [[ "$origin" == https://* ]]; then
+            up=$(git -C "$dir" config --get "branch.$branch.merge")
+            from=("$ssh_url" "${up#refs/heads/}")
+            [ -n "${from[1]}" ] || from[1]=$branch
+        fi
+        # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
+        if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+                GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+                no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
+                -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
+            [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+            rm -f "$known"
+            echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir."
+            echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
+            return 1
+        fi
+        rm -f "$known"
+        echo "$folder, al día con GitHub (rama $branch)"
+        return 0
+    fi
+    dir=$HTDOCS_DIR/$name
+    if [ -e "$dir" ] || [ -L "$dir" ]; then
+        rm -f "$known"
+        echo "Ya hay una carpeta $name en $HTDOCS_DIR que no es un clon de $full: muévela o renómbrala antes"
+        return 1
+    fi
+    [ -w "$HTDOCS_DIR" ] || { rm -f "$known"; echo "No puedes escribir en $HTDOCS_DIR: el proyecto se clona con tu usuario, sin sudo"; return 1; }
+    echo "Clonando $full por SSH en $dir..."
+    [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git clone $ssh_url $dir"; return 0; }
+    if ! repo_clone "$ssh_url" "$dir" "$known"; then
+        rm -f "$known"
+        echo "No se ha podido clonar: hace falta tu clave SSH configurada en GitHub (ssh -T git@github.com lo comprueba)"
+        return 1
+    fi
+    rm -f "$known"
+    htdocs_close_world "$dir"
+    # (como los de Montar nuevo proyecto: el dominio de su base no se falsea solo)
+    mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
+        || printf '%s\n' "$name" >> "$REPO_PROJECTS_FILE"; }
+    echo "Listo: $name está en Proyectos (cárgalo con su versión de PHP y su BBDD)"
+}
+
 # ¿Direccion de un repositorio que se puede clonar? Solo https:// o ssh (git@servidor:ruta o
 # ssh://git@servidor/ruta), con servidor y ruta sin caracteres raros ni un - al principio (git los
 # tomaria como opciones). Nada de file://, ext:: ni rutas locales
@@ -3986,6 +4346,29 @@ function git_url_ok() {
 # si se indica, carga en ella el volcado (con la carga protegida de importar-bd). El clon va con tu
 # usuario (sin sudo), sin submodulos ni ganchos y solo por https o ssh; sin preguntas: un
 # repositorio privado por https falla (se usa la direccion SSH con tu clave)
+# Clona un repositorio con tu usuario: repo_clone <direccion> <carpeta> <known_hosts de mas>. Sin
+# terminal (git y ssh leen tu configuracion: no pueden usar el permiso de sudo recordado ni quedarse
+# leyendola) y sin git-lfs (su .lfsconfig llevaria las descargas a otro servidor)
+function repo_clone() {
+    local url=$1 dest=$2 known=$3
+    GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+        GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+        no_tty git -c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always \
+            -c core.hooksPath=/dev/null -c credential.helper= \
+            -c filter.lfs.process= -c filter.lfs.smudge= -c filter.lfs.required=false \
+            clone --no-recurse-submodules -- "$url" "$dest"
+}
+
+# La direccion SSH de una https de GitHub, GitLab o Bitbucket (https://github.com/usuario/repo(.git) ->
+# git@github.com:usuario/repo.git; en GitLab, tambien con subgrupos). Nada si es de otro servidor
+function repo_ssh_url() {
+    [[ "$1" =~ ^https://(github\.com|gitlab\.com|bitbucket\.org)/([A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+)/?$ ]] || return 1
+    local host=${BASH_REMATCH[1]} path=${BASH_REMATCH[2]}
+    path=${path%.git}
+    [[ "$path" == */* ]] && [[ "$path" != *..* ]] || return 1
+    echo "git@$host:$path.git"
+}
+
 function mount_project() {
     local url=$1 folder=$2 version=$3 db=$4 file=$5 dest dir owner
     if [ -z "$url" ] || [ -z "$folder" ] || [ -z "$version" ] || [ -z "$db" ]; then
@@ -4054,17 +4437,20 @@ function mount_project() {
     # (en /tmp y no en $TMPDIR, que viene de la sesion: va entre comillas en GIT_SSH_COMMAND)
     known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
     printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
-    # Sin terminal (git y ssh leen tu configuracion: no pueden usar el permiso de sudo recordado ni
-    # quedarse leyendola) y sin git-lfs (su .lfsconfig llevaria las descargas a otro servidor)
-    if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
-        GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
-        no_tty git -c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always \
-            -c core.hooksPath=/dev/null -c credential.helper= \
-            -c filter.lfs.process= -c filter.lfs.smudge= -c filter.lfs.required=false \
-            clone --no-recurse-submodules -- "$url" "$dest"; then
+    # Un repositorio privado de GitHub, GitLab o Bitbucket por https no se puede clonar sin preguntar
+    # usuario y contraseña (y aqui no se preguntan): se prueba solo la misma direccion por SSH, con tu
+    # clave. Solo con esos tres, cuyas claves de servidor van en GIT_KNOWN_HOSTS
+    local ssh_url ok=0
+    if repo_clone "$url" "$dest" "$known"; then
+        ok=1
+    elif ssh_url=$(repo_ssh_url "$url") && [ ! -e "$dest" ]; then
+        echo "Por https no se puede (¿repositorio privado?): se prueba por SSH, $ssh_url"
+        repo_clone "$ssh_url" "$dest" "$known" && ok=1
+    fi
+    if [ $ok -eq 0 ]; then
         rm -f "$known"
-        echo "No se ha podido clonar el repositorio. Si es privado, usa su direccion SSH"
-        echo "(git@github.com:usuario/repositorio.git) con tu clave SSH ya configurada en GitHub."
+        echo "No se ha podido clonar el repositorio. Si es privado, hace falta tu clave SSH ya configurada"
+        echo "en GitHub, GitLab o Bitbucket (su direccion SSH es git@github.com:usuario/repositorio.git)."
         echo "Si es por SSH a un servidor que no es GitHub, GitLab ni Bitbucket y dice «Host key"
         echo "verification failed», conectate una vez a mano para comprobar y aceptar su clave"
         echo "(ssh -T git@servidor) y vuelve a intentarlo."
@@ -5465,9 +5851,18 @@ function media_project() {
     if [ "$prod" == quitar ]; then
         echo "$folder ya no pide a produccion las imagenes que le faltan"
     else
-        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado)"
+        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado"
+        echo "y, si esta en el Apache de Docker, tambien alli)"
     fi
     media_sync
+    # (en el Apache de Docker, en sus vhosts: se rehacen y se recargan)
+    local p
+    for p in $(docker_web_projects 2> /dev/null); do
+        if [ "$(docker_conf "$p" CARPETA)" == "$folder" ] && [ "$DRY" -eq 0 ]; then
+            docker_web_reload || echo "Aviso: el Apache de Docker no ha recargado su configuracion"
+            break
+        fi
+    done
 }
 
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
@@ -5498,8 +5893,20 @@ function gui_wp_prod() {
     echo "G|$(media_saved "$folder")"
     cfg=$(wp_config_read "$HTDOCS_DIR/$folder/wp-config.php") || return 0
     db=$(sed -n 1p <<< "$cfg") prefix=$(sed -n 4p <<< "$cfg")
-    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] && [ -x "$DB_CLIENT" ] || return 0
-    db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}options" || return 0
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] || return 0
+    if ! { [ -x "$DB_CLIENT" ] && db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}options"; }; then
+        # (sin ella en la version activa: la de su proyecto del Apache de Docker, si lo hay)
+        local p
+        for p in $(docker_web_projects 2> /dev/null); do
+            [ "$(docker_conf "$p" CARPETA)" == "$folder" ] || continue
+            docker_ready || return 0
+            url=$(docker_maria_sql "$(docker_conf "$p" MARIADB)" -N -e "SELECT option_value FROM \`$(docker_conf "$p" BBDD)\`.\`${prefix}options\`
+                WHERE option_name IN ('home', 'siteurl') ORDER BY option_name = 'home' DESC LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
+            url=$(tr 'A-Z' 'a-z' <<< "$url" | sed -E 's|^https?://||; s|[/:?#].*$||')
+            valid_domain "$url" && [[ "$url" != *.local && "$url" != *.test && "$url" != localhost && "$url" != *.localhost ]] && echo "D|$url"
+        done
+        return 0
+    fi
     url=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT option_value FROM \`$db\`.\`${prefix}options\`
         WHERE option_name IN ('home', 'siteurl') ORDER BY option_name = 'home' DESC LIMIT 1" < /dev/null 2> /dev/null)
     url=$(tr 'A-Z' 'a-z' <<< "$url" | sed -E 's|^https?://||; s|[/:?#].*$||')
@@ -5515,9 +5922,9 @@ function gui_wp_prod() {
 # seguir redirecciones y como mucho 30 MB por fichero. Lo que ya esta en local no se toca
 PS_IMAGES_DOH="https://cloudflare-dns.com/dns-query"
 function ps_images() {
-    local folder=${1%/} config db prefix domain t list total
+    local folder=${1%/} domain=$2 config db prefix t list total web="" maria="" p
     if [ -z "$folder" ]; then
-        echo "Uso: lvm-instalador ps-imagenes <carpeta>"
+        echo "Uso: lvm-instalador ps-imagenes <carpeta> [dominio de produccion]"
 
         return 1
     fi
@@ -5527,30 +5934,56 @@ function ps_images() {
     config=$(ps_config "$folder")
     db=${config%%|*} prefix=${config#*|}
     [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "No se puede leer la BBDD de $folder (su parameters.php o settings.inc.php)"; return 1; }
-    db_connect || return $?
-    if ! db_exists "$db"; then
-        echo "La BBDD de $folder ($db) no esta en lampp-$DB_FOLDER, la version activa: carga el proyecto"
-        echo "en su version (o importa su BBDD en esta) y vuelve a intentarlo"
+    # La BBDD con la lista de imagenes: la de la version activa o, si no esta alli, la de su proyecto del
+    # Apache de Docker (las imagenes van a su carpeta img, la misma con LAMPP y con Docker)
+    for p in $(docker_web_projects 2> /dev/null); do
+        [ "$(docker_conf "$p" CARPETA)" == "$folder" ] && web=$p
+    done
+    if { db_connect > /dev/null 2>&1 && db_exists "$db"; } || [ -z "$web" ]; then
+        db_connect || return $?
+        if ! db_exists "$db"; then
+            echo "La BBDD de $folder ($db) no esta en lampp-$DB_FOLDER, la version activa: carga el proyecto"
+            echo "en su version (o importa su BBDD en esta) y vuelve a intentarlo"
+
+            return 1
+        fi
+        [ -n "$domain" ] || domain=$(ps_domain "$folder")
+    else
+        db=$(docker_conf "$web" BBDD) maria=$(docker_conf "$web" MARIADB)
+        db_valid_name "$db" > /dev/null || { echo "$web no tiene una BBDD valida en su proyecto.conf"; return 1; }
+        docker_ready || { echo "Docker no esta en marcha: arrancalo y vuelve a intentarlo"; return 1; }
+        docker_maria_up "$maria" > /dev/null || { echo "La MariaDB $maria de Docker no responde"; return 1; }
+        echo "Con la BBDD de la tienda en Docker ($db, MariaDB $maria)"
+        [ -n "$domain" ] || domain=$(docker_conf "$web" PRODUCCION)
+    fi
+    domain=$(tr 'A-Z' 'a-z' <<< "$domain")
+    domain=${domain#https://} domain=${domain#http://} domain=${domain%/}
+    if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == *.test || "$domain" == localhost || "$domain" == *.localhost ]]; then
+        echo "No se sabe el dominio de produccion de $folder: ${domain:-ninguno}. Dilo tu:"
+        echo "lvm-instalador ps-imagenes $folder <dominio de produccion>"
 
         return 1
     fi
-    domain=$(ps_domain "$folder")
-    if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == localhost || "$domain" == *.localhost ]]; then
-        echo "No se sabe el dominio de produccion de $folder (el de su tabla ${prefix}shop_url): ${domain:-ninguno}"
-
-        return 1
-    fi
+    # (en Docker, preguntas a su MariaDB comun; las dos, solo tablas de verdad)
+    tbl() {
+        if [ -n "$maria" ]; then
+            [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$db' AND table_name = '$1' AND table_type = 'BASE TABLE'" < /dev/null 2> /dev/null | tr -d '\r')" == 1 ]
+        else
+            db_base_table root "${MYSQL_PWD:-}" "$db" "$1"
+        fi
+    }
     # (solo tablas de verdad: una vista del volcado ejecutaria sus funciones como root)
     for t in image image_type; do
-        db_base_table root "${MYSQL_PWD:-}" "$db" "$prefix$t" || { echo "La BBDD $db no tiene la tabla $prefix$t"; return 1; }
+        tbl "$prefix$t" || { echo "La BBDD $db no tiene la tabla $prefix$t"; return 1; }
     done
     local sql=(db_root_sql -N -B)
+    [ -n "$maria" ] && sql=(docker_maria_sql "$maria" -N -B)
     list=$( {
         "${sql[@]}" -e "SELECT 'I', id_image FROM \`$db\`.\`${prefix}image\`" < /dev/null
         "${sql[@]}" -e "SELECT 'T', name, products, categories, manufacturers FROM \`$db\`.\`${prefix}image_type\`" < /dev/null
-        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}category" \
+        tbl "${prefix}category" \
             && "${sql[@]}" -e "SELECT 'C', id_category FROM \`$db\`.\`${prefix}category\` WHERE id_category > 2" < /dev/null
-        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}manufacturer" \
+        tbl "${prefix}manufacturer" \
             && "${sql[@]}" -e "SELECT 'M', id_manufacturer FROM \`$db\`.\`${prefix}manufacturer\`" < /dev/null
     } 2> /dev/null | python3 -I -c '
 import os, re, sys
@@ -12760,11 +13193,29 @@ with zipfile.ZipFile(sys.stdout.buffer, "w", zipfile.ZIP_DEFLATED) as z:
 # MariaDB temporal de una version que no esta en marcha: sin red, sin comprobar usuarios
 # (--skip-grant-tables: solo se llega por un socket en una carpeta temporal). Deja el socket en
 # DB_TMP_SOCK; db_temp_stop lo para.
+# ¿Responde un MariaDB en ese socket? db_socket_alive <socket>
+function db_socket_alive() {
+    python3 -I -c 'import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(2)
+try:
+    s.connect(sys.argv[1])
+except OSError:
+    sys.exit(1)' "$1" 2> /dev/null
+}
+
 DB_TMP=""
 function db_temp_start() {
     local root=$1/xamppfiles data=$1/xamppfiles/var/mysql user grants=(--skip-grant-tables)
     # (con --con-permisos, con sus usuarios: para cargar una base con su usuario lvm_bd_<base>)
     [ "$2" == "--con-permisos" ] && grants=()
+    # Si su MariaDB ya esta en marcha (la arranco Docker, sin red), se usa esa: otra no podria abrir los
+    # mismos datos. DB_TMP se queda vacio: db_temp_stop no la para
+    if db_socket_alive "$data/mysql.sock"; then
+        echo "Se usa el MariaDB que ya esta en marcha para Docker (sin red)"
+        DB_TMP_SOCK=$data/mysql.sock DB_TMP_PID=""
+        return 0
+    fi
     # Root ejecuta su mariadbd: solo de una version de root (como xampp_ctl)
     if [ -z "$TEST_DIR" ] && ! trusted_version_dir "$1"; then
         echo "No se arranca el MariaDB de $1 como administrador: no es de root, tiene enlaces o el grupo"
@@ -16809,7 +17260,8 @@ func scriptArgs(_ args: [String]) -> [String] {
 }
 
 /// Comando sin sudo ni preguntas, en segundo plano. done(codigo, salida) en el hilo principal.
-func runQuick(_ args: [String], env: [String: String] = [:], _ done: @escaping (Int32, String) -> Void) {
+func runQuick(_ args: [String], env: [String: String] = [:], input: String? = nil,
+              _ done: @escaping (Int32, String) -> Void) {
     DispatchQueue.global(qos: .userInitiated).async {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -16819,12 +17271,18 @@ func runQuick(_ args: [String], env: [String: String] = [:], _ done: @escaping (
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = pipe
-        p.standardInput = FileHandle.nullDevice
+        // (lo de input, por la entrada: un token en la línea de órdenes se vería con ps)
+        let inPipe = input == nil ? nil : Pipe()
+        p.standardInput = inPipe ?? FileHandle.nullDevice
         do {
             try p.run()
         } catch {
             DispatchQueue.main.async { done(1, "ERROR|\(error.localizedDescription)") }
             return
+        }
+        if let w = inPipe, let text = input {
+            w.fileHandleForWriting.write(text.data(using: .utf8) ?? Data())
+            try? w.fileHandleForWriting.close()
         }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
@@ -18482,6 +18940,13 @@ final class AppModel: ObservableObject {
     // Montar nuevo proyecto (asistente de tres pasos dentro de Cargar proyecto)
     @Published var npOpen = false
     @Published var npStep = 1
+    /// Asistente: los repositorios de GitHub (los de la pestaña Repositorios), lo que se busca, el elegido, y
+    /// el dominio de producción (falsearlo o no)
+    @Published var npRepos: [RepoItem] = []
+    @Published var npRepoQuery = ""
+    @Published var npRepoNote = ""
+    @Published var npFake = false
+    @Published var npDomain = ""
     @Published var npUrl = ""
     @Published var npFolder = ""
     @Published var npFolderAuto = true
@@ -18494,6 +18959,8 @@ final class AppModel: ObservableObject {
     @Published var newDb = ""
     // Ventana: apartado de la barra lateral, proyecto elegido en Proyectos (se ve arriba) y su filtro
     @Published var tab = "proyectos"
+    /// Apartado elegido en Configuración (su clave de ToolsView.sections)
+    @Published var toolsSection = "parches"
     @Published var selProject: String? = nil
     @Published var projKind = "all"
     // Bases de datos: «solo la versión activa» (la activa se ve desplegada al abrir) y lo que ocupan
@@ -18529,7 +18996,48 @@ final class AppModel: ObservableObject {
     /// El túnel de Cloudflare abierto, cloudflared (I|instalado|versión|la del programa) y su configuración
     @Published var tunnel: TunnelState? = nil
     @Published var tunnelInfo: [String]? = nil
-    @Published var tunnelConf = readTunnelConf()
+    /// Lo que tiene un parche nuevo (componentes): nil mientras no se ha mirado
+    @Published var components: ComponentsState? = nil
+    /// La terminal de abajo: a la vista o no (sigue abierta al esconderla), su alto y la sesión
+    @Published var termOpen = false {
+        didSet { if termOpen { termStart() } }
+    }
+    @Published var termHeight: CGFloat = 260
+    @Published var termCwd = ""
+    let term = TermSession()
+
+    /// La carpeta del proyecto cargado (o la de los proyectos)
+    var termProject: String {
+        let cur = projects?.current ?? ""
+        var dir: ObjCBool = false
+        return !cur.isEmpty && FileManager.default.fileExists(atPath: cur, isDirectory: &dir) && dir.boolValue ? cur : HTDOCS
+    }
+
+    func termStart(restart: Bool = false) {
+        if restart { term.stop() }
+        guard !term.running else { return }
+        let cwd = termProject
+        term.onExit = { [weak self] in self?.termOpen = false }
+        if term.start(cwd: cwd) {
+            termCwd = cwd
+        } else {
+            termOpen = false
+            message("No se ha podido abrir la terminal", "No se ha podido crear su pseudoterminal.", error: true)
+        }
+    }
+
+    /// cd a la carpeta del proyecto cargado (escrito en la terminal, como si lo tecleara)
+    func termCd() {
+        let cwd = termProject
+        let quoted = "'" + cwd.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        term.write(Data("cd \(quoted)\r".utf8))
+        termCwd = cwd
+    }
+    /// Repositorios de GitHub (pestaña Repositorios) y la conexión (Configuración)
+    @Published var repos: ReposData? = nil
+    @Published var reposAll = false
+    @Published var reposLoading = false
+    @Published var github: GitHubState? = nil
     /// Al cargar un proyecto, la página de Proyectos sube hasta el visor (cambia y WidePage se desliza)
     @Published var scrollTop = 0
     private var fastTimer: Timer? = nil
@@ -18579,8 +19087,117 @@ final class AppModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
             guard let self = self else { return }
             if self.data == nil || self.busy { self.autoCheckUpdates(); return }
-            if updateCheckDue() { self.checkUpdates(auto: true) }
+            if updateCheckDue() {
+                self.checkUpdates(auto: true)
+                // (y los parches de los componentes, un poco después: sin juntarse con el aviso del programa)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 25) { self.autoCheckComponents() }
+            }
         }
+    }
+
+    /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), las
+    /// imágenes de Docker, Mailpit y cloudflared
+    func reloadComponents(_ then: ((ComponentsState) -> Void)? = nil) {
+        runQuick(["componentes"]) { _, out in
+            let c = parseComponents(out)
+            self.components = c
+            then?(c)
+        }
+    }
+
+    /// Al abrir (cuando toca buscar una versión nueva del programa): si algo tiene un parche nuevo, se
+    /// dice y se ofrece actualizarlo todo
+    func autoCheckComponents() {
+        reloadComponents { c in
+            guard !c.items.isEmpty else { return }
+            func ask() {
+                if self.busy { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { ask() }; return }
+                self.updateComponents(c)
+            }
+            ask()
+        }
+    }
+
+    // MARK: repositorios de GitHub
+
+    func reloadGithub() {
+        runQuick(["github"]) { _, out in
+            if let g = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 }) {
+                self.github = GitHubState(on: g[1] == "1", login: g[2], source: g[3], account: g[4], prefixes: g[5])
+            }
+        }
+    }
+
+    /// Después de conectar o cambiar algo: lo dice, y la lista de antes ya no vale (otra cuenta o prefijos)
+    func githubDone(_ rc: Int32, _ out: String) {
+        let lines = out.split(separator: "\n").map(String.init).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        toast(lines.last ?? (rc == 0 ? "Hecho" : "No se ha podido"))
+        repos = nil
+        reloadGithub()
+    }
+
+    func githubToken() {
+        let r = runDialog(title: "Conectar con GitHub",
+                          text: "Solo para leer la lista de repositorios (también los privados): se clonan por SSH, con tu clave. Créalo en GitHub (Settings, Developer settings, Personal access tokens) con el permiso «repo» (y «read:org» para los de una organización) y pégalo aquí. Se guarda en el Llavero, no en un fichero.",
+                          okLabel: "Conectar", hasField: true, placeholder: "ghp_… o github_pat_…", secure: true,
+                          validate: { _, t in (t.trimmingCharacters(in: .whitespaces).count >= 20, nil, false) })
+        guard r.ok else { return }
+        toast("Comprobando el token con GitHub…")
+        runQuick(["github-conectar"], input: r.text.trimmingCharacters(in: .whitespaces) + "\n") { rc, out in self.githubDone(rc, out) }
+    }
+
+    /// Guardar la cuenta o los prefijos: si no vale, se dice en una ventana y lo escrito se queda
+    func githubSet(_ key: String, _ value: String) {
+        runQuick(["github", key, value]) { rc, out in
+            if rc != 0 {
+                let lines = out.split(separator: "\n").map(String.init).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                message("No se ha guardado", lines.last ?? "No se ha podido guardar", error: true)
+                return
+            }
+            self.githubDone(rc, out)
+        }
+    }
+
+    func reloadRepos(cache: Bool = false) {
+        let args = ["repos"] + (reposAll ? ["--todos"] : []) + (cache ? ["--cache"] : [])
+        if !cache { reposLoading = true }
+        runQuick(args) { _, out in
+            if !cache { self.reposLoading = false }
+            let r = parseRepos(out)
+            if cache && r.head.isEmpty { return }
+            if !cache, let e = r.error, !(self.repos?.head ?? []).isEmpty {
+                // (sin conexión con GitHub: se queda la lista de la última vez, y se dice)
+                self.repos?.error = e
+            } else {
+                self.repos = r
+            }
+        }
+    }
+
+    /// Clonar (por SSH) o, si ya está clonado, traer sus cambios con git pull, preguntando antes
+    func fetchRepo(_ r: RepoItem) {
+        var args = ["repo-traer", r.full]
+        var title = "Clonando \(r.name)"
+        if r.state == "clonado" {
+            guard confirm("¿Aplastar \(r.folder) con lo de GitHub?",
+                          "Este repositorio ya está clonado en \(HTDOCS)/\(r.folder). Se traen sus cambios de GitHub (git pull) y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca nada y se dice.",
+                          "Traer los cambios") else { return }
+            args.append("--actualizar")
+            title = "Trayendo los cambios de \(r.name)"
+        }
+        _ = runTask(title, args, doneText: "Hecho", autoClose: true) { ok, _, _ in
+            self.reloadRepos(cache: true)
+            if ok && r.state != "clonado" { self.toast("\(r.name), en Proyectos") }
+        }
+    }
+
+    func updateComponents(_ c: ComponentsState) {
+        guard confirm("¿Actualizar todo?", c.items.map { "• " + $0 }.joined(separator: "\n")
+                      + "\n\nLas versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+                      "Actualizar todo") else { return }
+        components = nil
+        _ = runTask("Actualizando los componentes", ["componentes-actualizar"], progress: true,
+                    doneText: "Componentes al día", reloadBranches: true) { _, _, _ in self.reloadComponents() }
     }
 
     func toast(_ text: String) {
@@ -19271,6 +19888,7 @@ final class AppModel: ObservableObject {
     func openMail() {
         guard let m = data?.mail else { return }
         if !m.installed {
+            toolsSection = "correo"
             tab = "config"
             toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
         } else if !m.running {
@@ -19847,8 +20465,33 @@ final class AppModel: ObservableObject {
             npFile = nil
             npStep = 1
             projQuery = ""
+            npRepoQuery = ""
+            npRepoNote = ""
+            npFake = false
+            npDomain = ""
+            npRepos = []
+            runQuick(["repos", "--cache"]) { _, out in
+                self.npRepos = parseRepos(out).items
+                self.npRepoNote = self.npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo"
+                    : "\(self.npRepos.count) repositorios de GitHub (los de la pestaña Repositorios)"
+            }
         }
         npOpen = show
+    }
+
+    /// Repositorio elegido de la lista de GitHub: su dirección SSH (con tu clave), su carpeta y, si su web es
+    /// la de producción, su dominio para el paso 4 (en una tienda, falsearlo)
+    func npPickRepo(_ r: RepoItem) {
+        npRepoQuery = r.full
+        npUrl = "git@github.com:\(r.full).git"
+        if npFolderAuto { npFolder = folderFromGitURL(npUrl) }
+        var dom = r.web.lowercased().replacingOccurrences(of: "^https?://", with: "", options: .regularExpression)
+        dom = String(dom.split(separator: "/").first ?? "").components(separatedBy: ":").first ?? ""
+        if matches(DOMAIN_RX, dom) {
+            npDomain = dom
+            npFake = r.prefix.contains("prestashop") || r.name.contains("prestashop")
+        }
+        npRepoNote = "Se clona por SSH, con tu clave: \(npUrl)" + (dom.isEmpty ? "" : "  ·  web: \(dom)")
     }
 
     /// ¿Se puede seguir desde el paso del asistente? (y, si no, por qué: vacío si solo falta escribirlo)
@@ -19872,6 +20515,12 @@ final class AppModel: ObservableObject {
             return (true, "")
         case 2:
             return (d.installs.contains { $0.folder == npVersion }, "")
+        case 4:
+            let dom = npDomain.trimmingCharacters(in: .whitespaces).lowercased()
+            if npFake && !matches(DOMAIN_RX, dom) {
+                return (false, dom.isEmpty ? "" : "Dominio no válido (por ejemplo: midominio.com)")
+            }
+            return (true, "")
         default:
             let db = npDb.trimmingCharacters(in: .whitespaces)
             if db.isEmpty { return (false, "") }
@@ -19887,7 +20536,7 @@ final class AppModel: ObservableObject {
 
     func npGo(_ step: Int) {
         let next = npStep + step
-        if next >= 4 {
+        if next >= 5 {
             mountProject()
             return
         }
@@ -19922,11 +20571,19 @@ final class AppModel: ObservableObject {
         let version = npVersion
         var args = ["montar-proyecto", url, folder, version, db]
         if let f = npFile { args.append(f) }
+        let domain = npFake ? npDomain.trimmingCharacters(in: .whitespaces).lowercased() : ""
         runTask("Montando el proyecto \(folder)", args,
                 doneText: "\(folder) está clonado, cargado en XAMPP-\(version) y con su BBDD \(db)") { ok, _, _ in
             guard ok else { return }
             self.npOpen = false
             self.toast("Proyecto nuevo montado: \(folder) en XAMPP-\(version) con la BBDD \(db)")
+            // (después, si se ha pedido, su dominio de producción falseado)
+            if !domain.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    _ = self.runTask("Falseando \(domain) para \(folder)", ["nuevo-dominio", domain, folder],
+                                     doneText: "\(domain) falseado: se abre en local", autoClose: true)
+                }
+            }
         }
     }
 
@@ -19954,8 +20611,9 @@ final class AppModel: ObservableObject {
                                   return (!saved.isEmpty, saved.isEmpty ? "Dominio de la web real (ejemplo.com)"
                                           : "Vacío: deja de pedir nada a producción", false)
                               }
-                              let ok = matches(DOMAIN_RX, d) && !d.hasSuffix(".local") && d != saved
-                              return (ok, ok || d == saved ? "Dominio de la web real (ejemplo.com)" : "No es un dominio de la web real", !ok && d != saved)
+                              // (el mismo de antes también: se vuelve a aplicar, en web.local y en el Apache de Docker)
+                              let ok = matches(DOMAIN_RX, d) && !d.hasSuffix(".local") && !d.hasSuffix(".test")
+                              return (ok, ok ? "Dominio de la web real (ejemplo.com)" : "No es un dominio de la web real", !ok)
                           })
         if r.ok { done(clean(r.text)) }
     }
@@ -19990,7 +20648,7 @@ final class AppModel: ObservableObject {
             for l in parseLines(out) where l.count >= 2 { f[l[0]] = l[1] }
             let saved = f["G"] ?? "", guess = f["D"] ?? ""
             self.askMedia("Imágenes de producción de \(x.name)",
-                          "Mientras esté cargado, lo que falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde aquí."
+                          "Mientras esté cargado (y, si está en el Apache de Docker, también allí), lo que falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde aquí."
                               + (saved.isEmpty && !guess.isEmpty ? "\n\n\(guess) es el dominio de su BBDD: compruébalo antes de guardar." : ""),
                           saved: saved, value: saved.isEmpty ? guess : saved) { prod in
                 if prod.isEmpty {
@@ -20009,7 +20667,7 @@ final class AppModel: ObservableObject {
     func psImages(_ x: Project) {
         if busy { return }
         guard confirm("¿Descargar las imágenes que le faltan a \(x.name)?",
-                      "Se descargan de su web real las imágenes de productos, categorías y marcas que no están en su carpeta img (la lista sale de su BBDD, en la versión activa). Lo que ya está en local no se toca. Con muchos productos puede tardar y ocupar bastante.\n\nSu dominio está falseado en este Mac: se busca con DNS cifrado (Cloudflare) y se comprueba su certificado real.",
+                      "Se descargan de su web real las imágenes de productos, categorías y marcas que no están en su carpeta img (la lista sale de su BBDD: la de la versión activa o, si no está allí, la de su proyecto del Apache de Docker). Van a su carpeta img, la misma con XAMPP-X y con Docker. Lo que ya está en local no se toca. Con muchos productos puede tardar y ocupar bastante.\n\nSu dominio está falseado en este Mac: se busca con DNS cifrado (Cloudflare) y se comprueba su certificado real.",
                       "Descargar") else { return }
         checkDbAccess {
             _ = self.runTask("Descargando las imágenes de \(x.name)", ["ps-imagenes", x.name],
@@ -20624,6 +21282,7 @@ struct Page<Content: View>: View {
 /// Logotipos de los paquetes (Simple Icons, CC0; cada marca es de su dueño y solo se usa para
 /// identificar su paquete). El trazo, pasado a M, L, C y Z absolutos en una caja de 24x24
 let LOGO_PATHS: [String: String] = [
+    "github": "M 12 0.297 C 5.37 0.297 0 5.67 0 12.297 C 0 17.6 3.438 22.097 8.205 23.682 C 8.805 23.795 9.025 23.424 9.025 23.105 C 9.025 22.82 9.015 22.065 9.01 21.065 C 5.672 21.789 4.968 19.455 4.968 19.455 C 4.422 18.07 3.633 17.7 3.633 17.7 C 2.546 16.956 3.717 16.971 3.717 16.971 C 4.922 17.055 5.555 18.207 5.555 18.207 C 6.625 20.042 8.364 19.512 9.05 19.205 C 9.158 18.429 9.467 17.9 9.81 17.6 C 7.145 17.3 4.344 16.268 4.344 11.67 C 4.344 10.36 4.809 9.29 5.579 8.45 C 5.444 8.147 5.039 6.927 5.684 5.274 C 5.684 5.274 6.689 4.952 8.984 6.504 C 9.944 6.237 10.964 6.105 11.984 6.099 C 13.004 6.105 14.024 6.237 14.984 6.504 C 17.264 4.952 18.269 5.274 18.269 5.274 C 18.914 6.927 18.509 8.147 18.389 8.45 C 19.154 9.29 19.619 10.36 19.619 11.67 C 19.619 16.28 16.814 17.295 14.144 17.59 C 14.564 17.95 14.954 18.686 14.954 19.81 C 14.954 21.416 14.939 22.706 14.939 23.096 C 14.939 23.411 15.149 23.786 15.764 23.666 C 20.565 22.092 24 17.592 24 12.297 C 24 5.67 18.627 0.297 12 0.297",
     // (Cloudflare: Simple Icons 13.21.0, CC0; sus arcos, pasados a curvas)
     "cloudflare": "M 16.5088 16.8447 C 16.6563 16.3379 16.5996 15.874 16.3535 15.5293 C 16.1289 15.2129 15.749 15.0303 15.292 15.0088 L 6.6328 14.8965 C 6.579 14.8973 6.5287 14.8704 6.4995 14.8252 C 6.4712 14.7832 6.4644 14.7266 6.4785 14.6699 C 6.5063 14.5859 6.5908 14.5215 6.6821 14.5137 L 15.418 14.4014 C 16.4531 14.3525 17.5781 13.5146 17.9717 12.4878 L 18.4707 11.1865 C 18.4922 11.1304 18.5 11.0737 18.4854 11.0185 C 17.9229 8.4722 15.6504 6.5732 12.9355 6.5732 C 10.4316 6.5732 8.3071 8.1909 7.5479 10.4346 C 7.0552 10.0688 6.4292 9.8721 5.7539 9.9356 C 4.5513 10.0546 3.5874 11.0186 3.4678 12.2212 C 3.4395 12.5312 3.4609 12.834 3.5313 13.1152 C 1.5683 13.171 0 14.7754 0 16.752 C 0 16.9268 0.0142 17.1035 0.0352 17.2793 C 0.0493 17.3623 0.1196 17.4268 0.2041 17.4268 L 16.1855 17.4268 C 16.2764 17.4268 16.3613 17.3623 16.3887 17.2715 L 16.5087 16.8447 Z M 19.2656 11.2813 C 19.1885 11.2813 19.1045 11.2813 19.0273 11.2925 C 18.9707 11.2925 18.9219 11.334 18.9003 11.3901 L 18.5625 12.5645 C 18.415 13.0713 18.4707 13.5352 18.7168 13.8809 C 18.9424 14.1973 19.3223 14.3789 19.7793 14.4004 L 21.623 14.5137 C 21.6787 14.5137 21.7285 14.54 21.7559 14.584 C 21.7842 14.627 21.791 14.6914 21.7773 14.7402 C 21.749 14.8242 21.6641 14.8887 21.5733 14.8955 L 19.6523 15.0078 C 18.6113 15.0566 17.4941 15.8945 17.0996 16.9218 L 16.959 17.2803 C 16.9307 17.3516 16.9805 17.4219 17.0576 17.4219 L 23.6553 17.4219 C 23.7324 17.4219 23.8027 17.373 23.8243 17.2959 C 23.9365 16.8877 24 16.4589 24 16.0156 C 24 13.4131 21.875 11.2886 19.2656 11.2886",
     "php": "M 7.01 10.207 L 6.066 10.207 L 5.551 12.855 L 6.389 12.855 C 6.945 12.855 7.359 12.75 7.631 12.541 C 7.903 12.331 8.086 11.982 8.181 11.492 C 8.273 11.022 8.231 10.69 8.057 10.497 C 7.882 10.304 7.534 10.207 7.01 10.207 Z M 12 5.688 C 5.373 5.688 0 8.514 0 12 C 0 15.486 5.373 18.313 12 18.313 C 18.627 18.313 24 15.486 24 12 C 24 8.514 18.627 5.688 12 5.688 Z M 8.74 13.139 C 8.479 13.389 8.165 13.577 7.823 13.69 C 7.487 13.798 7.058 13.854 6.538 13.854 L 5.357 13.854 L 5.03 15.535 L 3.652 15.535 L 4.882 9.209 L 7.532 9.209 C 8.329 9.209 8.91 9.418 9.276 9.837 C 9.642 10.255 9.752 10.839 9.606 11.589 C 9.55 11.886 9.447 12.172 9.301 12.436 C 9.158 12.691 8.971 12.926 8.74 13.139 Z M 12.764 13.854 L 13.307 11.055 C 13.37 10.737 13.346 10.519 13.239 10.404 C 13.132 10.288 12.903 10.23 12.552 10.23 L 11.46 10.23 L 10.756 13.855 L 9.388 13.855 L 10.618 7.528 L 11.985 7.528 L 11.658 9.21 L 12.876 9.21 C 13.643 9.21 14.171 9.344 14.462 9.611 C 14.753 9.878 14.84 10.311 14.725 10.91 L 14.153 13.854 L 12.764 13.854 Z M 20.361 11.589 C 20.306 11.886 20.203 12.172 20.056 12.436 C 19.913 12.691 19.726 12.926 19.495 13.139 C 19.234 13.388 18.921 13.576 18.578 13.69 C 18.242 13.798 17.813 13.854 17.292 13.854 L 16.112 13.854 L 15.785 15.536 L 14.407 15.536 L 15.637 9.21 L 18.286 9.21 C 19.083 9.21 19.664 9.419 20.03 9.838 C 20.396 10.255 20.507 10.839 20.361 11.589 Z M 17.766 10.207 L 16.823 10.207 L 16.307 12.855 L 17.145 12.855 C 17.702 12.855 18.116 12.75 18.387 12.541 C 18.659 12.331 18.842 11.982 18.938 11.492 C 19.03 11.022 18.987 10.69 18.813 10.497 C 18.639 10.304 18.289 10.207 17.766 10.207 Z",
@@ -20665,7 +21324,7 @@ let LOGO_COLORS: [String: Color] = [
     "php": hexColor(0x777BB4), "apache": hexColor(0xD22128), "mariadb": hexColor(0x003545),
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
     "wordpress": hexColor(0x21759B), "prestashop": hexColor(0xDF0067), "mailpit": hexColor(0x00A87B), "docker": hexColor(0x2496ED),
-    "cloudflare": hexColor(0xF38020),
+    "cloudflare": hexColor(0xF38020), "github": hexColor(0x181717),
 ]
 
 func brand(_ name: String) -> Color { return LOGO_COLORS[name] ?? .gray }
@@ -20945,6 +21604,129 @@ extension Row where Leading == EmptyView {
 }
 
 extension Row where Leading == EmptyView, Trailing == EmptyView {
+    init(_ title: String, _ subtitle: String? = nil) {
+        self.init(title, subtitle, leading: { EmptyView() }, trailing: { EmptyView() })
+    }
+}
+
+/// ¿Va un apartado de Configuración a lo ancho? (sus tarjetas, en horizontal y con los botones a la derecha)
+private struct TileWideKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var tileWide: Bool {
+        get { self[TileWideKey.self] }
+        set { self[TileWideKey.self] = newValue }
+    }
+}
+
+/// Apartado de Configuración con sus ajustes en tarjetas de dos en dos (Tile), como los visores de las
+/// otras pestañas. wide: una tarjeta (o una lista) a lo ancho, con sus botones a la derecha
+struct TileCard<Content: View>: View {
+    let title: String?
+    let description: String?
+    let wide: Bool
+    let columns: Int
+    let content: Content
+    init(_ title: String? = nil, _ description: String? = nil, wide: Bool = false, columns: Int = 2,
+         @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.description = description
+        self.wide = wide
+        self.columns = columns
+        self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if title != nil || description != nil {
+                HStack(spacing: 6) {
+                    if let t = title { Text(t).font(.headline) }
+                    if let d = description {
+                        Image(systemName: "info.circle").foregroundColor(.secondary).tip(d)
+                    }
+                }
+            }
+            Group {
+                if wide {
+                    VStack(spacing: 12) { content }
+                } else {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: columns),
+                              alignment: .leading, spacing: 12) { content }
+                }
+            }
+            .environment(\.tileWide, wide)
+            .padding(.top, 4)
+        }
+    }
+}
+
+/// Un ajuste de Configuración en su tarjeta: el icono (por su título) y el título arriba, la explicación
+/// entera debajo y sus botones abajo a la derecha. En un apartado a lo ancho, todo en una línea
+struct Tile<Leading: View, Trailing: View>: View {
+    let title: String
+    let subtitle: String?
+    let leading: Leading
+    let trailing: Trailing
+    @Environment(\.tileWide) var wide
+    init(_ title: String, _ subtitle: String? = nil, @ViewBuilder leading: () -> Leading,
+         @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.leading = leading()
+        self.trailing = trailing()
+    }
+    var body: some View {
+        Group {
+            if wide {
+                HStack(spacing: 12) {
+                    icon
+                    texts
+                    Spacer(minLength: 8)
+                    trailing
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
+                        icon
+                        texts
+                    }
+                    Spacer(minLength: 0)
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        trailing
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: wide ? 0 : 118, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+    }
+    @ViewBuilder var icon: some View {
+        if Leading.self == EmptyView.self, let ic = rowIcon(title) {
+            ColorIcon(symbol: ic.0, color: ic.1, size: 20)
+        }
+        leading
+    }
+    var texts: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).fontWeight(.semibold).fixedSize(horizontal: false, vertical: true)
+            if let sub = subtitle, !sub.isEmpty {
+                Text(sub).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+extension Tile where Leading == EmptyView {
+    init(_ title: String, _ subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(title, subtitle, leading: { EmptyView() }, trailing: trailing)
+    }
+}
+
+extension Tile where Leading == EmptyView, Trailing == EmptyView {
     init(_ title: String, _ subtitle: String? = nil) {
         self.init(title, subtitle, leading: { EmptyView() }, trailing: { EmptyView() })
     }
@@ -21523,7 +22305,7 @@ enum Panel: Identifiable, Equatable {
         case .components: return 760
         case .install: return 720
         case .dockerNew: return 620
-        case .buttons: return 560
+        case .buttons: return 900
         }
     }
 }
@@ -21579,6 +22361,8 @@ struct DockerProject: Equatable, Identifiable {
     var isWeb = false
     var kind = ""
     var versions: [String] = []
+    /// La versión XAMPP-X cuya BBDD usa en vivo (vacío: su copia en la MariaDB común)
+    var lampp = ""
     var id: String { return slug }
 }
 
@@ -21625,10 +22409,12 @@ struct DockerStats: Equatable {
     var mem: [String: Double] = [:]
 }
 
-/// Formulario «Proyecto en Docker»: source es «versión|BBDD» de la que se copia ("" = vacía)
+/// Formulario «Proyecto en Docker»: source es «versión|BBDD» de la que se copia ("" = vacía); live: en un
+/// WordPress, esa BBDD de XAMPP-X en vivo en vez de copiarla
 struct DockerForm: Equatable {
     var folder = "", php = "", maria = "", source = "", domain = ""
     var domainSet = false
+    var live = true
 }
 
 /// Nombre corto de un proyecto en Docker (como docker_slug del script)
@@ -21675,13 +22461,20 @@ func dockerStatusText(_ status: String) -> String {
 func ownContainer(_ name: String) -> Bool {
     return name.range(of: "^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})$",
                       options: .regularExpression) != nil
-        || name.range(of: "^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$", options: .regularExpression) != nil
+        || name.range(of: "^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$",
+                      options: .regularExpression) != nil
 }
 
 // MARK: - Acciones de la ventana nueva
 
 extension AppModel {
     /// Cambia de apartado y lee lo que haga falta
+    /// Abre Configuración en ese apartado (su clave de ToolsView.sections)
+    func openTools(_ section: String) {
+        toolsSection = section
+        openTab("config")
+    }
+
     func openTab(_ key: String) {
         tab = key
         // Al entrar en un apartado, sus desplegables aparecen plegados (las versiones de Bases de datos
@@ -21689,6 +22482,10 @@ extension AppModel {
         expanded = expanded.filter { !$0.hasPrefix("@db") }
         dkOpen = []
         if key == "docker" { reloadDocker(stats: true) }
+        if key == "repos" {
+            if repos == nil { reloadRepos(cache: true) }
+            reloadRepos()
+        }
         if key == "bbdd" {
             refreshBackups()
             reloadDbSizes()
@@ -21876,9 +22673,11 @@ extension AppModel {
                 k.projects.append(DockerProject(slug: f[1], folder: f[2], php: f[3], maria: f[4], domain: f[5],
                                                 state: f[6], db: f[7], pma: isWeb ? "" : f[8], web: field(f, 9),
                                                 old: field(f, 10) == "1", isWeb: isWeb, kind: field(f, 11),
-                                                versions: isWeb ? field(f, 12).split(separator: " ").map(String.init) : []))
+                                                versions: isWeb ? field(f, 12).split(separator: " ").map(String.init) : [],
+                                                lampp: isWeb ? field(f, 13) : ""))
             case "W" where f.count >= 6:
-                k.web = DockerWeb(ip: f[1], http: f[2], https: f[3], state: f[4], ok: f[5] == "1")
+                k.web = DockerWeb(ip: f[1], http: f[2], https: f[3], state: f[4], ok: f[5] == "1",
+                                  tld: field(f, 6) == "docker.test" ? "docker.test" : "docker.local", dns: field(f, 7) == "1")
             case "C" where f.count >= 7:
                 k.containers.append(DockerContainer(name: f[1], image: f[2], state: f[3], status: f[4],
                                                     ports: f[5], project: f[6],
@@ -21964,11 +22763,16 @@ extension AppModel {
         guard !f.folder.isEmpty, !f.php.isEmpty, !f.maria.isEmpty else { return }
         var args = ["docker-nuevo", f.folder, f.php, f.maria]
         let slug = dockerSlug(f.folder)
+        let tld = dockerTLD(docker)
         let site = dockerWebURL(docker, (projects?.list.first(where: { $0.name == f.folder })?.kind == "ps")
-                                ? slug + ".docker.local" : slug + "-php" + f.php.replacingOccurrences(of: ".", with: "") + ".docker.local")
+                                ? slug + "." + tld : slug + "-php" + f.php.replacingOccurrences(of: ".", with: "") + "." + tld)
         var text = "Con el Apache de Docker (sin XAMPP-X): su PHP \(f.php) y su BBDD en la MariaDB \(f.maria) común. Se abrirá en \(site)."
         let src = f.source.split(separator: "|", maxSplits: 1).map(String.init)
-        if src.count == 2 {
+        let wp = projects?.list.first(where: { $0.name == f.folder })?.kind == "wp"
+        if src.count == 2 && wp && f.live {
+            args += ["--bd", src[1], "--desde", src[0], "--en-vivo"]
+            text += " Usa en vivo \(src[1]) de XAMPP-\(src[0]): la misma BBDD que web.local, sin copias."
+        } else if src.count == 2 {
             args += ["--bd", src[1], "--desde", src[0]]
             text += " Se copia \(src[1]) de XAMPP-\(src[0]) (esa no se toca)."
         } else {
@@ -21980,6 +22784,36 @@ extension AppModel {
             if ok { self.dkForm = DockerForm() }
             self.reloadDocker()
         }
+    }
+
+    /// La BBDD de un WordPress de Docker: en vivo la de una versión XAMPP-X (la misma que web.local) o su
+    /// copia en la MariaDB común de Docker
+    func dockerDbMode(_ p: DockerProject) {
+        var versions: [String] = []
+        if let x = projects?.list.first(where: { $0.name == p.folder }) {
+            for (i, _) in projectPairs(x) where !versions.contains(i.folder) { versions.append(i.folder) }
+        }
+        var choices: [(String, String)] = versions.map { ("lampp|" + $0, "En vivo: la de XAMPP-\($0) (la de web.local)") }
+        choices.append(("docker", "Su copia en la MariaDB común de Docker"))
+        let now = p.lampp.isEmpty ? "docker" : "lampp|" + p.lampp
+        let alert = NSAlert()
+        alert.messageText = "BBDD de \(p.folder) en Docker"
+        alert.addButton(withTitle: "Usarla")
+        alert.addButton(withTitle: "Cancelar")
+        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 26), pullsDown: false)
+        pop.addItems(withTitles: choices.map { $0.1 })
+        pop.selectItem(at: choices.firstIndex(where: { $0.0 == now }) ?? 0)
+        alert.accessoryView = dialogStack([
+            dialogLabel("En vivo, Docker usa la misma BBDD que web.local: lo que cambies en un lado se ve en el otro, sin copias. Si la MariaDB de esa versión no está en marcha, se arranca solo ella, en otro puerto. La copia de Docker no se borra: se puede volver a ella."
+                        + (versions.isEmpty ? " Su BBDD no está en ninguna versión de XAMPP-X." : ""), color: .secondaryLabelColor),
+            pop,
+        ], spacing: 10)
+        guard alert.runStyled() == .alertFirstButtonReturn else { return }
+        let i = pop.indexOfSelectedItem
+        guard i >= 0, i < choices.count, choices[i].0 != now else { return }
+        let c = choices[i].0
+        let args = ["docker-bd", p.slug] + (c.hasPrefix("lampp|") ? ["lampp", String(c.dropFirst(6))] : ["docker"])
+        _ = runTask("BBDD de \(p.folder)", args, doneText: "Hecho", autoClose: true) { _, _, _ in self.reloadDocker() }
     }
 
     func dockerAction(_ p: DockerProject, start: Bool) {
@@ -22214,18 +23048,20 @@ extension AppModel {
         sources += pairs.map { ("\($0.0.folder)|\($0.1)", "\($0.1) (XAMPP-\($0.0.folder))") }
         let srcSel = sources.firstIndex(where: { !d.active.isEmpty && $0.0.hasPrefix(d.active + "|") }) ?? (sources.count - 1)
         let srcPop = popup(sources.map { $0.1 }, srcSel)
+        let wp = x.kind == "wp"
+        let modePop = popup(["En vivo: la misma que web.local (sin copias)", "Una copia en Docker"], 0)
         alert.accessoryView = dialogStack([
-            dialogLabel("Con el Apache de Docker (sin XAMPP-X) y su BBDD en una MariaDB común. Se descargan las imágenes que falten y se abre por su dominio (\(dockerSlug(x.name)).docker.local). La carpeta y sus BBDD de XAMPP-X no se tocan.",
+            dialogLabel("Con el Apache de Docker (sin XAMPP-X). Se descargan las imágenes que falten y se abre por su dominio (\(dockerSlug(x.name)).\(dockerTLD(k))). La carpeta y sus BBDD de XAMPP-X no se tocan.",
                         color: .secondaryLabelColor),
-            line("PHP", phpPop), line("MariaDB", mariaPop), line("BBDD que se copia", srcPop),
-        ], spacing: 10)
+            line("PHP", phpPop), line("MariaDB", mariaPop), line(wp ? "BBDD" : "BBDD que se copia", srcPop),
+        ] + (wp ? [line("Cómo", modePop)] : []), spacing: 10)
         guard alert.runStyled() == .alertFirstButtonReturn else { return }
         let pi = phpPop.indexOfSelectedItem, mi = mariaPop.indexOfSelectedItem, si = srcPop.indexOfSelectedItem
         guard pi >= 0, pi < k.php.count, mi >= 0, mi < k.maria.count else { return }
         var args = ["docker-nuevo", x.name, k.php[pi], k.maria[mi]]
         if si > 0, si < sources.count {
             let src = sources[si].0.split(separator: "|", maxSplits: 1).map(String.init)
-            if src.count == 2 { args += ["--bd", src[1], "--desde", src[0]] }
+            if src.count == 2 { args += ["--bd", src[1], "--desde", src[0]] + (wp && modePop.indexOfSelectedItem == 0 ? ["--en-vivo"] : []) }
         }
         runTask("Montando \(x.name) en Docker", args, doneText: "\(x.name) en Docker") { ok, _, _ in
             self.reloadDocker()
@@ -22281,6 +23117,7 @@ struct TopBar: View {
     @Environment(\.colorScheme) var scheme
     @State private var menuOpen = false
     @State private var servicesOpen = false
+    @State private var servicesHover = false
     @State private var warnOpen = false
 
     var body: some View {
@@ -22300,11 +23137,12 @@ struct TopBar: View {
             menuButton()
             Spacer(minLength: 12)
             mailButton()
-            Button(action: { openURL("http://localhost/") }) {
-                Label("Localhost", systemImage: "globe")
+            // (la terminal de abajo de la ventana: se enseña y se esconde; en lugar de Localhost)
+            Button(action: { model.termOpen.toggle() }) {
+                Label("Terminal", systemImage: "terminal")
             }
-            .buttonStyle(OutlineButton())
-            .tip("Abrir http://localhost/")
+            .buttonStyle(OutlineButton(kind: model.termOpen ? "primary" : ""))
+            .tip("Enseñar o esconder la terminal, abajo de la ventana")
             warnings()
         }
         .padding(.horizontal, 16)
@@ -22352,30 +23190,32 @@ struct TopBar: View {
                 }
             }
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
-            ForEach(["apache", "mariadb"], id: \.self) { s in
-                HStack(spacing: 5) {
-                    StatusDot(on: act != nil && (svc[s] ?? running))
-                    Text(s == "apache" ? "Apache" : "MariaDB").font(.system(size: 12))
+            // Apache y MariaDB con su punto: al pulsarlos, sus servicios (arrancarlos, pararlos o reiniciarlos,
+            // y la versión entera)
+            Button(action: { servicesOpen.toggle() }) {
+                HStack(spacing: 9) {
+                    ForEach(["apache", "mariadb"], id: \.self) { s in
+                        HStack(spacing: 5) {
+                            StatusDot(on: act != nil && (svc[s] ?? running))
+                            Text(s == "apache" ? "Apache" : "MariaDB").font(.system(size: 12))
+                        }
+                    }
                 }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(servicesHover || servicesOpen ? 0.10 : 0)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .onHover { servicesHover = $0 }
+            .hoverPointer()
+            .tip("Servicios de la versión activa: arrancarlos, pararlos o reiniciarlos")
+            .popover(isPresented: $servicesOpen, arrowEdge: .bottom) {
+                // (los recuadros de arriba no heredan el estilo de los botones de la ventana)
+                ServicesView(close: { servicesOpen = false }).environmentObject(model).buttonStyle(PointerButtonStyle()).frame(width: 660, height: 470)
             }
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
             usageText()
-            Button(action: { model.power() }) {
-                Label(running ? "Encendidos" : "Parados", systemImage: "power")
-            }
-            .buttonStyle(OutlineButton(kind: running ? "encendido" : "", compact: true))
-            .disabled(model.busy)
-            .tip(act.map { (running ? "Parar y desactivar XAMPP-" : "Arrancar XAMPP-") + $0.folder }
-                 ?? "Activa una versión en Versiones de PHP")
-            Button(action: { servicesOpen.toggle() }) {
-                Image(systemName: "chevron.down").font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(OutlineButton(compact: true))
-            .tip("Servicios de la versión activa")
-            .popover(isPresented: $servicesOpen, arrowEdge: .bottom) {
-                // (los recuadros de arriba no heredan el estilo de los botones de la ventana)
-                ServicesView().environmentObject(model).buttonStyle(PointerButtonStyle()).frame(width: 660, height: 470)
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
@@ -22634,7 +23474,8 @@ struct WarningsView: View {
 
 /// Apartados: clave, texto e icono (logo:<paquete> o un símbolo)
 let NAV: [(String, [(String, String, String)])] = [
-    ("ENTORNO", [("proyectos", "Proyectos", "folder"), ("versiones", "Versiones de PHP", "logo:php"),
+    ("ENTORNO", [("proyectos", "Proyectos", "folder"), ("repos", "Repositorios", "logo:github"),
+                 ("versiones", "Versiones de PHP", "logo:php"),
                  ("bbdd", "Bases de datos", "internaldrive"), ("docker", "Docker", "logo:docker")]),
     ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("config", "Configuración", "gearshape")]),
 ]
@@ -22713,6 +23554,41 @@ struct NavRow: View {
             Image(systemName: icon).font(.system(size: 17)).frame(width: 21, height: 21)
                 .foregroundColor(on ? ACCENT : Color.secondary)
         }
+    }
+}
+
+/// Fila de la columna de apartados de Configuración: como las de la barra lateral, más pequeña
+struct SubNavRow: View {
+    @EnvironmentObject var model: AppModel
+    let key: String
+    let text: String
+    let icon: String
+    @State private var hover = false
+
+    var body: some View {
+        let on = model.toolsSection == key
+        return Button(action: { model.toolsSection = key }) {
+            HStack(spacing: 10) {
+                Group {
+                    if icon.hasPrefix("logo:") {
+                        LogoShape(d: LOGO_PATHS[String(icon.dropFirst(5))] ?? "").fill(on ? ACCENT : Color.secondary)
+                    } else {
+                        Image(systemName: icon).font(.system(size: 14)).foregroundColor(on ? ACCENT : Color.secondary)
+                    }
+                }
+                .frame(width: 17, height: 17)
+                Text(text).font(.system(size: 12.5, weight: on ? .semibold : .regular)).lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(on ? ACCENT : Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 7).fill(on ? ACCENT.opacity(0.13) : Color.primary.opacity(hover ? 0.06 : 0)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { hover = $0 }
+        .hoverPointer()
     }
 }
 
@@ -23462,7 +24338,7 @@ struct DockerView: View {
     }
 
     func sharingNote() -> some View {
-        Text("Docker Desktop solo deja a los contenedores usar las carpetas de su lista (Settings › Resources › File sharing), y /Library no está: añade \(HTDOCS) y pulsa Apply. Los proyectos nuevos van con el Apache de Docker (en 127.0.0.2: sin XAMPP-X y con varias versiones de PHP a la vez); su BBDD, en una MariaDB común, y su phpMyAdmin, en https://pma.docker.local (la llave de su fila copia la contraseña). Los de antes siguen con XAMPP-X delante hasta que los pasas.")
+        Text("Docker Desktop solo deja a los contenedores usar las carpetas de su lista (Settings › Resources › File sharing), y /Library no está: añade \(HTDOCS) y pulsa Apply. Los proyectos nuevos van con el Apache de Docker (en 127.0.0.2: sin XAMPP-X y con varias versiones de PHP a la vez); su BBDD, en una MariaDB común, y su phpMyAdmin, en https://pma.docker.local (o pma.docker.test, con el DNS de Docker de Configuración; la llave de su fila copia la contraseña). Los de antes siguen con XAMPP-X delante hasta que los pasas.")
             .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -23530,7 +24406,7 @@ struct DockerView: View {
                     Text(!w.ok ? "La dirección \(w.ip) del Apache de Docker aún no está en este Mac"
                          : (w.state == "marcha" ? "Apache de Docker en marcha" : "Apache de Docker parado"))
                     Text(!w.ok ? "macOS solo tiene 127.0.0.1: se da de alta una vez (pide la contraseña) y queda puesta en cada arranque. O elige otra en Configuración, Docker."
-                         : "En \(w.ip) (http \(w.http), https \(w.https)): sirve los proyectos de Docker sin XAMPP-X, con las mismas reglas de seguridad. phpMyAdmin: \(dockerWebURL(k, "pma.docker.local"))")
+                         : "En \(w.ip) (http \(w.http), https \(w.https)): sirve los proyectos de Docker sin XAMPP-X, con las mismas reglas de seguridad. phpMyAdmin: \(dockerWebURL(k, "pma." + dockerTLD(k)))")
                         .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
@@ -23603,6 +24479,8 @@ struct DockerView: View {
                 title = "Apache de Docker y phpMyAdmin"
             } else if p == nil && proj.range(of: "^nexum-mariadb-[0-9]+-[0-9]+$", options: .regularExpression) != nil {
                 title = "MariaDB " + String(proj.dropFirst(14)).replacingOccurrences(of: "-", with: ".") + " (común)"
+            } else if p == nil && proj.range(of: "^nexum-lampp-bd-[0-9]+-[0-9]+(-[0-9]+)?$", options: .regularExpression) != nil {
+                title = "Puente a la BBDD de XAMPP-" + String(proj.dropFirst(15)).replacingOccurrences(of: "-", with: ".") + " (en vivo)"
             }
             let visible = items.filter { c in
                 (!model.dkOnlyUp || c.state == "running")
@@ -23688,7 +24566,7 @@ struct DockerView: View {
                 }
             }
             .col(130)
-            Text(g.project.map { $0.isWeb ? "pma.docker.local" : ($0.pma.isEmpty ? "—" : "\($0.pma):80") } ?? "")
+            Text(g.project.map { $0.isWeb ? "pma." + dockerTLD(model.docker) : ($0.pma.isEmpty ? "—" : "\($0.pma):80") } ?? "")
                 .font(.system(size: 11.5, design: .monospaced)).foregroundColor(ACCENT).col(0)
             Text(cpuText(g.items.map { $0.name })).font(.system(size: 11.5, design: .monospaced)).foregroundColor(.secondary).col(55)
             HStack(spacing: 4) {
@@ -23709,6 +24587,12 @@ struct DockerView: View {
                     .disabled(model.busy)
                     iconAction("doc.text", "Ver los registros de sus contenedores") { model.dockerLogs(p) }
                         .disabled(model.busy)
+                    if p.isWeb && p.kind == "wp" {
+                        iconAction("arrow.left.arrow.right", "BBDD: la de XAMPP-X en vivo (la misma que web.local) o su copia de Docker") {
+                            model.dockerDbMode(p)
+                        }
+                        .disabled(model.busy)
+                    }
                     iconAction("trash", "Eliminar el proyecto de Docker: sus contenedores y la copia de su BBDD (la carpeta y la BBDD de XAMPP-X no se tocan)") {
                         model.dockerDelete(p)
                     }
@@ -23719,6 +24603,14 @@ struct DockerView: View {
                         if !up || model.stopSharedOK(["nexum-web"], "el Apache de Docker") {
                             model.dockerWebCommand(up ? "parar" : "arrancar")
                         }
+                    }
+                    .disabled(model.busy)
+                } else if g.id.hasPrefix("nexum-lampp-bd-"), g.items.count == 1, let c = g.items.first {
+                    // (el puente de los proyectos que usan en vivo la BBDD de esa versión XAMPP-X)
+                    let users = model.sharedUsers(c.name)
+                    iconAction(up ? "stop.fill" : "play.fill", up ? "Parar el puente (\(users.isEmpty ? "ningún proyecto" : users.joined(separator: ", ")) se \(users.count > 1 ? "quedan" : "queda") sin BBDD)"
+                               : "Arrancar el puente", kind: up ? "stop" : "play") {
+                        model.containerAction(c, up ? "parar" : "arrancar")
                     }
                     .disabled(model.busy)
                 } else if g.id.hasPrefix("nexum-mariadb-"), g.items.count == 1, let c = g.items.first {
@@ -23757,7 +24649,7 @@ struct DockerView: View {
                             SmallTag(text: "PrestaShop")
                         }
                     }
-                    Text(p.isWeb ? "PHP \(p.versions.joined(separator: " · ")) · MariaDB \(p.maria) común · \(site)"
+                    Text(p.isWeb ? "PHP \(p.versions.joined(separator: " · ")) · \(p.lampp.isEmpty ? "MariaDB \(p.maria) común" : "BBDD de XAMPP-\(p.lampp) en vivo (la de web.local)") · \(site)"
                          : "PHP \(p.php) · MariaDB \(p.maria) · \(site)")
                         .font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
                         .lineLimit(1).truncationMode(.middle)
@@ -23785,6 +24677,15 @@ struct DockerView: View {
                     VisorButton(conf: c, name: "Pasar al Apache de Docker", icon: .symbol("arrow.up.circle", Color.primary),
                                 tip: "Sin XAMPP-X y con varias versiones de PHP a la vez") {
                         model.dockerPass(p)
+                    }
+                    .disabled(model.busy)
+                }
+                // Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga
+                if let x = model.projects?.list.first(where: { $0.name == p.folder }), kind == "wp" || kind == "ps" {
+                    VisorButton(conf: c, name: "Imágenes de producción…", icon: .symbol("photo", Color.primary),
+                                tip: kind == "wp" ? "Lo que falte de wp-content/uploads se pide a su web real (el mismo dominio que con XAMPP-X)"
+                                    : "Descargar de su web real las imágenes de productos, categorías y marcas que faltan en su carpeta img") {
+                        if kind == "wp" { model.wpMedia(x) } else { model.psImages(x) }
                     }
                     .disabled(model.busy)
                 }
@@ -23818,7 +24719,7 @@ struct DockerView: View {
             : g.items.first(where: { $0.name.range(of: "^nexum-[a-z0-9-]+-php-[0-9]+$", options: .regularExpression) != nil })?.name
         // (un WordPress con varias versiones a la vez: cada una con su dominio)
         let targets: [(String, String)] = p.isWeb && p.kind != "ps" && p.versions.count > 1
-            ? p.versions.map { ($0, dockerWebURL(k, dockerWebDomain(p, $0))) } : [(p.php, site)]
+            ? p.versions.map { ($0, dockerWebURL(k, dockerWebDomain(p, $0, dockerTLD(k)))) } : [(p.php, site)]
         var items: [String: AnyView] = [:]
         items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
                                            tip: up ? (targets.count > 1 ? "Abrir una de sus versiones de PHP" : "Abrir \(site)/") : stopped) {
@@ -24014,6 +24915,14 @@ struct DockerGroup: Identifiable {
 struct DockerWeb: Equatable {
     var ip = "127.0.0.2", http = "80", https = "443", state = ""
     var ok = false
+    /// Final de sus dominios (docker.local o, con el DNS comodín, docker.test) y si va el DNS
+    var tld = "docker.local"
+    var dns = false
+}
+
+/// Final de los dominios del Apache de Docker
+func dockerTLD(_ k: DockerData?) -> String {
+    return k?.web?.tld ?? "docker.local"
 }
 
 /// Dirección https de un dominio del Apache de Docker (con el puerto si no es el 443)
@@ -24023,9 +24932,9 @@ func dockerWebURL(_ k: DockerData?, _ domain: String) -> String {
 }
 
 /// Dominio de una versión de PHP de un proyecto del Apache de Docker (una tienda va con uno solo)
-func dockerWebDomain(_ p: DockerProject, _ v: String) -> String {
-    if p.kind == "ps" { return p.slug + ".docker.local" }
-    return p.slug + "-php" + v.replacingOccurrences(of: ".", with: "") + ".docker.local"
+func dockerWebDomain(_ p: DockerProject, _ v: String, _ tld: String) -> String {
+    if p.kind == "ps" { return p.slug + "." + tld }
+    return p.slug + "-php" + v.replacingOccurrences(of: ".", with: "") + "." + tld
 }
 
 /// Contenedor de PHP de una versión de un proyecto del Apache de Docker
@@ -24067,11 +24976,14 @@ func popMenu(_ items: [(String, () -> Void)]) {
 let TUNNEL_DIR = LOG_DIR + "/tunel"
 let CLOUDFLARE = hexColor(0xF38020)
 
-/// El túnel abierto (tunel-abrir): su dirección, la web de este Mac que enseña, su carpeta y su hora de
-/// cierre
+/// El túnel abierto (tunel-abrir): su dirección, la web de este Mac que enseña, su carpeta, su hora de
+/// cierre y lo suyo: su contraseña, sus horas y si bloquea el panel de administración
 struct TunnelState: Equatable {
     let url, target, folder: String
     let expires: Int
+    var password = ""
+    var hours = 2
+    var block = true
 }
 
 /// El túnel abierto, o nil si no hay ninguno, si su proceso ya no está o si ha pasado su hora
@@ -24081,32 +24993,9 @@ func readTunnel() -> TunnelState? {
           let pid = o["pid"] as? Int, let url = o["url"] as? String, let target = o["target"] as? String else { return nil }
     let expires = o["expires"] as? Int ?? 0
     guard pid > 1, kill(pid_t(pid), 0) == 0, expires > Int(Date().timeIntervalSince1970) else { return nil }
-    return TunnelState(url: url, target: target, folder: o["folder"] as? String ?? "", expires: expires)
-}
-
-/// Lo de tunel-config: la contraseña de los visitantes (vacía hasta el primer túnel), las horas hasta que
-/// se cierra solo y si el panel de administración va bloqueado
-struct TunnelConf: Equatable {
-    var pass = ""
-    var hours = 2
-    var block = true
-}
-
-func readTunnelConf() -> TunnelConf {
-    var c = TunnelConf()
-    let text = (try? String(contentsOfFile: TUNNEL_DIR + "/config", encoding: .utf8)) ?? ""
-    for line in text.split(separator: "\n") {
-        let kv = line.split(separator: "=", maxSplits: 1).map(String.init)
-        guard kv.count == 2 else { continue }
-        if kv[0] == "CLAVE" && kv[1].range(of: "^[A-Za-z0-9-]{8,64}$", options: .regularExpression) != nil {
-            c.pass = kv[1]
-        } else if kv[0] == "HORAS", let h = Int(kv[1]), h >= 1, h <= 12 {
-            c.hours = h
-        } else if kv[0] == "ADMIN" {
-            c.block = kv[1] != "permitir"
-        }
-    }
-    return c
+    return TunnelState(url: url, target: target, folder: o["folder"] as? String ?? "", expires: expires,
+                       password: o["password"] as? String ?? "", hours: o["hours"] as? Int ?? 2,
+                       block: (o["admin"] as? String ?? "bloquear") != "permitir")
 }
 
 /// Hora (HH:mm) de un instante en segundos
@@ -24303,10 +25192,12 @@ struct ButtonsPanel: View {
 
     var body: some View {
         let names = Dictionary(uniqueKeysWithValues: VISOR_BUTTONS)
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.")
-                    .font(.callout).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+        // (en horizontal: la lista a la izquierda y el estilo, el tamaño y la vista previa a la derecha, para
+        // que quepa en la altura de un portátil)
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.")
+                .font(.callout).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 24) {
                 VStack(spacing: 0) {
                     ForEach(Array(conf.order.enumerated()), id: \.element) { i, key in
                         if i > 0 { Divider() }
@@ -24330,6 +25221,8 @@ struct ButtonsPanel: View {
                 }
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+                .frame(width: 320)
+              VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Text("Estilo").frame(width: 70, alignment: .leading)
                     Picker("", selection: Binding(get: { conf.style }, set: { s in
@@ -24353,7 +25246,9 @@ struct ButtonsPanel: View {
                 }
                 Text("Así quedan").font(.caption).foregroundColor(.secondary)
                 preview(names)
-                HStack {
+              }
+            }
+            HStack {
                     Button("Como al principio") {
                         conf = VisorConf()
                         sizeTouched = false
@@ -24363,11 +25258,8 @@ struct ButtonsPanel: View {
                     Spacer()
                     Button("Cancelar") { model.panel = nil }.buttonStyle(OutlineButton())
                     Button("Guardar") { model.saveVisor(conf) }.buttonStyle(OutlineButton(kind: "primary"))
-                }
             }
-            .padding(.trailing, 6)
         }
-        .frame(height: 600)
         .onAppear {
             if !loaded {
                 conf = model.visorConf
@@ -24396,6 +25288,263 @@ struct ButtonsPanel: View {
         guard j >= 0 && j < conf.order.count else { return }
         conf.order.swapAt(i, j)
     }
+}
+
+// MARK: repositorios de GitHub
+
+struct GitHubState: Equatable {
+    var on = false
+    var login = "", source = "", account = "", prefixes = ""
+}
+
+struct RepoItem: Equatable, Identifiable {
+    var id: String { full }
+    let full, name: String
+    let isPrivate: Bool
+    let date, branch, prefix, web, desc, state, folder: String
+}
+
+/// Lo que dice repos: la cabecera (C|usuario|cuenta|tipo|cuántos|cuántos se ven), los repositorios y el error
+struct ReposData: Equatable {
+    var head: [String] = []
+    var items: [RepoItem] = []
+    var error: String? = nil
+}
+
+func parseRepos(_ out: String) -> ReposData {
+    var r = ReposData()
+    for f in parseLines(out) {
+        switch f.first ?? "" {
+        case "C" where f.count >= 6: r.head = f
+        case "R" where f.count >= 11:
+            r.items.append(RepoItem(full: f[1], name: f[2], isPrivate: f[3] == "1", date: f[4], branch: f[5],
+                                    prefix: f[6], web: f[7], desc: f[8], state: f[9], folder: f[10]))
+        case "E" where f.count >= 2: r.error = f[1]
+        default: break
+        }
+    }
+    return r
+}
+
+/// Configuración, Docker: los proyectos sin visitas se paran solos (docker-reposo): cuántas horas (0:
+/// nunca; 3 si no se ha dicho) y lo último que se ha parado
+struct IdleStopCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var hours = "3"
+    @State private var last = ""
+    let choices = ["0", "1", "2", "3", "4", "6", "8", "12", "24"]
+
+    var body: some View {
+        TileCard(wide: true) {
+            Tile("Parar los proyectos sin visitas",
+                 (hours != "0" ? "Un proyecto de Docker que lleva esas horas sin ninguna visita (tampoco por el túnel) se para solo, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker): no gasta memoria ni CPU de la máquina virtual. Se mira cada 15 minutos, también con la ventana cerrada. Al entrar en uno parado, la web lo dice: se arranca en la pestaña Docker."
+                  : "Apagado: los proyectos de Docker siguen en marcha hasta que se paren a mano")
+                 + (hours != "0" && !last.isEmpty ? "\nLo último: " + last : "")) {
+                Picker("", selection: Binding(get: { hours }, set: { h in
+                    guard h != hours else { return }
+                    hours = h
+                    runQuick(["docker-reposo", "horas", h]) { _, out in
+                        model.toast(out.split(separator: "\n").last.map(String.init) ?? "Hecho")
+                        read()
+                    }
+                })) {
+                    ForEach(choices + (choices.contains(hours) ? [] : [hours]), id: \.self) { h in
+                        Text(h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas").tag(h)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 210)
+                .disabled(model.busy)
+            }
+        }
+        .onAppear { read() }
+    }
+
+    func read() {
+        let v = ((try? String(contentsOfFile: LOG_DIR + "/docker/reposo", encoding: .utf8)) ?? "3")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        hours = v.range(of: "^([0-9]|1[0-9]|2[0-4])$", options: .regularExpression) != nil ? v : "3"
+        last = ((try? String(contentsOfFile: LOG_DIR + "/docker-reposo.log", encoding: .utf8)) ?? "")
+            .split(separator: "\n").last.map(String.init) ?? ""
+    }
+}
+
+/// Configuración, GitHub: la conexión (un token en el Llavero o la sesión de gh), la organización o cuenta
+/// y los prefijos de los repositorios que se ven en Repositorios
+struct GitHubCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var account = ""
+    @State private var prefixes = ""
+    @State private var loaded = false
+
+    var body: some View {
+        let g = model.github
+        let how = ["llavero": "con el token del Llavero", "gh": "con tu sesión de gh"][g?.source ?? ""] ?? ""
+        return TileCard("GitHub (Repositorios)", "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para clonarlos por SSH (con tu clave) en \(HTDOCS). La lista se lee con un token de GitHub, que se guarda en el Llavero (no en un fichero), o con tu sesión de gh. Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, «Mostrar todos» enseña el resto).") {
+            Tile("Conexión", g == nil ? "Comprobando…" : g!.on ? "Conectado como \(g!.login), \(how)"
+                 : !(g!.source.isEmpty) ? "⚠ El token ya no vale (¿caducado?): conéctalo de nuevo"
+                 : "Sin conectar: hace falta para ver la lista de repositorios (también los privados)") {
+                Button("Conectar con un token…") { model.githubToken() }
+                    .buttonStyle(OutlineButton(kind: g?.on == true ? "" : "primary"))
+                    .disabled(model.busy)
+                if g?.source != "gh" && ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].contains(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+                    Button("Usar la sesión de gh") { runQuick(["github-conectar", "--gh"]) { rc, out in model.githubDone(rc, out) } }
+                        .disabled(model.busy)
+                        .tip("La de la herramienta de GitHub (gh auth login), sin pegar ningún token")
+                }
+                if !(g?.source ?? "").isEmpty {
+                    Button("Desconectar") { runQuick(["github-desconectar"]) { rc, out in model.githubDone(rc, out) } }
+                        .disabled(model.busy)
+                }
+            }
+            Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)") {
+                TextField("", text: $account).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 170)
+                Button("Guardar") { model.githubSet("cuenta", account.trimmingCharacters(in: .whitespaces)) }
+                    .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "") || model.busy)
+            }
+            Tile("Prefijos de los repositorios", "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos") {
+                TextField("", text: $prefixes).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 240)
+                Button("Guardar") { model.githubSet("prefijos", prefixes.trimmingCharacters(in: .whitespaces)) }
+                    .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "") || model.busy)
+            }
+        }
+        .onAppear { if model.github == nil { model.reloadGithub() } else { fill() } }
+        .onChange(of: model.github) { _ in fill() }
+    }
+
+    func fill() {
+        account = model.github?.account ?? ""
+        prefixes = model.github?.prefixes ?? ""
+    }
+}
+
+/// Pestaña Repositorios: los de la organización o cuenta de GitHub (Configuración), para clonarlos por SSH
+struct ReposView: View {
+    @EnvironmentObject var model: AppModel
+    @State private var query = ""
+
+    var body: some View {
+        WidePage {
+            let r = model.repos
+            let h = r?.head ?? []
+            PageTitle(title: "Repositorios",
+                      sub: h.count >= 6 ? "\(h[2]) en GitHub: \(h[5]) de \(h[4]) repositorios" + (model.reposAll ? "" : " (los de sus prefijos)")
+                        : "Los repositorios de tu organización en GitHub, para clonarlos por SSH en \(HTDOCS)",
+                      logo: "github")
+            if let e = r?.error, h.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(e)
+                    Button("Ir a Configuración") { model.openTools("github") }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+            } else {
+                HStack(spacing: 10) {
+                    TextField("Buscar por nombre, descripción o web", text: $query)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(width: 320)
+                    Toggle("Mostrar todos", isOn: Binding(get: { model.reposAll }, set: {
+                        model.reposAll = $0
+                        model.reloadRepos(cache: true)
+                        model.reloadRepos()
+                    }))
+                    .toggleStyle(SwitchToggleStyle())
+                    .tip("También los que no empiezan por ninguno de los prefijos (Configuración, GitHub)")
+                    Spacer()
+                    if let e = r?.error { Text("⚠ " + e).font(.caption).foregroundColor(.secondary).lineLimit(2) }
+                    if model.reposLoading || r == nil {
+                        ProgressView().scaleEffect(0.6)
+                    } else {
+                        Button(action: { model.reloadRepos() }) { Image(systemName: "arrow.clockwise") }
+                            .tip("Leer de nuevo la lista de GitHub")
+                    }
+                }
+                let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+                let items = (r?.items ?? []).filter { q.isEmpty || ($0.full + " " + $0.desc + " " + $0.web).lowercased().contains(q) }
+                Card {
+                    if items.isEmpty {
+                        Text(r == nil || model.reposLoading ? "Cargando la lista de GitHub…" : "Ningún repositorio")
+                            .foregroundColor(.secondary).padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    LazyVStack(spacing: 0) {
+                        ForEach(items) { item in
+                            row(item)
+                            if item != items.last { Divider().padding(.leading, 46) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func row(_ item: RepoItem) -> some View {
+        let kind = ["wordpress", "prestashop"].first { item.prefix.contains($0) || item.name.contains($0) }
+        let bits = [item.state == "clonado" ? "clonado en \(item.folder)" : "", item.desc, item.web,
+                    item.date.isEmpty ? "" : "actualizado el \(item.date)"].filter { !$0.isEmpty }
+        return HStack(spacing: 12) {
+            LogoShape(d: LOGO_PATHS[kind ?? "github"] ?? "")
+                .fill(kind.map { brand($0) } ?? Color.primary)
+                .frame(width: 20, height: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(item.name).font(.system(size: 13, weight: .medium))
+                    if item.isPrivate { Image(systemName: "lock.fill").font(.system(size: 10)).foregroundColor(.secondary) }
+                }
+                Text(bits.joined(separator: " · ")).font(.caption).foregroundColor(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if item.state == "clonado" {
+                Button("Traer cambios") { model.fetchRepo(item) }
+                    .buttonStyle(OutlineButton())
+                    .disabled(model.busy)
+                    .tip("Ya está clonado: git pull en \(HTDOCS)/\(item.folder)")
+            } else if item.state == "ocupado" {
+                Button("Clonar") {}
+                    .buttonStyle(OutlineButton())
+                    .disabled(true)
+                    .tip("Ya hay una carpeta \(HTDOCS)/\(item.name) que no es un clon de este repositorio")
+            } else {
+                Button("Clonar") { model.fetchRepo(item) }
+                    .buttonStyle(OutlineButton(kind: "primary"))
+                    .disabled(model.busy)
+                    .tip("Por SSH, con tu clave, en \(HTDOCS)/\(item.name)")
+            }
+            // (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo)
+            Button(action: { openURL("https://github.com/" + item.full) }) {
+                LogoShape(d: LOGO_PATHS["github"] ?? "").fill(Color.primary).frame(width: 16, height: 16)
+            }
+            .buttonStyle(OutlineButton())
+            .tip("Abrir en GitHub (https://github.com/" + item.full + ")")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+}
+
+// MARK: parches nuevos de los componentes
+
+/// Lo que dice componentes: lo que tiene un parche nuevo (para enseñarlo), lo que no se pone al día solo y
+/// lo que no se ha podido consultar
+struct ComponentsState: Equatable {
+    var items: [String] = []
+    var notes: [String] = []
+    var errors: [String] = []
+}
+
+func parseComponents(_ out: String) -> ComponentsState {
+    var c = ComponentsState()
+    for f in parseLines(out) {
+        switch f.first ?? "" {
+        case "L" where f.count >= 5: c.items.append("XAMPP-\(f[1]): \(f[2]) \(f[3]) → \(f[4])")
+        case "K" where f.count >= 3: c.items.append("\(f[1]) (\(f[2])): versión nueva en Docker Hub")
+        case "X" where f.count >= 4: c.items.append("\(f[1]): \(f[2]) → \(f[3])")
+        case "F" where f.count >= 3 && f[2].contains("→"): c.notes.append("XAMPP-\(f[1]): \(f[2])")
+        case "E" where f.count >= 2: c.errors.append(f[1])
+        default: break
+        }
+    }
+    return c
 }
 
 // MARK: consumo de Nexum y sus servicios
@@ -24502,7 +25651,7 @@ extension AppModel {
         return p.isWeb ? dockerWebURL(docker, p.domain) : "https://\(p.domain)"
     }
 
-    var dockerPmaURL: String { return dockerWebURL(docker, "pma.docker.local") + "/" }
+    var dockerPmaURL: String { return dockerWebURL(docker, "pma." + dockerTLD(docker)) + "/" }
 
     func saveVisor(_ c: VisorConf) {
         guard saveVisorConf(c) else {
@@ -24534,17 +25683,12 @@ extension AppModel {
         if t != tunnel { tunnel = t }
     }
 
-    /// Lo de cloudflared (tunel: I|instalado|versión|la del programa) y la configuración del túnel
+    /// Lo de cloudflared (tunel: I|instalado|versión|la del programa)
     func reloadTunnelInfo() {
-        tunnelConf = readTunnelConf()
         runQuick(["tunel"]) { _, out in
             let f = parseLines(out).first(where: { $0[0] == "I" && $0.count >= 4 })
             if f != self.tunnelInfo { self.tunnelInfo = f }
         }
-    }
-
-    func tunnelConfig(_ args: [String]) {
-        runQuick(["tunel-config"] + args) { _, _ in self.tunnelConf = readTunnelConf() }
     }
 
     /// «Compartir» del visor: abre un túnel de Cloudflare a esa dirección; si ya lo está, «Compartiendo»
@@ -24559,18 +25703,43 @@ extension AppModel {
         }
     }
 
+    /// Abre un túnel a esa web, con lo suyo, que se elige ahora: cuánto dura y si se bloquea el panel de
+    /// administración. Su contraseña, siempre una nueva al azar (se ve al abrirlo, para copiarla)
     func share(_ url: String, folder: String, name: String) {
-        let c = readTunnelConf()
-        var text = "Cualquiera que tenga la dirección y la contraseña verá \(url) tal y como está en este Mac (lo que cambies, al momento) mientras el túnel esté abierto. Se cierra solo en \(plural(c.hours, "hora", "horas")); también al pulsar «Cerrar el túnel». "
-        text += c.block ? "El panel de administración va bloqueado."
-            : "⚠ El panel de administración NO va bloqueado (Configuración, Túnel de Cloudflare)."
+        var text = "Cualquiera que tenga la dirección y la contraseña verá \(url) tal y como está en este Mac (lo que cambies, al momento) mientras el túnel esté abierto."
         if let t = tunnel { text += " Se cierra el que hay abierto (\(t.target))." }
         let installed = FileManager.default.isExecutableFile(atPath: TUNNEL_DIR + "/cloudflared")
         if !installed { text += " La primera vez se descarga cloudflared, el programa de Cloudflare (unos 20 MB)." }
-        guard confirm("¿Compartir \(name)?", text, "Compartir") else { return }
+        text += " Lleva una contraseña nueva al azar: se ve al abrirlo, para copiarla y mandarla."
+        let alert = NSAlert()
+        alert.messageText = "Compartir \(name)"
+        alert.addButton(withTitle: "Compartir")
+        alert.addButton(withTitle: "Cancelar")
+        func line(_ title: String, _ views: [NSView]) -> NSView {
+            let t = NSTextField(labelWithString: title)
+            t.textColor = .secondaryLabelColor
+            t.translatesAutoresizingMaskIntoConstraints = false
+            t.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            let row = NSStackView(views: [t] + views)
+            row.orientation = .horizontal
+            row.spacing = 10
+            return row
+        }
+        let hours = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 110, height: 26), pullsDown: false)
+        hours.addItems(withTitles: (1...12).map { plural($0, "hora", "horas") })
+        hours.selectItem(at: 1)
+        let block = NSButton(checkboxWithTitle: "Bloquear el panel de administración (tus BBDD llevan el administrador de pruebas)",
+                             target: nil, action: nil)
+        block.state = .on
+        alert.accessoryView = dialogStack([
+            dialogLabel(text, color: .secondaryLabelColor),
+            line("Se cierra solo en", [hours]), block,
+        ], spacing: 12)
+        guard alert.runStyled() == .alertFirstButtonReturn else { return }
+        let args = ["tunel-abrir", url, folder, "--horas", String(hours.indexOfSelectedItem + 1),
+                    "--admin", block.state == .on ? "bloquear" : "permitir"]
         let open: () -> Void = {
-            _ = self.runTask("Abriendo el túnel de \(name)", ["tunel-abrir", url, folder], doneText: "Túnel abierto",
-                             autoClose: true) { ok, _, _ in
+            _ = self.runTask("Abriendo el túnel de \(name)", args, doneText: "Túnel abierto", autoClose: true) { ok, _, _ in
                 self.refreshTunnel()
                 if ok && self.tunnel != nil {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.shareDialog() }
@@ -24594,7 +25763,6 @@ extension AppModel {
             toast("El túnel ya está cerrado")
             return
         }
-        let c = readTunnelConf()
         let hour = clockTime(t.expires)
         let alert = NSAlert()
         alert.messageText = "Compartiendo \(t.target)"
@@ -24605,7 +25773,7 @@ extension AppModel {
         let copyURL = DialogValidator()
         copyURL.update = { copyText(t.url); self.toast("Dirección copiada") }
         let copyPass = DialogValidator()
-        copyPass.update = { copyText(c.pass); self.toast("Contraseña copiada") }
+        copyPass.update = { copyText(t.password); self.toast("Contraseña copiada") }
         func line(_ title: String, _ value: String, _ v: DialogValidator) -> NSView {
             let l = NSTextField(labelWithString: title)
             l.textColor = .secondaryLabelColor
@@ -24621,16 +25789,16 @@ extension AppModel {
             return row
         }
         alert.accessoryView = dialogStack([
-            line("Dirección", t.url, copyURL), line("Contraseña", c.pass, copyPass),
+            line("Dirección", t.url, copyURL), line("Contraseña", t.password, copyPass),
             dialogLabel("Se cierra solo a las \(hour). "
-                        + (c.block ? "El panel de administración va bloqueado." : "⚠ El panel de administración no va bloqueado.")
+                        + (t.block ? "El panel de administración va bloqueado." : "⚠ El panel de administración no va bloqueado.")
                         + " Quién entra y lo que se bloquea queda en el registro del túnel (Configuración, Túnel de Cloudflare).",
                         color: .secondaryLabelColor),
         ], spacing: 12)
         let r = alert.runStyled()
         withExtendedLifetime([copyURL, copyPass]) {}
         if r == .alertSecondButtonReturn {
-            copyText("Te paso la web en pruebas:\n\(t.url)\nContraseña: \(c.pass)\n(Funciona hasta las \(hour).)")
+            copyText("Te paso la web en pruebas:\n\(t.url)\nContraseña: \(t.password)\n(Funciona hasta las \(hour).)")
             toast("Texto para enviar copiado")
         } else if r == .alertThirdButtonReturn {
             tunnelClose()
@@ -24651,14 +25819,18 @@ extension AppModel {
     func sharedUsers(_ name: String) -> [String] {
         guard let k = docker else { return [] }
         var maria: String? = nil
+        var bridge: String? = nil
         if name.range(of: "^nexum-mariadb-[0-9]+-[0-9]+$", options: .regularExpression) != nil {
             maria = String(name.dropFirst(14)).replacingOccurrences(of: "-", with: ".")
+        } else if name.range(of: "^nexum-lampp-bd-[0-9]+-[0-9]+(-[0-9]+)?$", options: .regularExpression) != nil {
+            bridge = String(name.dropFirst(15)).replacingOccurrences(of: "-", with: ".")
         } else if name != "nexum-web" && name != "nexum-pma" {
             return []
         }
         let up = k.containers.filter { $0.state == "running" }.map { $0.name }
         return k.projects.filter { p in
-            p.isWeb && (maria.map { p.maria == $0 } ?? true) && up.contains { n in
+            // (una MariaDB común no la usan los que van en vivo con XAMPP-X; el puente, solo esos)
+            p.isWeb && (maria.map { p.maria == $0 && p.lampp.isEmpty } ?? true) && (bridge.map { p.lampp == $0 } ?? true) && up.contains { n in
                 n.range(of: "^nexum-" + NSRegularExpression.escapedPattern(for: p.slug) + "-php[0-9]{2}$",
                         options: .regularExpression) != nil
             }
@@ -24671,7 +25843,7 @@ extension AppModel {
         if users.isEmpty { return true }
         let many = users.count > 1
         let text: String
-        if names.contains(where: { $0.hasPrefix("nexum-mariadb-") }) {
+        if names.contains(where: { $0.hasPrefix("nexum-mariadb-") || $0.hasPrefix("nexum-lampp-bd-") }) {
             text = "Es común: ahora \(many ? "la usan" : "la usa") \(users.joined(separator: ", ")). \(many ? "Se quedarán" : "Se quedará") sin BBDD (errores de conexión) hasta que la vuelvas a arrancar; al arrancar un proyecto que va con ella, se arranca sola."
         } else {
             text = "Es común: ahora \(many ? "lo usan" : "lo usa") \(users.joined(separator: ", ")). \(many ? "Dejarán" : "Dejará") de verse hasta que lo vuelvas a arrancar; al arrancar un proyecto del Apache de Docker, se arranca solo."
@@ -24690,10 +25862,26 @@ extension AppModel {
     func dockerWebCommand(_ action: String) {
         let titles = ["arrancar": "Arrancando el Apache de Docker", "parar": "Parando el Apache de Docker",
                       "permitir": "Dando de alta la dirección del Apache de Docker",
-                      "confiar": "Certificado de *.docker.local en el navegador"]
+                      "confiar": "Certificado de Docker en el navegador"]
         runTask(titles[action] ?? action, ["docker-web", action], doneText: "Listo", autoClose: true) { _, _, _ in
             self.reloadDocker(stats: true)
         }
+    }
+
+    /// docker-web dns activar|quitar: el DNS comodín de *.docker.test
+    func dockerDNS(_ on: Bool) {
+        if on {
+            guard confirm("¿Activar el DNS de *.docker.test?",
+                          "Un DNS mínimo, solo en este Mac (127.0.0.1), que contesta a cualquier <algo>.docker.test. Los proyectos del Apache de Docker pasan a .docker.test (su configuración, el dominio de las tiendas en su BBDD y el certificado) y sus líneas salen de /etc/hosts. Desde entonces, añadir proyectos o versiones de Docker no pide la contraseña por los dominios. web.local, los proyectos de siempre y los dominios falseados de las tiendas no cambian. Si no contesta, se quita y todo sigue como estaba. Pide la contraseña de administrador.",
+                          "Activar") else { return }
+        } else {
+            guard confirm("¿Quitar el DNS de *.docker.test?",
+                          "Los dominios de Docker siguen siendo .docker.test y vuelven a /etc/hosts. Pide la contraseña de administrador.",
+                          "Quitar", destructive: true) else { return }
+        }
+        runTask(on ? "Activando el DNS de *.docker.test" : "Quitando el DNS de *.docker.test",
+                ["docker-web", "dns", on ? "activar" : "quitar"],
+                doneText: "DNS de *.docker.test " + (on ? "puesto" : "quitado")) { _, _, _ in self.reloadDocker() }
     }
 
     /// Dirección y puertos del Apache de Docker (docker-web puertos)
@@ -24753,7 +25941,7 @@ extension AppModel {
             return
         }
         let now = ps ? "La tienda guarda su dominio en la BBDD: va con \(dockerSite(p)) y la versión que elijas (ahora PHP \(p.php))."
-            : "Todas a la vez, cada una con su dominio (\(p.slug)-php83.docker.local), con la misma carpeta y la misma BBDD."
+            : "Todas a la vez, cada una con su dominio (\(p.slug)-php83.\(dockerTLD(k))), con la misma carpeta y la misma BBDD."
         let alert = NSAlert()
         alert.messageText = "Versiones de PHP de \(p.folder)"
         alert.addButton(withTitle: "Hacerlo")
@@ -24834,7 +26022,7 @@ struct DockerNewPanel: View {
                 .labelsHidden()
                 .frame(width: 180)
             }
-            formRow("BBDD que se copia") {
+            formRow("BBDD") {
                 Picker("", selection: $model.dkForm.source) {
                     Text("— Ninguna: vacía —").tag("")
                     ForEach(Array(pairs.enumerated()), id: \.offset) { _, pr in
@@ -24843,6 +26031,16 @@ struct DockerNewPanel: View {
                 }
                 .labelsHidden()
                 .frame(width: wide)
+            }
+            if !model.dkForm.source.isEmpty && x?.kind == "wp" {
+                formRow("Cómo") {
+                    Picker("", selection: $model.dkForm.live) {
+                        Text("En vivo: la misma que web.local (sin copias)").tag(true)
+                        Text("Una copia en Docker").tag(false)
+                    }
+                    .labelsHidden()
+                    .frame(width: wide)
+                }
             }
             if folders.isEmpty {
                 Text("Todas las carpetas de htdocs están ya en Docker.").font(.callout).foregroundColor(.secondary)
@@ -24890,15 +26088,18 @@ struct NewProjectWizard: View {
     var body: some View {
         let check = model.npCheck()
         return VStack(alignment: .leading, spacing: 12) {
-            Text(["", "Paso 1 de 3: clonar el repositorio", "Paso 2 de 3: versión de PHP", "Paso 3 de 3: BBDD nueva"][model.npStep])
+            Text(["", "Paso 1 de 4: el repositorio", "Paso 2 de 4: versión de PHP", "Paso 3 de 4: BBDD nueva",
+                  "Paso 4 de 4: dominio de producción"][model.npStep])
                 .font(.headline).frame(maxWidth: .infinity)
             Group {
                 if model.npStep == 1 {
                     stepRepo()
                 } else if model.npStep == 2 {
                     stepVersion()
-                } else {
+                } else if model.npStep == 3 {
                     stepDb()
+                } else {
+                    stepDomain()
                 }
             }
             if !check.1.isEmpty {
@@ -24911,7 +26112,7 @@ struct NewProjectWizard: View {
                 if model.npStep > 1 {
                     Button("Atrás") { model.npGo(-1) }.buttonStyle(OutlineButton(big: true))
                 }
-                Button(model.npStep == 3 ? "Montar proyecto" : "Siguiente") { model.npGo(1) }
+                Button(model.npStep == 4 ? "Montar proyecto" : "Siguiente") { model.npGo(1) }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
                     .disabled(!check.0 || model.busy)
             }
@@ -24922,8 +26123,34 @@ struct NewProjectWizard: View {
     }
 
     func stepRepo() -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Dirección del repositorio (GitHub u otro):")
+        let q = model.npRepoQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        let hits = q.count < 2 || model.npRepos.contains(where: { $0.full.lowercased() == q }) ? []
+            : Array(model.npRepos.filter { $0.full.lowercased().contains(q) }.prefix(6))
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("¿De qué repositorio de GitHub? (escribe parte de su nombre)")
+            TextField("dob-wordpress-…", text: $model.npRepoQuery)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            if !hits.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(hits) { r in
+                        Button(action: { model.npPickRepo(r) }) {
+                            HStack {
+                                Text(r.full).lineLimit(1)
+                                Spacer()
+                                if !r.web.isEmpty { Text(r.web).font(.caption).foregroundColor(.secondary).lineLimit(1) }
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.06)))
+            }
+            if !model.npRepoNote.isEmpty {
+                Text(model.npRepoNote).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("o la dirección de otro repositorio (GitHub u otro servidor):")
             TextField("https://github.com/usuario/repositorio.git", text: Binding(
                 get: { model.npUrl },
                 set: { v in
@@ -24939,7 +26166,7 @@ struct NewProjectWizard: View {
                     model.npFolderAuto = v.isEmpty
                 }))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-            Text("Se clona con tu usuario (sin sudo). Si el repositorio es privado, usa su dirección SSH (git@github.com:usuario/repositorio.git) con tu clave SSH ya configurada.")
+            Text("Se clona con tu usuario (sin sudo). Los de la lista, por SSH con tu clave; una dirección https de un privado de GitHub, GitLab o Bitbucket se prueba sola por SSH.")
                 .font(.caption).foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -24961,6 +26188,20 @@ struct NewProjectWizard: View {
                 .pickerStyle(RadioGroupPickerStyle())
                 .labelsHidden()
             }
+        }
+    }
+
+    func stepDomain() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("¿Falsear su dominio de producción en este Mac?", isOn: $model.npFake)
+                .toggleStyle(SwitchToggleStyle())
+            Text("Dominio de producción:")
+            TextField("midominio.com", text: $model.npDomain)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .disabled(!model.npFake)
+            Text("Falseado, el navegador abre el proyecto en local con su dominio de verdad (con su certificado), como en Dominios y hosts: lo que necesitan las tiendas PrestaShop y los WordPress con el dominio en su BBDD. Si no, se abre en web.local.")
+                .font(.caption).foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -25089,6 +26330,8 @@ struct DatabasesView: View {
             if let d = model.data {
                 head(d)
                 cards(d)
+                // Subir o actualizar una BBDD: antes de la tabla, en un visor hundido
+                importCard(d)
                 HStack(spacing: 10) {
                     SearchField(text: $model.dbQuery, placeholder: "Buscar una BBDD o su proyecto").frame(width: 300)
                     Spacer(minLength: 8)
@@ -25096,7 +26339,6 @@ struct DatabasesView: View {
                     Toggle("", isOn: $model.dbOnlyActive).toggleStyle(SwitchToggleStyle()).labelsHidden().controlSize(.small)
                 }
                 dbTable(d)
-                importCard(d)
             } else {
                 Loading()
             }
@@ -25314,60 +26556,87 @@ struct DatabasesView: View {
         return f.string(from: Date(timeIntervalSince1970: TimeInterval(when)))
     }
 
+    /// Subir o actualizar una BBDD, compacto (como en Linux): el fichero, la BBDD de destino, el proyecto y
+    /// Cargar en columnas, dentro de un visor hundido, antes de la tabla
     func importCard(_ d: AppData) -> some View {
         let act = d.installs.first(where: { $0.folder == d.active })
-        let desc = "Carga una copia .sql, .sql.gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa"
-            + (act.map { ", XAMPP-\($0.folder) (MariaDB \($0.mariadb))" } ?? "")
-            + ". Antes se borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para que no quede nada de lo anterior."
+        let desc = "Carga una copia .sql, .sql.gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa. "
+            + "Antes se borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para que no quede nada de lo anterior."
         let dbs = d.dbs[d.active] ?? []
         let hint = model.importHint()
-        return VStack(alignment: .leading, spacing: 12) {
-            Card("Subir o actualizar una BBDD", desc) {
-                if act == nil {
-                    Row("No hay ninguna versión activa", "Activa una versión en Versiones de PHP para cargar BBDD.")
-                } else {
-                    Row("Fichero SQL", fileSubtitle()) {
-                        Button("Elegir…") { model.pickSql() }
-                    }
-                    Divider()
-                    Row("BBDD de destino", "En XAMPP-\(d.active)") {
-                        Picker("", selection: Binding(get: { model.impDb ?? "" },
-                                                      set: { model.impDb = $0.isEmpty ? nil : $0 })) {
-                            if model.impDb == nil { Text("Elige una BBDD").tag("") }
-                            ForEach(dbs, id: \.self) { Text($0).tag($0) }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "square.and.arrow.up").foregroundColor(.secondary)
+                Text("Subir o actualizar una BBDD").font(.system(size: 13, weight: .semibold))
+                Image(systemName: "info.circle").foregroundColor(.secondary).tip(desc)
+                if let a = act {
+                    Text("en XAMPP-\(a.folder) · MariaDB \(a.mariadb)").font(.caption).foregroundColor(.secondary)
+                }
+            }
+            if act == nil {
+                Text("Activa una versión en Versiones de PHP para cargar BBDD.").font(.caption).foregroundColor(.secondary)
+            } else {
+                HStack(alignment: .top, spacing: 16) {
+                    importColumn("Fichero SQL") {
+                        HStack(spacing: 6) {
+                            Button("Elegir…") { model.pickSql() }
+                            Text(fileSubtitle()).font(.caption).foregroundColor(model.impFile == nil ? Color.secondary : Color.primary)
+                                .lineLimit(1).truncationMode(.middle).tip(model.impFile ?? "")
                         }
-                        .labelsHidden()
-                        .frame(width: 230)
-                        IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.createDb() }
-                            .disabled(model.busy)
-                        IconButton(symbol: "trash", help: "Borrar la BBDD elegida") {
-                            if let db = model.impDb { model.dropDb(db) }
+                        // (lo que falta para poder cargar: debajo del fichero, que tiene sitio)
+                        if let h = hint {
+                            Text(h).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                         }
-                        .disabled(model.impDb == nil || model.busy)
                     }
-                    Divider()
-                    Row("Proyecto", model.importProjectHint()) {
+                    importColumn("BBDD de destino") {
+                        HStack(spacing: 4) {
+                            Picker("", selection: Binding(get: { model.impDb ?? "" },
+                                                          set: { model.impDb = $0.isEmpty ? nil : $0 })) {
+                                if model.impDb == nil { Text("Elige una BBDD").tag("") }
+                                ForEach(dbs, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
+                            .frame(minWidth: 150, maxWidth: 260)
+                            IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.createDb() }
+                                .disabled(model.busy)
+                            IconButton(symbol: "trash", help: "Borrar la BBDD elegida") {
+                                if let db = model.impDb { model.dropDb(db) }
+                            }
+                            .disabled(model.impDb == nil || model.busy)
+                        }
+                    }
+                    importColumn("Proyecto (opcional)") {
                         Picker("", selection: Binding(get: { model.impProject ?? "" },
                                                       set: { model.impProject = $0.isEmpty ? nil : $0 })) {
                             Text("Ninguno").tag("")
                             ForEach(model.impProjects, id: \.self) { Text($0).tag($0) }
                         }
                         .labelsHidden()
-                        .frame(width: model.importProjectWidth())
+                        .frame(minWidth: 150, maxWidth: 260)
+                        Text(model.importProjectHint()).font(.caption).foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .onAppear { if model.impProjects.isEmpty { model.refreshImpProjects() } }
-                }
-            }
-            if act != nil {
-                VStack(spacing: 6) {
                     Button("Cargar") { model.importDb() }
-                        .buttonStyle(OutlineButton(kind: "primary", big: true))
+                        .buttonStyle(OutlineButton(kind: "primary"))
                         .disabled(hint != nil || model.busy)
-                    if let h = hint { Text(h).font(.callout).foregroundColor(.secondary) }
+                        .padding(.top, 20)
                 }
-                .frame(maxWidth: .infinity)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SoftSunken(radius: 12))
+    }
+
+    /// Una columna del formulario de carga: su título en pequeño y lo de debajo
+    func importColumn<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title.uppercased()).font(.system(size: 10.5, weight: .semibold)).foregroundColor(.secondary)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func fileSubtitle() -> String {
@@ -25717,6 +26986,8 @@ struct HostEntry: Equatable {
 /// con la versión: se arranca aquí cuando haga falta
 struct ServicesView: View {
     @EnvironmentObject var model: AppModel
+    /// Cierra el desplegable de arriba (al arrancar o parar la versión entera)
+    var close: () -> Void = {}
 
     var body: some View {
         Page {
@@ -25756,6 +27027,14 @@ struct ServicesView: View {
                 Text("\(running) de \(services.count) en marcha").foregroundColor(.secondary)
             }
             Spacer(minLength: 8)
+            // Arrancar o parar la versión entera: lo que hacía el botón Encendidos del visor
+            if d.running {
+                Button("Parar y desactivar") { close(); model.power() }.disabled(model.busy)
+            } else {
+                Button("Arrancar XAMPP-\(d.active)") { close(); model.power() }
+                    .buttonStyle(OutlineButton(kind: "primary"))
+                    .disabled(model.busy)
+            }
             if exposed {
                 Badge(text: "Abierto a la red", symbol: "exclamationmark.triangle.fill", color: RED)
             } else {
@@ -26011,62 +27290,41 @@ struct ToolsView: View {
     @State private var dkHTTP = ""
     @State private var dkHTTPS = ""
 
+    /// Apartados de Configuración (como en Linux): su clave, su nombre en la columna de la izquierda y su icono
+    static let sections: [(String, String, String)] = [
+        ("parches", "Parches nuevos", "arrow.down.circle"),
+        ("hosts", "Vhosts y hosts", "network"),
+        ("seguridad", "Seguridad entre webs", "lock.shield"),
+        ("correo", "Correo de pruebas", "envelope"),
+        ("docker", "Docker", "logo:docker"),
+        ("tunel", "Túnel de Cloudflare", "cloud"),
+        ("visor", "Visor de los proyectos", "square.grid.2x2"),
+        ("github", "GitHub", "logo:github"),
+        ("errores", "Registro de errores", "exclamationmark.triangle"),
+        ("carpetas", "Carpetas", "folder"),
+        ("oficial", "XAMPP oficial", "externaldrive"),
+        ("info", "Información", "info.circle")]
+
     var body: some View {
-        Page {
-            PageTitle(title: "Configuración", sub: "Ficheros de configuración, carpetas, registros y el programa",
+        WidePage {
+            PageTitle(title: "Configuración", sub: "Elige un apartado a la izquierda para ver lo que se puede cambiar",
                       symbol: "gearshape")
             if let d = model.data {
-                Card("Configuración", "Después de cambiar los vhosts, reinicia la versión activa para aplicarlos.") {
-                    Row("Virtual hosts", d.vhosts) {
-                        Button("Editar…") { model.editVhosts() }.disabled(model.busy)
+                // A la izquierda, los encabezados de los apartados; a la derecha, lo que se puede cambiar del elegido
+                HStack(alignment: .top, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(ToolsView.sections, id: \.0) { sec in
+                            SubNavRow(key: sec.0, text: sec.1, icon: sec.2)
+                        }
                     }
-                    Divider()
-                    Row("Hosts del sistema", d.hosts) {
-                        Button("Editar…") { model.editHosts() }.disabled(model.busy)
+                    .padding(6)
+                    .frame(width: 230, alignment: .topLeading)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.035)))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                    VStack(alignment: .leading, spacing: 12) {
+                        section(model.toolsSection, d)
                     }
-                }
-                Card("Seguridad") {
-                    Row("Barrera entre webs",
-                        "Otra web no puede mandar formularios ni peticiones a tus proyectos. Apágala si una pasarela de pago vuelve a tu tienda con un POST.") {
-                        Toggle("", isOn: Binding(get: { d.barrier }, set: { model.setBarrier($0) }))
-                            .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                            .disabled(model.busy || d.installs.isEmpty)
-                    }
-                }
-                mailCard(d)
-                dockerCard()
-                tunnelCard()
-                buttonsCard()
-                officialCard(d)
-                Card("Carpetas") {
-                    Row("Copias de seguridad", "~/lvm-copias: BBDD borradas o desinstaladas, y las del XAMPP oficial") {
-                        Button("Abrir") { openFolder(NSHomeDirectory() + "/lvm-copias") }
-                    }
-                    Divider()
-                    Row("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
-                        Button("Abrir") { openFolder(LOG_DIR) }
-                    }
-                }
-                Card("Registro de errores", "Si la web cargada da un error (el «error crítico» de WordPress), el motivo está en el registro de su vhost: ahí van los errores de PHP. Los de Apache (que no arranca, un vhost mal escrito…), en el general. Lo más reciente está al final.") {
-                    if let path = projectErrorLog(d) {
-                        errorLogRow(d, path: path, title: "error_log de \(model.projects?.link ?? "")"
-                                    + ((model.projects?.current ?? "").isEmpty ? "" : "  (\(((model.projects?.current ?? "") as NSString).lastPathComponent))"))
-                        Divider()
-                    }
-                    errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
-                }
-                Card("Información") {
-                    Row("Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace cada uno") {
-                        Button("Ver") { model.showCommands() }
-                    }
-                    Divider()
-                    Row("Novedades", "Qué ha cambiado en cada versión") {
-                        Button("Ver") { model.showChanges() }
-                    }
-                    Divider()
-                    Row("Acerca de", "\(d.name) \(d.version)") {
-                        Button("Ver") { model.showAbout() }
-                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             } else {
                 Loading()
@@ -26074,24 +27332,85 @@ struct ToolsView: View {
         }
     }
 
+    /// Lo que se puede cambiar de un apartado
+    @ViewBuilder
+    func section(_ key: String, _ d: AppData) -> some View {
+        switch key {
+        case "hosts":
+            TileCard("Vhosts y hosts", "Después de cambiar los vhosts, reinicia la versión activa para aplicarlos.") {
+                Tile("Virtual hosts", d.vhosts) {
+                    Button("Editar…") { model.editVhosts() }.disabled(model.busy)
+                }
+                Tile("Hosts del sistema", d.hosts) {
+                    Button("Editar…") { model.editHosts() }.disabled(model.busy)
+                }
+            }
+        case "seguridad":
+            TileCard("Seguridad entre webs", wide: true) {
+                Tile("Barrera entre webs",
+                    "Otra web no puede mandar formularios ni peticiones a tus proyectos. Apágala si una pasarela de pago vuelve a tu tienda con un POST.") {
+                    Toggle("", isOn: Binding(get: { d.barrier }, set: { model.setBarrier($0) }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                        .disabled(model.busy || d.installs.isEmpty)
+                }
+            }
+        case "correo":
+            mailCard(d)
+        case "docker":
+            dockerCard()
+        case "tunel":
+            tunnelCard()
+        case "visor":
+            buttonsCard()
+        case "github":
+            GitHubCard()
+        case "errores":
+            TileCard("Registro de errores", "Si la web cargada da un error (el «error crítico» de WordPress), el motivo está en el registro de su vhost: ahí van los errores de PHP. Los de Apache (que no arranca, un vhost mal escrito…), en el general. Lo más reciente está al final.") {
+                if let path = projectErrorLog(d) {
+                    errorLogRow(d, path: path, title: "error_log de \(model.projects?.link ?? "")"
+                                + ((model.projects?.current ?? "").isEmpty ? "" : "  (\(((model.projects?.current ?? "") as NSString).lastPathComponent))"))
+                }
+                errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
+            }
+        case "carpetas":
+            TileCard("Carpetas") {
+                Tile("Copias de seguridad", "~/lvm-copias: BBDD borradas o desinstaladas, y las del XAMPP oficial") {
+                    Button("Abrir") { openFolder(NSHomeDirectory() + "/lvm-copias") }
+                }
+                Tile("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
+                    Button("Abrir") { openFolder(LOG_DIR) }
+                }
+            }
+        case "oficial":
+            officialCard(d)
+        case "info":
+            TileCard("Información") {
+                Tile("Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace cada uno") {
+                    Button("Ver") { model.showCommands() }
+                }
+                Tile("Novedades", "Qué ha cambiado en cada versión") {
+                    Button("Ver") { model.showChanges() }
+                }
+                Tile("Acerca de", "\(d.name) \(d.version)") {
+                    Button("Ver") { model.showAbout() }
+                }
+            }
+        default:
+            componentsCard()
+        }
+    }
+
     /// Docker: la dirección y los puertos del Apache de Docker, dar de alta la dirección en este Mac y que el
     /// navegador acepte el certificado de *.docker.local
     func dockerCard() -> some View {
         let w = model.docker?.web ?? DockerWeb()
-        return Card("Docker", "Los proyectos de Docker van con su propio Apache, en otra dirección de este Mac (nunca abierta a la red): funcionan sin XAMPP-X y a la vez que él, con las mismas reglas de seguridad. Con los puertos 80 y 443, las direcciones van sin puerto. macOS solo tiene 127.0.0.1: la otra se da de alta una vez («Permitir», pide la contraseña).") {
-            Row("Dirección", "De este Mac (127.x.x.x). 127.0.0.1 con 80 y 443 es la de XAMPP-X") {
-                TextField("127.0.0.2", text: $dkIP).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 130)
-            }
-            Divider()
-            Row("Puerto HTTP", "Lleva siempre a https") {
-                TextField("80", text: $dkHTTP).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 70)
-            }
-            Divider()
-            Row("Puerto HTTPS", "Si no es el 443, las direcciones lo llevan (https://…:8443)") {
-                TextField("443", text: $dkHTTPS).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 70)
-            }
-            Divider()
-            Row("Dirección en este Mac", w.ok ? "\(w.ip) ya está en este Mac" : "\(w.ip) aún no está: se da de alta una vez y queda puesta en cada arranque") {
+        return VStack(alignment: .leading, spacing: 12) {
+          TileCard("Docker", "Los proyectos de Docker van con su propio Apache, en otra dirección de este Mac (nunca abierta a la red): funcionan sin XAMPP-X y a la vez que él, con las mismas reglas de seguridad. Con los puertos 80 y 443, las direcciones van sin puerto. macOS solo tiene 127.0.0.1: la otra se da de alta una vez («Permitir», pide la contraseña).", wide: true) {
+            Tile("Dirección y puertos", "De este Mac (127.x.x.x; 127.0.0.1 con 80 y 443 es la de XAMPP-X). HTTP lleva siempre a https; si HTTPS no es el 443, las direcciones lo llevan. "
+                 + (w.ok ? "\(w.ip) ya está en este Mac." : "\(w.ip) aún no está: se da de alta una vez y queda puesta en cada arranque.")) {
+                field("Dirección", $dkIP, 120)
+                field("HTTP", $dkHTTP, 60)
+                field("HTTPS", $dkHTTPS, 60)
                 if !w.ok {
                     Button("Permitir") { model.dockerWebCommand("permitir") }.disabled(model.busy)
                 }
@@ -26099,16 +27418,31 @@ struct ToolsView: View {
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .disabled(model.busy)
             }
-            Divider()
-            Row("Certificado de *.docker.local", "Safari y Chrome lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)") {
+          }
+          TileCard {
+            Tile("DNS de *.docker.test", w.dns ? "Puesto: los dominios de Docker (<proyecto>-php83.docker.test) no van en /etc/hosts ni piden la contraseña"
+                : "Los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts: sin contraseña al añadir proyectos o versiones. web.local, los proyectos de siempre y las tiendas falseadas, igual") {
+                Button(w.dns ? "Quitar" : "Activar") { model.dockerDNS(!w.dns) }.disabled(model.busy)
+            }
+            Tile("Certificado de *.docker.local y *.docker.test", "Safari y Chrome lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)") {
                 Button("Confiar") { model.dockerWebCommand("confiar") }.disabled(model.busy)
             }
+          }
+          IdleStopCard()
         }
         .onAppear {
             if model.docker == nil { model.reloadDocker() }
             fillDocker()
         }
         .onChange(of: model.docker?.web) { _ in fillDocker() }
+    }
+
+    /// Campo con su nombre encima (la dirección y los puertos de Docker)
+    func field(_ title: String, _ text: Binding<String>, _ width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption).foregroundColor(.secondary)
+            TextField("", text: text).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: width)
+        }
     }
 
     func fillDocker() {
@@ -26118,14 +27452,14 @@ struct ToolsView: View {
         if dkHTTPS.isEmpty { dkHTTPS = w.https }
     }
 
-    /// Túnel de Cloudflare: cloudflared, la contraseña de los visitantes, cuándo se cierra solo, si el admin
-    /// se bloquea, el túnel abierto (con Cerrar) y su registro
+    /// Túnel de Cloudflare: cloudflared, el túnel abierto (con Cerrar) y su registro. La contraseña, las horas
+    /// y el admin de cada túnel se eligen al abrirlo («Compartir»)
     func tunnelCard() -> some View {
-        let c = model.tunnelConf
         let info = model.tunnelInfo
         let log = TUNNEL_DIR + "/registro"
-        return Card("Túnel de Cloudflare", "Para enseñar una web de este Mac a un cliente o a un compañero: una dirección https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto.") {
-            Row("cloudflared", info == nil ? "…" : (info?[1] == "1" ? "Versión \(info?[2] ?? ""), en ~/.lvm-instalador/tunel"
+        return VStack(alignment: .leading, spacing: 12) {
+          TileCard("Túnel de Cloudflare", "Para enseñar una web de este Mac a un cliente o a un compañero: una dirección https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto, y ahí se elige su contraseña, cuánto dura y si se bloquea el admin.") {
+            Tile("cloudflared", info == nil ? "…" : (info?[1] == "1" ? "Versión \(info?[2] ?? ""), en ~/.lvm-instalador/tunel"
                                                      : "Aún no está: se descarga de GitHub la primera vez que compartes (unos 20 MB)"),
                 leading: { LogoShape(d: LOGO_PATHS["cloudflare"] ?? "").fill(brand("cloudflare")).frame(width: 20, height: 20) }) {
                 if let f = info, f[1] != "1" || f[2] != f[3] {
@@ -26137,44 +27471,20 @@ struct ToolsView: View {
                     .disabled(model.busy)
                 }
             }
-            Divider()
-            Row("Contraseña para los visitantes", c.pass.isEmpty ? "Se crea al compartir la primera vez"
-                : "La piden al entrar: pásasela con la dirección. Vale para el siguiente túnel") {
-                if !c.pass.isEmpty {
-                    Text(c.pass).font(.system(size: 12.5, design: .monospaced)).textSelection(.enabled)
-                    Button(action: { copyText(c.pass); model.toast("Contraseña del túnel copiada") }) { Image(systemName: "doc.on.doc") }
-                        .buttonStyle(LinkHoverButton()).tip("Copiar la contraseña")
+            if FileManager.default.fileExists(atPath: log) {
+                Tile("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)") {
+                    Button("Ver") { model.showLogTail(log) }
                 }
-                Button("Nueva") { model.tunnelConfig(["clave-nueva"]) }
-                    .disabled(model.busy)
-                    .tip("Otra contraseña al azar (el túnel abierto sigue con la suya)")
             }
-            Divider()
-            Row("Se cierra solo", "Horas desde que se abre (de 1 a 12)") {
-                Stepper("\(c.hours) h", value: Binding(get: { c.hours }, set: { model.tunnelConfig(["horas", String($0)]) }), in: 1...12)
-                    .disabled(model.busy)
-            }
-            Divider()
-            Row("Bloquear el panel de administración", c.block
-                ? "wp-admin y el admin de PrestaShop no se abren por el túnel (tus BBDD llevan el administrador de pruebas, con una contraseña conocida)"
-                : "⚠ Se pueden abrir por el túnel: cualquiera con la contraseña del túnel puede probar a entrar") {
-                Toggle("", isOn: Binding(get: { c.block }, set: { model.tunnelConfig(["admin", $0 ? "bloquear" : "permitir"]) }))
-                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                    .disabled(model.busy)
-            }
-            if let t = model.tunnel {
-                Divider()
-                Row("Túnel abierto", "\(t.url) → \(t.target), hasta las \(clockTime(t.expires))") {
+          }
+          if let t = model.tunnel {
+            TileCard(wide: true) {
+                Tile("Túnel abierto", "\(t.url) → \(t.target), hasta las \(clockTime(t.expires))") {
                     Button("Ver") { model.shareDialog() }
                     Button("Cerrar") { model.tunnelClose() }.buttonStyle(OutlineButton(kind: "stop"))
                 }
             }
-            if FileManager.default.fileExists(atPath: log) {
-                Divider()
-                Row("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)") {
-                    Button("Ver") { model.showLogTail(log) }
-                }
-            }
+          }
         }
         .onAppear { model.reloadTunnelInfo() }
     }
@@ -26185,27 +27495,50 @@ struct ToolsView: View {
         let names = Dictionary(uniqueKeysWithValues: VISOR_BUTTONS)
         let shown = c.order.filter { !c.hidden.contains($0) }.map { names[$0] ?? $0 }
         let style = (VISOR_STYLES.first(where: { $0.0 == c.style })?.1 ?? "").lowercased()
-        return Card("Visor de los proyectos") {
-            Row("Botones", (shown.isEmpty ? "ninguno" : shown.joined(separator: ", ")) + " · " + style
+        return TileCard("Visor de los proyectos", wide: true) {
+            Tile("Botones", (shown.isEmpty ? "ninguno" : shown.joined(separator: ", ")) + " · " + style
                 + (c.square ? " de \(Int(c.side)) px" : "")) {
                 Button("Personalizar…") { model.panel = .buttons }
             }
         }
     }
 
+    /// Parches nuevos: lo que tiene un parche publicado y «Actualizar todo»
+    func componentsCard() -> some View {
+        let c = model.components
+        var text = "Buscando parches nuevos…"
+        if let c = c {
+            text = c.items.isEmpty ? (c.errors.isEmpty ? "Todo al día: no hay parches nuevos."
+                                      : "No se ha podido consultar: " + c.errors.joined(separator: ", "))
+                : c.items.map { "• " + $0 }.joined(separator: "\n")
+            if !c.notes.isEmpty { text += "\n" + c.notes.map { "• " + $0 }.joined(separator: "\n") }
+            if !c.items.isEmpty && !c.errors.isEmpty { text += "\n(No se ha podido consultar: " + c.errors.joined(separator: ", ") + ")" }
+        }
+        return TileCard("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.", wide: true) {
+            Tile("Componentes", text) {
+                Button("Buscar de nuevo") { model.components = nil; model.reloadComponents() }.disabled(model.busy || c == nil)
+                if let c = c, !c.items.isEmpty {
+                    Button("Actualizar todo (\(c.items.count))") { model.updateComponents(c) }
+                        .buttonStyle(OutlineButton(kind: "primary"))
+                        .disabled(model.busy)
+                }
+            }
+        }
+        .onAppear { if model.components == nil { model.reloadComponents() } }
+    }
+
     /// Correo de pruebas (Mailpit): encenderlo, los plugins de correo de WordPress y la bandeja
     @ViewBuilder
     func mailCard(_ d: AppData) -> some View {
         if let m = d.mail {
-            Card("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.") {
-                Row("Correo de pruebas", m.on ? "Encendido: el correo de las webs va a Mailpit"
+            TileCard("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.", columns: 3) {
+                Tile("Correo de pruebas", m.on ? "Encendido: el correo de las webs va a Mailpit"
                     : "Apagado: lo que manden las webs puede llegar de verdad a los clientes") {
                     Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                         .disabled(model.busy)
                 }
-                Divider()
-                Row("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
+                Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
                     Picker("", selection: Binding(get: { m.wp }, set: { model.setMailWp($0) })) {
                         Text("Llevarlos a Mailpit").tag("mailpit")
                         Text("Desactivarlos en la copia local").tag("desactivar")
@@ -26216,16 +27549,8 @@ struct ToolsView: View {
                     .disabled(!m.on || model.busy)
                     .tip("WP Mail SMTP, Easy WP SMTP, Post SMTP, FluentSMTP, Brevo…\n• Llevarlos a Mailpit: los de SMTP siguen funcionando, pero su correo va a Mailpit; los que mandan por una API (Brevo, FluentSMTP, Post SMTP…) se desactivan en la copia local.\n• Desactivarlos: todos fuera de la copia local; WordPress usa mail(), que va a Mailpit.\n• No tocarlos: como en producción; su correo puede llegar de verdad.\nSe aplica al cargar el proyecto o su BBDD.")
                 }
-                if m.wp == "nada" {
-                    Text("⚠ No se tocan: lo que manden puede llegar de verdad a los clientes")
-                        .font(.caption.weight(.semibold)).foregroundColor(.orange)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 8)
-                }
-                Divider()
                 if m.installed {
-                    Row("Bandeja de entrada", mailInboxText(m)) {
+                    Tile("Bandeja de entrada", mailInboxText(m)) {
                         if !m.version.isEmpty && !m.offer.isEmpty && verParts(m.version).lexicographicallyPrecedes(verParts(m.offer)) {
                             Button("Actualizar a \(m.offer)") { model.installMail() }
                                 .buttonStyle(OutlineButton(kind: "primary"))
@@ -26235,7 +27560,7 @@ struct ToolsView: View {
                         Button("Abrir") { openURL(m.url) }.disabled(!m.running)
                     }
                 } else {
-                    Row("Mailpit no está instalado",
+                    Tile("Mailpit no está instalado",
                         "Sin él, el correo de las webs no sale ni se ve. Se descarga de GitHub (Mailpit \(m.offer)) y se comprueba antes de instalarlo") {
                         Button("Instalar Mailpit") { model.installMail() }
                             .buttonStyle(OutlineButton(kind: "primary"))
@@ -26256,7 +27581,7 @@ struct ToolsView: View {
     func mailWpText(_ mode: String) -> String {
         switch mode {
         case "desactivar": return "Se desactivan en la copia local: WordPress manda con mail(), a Mailpit"
-        case "nada": return ""
+        case "nada": return "⚠ No se tocan: lo que manden puede llegar de verdad a los clientes"
         default: return "Siguen funcionando, con su correo a Mailpit (los que usan una API, como Brevo, se desactivan en la copia local)"
         }
     }
@@ -26277,7 +27602,7 @@ struct ToolsView: View {
         let sizeText = ByteCountFormatter.string(fromByteCount: max(size, 0), countStyle: .file)
         let sub = size < 0 ? "\(path): no existe todavía (se crea con el primer error)"
             : "\(path)  ·  \(sizeText)  ·  modificado el \(fmt.string(from: date))"
-        return Row(title, sub) {
+        return Tile(title, sub) {
             Button("Ver el final") { model.showLogTail(path) }.disabled(size <= 0)
             Button("Abrir") { model.openInEditor(path) }
                 .disabled(size < 0 || size > LOG_OPEN_MAX)
@@ -26292,18 +27617,17 @@ struct ToolsView: View {
 
     /// XAMPP oficial: apartarlo, volver a él y cargar las copias de sus bases
     func officialCard(_ d: AppData) -> some View {
-        Card("XAMPP oficial",
-             "Si este Mac tenía un XAMPP oficial en /Applications/XAMPP: al apartarlo se copian sus BBDD, sus proyectos y sus vhosts, sin borrar nada.") {
+        TileCard("XAMPP oficial",
+             "Si este Mac tenía un XAMPP oficial en /Applications/XAMPP: al apartarlo se copian sus BBDD, sus proyectos y sus vhosts, sin borrar nada.", wide: true) {
             if d.official {
-                Row("Hay un XAMPP oficial en /Applications/XAMPP", "Hay que apartarlo para activar las versiones del gestor") {
+                Tile("Hay un XAMPP oficial en /Applications/XAMPP", "Hay que apartarlo para activar las versiones del gestor") {
                     Button("Apartar…") { model.setAside() }.disabled(model.busy)
                 }
             } else if d.asides.isEmpty && d.copies.isEmpty {
-                Row("No hay ningún XAMPP oficial apartado")
+                Tile("No hay ningún XAMPP oficial apartado")
             }
             ForEach(d.copies.keys.sorted(), id: \.self) { folder in
-                if d.official || folder != d.copies.keys.sorted().first { Divider() }
-                Row("BBDD de \((folder as NSString).lastPathComponent)",
+                Tile("BBDD de \((folder as NSString).lastPathComponent)",
                     "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/lvm-copias. Las que ya existan en la versión activa no se tocan.") {
                     Button("Carpeta") { showFolder(folder) }
                     Button(d.active.isEmpty ? "Cargar" : "Cargar en XAMPP-\(d.active)") { model.importBackups(folder) }
@@ -26312,12 +27636,261 @@ struct ToolsView: View {
                 }
             }
             ForEach(d.asides, id: \.self) { a in
-                if d.official || !d.copies.isEmpty || a != d.asides.first { Divider() }
-                Row((a as NSString).lastPathComponent, "Si algo no va: se desactiva la versión del gestor y vuelve a /Applications/XAMPP") {
+                Tile((a as NSString).lastPathComponent, "Si algo no va: se desactiva la versión del gestor y vuelve a /Applications/XAMPP") {
                     Button("Volver al XAMPP oficial…") { model.restoreOfficial(a) }.disabled(model.busy || d.official)
                 }
             }
         }
+    }
+}
+
+// MARK: - Terminal (abajo de la ventana)
+
+/// Tu shell en una pseudoterminal (con su sesión y su terminal de control: Ctrl+C y los trabajos van
+/// como en Terminal). Se ve como texto: sin colores ni programas a pantalla completa (vim, htop)
+final class TermSession {
+    let view = TermTextView(frame: .zero)
+    private var master: Int32 = -1
+    private var pid: pid_t = 0
+    private var source: DispatchSourceRead?
+    var onExit: (() -> Void)?
+    var running: Bool { return pid > 0 }
+
+    init() {
+        view.send = { [weak self] d in self?.write(d) }
+    }
+
+    func start(cwd: String) -> Bool {
+        guard pid == 0 else { return true }
+        let m = posix_openpt(O_RDWR | O_NOCTTY)
+        guard m >= 0 else { return false }
+        guard grantpt(m) == 0, unlockpt(m) == 0, let name = ptsname(m) else { close(m); return false }
+        let slave = String(cString: name)
+        var ws = winsize(ws_row: 40, ws_col: 160, ws_xpixel: 0, ws_ypixel: 0)
+        // (TIOCSWINSZ: en Swift no llega, es una macro de C; en macOS vale 0x80087467)
+        _ = ioctl(m, UInt(0x80087467), &ws)
+        var attr: posix_spawnattr_t? = nil
+        posix_spawnattr_init(&attr)
+        // (una sesión nueva: al abrir la pseudoterminal, pasa a ser su terminal de control)
+        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
+        var fa: posix_spawn_file_actions_t? = nil
+        posix_spawn_file_actions_init(&fa)
+        posix_spawn_file_actions_addopen(&fa, 0, slave, O_RDWR, 0)
+        posix_spawn_file_actions_adddup2(&fa, 0, 1)
+        posix_spawn_file_actions_adddup2(&fa, 0, 2)
+        posix_spawn_file_actions_addchdir_np(&fa, cwd)
+        let env0 = ProcessInfo.processInfo.environment
+        var shell = env0["SHELL"] ?? "/bin/zsh"
+        if !shell.hasPrefix("/") || !FileManager.default.isExecutableFile(atPath: shell) { shell = "/bin/zsh" }
+        var env = env0
+        // (sin colores ni redibujos: se ve como texto)
+        env["TERM"] = "dumb"
+        env["CLICOLOR"] = "0"
+        let argv: [UnsafeMutablePointer<CChar>?] = [strdup(shell), strdup("-l"), nil]
+        let envp: [UnsafeMutablePointer<CChar>?] = env.map { strdup("\($0.key)=\($0.value)") } + [nil]
+        var p: pid_t = 0
+        let rc = posix_spawn(&p, shell, &fa, &attr, argv, envp)
+        for a in argv { free(a) }
+        for e in envp { free(e) }
+        posix_spawn_file_actions_destroy(&fa)
+        posix_spawnattr_destroy(&attr)
+        guard rc == 0 else { close(m); return false }
+        master = m
+        pid = p
+        view.reset()
+        let src = DispatchSource.makeReadSource(fileDescriptor: m, queue: .main)
+        src.setEventHandler { [weak self] in self?.readOut() }
+        src.resume()
+        source = src
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            var st: Int32 = 0
+            waitpid(p, &st, 0)
+            DispatchQueue.main.async { self?.exited() }
+        }
+        return true
+    }
+
+    private func readOut() {
+        guard master >= 0 else { return }
+        var buf = [UInt8](repeating: 0, count: 16384)
+        let n = read(master, &buf, buf.count)
+        if n > 0 { view.feed(Array(buf[0..<n])) }
+    }
+
+    func write(_ d: Data) {
+        guard master >= 0 else { return }
+        d.withUnsafeBytes { raw in _ = Darwin.write(master, raw.baseAddress, raw.count) }
+    }
+
+    func stop() {
+        if pid > 0 { kill(pid, SIGHUP) }
+    }
+
+    private func exited() {
+        source?.cancel()
+        source = nil
+        if master >= 0 { close(master) }
+        master = -1
+        pid = 0
+        onExit?()
+    }
+}
+
+/// El texto de la terminal: enseña lo que sale (sin los códigos de color ni de cursor) y manda lo que
+/// se teclea a la pseudoterminal
+final class TermTextView: NSTextView {
+    var send: ((Data) -> Void)?
+    private var pending: [UInt8] = []
+    private let font0 = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+
+    override var acceptsFirstResponder: Bool { return true }
+
+    func reset() {
+        pending = []
+        textStorage?.setAttributedString(NSAttributedString(string: ""))
+    }
+
+    override func keyDown(with e: NSEvent) {
+        // (⌘: lo del menú, como copiar)
+        if e.modifierFlags.contains(.command) { super.keyDown(with: e); return }
+        var out: [UInt8]? = nil
+        switch e.keyCode {
+        case 36, 76: out = [13]
+        case 51: out = [127]
+        case 48: out = [9]
+        case 53: out = [27]
+        case 123: out = Array("\u{1b}[D".utf8)
+        case 124: out = Array("\u{1b}[C".utf8)
+        case 125: out = Array("\u{1b}[B".utf8)
+        case 126: out = Array("\u{1b}[A".utf8)
+        default:
+            if e.modifierFlags.contains(.control), let c = e.charactersIgnoringModifiers?.lowercased().unicodeScalars.first,
+               c.value >= 97 && c.value <= 122 {
+                out = [UInt8(c.value - 96)]
+            } else if let s = e.characters, !s.isEmpty {
+                out = Array(s.utf8)
+            }
+        }
+        if let o = out { send?(Data(o)) }
+    }
+
+    override func paste(_ sender: Any?) {
+        if let s = NSPasteboard.general.string(forType: .string) { send?(Data(s.utf8)) }
+    }
+
+    /// Lo que sale de la terminal: sin los códigos de escape; \b borra; \r antes de \n no cuenta
+    func feed(_ bytes: [UInt8]) {
+        var data = pending + bytes
+        pending = []
+        // (un carácter de varios bytes a medias: espera al resto)
+        var cut = data.count
+        var i = data.count - 1
+        var back = 0
+        while i >= 0 && back < 4 && (data[i] & 0xC0) == 0x80 { i -= 1; back += 1 }
+        if i >= 0 && data[i] >= 0xC0 {
+            let need = data[i] >= 0xF0 ? 4 : data[i] >= 0xE0 ? 3 : 2
+            if data.count - i < need { cut = i }
+        }
+        if cut < data.count { pending = Array(data[cut...]); data = Array(data[..<cut]) }
+        var text = String(decoding: data, as: UTF8.self)
+        text = text.replacingOccurrences(of: "\u{1b}\\][^\u{07}\u{1b}]*(\u{07}|\u{1b}\\\\)", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\u{1b}\\[[0-9;?]*[ -/]*[@-~]", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\u{1b}[()][0-9A-Za-z]|\u{1b}[=>78]", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\u{07}", with: "")
+        guard let ts = textStorage else { return }
+        let attrs: [NSAttributedString.Key: Any] = [.font: font0, .foregroundColor: NSColor(calibratedRed: 0xD7 / 255.0, green: 0xDE / 255.0, blue: 0xE6 / 255.0, alpha: 1)]
+        var chunk = ""
+        func flush() {
+            if !chunk.isEmpty { ts.append(NSAttributedString(string: chunk, attributes: attrs)); chunk = "" }
+        }
+        for ch in text {
+            if ch == "\u{08}" {
+                if !chunk.isEmpty { chunk.removeLast() } else if ts.length > 0 { ts.deleteCharacters(in: NSRange(location: ts.length - 1, length: 1)) }
+            } else if ch == "\r" {
+                continue
+            } else {
+                chunk.append(ch)
+            }
+        }
+        flush()
+        // (como mucho las últimas 200.000 letras)
+        if ts.length > 250_000 { ts.deleteCharacters(in: NSRange(location: 0, length: ts.length - 200_000)) }
+        scrollToEndOfDocument(nil)
+    }
+}
+
+/// El texto de la terminal en su caja con barra de desplazamiento
+struct TermHost: NSViewRepresentable {
+    let session: TermSession
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let sv = NSScrollView()
+        sv.hasVerticalScroller = true
+        sv.drawsBackground = false
+        sv.borderType = .noBorder
+        let tv = session.view
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.drawsBackground = true
+        tv.backgroundColor = NSColor(calibratedRed: 0x1D / 255.0, green: 0x22 / 255.0, blue: 0x28 / 255.0, alpha: 1)
+        tv.textContainerInset = NSSize(width: 8, height: 6)
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.textContainer?.widthTracksTextView = true
+        sv.documentView = tv
+        DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
+        return sv
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {}
+}
+
+/// La terminal de abajo: con el aspecto del visor de arriba, un poco hundida; el borde de arriba se
+/// arrastra para cambiar su alto
+struct TermPanel: View {
+    @EnvironmentObject var model: AppModel
+    @State private var dragStart: CGFloat? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // (asa para cambiar el alto)
+            Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 44, height: 4)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(DragGesture().onChanged { v in
+                    if dragStart == nil { dragStart = model.termHeight }
+                    model.termHeight = min(700, max(140, (dragStart ?? 260) - v.translation.height))
+                }.onEnded { _ in dragStart = nil })
+                .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+            HStack(spacing: 8) {
+                Image(systemName: "terminal").foregroundColor(.secondary)
+                Text("Terminal").font(.caption)
+                Text(model.termCwd).font(.caption).foregroundColor(.secondary).lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Button(action: { model.termCd() }) { Label("Proyecto cargado", systemImage: "folder") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Ir a la carpeta del proyecto cargado (cd)")
+                Button(action: { model.termStart(restart: true) }) { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Terminal nueva (cierra la de ahora)")
+                Button(action: { model.termOpen = false }) { Image(systemName: "xmark") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Esconder la terminal (sigue abierta)")
+            }
+            TermHost(session: model.term)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
+        .frame(height: model.termHeight)
+        // (como el visor de arriba, hundida: fondo algo más oscuro y sombra por dentro)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(model.isDark ? 0.28 : 0.10))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.25), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.35), lineWidth: 4).blur(radius: 4).mask(RoundedRectangle(cornerRadius: 12)))
+        )
+        .padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
     }
 }
 
@@ -26335,8 +27908,13 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 Sidebar()
                 Divider()
-                detail()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 0) {
+                    detail()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if model.termOpen {
+                        TermPanel()
+                    }
+                }
             }
         }
         // Todos los botones: con borde, la mano y el borde azul al pasar el ratón (como en Linux)
@@ -26353,6 +27931,7 @@ struct ContentView: View {
         case "versiones": VersionsView()
         case "bbdd": DatabasesView()
         case "docker": DockerView()
+        case "repos": ReposView()
         case "dominios": HostsView()
         case "config": ToolsView()
         default: ProjectsView()
@@ -26649,7 +28228,8 @@ function gui_php_dates() {
 # direccion publica (https://<algo>.trycloudflare.com, sin cuenta: cambia cada vez). cloudflared abre
 # una conexion de salida a Cloudflare, sin abrir puertos, y lo que llega por ella pasa por un proxy
 # del programa (TUNNEL_PY, solo en 127.0.0.1) antes de llegar a Apache:
-#  - pide una contraseña (la de TUNNEL_CONF, al azar) y se cierra solo pasadas unas horas
+#  - pide una contraseña (la de ese tunel: al azar o la que se elija al abrirlo) y se cierra solo pasadas
+#    las horas que se elijan
 #  - el admin de WordPress o PrestaShop, bloqueado (las BBDD llevan el administrador de pruebas, con
 #    contraseña conocida), y siempre lo de LAMPP para este equipo (phpMyAdmin...): Apache ve las
 #    peticiones del proxy como de 127.0.0.1
@@ -26663,9 +28243,8 @@ TUNNEL_SHA_AMD64="903845b81828c8cb3c5d13d816a2de71c06a3da5785469df8eb0e1b736d92f
 TUNNEL_SHA_ARM64="a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70"
 TUNNEL_DIR=$LOG_DIR/tunel
 TUNNEL_BIN=$TUNNEL_DIR/cloudflared
-# CLAVE=, HORAS= (1 a 12) y ADMIN= (bloquear o permitir)
-TUNNEL_CONF=$TUNNEL_DIR/config
-# El tunel abierto (lo escribe TUNNEL_PY al tener su direccion): JSON con pid, url, destino, carpeta y fin
+# El tunel abierto (lo escribe TUNNEL_PY al tener su direccion, solo tuyo): JSON con pid, url, destino,
+# carpeta, fin, su contraseña, sus horas y si bloquea el admin
 TUNNEL_STATE=$TUNNEL_DIR/estado
 TUNNEL_LOG=$TUNNEL_DIR/registro
 
@@ -26729,49 +28308,11 @@ function tunnel_install() {
     echo "cloudflared $TUNNEL_VERSION instalado: $TUNNEL_BIN"
 }
 
-# Valor de TUNNEL_CONF (o el de por defecto, si no esta o no vale)
-function tunnel_conf() {
-    local v
-    v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$TUNNEL_CONF" 2> /dev/null)
-    case $1 in
-        CLAVE) [[ "$v" =~ ^[A-Za-z0-9-]{8,64}$ ]] || v="" ;;
-        HORAS) [[ "$v" =~ ^([1-9]|1[0-2])$ ]] || v=2 ;;
-        ADMIN) [ "$v" == permitir ] || v=bloquear ;;
-    esac
-    echo "$v"
-}
-
 # Contraseña nueva, facil de dictar: tres grupos de cuatro letras y numeros sin los que se confunden
 function tunnel_new_pass() {
     local s
     s=$(LC_ALL=C tr -dc 'abcdefghjkmnpqrstuvwxyz23456789' < /dev/urandom | head -c 12)
     echo "${s:0:4}-${s:4:4}-${s:8:4}"
-}
-
-function tunnel_conf_write() {
-    local clave=$1 horas=$2 admin=$3
-    mkdir -p -m 700 "$TUNNEL_DIR" || return 1
-    ( umask 077; printf 'CLAVE=%s\nHORAS=%s\nADMIN=%s\n' "$clave" "$horas" "$admin" > "$TUNNEL_CONF.nuevo" ) \
-        && mv -f "$TUNNEL_CONF.nuevo" "$TUNNEL_CONF"
-}
-
-# tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir: vale para el siguiente tunel
-function tunnel_config() {
-    local clave horas admin
-    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
-    [ -n "$clave" ] || clave=$(tunnel_new_pass)
-    case $1 in
-        clave-nueva) clave=$(tunnel_new_pass); echo "Contraseña nueva para los visitantes del tunel" ;;
-        horas)
-            [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }
-            horas=$2; echo "El tunel se cierra solo a las $horas h de abrirlo" ;;
-        admin)
-            [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "Uso: lvm-instalador tunel-config admin bloquear|permitir"; return 1; }
-            admin=$2; [ "$admin" == bloquear ] && echo "El admin no se puede abrir por el tunel" \
-                || echo "Aviso: el admin se puede abrir por el tunel (y el administrador de pruebas tiene una contraseña conocida)" ;;
-        *) echo "Uso: lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir"; return 1 ;;
-    esac
-    tunnel_conf_write "$clave" "$horas" "$admin"
 }
 
 # PID del tunel abierto (el de TUNNEL_PY, si sigue vivo y es el)
@@ -26806,16 +28347,28 @@ function tunnel_close() {
     echo "Tunel cerrado: la direccion ya no lleva a ningun sitio"
 }
 
-# tunel-abrir <direccion local> [carpeta del proyecto]: la direccion, de una web de este equipo
-# (http://web.local, https://proyecto-php83.docker.local:8443...); la carpeta, para saber que admin
-# bloquear y el dominio de una tienda PrestaShop. Cierra el que hubiera
+# tunel-abrir <direccion local> [carpeta del proyecto] [--horas 1-12] [--admin bloquear|permitir]: la
+# direccion, de una web de este equipo (http://web.local, https://proyecto-php83.docker.local:8443...); la
+# carpeta, para saber que admin bloquear y el dominio de una tienda PrestaShop. Cada tunel con lo suyo: sus
+# horas (2 si no se dice), el admin (bloqueado si no se dice) y su contraseña, siempre una nueva al azar
+# (la de un tunel no vale para el siguiente). Cierra el que hubiera
 function tunnel_open() {
-    local url=$1 folder=${2%/} scheme host port ip clave horas admin params dir="" domains n url_t
+    local url=$1 folder="" scheme host port ip clave horas=2 admin=bloquear params dir="" domains n url_t
+    shift
+    [ -n "$1" ] && [[ "$1" != --* ]] && { folder=${1%/}; shift; }
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --horas) [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }; horas=$2; shift 2 ;;
+            --admin) [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "--admin bloquear o permitir"; return 1; }; admin=$2; shift 2 ;;
+            *) echo "Opcion desconocida: $1"; return 1 ;;
+        esac
+    done
     if [ -z "$url" ]; then
-        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta del proyecto]"
+        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
 
         return 1
     fi
+    clave=$(tunnel_new_pass)
     if ! [[ "$url" =~ ^(https?)://([A-Za-z0-9.-]+)(:([0-9]{1,5}))?/?$ ]]; then
         echo "$url no es una direccion valida (como http://web.local)"
 
@@ -26851,11 +28404,6 @@ print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])' "$host" 2
     if [ -n "$dir" ] && is_prestashop "$(basename "$dir")" 2> /dev/null; then
         n=$(ps_domain "$(basename "$dir")" 2> /dev/null)
         valid_domain "$n" && domains+=" $n"
-    fi
-    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
-    if [ -z "$clave" ]; then
-        clave=$(tunnel_new_pass)
-        tunnel_conf_write "$clave" "$horas" "$admin" || return 1
     fi
     echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
     echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $horas h)"
@@ -26904,12 +28452,10 @@ json.dump({"scheme": e["T_SCHEME"], "host": e["T_HOST"], "port": int(e["T_PORT"]
 
 # tunel [estado]: para la ventana y la terminal
 #   I|instalado (1/0)|version instalada|version del programa
-#   C|horas|admin
 #   T|url|direccion local|carpeta|fin (epoch)   (si hay uno abierto)
 function tunnel_status() {
     local pid
     echo "I|$(tunnel_installed && echo 1 || echo 0)|$(tunnel_installed_version)|$TUNNEL_VERSION"
-    echo "C|$(tunnel_conf HORAS)|$(tunnel_conf ADMIN)"
     pid=$(tunnel_pid)
     [ -n "$pid" ] && python3 -I -c 'import json, sys
 s = json.load(open(sys.argv[1]))
@@ -27290,7 +28836,8 @@ def write_state(url):
     with os.fdopen(fd, "w") as f:
         json.dump({"pid": os.getpid(), "url": url, "target": "%s://%s" % (P["scheme"], host_header(
             {"scheme": P["scheme"], "host": P["host"], "port": int(P["port"])})), "folder": P["folder"],
-            "expires": EXPIRES, "started": int(time.time())}, f)
+            "expires": EXPIRES, "started": int(time.time()), "password": P["password"], "hours": int(P["hours"]),
+            "admin": P["admin"]}, f)
     os.replace(tmp, STATE)
 
 
@@ -27500,13 +29047,16 @@ function gui_docker() {
     if [ $installed -eq 1 ] && docker_ready; then
         ready=1
         version=$(dk version --format '{{.Server.Version}}' 2> /dev/null | tr -cd '0-9.')
+        # (con proyectos del Apache de Docker, que el temporizador de los que no tienen visitas este puesto:
+        # los de antes de la 1.56.8 / 1.40.1 no lo tenian)
+        [ -n "$(docker_web_projects)" ] && docker_idle_ensure
     fi
     echo "S|$installed|$ready|$version|$(lampp_running && echo 1 || echo 0)|$app"
     echo "V|$DOCKER_PHP_VERSIONS|$DOCKER_MARIADB_VERSIONS"
     for p in $(docker_projects); do
         # (los del Apache de Docker: web en vez de los puertos, y su tipo y sus versiones de PHP al final)
         if docker_web_project "$p"; then
-            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|web|web|0|$(docker_conf "$p" TIPO)|$(docker_conf "$p" PHP)" \
+            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|web|web|0|$(docker_conf "$p" TIPO)|$(docker_conf "$p" PHP)|$(docker_conf "$p" LAMPP_BD)" \
                 | tr -d '\000-\010\013-\037'
             continue
         fi
@@ -27514,11 +29064,14 @@ function gui_docker() {
             | tr -d '\000-\010\013-\037'
     done
     # El Apache de Docker: W|direccion|http|https|estado|direccion dada de alta (1/0)
-    echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$([ $ready -eq 1 ] && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)"
+    echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$([ $ready -eq 1 ] && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)|$(docker_web_tld)|$(docker_dns_on && echo 1 || echo 0)"
     if [ $ready -eq 1 ]; then
         # (al final, el ID corto del contenedor)
         dk ps -a --format '{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}|{{.ID}}' 2> /dev/null \
-            | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ { print "C|" $0 }'
+            | tr -d '\000-\010\013-\037' | awk -F'|' -v OFS='|' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ {
+                # (el puente hasta la BBDD de una version XAMPP-X no es de compose: va con su nombre)
+                if ($6 == "" && $1 ~ /^nexum-lampp-bd-[0-9]+-[0-9]+(-[0-9]+)?$/) $6 = $1
+                print "C|" $0 }'
         # (imagen, etiqueta e ID corto por separado)
         dk images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}|{{.CreatedSince}}' 2> /dev/null \
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
@@ -27548,12 +29101,18 @@ function docker_container_action() {
     local action=$1 name=$2
     if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ \
             || "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-php[0-9]{2}$ \
-            || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$ ]]; then
+            || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$ ]]; then
         echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
         return 1
     fi
     case $action in
-        arrancar) run dk start "$name" ;;
+        arrancar)
+            if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+                local f=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}}
+                lampp_bd_up "$f" && lampp_bd_bridge_up "$f"
+                return
+            fi
+            run dk start "$name" ;;
         parar)
             docker_shared_warn "$name"
             run dk stop "$name" ;;
@@ -27777,6 +29336,20 @@ if rel == "wp-config.php":
     # (el dominio del contenedor, sin tocar la BBDD; detras de un proxy con https)
     extra = ("\nif (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' || ($_SERVER['HTTPS'] ?? '') === 'on') { $_SERVER['HTTPS'] = 'on'; }\n"
              "define('WP_HOME', 'https://%s');\ndefine('WP_SITEURL', 'https://%s');\n" % (domain, domain))
+    # Las direcciones de la web en local que lleva el contenido (las imagenes y enlaces que se guardaron
+    # trabajando con LAMPP: https://web.local/wp-content/...): en lo que devuelve, las del contenedor. Si
+    # no, se piden a LAMPP (sin el en marcha, o con otro proyecto en web.local, no salen). La BBDD no se
+    # toca. Tambien escapadas (JSON, Elementor) y codificadas
+    hosts = [h for h in os.environ.get("LVM_DOMINIOS_LOCALES", "").split() if re.fullmatch(r"[A-Za-z0-9.-]+(:[0-9]+)?", h)]
+    if hosts:
+        pairs = []
+        for h in hosts:
+            for scheme in ("https://", "http://"):
+                pairs.append((scheme + h, "https://" + domain))
+                pairs.append((scheme.replace("/", "\\/") + h, "https:\\/\\/" + domain))
+                pairs.append((scheme.replace(":", "%3A").replace("/", "%2F") + h, "https%3A%2F%2F" + domain))
+        extra += ("if (PHP_SAPI !== 'cli') { ob_start(function ($b) { return str_replace(%s, %s, $b); }); }\n"
+                  % ("array(" + ", ".join(lit(a) for a, _ in pairs) + ")", "array(" + ", ".join(lit(b) for _, b in pairs) + ")"))
     text = re.sub(r"(?m)^[ \t]*define\(\s*['\"](WP_HOME|WP_SITEURL)['\"].*$", "", text)
     text = re.sub(r"^<\?php", lambda m: "<?php" + extra, text, count=1)
 elif rel == "app/config/parameters.php":
@@ -28253,14 +29826,38 @@ DOCKER_LOOPBACK_PLIST=${LVM_LOOPBACK_PLIST:-/Library/LaunchDaemons/dev.hexer.nex
 # Direccion (IP) y puertos (HTTP, HTTPS) del Apache de Docker. Siempre de 127.x: nunca abiertos a la red
 function docker_web_get() {
     local v def
-    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; *) return 1 ;; esac
+    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; TLD) def=docker.local ;; DNS) def=0 ;; *) return 1 ;; esac
     v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$DOCKER_WEB_FILE" 2> /dev/null)
-    if [ "$1" == IP ]; then
-        docker_web_valid_ip "$v" || v=$def
-    else
-        [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def
-    fi
+    case $1 in
+        IP) docker_web_valid_ip "$v" || v=$def ;;
+        TLD) [ "$v" == docker.test ] || v=$def ;;
+        DNS) [ "$v" == 1 ] || v=$def ;;
+        *) [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def ;;
+    esac
     echo "$v"
+}
+
+# Guarda web.conf (solo tuyo): docker_web_conf_write <ip> <http> <https> <tld> <dns>
+function docker_web_conf_write() {
+    mkdir -p -m 700 "$DOCKER_DIR" || return 1
+    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\nTLD=%s\nDNS=%s\n' "$@" > "$DOCKER_WEB_FILE.nuevo" ) \
+        && mv -f "$DOCKER_WEB_FILE.nuevo" "$DOCKER_WEB_FILE"
+}
+
+# Final de los dominios del Apache de Docker: docker.local (en /etc/hosts, uno a uno) o, con el DNS
+# comodin, docker.test. .local es de mDNS: un DNS para *.docker.local no se consultaria
+function docker_web_tld() {
+    docker_web_get TLD
+}
+
+# ¿Va el DNS comodin de *.docker.test? (sus dominios ya no van en /etc/hosts)
+function docker_dns_on() {
+    [ "$(docker_web_get DNS)" == 1 ] && [ "$(docker_web_get TLD)" == docker.test ]
+}
+
+# Dominio de phpMyAdmin
+function docker_web_pma() {
+    echo "pma.$(docker_web_tld)"
 }
 
 function docker_web_valid_ip() {
@@ -28305,9 +29902,9 @@ function docker_web_project() {
 # Dominio de una version de PHP de un proyecto: el de la tienda (uno solo) o <proyecto>-php83.docker.local
 function docker_web_domain() {
     if [ "$(docker_conf "$1" TIPO)" == ps ]; then
-        echo "$1.docker.local"
+        echo "$1.$(docker_web_tld)"
     else
-        echo "$1-php${2//./}.docker.local"
+        echo "$1-php${2//./}.$(docker_web_tld)"
     fi
 }
 
@@ -28354,7 +29951,7 @@ function docker_maria_up() {
         ( umask 077
           printf 'DB_ROOT_PASS=%s\n' "$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')" > "$dir/.env"
           { printf 'name: %s\nservices:\n  db:\n    image: mariadb:%s\n    container_name: %s\n    restart: "no"\n' "$name" "$v" "$name"
-            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n'
+            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_AUTO_UPGRADE: "1"\n'
             printf '    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-allowed-packet=512M"]\n'
             printf '    volumes:\n      - "datos:/var/lib/mysql"\n    networks: [nexum]\n'
             printf 'volumes:\n  datos:\n    name: %s\n' "$name"
@@ -28384,7 +29981,10 @@ function docker_maria_versions() {
 # solo tuya que Docker Desktop comparte con el Apache de Docker (825 dias: lo maximo que acepta Safari)
 function docker_web_cert() {
     local c=$DOCKER_WEB_DIR/certs tmp
-    [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ] && return 0
+    if [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ]; then
+        openssl x509 -in "$c/docker.local.crt" -noout -text 2> /dev/null | grep -q 'DNS:\*\.docker\.test' && return 0
+        [ "$DRY" -eq 1 ] || rm -f "$c/docker.local.crt" "$c/docker.local.key"
+    fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] certificado propio de *.docker.local en $c"
         return 0
@@ -28392,7 +29992,7 @@ function docker_web_cert() {
     mkdir -p -m 700 "$DOCKER_DIR" "$DOCKER_WEB_DIR" "$c" || return 1
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-cert.XXXXXX") || return 1
     # (las extensiones en un fichero de configuracion: la LibreSSL de macOS 12 no tiene -addext)
-    printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = docker.local\n[ext]\nbasicConstraints = critical,CA:FALSE\nextendedKeyUsage = serverAuth\nsubjectAltName = DNS:docker.local,DNS:*.docker.local\n' > "$tmp/cnf"
+    printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = docker.local\n[ext]\nbasicConstraints = critical,CA:FALSE\nextendedKeyUsage = serverAuth\nsubjectAltName = DNS:docker.local,DNS:*.docker.local,DNS:docker.test,DNS:*.docker.test\n' > "$tmp/cnf"
     if ! ( umask 077; openssl req -x509 -nodes -newkey rsa:2048 -days 825 -config "$tmp/cnf" \
             -keyout "$c/docker.local.key" -out "$c/docker.local.crt" > /dev/null 2>&1 ); then
         rm -rf "$tmp"
@@ -28401,7 +30001,7 @@ function docker_web_cert() {
         return 1
     fi
     rm -rf "$tmp"
-    echo "Certificado propio de *.docker.local (solo vale para esos dominios)"
+    echo "Certificado propio de *.docker.local y *.docker.test (solo vale para esos dominios)"
 }
 
 # Safari y Chrome aceptan sin aviso el certificado de *.docker.local: va a tus ajustes de confianza del
@@ -28426,8 +30026,14 @@ function docker_web_trust() {
 # Lineas de /etc/hosts de los dominios de Docker: docker_web_hosts poner|quitar <dominio...>. poner: a la
 # direccion del Apache de Docker (y fuera de cualquier otra linea); quitar: fuera. Solo esos dominios
 function docker_web_hosts() {
-    local mode=$1 copy rc
+    local mode=$1 copy rc n names=()
     shift
+    # (con el DNS comodin, los *.docker.test los contesta el; solo se tocan los de antes)
+    for n in "$@"; do
+        docker_dns_on && [[ "$n" == *.docker.test ]] && continue
+        names+=("$n")
+    done
+    set -- "${names[@]}"
     [ $# -gt 0 ] || return 0
     mkdir -p -m 700 "$LOG_DIR" || return 1
     copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
@@ -28494,11 +30100,29 @@ function docker_web_site() {
         printf '<VirtualHost *:80>\n    ServerName %s\n    Redirect permanent / %s/\n</VirtualHost>\n' "$dom" "$(docker_web_url "$dom")"
         printf '<VirtualHost *:443>\n    ServerName %s\n' "$dom"
         printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
+        # (con su PHP parado, por ejemplo al llevar horas sin visitas, lo dice en vez de un error sin mas.
+        # Solo los errores del propio Apache: un 503 de la web, como el modo mantenimiento, pasa igual)
+        printf '    ErrorDocument 502 "%s"\n    ErrorDocument 503 "%s"\n' "$DOCKER_STOPPED_MSG" "$DOCKER_STOPPED_MSG"
+        # (antes que ProxyPass: mod_rewrite va primero)
+        [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_media "$folder"
         printf '    ProxyPreserveHost On\n    ProxyPass / http://%s/\n    ProxyPassReverse / http://%s/\n' \
             "$(docker_web_container "$slug" "$v")" "$(docker_web_container "$slug" "$v")"
         printf '    RequestHeader set X-Forwarded-Proto "https"\n    RequestHeader set X-Nexum-Key "%s"\n' "$key"
         printf '</VirtualHost>\n'
     done
+}
+
+# Reglas de las imagenes de produccion de un WordPress en el Apache de Docker (su dominio, el de media-proyecto,
+# el mismo que con LAMPP): lo que falte de wp-content/uploads (imagenes, videos y PDF; solo GET y HEAD) se pide
+# a su web real con una redireccion 302. Nada si no tiene dominio de produccion
+function docker_web_media() {
+    local folder=$1 prod
+    prod=$(media_saved "$folder")
+    valid_domain "$prod" && [[ "$prod" != *.local && "$prod" != *.test && "$prod" != localhost && "$prod" != *.localhost ]] || return 0
+    printf '    # nexum-media %s: lo que falte de wp-content/uploads se pide a produccion (media-proyecto)\n' "$prod"
+    printf '    RewriteEngine On\n    RewriteCond %%{REQUEST_METHOD} ^(GET|HEAD)$\n'
+    printf '    RewriteCond /opt/lampp/htdocs/%s%%{REQUEST_URI} !-f\n' "$folder"
+    printf '    RewriteRule ^/(wp-content/uploads/.+\\.(%s))$ https://%s/$1 [NC,R=302,L]\n' "$MEDIA_EXT" "$prod"
 }
 
 # Configuracion del Apache de Docker (httpd.conf, las reglas, un vhost por proyecto y el de phpMyAdmin,
@@ -28519,6 +30143,13 @@ ServerRoot "/usr/local/apache2"
 Listen 80
 Listen 443
 LoadModule mpm_event_module modules/mod_mpm_event.so
+# (en local basta un proceso con sus hilos: no tres esperando, como trae de fabrica)
+StartServers 1
+ServerLimit 4
+ThreadsPerChild 25
+MinSpareThreads 5
+MaxSpareThreads 50
+MaxRequestWorkers 100
 LoadModule unixd_module modules/mod_unixd.so
 LoadModule authz_core_module modules/mod_authz_core.so
 LoadModule authz_host_module modules/mod_authz_host.so
@@ -28574,9 +30205,9 @@ EOF
           [ $p == 443 ] && printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
           printf '    <Location />\n        Require all denied\n        ErrorDocument 403 "Este dominio no tiene ningun proyecto en Docker (lvm-instalador)"\n    </Location>\n</VirtualHost>\n'
       done; } > "$tmp/sitios/000-defecto.conf"
-    # phpMyAdmin: su contenedor, por https://pma.docker.local (con su pantalla de acceso)
-    { printf '<VirtualHost *:80>\n    ServerName pma.docker.local\n    Redirect permanent / %s/\n</VirtualHost>\n' "$(docker_web_url pma.docker.local)"
-      printf '<VirtualHost *:443>\n    ServerName pma.docker.local\n'
+    # phpMyAdmin: su contenedor, por https://pma.docker.local o pma.docker.test (con su pantalla de acceso)
+    { printf '<VirtualHost *:80>\n    ServerName %s\n    Redirect permanent / %s/\n</VirtualHost>\n' "$(docker_web_pma)" "$(docker_web_url "$(docker_web_pma)")"
+      printf '<VirtualHost *:443>\n    ServerName %s\n' "$(docker_web_pma)"
       printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
       printf '    ProxyPass / http://nexum-pma/\n    ProxyPassReverse / http://nexum-pma/\n</VirtualHost>\n'; } > "$tmp/sitios/001-phpmyadmin.conf"
     for p in $(docker_web_projects); do
@@ -28587,11 +30218,11 @@ EOF
     { printf 'name: nexum-web\nservices:\n'
       printf '  web:\n    image: %s\n    container_name: nexum-web\n    restart: "no"\n' "$DOCKER_WEB_IMAGE"
       printf '    ports:\n      - "%s:%s:80"\n      - "%s:%s:443"\n' "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get IP)" "$(docker_web_get HTTPS)"
-      printf '    volumes:\n      - "./conf:/usr/local/apache2/conf/nexum:ro"\n      - "./certs:/certs:ro"\n'
+      printf '    volumes:\n      - "%s:/opt/lampp/htdocs:ro"\n      - "./conf:/usr/local/apache2/conf/nexum:ro"\n      - "./certs:/certs:ro"\n' "$HTDOCS_DIR"
       printf '    command: ["httpd-foreground", "-f", "%s"]\n    networks: [nexum]\n' "$DOCKER_WEB_CONF"
       printf '  pma:\n    image: %s\n    container_name: nexum-pma\n    restart: "no"\n    environment:\n' "$DOCKER_PMA_IMAGE"
       printf '      PMA_HOSTS: "%s"\n      PMA_ABSOLUTE_URI: "%s/"\n      UPLOAD_LIMIT: 64M\n    networks: [nexum]\n' \
-          "${pma_hosts:-$(docker_maria_name 11.8)}" "$(docker_web_url pma.docker.local)"
+          "${pma_hosts:-$(docker_maria_name 11.8)}" "$(docker_web_url "$(docker_web_pma)")"
       printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$tmp/compose.yaml"
     chmod -R go-rwx "$tmp"
     # (dentro de conf, que no se cambia: los ficheros y, de golpe, la carpeta de los vhosts)
@@ -28623,7 +30254,7 @@ function docker_web_up() {
         return 1
     fi
     docker_web_cert && docker_web_write && docker_net || return 1
-    docker_web_hosts poner pma.docker.local || return 1
+    docker_web_hosts poner "$(docker_web_pma)" || return 1
     local was
     was=$(docker_web_state)
     dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" up -d || return 1
@@ -28651,7 +30282,8 @@ function docker_web_reload() {
 function docker_web_command() {
     case ${1:-estado} in
         estado)
-            echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$(docker_ready && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)" ;;
+            echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$(docker_ready && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)|$(docker_web_tld)|$(docker_dns_on && echo 1 || echo 0)" ;;
+        dns) shift; docker_dns_command "$@" ;;
         puertos) docker_web_set "$2" "$3" "$4" ;;
         permitir) docker_web_allow ;;
         arrancar)
@@ -28661,7 +30293,7 @@ function docker_web_command() {
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] Apache de Docker y phpMyAdmin parados"; return 0; }
             run dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" stop ;;
         confiar) docker_web_trust ;;
-        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar"; return 1 ;;
+        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar"; return 1 ;;
     esac
 }
 
@@ -28689,20 +30321,22 @@ function docker_web_set() {
         return 0
     fi
     mkdir -p -m 700 "$DOCKER_DIR" || return 1
-    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\n' "$ip" "$http" "$https" > "$DOCKER_WEB_FILE" ) || return 1
+    docker_web_conf_write "$ip" "$http" "$https" "$(docker_web_tld)" "$(docker_web_get DNS)" || return 1
     docker_web_ports_ok || echo "Aviso: $ip aun no esta en este Mac: pulsa «Permitir» (lvm-instalador docker-web permitir)"
     [ -d "$DOCKER_WEB_DIR" ] || return 0
     sudo_first || return 1
+    # (con el DNS comodin, este responde con la direccion nueva)
+    docker_dns_on && { docker_dns_install || return 1; }
     for p in $(docker_web_projects); do
         mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
     done
-    docker_web_hosts poner pma.docker.local "${domains[@]}" || return 1
+    docker_web_hosts poner "$(docker_web_pma)" "${domains[@]}" || return 1
     if docker_ready && [ "$(docker_web_state)" != nuevo ] && docker_web_ports_ok; then
         docker_web_up || return 1
     else
         docker_web_write
     fi
-    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.local")"
+    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.$(docker_web_tld)")"
 }
 
 # docker-web permitir: la direccion del Apache de Docker (127.0.0.2) en este Mac. macOS solo tiene
@@ -28751,6 +30385,270 @@ EOF
     echo "Listo: $ip ya esta en este Mac (y lo estara en cada arranque)"
 }
 
+# El DNS en el Mac: un servicio del sistema (launchd) con el usuario nobody y /etc/resolver/docker.test, con
+# el que macOS le pregunta solo lo de docker.test. Todo de root. Con el python3 de las herramientas de
+# Xcode (el de /usr/bin solo lo lanza, y como nobody no siempre puede)
+DOCKER_DNS_SCRIPT=${LVM_DNS_SCRIPT:-/Library/Nexum/nexum-dns.py}
+DOCKER_DNS_PLIST=${LVM_DNS_PLIST:-/Library/LaunchDaemons/dev.hexer.nexum-dns.plist}
+DOCKER_DNS_RESOLVER=${LVM_DNS_RESOLVER:-/etc/resolver/docker.test}
+function docker_dns_install() {
+    local ip py tmp d
+    ip=$(docker_web_get IP)
+    [ "$DRY" -eq 1 ] && return 0
+    py=$(xcrun -f python3 2> /dev/null)
+    [ -x "$py" ] || py=/usr/bin/python3
+    for d in "$(dirname "$DOCKER_DNS_SCRIPT")" "$(dirname "$DOCKER_DNS_RESOLVER")"; do
+        $SUDO mkdir -p "$d" || return 1
+    done
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-dns.XXXXXX") || return 1
+    printf '%s\n' "$DOCKER_DNS_PY" > "$tmp/nexum-dns.py"
+    cat > "$tmp/plist" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.hexer.nexum-dns</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$py</string>
+        <string>-I</string>
+        <string>$DOCKER_DNS_SCRIPT</string>
+        <string>127.0.0.1</string>
+        <string>$DOCKER_DNS_PORT</string>
+        <string>docker.test</string>
+        <string>$ip</string>
+    </array>
+    <key>UserName</key>
+    <string>nobody</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+    printf 'nameserver 127.0.0.1\nport %s\n' "$DOCKER_DNS_PORT" > "$tmp/resolver"
+    $SUDO launchctl bootout system "$DOCKER_DNS_PLIST" > /dev/null 2>&1
+    if ! { $SUDO install -o 0 -g 0 -m 644 "$tmp/nexum-dns.py" "$DOCKER_DNS_SCRIPT" \
+            && $SUDO install -o 0 -g 0 -m 644 "$tmp/plist" "$DOCKER_DNS_PLIST" \
+            && $SUDO install -o 0 -g 0 -m 644 "$tmp/resolver" "$DOCKER_DNS_RESOLVER"; }; then
+        rm -rf "$tmp"
+        return 1
+    fi
+    rm -rf "$tmp"
+    $SUDO launchctl bootstrap system "$DOCKER_DNS_PLIST" || return 1
+    $SUDO dscacheutil -flushcache 2> /dev/null
+    $SUDO killall -HUP mDNSResponder 2> /dev/null
+    return 0
+}
+
+function docker_dns_uninstall() {
+    [ "$DRY" -eq 1 ] && return 0
+    $SUDO launchctl bootout system "$DOCKER_DNS_PLIST" > /dev/null 2>&1
+    $SUDO rm -f "$DOCKER_DNS_PLIST" "$DOCKER_DNS_RESOLVER" "$DOCKER_DNS_SCRIPT"
+    $SUDO dscacheutil -flushcache 2> /dev/null
+    $SUDO killall -HUP mDNSResponder 2> /dev/null
+    return 0
+}
+
+# DNS comodin de *.docker.test (docker-web dns activar): un DNS minimo, solo en 127.0.0.1, que contesta
+# la direccion del Apache de Docker a cualquier <algo>.docker.test y rechaza todo lo demas. Asi los
+# dominios de Docker ya no van en /etc/hosts (ni piden la contraseña al añadir proyectos o versiones).
+# Solo para *.docker.test: web.local, los proyectos de siempre y los dominios falseados de las tiendas
+# siguen en /etc/hosts, que se mira antes. (.local es de mDNS: un DNS para *.docker.local no se
+# consultaria nunca)
+DOCKER_DNS_PORT=5354
+DOCKER_DNS_PY=$(cat <<'DNSPY'
+# DNS de *.docker.test de Nexum Dev Stack (lo pone lvm-instalador docker-web dns activar: no se edita a
+# mano). nexum-dns.py <direccion> <puerto> <zona> <ip>: contesta <ip> a la zona y a lo que acabe en ella
+# (registros A; los demas tipos, sin datos) y REFUSED a todo lo demas. UDP y TCP, sin estado
+import socket, socketserver, struct, sys, threading
+
+HOST, PORT, ZONE, IP = sys.argv[1], int(sys.argv[2]), sys.argv[3].lower().strip("."), sys.argv[4]
+ADDR = socket.inet_aton(IP)
+
+
+def answer(q):
+    if len(q) < 17:
+        return None
+    tid, flags, qd = struct.unpack(">HHH", q[:6])
+    # (solo preguntas normales, de una en una)
+    if flags & 0x8000 or (flags >> 11) & 0xF or qd != 1:
+        return None
+    i, labels = 12, []
+    while True:
+        if i >= len(q):
+            return None
+        n = q[i]
+        i += 1
+        if n == 0:
+            break
+        if n > 63 or i + n > len(q):
+            return None
+        labels.append(q[i:i + n].decode("ascii", "replace").lower())
+        i += n
+    if i + 4 > len(q):
+        return None
+    qtype, qclass = struct.unpack(">HH", q[i:i + 4])
+    question = q[12:i + 4]
+    name = ".".join(labels)
+    rd = flags & 0x0100
+    if name != ZONE and not name.endswith("." + ZONE):
+        return struct.pack(">HHHHHH", tid, 0x8000 | rd | 0x0080 | 5, 1, 0, 0, 0) + question
+    if qtype == 1 and qclass == 1:
+        rr = b"\xc0\x0c" + struct.pack(">HHIH", 1, 1, 60, 4) + ADDR
+        return struct.pack(">HHHHHH", tid, 0x8400 | rd | 0x0080, 1, 1, 0, 0) + question + rr
+    return struct.pack(">HHHHHH", tid, 0x8400 | rd | 0x0080, 1, 0, 0, 0) + question
+
+
+class UDP(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, sock = self.request
+        out = answer(data)
+        if out:
+            sock.sendto(out, self.client_address)
+
+
+class TCP(socketserver.StreamRequestHandler):
+    def handle(self):
+        self.connection.settimeout(5)
+        try:
+            size = struct.unpack(">H", self.rfile.read(2))[0]
+            out = answer(self.rfile.read(size))
+            if out:
+                self.wfile.write(struct.pack(">H", len(out)) + out)
+        except (OSError, struct.error):
+            pass
+
+
+class UDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class TCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+udp = UDPServer((HOST, PORT), UDP)
+tcp = TCPServer((HOST, PORT), TCP)
+threading.Thread(target=tcp.serve_forever, daemon=True).start()
+udp.serve_forever()
+DNSPY
+)
+
+# ¿Contesta el DNS comodin? (como lo buscan los navegadores: con el sistema)
+function docker_dns_works() {
+    local ip got i
+    ip=$(docker_web_get IP)
+    for i in $(seq 20); do
+        got=$(python3 -I -c 'import socket, sys
+try:
+    print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])
+except OSError:
+    pass' "nexum-comprobacion.docker.test" 2> /dev/null)
+        [ "$got" == "$ip" ] && return 0
+        sleep 0.5
+    done
+    return 1
+}
+
+# docker_web_retld: los proyectos del Apache de Docker con el final de los dominios de ahora (docker_web_tld):
+# su dominio, su configuracion de cada version (WordPress: WP_HOME), el dominio de una tienda en su BBDD y
+# sus contenedores de PHP en marcha, rehechos (su configuracion va montada fichero a fichero)
+function docker_web_retld() {
+    local p state
+    for p in $(docker_web_projects); do
+        docker_conf_set "$p" DOMINIO "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")" || return 1
+        for v in $(docker_conf "$p" PHP); do
+            docker_web_config "$p" "$v" || return 1
+        done
+        docker_web_compose "$p" || return 1
+        if docker_ready; then
+            if [ "$(docker_conf "$p" TIPO)" == ps ] && docker_maria_up "$(docker_conf "$p" MARIADB)" > /dev/null; then
+                docker_web_ps_domain "$p"
+            fi
+            state=$(docker_state "$p")
+            if [ "$state" == marcha ] || [ "$state" == parcial ]; then
+                dk compose --project-directory "$DOCKER_DIR/$p" -f "$DOCKER_DIR/$p/compose.yaml" up -d --force-recreate \
+                    $(docker_web_services "$p") > /dev/null || return 1
+            fi
+        fi
+        echo "  $(docker_conf "$p" CARPETA): $(docker_web_url "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")")"
+    done
+}
+
+# docker-web dns activar: pone el DNS comodin y pasa los proyectos del Apache de Docker a *.docker.test
+# (sus lineas de /etc/hosts se quitan). Si no contesta, se quita y todo sigue como estaba. Pide la
+# contraseña de administrador una vez
+function docker_dns_activate() {
+    local old p olds=()
+    if docker_dns_on && docker_dns_works; then
+        echo "El DNS de *.docker.test ya va: los dominios de Docker no van en /etc/hosts"
+        return 0
+    fi
+    echo "DNS de *.docker.test: los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts"
+    echo "(web.local, los proyectos de siempre y los dominios falseados de las tiendas siguen igual)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] DNS en 127.0.0.1:$DOCKER_DNS_PORT para *.docker.test y los proyectos de Docker a .docker.test"
+        return 0
+    fi
+    sudo_first || return 1
+    docker_dns_install || { echo "No se ha podido poner el DNS de *.docker.test"; docker_dns_uninstall; return 1; }
+    if ! docker_dns_works; then
+        echo "El DNS de *.docker.test no contesta: se quita y todo sigue como estaba"
+        docker_dns_uninstall
+        return 1
+    fi
+    old=$(docker_web_tld)
+    if [ "$old" != docker.test ]; then
+        olds+=("pma.$old")
+        for p in $(docker_web_projects); do
+            mapfile -t -O "${#olds[@]}" olds < <(docker_web_domains "$p")
+        done
+    fi
+    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" docker.test 1 || return 1
+    if [ "$old" != docker.test ] && [ -n "$(docker_web_projects)" ]; then
+        echo "Los proyectos del Apache de Docker pasan a .docker.test:"
+        docker_web_retld || return 1
+    fi
+    [ ${#olds[@]} -gt 0 ] && docker_web_hosts quitar "${olds[@]}"
+    if [ -d "$DOCKER_WEB_DIR" ]; then
+        docker_web_cert && docker_web_trust
+        if docker_ready && [ "$(docker_web_state)" != nuevo ]; then
+            docker_web_up || return 1
+        else
+            docker_web_write
+        fi
+    fi
+    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.test") y phpMyAdmin en $(docker_web_url "$(docker_web_pma)")"
+}
+
+# docker-web dns quitar: sin el DNS comodin. Los dominios siguen siendo .docker.test y vuelven a /etc/hosts
+function docker_dns_deactivate() {
+    local p domains=()
+    echo "Se quita el DNS de *.docker.test: sus dominios vuelven a /etc/hosts"
+    [ "$DRY" -eq 1 ] && return 0
+    sudo_first || return 1
+    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" "$(docker_web_tld)" 0 || return 1
+    docker_dns_uninstall
+    for p in $(docker_web_projects); do
+        mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
+    done
+    [ -d "$DOCKER_WEB_DIR" ] && { docker_web_hosts poner "$(docker_web_pma)" "${domains[@]}" || return 1; }
+    echo "Listo: los dominios de Docker van otra vez en /etc/hosts"
+}
+
+function docker_dns_command() {
+    case $1 in
+        activar) docker_dns_activate ;;
+        quitar) docker_dns_deactivate ;;
+        *) echo "Uso: lvm-instalador docker-web dns activar|quitar"; return 1 ;;
+    esac
+}
+
 # Configuracion de una version de PHP de un proyecto para su contenedor (config-83.php: su BBDD en la
 # MariaDB comun y, en WordPress, el dominio de esa version). Nada si el proyecto no la tiene
 function docker_web_config() {
@@ -28758,11 +30656,27 @@ function docker_web_config() {
     # (el dominio, con el puerto si no es el 443: WordPress lo pone en sus enlaces)
     local url
     url=$(docker_web_url "$(docker_web_domain "$slug" "$v")")
-    rel=$(docker_project_config "$(docker_conf "$slug" CARPETA)" "$dir" "${url#https://}" \
+    local folder hosts
+    folder=$(docker_conf "$slug" CARPETA)
+    # (las de la web en local: web.local y su dominio propio, si tiene. En lo que devuelve, las del contenedor)
+    hosts="$PROJECT_VHOST $(custom_domain "$folder" 2> /dev/null)"
+    local server
+    # (la BBDD: la de una version XAMPP-X en vivo, por su puente, o la de la MariaDB comun)
+    if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+        server=$(lampp_bd_bridge "$(docker_conf "$slug" LAMPP_BD)")
+    else
+        server=$(docker_maria_name "$(docker_conf "$slug" MARIADB)")
+    fi
+    rel=$(LVM_DOMINIOS_LOCALES=$hosts docker_project_config "$folder" "$dir" "${url#https://}" \
         "$(docker_conf "$slug" BBDD)" "$(docker_conf "$slug" USUARIO)" "$(sed -n 's/^DB_PASS=//p' "$dir/.env")" \
-        "$(docker_maria_name "$(docker_conf "$slug" MARIADB)")") || return 1
-    [ -n "$rel" ] && mv -f "$dir/config.php" "$dir/config-${v//./}.php"
-    return 0
+        "$server") || return 1
+    [ -n "$rel" ] || return 0
+    # (si ya estaba, se cambia en su sitio: el contenedor la tiene montada y la ve al momento)
+    if [ -f "$dir/config-${v//./}.php" ]; then
+        cat "$dir/config.php" > "$dir/config-${v//./}.php" && rm -f "$dir/config.php"
+    else
+        mv -f "$dir/config.php" "$dir/config-${v//./}.php"
+    fi
 }
 
 # compose.yaml de un proyecto: un servicio por version de PHP (php83...), con la imagen nexum-php de esa
@@ -28773,12 +30687,14 @@ function docker_web_compose() {
     local slug=$1 dir=$DOCKER_DIR/$1 folder rel v vv vols="" root
     folder=$(docker_conf "$slug" CARPETA) rel=$(docker_conf "$slug" CONFIG)
     root=$LINK/xamppfiles/htdocs/$folder
+    docker_prefork_conf | cmp -s - "$DOCKER_PREFORK_CONF" || ( umask 077; docker_prefork_conf > "$DOCKER_PREFORK_CONF" ) || return 1
     { printf 'name: nexum-%s\nservices:\n' "$slug"
       for v in $(docker_conf "$slug" PHP); do
           vv=${v//./}
           printf '  php%s:\n    image: nexum-php:%s\n    container_name: %s\n    restart: "no"\n' "$vv" "$v" "$(docker_web_container "$slug" "$v")"
           printf '    environment:\n      NEXUM_KEY: ${WEB_KEY}\n      NEXUM_DOMAIN: "%s"\n      NEXUM_ROOT: "%s"\n' "$(docker_web_domain "$slug" "$v")" "$root"
           printf '    volumes:\n      - "%s:%s"\n' "$HTDOCS_DIR/$folder" "$root"
+          printf '      - "%s:/etc/apache2/mods-available/mpm_prefork.conf:ro"\n' "$DOCKER_PREFORK_CONF"
           [ -n "$rel" ] && [ -f "$dir/config-$vv.php" ] && printf '      - "./config-%s.php:%s/%s:ro"\n' "$vv" "$root" "$rel"
           if [ "$rel" == app/config/parameters.php ]; then
               printf '      - "cache-%s:%s/var/cache"\n' "$vv" "$root"
@@ -28789,6 +30705,15 @@ function docker_web_compose() {
       [ -n "$vols" ] && printf 'volumes:\n%s' "$vols"
       printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$dir/compose.yaml.nuevo" \
         && mv -f "$dir/compose.yaml.nuevo" "$dir/compose.yaml"
+}
+
+# Procesos del Apache con PHP de los contenedores (prefork, de todos los proyectos): uno esperando y, sin
+# trabajo, no mas de dos (de fabrica, cinco esperando: 100-250 MB por contenedor). Cada uno se
+# rehace a las 200 peticiones (PHP no le crece). Va en DOCKER_DIR/apache-ligero.conf y en cada contenedor
+# en lugar del de la imagen. Lo escribe docker_web_compose
+DOCKER_PREFORK_CONF=$DOCKER_DIR/apache-ligero.conf
+function docker_prefork_conf() {
+    printf '# Nexum Dev Stack: pocos procesos esperando (se rehace solo)\n<IfModule mpm_prefork_module>\n    StartServers 1\n    MinSpareServers 1\n    MaxSpareServers 2\n    MaxRequestWorkers 20\n    MaxConnectionsPerChild 200\n</IfModule>\n'
 }
 
 # Servicios que van en marcha: todas las versiones o, en una tienda, la elegida
@@ -28819,6 +30744,14 @@ function docker_web_ps_domain() {
     prefix=$(docker_maria_sql "$v" -N -e "SELECT LEFT(table_name, LENGTH(table_name) - 8) FROM information_schema.tables
         WHERE table_schema = '$db' AND table_name LIKE '%shop\\_url' AND table_type = 'BASE TABLE' LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
     [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || return 0
+    # (el de produccion, para traer de alli sus imagenes: ps-imagenes)
+    local prod
+    prod=$(docker_maria_sql "$v" -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" \
+        < /dev/null 2> /dev/null | tr -d '\r' | tr 'A-Z' 'a-z')
+    prod=${prod%%:*}
+    if valid_domain "$prod" && [[ "$prod" != *.docker.local && "$prod" != *.docker.test && "$prod" != *.local ]]; then
+        docker_conf_set "$slug" PRODUCCION "$prod"
+    fi
     echo "Tienda PrestaShop: su dominio pasa a $dom en la BBDD de Docker"
     docker_maria_sql "$v" "$db" << EOF
 UPDATE \`${prefix}shop_url\` SET domain = '$dom', domain_ssl = '$dom';
@@ -28831,10 +30764,11 @@ EOF
 # proyecto en Docker con el Apache de Docker. Su BBDD (vacia, la de una version XAMPP-X o un volcado) va en
 # la MariaDB comun de esa version, con su propio usuario. Mas versiones de PHP: docker-php-añadir
 function docker_web_create() {
-    local folder=${1%/} php=$2 maria=$3 db="" from="" dump="" slug dir tipo dbname user pass rel p
+    local folder=${1%/} php=$2 maria=$3 db="" from="" dump="" slug dir tipo dbname user pass rel p live=0
     shift 3 2> /dev/null
     while [ $# -gt 0 ]; do
         case $1 in
+            --en-vivo) live=1; shift ;;
             --bd|--desde|--volcado)
                 [ -n "$2" ] || { echo "Falta el valor de $1"; return 1; }
                 case $1 in --bd) db=$2 ;; --desde) from=$2 ;; --volcado) dump=$2 ;; esac
@@ -28878,6 +30812,9 @@ function docker_web_create() {
         return 1
     fi
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
+    if [ $live -eq 1 ]; then
+        [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version XAMPP-X (--bd y --desde)"; return 1; }
+    fi
     dbname=${db:-$(tr '-' '_' <<< "$slug")}
     user=$(cut -c1-32 <<< "nx_$dbname")
     echo "Proyecto en Docker: $folder con PHP $php y MariaDB $maria comun (BBDD $dbname)"
@@ -28892,8 +30829,13 @@ function docker_web_create() {
         echo "Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otra direccion."
         return 1
     fi
-    # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba
-    sudo_first || return 1
+    # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba. Con el DNS comodin no
+    # se toca /etc/hosts: no hace falta
+    docker_dns_on || sudo_first || return 1
+    if [ $live -eq 1 ]; then
+        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
+        return
+    fi
     echo "1/5 MariaDB $maria comun"
     docker_maria_up "$maria" || return 1
     if [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$dbname'" < /dev/null 2> /dev/null | tr -d '\r')" != 0 ]; then
@@ -28945,12 +30887,39 @@ EOF
         fi
     fi
     echo "4/5 Apache de Docker y $(docker_web_domain "$slug" "$php")"
-    docker_web_hosts poner pma.docker.local "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
     echo "5/5 Certificado en el navegador"
     docker_web_trust
-    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url pma.docker.local)"
+    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url "$(docker_web_pma)")"
+}
+
+# docker-nuevo ... --en-vivo: el proyecto sin BBDD en Docker, con la de esa version XAMPP-X en vivo (con el
+# usuario y la contraseña de su wp-config.php)
+function docker_web_create_live() {
+    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 creds owner
+    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base del wp-config.php de $folder"; return 1; }
+    owner=$(lampp_bd_owner "$from")
+    mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
+    ( umask 077
+      printf 'DB_PASS=%s\n' "$(sed -n 2p <<< "$creds")" > "$dir/.env"
+      printf 'MODO=web\nCARPETA=%s\nTIPO=wp\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=wp-config.php\nLAMPP_BD=%s\n' \
+          "$folder" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$owner" > "$dir/proyecto.conf"
+      docker_fpm_conf > "$dir/fpm.conf" ) || return 1
+    docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
+    docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    echo "1/4 Imagen de PHP $php"
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    echo "2/4 BBDD $(docker_conf "$slug" BBDD) de XAMPP-$owner, en vivo (la misma que web.local)"
+    lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
+    docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_web_up || return 1
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    echo "4/4 Certificado en el navegador"
+    docker_web_trust
+    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php), con la BBDD de XAMPP-$owner en vivo"
 }
 
 # docker-php-añadir <nombre> <php>: otra version de PHP del mismo proyecto, con la misma carpeta y la
@@ -28968,7 +30937,7 @@ function docker_web_add() {
         return 0
     fi
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
-    sudo_first || return 1
+    docker_dns_on || sudo_first || return 1
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
     docker_conf_set "$slug" PHP "$(tr ' ' '\n' <<< "$list $php" | sort -t. -k1,1nr -k2,2nr | tr '\n' ' ' | sed 's/ $//')" || return 1
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
@@ -28998,7 +30967,7 @@ function docker_web_remove() {
         echo "  [simulacion] fuera el contenedor $(docker_web_container "$slug" "$php")"
         return 0
     fi
-    sudo_first || return 1
+    docker_dns_on || sudo_first || return 1
     if [ "$(docker_conf "$slug" TIPO)" == ps ] && [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
         docker_web_switch "$slug" "${rest%% *}" || return 1
     fi
@@ -29028,7 +30997,7 @@ function docker_web_switch() {
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
     docker_conf_set "$slug" ACTIVA "$php" || return 1
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
-    docker_maria_up "$(docker_conf "$slug" MARIADB)" || return 1
+    docker_maria_up "$(docker_conf "$slug" MARIADB)" && docker_web_compose "$slug" || return 1
     if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}"; then
         echo "No arranca con PHP $php: sigue con PHP $old"
         docker_conf_set "$slug" ACTIVA "$old"
@@ -29051,17 +31020,33 @@ function docker_web_action() {
     case $action in
         arrancar)
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] MariaDB $maria, Apache de Docker y $(docker_web_services "$slug" | tr '\n' ' ')"; return 0; }
-            docker_maria_up "$maria" && docker_web_up || return 1
+            docker_idle_ensure
+            # (su configuracion, al dia: la de su wp-config.php y las direcciones de la web en local)
+            if [ -n "$(docker_conf "$slug" CONFIG)" ]; then
+                local v
+                for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+            fi
+            if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+                lampp_bd_up "$(docker_conf "$slug" LAMPP_BD)" && lampp_bd_bridge_up "$(docker_conf "$slug" LAMPP_BD)" || return 1
+                docker_web_up && docker_web_compose "$slug" || return 1
+            else
+                docker_maria_up "$maria" && docker_web_up && docker_web_compose "$slug" || return 1
+            fi
             run "${c[@]}" up -d $(docker_web_services "$slug") ;;
-        parar) run "${c[@]}" stop && docker_web_idle_stop ;;
+        parar) run "${c[@]}" stop && docker_web_idle_stop && lampp_bd_release "$(docker_conf "$slug" LAMPP_BD)" "$slug" ;;
         registros) "${c[@]}" logs --no-color --tail 200 ;;
         borrar)
             local db user domains
             db=$(docker_conf "$slug" BBDD) user=$(docker_conf "$slug" USUARIO)
             mapfile -t domains < <(docker_web_domains "$slug")
-            echo "Se borran los contenedores de $slug y su BBDD $db de la MariaDB $maria de Docker (la de XAMPP-X no se toca)"
+            # (con la BBDD de XAMPP-X en vivo, la que se borra es su copia de Docker, si tiene: la de XAMPP-X nunca)
+            if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+                db=$(docker_conf "$slug" BBDD_DOCKER) user=$(docker_conf "$slug" USUARIO_DOCKER)
+            fi
+            echo "Se borran los contenedores de $slug${db:+ y su BBDD $db de la MariaDB $maria de Docker} (la de XAMPP-X no se toca)"
             [ "$DRY" -eq 1 ] && return 0
             run "${c[@]}" down -v || return 1
+            lampp_bd_release "$(docker_conf "$slug" LAMPP_BD)" "$slug"
             if db_valid_name "$db" > /dev/null && [[ "$user" =~ ^[A-Za-z0-9_]{1,32}$ ]] && docker_maria_up "$maria" > /dev/null; then
                 printf 'DROP DATABASE IF EXISTS `%s`;\nDROP USER IF EXISTS '"'"'%s'"'"'@'"'"'%%'"'"';\n' "$db" "$user" | docker_maria_sql "$maria"
             fi
@@ -29082,7 +31067,8 @@ function docker_web_idle_stop() {
     for p in $(docker_web_projects); do
         if grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up"; then
             web_used=1
-            used+=("$(docker_conf "$p" MARIADB)")
+            # (los que van en vivo con la BBDD de XAMPP-X no usan la MariaDB comun)
+            [ -z "$(docker_conf "$p" LAMPP_BD)" ] && used+=("$(docker_conf "$p" MARIADB)")
         fi
     done
     for name in $(grep -E '^nexum-mariadb-[0-9]{1,2}-[0-9]{1,2}$' <<< "$up"); do
@@ -29099,15 +31085,374 @@ function docker_web_idle_stop() {
     return 0
 }
 
+# ===========================================================================
+# Proyectos de Docker sin visitas: se paran solos
+# ===========================================================================
+# Un proyecto del Apache de Docker en marcha que lleva DOCKER_IDLE_FILE horas sin ninguna visita (en el
+# registro de nexum-web, que apunta el dominio de cada una: tambien las que llegan por el tunel) se para,
+# y con el lo comun que ya no use nadie (su MariaDB, el Apache de Docker). Solo si el y nexum-web llevan
+# en marcha al menos esas horas (si no, su registro no alcanza). Con 0, nunca. Por defecto, 3 horas
+DOCKER_IDLE_FILE=$DOCKER_DIR/reposo
+DOCKER_STOPPED_MSG="Este proyecto de Docker está parado (se para solo tras unas horas sin visitas). Arráncalo en Nexum Dev Stack, pestaña Docker."
+DOCKER_IDLE_LOG=$LOG_DIR/docker-reposo.log
+function docker_idle_hours() {
+    local v
+    v=$(head -c 10 "$DOCKER_IDLE_FILE" 2> /dev/null | tr -d ' \n')
+    [ -f "$DOCKER_IDLE_FILE" ] || v=3
+    [[ "$v" =~ ^([0-9]|1[0-9]|2[0-4])$ ]] || v=3
+    echo "$v"
+}
+
+# El temporizador: un LaunchAgent tuyo (sin root) que cada 15 minutos lanza docker-reposo comprobar
+DOCKER_IDLE_AGENT=dev.hexer.nexum-reposo
+DOCKER_IDLE_PLIST=${LVM_REPOSO_PLIST:-$HOME/Library/LaunchAgents/$DOCKER_IDLE_AGENT.plist}
+function docker_idle_timer_on() {
+    [ -f "$DOCKER_IDLE_PLIST" ] && launchctl print "gui/$(id -u)/$DOCKER_IDLE_AGENT" > /dev/null 2>&1
+}
+function docker_idle_timer() {
+    if [ "$1" == poner ]; then
+        mkdir -p "$(dirname "$DOCKER_IDLE_PLIST")" "$LOG_DIR" || return 1
+        cat > "$DOCKER_IDLE_PLIST.nuevo" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>$DOCKER_IDLE_AGENT</string>
+    <key>ProgramArguments</key>
+    <array><string>/bin/bash</string><string>$TRUSTED_SCRIPT</string><string>docker-reposo</string><string>comprobar</string></array>
+    <key>StartInterval</key><integer>900</integer>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>/dev/null</string>
+    <key>StandardErrorPath</key><string>/dev/null</string>
+</dict>
+</plist>
+EOF
+        mv -f "$DOCKER_IDLE_PLIST.nuevo" "$DOCKER_IDLE_PLIST" || return 1
+        launchctl bootout "gui/$(id -u)/$DOCKER_IDLE_AGENT" > /dev/null 2>&1
+        launchctl bootstrap "gui/$(id -u)" "$DOCKER_IDLE_PLIST"
+    else
+        launchctl bootout "gui/$(id -u)/$DOCKER_IDLE_AGENT" > /dev/null 2>&1
+        rm -f "$DOCKER_IDLE_PLIST"
+    fi
+}
+
+# Segundos (de 1970) de cuando arranco un contenedor (nada si no esta)
+function docker_started_at() {
+    dk inspect -f '{{.State.StartedAt}}' "$1" 2> /dev/null | python3 -I -c '
+import datetime, re, sys
+t = sys.stdin.read().strip()
+m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", t)
+if m:
+    print(int(datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()))'
+}
+
+# docker-reposo comprobar: para los que llevan las horas sin visitas (lo lanza el temporizador)
+function docker_idle_check() {
+    local h now cutoff up visited p name t newest stopped=0 dom seen
+    h=$(docker_idle_hours)
+    [ "$h" -gt 0 ] || return 0
+    docker_ready > /dev/null 2>&1 || return 0
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null)
+    grep -qx nexum-web <<< "$up" || return 0
+    now=$(date +%s) cutoff=$(( $(date +%s) - h * 3600 ))
+    t=$(docker_started_at nexum-web)
+    [ -n "$t" ] && [ "$t" -le "$cutoff" ] || return 0
+    # (los dominios visitados en esas horas: el primero de cada linea del registro de nexum-web)
+    visited=$(dk logs --since "${h}h" nexum-web 2> /dev/null | awk '{ print tolower($1) }' | sort -u)
+    for p in $(docker_web_projects); do
+        newest=""
+        for name in $(grep -E "^nexum-$p-php[0-9]{2}\$" <<< "$up"); do
+            t=$(docker_started_at "$name")
+            [ -n "$t" ] && { [ -z "$newest" ] || [ "$t" -gt "$newest" ]; } && newest=$t
+        done
+        [ -n "$newest" ] && [ "$newest" -le "$cutoff" ] || continue
+        seen=0
+        for dom in $(docker_web_domains "$p"); do
+            grep -qxF "${dom,,}" <<< "$visited" && { seen=1; break; }
+        done
+        [ $seen -eq 1 ] && continue
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] $p: $h h sin visitas, se pararia"
+            stopped=$((stopped + 1))
+            continue
+        fi
+        echo "$(date '+%Y-%m-%d %H:%M') $p: $h h sin visitas, se para" | tee -a "$DOCKER_IDLE_LOG"
+        docker_web_action parar "$p" > /dev/null 2>&1 && stopped=$((stopped + 1))
+    done
+    # (el registro, con lo ultimo)
+    [ -f "$DOCKER_IDLE_LOG" ] && [ "$(wc -l < "$DOCKER_IDLE_LOG")" -gt 500 ] \
+        && tail -n 200 "$DOCKER_IDLE_LOG" > "$DOCKER_IDLE_LOG.nuevo" && mv -f "$DOCKER_IDLE_LOG.nuevo" "$DOCKER_IDLE_LOG"
+    [ $stopped -gt 0 ] || [ "${1:-}" != --decir ] || echo "Ningún proyecto lleva $h h sin visitas"
+    return 0
+}
+
+# Que el temporizador este si hace falta (al arrancar un proyecto de Docker): con horas y sin el, se pone
+function docker_idle_ensure() {
+    [ "$DRY" -eq 1 ] && return 0
+    if [ "$(docker_idle_hours)" -gt 0 ]; then
+        docker_idle_timer_on || docker_idle_timer poner > /dev/null 2>&1
+    fi
+    return 0
+}
+
+# docker-reposo [estado] | horas <0-24> | comprobar
+#   estado: Q|horas (0: nunca)|temporizador puesto (1/0)|lo ultimo que se ha parado
+function docker_idle_command() {
+    case ${1:-estado} in
+        estado) echo "Q|$(docker_idle_hours)|$(docker_idle_timer_on && echo 1 || echo 0)|$(tail -n 1 "$DOCKER_IDLE_LOG" 2> /dev/null | tr '|' ' ')" ;;
+        horas)
+            [[ "$2" =~ ^([0-9]|1[0-9]|2[0-4])$ ]] || { echo "Las horas van de 0 (nunca) a 24"; return 1; }
+            [ "$DRY" -eq 1 ] && { echo "  [simulacion] proyectos de Docker parados tras $2 h sin visitas"; return 0; }
+            mkdir -p -m 700 "$DOCKER_DIR" && ( umask 077; echo "$2" > "$DOCKER_IDLE_FILE" ) || return 1
+            if [ "$2" -gt 0 ]; then
+                docker_idle_timer poner || { echo "No se ha podido poner el temporizador"; return 1; }
+                echo "Los proyectos de Docker sin visitas se paran solos a las $2 h"
+            else
+                docker_idle_timer quitar
+                echo "Los proyectos de Docker ya no se paran solos"
+            fi ;;
+        comprobar) docker_idle_check "$2" ;;
+        *) echo "Uso: lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar"; return 1 ;;
+    esac
+}
+
+# ===========================================================================
+# BBDD de XAMPP-X en Docker (en vivo)
+# ===========================================================================
+# Un WordPress de Docker puede usar la BBDD de una version XAMPP-X en vivo: la misma que web.local, sin
+# copias. Su MariaDB (si no esta en marcha, solo ella, con tu usuario y en otro puerto de 127.0.0.1: no
+# choca con la de la version activa en el 3306) y, en la red de Docker, un puente hasta su puerto en el
+# Mac (socat, de la imagen de MariaDB, por host.docker.internal: Docker Desktop no llega a los sockets
+# del Mac). Si cambia el puerto (al activar esa version, pasa al 3306), se rehace el puente: la
+# configuracion del proyecto no cambia. El proyecto entra con el usuario y la contraseña de su
+# wp-config.php, los mismos que con web.local. PrestaShop no: guarda su dominio en la BBDD
+LAMPP_BD_BRIDGE_IMAGE=mariadb:11.8
+LAMPP_BD_MARK_DIR=$DOCKER_DIR/lampp-bd
+LAMPP_BD_PORTS="3310 3399"
+
+# (cada version tiene sus BBDD)
+function lampp_bd_owner() {
+    echo "$1"
+}
+
+function lampp_bd_xdir() {
+    echo "$BASE_DIR/XAMPP-$1/xamppfiles"
+}
+
+function lampp_bd_data() {
+    echo "$(lampp_bd_xdir "$1")/var/mysql"
+}
+
+function lampp_bd_bridge() {
+    echo "nexum-lampp-bd-${1//./-}"
+}
+
+# ¿Responde la MariaDB de esa version en su socket?
+function lampp_bd_alive() {
+    db_socket_alive "$(lampp_bd_data "$1")/mysql.sock"
+}
+
+# Su puerto: el apuntado si la arranco Docker; si no, el de siempre
+function lampp_bd_port() {
+    local p
+    p=$(head -c 10 "$LAMPP_BD_MARK_DIR/$1" 2> /dev/null | tr -d ' \n')
+    [[ "$p" =~ ^[0-9]{4,5}$ ]] && echo "$p" || echo "$PORT_MYSQL"
+}
+
+# Un puerto libre para la MariaDB de una version que arranca Docker (ni de otra apuntada ni ocupado)
+function lampp_bd_free_port() {
+    local p used
+    used=$(cat "$LAMPP_BD_MARK_DIR"/* 2> /dev/null; netstat -an -p tcp 2> /dev/null | awk '$NF == "LISTEN" { n = split($4, a, "."); print a[n] }')
+    for p in $(seq $LAMPP_BD_PORTS); do
+        grep -qx "$p" <<< "$used" || { echo "$p"; return 0; }
+    done
+    return 1
+}
+
+# La MariaDB de una version, en marcha: si no lo esta, se arranca solo ella, con tu usuario y en otro
+# puerto de 127.0.0.1, y se apunta en LAMPP_BD_MARK_DIR (asi no se cierra al arrancar otra version ni al
+# parar XAMPP-X)
+function lampp_bd_up() {
+    local f=$1 x data port i
+    x=$(lampp_bd_xdir "$f") data=$(lampp_bd_data "$f")
+    lampp_bd_alive "$f" && return 0
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] MariaDB de XAMPP-$f en otro puerto de 127.0.0.1, para Docker"
+        return 0
+    fi
+    [ -d "$data" ] && [ -x "$x/mysql/bin/mariadbd" ] || { echo "XAMPP-$f no tiene MariaDB ($x)"; return 1; }
+    port=$(lampp_bd_free_port) || { echo "No hay ningun puerto libre para la MariaDB de XAMPP-$f"; return 1; }
+    echo "Arrancando la MariaDB de XAMPP-$f para Docker (en 127.0.0.1:$port)..."
+    mkdir -p -m 700 "$LAMPP_BD_MARK_DIR" && echo "$port" > "$LAMPP_BD_MARK_DIR/$f" || return 1
+    # (con tu usuario, como la de XAMPP-X; aparte de esta tarea: sigue al terminar)
+    ( cd "$x/mysql" && /usr/bin/nohup ./bin/mariadbd --defaults-file="$x/etc/my.cnf" --port="$port" \
+        --bind-address=127.0.0.1 < /dev/null > /dev/null 2>&1 & )
+    for i in $(seq 300); do
+        lampp_bd_alive "$f" && return 0
+        sleep 0.2
+    done
+    rm -f "$LAMPP_BD_MARK_DIR/$f"
+    echo "La MariaDB de XAMPP-$f no ha arrancado (¿la tiene otro programa?). Lo ultimo de su registro:"
+    tail -8 "$data/mysqld.err" 2> /dev/null | sed 's/^/  /'
+    return 1
+}
+
+# El puente de la red de Docker hasta su puerto en el Mac (nexum-lampp-bd-8-4-27, en el 3306). Si el
+# puerto ha cambiado, se rehace
+function lampp_bd_bridge_up() {
+    local f=$1 name port
+    name=$(lampp_bd_bridge "$f") port=$(lampp_bd_port "$f")
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] puente $name hasta host.docker.internal:$port"; return 0; }
+    [ "$(dk inspect -f '{{.State.Running}} {{index .Config.Labels "nexum.lampp-bd-puerto"}}' "$name" 2> /dev/null)" == "true $port" ] && return 0
+    dk rm -f "$name" > /dev/null 2>&1
+    docker_net || return 1
+    dk run -d --name "$name" --network nexum --restart no --label "nexum.lampp-bd=$f" --label "nexum.lampp-bd-puerto=$port" \
+        --entrypoint socat "$LAMPP_BD_BRIDGE_IMAGE" TCP-LISTEN:3306,fork,reuseaddr "TCP:host.docker.internal:$port" > /dev/null
+}
+
+# Proyectos de Docker en marcha que usan la BBDD de esa version (menos el segundo argumento)
+function lampp_bd_users() {
+    local f=$1 skip=$2 p up
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null)
+    for p in $(docker_web_projects); do
+        [ "$p" != "$skip" ] && [ "$(docker_conf "$p" LAMPP_BD)" == "$f" ] && grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up" && echo "$p"
+    done
+}
+
+# La MariaDB que arranco Docker para esa version (solo si de verdad es ella: su .pid y su puerto)
+function lampp_bd_stop_own() {
+    local f=$1 data pid port
+    data=$(lampp_bd_data "$f") port=$(lampp_bd_port "$f")
+    pid=$(head -c 20 "$data/mysqld.pid" 2> /dev/null | tr -d ' \n')
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" -gt 1 ] || return 0
+    [[ " $(ps -ww -o command= -p "$pid" 2> /dev/null) " == *" --port=$port "* ]] || return 0
+    kill "$pid" 2> /dev/null
+    local i
+    for i in $(seq 150); do lampp_bd_alive "$f" || break; sleep 0.2; done
+    return 0
+}
+
+# Cuando ya no la usa ningun proyecto en marcha: fuera su puente y, si la arranco Docker, su MariaDB
+# lampp_bd_release <version> [proyecto que se para]
+function lampp_bd_release() {
+    local f=$1 slug=$2
+    [ -n "$f" ] || return 0
+    [ -n "$(lampp_bd_users "$f" "$slug")" ] && return 0
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] fuera el puente de XAMPP-$f (y su MariaDB, si la arranco Docker)"; return 0; }
+    dk rm -f "$(lampp_bd_bridge "$f")" > /dev/null 2>&1
+    [ -f "$LAMPP_BD_MARK_DIR/$f" ] || return 0
+    lampp_bd_stop_own "$f"
+    rm -f "$LAMPP_BD_MARK_DIR/$f"
+    echo "MariaDB de XAMPP-$f parada (ya no la usa ningun proyecto de Docker)"
+}
+
+# Antes de arrancar XAMPP-X con esa version: si su MariaDB la tenia Docker (en otro puerto), se para para
+# que arranque la normal; despues, lampp_bd_retarget lleva su puente al 3306
+function lampp_bd_handover() {
+    local f=${1##*/XAMPP-}
+    [ -n "$f" ] && [ -f "$LAMPP_BD_MARK_DIR/$f" ] || return 0
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] la MariaDB de XAMPP-$f que tenia Docker pasa a la de XAMPP-X"; return 0; }
+    echo "La MariaDB de XAMPP-$f la tenia Docker: pasa a la de XAMPP-X"
+    lampp_bd_stop_own "$f"
+    rm -f "$LAMPP_BD_MARK_DIR/$f"
+}
+
+# Despues de arrancar XAMPP-X: el puente de esa version, a su puerto de siempre (si lo usa Docker)
+function lampp_bd_retarget() {
+    local f=${1##*/XAMPP-}
+    [ -n "$f" ] && [ -n "$(lampp_bd_users "$f")" ] || return 0
+    lampp_bd_bridge_up "$f"
+}
+
+# Al parar XAMPP-X: si algun proyecto de Docker en marcha usaba la BBDD de esta version, vuelve su MariaDB
+# (en otro puerto, para Docker) y su puente
+function lampp_bd_keep() {
+    local f=${1##*/XAMPP-}
+    [ -n "$f" ] && [ -n "$(lampp_bd_users "$f")" ] || return 0
+    echo "Algun proyecto de Docker usa la BBDD de XAMPP-$f: su MariaDB sigue para el (en otro puerto)"
+    lampp_bd_up "$f" && lampp_bd_bridge_up "$f"
+}
+
+# El usuario, la contraseña y la base del proyecto en LAMPP (los de su wp-config.php): usuario|base y la
+# contraseña en la segunda linea
+function lampp_bd_creds() {
+    python3 -I - "$HTDOCS_DIR/$1/wp-config.php" << 'EOF'
+import re, sys
+try:
+    text = open(sys.argv[1], encoding="utf-8", errors="replace").read(2000000)
+except OSError:
+    sys.exit(1)
+def get(name):
+    m = re.search(r"""(?m)^(?:(?!//|#)[^\n])*?\bdefine\(\s*['"]%s['"]\s*,\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")""" % name, text)
+    return None if not m else re.sub(r"\\(.)", r"\1", m.group(1) if m.group(1) is not None else m.group(2))
+user, db, pw = get("DB_USER"), get("DB_NAME"), get("DB_PASSWORD")
+if not user or not db or pw is None or "\n" in pw or "|" in user + db:
+    sys.exit(1)
+print(user + "|" + db)
+print(pw)
+EOF
+}
+
+# docker-bd <nombre> lampp <version> | docker: la BBDD de un WordPress de Docker, en vivo la de esa
+# version XAMPP-X (la misma que web.local) o su copia en la MariaDB comun de Docker (la de antes, que no
+# se borra al pasar a LAMPP)
+function docker_db_mode() {
+    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was
+    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    case $mode in
+        lampp)
+            [ "$(docker_conf "$slug" TIPO)" == wp ] || { echo "Solo WordPress: una tienda guarda su dominio en la BBDD y no puede servir a web.local y a Docker a la vez"; return 1; }
+            valid_version_name "$v" && [ -d "$BASE_DIR/XAMPP-$v" ] || { echo "No existe la version XAMPP-$v"; return 1; }
+            owner=$(lampp_bd_owner "$v")
+            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base del wp-config.php de $(docker_conf "$slug" CARPETA)"; return 1; }
+            user=${creds%%|*} db=$(head -1 <<< "$creds" | cut -d'|' -f2) pass=$(sed -n 2p <<< "$creds")
+            echo "$slug: BBDD $db de XAMPP-$owner, en vivo (la misma que web.local; la copia de Docker se queda)"
+            [ "$DRY" -eq 1 ] && return 0
+            # (los de Docker de antes, para volver: BBDD y usuario de su copia)
+            [ -z "$(docker_conf "$slug" LAMPP_BD)" ] && docker_conf_set "$slug" BBDD_DOCKER "$(docker_conf "$slug" BBDD)" \
+                && docker_conf_set "$slug" USUARIO_DOCKER "$(docker_conf "$slug" USUARIO)" \
+                && { grep -q '^DB_PASS_DOCKER=' "$dir/.env" || ( umask 077; sed -n 's/^DB_PASS=/DB_PASS_DOCKER=/p' "$dir/.env" >> "$dir/.env" ); }
+            docker_conf_set "$slug" LAMPP_BD "$owner" && docker_conf_set "$slug" BBDD "$db" && docker_conf_set "$slug" USUARIO "$user" || return 1
+            ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; printf 'DB_PASS=%s\n' "$pass"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
+        docker)
+            owner=$(docker_conf "$slug" LAMPP_BD)
+            [ -n "$owner" ] || { echo "$slug ya usa su copia de Docker"; return 0; }
+            [ -n "$(docker_conf "$slug" BBDD_DOCKER)" ] || { echo "$slug no tiene copia en Docker: crea el proyecto de nuevo copiando la BBDD"; return 1; }
+            echo "$slug: vuelve a su copia de Docker ($(docker_conf "$slug" BBDD_DOCKER))"
+            [ "$DRY" -eq 1 ] && return 0
+            docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
+                && docker_conf_set "$slug" LAMPP_BD "" || return 1
+            ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
+        *) echo "Uso: lvm-instalador docker-bd <nombre> lampp <version> | docker"; return 1 ;;
+    esac
+    # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
+    was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
+    for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+    if [ "$was" -gt 0 ]; then
+        docker_web_action arrancar "$slug" || return 1
+        [ "$mode" == docker ] && lampp_bd_release "$owner" "$slug"
+    fi
+    echo "Listo"
+}
+
 # Aviso al parar algo comun (una MariaDB comun, el Apache de Docker o su phpMyAdmin) que usa algun
 # proyecto en marcha: cuales se quedan sin el
 function docker_shared_warn() {
-    local name=$1 up p v="" users=()
-    [[ "$name" =~ ^nexum-(web|pma|mariadb-([0-9]{1,2})-([0-9]{1,2}))$ ]] || return 0
-    [ -n "${BASH_REMATCH[2]}" ] && v=${BASH_REMATCH[2]}.${BASH_REMATCH[3]}
+    local name=$1 up p v="" users=() lampp=""
+    if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+        lampp=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}} v=x
+    else
+        [[ "$name" =~ ^nexum-(web|pma|mariadb-([0-9]{1,2})-([0-9]{1,2}))$ ]] || return 0
+        [ -n "${BASH_REMATCH[2]}" ] && v=${BASH_REMATCH[2]}.${BASH_REMATCH[3]}
+    fi
     up=$(dk ps --format '{{.Names}}' 2> /dev/null) || return 0
     for p in $(docker_web_projects); do
-        [ -n "$v" ] && [ "$(docker_conf "$p" MARIADB)" != "$v" ] && continue
+        if [ -n "$lampp" ]; then
+            [ "$(docker_conf "$p" LAMPP_BD)" == "$lampp" ] || continue
+        elif [ -n "$v" ] && { [ "$(docker_conf "$p" MARIADB)" != "$v" ] || [ -n "$(docker_conf "$p" LAMPP_BD)" ]; }; then
+            continue
+        fi
         grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up" && users+=("$(docker_conf "$p" CARPETA)")
     done
     [ ${#users[@]} -eq 0 ] && return 0
@@ -29119,13 +31464,16 @@ function docker_shared_warn() {
 function docker_stop_all() {
     local up names=()
     up=$(dk ps --format '{{.Names}}' 2> /dev/null) || { echo "Docker no responde"; return 1; }
-    mapfile -t names < <(grep -E '^nexum-([a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})|web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$' <<< "$up")
+    mapfile -t names < <(grep -E '^nexum-([a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})|web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$' <<< "$up")
     if [ ${#names[@]} -eq 0 ]; then
         echo "No hay ningun contenedor de Nexum en marcha"
         return 0
     fi
     echo "Parando ${#names[@]} contenedores de Nexum: ${names[*]}"
     run dk stop "${names[@]}" > /dev/null || return 1
+    # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
+    local f
+    for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }
 
@@ -29227,11 +31575,17 @@ function control_lampp() {
         vhosts_root
     fi
     local rc
+    # (la MariaDB de esta version, si la tenia Docker en otro puerto: se para para que arranque la normal)
+    [ "$1" != stop ] && lampp_bd_handover "$(active_dir)"
     run xampp_ctl "$1"
     rc=$?
     # Parada: no queda nada en memoria, tampoco de esta version
     if [ "$1" == stop ]; then
         close_processes --todos
+        # (salvo lo que use Docker: su MariaDB vuelve, en otro puerto)
+        lampp_bd_keep "$(active_dir)"
+    else
+        lampp_bd_retarget "$(active_dir)"
     fi
     # Mailpit (correo de pruebas) arranca y para con la version
     mailpit_sync
@@ -29296,6 +31650,138 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.40.2 (30 oct 2026)
+- Descargar una BBDD: ya no falla («Unable to lock ibdata1») si la
+  MariaDB de esa versión la tiene en marcha Docker (sin red). Se usa
+  esa MariaDB en lugar de arrancar otra sobre los mismos datos, y al
+  terminar sigue en marcha para Docker. Lo mismo al copiar una BBDD a
+  otra versión.
+- Visor de arriba: sin el botón Encendidos. Al pulsar Apache o MariaDB
+  se abren sus servicios (lo que antes salía en la flecha), con
+  «Parar y desactivar» o «Arrancar» la versión entera arriba.
+- Bases de datos: «Subir o actualizar una BBDD» va antes de la tabla,
+  más compacto (el fichero, la BBDD de destino, el proyecto y Cargar
+  en columnas) y en un visor un poco hundido.
+- Configuración: a la izquierda, una columna con sus apartados (Parches
+  nuevos, Vhosts y hosts, Correo de pruebas, Docker, GitHub, Carpetas…);
+  a la derecha, solo lo que se puede cambiar del elegido.
+
+1.40.1 (30 oct 2026)
+- Nuevo proyecto: en el paso 1, el repositorio se elige de los de
+  GitHub (los de la pestaña Repositorios, escribiendo parte de su
+  nombre): se rellenan solos su dirección SSH y su carpeta. Se puede
+  seguir escribiendo la dirección de otro. Un paso 4 pregunta si falsear
+  su dominio de producción (ya puesto si el repositorio tiene su web en
+  GitHub): al terminar de montarlo, se falsea como en Dominios y hosts.
+- Terminal: el mismo hueco arriba que abajo de su caja.
+- Terminal abajo de la ventana: el botón Terminal de arriba (en lugar
+  de Localhost) la enseña y la esconde. Con el aspecto del visor, un
+  poco hundida; tu shell, con tu usuario, en la carpeta del proyecto
+  cargado, con Ctrl+C como en Terminal (sin colores ni programas a
+  pantalla completa, como vim). Al esconderla sigue abierta.
+- Docker con la BBDD de XAMPP-X en vivo (WordPress): un proyecto de
+  Docker puede usar la BBDD de cualquier versión de XAMPP-X, la misma
+  que web.local, sin copias. Si la MariaDB de esa versión no está en
+  marcha, se arranca solo ella, con tu usuario y en otro puerto de
+  127.0.0.1; un puente en Docker lleva las conexiones hasta ella. Se para
+  sola cuando ningún proyecto de Docker la usa, y al activar esa versión
+  pasa a la de siempre. Se elige al montarlo («Cómo: en vivo») o con el
+  botón de su fila en la pestaña Docker. Las tiendas PrestaShop siguen
+  con su copia. En la terminal: docker-bd <proyecto> lampp <versión> |
+  docker.
+- Docker: las imágenes y enlaces que un WordPress guardó trabajando con
+  XAMPP-X (https://web.local/wp-content/…, o su dominio propio) salen del
+  contenedor: antes se pedían a XAMPP-X y, sin él en marcha o con otro
+  proyecto en web.local, no se veían. La BBDD no se toca: se cambian en
+  lo que devuelve la web (también escapadas, como las de Elementor). Los
+  proyectos de antes se arreglan al arrancarlos.
+- Configuración, GitHub: la organización o cuenta se puede escribir
+  también como su dirección (https://github.com/hexer-dev) o con @, se
+  comprueba que existe, y si no vale se dice en una ventana y lo escrito
+  se queda (antes volvía la de antes sin decir nada).
+- Los proyectos de Docker sin visitas se paran solos (Configuración,
+  Docker): uno que lleva las horas elegidas (3 de partida; de 1 a 24, o
+  nunca) sin ninguna visita, tampoco por el túnel, se para, y con él lo
+  común que ya no use nadie (su MariaDB, el Apache de Docker). Se mira
+  cada 15 minutos, también con la ventana cerrada (un LaunchAgent tuyo). Al entrar
+  en un proyecto parado, su web lo dice en vez de dar un error. En la
+  terminal: docker-reposo.
+- Pestaña Repositorios (como DevHub): los repositorios de la
+  organización o cuenta de GitHub que se elija en Configuración, solo
+  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
+  pueden añadir otros, como los de Shopify) o todos, con un buscador.
+  «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
+  Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
+  traen sus cambios con git pull y, si chocan con los tuyos, no se toca
+  nada y se dice. La lista se lee con un token de GitHub (se guarda en
+  el Llavero, no en un fichero) o con la sesión de gh, y la de la
+  última vez sale al momento. En la terminal: github, github-conectar,
+  repos y repo-traer.
+- Túnel de Cloudflare: cuánto dura y si se bloquea el admin se eligen
+  al pulsar «Compartir», para ese proyecto y ese túnel. Cada túnel
+  lleva una contraseña nueva al azar (se ve al abrirlo, para copiarla);
+  la de un túnel no vale para el siguiente. Configuración, Túnel de
+  Cloudflare deja solo cloudflared, el túnel abierto y su registro. En
+  la terminal: tunel-abrir <dirección> [carpeta] [--horas 1-12]
+  [--admin bloquear|permitir]; ya no hay tunel-config.
+- Menos memoria con varios proyectos de Docker a la vez: el Apache con
+  PHP de cada contenedor espera con un proceso (no con cinco) y, sin
+  trabajo, no se queda con más de dos; cada uno se rehace a las 200
+  peticiones. Los de antes se ponen al día solos al arrancarlos. El
+  Apache de Docker espera con un proceso, no con tres.
+- Imágenes de producción: «Guardar» funciona también con el dominio que
+  ya estaba guardado (así se vuelve a aplicar, también en el Apache de
+  Docker).
+- Imágenes de producción también en Docker: en un WordPress del Apache
+  de Docker, lo que falte de wp-content/uploads se pide a su web real
+  (con el mismo dominio que con XAMPP-X: «Imágenes de producción…» vale
+  para los dos). En una tienda, «Descargar las imágenes que faltan»
+  usa la BBDD de Docker si no está en la versión activa (su dominio de
+  producción se guarda al pasarla a Docker; si no se sabe, se pide).
+  Botón «Imágenes de producción…» en el visor de Docker.
+- Configuración más clara: cada ajuste en su tarjeta, de dos en dos
+  (como los visores de las otras pestañas), con su explicación entera
+  y sus botones en la tarjeta. Docker junta la dirección y los dos
+  puertos en una sola; lo que va solo (la barrera entre webs, los
+  botones del visor, el túnel abierto) va a lo ancho.
+- Botones del proyecto: el configurador va en horizontal (la lista a la
+  izquierda; el estilo, el tamaño y la vista previa a la derecha), y
+  cabe en la pantalla de un portátil: el botón Guardar ya no se queda
+  fuera.
+- Proyecto nuevo desde un repositorio privado: si su dirección https
+  de GitHub, GitLab o Bitbucket no se puede clonar (pide usuario y
+  contraseña), se prueba sola la misma por SSH
+  (git@github.com:usuario/repositorio.git), con tu clave. Con otros
+  servidores, como siempre: su dirección SSH a mano.
+- DNS de *.docker.test (Configuración, Docker, «Activar»): un DNS
+  mínimo, solo en este Mac, que contesta a cualquier
+  <algo>.docker.test. Los proyectos del Apache de Docker pasan a
+  .docker.test (su configuración, el dominio de las tiendas en su BBDD
+  y el certificado) y dejan de ir en /etc/hosts: añadir proyectos o
+  versiones de Docker ya no pide la contraseña por los dominios.
+  web.local, los proyectos de siempre y los dominios falseados de las
+  tiendas no cambian (siguen en /etc/hosts, que se mira antes). Si el
+  DNS no contesta al activarlo, se quita y todo sigue como estaba.
+  .local es de mDNS (Bonjour): un DNS para *.docker.local no se
+  consultaría nunca. En la terminal: docker-web dns activar|quitar.
+- El certificado del Apache de Docker vale para *.docker.local y
+  *.docker.test.
+- Parches nuevos (Configuración): lo que tiene un parche publicado en
+  cada versión XAMPP-X (PHP, Apache, MariaDB, ProFTPD, Perl y
+  phpMyAdmin), en las imágenes de Docker (las MariaDB comunes,
+  phpMyAdmin y PHP, frente a Docker Hub, sin descargar nada), Mailpit y
+  cloudflared, con «Actualizar todo» (las XAMPP-X.Y.Z llevan su parche
+  en el nombre: la nueva se instala a su lado). Se busca al abrir la ventana
+  cuando toca buscar una versión nueva del programa y, si hay algo, se
+  ofrece actualizarlo. Las MariaDB comunes de Docker se ponen al día
+  solas al cambiar de parche. En la terminal: componentes y
+  componentes-actualizar.
+- Correo de pruebas (Configuración): sus tres tarjetas en una fila.
+- Repositorios: detrás de «Clonar» o «Traer cambios», el logotipo de
+  GitHub abre el repositorio en GitHub (sus cambios, ramas y pull
+  requests). La carpeta de los ya clonados va debajo del nombre, y así
+  todos los botones quedan a la misma altura.
 
 1.40.0 (28 oct 2026)
 - Docker con su propio Apache: los proyectos de Docker ya no necesitan
@@ -30816,6 +33302,161 @@ function cli_rebuild() {
     install_plan "rehacer:$full"
 }
 
+# ===========================================================================
+# Componentes: los parches nuevos de todo lo que usa el gestor
+# ===========================================================================
+# Lo que tiene un parche nuevo publicado: cada version de PHP (su PHP, Apache, MariaDB, ProFTPD, Perl y
+# phpMyAdmin, frente a lo ultimo de su rama), las imagenes de Docker que se usan (las MariaDB comunes,
+# phpMyAdmin y la base de cada imagen de PHP, frente a su huella en Docker Hub: sin descargar nada), y
+# Mailpit y cloudflared (frente a los que pone esta version del gestor). componentes [--sin-docker]:
+#   L|carpeta|componente|instalada|nueva   una version de PHP: se rehace entera con lo ultimo de su rama
+#   F|carpeta|motivo                       una version que no se pone al dia sola (parche concreto, XAMPP)
+#   K|imagen|para que                      una imagen de Docker con una version nueva en Docker Hub
+#   X|programa|instalada|nueva             Mailpit o cloudflared
+#   E|lo que no se ha podido consultar
+#   S|cuantos componentes tienen parche nuevo
+function components_check() {
+    local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
+    local a b
+    releases=$(php_releases)
+    [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
+    local pinned
+    while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        name=$(version_name "$dir")
+        [ -f "$dir/xamppfiles/etc/pvm-stack" ] || continue
+        cur=$(stack_fields "$dir")
+        # (las de ahora, XAMPP-X.Y.Z, llevan su parche en el nombre: no se rehacen, se instala la nueva al
+        # lado y se le pasan las BBDD con pasar-version)
+        pinned=0
+        [[ "$name" =~ ^[0-9]+\.[0-9]+$ ]] || pinned=1
+        [ -z "$releases" ] && continue
+        full=$(rebuild_version "$dir" "$releases")
+        [ -z "$full" ] && { echo "E|la última versión de la rama de XAMPP-$name"; continue; }
+        new=$(stack_versions "$full")
+        IFS='|' read -r -a a <<< "$cur"
+        IFS='|' read -r -a b <<< "$new"
+        for i in 0 1 2 3 4 5; do
+            # (lo que no se ha podido consultar sale como su rama seguida de .x: no cuenta)
+            [ -z "${b[$i]}" ] || [[ "${b[$i]}" == *.x ]] && continue
+            if [ "${a[$i]}" != "${b[$i]}" ] && [ "$(printf '%s\n%s\n' "${a[$i]}" "${b[$i]}" | sort -V | tail -1)" == "${b[$i]}" ]; then
+                if [ $pinned -eq 1 ]; then
+                    echo "F|$name|${names[$i]} ${a[$i]:-?} → ${b[$i]}: instala la nueva a su lado (Instalar versión) y pásale las BBDD"
+                else
+                    echo "L|$name|${names[$i]}|${a[$i]:-?}|${b[$i]}"
+                fi
+                n=$((n + 1))
+            fi
+        done
+    done < <(version_dirs)
+    if [ "$1" != --sin-docker ] && docker_ready > /dev/null 2>&1; then
+        for v in $(docker_maria_versions); do
+            img=mariadb:$v
+            docker_image_outdated "$img" && { echo "K|$img|la MariaDB $v común de Docker"; n=$((n + 1)); }
+        done
+        if dk image inspect "$DOCKER_PMA_IMAGE" > /dev/null 2>&1 && docker_image_outdated "$DOCKER_PMA_IMAGE"; then
+            echo "K|$DOCKER_PMA_IMAGE|phpMyAdmin de Docker"
+            n=$((n + 1))
+        fi
+        for v in $DOCKER_PHP_VERSIONS; do
+            dk image inspect "nexum-php:$v" > /dev/null 2>&1 || continue
+            img=php:$v-apache
+            docker_image_outdated "$img" && { echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1)); }
+        done
+    fi
+    if mailpit_installed && [ "$(mailpit_installed_version)" != "$MAILPIT_VERSION" ]; then
+        echo "X|Mailpit|$(mailpit_installed_version)|$MAILPIT_VERSION"
+        n=$((n + 1))
+    fi
+    if tunnel_installed && [ "$(tunnel_installed_version)" != "$TUNNEL_VERSION" ]; then
+        echo "X|cloudflared|$(tunnel_installed_version)|$TUNNEL_VERSION"
+        n=$((n + 1))
+    fi
+    echo "S|$n"
+}
+
+# ¿Hay en Docker Hub una version nueva de una imagen que ya esta en este equipo? Compara su huella
+# (la de la etiqueta, con una consulta HEAD que no cuenta para los limites de Docker Hub) con la de
+# la descargada. Sin la imagen o sin respuesta: no (no se puede saber)
+function docker_image_outdated() {
+    local img=$1 repo tag token remote local_d
+    repo=${img%%:*} tag=${img#*:}
+    [[ "$repo" == */* ]] || repo=library/$repo
+    local_d=$(dk image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$img" 2> /dev/null | sed -n 's/^[^@]*@//p' | head -1)
+    [ -z "$local_d" ] && return 1
+    token=$(curl -q --proto =https -fsS --max-time 15 "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$repo:pull" 2> /dev/null \
+        | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["token"])' 2> /dev/null) || return 1
+    remote=$(curl -q --proto =https -fsSI --max-time 15 -H "Authorization: Bearer $token" \
+        -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json" \
+        "https://registry-1.docker.io/v2/$repo/manifests/$tag" 2> /dev/null | tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: *//p' | head -1)
+    [[ "$remote" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+    [ "$remote" != "$local_d" ]
+}
+
+# componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
+# (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
+# PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version
+function components_update() {
+    local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    echo "Buscando parches nuevos..."
+    out=$(components_check)
+    while IFS= read -r line; do
+        IFS='|' read -r -a f <<< "$line"
+        case ${f[0]} in
+            L) echo "  XAMPP-${f[1]}: ${f[2]} ${f[3]} → ${f[4]}"
+               [[ " $folders " == *" ${f[1]} "* ]] || folders+=" ${f[1]}" ;;
+            K) echo "  ${f[1]} (${f[2]}): versión nueva en Docker Hub"; imgs+=" ${f[1]}" ;;
+            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"; progs+=" ${f[1]}" ;;
+            F) echo "  XAMPP-${f[1]}: ${f[2]}" ;;
+            E) echo "  (no se ha podido consultar: ${f[1]})" ;;
+        esac
+    done <<< "$out"
+    if [ -z "$folders$imgs$progs" ]; then
+        echo "Todo está al día: no hay parches nuevos."
+        return 0
+    fi
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
+    for v in $imgs; do
+        case $v in
+            mariadb:*)
+                v=${v#mariadb:}
+                echo "MariaDB $v común de Docker: la imagen nueva y su contenedor de nuevo (sus BBDD no cambian)"
+                # (y, de paso, que se ponga al dia sola al cambiar de parche: MARIADB_AUTO_UPGRADE)
+                cf=$DOCKER_DIR/mariadb-$v/compose.yaml
+                if dk pull "mariadb:$v" && awk '/^      MARIADB_AUTO_UPGRADE:/ { next } { print } /^      MARIADB_ROOT_PASSWORD: / { print "      MARIADB_AUTO_UPGRADE: \"1\"" }' "$cf" > "$cf.nuevo" \
+                        && chmod 600 "$cf.nuevo" && mv -f "$cf.nuevo" "$cf"; then
+                    [ -n "$(dk ps -q --filter "name=^$(docker_maria_name "$v")\$" 2> /dev/null)" ] && { docker_maria_up "$v" > /dev/null || fail=1; }
+                else
+                    fail=1
+                fi ;;
+            "$DOCKER_PMA_IMAGE")
+                echo "phpMyAdmin de Docker: la imagen nueva"
+                dk pull "$DOCKER_PMA_IMAGE" || { fail=1; continue; }
+                [ "$(docker_web_state)" == marcha ] && { docker_web_up > /dev/null || fail=1; } ;;
+            php:*)
+                v=${v#php:}; v=${v%-apache}
+                echo "Imagen de PHP $v de Docker: de nuevo, con lo último de Docker Hub"
+                docker_php_image "$v" --nueva || { echo "No se ha podido rehacer la imagen de PHP $v: sigue con la anterior"; fail=1; continue; }
+                for slug in $(docker_projects); do
+                    [[ " $(docker_conf "$slug" PHP) " == *" $v "* ]] || continue
+                    dir=$DOCKER_DIR/$slug
+                    running=$(dk ps --filter "label=com.docker.compose.project=nexum-$slug" --format '{{.Label "com.docker.compose.service"}}' 2> /dev/null)
+                    [ -n "$running" ] && { dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d $running > /dev/null || fail=1; }
+                done ;;
+        esac
+    done
+    [ -n "$imgs" ] && dk image prune -f > /dev/null 2>&1
+    [[ " $progs " == *" Mailpit "* ]] && { mailpit_install || fail=1; }
+    [[ " $progs " == *" cloudflared "* ]] && { tunnel_install || fail=1; }
+    for v in $folders; do
+        echo "XAMPP-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"
+        ( cli_rebuild "$v" ) || fail=1
+    done
+    [ $fail -eq 0 ] && echo "Todo al día." || echo "Algo no se ha podido actualizar: mira lo de arriba."
+    return $fail
+}
+
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
@@ -31040,9 +33681,8 @@ case "$1" in
     docker-instalar) docker_install ;;
     tunel) tunnel_status ;;
     tunel-instalar) tunnel_install ;;
-    tunel-abrir) tunnel_open "$2" "$3" ;;
+    tunel-abrir) shift; tunnel_open "$@" ;;
     tunel-cerrar) tunnel_close ;;
-    tunel-config) shift; tunnel_config "$@" ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-nuevo) shift; docker_web_create "$@" ;;
     docker-php-anadir) docker_web_add "$2" "$3" ;;
@@ -31088,7 +33728,7 @@ case "$1" in
     media-produccion) media_proxy "$2" "$3" ;;
     media-proyecto) media_project "$2" "$3" ;;
     gui-wp-produccion) gui_wp_prod "$2" ;;
-    ps-imagenes) ps_images "$2" ;;
+    ps-imagenes) ps_images "$2" "$3" ;;
     hosts-enlace) hosts_fix_link ;;
     nuevo-dominio) new_custom_domain "$2" "$3" "$4" ;;
     cerrar-procesos) close_processes "$2" ;;
@@ -31102,6 +33742,15 @@ case "$1" in
     correo) mail_command "$2" "$3" ;;
     vincular-bd) link_database "$2" "$3" "$4" ;;
     rehacer|actualizar) cli_rebuild "$2" ;;
+    github) shift; github_command "$@" ;;
+    github-conectar) github_connect "$2" ;;
+    github-desconectar) github_disconnect ;;
+    repos) shift; repos_list "$@" ;;
+    repo-traer) repo_fetch "$2" "$3" ;;
+    docker-reposo) shift; docker_idle_command "$@" ;;
+    docker-bd) docker_db_mode "$2" "$3" "$4" ;;
+    componentes) components_check "$2" ;;
+    componentes-actualizar) components_update ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;
     novedades) changes_text ;;

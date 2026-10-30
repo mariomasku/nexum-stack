@@ -76,6 +76,22 @@
 #       Vuelve a compilar una version con la ultima pila de su rama (las basadas en XAMPP
 #       pasan a pila propia)
 #
+#   lvm-instalador github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
+#   lvm-instalador github-conectar [--gh] | github-desconectar
+#   lvm-instalador repos [--todos] [--cache] | repo-traer <dueño/repo> [--actualizar]
+#       Repositorios de GitHub (pestaña Repositorios): los de una organizacion o cuenta (los de sus
+#       prefijos, o --todos), leidos con un token (por la entrada; se guarda en el llavero) o con la
+#       sesion de gh. repo-traer lo clona por SSH en htdocs o, si ya esta, trae sus cambios (git pull)
+#
+#   lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar
+#       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
+#       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
+#
+#   lvm-instalador componentes | componentes-actualizar
+#       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
+#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
+#       ponerlo todo al dia
+#
 #   lvm-instalador actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
@@ -117,23 +133,29 @@
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
 #       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
 #
-#   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]
+#   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> [--en-vivo] | --volcado <fichero>]
+#   lvm-instalador docker-bd <nombre> lampp <version> | docker
+#       --en-vivo y docker-bd lampp: un WordPress de Docker con la BBDD de esa version LAMPP en vivo, la
+#       misma que web.local (sin copias; su MariaDB se arranca sola, sin red, si no esta en marcha).
+#       docker-bd docker: vuelve a su copia en la MariaDB comun de Docker
 #   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
 #   lvm-instalador docker-pasar <nombre>
 #   lvm-instalador docker-parar-todo
-#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
+#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.56): no necesitan LAMPP y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
 #       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
 #       Su BBDD va en una MariaDB comun por version y phpMyAdmin en https://pma.docker.local.
 #       docker-pasar lleva al Apache de Docker un proyecto de antes (con LAMPP delante). docker-web:
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y permitir que Docker sin root use los de
-#       menos de 1024
-#   lvm-instalador tunel-abrir <direccion local> [carpeta] | tunel-cerrar | tunel | tunel-instalar
-#   lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir
+#       menos de 1024. dns activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test
+#       y dejan de ir en /etc/hosts; web.local y lo demas, igual)
+#   lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
+#   lvm-instalador tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
-#       direccion https://<algo>.trycloudflare.com, con contraseña, el admin bloqueado y que se
-#       cierra solo (2 h). La web no se toca: el dominio local se cambia por el del tunel al pasar
+#       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
+#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice). La web no se toca: el
+#       dominio local se cambia por el del tunel al pasar
 #   lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   lvm-instalador docker-php <nombre> <version de PHP>
 #   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
@@ -709,7 +731,8 @@ TEST_DIR=${LVM_PRUEBA:-}
 if [ -z "$TEST_DIR" ]; then
     unset LVM_HTDOCS LVM_VHOSTS LVM_VHOSTS_ACTIVO LVM_SSL_CERTS LVM_SSL_KEYS LVM_HOSTS LVM_BD_CLIENTE \
         LVM_BD_VOLCADO LVM_ENLACE LVM_PS LVM_PRUEBA_CAS LVM_PRUEBA_CLAVES LVM_PRUEBA_SSL LVM_MAILPIT_URL \
-        LVM_MAILPIT_SHA LVM_DOCKER_SYSCTL LVM_PORT_START_FILE LVM_CLOUDFLARED_URL LVM_CLOUDFLARED_SHA
+        LVM_MAILPIT_SHA LVM_DOCKER_SYSCTL LVM_PORT_START_FILE LVM_CLOUDFLARED_URL LVM_CLOUDFLARED_SHA \
+        LVM_DNS_SCRIPT LVM_DNS_UNIT LVM_DNS_RESOLVED
 fi
 # Proyectos y vhosts compartidos por todas las versiones (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-/opt/htdocs}
@@ -745,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.2"
+APP_VERSION="1.56.15"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -1562,6 +1585,35 @@ function run() {
     fi
 }
 
+# Instala con apt los paquetes de Ubuntu que falten (los que ya estan no se tocan, y si estan todos no se
+# llama a apt). Un repositorio roto de otro programa (un PPA sin version para esta Ubuntu, una clave
+# caducada) hace fallar apt-get update: no se para por eso, se avisa de cual es y se instala con las
+# listas que ya habia. Solo falla si no se puede instalar algun paquete. Uso: apt_install <paquetes...>
+function apt_install() {
+    local p missing=() out="" rc
+    for p in "$@"; do
+        dpkg-query -W -f='${Status}' "$p" 2> /dev/null | grep -q "install ok installed" || missing+=("$p")
+    done
+    [ ${#missing[@]} -eq 0 ] && { echo "  Ya estan todas instaladas"; return 0; }
+    echo "  Faltan: ${missing[*]}"
+    out=$(sudo apt-get update -qq 2>&1)
+    rc=$?
+    if [ $rc -ne 0 ] || grep -q '^E:' <<< "$out"; then
+        echo "  Aviso: apt-get update no ha podido leer algun repositorio (de otro programa, no de Nexum):"
+        grep -E '^(E|W):' <<< "$out" | sed 's/^/    /'
+        echo "  Se sigue con las listas de paquetes que ya habia."
+    fi
+    # (sin preguntas de debconf: la tarea no tiene una terminal donde contestarlas)
+    if ! sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" > /dev/null; then
+        echo "No se han podido instalar: ${missing[*]}"
+        if [ -n "$out" ]; then
+            echo "Puede ser por los repositorios rotos de arriba: quitalos o arreglalos (Software y actualizaciones,"
+            echo "pestaña Otro software, o los ficheros de /etc/apt/sources.list.d) y vuelve a probar."
+        fi
+        return 1
+    fi
+}
+
 # ===========================================================================
 # Acciones de lvm
 # ===========================================================================
@@ -1917,11 +1969,15 @@ function use_lampp() {
         echo "  Usala solo con proyectos tuyos y pasa a una version con el arreglo (lvm-instalador actualizar-a)."
     fi
 
+    local before
+    before=$(active_dir)
     [ -L /opt/lampp ] && run sudo /opt/lampp/lampp stop
     [ -L /opt/lampp ] && run sudo unlink /opt/lampp
     # Lo que no se haya cerrado al parar (de esta version o de otras anteriores) no puede seguir en
     # memoria al montar la nueva
     close_processes --todos
+    # (la BBDD de la que se deja, si la usa en vivo un proyecto de Docker: su MariaDB sigue, sin red)
+    [ -n "$before" ] && [ "$before" != "/opt/lampp-$version" ] && lampp_bd_keep "$before"
     # Solo para este equipo (lo que falte), antes de arrancarla. Tambien las demas versiones, por si
     # se arrancan a mano. Si no se puede, no se arranca: quedaria abierta a la red
     secure_all
@@ -1932,6 +1988,7 @@ function use_lampp() {
     fi
     vhosts_root
     run sudo ln -s "/opt/lampp-$version" /opt/lampp
+    lampp_bd_handover "/opt/lampp-$version"
     run sudo /opt/lampp/lampp start
     # MariaDB de XAMPP: sin el usuario anonimo ni los permisos de cualquiera en las bases test
     [ "$DRY" -eq 0 ] && wait_mariadb && secure_mariadb
@@ -1957,12 +2014,14 @@ function use_lampp() {
 LAMPP_LINK=/opt/lampp
 [ -n "$TEST_DIR" ] && [ -n "$LVM_ENLACE" ] && LAMPP_LINK=$LVM_ENLACE
 
-# P|pid|padre|usuario|version|sobra (1/0)|nombre. Sobran los que no son de la version montada (todos
-# si no hay ninguna).
+# P|pid|padre|usuario|version|sobra (1/0)|nombre|de Docker (1/0). Sobran los que no son de la version
+# montada (todos si no hay ninguna), salvo la MariaDB de una version que usa en vivo un proyecto de
+# Docker (sin red, apuntada en LAMPP_BD_MARK_DIR): esa no se cierra ni al parar LAMPP
 function lampp_processes() {
-    python3 -I - "$LAMPP_LINK" <<'EOF'
+    python3 -I - "$LAMPP_LINK" "$LAMPP_BD_MARK_DIR" <<'EOF'
 import glob, os, pwd, re, sys
 link = sys.argv[1]
+marks = sys.argv[2] if len(sys.argv) > 2 else ""
 base = os.path.dirname(link)
 active, link_time = "", 0
 if os.path.islink(link):
@@ -2088,10 +2147,14 @@ for pid in sorted(lampp):
     name = a0.split(":")[0] if ":" in a0 and not a0.startswith("/") else os.path.basename(a0)
     if name in ("sh", "bash", "dash", "perl") and len(p["argv"]) > 1:
         name = os.path.basename(p["argv"][1])
+    # La MariaDB que usa Docker: sin red, con el socket de su version y apuntada
+    for_docker = (name in ("mysqld", "mariadbd") and "--skip-networking" in p["argv"] and v not in ("", "?")
+                  and "--socket=%s/lampp-%s/var/mysql/mysql.sock" % (base, v) in p["argv"]
+                  and bool(marks) and os.path.isfile(os.path.join(marks, v)))
     # Cualquier proceso elige su propio nombre: sin saltos de linea ni «|», que meterian lineas o
     # campos falsos (un pid que despues se cierra con sudo kill)
-    print("P|%d|%d|%s|%s|%d|%s" % (pid, p["ppid"], clean(user), clean(v), int(v != active),
-                                   clean(name or a0)))
+    print("P|%d|%d|%s|%s|%d|%s|%d" % (pid, p["ppid"], clean(user), clean(v), int(v != active and not for_docker),
+                                      clean(name or a0), int(for_docker)))
 EOF
 }
 
@@ -2116,7 +2179,7 @@ function stray_summary() {
 function close_processes() {
     local all=$1 list pids wait sure
     function _stray() {
-        lampp_processes | awk -F'|' -v all="$all" '$6 == 1 || all == "--todos"'
+        lampp_processes | awk -F'|' -v all="$all" '$8 != 1 && ($6 == 1 || all == "--todos")'
     }
     list=$(_stray)
     [ -z "$list" ] && return 0
@@ -2659,6 +2722,325 @@ EOF
     echo "Proyecto $folder borrado"
 }
 
+# ===========================================================================
+# Repositorios de GitHub (pestaña Repositorios)
+# ===========================================================================
+# Los repositorios de una organizacion o cuenta de GitHub, para clonarlos por SSH en htdocs (o, si ya
+# estan, traer sus cambios con git pull). Como DevHub: un token de GitHub (o la sesion de gh) solo para
+# leer la lista, y los prefijos de los nombres que se ven (dob-wordpress-, dob-prestashop-...). El token
+# va en el llavero de la sesión, no en un fichero; GITHUB_CONF_FILE (solo tuyo) lleva:
+#   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
+#   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
+#   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
+GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
+GITHUB_KEYRING_SERVICE=nexum-dev-stack
+GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
+
+function github_conf() {
+    local v="" p ok=""
+    [ -f "$GITHUB_CONF_FILE" ] && v=$(sed -n "s/^$1=//p" "$GITHUB_CONF_FILE" | head -1)
+    case $1 in
+        CUENTA) [[ "$v" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || v="" ;;
+        ORIGEN) [[ "$v" =~ ^(llavero|gh)$ ]] || v="" ;;
+        PREFIJOS)
+            grep -q '^PREFIJOS=' "$GITHUB_CONF_FILE" 2> /dev/null || v=$GITHUB_DEFAULT_PREFIXES
+            for p in $v; do [[ "$p" =~ ^[A-Za-z0-9._-]{1,50}$ ]] && ok+=" $p"; done
+            v=${ok# } ;;
+    esac
+    echo "$v"
+}
+
+# github_conf_set <clave> <valor>
+function github_conf_set() {
+    local tmp
+    mkdir -p -m 700 "$(dirname "$GITHUB_CONF_FILE")" || return 1
+    tmp=$(mktemp "$GITHUB_CONF_FILE.XXXXXX") || return 1
+    { grep -v "^$1=" "$GITHUB_CONF_FILE" 2> /dev/null; printf '%s=%s\n' "$1" "$2"; } > "$tmp" && chmod 600 "$tmp" \
+        && mv -f "$tmp" "$GITHUB_CONF_FILE"
+}
+
+# El token con el que se lee la lista (nada si no hay)
+function github_token() {
+    case $(github_conf ORIGEN) in
+        llavero) timeout 15 secret-tool lookup service "$GITHUB_KEYRING_SERVICE" account github 2> /dev/null ;;
+        gh) command -v gh > /dev/null && gh_token ;;
+    esac
+}
+
+# El token de la sesion de gh, sin esperar mas de 15 s (con el llavero bloqueado o sin el, gh se queda
+# esperandolo)
+function gh_token() {
+    local out pid
+    out=$(mktemp "${TMPDIR:-/tmp}/lvm-gh.XXXXXX") || return 1
+    gh auth token > "$out" 2> /dev/null < /dev/null &
+    pid=$!
+    ( sleep 15; kill $pid 2> /dev/null ) &
+    wait $pid 2> /dev/null
+    kill $! 2> /dev/null
+    cat "$out"
+    rm -f "$out"
+}
+
+# GET a la API de GitHub: github_api <ruta o direccion> [fichero para las cabeceras]. El token, por la
+# entrada de curl (-K -): en la linea de ordenes se veria con ps
+function github_api() {
+    local url=$1 hdr=${2:-/dev/null} token
+    token=$(github_token)
+    [ -n "$token" ] || return 2
+    [[ "$url" == https://api.github.com/* ]] || url=https://api.github.com$url
+    printf 'header = "Authorization: Bearer %s"\n' "$token" | curl -q --proto =https --proto-redir =https -fsS --max-time 30 -K - \
+        -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "User-Agent: nexum-dev-stack" \
+        -D "$hdr" "$url"
+}
+
+# github-conectar [--gh]: con el token que llega por la entrada (una linea), o con la sesion de gh.
+# Se comprueba con GitHub antes de guardarlo
+function github_connect() {
+    local token login
+    if [ "$1" == --gh ]; then
+        command -v gh > /dev/null && token=$(gh_token)
+        [ -n "$token" ] || { echo "No hay sesión de gh (gh auth login) en este equipo"; return 1; }
+    else
+        IFS= read -r token
+        token=${token//[[:space:]]/}
+        [[ "$token" =~ ^[A-Za-z0-9_]{20,255}$ ]] || { echo "Eso no parece un token de GitHub (ghp_…, github_pat_…)"; return 1; }
+    fi
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se comprobaria el token con GitHub y se guardaria en el llavero de la sesión"; return 0; }
+    login=$(printf 'header = "Authorization: Bearer %s"\n' "$token" | curl -q --proto =https -fsS --max-time 30 -K - \
+        -H "Accept: application/vnd.github+json" -H "User-Agent: nexum-dev-stack" https://api.github.com/user 2> /dev/null \
+        | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+    [ -n "$login" ] || { echo "GitHub no acepta ese token (¿caducado o sin permiso?)"; return 1; }
+    if [ "$1" == --gh ]; then
+        github_conf_set ORIGEN gh || return 1
+    else
+    command -v secret-tool > /dev/null || { echo "Hace falta secret-tool para guardar el token en el llavero: sudo apt install libsecret-tools"; return 1; }
+    # (al llavero de la sesion por la entrada de secret-tool: en la linea de ordenes se veria con ps)
+    printf '%s' "$token" | secret-tool store --label="Nexum Dev Stack (GitHub)" service "$GITHUB_KEYRING_SERVICE" account github \
+        || { echo "No se ha podido guardar el token en el llavero de la sesion"; return 1; }
+        github_conf_set ORIGEN llavero || return 1
+    fi
+    [ -n "$(github_conf CUENTA)" ] || github_conf_set CUENTA "$login"
+    echo "Conectado a GitHub como $login"
+}
+
+function github_disconnect() {
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token de el llavero de la sesión"; return 0; }
+    command -v secret-tool > /dev/null && secret-tool clear service "$GITHUB_KEYRING_SERVICE" account github 2> /dev/null
+    github_conf_set ORIGEN ""
+    echo "Desconectado de GitHub (el token ya no está en el llavero de la sesión)"
+}
+
+# github [estado]: G|conectado (1/0)|usuario|origen|cuenta|prefijos
+# github cuenta <organizacion o cuenta> | prefijos "<p1> <p2>..."
+function github_command() {
+    local login=""
+    case $1 in
+        ""|estado)
+            [ -n "$(github_token)" ] && login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+            echo "G|$([ -n "$login" ] && echo 1 || echo 0)|$login|$(github_conf ORIGEN)|$(github_conf CUENTA)|$(github_conf PREFIJOS)" ;;
+        cuenta)
+            # (tambien su direccion de GitHub o con @: https://github.com/hexer-dev, @hexer-dev)
+            local a kind
+            a=$(printf "%s" "$2" | sed "s/^[[:space:]]*//; s/[[:space:]]*$//")
+            a=${a#http://} a=${a#https://} a=${a#www.} a=${a#github.com/} a=${a#@} a=${a%%/*}
+            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como hexer-dev)"; return 1; }
+            # (con la conexion hecha, que exista)
+            if [ -n "$(github_token)" ]; then
+                kind=$(github_api "/users/$a" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
+                [ -n "$kind" ] || { echo "En GitHub no hay ninguna organización ni cuenta $a (o el token no la ve)"; return 1; }
+            fi
+            github_conf_set CUENTA "$a" && echo "Repositorios de $a" ;;
+        prefijos)
+            local p ok=""
+            for p in $2; do
+                [[ "$p" =~ ^[A-Za-z0-9._-]{1,50}$ ]] || { echo "Prefijo no válido: $p (letras sin acentos, números, punto, _ y -)"; return 1; }
+                ok+=" $p"
+            done
+            github_conf_set PREFIJOS "${ok# }" && echo "Prefijos: ${ok# }" ;;
+        *) echo "Uso: lvm-instalador github [estado] | cuenta <nombre> | prefijos \"<p1> <p2>\""; return 1 ;;
+    esac
+}
+
+# Proyectos de htdocs que son un clon de un repositorio de GitHub: "dueño/repositorio carpeta" (en
+# minusculas el nombre, que GitHub no distingue). Su origin, por https o por SSH
+function repo_clones() {
+    python3 -I - "$HTDOCS_DIR" << 'EOF'
+import os, re, sys
+base = sys.argv[1]
+for name in sorted(os.listdir(base)):
+    cfg = os.path.join(base, name, ".git", "config")
+    if os.path.islink(os.path.join(base, name)) or not os.path.isfile(cfg):
+        continue
+    try:
+        text = open(cfg, encoding="utf-8", errors="replace").read(200000)
+    except OSError:
+        continue
+    m = re.search(r'\[remote "origin"\][^\[]*?\burl\s*=\s*(\S+)', text)
+    if not m:
+        continue
+    r = re.match(r"(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*?)(?:\.git)?/?$", m.group(1))
+    if r:
+        print(r.group(1).lower(), name)
+EOF
+}
+
+# repos [--todos] [--cache]: los repositorios de la cuenta (sin los archivados; sin --todos, solo los de
+# los prefijos), los mas recientes primero. Lo que da GitHub se guarda en REPOS_CACHE_FILE (solo tuyo):
+# con --cache, la lista de la ultima vez, sin preguntar a GitHub (al abrir la pestaña, al momento):
+#   C|usuario conectado|cuenta|Organization o User|cuantos|cuantos se ven
+#   R|dueño/repo|nombre|privado (1/0)|ultimo cambio (AAAA-MM-DD)|rama|prefijo|web|descripcion|estado|carpeta
+#     estado: clonado (en la carpeta), ocupado (hay una carpeta con su nombre que no es ese repositorio) o nuevo
+#   E|lo que ha fallado
+REPOS_CACHE_FILE=$HOME/.lvm-instalador/repos-github
+function repos_list() {
+    local account kind login path all="" hdr page=1 url next clones show_all=0 cached=0 a
+    for a in "$@"; do
+        case $a in --todos) show_all=1 ;; --cache) cached=1 ;; esac
+    done
+    account=$(github_conf CUENTA)
+    [ -n "$(github_token)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    [ -n "$account" ] || { echo "E|Falta la organización o cuenta (Configuración, GitHub)"; return 1; }
+    # (la primera linea de la cache: usuario, cuenta y tipo; si es de otra cuenta, no vale)
+    if [ $cached -eq 1 ]; then
+        IFS='|' read -r login a kind < "$REPOS_CACHE_FILE" 2> /dev/null
+        [ -n "$login" ] && [ "${a,,}" == "${account,,}" ] || return 0
+        all=$(tail -n +2 "$REPOS_CACHE_FILE")
+        clones=$(repo_clones)
+        repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
+        return
+    fi
+    login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
+    [ -n "$login" ] || { echo "E|GitHub no acepta el token (¿caducado?): conéctalo de nuevo en Configuración"; return 1; }
+    kind=$(github_api "/users/$account" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
+    [ -n "$kind" ] || { echo "E|No existe en GitHub la organización o cuenta $account"; return 1; }
+    if [ "$kind" == Organization ]; then
+        path="/orgs/$account/repos?type=all&sort=pushed&per_page=100"
+    elif [ "${login,,}" == "${account,,}" ]; then
+        # (la tuya: tambien los privados)
+        path="/user/repos?affiliation=owner&sort=pushed&per_page=100"
+    else
+        path="/users/$account/repos?sort=pushed&per_page=100"
+    fi
+    hdr=$(mktemp "${TMPDIR:-/tmp}/lvm-github.XXXXXX") || return 1
+    url=$path
+    while [ -n "$url" ] && [ $page -le 30 ]; do
+        all+=$(github_api "$url" "$hdr") || { rm -f "$hdr"; echo "E|GitHub no ha dado la lista de $account"; return 1; }
+        all+=$'\n'
+        next=$(tr -d '\r' < "$hdr" | sed -n 's/^[Ll]ink: .*<\([^>]*\)>; rel="next".*/\1/p' | head -1)
+        url=$next page=$((page + 1))
+    done
+    rm -f "$hdr"
+    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.nuevo" \
+        && mv -f "$REPOS_CACHE_FILE.nuevo" "$REPOS_CACHE_FILE" )
+    clones=$(repo_clones)
+    repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
+}
+
+# Las filas de repos (C| y R|) de las paginas de GitHub (por la entrada):
+# repos_rows <usuario> <cuenta> <tipo> <todos (1/0)> <clones (repo_clones)>
+function repos_rows() {
+    python3 -I -c '
+import json, os, re, sys
+login, account, kind, prefixes, show_all, base, clones = sys.argv[1:8]
+sys.stdout.reconfigure(errors="replace")
+prefixes = prefixes.split()
+have = dict(l.split(" ", 1) for l in clones.splitlines() if " " in l)
+dec = json.JSONDecoder()
+text, i, repos = sys.stdin.read(), 0, []
+while True:
+    while i < len(text) and text[i].isspace():
+        i += 1
+    if i >= len(text):
+        break
+    page, i = dec.raw_decode(text, i)
+    repos += page
+clean = lambda v: re.sub(r"\s+", " ", re.sub(r"[|\r\n\t]", " ", v or "")).strip()
+rows = []
+for r in repos:
+    if r.get("archived") or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*", r.get("full_name", "")):
+        continue
+    if kind != "Organization" and r["owner"]["login"].lower() != account.lower():
+        continue
+    pre = next((p for p in prefixes if r["name"].startswith(p)), "")
+    rows.append((r, pre))
+shown = [x for x in rows if show_all == "1" or not prefixes or x[1]]
+print("C|%s|%s|%s|%d|%d" % (login, account, kind, len(rows), len(shown)))
+for r, pre in shown:
+    name, full = r["name"], r["full_name"]
+    folder = have.get(full.lower(), "")
+    state = "clonado" if folder else ("ocupado" if os.path.lexists(os.path.join(base, name)) else "nuevo")
+    print("R|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % (full, name, 1 if r.get("private") else 0, (r.get("pushed_at") or "")[:10],
+          clean(r.get("default_branch")), pre, clean(r.get("homepage")), clean(r.get("description"))[:300], state, folder or (name if state == "ocupado" else "")))
+' "$1" "$2" "$3" "$(github_conf PREFIJOS)" "$4" "$HTDOCS_DIR" "$5"
+}
+
+# repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
+# su nombre. Si ya esta clonado en un proyecto, lo dice (EXISTE|carpeta, y sale con 3) y, con
+# --actualizar, trae sus cambios con git pull (si chocan con los tuyos, no se toca nada y se dice)
+function repo_fetch() {
+    local full=$1 name dir folder known ssh_url branch origin
+    [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
+    command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
+    name=${full#*/} ssh_url="git@github.com:$full.git"
+    folder=$(repo_clones | awk -v r="${full,,}" '$1 == r { print $2; exit }')
+    known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
+    printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
+    if [ -n "$folder" ]; then
+        dir=$HTDOCS_DIR/$folder
+        if [ "$2" != --actualizar ]; then
+            rm -f "$known"
+            echo "EXISTE|$folder"
+            echo "$full ya está clonado en $dir"
+            return 3
+        fi
+        echo "$full: se traen sus cambios a $dir (git pull)"
+        [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git pull en $dir"; return 0; }
+        branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { rm -f "$known"; echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
+        origin=$(git -C "$dir" config --get remote.origin.url)
+        # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
+        local from=() up
+        if [[ "$origin" == https://* ]]; then
+            up=$(git -C "$dir" config --get "branch.$branch.merge")
+            from=("$ssh_url" "${up#refs/heads/}")
+            [ -n "${from[1]}" ] || from[1]=$branch
+        fi
+        # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
+        if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+                GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+                no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
+                -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
+            [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+            rm -f "$known"
+            echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir."
+            echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
+            return 1
+        fi
+        rm -f "$known"
+        echo "$folder, al día con GitHub (rama $branch)"
+        return 0
+    fi
+    dir=$HTDOCS_DIR/$name
+    if [ -e "$dir" ] || [ -L "$dir" ]; then
+        rm -f "$known"
+        echo "Ya hay una carpeta $name en $HTDOCS_DIR que no es un clon de $full: muévela o renómbrala antes"
+        return 1
+    fi
+    [ -w "$HTDOCS_DIR" ] || { rm -f "$known"; echo "No puedes escribir en $HTDOCS_DIR: el proyecto se clona con tu usuario, sin sudo"; return 1; }
+    echo "Clonando $full por SSH en $dir..."
+    [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git clone $ssh_url $dir"; return 0; }
+    if ! repo_clone "$ssh_url" "$dir" "$known"; then
+        rm -f "$known"
+        echo "No se ha podido clonar: hace falta tu clave SSH configurada en GitHub (ssh -T git@github.com lo comprueba)"
+        return 1
+    fi
+    rm -f "$known"
+    htdocs_close_world "$dir"
+    # (como los de Montar nuevo proyecto: el dominio de su base no se falsea solo)
+    mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
+        || printf '%s\n' "$name" >> "$REPO_PROJECTS_FILE"; }
+    echo "Listo: $name está en Proyectos (cárgalo con su versión de PHP y su BBDD)"
+}
+
 # ¿Direccion de un repositorio que se puede clonar? Solo https:// o ssh (git@servidor:ruta o
 # ssh://git@servidor/ruta), con servidor y ruta sin caracteres raros ni un - al principio (git los
 # tomaria como opciones). Nada de file://, ext:: ni rutas locales
@@ -2673,6 +3055,29 @@ function git_url_ok() {
 # si se indica, carga en ella el volcado (con la carga protegida de importar-bd). El clon va con tu
 # usuario (sin sudo), sin submodulos ni ganchos y solo por https o ssh; sin preguntas: un
 # repositorio privado por https falla (se usa la direccion SSH con tu clave)
+# Clona un repositorio con tu usuario: repo_clone <direccion> <carpeta> <known_hosts de mas>. Sin
+# terminal (git y ssh leen tu configuracion: no pueden usar el permiso de sudo recordado ni quedarse
+# leyendola) y sin git-lfs (su .lfsconfig llevaria las descargas a otro servidor)
+function repo_clone() {
+    local url=$1 dest=$2 known=$3
+    GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+        GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+        no_tty git -c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always \
+            -c core.hooksPath=/dev/null -c credential.helper= \
+            -c filter.lfs.process= -c filter.lfs.smudge= -c filter.lfs.required=false \
+            clone --no-recurse-submodules -- "$url" "$dest"
+}
+
+# La direccion SSH de una https de GitHub, GitLab o Bitbucket (https://github.com/usuario/repo(.git) ->
+# git@github.com:usuario/repo.git; en GitLab, tambien con subgrupos). Nada si es de otro servidor
+function repo_ssh_url() {
+    [[ "$1" =~ ^https://(github\.com|gitlab\.com|bitbucket\.org)/([A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+)/?$ ]] || return 1
+    local host=${BASH_REMATCH[1]} path=${BASH_REMATCH[2]}
+    path=${path%.git}
+    [[ "$path" == */* ]] && [[ "$path" != *..* ]] || return 1
+    echo "git@$host:$path.git"
+}
+
 function mount_project() {
     local url=$1 folder=$2 version=$3 db=$4 file=$5 dest dir owner
     if [ -z "$url" ] || [ -z "$folder" ] || [ -z "$version" ] || [ -z "$db" ]; then
@@ -2741,17 +3146,20 @@ function mount_project() {
     # (en /tmp y no en $TMPDIR, que viene de la sesion: va entre comillas en GIT_SSH_COMMAND)
     known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
     printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
-    # Sin terminal (git y ssh leen tu configuracion: no pueden usar el permiso de sudo recordado ni
-    # quedarse leyendola) y sin git-lfs (su .lfsconfig llevaria las descargas a otro servidor)
-    if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
-        GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
-        no_tty git -c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always \
-            -c core.hooksPath=/dev/null -c credential.helper= \
-            -c filter.lfs.process= -c filter.lfs.smudge= -c filter.lfs.required=false \
-            clone --no-recurse-submodules -- "$url" "$dest"; then
+    # Un repositorio privado de GitHub, GitLab o Bitbucket por https no se puede clonar sin preguntar
+    # usuario y contraseña (y aqui no se preguntan): se prueba solo la misma direccion por SSH, con tu
+    # clave. Solo con esos tres, cuyas claves de servidor van en GIT_KNOWN_HOSTS
+    local ssh_url ok=0
+    if repo_clone "$url" "$dest" "$known"; then
+        ok=1
+    elif ssh_url=$(repo_ssh_url "$url") && [ ! -e "$dest" ]; then
+        echo "Por https no se puede (¿repositorio privado?): se prueba por SSH, $ssh_url"
+        repo_clone "$ssh_url" "$dest" "$known" && ok=1
+    fi
+    if [ $ok -eq 0 ]; then
         rm -f "$known"
-        echo "No se ha podido clonar el repositorio. Si es privado, usa su direccion SSH"
-        echo "(git@github.com:usuario/repositorio.git) con tu clave SSH ya configurada en GitHub."
+        echo "No se ha podido clonar el repositorio. Si es privado, hace falta tu clave SSH ya configurada"
+        echo "en GitHub, GitLab o Bitbucket (su direccion SSH es git@github.com:usuario/repositorio.git)."
         echo "Si es por SSH a un servidor que no es GitHub, GitLab ni Bitbucket y dice «Host key"
         echo "verification failed», conectate una vez a mano para comprobar y aceptar su clave"
         echo "(ssh -T git@servidor) y vuelve a intentarlo."
@@ -4189,9 +4597,18 @@ function media_project() {
     if [ "$prod" == quitar ]; then
         echo "$folder ya no pide a produccion las imagenes que le faltan"
     else
-        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado)"
+        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado"
+        echo "y, si esta en el Apache de Docker, tambien alli)"
     fi
     media_sync
+    # (en el Apache de Docker, en sus vhosts: se rehacen y se recargan)
+    local p
+    for p in $(docker_web_projects 2> /dev/null); do
+        if [ "$(docker_conf "$p" CARPETA)" == "$folder" ] && [ "$DRY" -eq 0 ]; then
+            docker_web_reload || echo "Aviso: el Apache de Docker no ha recargado su configuracion"
+            break
+        fi
+    done
 }
 
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
@@ -4222,8 +4639,20 @@ function gui_wp_prod() {
     echo "G|$(media_saved "$folder")"
     cfg=$(wp_config_read "$HTDOCS_DIR/$folder/wp-config.php") || return 0
     db=$(sed -n 1p <<< "$cfg") prefix=$(sed -n 4p <<< "$cfg")
-    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] && [ -x "$DB_CLIENT" ] || return 0
-    db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}options" || return 0
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] || return 0
+    if ! { [ -x "$DB_CLIENT" ] && db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}options"; }; then
+        # (sin ella en la version activa: la de su proyecto del Apache de Docker, si lo hay)
+        local p
+        for p in $(docker_web_projects 2> /dev/null); do
+            [ "$(docker_conf "$p" CARPETA)" == "$folder" ] || continue
+            docker_ready || return 0
+            url=$(docker_maria_sql "$(docker_conf "$p" MARIADB)" -N -e "SELECT option_value FROM \`$(docker_conf "$p" BBDD)\`.\`${prefix}options\`
+                WHERE option_name IN ('home', 'siteurl') ORDER BY option_name = 'home' DESC LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
+            url=$(tr 'A-Z' 'a-z' <<< "$url" | sed -E 's|^https?://||; s|[/:?#].*$||')
+            valid_domain "$url" && [[ "$url" != *.local && "$url" != *.test && "$url" != localhost && "$url" != *.localhost ]] && echo "D|$url"
+        done
+        return 0
+    fi
     url=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT option_value FROM \`$db\`.\`${prefix}options\`
         WHERE option_name IN ('home', 'siteurl') ORDER BY option_name = 'home' DESC LIMIT 1" < /dev/null 2> /dev/null)
     url=$(tr 'A-Z' 'a-z' <<< "$url" | sed -E 's|^https?://||; s|[/:?#].*$||')
@@ -4239,9 +4668,9 @@ function gui_wp_prod() {
 # seguir redirecciones y como mucho 30 MB por fichero. Lo que ya esta en local no se toca
 PS_IMAGES_DOH="https://cloudflare-dns.com/dns-query"
 function ps_images() {
-    local folder=${1%/} config db prefix domain t list total
+    local folder=${1%/} domain=$2 config db prefix t list total web="" maria="" p
     if [ -z "$folder" ]; then
-        echo "Uso: lvm-instalador ps-imagenes <carpeta>"
+        echo "Uso: lvm-instalador ps-imagenes <carpeta> [dominio de produccion]"
 
         return 1
     fi
@@ -4251,30 +4680,56 @@ function ps_images() {
     config=$(ps_config "$folder")
     db=${config%%|*} prefix=${config#*|}
     [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "No se puede leer la BBDD de $folder (su parameters.php o settings.inc.php)"; return 1; }
-    db_connect || return $?
-    if ! db_exists "$db"; then
-        echo "La BBDD de $folder ($db) no esta en lampp-$DB_FOLDER, la version activa: carga el proyecto"
-        echo "en su version (o importa su BBDD en esta) y vuelve a intentarlo"
+    # La BBDD con la lista de imagenes: la de la version activa o, si no esta alli, la de su proyecto del
+    # Apache de Docker (las imagenes van a su carpeta img, la misma con LAMPP y con Docker)
+    for p in $(docker_web_projects 2> /dev/null); do
+        [ "$(docker_conf "$p" CARPETA)" == "$folder" ] && web=$p
+    done
+    if { db_connect > /dev/null 2>&1 && db_exists "$db"; } || [ -z "$web" ]; then
+        db_connect || return $?
+        if ! db_exists "$db"; then
+            echo "La BBDD de $folder ($db) no esta en lampp-$DB_FOLDER, la version activa: carga el proyecto"
+            echo "en su version (o importa su BBDD en esta) y vuelve a intentarlo"
+
+            return 1
+        fi
+        [ -n "$domain" ] || domain=$(ps_domain "$folder")
+    else
+        db=$(docker_conf "$web" BBDD) maria=$(docker_conf "$web" MARIADB)
+        db_valid_name "$db" > /dev/null || { echo "$web no tiene una BBDD valida en su proyecto.conf"; return 1; }
+        docker_ready || { echo "Docker no esta en marcha: arrancalo y vuelve a intentarlo"; return 1; }
+        docker_maria_up "$maria" > /dev/null || { echo "La MariaDB $maria de Docker no responde"; return 1; }
+        echo "Con la BBDD de la tienda en Docker ($db, MariaDB $maria)"
+        [ -n "$domain" ] || domain=$(docker_conf "$web" PRODUCCION)
+    fi
+    domain=$(tr 'A-Z' 'a-z' <<< "$domain")
+    domain=${domain#https://} domain=${domain#http://} domain=${domain%/}
+    if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == *.test || "$domain" == localhost || "$domain" == *.localhost ]]; then
+        echo "No se sabe el dominio de produccion de $folder: ${domain:-ninguno}. Dilo tu:"
+        echo "lvm-instalador ps-imagenes $folder <dominio de produccion>"
 
         return 1
     fi
-    domain=$(ps_domain "$folder")
-    if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == localhost || "$domain" == *.localhost ]]; then
-        echo "No se sabe el dominio de produccion de $folder (el de su tabla ${prefix}shop_url): ${domain:-ninguno}"
-
-        return 1
-    fi
+    # (en Docker, preguntas a su MariaDB comun; las dos, solo tablas de verdad)
+    tbl() {
+        if [ -n "$maria" ]; then
+            [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '$db' AND table_name = '$1' AND table_type = 'BASE TABLE'" < /dev/null 2> /dev/null | tr -d '\r')" == 1 ]
+        else
+            db_base_table root "${MYSQL_PWD:-}" "$db" "$1"
+        fi
+    }
     # (solo tablas de verdad: una vista del volcado ejecutaria sus funciones como root)
     for t in image image_type; do
-        db_base_table root "${MYSQL_PWD:-}" "$db" "$prefix$t" || { echo "La BBDD $db no tiene la tabla $prefix$t"; return 1; }
+        tbl "$prefix$t" || { echo "La BBDD $db no tiene la tabla $prefix$t"; return 1; }
     done
     local sql=(db_root_sql -N -B)
+    [ -n "$maria" ] && sql=(docker_maria_sql "$maria" -N -B)
     list=$( {
         "${sql[@]}" -e "SELECT 'I', id_image FROM \`$db\`.\`${prefix}image\`" < /dev/null
         "${sql[@]}" -e "SELECT 'T', name, products, categories, manufacturers FROM \`$db\`.\`${prefix}image_type\`" < /dev/null
-        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}category" \
+        tbl "${prefix}category" \
             && "${sql[@]}" -e "SELECT 'C', id_category FROM \`$db\`.\`${prefix}category\` WHERE id_category > 2" < /dev/null
-        db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}manufacturer" \
+        tbl "${prefix}manufacturer" \
             && "${sql[@]}" -e "SELECT 'M', id_manufacturer FROM \`$db\`.\`${prefix}manufacturer\`" < /dev/null
     } 2> /dev/null | python3 -I -c '
 import os, re, sys
@@ -7144,11 +7599,15 @@ function control_lampp() {
         vhosts_root
     fi
     local rc
+    # (la MariaDB de esta version, si la tenia Docker sin red: se para para que arranque la normal)
+    [ "$1" != stop ] && lampp_bd_handover "$(active_dir)"
     run sudo /opt/lampp/lampp "$1"
     rc=$?
     # Parada: no queda nada en memoria, tampoco de esta version
     if [ "$1" == stop ]; then
         close_processes --todos
+        # (salvo lo que use Docker: su MariaDB vuelve, sin red)
+        lampp_bd_keep "$(active_dir)"
     fi
     # Mailpit (correo de pruebas) arranca y para con la version
     mailpit_sync
@@ -10197,7 +10656,7 @@ function install_stack() {
         echo "Instalando dependencias de compilacion (solo librerias, no PHP)..."
         local deps=$STACK_BUILD_DEPS
         native_binaries || deps+=" $MARIADB_BUILD_DEPS"
-        sudo apt-get update -qq && sudo apt-get install -y -qq $deps > /dev/null || exit 1
+        apt_install $deps || exit 1
 
         # MariaDB se ejecuta con el usuario 'mysql', como en XAMPP
         if ! id mysql > /dev/null 2>&1; then
@@ -11689,6 +12148,182 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.56.15 (30 oct 2026)
+- Instalar una versión de PHP: un repositorio roto de otro programa
+  (un PPA sin versión para tu Ubuntu, una clave caducada como la de
+  Warp) ya no impide instalarla. Solo se instalan las librerías que
+  faltan (si están todas, ni se llama a apt); si apt-get update no
+  puede leer algún repositorio, se dice cuál y se sigue con las listas
+  que ya había. Solo se para si de verdad falta un paquete, y entonces
+  dice qué repositorio arreglar.
+- Ventana: al buscar los parches nuevos se quedaba dando vueltas a toda
+  CPU (un núcleo entero) y, al cerrarla, su proceso seguía en marcha;
+  con cada vez que se abría se sumaba otro. Ya no: al actualizar,
+  cierra las que tengas abiertas y vuelve a abrirla.
+
+1.56.14 (30 oct 2026)
+- Descargar una BBDD: ya no falla («Unable to lock ibdata1») si la
+  MariaDB de esa versión la tiene en marcha Docker (sin red). Se usa
+  esa MariaDB en lugar de arrancar otra sobre los mismos datos, y al
+  terminar sigue en marcha para Docker. Lo mismo al copiar una BBDD a
+  otra versión.
+- Visor de arriba: sin el botón Encendidos. Al pulsar Apache o MariaDB
+  se abren sus servicios (lo que antes salía en la flecha), con
+  «Parar y desactivar» o «Arrancar» la versión entera arriba.
+- Bases de datos: «Subir o actualizar una BBDD» va antes de la tabla,
+  más compacto (el fichero, la BBDD de destino, el proyecto y Cargar
+  en columnas) y en un visor un poco hundido.
+- Configuración: a la izquierda, una columna con sus apartados (Parches
+  nuevos, Vhosts y hosts, Correo de pruebas, Docker, GitHub, Carpetas…);
+  a la derecha, solo lo que se puede cambiar del elegido.
+
+1.56.13 (30 oct 2026)
+- Nuevo proyecto: en el paso 1, el repositorio se elige de los de
+  GitHub (los de la pestaña Repositorios, escribiendo parte de su
+  nombre): se rellenan solos su dirección SSH y su carpeta. Se puede
+  seguir escribiendo la dirección de otro. Un paso 4 pregunta si falsear
+  su dominio de producción (ya puesto si el repositorio tiene su web en
+  GitHub): al terminar de montarlo, se falsea como en Dominios y hosts.
+- Terminal: el mismo hueco arriba que abajo de su caja.
+
+1.56.12 (30 oct 2026)
+- Terminal abajo de la ventana: el botón Terminal de arriba (en lugar
+  de Localhost) la enseña y la esconde. Con el aspecto del visor, un
+  poco hundida; es la de la Terminal de GNOME (VTE), con tu shell, en la
+  carpeta del proyecto cargado («Proyecto cargado» vuelve a ella; el
+  borde se arrastra para cambiar su alto). Al esconderla sigue abierta.
+  Si falta VTE, dice cómo ponerla: sudo apt install gir1.2-vte-2.91.
+
+1.56.11 (30 oct 2026)
+- Pestaña Docker: el puente hasta la BBDD de LAMPP en vivo sale con su
+  nombre («Puente a la BBDD de lampp-8.4 (en vivo)»), dice qué
+  proyectos lo usan y se puede parar o arrancar (antes salía como «(sin
+  proyecto)» y sin botones). La MariaDB común de Docker ya no cuenta
+  como usada por los proyectos que van en vivo con LAMPP.
+- Repositorios: detrás de «Clonar» o «Traer cambios», el logotipo de
+  GitHub abre el repositorio en GitHub (sus cambios, ramas y pull
+  requests). La carpeta de los ya clonados va debajo del nombre, y así
+  todos los botones quedan a la misma altura.
+
+1.56.10 (30 oct 2026)
+- Docker con la BBDD de LAMPP en vivo (WordPress): un proyecto de
+  Docker puede usar la BBDD de cualquier versión de PHP de LAMPP, la
+  misma que web.local, sin copias: lo que cambias en un lado se ve en el
+  otro. Si la MariaDB de esa versión no está en marcha, se arranca solo
+  ella, sin red (no choca con la de la versión activa); se para sola
+  cuando ningún proyecto de Docker la usa, y al activar esa versión en
+  LAMPP pasa a la de siempre. Se elige al montar el proyecto en Docker
+  («Cómo: en vivo») o después, en su fila de la pestaña Docker. Las
+  tiendas PrestaShop siguen con su copia: guardan su dominio en la BBDD
+  y una misma BBDD no puede servir a web.local y a Docker a la vez. En
+  la terminal: docker-bd <proyecto> lampp <versión> | docker.
+
+1.56.9 (30 oct 2026)
+- Docker: las imágenes y enlaces que un WordPress guardó trabajando con
+  LAMPP (https://web.local/wp-content/…, o su dominio propio) salen del
+  contenedor: antes se pedían a LAMPP y, sin él en marcha o con otro
+  proyecto en web.local, no se veían. La BBDD no se toca: se cambian en
+  lo que devuelve la web (también escapadas, como las de Elementor). Los
+  proyectos de antes se arreglan al arrancarlos.
+- Configuración, GitHub: la organización o cuenta se puede escribir
+  también como su dirección (https://github.com/hexer-dev) o con @, se
+  comprueba que existe, y si no vale se dice en una ventana y lo escrito
+  se queda (antes volvía la de antes sin decir nada).
+
+1.56.8 (29 oct 2026)
+- Los proyectos de Docker sin visitas se paran solos (Configuración,
+  Docker): uno que lleva las horas elegidas (3 de partida; de 1 a 24, o
+  nunca) sin ninguna visita, tampoco por el túnel, se para, y con él lo
+  común que ya no use nadie (su MariaDB, el Apache de Docker). Se mira
+  cada 15 minutos, también con la ventana cerrada (un temporizador de systemctl --user). Al entrar
+  en un proyecto parado, su web lo dice en vez de dar un error. En la
+  terminal: docker-reposo.
+- Pestaña Repositorios (como DevHub): los repositorios de la
+  organización o cuenta de GitHub que se elija en Configuración, solo
+  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
+  pueden añadir otros, como los de Shopify) o todos, con un buscador.
+  «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
+  Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
+  traen sus cambios con git pull y, si chocan con los tuyos, no se toca
+  nada y se dice. La lista se lee con un token de GitHub (se guarda en
+  el llavero de la sesión, no en un fichero) o con la sesión de gh, y la de la
+  última vez sale al momento. En la terminal: github, github-conectar,
+  repos y repo-traer.
+- Parches nuevos (Configuración): lo que tiene un parche publicado en
+  cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y
+  phpMyAdmin), en las imágenes de Docker (las MariaDB comunes,
+  phpMyAdmin y PHP, frente a Docker Hub, sin descargar nada), Mailpit y
+  cloudflared, con «Actualizar todo». Se busca al abrir la ventana
+  cuando toca buscar una versión nueva del programa y, si hay algo, se
+  ofrece actualizarlo. Las MariaDB comunes de Docker se ponen al día
+  solas al cambiar de parche. En la terminal: componentes y
+  componentes-actualizar.
+- Correo de pruebas (Configuración): sus tres tarjetas en una fila.
+- Configuración, Túnel de Cloudflare: cloudflared y el registro, juntos
+  en una fila, y el túnel abierto debajo, a lo ancho (antes cada uno
+  quedaba suelto).
+
+1.56.7 (29 oct 2026)
+- Túnel de Cloudflare: cuánto dura y si se bloquea el admin se eligen
+  al pulsar «Compartir», para ese proyecto y ese túnel. Cada túnel
+  lleva una contraseña nueva al azar (se ve al abrirlo, para copiarla);
+  la de un túnel no vale para el siguiente. Configuración, Túnel de
+  Cloudflare deja solo cloudflared, el túnel abierto y su registro. En
+  la terminal: tunel-abrir <dirección> [carpeta] [--horas 1-12]
+  [--admin bloquear|permitir]; ya no hay tunel-config.
+- Menos memoria con varios proyectos de Docker a la vez: el PHP de cada
+  contenedor abre sus procesos al llegar peticiones y los cierra a los
+  20 s sin trabajo (un proyecto en marcha sin usar pasa de unos 190 MB
+  a unos 11 MB). Los de antes se ponen al día solos al arrancarlos. El
+  Apache de Docker espera con un proceso, no con tres.
+- El consumo de arriba no lee nada con la ventana minimizada, y lee
+  menos cada vez (lo que no cambia de cada proceso, una sola vez).
+
+1.56.6 (28 oct 2026)
+- Imágenes de producción: «Guardar» funciona también con el dominio que
+  ya estaba guardado (antes solo se podía quitar o cancelar). Así se
+  vuelve a aplicar, también en el Apache de Docker.
+
+1.56.5 (28 oct 2026)
+- Imágenes de producción también en Docker: en un WordPress del Apache
+  de Docker, lo que falte de wp-content/uploads se pide a su web real
+  (con el mismo dominio que con LAMPP: «Imágenes de producción…» vale
+  para los dos). En una tienda, «Descargar las imágenes que faltan»
+  usa la BBDD de Docker si no está en la versión activa (su dominio de
+  producción se guarda al pasarla a Docker; si no se sabe, se pide).
+  Botón «Imágenes de producción…» en el visor de Docker.
+
+1.56.4 (28 oct 2026)
+- Configuración más clara: cada ajuste en su tarjeta, de dos en dos
+  (como los visores de las otras pestañas), con su explicación entera
+  y sus botones en la tarjeta. Docker junta la dirección y los dos
+  puertos en una sola; lo que va solo (la barrera entre webs, los
+  botones del visor, el túnel abierto) va a lo ancho.
+- Botones del proyecto: el configurador va en horizontal (la lista a la
+  izquierda; el estilo, el tamaño y la vista previa a la derecha), y
+  cabe en la pantalla de un portátil: el botón Guardar ya no se queda
+  fuera.
+
+1.56.3 (28 oct 2026)
+- Proyecto nuevo desde un repositorio privado: si su dirección https
+  de GitHub, GitLab o Bitbucket no se puede clonar (pide usuario y
+  contraseña), se prueba sola la misma por SSH
+  (git@github.com:usuario/repositorio.git), con tu clave. Con otros
+  servidores, como siempre: su dirección SSH a mano.
+- DNS de *.docker.test (Configuración, Docker, «Activar»): un DNS
+  mínimo, solo en este equipo, que contesta a cualquier
+  <algo>.docker.test. Los proyectos del Apache de Docker pasan a
+  .docker.test (su configuración, el dominio de las tiendas en su BBDD
+  y el certificado) y dejan de ir en /etc/hosts: añadir proyectos o
+  versiones de Docker ya no pide la contraseña por los dominios.
+  web.local, los proyectos de siempre y los dominios falseados de las
+  tiendas no cambian (siguen en /etc/hosts, que se mira antes). Si el
+  DNS no contesta al activarlo, se quita y todo sigue como estaba.
+  .local es de mDNS (Bonjour, Avahi): un DNS para *.docker.local no se
+  consultaría nunca. En la terminal: docker-web dns activar|quitar.
+- El certificado del Apache de Docker vale para *.docker.local y
+  *.docker.test.
 
 1.56.2 (27 oct 2026)
 - Botones del proyecto: «Solo el icono» y «Icono y nombre» son
@@ -13603,22 +14238,28 @@ function gui_docker() {
     if [ $installed -eq 1 ] && docker_ready; then
         ready=1
         version=$(dk version --format '{{.Server.Version}}' 2> /dev/null | tr -cd '0-9.')
+        # (con proyectos del Apache de Docker, que el temporizador de los que no tienen visitas este puesto:
+        # los de antes de la 1.56.8 / 1.40.1 no lo tenian)
+        [ -n "$(docker_web_projects)" ] && docker_idle_ensure
     fi
     [ $ready -eq 1 ] && docker_fix_restart > /dev/null
     echo "S|$installed|$ready|$version|$(lampp_running && echo 1 || echo 0)|$(systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null && echo 1 || echo 0)"
     echo "V|$DOCKER_PHP_VERSIONS|$DOCKER_MARIADB_VERSIONS"
     for p in $(docker_projects); do
         if docker_web_project "$p"; then
-            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|web|web|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" TIPO)|$(docker_conf "$p" PHP)"
+            echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|web|web|$(docker_conf "$p" ACTIVA)|$(docker_conf "$p" TIPO)|$(docker_conf "$p" PHP)|$(docker_conf "$p" LAMPP_BD)"
         else
             echo "P|$p|$(docker_conf "$p" CARPETA)|$(docker_conf "$p" PHP)|$(docker_conf "$p" MARIADB)|$(docker_conf "$p" DOMINIO)|$([ $ready -eq 1 ] && docker_state "$p" || echo "?")|$(docker_conf "$p" BBDD)|$(docker_conf "$p" PUERTO_PMA)"
         fi | tr -d '\000-\010\013-\037'
     done
-    echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$([ $ready -eq 1 ] && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)"
+    echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$([ $ready -eq 1 ] && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)|$(docker_web_tld)|$(docker_dns_on && echo 1 || echo 0)"
     if [ $ready -eq 1 ]; then
         # (al final, el ID corto del contenedor)
         dk ps -a --format '{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}|{{.ID}}' 2> /dev/null \
-            | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ { print "C|" $0 }'
+            | tr -d '\000-\010\013-\037' | awk -F'|' -v OFS='|' 'NF == 7 && $7 ~ /^[0-9a-f]+$/ {
+                # (el puente hasta la BBDD de una version LAMPP no es de compose: va con su nombre)
+                if ($6 == "" && $1 ~ /^nexum-lampp-bd-[0-9]+-[0-9]+(-[0-9]+)?$/) $6 = $1
+                print "C|" $0 }'
         # (imagen, etiqueta e ID corto por separado)
         dk images --format '{{.Repository}}|{{.Tag}}|{{.ID}}|{{.Size}}|{{.CreatedSince}}' 2> /dev/null \
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
@@ -13644,12 +14285,18 @@ function docker_container_action() {
     local action=$1 name=$2
     if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ \
             || "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-php[0-9]{2}$ \
-            || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$ ]]; then
+            || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$ ]]; then
         echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
         return 1
     fi
     case $action in
-        arrancar) run dk start "$name" ;;
+        arrancar)
+            if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+                local f=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}}
+                lampp_bd_up "$f" && lampp_bd_bridge_up "$f"
+                return
+            fi
+            run dk start "$name" ;;
         parar)
             docker_shared_warn "$name"
             run dk stop "$name" ;;
@@ -14023,6 +14670,20 @@ if rel == "wp-config.php":
     # (el dominio del contenedor, sin tocar la BBDD; detras de un proxy con https)
     extra = ("\nif (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' || ($_SERVER['HTTPS'] ?? '') === 'on') { $_SERVER['HTTPS'] = 'on'; }\n"
              "define('WP_HOME', 'https://%s');\ndefine('WP_SITEURL', 'https://%s');\n" % (domain, domain))
+    # Las direcciones de la web en local que lleva el contenido (las imagenes y enlaces que se guardaron
+    # trabajando con LAMPP: https://web.local/wp-content/...): en lo que devuelve, las del contenedor. Si
+    # no, se piden a LAMPP (sin el en marcha, o con otro proyecto en web.local, no salen). La BBDD no se
+    # toca. Tambien escapadas (JSON, Elementor) y codificadas
+    hosts = [h for h in os.environ.get("LVM_DOMINIOS_LOCALES", "").split() if re.fullmatch(r"[A-Za-z0-9.-]+(:[0-9]+)?", h)]
+    if hosts:
+        pairs = []
+        for h in hosts:
+            for scheme in ("https://", "http://"):
+                pairs.append((scheme + h, "https://" + domain))
+                pairs.append((scheme.replace("/", "\\/") + h, "https:\\/\\/" + domain))
+                pairs.append((scheme.replace(":", "%3A").replace("/", "%2F") + h, "https%3A%2F%2F" + domain))
+        extra += ("if (PHP_SAPI !== 'cli') { ob_start(function ($b) { return str_replace(%s, %s, $b); }); }\n"
+                  % ("array(" + ", ".join(lit(a) for a, _ in pairs) + ")", "array(" + ", ".join(lit(b) for _, b in pairs) + ")"))
     text = re.sub(r"(?m)^[ \t]*define\(\s*['\"](WP_HOME|WP_SITEURL)['\"].*$", "", text)
     text = re.sub(r"^<\?php", lambda m: "<?php" + extra, text, count=1)
 elif rel == "app/config/parameters.php":
@@ -14323,14 +14984,38 @@ DOCKER_SYSCTL=${LVM_DOCKER_SYSCTL:-/etc/sysctl.d/60-nexum-docker.conf}
 # Direccion (IP) y puertos (HTTP, HTTPS) del Apache de Docker. Siempre de 127.x: nunca abiertos a la red
 function docker_web_get() {
     local v def
-    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; *) return 1 ;; esac
+    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; TLD) def=docker.local ;; DNS) def=0 ;; *) return 1 ;; esac
     v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$DOCKER_WEB_FILE" 2> /dev/null)
-    if [ "$1" == IP ]; then
-        docker_web_valid_ip "$v" || v=$def
-    else
-        [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def
-    fi
+    case $1 in
+        IP) docker_web_valid_ip "$v" || v=$def ;;
+        TLD) [ "$v" == docker.test ] || v=$def ;;
+        DNS) [ "$v" == 1 ] || v=$def ;;
+        *) [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def ;;
+    esac
     echo "$v"
+}
+
+# Guarda web.conf (solo tuyo): docker_web_conf_write <ip> <http> <https> <tld> <dns>
+function docker_web_conf_write() {
+    mkdir -p -m 700 "$DOCKER_DIR" || return 1
+    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\nTLD=%s\nDNS=%s\n' "$@" > "$DOCKER_WEB_FILE.nuevo" ) \
+        && mv -f "$DOCKER_WEB_FILE.nuevo" "$DOCKER_WEB_FILE"
+}
+
+# Final de los dominios del Apache de Docker: docker.local (en /etc/hosts, uno a uno) o, con el DNS
+# comodin, docker.test. .local es de mDNS: un DNS para *.docker.local no se consultaria
+function docker_web_tld() {
+    docker_web_get TLD
+}
+
+# ¿Va el DNS comodin de *.docker.test? (sus dominios ya no van en /etc/hosts)
+function docker_dns_on() {
+    [ "$(docker_web_get DNS)" == 1 ] && [ "$(docker_web_get TLD)" == docker.test ]
+}
+
+# Dominio de phpMyAdmin
+function docker_web_pma() {
+    echo "pma.$(docker_web_tld)"
 }
 
 function docker_web_valid_ip() {
@@ -14372,9 +15057,9 @@ function docker_web_project() {
 # Dominio de una version de PHP de un proyecto: el de la tienda (uno solo) o <proyecto>-php83.docker.local
 function docker_web_domain() {
     if [ "$(docker_conf "$1" TIPO)" == ps ]; then
-        echo "$1.docker.local"
+        echo "$1.$(docker_web_tld)"
     else
-        echo "$1-php${2//./}.docker.local"
+        echo "$1-php${2//./}.$(docker_web_tld)"
     fi
 }
 
@@ -14421,7 +15106,7 @@ function docker_maria_up() {
         ( umask 077
           printf 'DB_ROOT_PASS=%s\n' "$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')" > "$dir/.env"
           { printf 'name: %s\nservices:\n  db:\n    image: mariadb:%s\n    container_name: %s\n    restart: "no"\n' "$name" "$v" "$name"
-            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n'
+            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_AUTO_UPGRADE: "1"\n'
             printf '    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-allowed-packet=512M"]\n'
             printf '    volumes:\n      - "datos:/var/lib/mysql"\n    networks: [nexum]\n'
             printf 'volumes:\n  datos:\n    name: %s\n' "$name"
@@ -14451,7 +15136,10 @@ function docker_maria_versions() {
 # solo tuya: el Apache del contenedor lo lee como el root del contenedor, que en Docker sin root eres tu
 function docker_web_cert() {
     local c=$DOCKER_WEB_DIR/certs
-    [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ] && return 0
+    if [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ]; then
+        openssl x509 -in "$c/docker.local.crt" -noout -text 2> /dev/null | grep -q 'DNS:\*\.docker\.test' && return 0
+        [ "$DRY" -eq 1 ] || rm -f "$c/docker.local.crt" "$c/docker.local.key"
+    fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] certificado propio de *.docker.local en $c"
         return 0
@@ -14459,13 +15147,13 @@ function docker_web_cert() {
     mkdir -p -m 700 "$DOCKER_DIR" "$DOCKER_WEB_DIR" "$c" || return 1
     if ! ( umask 077; openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=docker.local" \
             -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth" \
-            -addext "subjectAltName=DNS:docker.local,DNS:*.docker.local" \
+            -addext "subjectAltName=DNS:docker.local,DNS:*.docker.local,DNS:docker.test,DNS:*.docker.test" \
             -keyout "$c/docker.local.key" -out "$c/docker.local.crt" > /dev/null 2>&1 ); then
         rm -f "$c/docker.local.key" "$c/docker.local.crt"
         echo "No se ha podido crear el certificado de *.docker.local"
         return 1
     fi
-    echo "Certificado propio de *.docker.local (solo vale para esos dominios)"
+    echo "Certificado propio de *.docker.local y *.docker.test (solo vale para esos dominios)"
 }
 
 # Chrome, Chromium y Firefox aceptan sin aviso el certificado de *.docker.local: va a sus almacenes
@@ -14498,8 +15186,14 @@ function docker_web_trust() {
 # Lineas de /etc/hosts de los dominios de Docker: docker_web_hosts poner|quitar <dominio...>. poner: a la
 # direccion del Apache de Docker (y fuera de cualquier otra linea); quitar: fuera. Solo esos dominios
 function docker_web_hosts() {
-    local mode=$1 copy rc
+    local mode=$1 copy rc n names=()
     shift
+    # (con el DNS comodin, los *.docker.test los contesta el; solo se tocan los de antes)
+    for n in "$@"; do
+        docker_dns_on && [[ "$n" == *.docker.test ]] && continue
+        names+=("$n")
+    done
+    set -- "${names[@]}"
     [ $# -gt 0 ] || return 0
     mkdir -p -m 700 "$LOG_DIR" || return 1
     copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
@@ -14566,9 +15260,26 @@ function docker_web_site() {
         printf '<VirtualHost *:80>\n    ServerName %s\n    Redirect permanent / %s/\n</VirtualHost>\n' "$dom" "$(docker_web_url "$dom")"
         printf '<VirtualHost *:443>\n    ServerName %s\n    DocumentRoot "/opt/lampp/htdocs/%s"\n' "$dom" "$folder"
         printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
+        # (con su PHP parado, por ejemplo al llevar horas sin visitas, lo dice en vez de un error sin mas.
+        # Solo los errores del propio Apache: un 503 de la web, como el modo mantenimiento, pasa igual)
+        printf '    ErrorDocument 502 "%s"\n    ErrorDocument 503 "%s"\n' "$DOCKER_STOPPED_MSG" "$DOCKER_STOPPED_MSG"
         printf '    <FilesMatch "\\.php$">\n        SetHandler "proxy:fcgi://%s:9000"\n    </FilesMatch>\n' "$(docker_web_container "$slug" "$v")"
+        [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_media "$folder"
         printf '</VirtualHost>\n'
     done
+}
+
+# Reglas de las imagenes de produccion de un WordPress en el Apache de Docker (su dominio, el de media-proyecto,
+# el mismo que con LAMPP): lo que falte de wp-content/uploads (imagenes, videos y PDF; solo GET y HEAD) se pide
+# a su web real con una redireccion 302. Nada si no tiene dominio de produccion
+function docker_web_media() {
+    local folder=$1 prod
+    prod=$(media_saved "$folder")
+    valid_domain "$prod" && [[ "$prod" != *.local && "$prod" != *.test && "$prod" != localhost && "$prod" != *.localhost ]] || return 0
+    printf '    # nexum-media %s: lo que falte de wp-content/uploads se pide a produccion (media-proyecto)\n' "$prod"
+    printf '    RewriteEngine On\n    RewriteCond %%{REQUEST_METHOD} ^(GET|HEAD)$\n'
+    printf '    RewriteCond /opt/lampp/htdocs/%s%%{REQUEST_URI} !-f\n' "$folder"
+    printf '    RewriteRule ^/(wp-content/uploads/.+\\.(%s))$ https://%s/$1 [NC,R=302,L]\n' "$MEDIA_EXT" "$prod"
 }
 
 # Configuracion del Apache de Docker (httpd.conf, las reglas, un vhost por proyecto y el de phpMyAdmin,
@@ -14589,6 +15300,13 @@ ServerRoot "/usr/local/apache2"
 Listen 80
 Listen 443
 LoadModule mpm_event_module modules/mod_mpm_event.so
+# (en local basta un proceso con sus hilos: no tres esperando, como trae de fabrica)
+StartServers 1
+ServerLimit 4
+ThreadsPerChild 25
+MinSpareThreads 5
+MaxSpareThreads 50
+MaxRequestWorkers 100
 LoadModule unixd_module modules/mod_unixd.so
 LoadModule authz_core_module modules/mod_authz_core.so
 LoadModule authz_host_module modules/mod_authz_host.so
@@ -14650,9 +15368,9 @@ EOF
           [ $p == 443 ] && printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
           printf '    <Location />\n        Require all denied\n        ErrorDocument 403 "Este dominio no tiene ningun proyecto en Docker (lvm-instalador)"\n    </Location>\n</VirtualHost>\n'
       done; } > "$tmp/sitios/000-defecto.conf"
-    # phpMyAdmin: su contenedor, por https://pma.docker.local (con su pantalla de acceso)
-    { printf '<VirtualHost *:80>\n    ServerName pma.docker.local\n    Redirect permanent / %s/\n</VirtualHost>\n' "$(docker_web_url pma.docker.local)"
-      printf '<VirtualHost *:443>\n    ServerName pma.docker.local\n'
+    # phpMyAdmin: su contenedor, por https://pma.docker.local o pma.docker.test (con su pantalla de acceso)
+    { printf '<VirtualHost *:80>\n    ServerName %s\n    Redirect permanent / %s/\n</VirtualHost>\n' "$(docker_web_pma)" "$(docker_web_url "$(docker_web_pma)")"
+      printf '<VirtualHost *:443>\n    ServerName %s\n' "$(docker_web_pma)"
       printf '    SSLEngine on\n    SSLCertificateFile /certs/docker.local.crt\n    SSLCertificateKeyFile /certs/docker.local.key\n'
       printf '    ProxyPass / http://nexum-pma/\n    ProxyPassReverse / http://nexum-pma/\n</VirtualHost>\n'; } > "$tmp/sitios/001-phpmyadmin.conf"
     for p in $(docker_web_projects); do
@@ -14668,7 +15386,7 @@ EOF
       printf '    command: ["httpd-foreground", "-f", "%s"]\n    networks: [nexum]\n' "$DOCKER_WEB_CONF"
       printf '  pma:\n    image: %s\n    container_name: nexum-pma\n    restart: "no"\n    environment:\n' "$DOCKER_PMA_IMAGE"
       printf '      PMA_HOSTS: "%s"\n      PMA_ABSOLUTE_URI: "%s/"\n      UPLOAD_LIMIT: 64M\n    networks: [nexum]\n' \
-          "${pma_hosts:-$(docker_maria_name 11.8)}" "$(docker_web_url pma.docker.local)"
+          "${pma_hosts:-$(docker_maria_name 11.8)}" "$(docker_web_url "$(docker_web_pma)")"
       printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$tmp/compose.yaml"
     chmod -R go-rwx "$tmp"
     # (dentro de conf, que no se cambia: los ficheros y, de golpe, la carpeta de los vhosts)
@@ -14700,7 +15418,7 @@ function docker_web_up() {
         return 1
     fi
     docker_web_cert && docker_web_write && docker_net || return 1
-    docker_web_hosts poner pma.docker.local || return 1
+    docker_web_hosts poner "$(docker_web_pma)" || return 1
     local was
     was=$(docker_web_state)
     dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" up -d || return 1
@@ -14728,7 +15446,8 @@ function docker_web_reload() {
 function docker_web_command() {
     case ${1:-estado} in
         estado)
-            echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$(docker_ready && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)" ;;
+            echo "W|$(docker_web_get IP)|$(docker_web_get HTTP)|$(docker_web_get HTTPS)|$(docker_ready && docker_web_state || echo "?")|$(docker_web_ports_ok && echo 1 || echo 0)|$(docker_web_tld)|$(docker_dns_on && echo 1 || echo 0)" ;;
+        dns) shift; docker_dns_command "$@" ;;
         puertos) docker_web_set "$2" "$3" "$4" ;;
         permitir) docker_web_allow ;;
         arrancar)
@@ -14738,7 +15457,7 @@ function docker_web_command() {
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] Apache de Docker y phpMyAdmin parados"; return 0; }
             run dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" stop ;;
         confiar) docker_web_trust ;;
-        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar"; return 1 ;;
+        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar"; return 1 ;;
     esac
 }
 
@@ -14767,20 +15486,22 @@ function docker_web_set() {
         return 0
     fi
     mkdir -p -m 700 "$DOCKER_DIR" || return 1
-    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\n' "$ip" "$http" "$https" > "$DOCKER_WEB_FILE" ) || return 1
+    docker_web_conf_write "$ip" "$http" "$https" "$(docker_web_tld)" "$(docker_web_get DNS)" || return 1
     docker_web_ports_ok || echo "Aviso: Docker sin root aun no puede usar esos puertos: pulsa «Permitir» (lvm-instalador docker-web permitir)"
     [ -d "$DOCKER_WEB_DIR" ] || return 0
     sudo_first || return 1
+    # (con el DNS comodin, este responde con la direccion nueva)
+    docker_dns_on && { docker_dns_install || return 1; }
     for p in $(docker_web_projects); do
         mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
     done
-    docker_web_hosts poner pma.docker.local "${domains[@]}" || return 1
+    docker_web_hosts poner "$(docker_web_pma)" "${domains[@]}" || return 1
     if docker_ready && [ "$(docker_web_state)" != nuevo ] && docker_web_ports_ok; then
         docker_web_up || return 1
     else
         docker_web_write
     fi
-    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.local")"
+    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.$(docker_web_tld)")"
 }
 
 # docker-web permitir: Docker sin root puede abrir los puertos del Apache de Docker. Linux deja los de
@@ -14808,6 +15529,237 @@ function docker_web_allow() {
     echo "Listo: Docker sin root ya puede usar los puertos $http y $https"
 }
 
+# El DNS en Linux: un servicio del sistema con un usuario sin privilegios que se crea cada vez
+# (DynamicUser) y systemd-resolved, que le manda solo lo de docker.test (Domains=~docker.test: un DNS con
+# solo dominios de enrutado no recibe ninguna otra pregunta). Todo de root
+DOCKER_DNS_SCRIPT=${LVM_DNS_SCRIPT:-/usr/local/lib/nexum/nexum-dns.py}
+DOCKER_DNS_UNIT=${LVM_DNS_UNIT:-/etc/systemd/system/nexum-dns.service}
+DOCKER_DNS_RESOLVED=${LVM_DNS_RESOLVED:-/etc/systemd/resolved.conf.d/60-nexum-docker.conf}
+function docker_dns_install() {
+    local ip d
+    ip=$(docker_web_get IP)
+    [ "$DRY" -eq 1 ] && return 0
+    for d in "$(dirname "$DOCKER_DNS_SCRIPT")" "$(dirname "$DOCKER_DNS_RESOLVED")"; do
+        sudo install -d -m 755 "$d" || return 1
+    done
+    printf '%s\n' "$DOCKER_DNS_PY" | sudo tee "$DOCKER_DNS_SCRIPT" > /dev/null && sudo chmod 644 "$DOCKER_DNS_SCRIPT" || return 1
+    printf '%s\n' "# Nexum Dev Stack: DNS de *.docker.test, solo en 127.0.0.1 (lo pone lvm-instalador docker-web dns activar)" \
+        "[Unit]" "Description=Nexum Dev Stack: DNS de *.docker.test" "After=network.target" "" "[Service]" \
+        "ExecStart=/usr/bin/python3 -I $DOCKER_DNS_SCRIPT 127.0.0.1 $DOCKER_DNS_PORT docker.test $ip" \
+        "DynamicUser=yes" "ProtectSystem=strict" "ProtectHome=yes" "PrivateTmp=yes" "PrivateDevices=yes" "NoNewPrivileges=yes" \
+        "RestrictAddressFamilies=AF_INET AF_INET6" "CapabilityBoundingSet=" "Restart=on-failure" "" "[Install]" "WantedBy=multi-user.target" \
+        | sudo tee "$DOCKER_DNS_UNIT" > /dev/null || return 1
+    printf '%s\n' "# Nexum Dev Stack: lo de docker.test, al DNS de Nexum (y nada mas)" "[Resolve]" \
+        "DNS=127.0.0.1:$DOCKER_DNS_PORT" "Domains=~docker.test" | sudo tee "$DOCKER_DNS_RESOLVED" > /dev/null || return 1
+    sudo systemctl daemon-reload && sudo systemctl enable nexum-dns.service > /dev/null 2>&1 \
+        && sudo systemctl restart nexum-dns.service && sudo systemctl restart systemd-resolved
+}
+
+function docker_dns_uninstall() {
+    [ "$DRY" -eq 1 ] && return 0
+    sudo systemctl disable --now nexum-dns.service > /dev/null 2>&1
+    sudo rm -f "$DOCKER_DNS_UNIT" "$DOCKER_DNS_RESOLVED" "$DOCKER_DNS_SCRIPT"
+    sudo systemctl daemon-reload
+    sudo systemctl restart systemd-resolved
+}
+
+# DNS comodin de *.docker.test (docker-web dns activar): un DNS minimo, solo en 127.0.0.1, que contesta
+# la direccion del Apache de Docker a cualquier <algo>.docker.test y rechaza todo lo demas. Asi los
+# dominios de Docker ya no van en /etc/hosts (ni piden la contraseña al añadir proyectos o versiones).
+# Solo para *.docker.test: web.local, los proyectos de siempre y los dominios falseados de las tiendas
+# siguen en /etc/hosts, que se mira antes. (.local es de mDNS: un DNS para *.docker.local no se
+# consultaria nunca)
+DOCKER_DNS_PORT=5354
+DOCKER_DNS_PY=$(cat <<'DNSPY'
+# DNS de *.docker.test de Nexum Dev Stack (lo pone lvm-instalador docker-web dns activar: no se edita a
+# mano). nexum-dns.py <direccion> <puerto> <zona> <ip>: contesta <ip> a la zona y a lo que acabe en ella
+# (registros A; los demas tipos, sin datos) y REFUSED a todo lo demas. UDP y TCP, sin estado
+import socket, socketserver, struct, sys, threading
+
+HOST, PORT, ZONE, IP = sys.argv[1], int(sys.argv[2]), sys.argv[3].lower().strip("."), sys.argv[4]
+ADDR = socket.inet_aton(IP)
+
+
+def answer(q):
+    if len(q) < 17:
+        return None
+    tid, flags, qd = struct.unpack(">HHH", q[:6])
+    # (solo preguntas normales, de una en una)
+    if flags & 0x8000 or (flags >> 11) & 0xF or qd != 1:
+        return None
+    i, labels = 12, []
+    while True:
+        if i >= len(q):
+            return None
+        n = q[i]
+        i += 1
+        if n == 0:
+            break
+        if n > 63 or i + n > len(q):
+            return None
+        labels.append(q[i:i + n].decode("ascii", "replace").lower())
+        i += n
+    if i + 4 > len(q):
+        return None
+    qtype, qclass = struct.unpack(">HH", q[i:i + 4])
+    question = q[12:i + 4]
+    name = ".".join(labels)
+    rd = flags & 0x0100
+    if name != ZONE and not name.endswith("." + ZONE):
+        return struct.pack(">HHHHHH", tid, 0x8000 | rd | 0x0080 | 5, 1, 0, 0, 0) + question
+    if qtype == 1 and qclass == 1:
+        rr = b"\xc0\x0c" + struct.pack(">HHIH", 1, 1, 60, 4) + ADDR
+        return struct.pack(">HHHHHH", tid, 0x8400 | rd | 0x0080, 1, 1, 0, 0) + question + rr
+    return struct.pack(">HHHHHH", tid, 0x8400 | rd | 0x0080, 1, 0, 0, 0) + question
+
+
+class UDP(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, sock = self.request
+        out = answer(data)
+        if out:
+            sock.sendto(out, self.client_address)
+
+
+class TCP(socketserver.StreamRequestHandler):
+    def handle(self):
+        self.connection.settimeout(5)
+        try:
+            size = struct.unpack(">H", self.rfile.read(2))[0]
+            out = answer(self.rfile.read(size))
+            if out:
+                self.wfile.write(struct.pack(">H", len(out)) + out)
+        except (OSError, struct.error):
+            pass
+
+
+class UDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class TCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+udp = UDPServer((HOST, PORT), UDP)
+tcp = TCPServer((HOST, PORT), TCP)
+threading.Thread(target=tcp.serve_forever, daemon=True).start()
+udp.serve_forever()
+DNSPY
+)
+
+# ¿Contesta el DNS comodin? (como lo buscan los navegadores: con el sistema)
+function docker_dns_works() {
+    local ip got i
+    ip=$(docker_web_get IP)
+    for i in $(seq 20); do
+        got=$(python3 -I -c 'import socket, sys
+try:
+    print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])
+except OSError:
+    pass' "nexum-comprobacion.docker.test" 2> /dev/null)
+        [ "$got" == "$ip" ] && return 0
+        sleep 0.5
+    done
+    return 1
+}
+
+# docker_web_retld: los proyectos del Apache de Docker con el final de los dominios de ahora (docker_web_tld):
+# su dominio, su configuracion de cada version (WordPress: WP_HOME), el dominio de una tienda en su BBDD y
+# sus contenedores de PHP en marcha, rehechos (su configuracion va montada fichero a fichero)
+function docker_web_retld() {
+    local p state
+    for p in $(docker_web_projects); do
+        docker_conf_set "$p" DOMINIO "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")" || return 1
+        for v in $(docker_conf "$p" PHP); do
+            docker_web_config "$p" "$v" || return 1
+        done
+        docker_web_compose "$p" || return 1
+        if docker_ready; then
+            if [ "$(docker_conf "$p" TIPO)" == ps ] && docker_maria_up "$(docker_conf "$p" MARIADB)" > /dev/null; then
+                docker_web_ps_domain "$p"
+            fi
+            state=$(docker_state "$p")
+            if [ "$state" == marcha ] || [ "$state" == parcial ]; then
+                dk compose --project-directory "$DOCKER_DIR/$p" -f "$DOCKER_DIR/$p/compose.yaml" up -d --force-recreate \
+                    $(docker_web_services "$p") > /dev/null || return 1
+            fi
+        fi
+        echo "  $(docker_conf "$p" CARPETA): $(docker_web_url "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")")"
+    done
+}
+
+# docker-web dns activar: pone el DNS comodin y pasa los proyectos del Apache de Docker a *.docker.test
+# (sus lineas de /etc/hosts se quitan). Si no contesta, se quita y todo sigue como estaba. Pide la
+# contraseña de administrador una vez
+function docker_dns_activate() {
+    local old p olds=()
+    if docker_dns_on && docker_dns_works; then
+        echo "El DNS de *.docker.test ya va: los dominios de Docker no van en /etc/hosts"
+        return 0
+    fi
+    echo "DNS de *.docker.test: los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts"
+    echo "(web.local, los proyectos de siempre y los dominios falseados de las tiendas siguen igual)"
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] DNS en 127.0.0.1:$DOCKER_DNS_PORT para *.docker.test y los proyectos de Docker a .docker.test"
+        return 0
+    fi
+    sudo_first || return 1
+    docker_dns_install || { echo "No se ha podido poner el DNS de *.docker.test"; docker_dns_uninstall; return 1; }
+    if ! docker_dns_works; then
+        echo "El DNS de *.docker.test no contesta: se quita y todo sigue como estaba"
+        docker_dns_uninstall
+        return 1
+    fi
+    old=$(docker_web_tld)
+    if [ "$old" != docker.test ]; then
+        olds+=("pma.$old")
+        for p in $(docker_web_projects); do
+            mapfile -t -O "${#olds[@]}" olds < <(docker_web_domains "$p")
+        done
+    fi
+    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" docker.test 1 || return 1
+    if [ "$old" != docker.test ] && [ -n "$(docker_web_projects)" ]; then
+        echo "Los proyectos del Apache de Docker pasan a .docker.test:"
+        docker_web_retld || return 1
+    fi
+    [ ${#olds[@]} -gt 0 ] && docker_web_hosts quitar "${olds[@]}"
+    if [ -d "$DOCKER_WEB_DIR" ]; then
+        docker_web_cert && docker_web_trust
+        if docker_ready && [ "$(docker_web_state)" != nuevo ]; then
+            docker_web_up || return 1
+        else
+            docker_web_write
+        fi
+    fi
+    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.test") y phpMyAdmin en $(docker_web_url "$(docker_web_pma)")"
+}
+
+# docker-web dns quitar: sin el DNS comodin. Los dominios siguen siendo .docker.test y vuelven a /etc/hosts
+function docker_dns_deactivate() {
+    local p domains=()
+    echo "Se quita el DNS de *.docker.test: sus dominios vuelven a /etc/hosts"
+    [ "$DRY" -eq 1 ] && return 0
+    sudo_first || return 1
+    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" "$(docker_web_tld)" 0 || return 1
+    docker_dns_uninstall
+    for p in $(docker_web_projects); do
+        mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
+    done
+    [ -d "$DOCKER_WEB_DIR" ] && { docker_web_hosts poner "$(docker_web_pma)" "${domains[@]}" || return 1; }
+    echo "Listo: los dominios de Docker van otra vez en /etc/hosts"
+}
+
+function docker_dns_command() {
+    case $1 in
+        activar) docker_dns_activate ;;
+        quitar) docker_dns_deactivate ;;
+        *) echo "Uso: lvm-instalador docker-web dns activar|quitar"; return 1 ;;
+    esac
+}
+
 # Configuracion de una version de PHP de un proyecto para su contenedor (config-83.php: su BBDD en la
 # MariaDB comun y, en WordPress, el dominio de esa version). Nada si el proyecto no la tiene
 function docker_web_config() {
@@ -14815,11 +15767,27 @@ function docker_web_config() {
     # (el dominio, con el puerto si no es el 443: WordPress lo pone en sus enlaces)
     local url
     url=$(docker_web_url "$(docker_web_domain "$slug" "$v")")
-    rel=$(docker_project_config "$(docker_conf "$slug" CARPETA)" "$dir" "${url#https://}" \
+    local folder hosts
+    folder=$(docker_conf "$slug" CARPETA)
+    # (las de la web en local: web.local y su dominio propio, si tiene. En lo que devuelve, las del contenedor)
+    hosts="$PROJECT_VHOST $(custom_domain "$folder" 2> /dev/null)"
+    local server
+    # (la BBDD: la de una version LAMPP en vivo, por su puente, o la de la MariaDB comun)
+    if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+        server=$(lampp_bd_bridge "$(docker_conf "$slug" LAMPP_BD)")
+    else
+        server=$(docker_maria_name "$(docker_conf "$slug" MARIADB)")
+    fi
+    rel=$(LVM_DOMINIOS_LOCALES=$hosts docker_project_config "$folder" "$dir" "${url#https://}" \
         "$(docker_conf "$slug" BBDD)" "$(docker_conf "$slug" USUARIO)" "$(sed -n 's/^DB_PASS=//p' "$dir/.env")" \
-        "$(docker_maria_name "$(docker_conf "$slug" MARIADB)")") || return 1
-    [ -n "$rel" ] && mv -f "$dir/config.php" "$dir/config-${v//./}.php"
-    return 0
+        "$server") || return 1
+    [ -n "$rel" ] || return 0
+    # (si ya estaba, se cambia en su sitio: el contenedor la tiene montada y la ve al momento)
+    if [ -f "$dir/config-${v//./}.php" ]; then
+        cat "$dir/config.php" > "$dir/config-${v//./}.php" && rm -f "$dir/config.php"
+    else
+        mv -f "$dir/config.php" "$dir/config-${v//./}.php"
+    fi
 }
 
 # compose.yaml de un proyecto: un servicio por version de PHP (php83...), con la imagen nexum-php de esa
@@ -14846,6 +15814,21 @@ function docker_web_compose() {
       [ -n "$vols" ] && printf 'volumes:\n%s' "$vols"
       printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$dir/compose.yaml.nuevo" \
         && mv -f "$dir/compose.yaml.nuevo" "$dir/compose.yaml"
+}
+
+# Pool de PHP-FPM de los contenedores (fpm.conf): los procesos se abren al llegar peticiones (ondemand)
+# y se cierran a los 20 s sin trabajo. Un proyecto en marcha sin usar gasta solo su proceso principal (unos
+# MB), no dos o tres procesos esperando (100-200 MB, lo de fabrica de la imagen). Al arrancar se rehace
+function docker_fpm_conf() {
+    printf '[global]\nerror_log = /proc/self/fd/2\ndaemonize = no\n[www]\nuser = root\ngroup = root\nlisten = 9000\nclear_env = no\ncatch_workers_output = yes\npm = ondemand\npm.max_children = 10\npm.process_idle_timeout = 20s\npm.max_requests = 50\n'
+}
+
+# El fpm.conf del proyecto, al dia (los de antes de la 1.56.7, sin ondemand). Devuelve 0 si ha cambiado:
+# sus contenedores se rehacen al arrancar (lo leen al empezar)
+function docker_fpm_refresh() {
+    local f=$DOCKER_DIR/$1/fpm.conf
+    docker_fpm_conf | cmp -s - "$f" && return 1
+    ( umask 077; docker_fpm_conf > "$f" )
 }
 
 # Servicios que van en marcha: todas las versiones o, en una tienda, la elegida
@@ -14876,6 +15859,14 @@ function docker_web_ps_domain() {
     prefix=$(docker_maria_sql "$v" -N -e "SELECT LEFT(table_name, LENGTH(table_name) - 8) FROM information_schema.tables
         WHERE table_schema = '$db' AND table_name LIKE '%shop\\_url' AND table_type = 'BASE TABLE' LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
     [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || return 0
+    # (el de produccion, para traer de alli sus imagenes: ps-imagenes)
+    local prod
+    prod=$(docker_maria_sql "$v" -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" \
+        < /dev/null 2> /dev/null | tr -d '\r' | tr 'A-Z' 'a-z')
+    prod=${prod%%:*}
+    if valid_domain "$prod" && [[ "$prod" != *.docker.local && "$prod" != *.docker.test && "$prod" != *.local ]]; then
+        docker_conf_set "$slug" PRODUCCION "$prod"
+    fi
     echo "Tienda PrestaShop: su dominio pasa a $dom en la BBDD de Docker"
     docker_maria_sql "$v" "$db" << EOF
 UPDATE \`${prefix}shop_url\` SET domain = '$dom', domain_ssl = '$dom';
@@ -14888,10 +15879,11 @@ EOF
 # proyecto en Docker con el Apache de Docker. Su BBDD (vacia, la de una version LAMPP o un volcado) va en
 # la MariaDB comun de esa version, con su propio usuario. Mas versiones de PHP: docker-php-añadir
 function docker_web_create() {
-    local folder=${1%/} php=$2 maria=$3 db="" from="" dump="" slug dir tipo dbname user pass rel p
+    local folder=${1%/} php=$2 maria=$3 db="" from="" dump="" slug dir tipo dbname user pass rel p live=0
     shift 3 2> /dev/null
     while [ $# -gt 0 ]; do
         case $1 in
+            --en-vivo) live=1; shift ;;
             --bd|--desde|--volcado)
                 [ -n "$2" ] || { echo "Falta el valor de $1"; return 1; }
                 case $1 in --bd) db=$2 ;; --desde) from=$2 ;; --volcado) dump=$2 ;; esac
@@ -14935,6 +15927,9 @@ function docker_web_create() {
         return 1
     fi
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
+    if [ $live -eq 1 ]; then
+        [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version LAMPP (--bd y --desde)"; return 1; }
+    fi
     dbname=${db:-$(tr '-' '_' <<< "$slug")}
     user=$(cut -c1-32 <<< "nx_$dbname")
     echo "Proyecto en Docker: $folder con PHP $php y MariaDB $maria comun (BBDD $dbname)"
@@ -14949,8 +15944,13 @@ function docker_web_create() {
         echo "Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otros puertos."
         return 1
     fi
-    # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba
-    sudo_first || return 1
+    # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba. Con el DNS comodin no
+    # se toca /etc/hosts: no hace falta
+    docker_dns_on || sudo_first || return 1
+    if [ $live -eq 1 ]; then
+        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
+        return
+    fi
     echo "1/5 MariaDB $maria comun"
     docker_maria_up "$maria" || return 1
     if [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$dbname'" < /dev/null 2> /dev/null | tr -d '\r')" != 0 ]; then
@@ -14967,7 +15967,7 @@ function docker_web_create() {
       printf 'DB_PASS=%s\n' "$pass" > "$dir/.env"
       printf 'MODO=web\nCARPETA=%s\nTIPO=%s\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=%s\n' \
           "$folder" "$tipo" "$php" "$php" "$maria" "$dbname" "$user" "$rel" > "$dir/proyecto.conf"
-      printf '[global]\nerror_log = /proc/self/fd/2\ndaemonize = no\n[www]\nuser = root\ngroup = root\nlisten = 9000\nclear_env = no\ncatch_workers_output = yes\npm.max_requests = 50\n' > "$dir/fpm.conf" ) || return 1
+      docker_fpm_conf > "$dir/fpm.conf" ) || return 1
     # (el dominio: el de la tienda o el de la version)
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
@@ -15002,12 +16002,39 @@ EOF
         fi
     fi
     echo "4/5 Apache de Docker y $(docker_web_domain "$slug" "$php")"
-    docker_web_hosts poner pma.docker.local "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
     echo "5/5 Certificado en el navegador"
     docker_web_trust
-    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url pma.docker.local)"
+    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url "$(docker_web_pma)")"
+}
+
+# docker-nuevo ... --en-vivo: el proyecto sin BBDD en Docker, con la de esa version LAMPP en vivo (con el
+# usuario y la contraseña de su wp-config.php)
+function docker_web_create_live() {
+    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 creds owner
+    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base del wp-config.php de $folder"; return 1; }
+    owner=$(lampp_bd_owner "$from")
+    mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
+    ( umask 077
+      printf 'DB_PASS=%s\n' "$(sed -n 2p <<< "$creds")" > "$dir/.env"
+      printf 'MODO=web\nCARPETA=%s\nTIPO=wp\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=wp-config.php\nLAMPP_BD=%s\n' \
+          "$folder" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$owner" > "$dir/proyecto.conf"
+      docker_fpm_conf > "$dir/fpm.conf" ) || return 1
+    docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
+    docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    echo "1/4 Imagen de PHP $php"
+    docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    echo "2/4 BBDD $(docker_conf "$slug" BBDD) de lampp-$owner, en vivo (la misma que web.local)"
+    lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
+    docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
+    docker_web_up || return 1
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    echo "4/4 Certificado en el navegador"
+    docker_web_trust
+    echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php), con la BBDD de lampp-$owner en vivo"
 }
 
 # docker-php-añadir <nombre> <php>: otra version de PHP del mismo proyecto, con la misma carpeta y la
@@ -15025,7 +16052,7 @@ function docker_web_add() {
         return 0
     fi
     docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
-    sudo_first || return 1
+    docker_dns_on || sudo_first || return 1
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
     docker_conf_set "$slug" PHP "$(tr ' ' '\n' <<< "$list $php" | sort -t. -k1,1nr -k2,2nr | tr '\n' ' ' | sed 's/ $//')" || return 1
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
@@ -15055,7 +16082,7 @@ function docker_web_remove() {
         echo "  [simulacion] fuera el contenedor $(docker_web_container "$slug" "$php")"
         return 0
     fi
-    sudo_first || return 1
+    docker_dns_on || sudo_first || return 1
     if [ "$(docker_conf "$slug" TIPO)" == ps ] && [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
         docker_web_switch "$slug" "${rest%% *}" || return 1
     fi
@@ -15086,7 +16113,9 @@ function docker_web_switch() {
     docker_conf_set "$slug" ACTIVA "$php" || return 1
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
     docker_maria_up "$(docker_conf "$slug" MARIADB)" || return 1
-    if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}"; then
+    local fresh=()
+    docker_fpm_refresh "$slug" && fresh=(--force-recreate)
+    if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "${fresh[@]}" "php${php//./}"; then
         echo "No arranca con PHP $php: sigue con PHP $old"
         docker_conf_set "$slug" ACTIVA "$old"
         return 1
@@ -15108,17 +16137,35 @@ function docker_web_action() {
     case $action in
         arrancar)
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] MariaDB $maria, Apache de Docker y $(docker_web_services "$slug" | tr '\n' ' ')"; return 0; }
-            docker_maria_up "$maria" && docker_web_up || return 1
-            run "${c[@]}" up -d $(docker_web_services "$slug") ;;
-        parar) run "${c[@]}" stop && docker_web_idle_stop ;;
+            docker_idle_ensure
+            # (su configuracion, al dia: la de su wp-config.php y las direcciones de la web en local)
+            if [ -n "$(docker_conf "$slug" CONFIG)" ]; then
+                local v
+                for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+            fi
+            if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+                lampp_bd_up "$(docker_conf "$slug" LAMPP_BD)" && lampp_bd_bridge_up "$(docker_conf "$slug" LAMPP_BD)" || return 1
+                docker_web_up || return 1
+            else
+                docker_maria_up "$maria" && docker_web_up || return 1
+            fi
+            local fresh=()
+            docker_fpm_refresh "$slug" && fresh=(--force-recreate)
+            run "${c[@]}" up -d "${fresh[@]}" $(docker_web_services "$slug") ;;
+        parar) run "${c[@]}" stop && docker_web_idle_stop && lampp_bd_release "$(docker_conf "$slug" LAMPP_BD)" "$slug" ;;
         registros) "${c[@]}" logs --no-color --tail 200 ;;
         borrar)
             local db user domains
             db=$(docker_conf "$slug" BBDD) user=$(docker_conf "$slug" USUARIO)
             mapfile -t domains < <(docker_web_domains "$slug")
-            echo "Se borran los contenedores de $slug y su BBDD $db de la MariaDB $maria de Docker (la de LAMPP no se toca)"
+            # (con la BBDD de LAMPP en vivo, la que se borra es su copia de Docker, si tiene: la de LAMPP nunca)
+            if [ -n "$(docker_conf "$slug" LAMPP_BD)" ]; then
+                db=$(docker_conf "$slug" BBDD_DOCKER) user=$(docker_conf "$slug" USUARIO_DOCKER)
+            fi
+            echo "Se borran los contenedores de $slug${db:+ y su BBDD $db de la MariaDB $maria de Docker} (la de LAMPP no se toca)"
             [ "$DRY" -eq 1 ] && return 0
             run "${c[@]}" down -v || return 1
+            lampp_bd_release "$(docker_conf "$slug" LAMPP_BD)" "$slug"
             if db_valid_name "$db" > /dev/null && [[ "$user" =~ ^[A-Za-z0-9_]{1,32}$ ]] && docker_maria_up "$maria" > /dev/null; then
                 printf 'DROP DATABASE IF EXISTS `%s`;\nDROP USER IF EXISTS '"'"'%s'"'"'@'"'"'%%'"'"';\n' "$db" "$user" | docker_maria_sql "$maria"
             fi
@@ -15139,7 +16186,8 @@ function docker_web_idle_stop() {
     for p in $(docker_web_projects); do
         if grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up"; then
             web_used=1
-            used+=("$(docker_conf "$p" MARIADB)")
+            # (los que van en vivo con la BBDD de LAMPP no usan la MariaDB comun)
+            [ -z "$(docker_conf "$p" LAMPP_BD)" ] && used+=("$(docker_conf "$p" MARIADB)")
         fi
     done
     for name in $(grep -E '^nexum-mariadb-[0-9]{1,2}-[0-9]{1,2}$' <<< "$up"); do
@@ -15156,15 +16204,361 @@ function docker_web_idle_stop() {
     return 0
 }
 
+# ===========================================================================
+# Proyectos de Docker sin visitas: se paran solos
+# ===========================================================================
+# Un proyecto del Apache de Docker en marcha que lleva DOCKER_IDLE_FILE horas sin ninguna visita (en el
+# registro de nexum-web, que apunta el dominio de cada una: tambien las que llegan por el tunel) se para,
+# y con el lo comun que ya no use nadie (su MariaDB, el Apache de Docker). Solo si el y nexum-web llevan
+# en marcha al menos esas horas (si no, su registro no alcanza). Con 0, nunca. Por defecto, 3 horas
+DOCKER_IDLE_FILE=$DOCKER_DIR/reposo
+DOCKER_STOPPED_MSG="Este proyecto de Docker está parado (se para solo tras unas horas sin visitas). Arráncalo en Nexum Dev Stack, pestaña Docker."
+DOCKER_IDLE_LOG=$LOG_DIR/docker-reposo.log
+function docker_idle_hours() {
+    local v
+    v=$(head -c 10 "$DOCKER_IDLE_FILE" 2> /dev/null | tr -d ' \n')
+    [ -f "$DOCKER_IDLE_FILE" ] || v=3
+    [[ "$v" =~ ^([0-9]|1[0-9]|2[0-4])$ ]] || v=3
+    echo "$v"
+}
+
+# El temporizador: uno de systemctl --user (sin root, como Docker sin root) que cada 15 minutos lanza
+# docker-reposo comprobar, aunque la ventana este cerrada
+DOCKER_IDLE_UNIT_DIR=${LVM_REPOSO_UNITS:-$HOME/.config/systemd/user}
+function docker_idle_timer_on() {
+    systemctl --user is-active --quiet nexum-reposo.timer 2> /dev/null
+}
+function docker_idle_timer() {
+    local bin
+    if [ "$1" == poner ]; then
+        # (el instalado; si no, este mismo)
+        bin=$(command -v lvm-instalador 2> /dev/null)
+        [ -n "$bin" ] || bin=$SELF
+        mkdir -p "$DOCKER_IDLE_UNIT_DIR" || return 1
+        printf '[Unit]\nDescription=Nexum Dev Stack: parar los proyectos de Docker sin visitas\n\n[Service]\nType=oneshot\nExecStart=%s docker-reposo comprobar\n' \
+            "$bin" > "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service" || return 1
+        printf '[Unit]\nDescription=Nexum Dev Stack: cada 15 minutos, los proyectos de Docker sin visitas\n\n[Timer]\nOnBootSec=10min\nOnUnitActiveSec=15min\n\n[Install]\nWantedBy=timers.target\n' \
+            > "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.timer" || return 1
+        systemctl --user daemon-reload && systemctl --user enable --now nexum-reposo.timer > /dev/null 2>&1
+    else
+        systemctl --user disable --now nexum-reposo.timer > /dev/null 2>&1
+        rm -f "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service" "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.timer"
+        systemctl --user daemon-reload > /dev/null 2>&1
+    fi
+}
+
+# Segundos (de 1970) de cuando arranco un contenedor (nada si no esta)
+function docker_started_at() {
+    dk inspect -f '{{.State.StartedAt}}' "$1" 2> /dev/null | python3 -I -c '
+import datetime, re, sys
+t = sys.stdin.read().strip()
+m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", t)
+if m:
+    print(int(datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()))'
+}
+
+# docker-reposo comprobar: para los que llevan las horas sin visitas (lo lanza el temporizador)
+function docker_idle_check() {
+    local h now cutoff up visited p name t newest stopped=0 dom seen
+    h=$(docker_idle_hours)
+    [ "$h" -gt 0 ] || return 0
+    docker_ready > /dev/null 2>&1 || return 0
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null)
+    grep -qx nexum-web <<< "$up" || return 0
+    now=$(date +%s) cutoff=$(( $(date +%s) - h * 3600 ))
+    t=$(docker_started_at nexum-web)
+    [ -n "$t" ] && [ "$t" -le "$cutoff" ] || return 0
+    # (los dominios visitados en esas horas: el primero de cada linea del registro de nexum-web)
+    visited=$(dk logs --since "${h}h" nexum-web 2> /dev/null | awk '{ print tolower($1) }' | sort -u)
+    for p in $(docker_web_projects); do
+        newest=""
+        for name in $(grep -E "^nexum-$p-php[0-9]{2}\$" <<< "$up"); do
+            t=$(docker_started_at "$name")
+            [ -n "$t" ] && { [ -z "$newest" ] || [ "$t" -gt "$newest" ]; } && newest=$t
+        done
+        [ -n "$newest" ] && [ "$newest" -le "$cutoff" ] || continue
+        seen=0
+        for dom in $(docker_web_domains "$p"); do
+            grep -qxF "${dom,,}" <<< "$visited" && { seen=1; break; }
+        done
+        [ $seen -eq 1 ] && continue
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] $p: $h h sin visitas, se pararia"
+            stopped=$((stopped + 1))
+            continue
+        fi
+        echo "$(date '+%Y-%m-%d %H:%M') $p: $h h sin visitas, se para" | tee -a "$DOCKER_IDLE_LOG"
+        docker_web_action parar "$p" > /dev/null 2>&1 && stopped=$((stopped + 1))
+    done
+    # (el registro, con lo ultimo)
+    [ -f "$DOCKER_IDLE_LOG" ] && [ "$(wc -l < "$DOCKER_IDLE_LOG")" -gt 500 ] \
+        && tail -n 200 "$DOCKER_IDLE_LOG" > "$DOCKER_IDLE_LOG.nuevo" && mv -f "$DOCKER_IDLE_LOG.nuevo" "$DOCKER_IDLE_LOG"
+    [ $stopped -gt 0 ] || [ "${1:-}" != --decir ] || echo "Ningún proyecto lleva $h h sin visitas"
+    return 0
+}
+
+# Que el temporizador este si hace falta (al arrancar un proyecto de Docker): con horas y sin el, se pone
+function docker_idle_ensure() {
+    [ "$DRY" -eq 1 ] && return 0
+    if [ "$(docker_idle_hours)" -gt 0 ]; then
+        docker_idle_timer_on || docker_idle_timer poner > /dev/null 2>&1
+    fi
+    return 0
+}
+
+# docker-reposo [estado] | horas <0-24> | comprobar
+#   estado: Q|horas (0: nunca)|temporizador puesto (1/0)|lo ultimo que se ha parado
+function docker_idle_command() {
+    case ${1:-estado} in
+        estado) echo "Q|$(docker_idle_hours)|$(docker_idle_timer_on && echo 1 || echo 0)|$(tail -n 1 "$DOCKER_IDLE_LOG" 2> /dev/null | tr '|' ' ')" ;;
+        horas)
+            [[ "$2" =~ ^([0-9]|1[0-9]|2[0-4])$ ]] || { echo "Las horas van de 0 (nunca) a 24"; return 1; }
+            [ "$DRY" -eq 1 ] && { echo "  [simulacion] proyectos de Docker parados tras $2 h sin visitas"; return 0; }
+            mkdir -p -m 700 "$DOCKER_DIR" && ( umask 077; echo "$2" > "$DOCKER_IDLE_FILE" ) || return 1
+            if [ "$2" -gt 0 ]; then
+                docker_idle_timer poner || { echo "No se ha podido poner el temporizador"; return 1; }
+                echo "Los proyectos de Docker sin visitas se paran solos a las $2 h"
+            else
+                docker_idle_timer quitar
+                echo "Los proyectos de Docker ya no se paran solos"
+            fi ;;
+        comprobar) docker_idle_check "$2" ;;
+        *) echo "Uso: lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar"; return 1 ;;
+    esac
+}
+
+# ===========================================================================
+# BBDD de LAMPP en Docker (en vivo)
+# ===========================================================================
+# Un WordPress de Docker puede usar la BBDD de una version LAMPP en vivo: la misma que web.local, sin
+# copias. Su MariaDB (si no esta en marcha, solo ella y sin red: no choca con la de la version activa
+# en el 3306) y, en la red de Docker, un puente hasta su socket (socat, de la imagen de MariaDB; ella ve
+# las conexiones como de localhost, como las de web.local). El proyecto entra con el usuario y la
+# contraseña de su wp-config.php, los mismos que con web.local. PrestaShop no: guarda su dominio en la
+# BBDD y una misma BBDD no puede servir a web.local y a Docker a la vez
+LAMPP_BD_BRIDGE_IMAGE=mariadb:11.8
+LAMPP_BD_MARK_DIR=$DOCKER_DIR/lampp-bd
+
+# La version que tiene de verdad las BBDD de otra (las que comparten datos)
+function lampp_bd_owner() {
+    local o
+    o=$(data_owner "${TEST_DIR:-/opt}/lampp-$1")
+    echo "${o:-$1}"
+}
+
+function lampp_bd_data() {
+    echo "${TEST_DIR:-/opt}/lampp-$1/var/mysql"
+}
+
+function lampp_bd_bridge() {
+    echo "nexum-lampp-bd-${1//./-}"
+}
+
+# ¿Responde la MariaDB de esa version en su socket?
+function lampp_bd_alive() {
+    db_socket_alive "$(lampp_bd_data "$1")/mysql.sock"
+}
+
+# La MariaDB de una version, en marcha: si no lo esta, se arranca solo ella, sin red (pide la contraseña)
+# y se apunta en LAMPP_BD_MARK_DIR (asi no se cierra al arrancar otra version ni al parar LAMPP)
+function lampp_bd_up() {
+    local f=$1 dir data user server=() i
+    dir=${TEST_DIR:-/opt}/lampp-$f data=$(lampp_bd_data "$f")
+    lampp_bd_alive "$f" && return 0
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] MariaDB de lampp-$f, sin red (solo su socket), para Docker"
+        return 0
+    fi
+    [ -d "$data" ] || { echo "lampp-$f no tiene BBDD ($data)"; return 1; }
+    # (con el dueño de sus datos, nunca root, como db_temp_start)
+    user=$($SUDO stat -L -c %U "$data") || return 1
+    if [ "$user" == root ] || ! [[ "$user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+        echo "Las BBDD de lampp-$f son de $user: no se arranca su MariaDB con ese usuario"
+        return 1
+    fi
+    if [ -x "$dir/mysql/bin/mariadbd" ]; then
+        server=("$dir/mysql/bin/mariadbd" --defaults-file="$dir/etc/my.cnf")
+    elif [ -x "$dir/sbin/mysqld" ]; then
+        server=(env LD_LIBRARY_PATH="$dir/lib" "$dir/sbin/mysqld" --defaults-file="$dir/etc/my.cnf"
+            --basedir="$dir" --plugin-dir="$dir/lib/mysql/plugin/"
+            --innodb-data-home-dir="$data/" --innodb-log-group-home-dir="$data/")
+    else
+        echo "lampp-$f no tiene el servidor de MariaDB"
+        return 1
+    fi
+    echo "Arrancando la MariaDB de lampp-$f para Docker (sin red: solo su socket)..."
+    mkdir -p -m 700 "$LAMPP_BD_MARK_DIR" && : > "$LAMPP_BD_MARK_DIR/$f" || return 1
+    # (aparte de esta tarea: sigue al terminar)
+    $SUDO setsid -f "${server[@]}" --datadir="$data" --user="$user" --skip-networking \
+        --socket="$data/mysql.sock" --pid-file="$data/mysqld.pid" --log-error="$data/mysqld.err" \
+        < /dev/null > /dev/null 2>&1
+    for i in $(seq 300); do
+        lampp_bd_alive "$f" && return 0
+        sleep 0.2
+    done
+    rm -f "$LAMPP_BD_MARK_DIR/$f"
+    echo "La MariaDB de lampp-$f no ha arrancado (¿la tiene otro programa?). Lo ultimo de su registro:"
+    $SUDO ${SUDO:+-u "$user"} tail -8 "$data/mysqld.err" 2> /dev/null | sed 's/^/  /'
+    return 1
+}
+
+# El puente de la red de Docker hasta el socket de esa version (nexum-lampp-bd-8-4, en el 3306)
+function lampp_bd_bridge_up() {
+    local f=$1 name data
+    name=$(lampp_bd_bridge "$f") data=$(lampp_bd_data "$f")
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] puente $name hasta $data/mysql.sock"; return 0; }
+    [ "$(dk inspect -f '{{.State.Running}}' "$name" 2> /dev/null)" == true ] && return 0
+    dk rm -f "$name" > /dev/null 2>&1
+    docker_net || return 1
+    dk run -d --name "$name" --network nexum --restart no --label "nexum.lampp-bd=$f" \
+        -v "$(readlink -f "$data"):/run/nexum-bd:ro" --entrypoint socat "$LAMPP_BD_BRIDGE_IMAGE" \
+        TCP-LISTEN:3306,fork,reuseaddr UNIX-CONNECT:/run/nexum-bd/mysql.sock > /dev/null
+}
+
+# Proyectos de Docker en marcha que usan la BBDD de esa version (menos el segundo argumento)
+function lampp_bd_users() {
+    local f=$1 skip=$2 p up
+    up=$(dk ps --format '{{.Names}}' 2> /dev/null)
+    for p in $(docker_web_projects); do
+        [ "$p" != "$skip" ] && [ "$(docker_conf "$p" LAMPP_BD)" == "$f" ] && grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up" && echo "$p"
+    done
+}
+
+# Cuando ya no la usa ningun proyecto en marcha: fuera su puente y, si la arranco Docker, su MariaDB (sin
+# contraseña de root: la para con el usuario del proyecto, que en LAMPP es root de MariaDB)
+# lampp_bd_release <version> [proyecto que se para]
+function lampp_bd_release() {
+    local f=$1 slug=$2 dir data admin user pass
+    [ -n "$f" ] || return 0
+    [ -n "$(lampp_bd_users "$f" "$slug")" ] && return 0
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] fuera el puente de lampp-$f (y su MariaDB, si la arranco Docker)"; return 0; }
+    dk rm -f "$(lampp_bd_bridge "$f")" > /dev/null 2>&1
+    [ -f "$LAMPP_BD_MARK_DIR/$f" ] || return 0
+    # (la de la version activa con LAMPP en marcha no: es la suya)
+    [ "$(active_dir)" == "${TEST_DIR:-/opt}/lampp-$f" ] && lampp_running && return 0
+    dir=${TEST_DIR:-/opt}/lampp-$f data=$(lampp_bd_data "$f")
+    admin=$dir/mysql/bin/mariadb-admin
+    [ -x "$admin" ] || admin=$dir/bin/mysqladmin
+    for p in ${slug:-} $(docker_web_projects); do
+        [ "$(docker_conf "$p" LAMPP_BD)" == "$f" ] || continue
+        user=$(docker_conf "$p" USUARIO) pass=$(sed -n 's/^DB_PASS=//p' "$DOCKER_DIR/$p/.env")
+        if MYSQL_PWD=$pass LD_LIBRARY_PATH="$dir/lib" "$admin" --no-defaults -S "$data/mysql.sock" -u "$user" shutdown > /dev/null 2>&1; then
+            rm -f "$LAMPP_BD_MARK_DIR/$f"
+            echo "MariaDB de lampp-$f parada (ya no la usa ningun proyecto de Docker)"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# Antes de arrancar LAMPP con esa version: si su MariaDB la tenia Docker (sin red), se para para que
+# arranque la normal (con su puerto); los proyectos de Docker vuelven a entrar por el mismo socket
+function lampp_bd_handover() {
+    local f data pid
+    f=${1##*/lampp-} data=$(lampp_bd_data "$f")
+    [ -n "$f" ] && [ -f "$LAMPP_BD_MARK_DIR/$f" ] || return 0
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] la MariaDB de lampp-$f que tenia Docker pasa a la de LAMPP"; return 0; }
+    rm -f "$LAMPP_BD_MARK_DIR/$f"
+    lampp_bd_alive "$f" || return 0
+    # (solo si de verdad es ese servidor: el de su .pid, sin red y con su socket)
+    pid=$(db_temp_pid "$data/mysqld.pid" "$data/mysql.sock") || return 0
+    [[ "$($SUDO ps -ww -o args= -p "$pid" 2> /dev/null)" == *--skip-networking* ]] || return 0
+    echo "La MariaDB de lampp-$f la tenia Docker: pasa a la de LAMPP"
+    $SUDO kill "$pid" 2> /dev/null
+    local i
+    for i in $(seq 150); do lampp_bd_alive "$f" || break; sleep 0.2; done
+    return 0
+}
+
+# Al parar LAMPP: si algun proyecto de Docker en marcha usaba la BBDD de esta version, vuelve su MariaDB
+# (sin red, para Docker)
+function lampp_bd_keep() {
+    local f=${1##*/lampp-}
+    [ -n "$f" ] && [ -n "$(lampp_bd_users "$f")" ] || return 0
+    echo "Algun proyecto de Docker usa la BBDD de lampp-$f: su MariaDB sigue para el (sin red)"
+    lampp_bd_up "$f"
+}
+
+# El usuario, la contraseña y la base del proyecto en LAMPP (los de su wp-config.php): usuario|base y la
+# contraseña en la segunda linea
+function lampp_bd_creds() {
+    python3 -I - "$HTDOCS_DIR/$1/wp-config.php" << 'EOF'
+import re, sys
+try:
+    text = open(sys.argv[1], encoding="utf-8", errors="replace").read(2000000)
+except OSError:
+    sys.exit(1)
+def get(name):
+    m = re.search(r"""(?m)^(?:(?!//|#)[^\n])*?\bdefine\(\s*['"]%s['"]\s*,\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")""" % name, text)
+    return None if not m else re.sub(r"\\(.)", r"\1", m.group(1) if m.group(1) is not None else m.group(2))
+user, db, pw = get("DB_USER"), get("DB_NAME"), get("DB_PASSWORD")
+if not user or not db or pw is None or "\n" in pw or "|" in user + db:
+    sys.exit(1)
+print(user + "|" + db)
+print(pw)
+EOF
+}
+
+# docker-bd <nombre> lampp <version> | docker: la BBDD de un WordPress de Docker, en vivo la de esa
+# version LAMPP (la misma que web.local) o su copia en la MariaDB comun de Docker (la de antes, que no
+# se borra al pasar a LAMPP)
+function docker_db_mode() {
+    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was
+    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
+    dir=$DOCKER_DIR/$slug
+    case $mode in
+        lampp)
+            [ "$(docker_conf "$slug" TIPO)" == wp ] || { echo "Solo WordPress: una tienda guarda su dominio en la BBDD y no puede servir a web.local y a Docker a la vez"; return 1; }
+            valid_version_name "$v" && [ -d "${TEST_DIR:-/opt}/lampp-$v" ] || { echo "No existe la version lampp-$v"; return 1; }
+            owner=$(lampp_bd_owner "$v")
+            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base del wp-config.php de $(docker_conf "$slug" CARPETA)"; return 1; }
+            user=${creds%%|*} db=$(head -1 <<< "$creds" | cut -d'|' -f2) pass=$(sed -n 2p <<< "$creds")
+            echo "$slug: BBDD $db de lampp-$owner, en vivo (la misma que web.local; la copia de Docker se queda)"
+            [ "$DRY" -eq 1 ] && return 0
+            # (los de Docker de antes, para volver: BBDD y usuario de su copia)
+            [ -z "$(docker_conf "$slug" LAMPP_BD)" ] && docker_conf_set "$slug" BBDD_DOCKER "$(docker_conf "$slug" BBDD)" \
+                && docker_conf_set "$slug" USUARIO_DOCKER "$(docker_conf "$slug" USUARIO)" \
+                && { grep -q '^DB_PASS_DOCKER=' "$dir/.env" || ( umask 077; sed -n 's/^DB_PASS=/DB_PASS_DOCKER=/p' "$dir/.env" >> "$dir/.env" ); }
+            docker_conf_set "$slug" LAMPP_BD "$owner" && docker_conf_set "$slug" BBDD "$db" && docker_conf_set "$slug" USUARIO "$user" || return 1
+            ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; printf 'DB_PASS=%s\n' "$pass"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
+        docker)
+            owner=$(docker_conf "$slug" LAMPP_BD)
+            [ -n "$owner" ] || { echo "$slug ya usa su copia de Docker"; return 0; }
+            [ -n "$(docker_conf "$slug" BBDD_DOCKER)" ] || { echo "$slug no tiene copia en Docker: crea el proyecto de nuevo copiando la BBDD"; return 1; }
+            echo "$slug: vuelve a su copia de Docker ($(docker_conf "$slug" BBDD_DOCKER))"
+            [ "$DRY" -eq 1 ] && return 0
+            docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
+                && docker_conf_set "$slug" LAMPP_BD "" || return 1
+            ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
+        *) echo "Uso: lvm-instalador docker-bd <nombre> lampp <version> | docker"; return 1 ;;
+    esac
+    # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
+    was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
+    for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+    if [ "$was" -gt 0 ]; then
+        docker_web_action arrancar "$slug" || return 1
+        [ "$mode" == docker ] && lampp_bd_release "$owner" "$slug"
+    fi
+    echo "Listo"
+}
+
 # Aviso al parar algo comun (una MariaDB comun, el Apache de Docker o su phpMyAdmin) que usa algun
 # proyecto en marcha: cuales se quedan sin el
 function docker_shared_warn() {
-    local name=$1 up p v="" users=()
-    [[ "$name" =~ ^nexum-(web|pma|mariadb-([0-9]{1,2})-([0-9]{1,2}))$ ]] || return 0
-    [ -n "${BASH_REMATCH[2]}" ] && v=${BASH_REMATCH[2]}.${BASH_REMATCH[3]}
+    local name=$1 up p v="" users=() lampp=""
+    if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+        lampp=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}} v=x
+    else
+        [[ "$name" =~ ^nexum-(web|pma|mariadb-([0-9]{1,2})-([0-9]{1,2}))$ ]] || return 0
+        [ -n "${BASH_REMATCH[2]}" ] && v=${BASH_REMATCH[2]}.${BASH_REMATCH[3]}
+    fi
     up=$(dk ps --format '{{.Names}}' 2> /dev/null) || return 0
     for p in $(docker_web_projects); do
-        [ -n "$v" ] && [ "$(docker_conf "$p" MARIADB)" != "$v" ] && continue
+        if [ -n "$lampp" ]; then
+            [ "$(docker_conf "$p" LAMPP_BD)" == "$lampp" ] || continue
+        elif [ -n "$v" ] && { [ "$(docker_conf "$p" MARIADB)" != "$v" ] || [ -n "$(docker_conf "$p" LAMPP_BD)" ]; }; then
+            continue
+        fi
         grep -qE "^nexum-$p-php[0-9]{2}\$" <<< "$up" && users+=("$(docker_conf "$p" CARPETA)")
     done
     [ ${#users[@]} -eq 0 ] && return 0
@@ -15176,13 +16570,16 @@ function docker_shared_warn() {
 function docker_stop_all() {
     local up names=()
     up=$(dk ps --format '{{.Names}}' 2> /dev/null) || { echo "Docker no responde"; return 1; }
-    mapfile -t names < <(grep -E '^nexum-([a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})|web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2})$' <<< "$up")
+    mapfile -t names < <(grep -E '^nexum-([a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-((php|db|pma)-[0-9]{1,3}|php[0-9]{2})|web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$' <<< "$up")
     if [ ${#names[@]} -eq 0 ]; then
         echo "No hay ningun contenedor de Nexum en marcha"
         return 0
     fi
     echo "Parando ${#names[@]} contenedores de Nexum: ${names[*]}"
     run dk stop "${names[@]}" > /dev/null || return 1
+    # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
+    local f
+    for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }
 
@@ -15246,7 +16643,8 @@ function docker_pass() {
 # direccion publica (https://<algo>.trycloudflare.com, sin cuenta: cambia cada vez). cloudflared abre
 # una conexion de salida a Cloudflare, sin abrir puertos, y lo que llega por ella pasa por un proxy
 # del programa (TUNNEL_PY, solo en 127.0.0.1) antes de llegar a Apache:
-#  - pide una contraseña (la de TUNNEL_CONF, al azar) y se cierra solo pasadas unas horas
+#  - pide una contraseña (la de ese tunel: al azar o la que se elija al abrirlo) y se cierra solo pasadas
+#    las horas que se elijan
 #  - el admin de WordPress o PrestaShop, bloqueado (las BBDD llevan el administrador de pruebas, con
 #    contraseña conocida), y siempre lo de LAMPP para este equipo (phpMyAdmin...): Apache ve las
 #    peticiones del proxy como de 127.0.0.1
@@ -15259,9 +16657,8 @@ TUNNEL_SHA_AMD64="d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99
 TUNNEL_SHA_ARM64="e6422b9d4f72d3194bc5a38676f13667c06666523217b842a877d72a80b5ac08"
 TUNNEL_DIR=$LOG_DIR/tunel
 TUNNEL_BIN=$TUNNEL_DIR/cloudflared
-# CLAVE=, HORAS= (1 a 12) y ADMIN= (bloquear o permitir)
-TUNNEL_CONF=$TUNNEL_DIR/config
-# El tunel abierto (lo escribe TUNNEL_PY al tener su direccion): JSON con pid, url, destino, carpeta y fin
+# El tunel abierto (lo escribe TUNNEL_PY al tener su direccion, solo tuyo): JSON con pid, url, destino,
+# carpeta, fin, su contraseña, sus horas y si bloquea el admin
 TUNNEL_STATE=$TUNNEL_DIR/estado
 TUNNEL_LOG=$TUNNEL_DIR/registro
 
@@ -15317,49 +16714,11 @@ function tunnel_install() {
     echo "cloudflared $TUNNEL_VERSION instalado: $TUNNEL_BIN"
 }
 
-# Valor de TUNNEL_CONF (o el de por defecto, si no esta o no vale)
-function tunnel_conf() {
-    local v
-    v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); v = $0 } END { print v }' "$TUNNEL_CONF" 2> /dev/null)
-    case $1 in
-        CLAVE) [[ "$v" =~ ^[A-Za-z0-9-]{8,64}$ ]] || v="" ;;
-        HORAS) [[ "$v" =~ ^([1-9]|1[0-2])$ ]] || v=2 ;;
-        ADMIN) [ "$v" == permitir ] || v=bloquear ;;
-    esac
-    echo "$v"
-}
-
 # Contraseña nueva, facil de dictar: tres grupos de cuatro letras y numeros sin los que se confunden
 function tunnel_new_pass() {
     local s
     s=$(LC_ALL=C tr -dc 'abcdefghjkmnpqrstuvwxyz23456789' < /dev/urandom | head -c 12)
     echo "${s:0:4}-${s:4:4}-${s:8:4}"
-}
-
-function tunnel_conf_write() {
-    local clave=$1 horas=$2 admin=$3
-    mkdir -p -m 700 "$TUNNEL_DIR" || return 1
-    ( umask 077; printf 'CLAVE=%s\nHORAS=%s\nADMIN=%s\n' "$clave" "$horas" "$admin" > "$TUNNEL_CONF.nuevo" ) \
-        && mv -f "$TUNNEL_CONF.nuevo" "$TUNNEL_CONF"
-}
-
-# tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir: vale para el siguiente tunel
-function tunnel_config() {
-    local clave horas admin
-    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
-    [ -n "$clave" ] || clave=$(tunnel_new_pass)
-    case $1 in
-        clave-nueva) clave=$(tunnel_new_pass); echo "Contraseña nueva para los visitantes del tunel" ;;
-        horas)
-            [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }
-            horas=$2; echo "El tunel se cierra solo a las $horas h de abrirlo" ;;
-        admin)
-            [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "Uso: lvm-instalador tunel-config admin bloquear|permitir"; return 1; }
-            admin=$2; [ "$admin" == bloquear ] && echo "El admin no se puede abrir por el tunel" \
-                || echo "Aviso: el admin se puede abrir por el tunel (y el administrador de pruebas tiene una contraseña conocida)" ;;
-        *) echo "Uso: lvm-instalador tunel-config clave-nueva | horas <1-12> | admin bloquear|permitir"; return 1 ;;
-    esac
-    tunnel_conf_write "$clave" "$horas" "$admin"
 }
 
 # PID del tunel abierto (el de TUNNEL_PY, si sigue vivo y es el)
@@ -15394,16 +16753,28 @@ function tunnel_close() {
     echo "Tunel cerrado: la direccion ya no lleva a ningun sitio"
 }
 
-# tunel-abrir <direccion local> [carpeta del proyecto]: la direccion, de una web de este equipo
-# (http://web.local, https://proyecto-php83.docker.local:8443...); la carpeta, para saber que admin
-# bloquear y el dominio de una tienda PrestaShop. Cierra el que hubiera
+# tunel-abrir <direccion local> [carpeta del proyecto] [--horas 1-12] [--admin bloquear|permitir]: la
+# direccion, de una web de este equipo (http://web.local, https://proyecto-php83.docker.local:8443...); la
+# carpeta, para saber que admin bloquear y el dominio de una tienda PrestaShop. Cada tunel con lo suyo: sus
+# horas (2 si no se dice), el admin (bloqueado si no se dice) y su contraseña, siempre una nueva al azar
+# (la de un tunel no vale para el siguiente). Cierra el que hubiera
 function tunnel_open() {
-    local url=$1 folder=${2%/} scheme host port ip clave horas admin params dir="" domains n url_t
+    local url=$1 folder="" scheme host port ip clave horas=2 admin=bloquear params dir="" domains n url_t
+    shift
+    [ -n "$1" ] && [[ "$1" != --* ]] && { folder=${1%/}; shift; }
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --horas) [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }; horas=$2; shift 2 ;;
+            --admin) [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "--admin bloquear o permitir"; return 1; }; admin=$2; shift 2 ;;
+            *) echo "Opcion desconocida: $1"; return 1 ;;
+        esac
+    done
     if [ -z "$url" ]; then
-        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta del proyecto]"
+        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
 
         return 1
     fi
+    clave=$(tunnel_new_pass)
     if ! [[ "$url" =~ ^(https?)://([A-Za-z0-9.-]+)(:([0-9]{1,5}))?/?$ ]]; then
         echo "$url no es una direccion valida (como http://web.local)"
 
@@ -15438,11 +16809,6 @@ function tunnel_open() {
     if [ -n "$dir" ] && is_prestashop "$(basename "$dir")" 2> /dev/null; then
         n=$(ps_domain "$(basename "$dir")" 2> /dev/null)
         valid_domain "$n" && domains+=" $n"
-    fi
-    clave=$(tunnel_conf CLAVE) horas=$(tunnel_conf HORAS) admin=$(tunnel_conf ADMIN)
-    if [ -z "$clave" ]; then
-        clave=$(tunnel_new_pass)
-        tunnel_conf_write "$clave" "$horas" "$admin" || return 1
     fi
     echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
     echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $horas h)"
@@ -15490,12 +16856,10 @@ json.dump({"scheme": e["T_SCHEME"], "host": e["T_HOST"], "port": int(e["T_PORT"]
 
 # tunel [estado]: para la ventana y la terminal
 #   I|instalado (1/0)|version instalada|version del programa
-#   C|horas|admin
 #   T|url|direccion local|carpeta|fin (epoch)   (si hay uno abierto)
 function tunnel_status() {
     local pid
     echo "I|$(tunnel_installed && echo 1 || echo 0)|$(tunnel_installed_version)|$TUNNEL_VERSION"
-    echo "C|$(tunnel_conf HORAS)|$(tunnel_conf ADMIN)"
     pid=$(tunnel_pid)
     [ -n "$pid" ] && python3 -I -c 'import json, sys
 s = json.load(open(sys.argv[1]))
@@ -15871,7 +17235,8 @@ def write_state(url):
     with os.fdopen(fd, "w") as f:
         json.dump({"pid": os.getpid(), "url": url, "target": "%s://%s" % (P["scheme"], host_header(
             {"scheme": P["scheme"], "host": P["host"], "port": int(P["port"])})), "folder": P["folder"],
-            "expires": EXPIRES, "started": int(time.time())}, f)
+            "expires": EXPIRES, "started": int(time.time()), "password": P["password"], "hours": int(P["hours"]),
+            "admin": P["admin"]}, f)
     os.replace(tmp, STATE)
 
 
@@ -16242,11 +17607,29 @@ function drop_database() {
 # (--skip-grant-tables: solo se llega por un socket en una carpeta temporal) y con los ficheros de
 # esa version (las de XAMPP tienen en su my.cnf y en el RPATH las rutas de /opt/lampp, la version
 # activa: se cambian por las suyas). Deja el socket en DB_TMP_SOCK; db_temp_stop lo para.
+# ¿Responde un MariaDB en ese socket? db_socket_alive <socket>
+function db_socket_alive() {
+    python3 -I -c 'import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(2)
+try:
+    s.connect(sys.argv[1])
+except OSError:
+    sys.exit(1)' "$1" 2> /dev/null
+}
+
 DB_TMP=""
 function db_temp_start() {
     local dir=$1 data=$1/var/mysql server args user grants=(--skip-grant-tables)
     # (con --con-permisos, con sus usuarios: para cargar una base con su usuario lvm_bd_<base>)
     [ "$2" == "--con-permisos" ] && grants=()
+    # Si su MariaDB ya esta en marcha (la arranco Docker, sin red), se usa esa: otra no podria abrir los
+    # mismos datos. DB_TMP se queda vacio: db_temp_stop no la para
+    if db_socket_alive "$data/mysql.sock"; then
+        echo "Se usa el MariaDB que ya esta en marcha para Docker (sin red)"
+        DB_TMP_SOCK=$data/mysql.sock DB_TMP_PID=""
+        return 0
+    fi
     # El dueño de los datos de verdad (-L: si var/mysql es un enlace, el de su destino). Nunca root:
     # un MariaDB de root escribiria como root donde le pidiera una base (DATA DIRECTORY, registros)
     user=$($SUDO stat -L -c %U "$data") || return 1
@@ -18038,12 +19421,20 @@ def docker_slug(folder):
     return s or "proyecto"
 
 
+# Final de los dominios del Apache de Docker (gui-docker, W): docker.local o, con el DNS comodín, docker.test
+DOCKER_TLD = ["docker.local"]
+
+
 def docker_web_domain(p, v):
     """Dominio de una versión de PHP de un proyecto del Apache de Docker (docker_web_domain del script):
-    el de la tienda (uno solo) o <proyecto>-php83.docker.local."""
+    el de la tienda (uno solo) o <proyecto>-php83.docker.local (o .docker.test)."""
     if p.get("kind") == "ps":
-        return "%s.docker.local" % p["slug"]
-    return "%s-php%s.docker.local" % (p["slug"], v.replace(".", ""))
+        return "%s.%s" % (p["slug"], DOCKER_TLD[0])
+    return "%s-php%s.%s" % (p["slug"], v.replace(".", ""), DOCKER_TLD[0])
+
+
+def docker_pma_domain():
+    return "pma." + DOCKER_TLD[0]
 
 
 def copy_name(db, php):
@@ -18449,6 +19840,7 @@ LOGO_PATHS = {
         ".292-0.021,3.99,1.776,4.31,3.446 c0.17,0.888,0.089,1.776-0.103,2.663c-0.112,0.517-0.31,1"
         ".008-0.524,1.492C20.034,12.245,20.043,12.345,20.125,12.473z"
     ),
+    "github": "M 12 0.297 C 5.37 0.297 0 5.67 0 12.297 C 0 17.6 3.438 22.097 8.205 23.682 C 8.805 23.795 9.025 23.424 9.025 23.105 C 9.025 22.82 9.015 22.065 9.01 21.065 C 5.672 21.789 4.968 19.455 4.968 19.455 C 4.422 18.07 3.633 17.7 3.633 17.7 C 2.546 16.956 3.717 16.971 3.717 16.971 C 4.922 17.055 5.555 18.207 5.555 18.207 C 6.625 20.042 8.364 19.512 9.05 19.205 C 9.158 18.429 9.467 17.9 9.81 17.6 C 7.145 17.3 4.344 16.268 4.344 11.67 C 4.344 10.36 4.809 9.29 5.579 8.45 C 5.444 8.147 5.039 6.927 5.684 5.274 C 5.684 5.274 6.689 4.952 8.984 6.504 C 9.944 6.237 10.964 6.105 11.984 6.099 C 13.004 6.105 14.024 6.237 14.984 6.504 C 17.264 4.952 18.269 5.274 18.269 5.274 C 18.914 6.927 18.509 8.147 18.389 8.45 C 19.154 9.29 19.619 10.36 19.619 11.67 C 19.619 16.28 16.814 17.295 14.144 17.59 C 14.564 17.95 14.954 18.686 14.954 19.81 C 14.954 21.416 14.939 22.706 14.939 23.096 C 14.939 23.411 15.149 23.786 15.764 23.666 C 20.565 22.092 24 17.592 24 12.297 C 24 5.67 18.627 0.297 12 0.297",
     "wordpress": (
         "M21.469 6.825c.84 1.537 1.318 3.3 1.318 5.175 0 3.979-2.156 7.456-5.363 9.325l3.295-9.52"
         "7c.615-1.54.82-2.771.82-3.864 0-.405-.026-.78-.07-1.11m-7.981.105c.647-.03 1.232-.105 1."
@@ -18526,7 +19918,8 @@ LOGO_COLORS = {"php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
                "globo": ("#1C71D8", "#62A0EA"), "docker": ("#2496ED", "#4FAEF2"),
-               "mailpit": ("#00A87B", "#2FD3A4"), "cloudflare": ("#F38020", "#F6A35A")}
+               "mailpit": ("#00A87B", "#2FD3A4"), "cloudflare": ("#F38020", "#F6A35A"),
+               "github": ("#181717", "#E6EDF3")}
 _logo_cache = {}
 
 
@@ -18752,6 +20145,7 @@ class ActionRow(Gtk.ListBoxRow):
         self.subtitle.set_no_show_all(not subtitle)
         texts.pack_start(self.subtitle, False, False, 0)
         self.header.pack_start(texts, True, True, 0)
+        self.texts = texts
         self.suffix = Gtk.Box(spacing=8)
         self.header.pack_end(self.suffix, False, False, 0)
         self.set_size_request(-1, 50)
@@ -18876,9 +20270,82 @@ def info_icon(text):
     return ev
 
 
-def group(title=None, description=None):
+class TileGrid(Gtk.Grid):
+    """Las filas de un apartado en tarjetas de dos en dos, como los visores de las otras pestañas: el
+    icono y el título arriba, la explicación debajo (entera) y sus botones abajo a la derecha. add e
+    insert reciben ActionRow, como un ListBox. Una fila con .wide (o la única del apartado) va a lo
+    ancho, en una tarjeta con sus botones a la derecha. columns: las tarjetas por fila (2 de normal)."""
+
+    def __init__(self, columns=2):
+        super().__init__(column_spacing=12, row_spacing=12, column_homogeneous=True, margin_top=6)
+        self.rows, self.columns = [], columns
+
+    def add(self, row):
+        self.insert(row, -1)
+
+    def insert(self, row, pos):
+        if 0 <= pos < len(self.rows):
+            self.rows.insert(pos, row)
+        else:
+            self.rows.append(row)
+        self.layout()
+
+    def tile(self, row, wide):
+        for w in (row.prefix, row.texts, row.suffix):
+            if w.get_parent():
+                w.get_parent().remove(w)
+        for lbl in (row.title, row.subtitle):
+            lbl.set_ellipsize(0)
+            lbl.set_line_wrap(True)
+            lbl.set_xalign(0)
+        row.subtitle.set_max_width_chars(60)
+        css(row.title, "nv-mosaico-titulo")
+        card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "nv-mosaico")
+        if wide:
+            line = Gtk.Box(spacing=12)
+            line.pack_start(row.prefix, False, False, 0)
+            line.pack_start(row.texts, True, True, 0)
+            line.pack_end(row.suffix, False, False, 0)
+            card.pack_start(line, True, True, 0)
+        else:
+            top = Gtk.Box(spacing=10)
+            top.pack_start(row.prefix, False, False, 0)
+            top.pack_start(row.texts, True, True, 0)
+            card.pack_start(top, False, False, 0)
+            bottom = Gtk.Box()
+            bottom.pack_end(row.suffix, False, False, 0)
+            card.pack_end(bottom, False, False, 0)
+        return card
+
+    def layout(self):
+        # (antes de quitar las tarjetas de antes, lo de cada fila fuera de ellas: GTK destruye lo que lleve
+        # dentro una tarjeta que se queda sin dueño)
+        for row in self.rows:
+            for w in (row.prefix, row.texts, row.suffix):
+                if w.get_parent():
+                    w.get_parent().remove(w)
+        for ch in self.get_children():
+            self.remove(ch)
+        r = c = 0
+        for row in self.rows:
+            wide = getattr(row, "wide", False) or len(self.rows) == 1
+            card = self.tile(row, wide)
+            if wide:
+                if c:
+                    r, c = r + 1, 0
+                self.attach(card, 0, r, self.columns, 1)
+                r += 1
+            else:
+                self.attach(card, c, r, 1, 1)
+                c += 1
+                if c == self.columns:
+                    r, c = r + 1, 0
+        self.show_all()
+
+
+def group(title=None, description=None, tiles=False, columns=2):
     """Bloque con titulo (con su simbolo de informacion si hay descripcion) y una lista con
-    bordes redondeados."""
+    bordes redondeados (o, con tiles, sus filas en tarjetas de dos en dos: TileGrid)."""
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     if title or description:
         head = Gtk.Box(spacing=6)
@@ -18887,10 +20354,18 @@ def group(title=None, description=None):
         if description:
             head.pack_start(info_icon(description), False, False, 0)
         box.pack_start(head, False, False, 0)
-    lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
-    lb.connect("row-activated", on_row_activated)
+    if tiles:
+        lb = TileGrid(columns)
+    else:
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
+        lb.connect("row-activated", on_row_activated)
     box.pack_start(lb, False, False, 0)
     return box, lb
+
+
+def tile_group(title=None, description=None, columns=2):
+    """group() con sus filas en tarjetas de dos en dos, o de columns en columns (Configuración)."""
+    return group(title, description, tiles=True, columns=columns)
 
 
 def fold_group(title, description, opened, on_toggle, summary=""):
@@ -19106,6 +20581,13 @@ def script_env(**extra):
     return env
 
 
+def once(callback, *args):
+    """Llama a callback(*args) una sola vez en la interfaz. GLib.idle_add repite la llamada mientras
+    devuelva algo verdadero: un callback que devolviera sus datos se quedaria dando vueltas a toda
+    CPU, tambien despues de cerrar la ventana."""
+    GLib.idle_add(lambda: (callback(*args), False)[1])
+
+
 def run_quick(args, callback, env=None, timeout=180):
     """Comando sin sudo ni preguntas, en segundo plano. callback(rc, salida) en la interfaz."""
     def work():
@@ -19114,9 +20596,22 @@ def run_quick(args, callback, env=None, timeout=180):
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                  env=script_env(**(env or {})), timeout=timeout)
             out = res.stdout.decode("utf-8", "replace")
-            GLib.idle_add(callback, res.returncode, out)
+            once(callback, res.returncode, out)
         except Exception as exc:  # noqa: BLE001 - cualquier fallo se muestra como error
-            GLib.idle_add(callback, 1, "ERROR|%s" % exc)
+            once(callback, 1, "ERROR|%s" % exc)
+    threading.Thread(target=work, daemon=True).start()
+
+
+def run_quick_input(args, text, callback, timeout=60):
+    """Como run_quick, con text por la entrada del comando (un token: en la línea de órdenes se vería
+    con ps)."""
+    def work():
+        try:
+            res = subprocess.run(script_cmd(*args), input=text.encode(), stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, env=script_env(), timeout=timeout)
+            once(callback, res.returncode, res.stdout.decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001 - cualquier fallo se muestra como error
+            once(callback, 1, "ERROR|%s" % exc)
     threading.Thread(target=work, daemon=True).start()
 
 
@@ -19217,7 +20712,7 @@ class UsageMeter:
     compartido."""
 
     def __init__(self):
-        self.prev, self.when = {}, None
+        self.prev, self.when, self.known = {}, None, {}
         self.tick = os.sysconf("SC_CLK_TCK")
         self.page = os.sysconf("SC_PAGE_SIZE")
         self.cpus = os.cpu_count() or 1
@@ -19238,19 +20733,27 @@ class UsageMeter:
 
     def sample(self):
         own = os.getpid()
-        procs = {}
+        procs, known, seen = {}, self.known, {}
         for name in os.listdir("/proc"):
             if not name.isdigit():
                 continue
             pid = int(name)
             stat = self.read("/proc/%d/stat" % pid)
-            raw = self.read("/proc/%d/cmdline" % pid, "rb")
-            if stat is None or raw is None:
+            if stat is None:
                 continue
             f = stat[stat.rfind(")") + 2:].split()
-            argv = [a.decode("utf-8", "replace") for a in raw.split(b"\0") if a]
-            procs[pid] = {"ppid": int(f[1]), "cpu": int(f[11]) + int(f[12]), "argv": argv,
-                          "group": usage_group(pid, argv, self.read("/proc/%d/cgroup" % pid) or "", own)}
+            # (su orden y su parte no cambian: se leen una vez por proceso, con su hora de inicio)
+            key = (pid, f[19])
+            if key not in known:
+                raw = self.read("/proc/%d/cmdline" % pid, "rb")
+                if raw is None:
+                    continue
+                argv = [a.decode("utf-8", "replace") for a in raw.split(b"\0") if a]
+                known[key] = (argv, usage_group(pid, argv, self.read("/proc/%d/cgroup" % pid) or "", own))
+            argv, group = known[key]
+            seen[key] = known[key]
+            procs[pid] = {"ppid": int(f[1]), "cpu": int(f[11]) + int(f[12]), "argv": argv, "group": group}
+        self.known = seen
         # Los hijos van con su padre (los PHP-FPM de LAMPP, las tareas de la ventana: solo las suyas)
         for pid, pr in procs.items():
             q, depth = pr["ppid"], 0
@@ -19318,21 +20821,6 @@ def tunnel_state():
         return st if st.get("url") and int(st.get("expires", 0)) > time.time() else None
     except (OSError, ValueError, KeyError, TypeError):
         return None
-
-
-def tunnel_conf():
-    """CLAVE, HORAS y ADMIN del túnel (tunel-config); la contraseña, vacía hasta el primero."""
-    conf = {"CLAVE": "", "HORAS": "2", "ADMIN": "bloquear"}
-    try:
-        with open(os.path.join(LOG_DIR, "tunel", "config"), encoding="utf-8", errors="replace") as fh:
-            for line in fh.read(2000).splitlines():
-                k, _, v = line.partition("=")
-                if k == "CLAVE" and re.fullmatch(r"[A-Za-z0-9-]{8,64}", v) or k == "HORAS" and re.fullmatch(r"[1-9]|1[0-2]", v) \
-                        or k == "ADMIN" and v in ("bloquear", "permitir"):
-                    conf[k] = v
-    except OSError:
-        pass
-    return conf
 
 
 def project_admin(folder):
@@ -20850,6 +22338,15 @@ class App(Gtk.Application):
                                        "y ::1): los demás equipos de la red no ven los proyectos "
                                        "ni las BBDD.")
         head.pack_end(badge, False, False, 0)
+        # (en la ventana nueva, arrancar o parar la version entera: lo que hacia el boton Encendidos)
+        if hasattr(self, "nv_power"):
+            on = d["running"]
+            b = Gtk.Button(label="Parar y desactivar" if on else "Arrancar lampp-%s" % d["active"],
+                           valign=Gtk.Align.CENTER, sensitive=not self.busy)
+            if not on:
+                css(b, "verde")
+            b.connect("clicked", lambda *_: (self.services_pop.popdown(), self.nv_power()))
+            head.pack_end(b, False, False, 0)
         self.services_box.pack_start(head, False, False, 0)
 
         info = {"apache": ("Apache", "Servidor web: las webs de /opt/htdocs y phpMyAdmin (con PHP)",
@@ -21306,7 +22803,7 @@ class App(Gtk.Application):
             row.add_suffix(b)
             lb.add(row)
 
-        box, lb = group("Configuración",
+        box, lb = tile_group("Configuración",
                         "Los vhosts y los hosts del sistema son del administrador: se edita una "
                         "copia y se aplica con Aplicar (pide la contraseña).")
         add_row(lb, "Virtual hosts", d["vhosts"], "Editar…", self.on_vhosts)
@@ -21314,13 +22811,13 @@ class App(Gtk.Application):
         self.tools_box.pack_start(box, False, False, 0)
 
         if d["unregistered"]:
-            box, lb = group("XAMPP sin registrar",
+            box, lb = tile_group("XAMPP sin registrar",
                             "/opt/lampp es una instalación de XAMPP completa y no un enlace.")
             add_row(lb, "XAMPP en /opt/lampp", "Regístralo con un nombre para gestionarlo junto a "
                     "las demás versiones", "Registrar…", self.on_register)
             self.tools_box.pack_start(box, False, False, 0)
 
-        box, lb = group("Carpetas")
+        box, lb = tile_group("Carpetas")
         add_row(lb, "Proyectos", "/opt/htdocs, compartida por todas las versiones", "Abrir",
                 lambda: self.open_uri(GLib.filename_to_uri("/opt/htdocs")))
         copies = os.path.expanduser("~/lvm-copias")
@@ -21334,7 +22831,7 @@ class App(Gtk.Application):
 
         self.build_error_logs(add_row)
 
-        box, lb = group("Programa")
+        box, lb = tile_group("Programa")
         add_row(lb, "Buscar una versión nueva", "Busca en GitHub (y en Descargas) una versión más "
                 "nueva, firmada, y la instala", "Buscar", lambda: self.check_package(manual=True))
         add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Dev Stack» "
@@ -21342,7 +22839,7 @@ class App(Gtk.Application):
                 self.on_create_launcher)
         self.tools_box.pack_start(box, False, False, 0)
 
-        box, lb = group("Información")
+        box, lb = tile_group("Información")
         add_row(lb, "Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace "
                 "cada uno", "Ver", self.on_commands)
         add_row(lb, "Novedades", "Qué ha cambiado en cada versión", "Ver", self.on_changes)
@@ -21415,7 +22912,7 @@ class App(Gtk.Application):
     def build_error_logs(self, add_row):
         """Los registros de errores de la versión montada: el del vhost del proyecto cargado
         (web.local), donde van los errores de PHP de la web, y el general de Apache."""
-        box, lb = group("Registro de errores",
+        box, lb = tile_group("Registro de errores",
                         "Si la web cargada da un error (el «error crítico» de WordPress), el motivo "
                         "está en el registro de su vhost: ahí van los errores de PHP. Los de Apache "
                         "(que no arranca, un vhost mal escrito…), en el general. Lo más reciente "
@@ -21639,17 +23136,27 @@ class App(Gtk.Application):
                                vhomogeneous=False, interpolate_size=True)
         outer.pack_start(w["stack"], False, False, 0)
 
-        # 1. Repositorio y carpeta
+        # 1. Repositorio y carpeta: de los de GitHub (pestaña Repositorios) o la dirección de otro
         p1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        p1.pack_start(label("Dirección del repositorio (GitHub u otro):"), False, False, 0)
+        p1.pack_start(label("¿De qué repositorio de GitHub? (escribe parte de su nombre)"), False, False, 0)
+        w["repo"] = Gtk.Entry(placeholder_text="dob-wordpress-…", primary_icon_name="system-search-symbolic")
+        w["repo_store"] = Gtk.ListStore(str, str, str)
+        comp = Gtk.EntryCompletion(model=w["repo_store"], text_column=0, minimum_key_length=2, popup_set_width=True)
+        comp.set_match_func(lambda c, key, it, *_: key.lower() in (c.get_model()[it][0] or "").lower())
+        comp.connect("match-selected", lambda c, m, it: (self.new_project_repo(m[it][0], m[it][1], m[it][2]), False)[1])
+        w["repo"].set_completion(comp)
+        p1.pack_start(w["repo"], False, False, 0)
+        w["repo_note"] = label("", "dim-label", wrap=True)
+        p1.pack_start(w["repo_note"], False, False, 0)
+        p1.pack_start(label("o la dirección de otro repositorio (GitHub u otro servidor):"), False, False, 0)
         w["url"] = Gtk.Entry(placeholder_text="https://github.com/usuario/repositorio.git")
         p1.pack_start(w["url"], False, False, 0)
         p1.pack_start(label("Carpeta en /opt/htdocs:"), False, False, 0)
         w["folder"] = Gtk.Entry(placeholder_text="nombre-del-proyecto")
         p1.pack_start(w["folder"], False, False, 0)
-        p1.pack_start(label("Se clona con tu usuario (sin sudo). Si el repositorio es privado, usa "
-                            "su dirección SSH (git@github.com:usuario/repositorio.git) con tu clave "
-                            "SSH ya configurada.", "dim-label", wrap=True), False, False, 0)
+        p1.pack_start(label("Se clona con tu usuario (sin sudo). Los de la lista, por SSH con tu clave; "
+                            "una dirección https de un privado de GitHub, GitLab o Bitbucket se prueba sola "
+                            "por SSH.", "dim-label", wrap=True), False, False, 0)
         w["err1"] = label("", "aviso-rojo", wrap=True)
         p1.pack_start(w["err1"], False, False, 0)
         w["stack"].add_named(p1, "1")
@@ -21701,6 +23208,26 @@ class App(Gtk.Application):
         p3.pack_start(w["err3"], False, False, 0)
         w["stack"].add_named(p3, "3")
 
+        # 4. El dominio de producción: falsearlo en este equipo (como en Dominios y hosts) o no
+        p4 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        row4 = Gtk.Box(spacing=10)
+        row4.pack_start(label("¿Falsear su dominio de producción en este equipo?", valign=Gtk.Align.CENTER), False, False, 0)
+        w["fake"] = Gtk.Switch(active=False, valign=Gtk.Align.CENTER)
+        w["fake"].connect("notify::active", lambda *_: self.new_project_check())
+        row4.pack_end(w["fake"], False, False, 0)
+        p4.pack_start(row4, False, False, 0)
+        p4.pack_start(label("Dominio de producción:"), False, False, 0)
+        w["domain"] = Gtk.Entry(placeholder_text="midominio.com")
+        w["domain"].connect("changed", lambda *_: self.new_project_check())
+        p4.pack_start(w["domain"], False, False, 0)
+        p4.pack_start(label("Falseado, el navegador abre el proyecto en local con su dominio de verdad (con su "
+                            "certificado), como en Dominios y hosts: lo que necesitan las tiendas PrestaShop y "
+                            "los WordPress con el dominio en su BBDD. Si no, se abre en web.local.",
+                            "dim-label", wrap=True), False, False, 0)
+        w["err4"] = label("", "aviso-rojo", wrap=True)
+        p4.pack_start(w["err4"], False, False, 0)
+        w["stack"].add_named(p4, "4")
+
         # Botones: Cancelar a la izquierda; Atrás y Siguiente (o Montar proyecto) a la derecha
         nav = Gtk.Box(spacing=8)
         cancel = Gtk.Button(label="Cancelar")
@@ -21718,6 +23245,11 @@ class App(Gtk.Application):
     def toggle_new_project(self, show):
         w = self.np
         if show:
+            w["repo"].set_text("")
+            w["repo_note"].set_label("")
+            w["fake"].set_active(False)
+            w["domain"].set_text("")
+            self.new_project_repos()
             w["url"].set_text("")
             w["folder"].set_text("")
             w["folder_auto"] = True
@@ -21734,7 +23266,7 @@ class App(Gtk.Application):
         self.new_proj_rev.set_reveal_child(show)
         self.proj_new_btn.set_sensitive(not show)
         if show:
-            GLib.idle_add(w["url"].grab_focus)
+            GLib.idle_add(w["repo"].grab_focus)
 
     def new_project_page(self):
         return int(self.np["stack"].get_visible_child_name() or "1")
@@ -21743,11 +23275,11 @@ class App(Gtk.Application):
         """Comprueba el paso en el que está el asistente: activa Siguiente y explica lo que falta."""
         w = self.np
         page = self.new_project_page()
-        titles = {1: "Paso 1 de 3: clonar el repositorio", 2: "Paso 2 de 3: versión de PHP",
-                  3: "Paso 3 de 3: BBDD nueva"}
+        titles = {1: "Paso 1 de 4: el repositorio", 2: "Paso 2 de 4: versión de PHP",
+                  3: "Paso 3 de 4: BBDD nueva", 4: "Paso 4 de 4: dominio de producción"}
         w["step"].set_label(titles[page])
         w["back"].set_visible(page > 1)
-        w["next"].set_label("Montar proyecto" if page == 3 else "Siguiente")
+        w["next"].set_label("Montar proyecto" if page == 4 else "Siguiente")
         ok, err = True, ""
         if page == 1:
             url, folder = w["url"].get_text().strip(), w["folder"].get_text().strip()
@@ -21778,12 +23310,20 @@ class App(Gtk.Application):
                 ok, err = False, "lampp-%s ya tiene una BBDD %s: elige otro nombre" % (w["version"], db)
             w["err3"].set_label(err)
             w["err3"].set_visible(bool(err))
+        if page == 4:
+            dom = w["domain"].get_text().strip().lower()
+            w["domain"].set_sensitive(w["fake"].get_active())
+            ok, err = True, ""
+            if w["fake"].get_active() and not re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", dom):
+                ok, err = False, ("Dominio no válido (por ejemplo: midominio.com)" if dom else "")
+            w["err4"].set_label(err)
+            w["err4"].set_visible(bool(err))
         w["next"].set_sensitive(ok and not self.busy)
 
     def new_project_go(self, step):
         w = self.np
         page = self.new_project_page() + step
-        if page == 4:
+        if page == 5:
             self.new_project_run()
             return
         page = max(1, page)
@@ -21821,14 +23361,52 @@ class App(Gtk.Application):
         version, db = w["version"], w["db"].get_text().strip()
         dump = w["file"].get_filename() or ""
         args = ["montar-proyecto", url, folder, version, db] + ([dump] if dump else [])
+        domain = w["domain"].get_text().strip().lower() if w["fake"].get_active() else ""
+
+        def faked(ok, *_):
+            if ok:
+                self.toast("%s, con %s falseado en este equipo" % (folder, domain))
 
         def done(ok, *_):
             if ok:
                 self.toggle_new_project(False)
                 self.toast("Proyecto nuevo montado: %s en lampp-%s con la BBDD %s" % (folder, version, db))
+                # (después, si se ha pedido, su dominio de producción falseado)
+                if domain:
+                    GLib.idle_add(lambda: self.run_task("Falseando %s para %s" % (domain, folder),
+                                                        ["nuevo-dominio", domain, folder], auto_close=True,
+                                                        done_text="%s falseado: se abre en local" % domain,
+                                                        on_done=faked) and False)
         self.run_task("Montando el proyecto %s" % folder, args,
                       done_text="%s está clonado, cargado en lampp-%s y con su BBDD %s" % (folder, version, db),
                       on_done=done)
+
+    def new_project_repo(self, full, web, kind):
+        """Repositorio elegido de la lista de GitHub: su dirección SSH (con tu clave), su carpeta y, si su web
+        es la de producción, su dominio para el paso 4 (y, en una tienda, falsearlo)."""
+        w = self.np
+        w["url"].set_text("git@github.com:%s.git" % full)
+        dom = re.sub(r"^https?://", "", (web or "").strip().lower()).split("/")[0].split(":")[0]
+        if re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", dom):
+            w["domain"].set_text(dom)
+            w["fake"].set_active(kind == "ps")
+        w["repo_note"].set_label("Se clona por SSH, con tu clave: git@github.com:%s.git%s" % (
+            full, ("  ·  web: %s" % dom) if dom else ""))
+
+    def new_project_repos(self):
+        """La lista de repositorios de GitHub para el paso 1 (la de la última vez: al momento)."""
+        def got(_rc, out):
+            store = self.np["repo_store"]
+            store.clear()
+            for f in parse_lines(out):
+                if f[0] == "R" and len(f) >= 11:
+                    kind = "ps" if "prestashop" in f[6] + f[2] else "wp" if "wordpress" in f[6] + f[2] else ""
+                    store.append([f[1], f[7], kind])
+            n = len(store)
+            self.np["repo_note"].set_label(("%d repositorios de GitHub (los de la pestaña Repositorios)" % n) if n else
+                                           "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo")
+            return False
+        run_quick(["repos", "--cache"], got)
 
     def on_unload_project(self):
         p = self.projects
@@ -23544,9 +25122,13 @@ class App(Gtk.Application):
                 web = len(f) >= 13 and f[9] == "web"
                 d["projects"].append({"slug": f[1], "folder": f[2], "php": f[3], "maria": f[4],
                                       "domain": f[5], "state": f[6], "db": f[7], "pma": f[8], "web": web,
-                                      "kind": f[11] if web else "", "versions": f[12].split() if web else [f[3]]})
+                                      "kind": f[11] if web else "", "versions": f[12].split() if web else [f[3]],
+                                      "lampp": f[13] if web and len(f) > 13 else ""})
             elif f[0] == "W" and len(f) >= 6:
-                d["web"] = {"ip": f[1], "http": f[2], "https": f[3], "state": f[4], "ports_ok": f[5] == "1"}
+                d["web"] = {"ip": f[1], "http": f[2], "https": f[3], "state": f[4], "ports_ok": f[5] == "1",
+                            "tld": f[6] if len(f) > 6 and f[6] in ("docker.local", "docker.test") else "docker.local",
+                            "dns": len(f) > 7 and f[7] == "1"}
+                DOCKER_TLD[0] = d["web"]["tld"]
             elif f[0] == "C" and len(f) >= 7:
                 d["containers"].append({"name": f[1], "image": f[2], "state": f[3], "status": f[4],
                                         "ports": f[5], "project": f[6], "id": f[7][:12] if len(f) > 7 else ""})
@@ -23946,6 +25528,7 @@ class App(Gtk.Application):
             self.imp["project"] = guess_project(self.imp["db"], self.data["active"] if self.data else None) or self.imp["project"]
             self.imp["project_for"] = self.imp["db"]
         self.imp_proj_row = ActionRow("Proyecto", self.import_project_hint())
+        self.imp_proj_hint = self.imp_proj_row.subtitle
         # Ancho del nombre más largo (hasta 56 letras), para verlo entero al elegirlo
         combo = narrow(Gtk.ComboBoxText(valign=Gtk.Align.CENTER),
                        min(56, max([COMBO_CHARS] + [len(n) for n in folders])))
@@ -24028,7 +25611,7 @@ class App(Gtk.Application):
         folder = combo.get_active_id()
         self.imp["project"] = None if folder in (None, "@ninguno") else folder
         self.imp["project_for"] = self.imp["db"]
-        self.imp_proj_row.subtitle.set_label(self.import_project_hint())
+        self.imp_proj_hint.set_label(self.import_project_hint())
 
     def on_pick_db(self, combo):
         db = combo.get_active_id()
@@ -24397,12 +25980,26 @@ NEW_CSS = """
 .nv-nav row:hover { background-color: alpha(@theme_fg_color, 0.06); }
 .nv-nav row:selected { background-color: %(b)s; color: white; }
 .nv-nav row:selected label, .nv-nav row:selected image { color: white; }
+/* Configuración: la columna de sus apartados */
+.nv-subnav-caja { background-color: alpha(@theme_fg_color, 0.035); border: 1px solid alpha(@theme_fg_color, 0.08);
+                  border-radius: 12px; padding: 6px 0; }
+.nv-subnav row { padding: 9px 12px; margin: 1px 6px; border-radius: 8px; }
 /* Barra de arriba mas alta, y el recuadro de la version montada, hundido (como una pantallita) */
 headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
 .nv-pastilla { background-color: shade(@theme_bg_color, 0.78); border: 1px solid alpha(black, 0.25); border-radius: 12px;
                padding: 3px 4px; box-shadow: inset 0 2px 4px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.10),
                0 1px 0 alpha(white, 0.06); }
 .nv-pastilla button { border: none; background: transparent; box-shadow: none; }
+.nv-pastilla button.nv-servicios { border-radius: 8px; padding: 2px 8px; }
+.nv-pastilla button.nv-servicios:hover, .nv-pastilla button.nv-servicios:checked { background-color: alpha(@theme_fg_color, 0.10); }
+/* Subir o actualizar una BBDD: un visor un poco hundido, como el de arriba */
+.nv-hundido { background-color: shade(@theme_bg_color, 0.86); border: 1px solid alpha(black, 0.20); border-radius: 12px;
+              box-shadow: inset 0 2px 6px alpha(black, 0.35), inset 0 0 0 1px alpha(black, 0.10); padding: 14px 16px; }
+.nv-hundido-titulo { font-weight: bold; }
+.nv-terminal { background-color: shade(@theme_bg_color, 0.78); border: 1px solid alpha(black, 0.25); border-radius: 12px;
+               box-shadow: inset 0 2px 7px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.15); margin: 12px 14px 12px 14px;
+               padding: 10px 10px 10px 10px; }
+.nv-terminal-vte { border-radius: 8px; }
 .nv-sep { background-color: alpha(@theme_fg_color, 0.15); min-width: 1px; margin: 6px 2px; }
 .nv-verde { color: %(g)s; }
 .nv-gris { color: alpha(@theme_fg_color, 0.3); }
@@ -24444,6 +26041,9 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-fila { padding: 8px 14px; }
 .nv-cab label { font-size: 0.76em; font-weight: bold; color: alpha(@theme_fg_color, 0.45); }
 .nv-tarjeta { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 14px; padding: 20px 22px; }
+/* (Configuración: cada ajuste en su tarjeta, de dos en dos) */
+.nv-mosaico { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 12px; padding: 14px 16px; }
+.nv-mosaico-titulo { font-weight: 600; }
 .nv-etiqueta { font-size: 0.78em; padding: 1px 8px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.07); color: alpha(@theme_fg_color, 0.75); }
 .nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
 .nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
@@ -24698,15 +26298,21 @@ class App2(App):
         self.page_hosts, self.hosts_box = new_page()
         self.page_docker, self.docker_box = new_page(940)
         self.page_projects, self.proj_page = new_page(940)
+        self.page_repos, self.repos_page = new_page(940)
+        self.repos, self.repos_all, self.github = None, False, None
         self.page_vers, self.vers_page = new_page(900)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
-        for name, w in [("proyectos", self.page_projects), ("versiones", self.page_vers),
+        for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
                         ("bbdd", self.page_dbs), ("docker", self.page_docker),
                         ("dominios", self.page_hosts), ("config", self.page_tools)]:
             self.stack.add_named(w, name)
         body = Gtk.Box()
         body.pack_start(self.nv_sidebar(), False, False, 0)
-        body.pack_start(self.stack, True, True, 0)
+        # (el contenido arriba y, abajo, la terminal: se cambia de alto arrastrando el borde)
+        self.term_paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        self.term_paned.pack1(self.stack, True, False)
+        self.term_paned.pack2(self.nv_term_panel(), False, False)
+        body.pack_start(self.term_paned, True, True, 0)
         overlay = Gtk.Overlay()
         overlay.add(body)
         overlay.add_overlay(self.build_toast())
@@ -24728,6 +26334,8 @@ class App2(App):
             return True
         if self.update_check_due():
             self.check_package(auto=True)
+            # (y los parches de los componentes, un poco después: sin juntarse con el aviso del programa)
+            GLib.timeout_add_seconds(25, self.nv_components_auto)
         return False
 
     def update_check_due(self):
@@ -24805,8 +26413,8 @@ class App2(App):
         pop.add(mbox)
         mb.set_popover(pop)
         self.menu_btn = mb
-        # Recuadro de la version montada: el logotipo de PHP y su version, Apache y MariaDB con su punto
-        # (verde si estan en marcha), encender o apagar y, en la flecha, sus servicios
+        # Recuadro de la version montada: el logotipo de PHP y su version y Apache y MariaDB con su punto
+        # (verde si estan en marcha); al pulsar en ellos, sus servicios (arrancarlos, pararlos...)
         pill = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-pastilla")
         pill.pack_start(Gtk.Box(), False, False, 4)
         pill.pack_start(logo("php", 18), False, False, 0)
@@ -24815,12 +26423,19 @@ class App2(App):
         self.status_sub = label("", "nv-tenue", "nv-mono", "nv-chico")
         pill.pack_start(self.status_sub, False, False, 0)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
+        self.status_btn = css(Gtk.MenuButton(tooltip_text="Servicios de la versión activa: arrancarlos, pararlos o "
+                                             "reiniciarlos"), "nv-servicios")
+        sbox = Gtk.Box(spacing=8)
         self.svc_dots = {}
         for name in ("Apache", "MariaDB"):
             dt = nv_dot(False)
             self.svc_dots[name] = dt
-            pill.pack_start(dt, False, False, 0)
-            pill.pack_start(label(name, "nv-chico"), False, False, 0)
+            sbox.pack_start(dt, False, False, 0)
+            sbox.pack_start(label(name, "nv-chico"), False, False, 0)
+        self.status_btn.add(sbox)
+        self.services_pop = Gtk.Popover(relative_to=self.status_btn)
+        self.status_btn.set_popover(self.services_pop)
+        pill.pack_start(self.status_btn, False, False, 0)
         # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,
@@ -24829,13 +26444,7 @@ class App2(App):
         self.usage = UsageMeter()
         self.nv_usage_tick()
         GLib.timeout_add_seconds(3, self.nv_usage_tick)
-        self.power_btn = nv_button("system-shutdown-symbolic", "…", None, lambda *_: self.nv_power())
-        pill.pack_start(self.power_btn, False, False, 2)
-        self.status_btn = Gtk.MenuButton(tooltip_text="Servicios de la versión activa")
-        self.status_btn.add(icon("pan-down-symbolic"))
-        self.services_pop = Gtk.Popover(relative_to=self.status_btn)
-        self.status_btn.set_popover(self.services_pop)
-        pill.pack_start(self.status_btn, False, False, 0)
+        pill.pack_start(Gtk.Box(), False, False, 2)
         self.warn_btn = Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE)
         wb = Gtk.Box(spacing=4)
         wb.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
@@ -24860,10 +26469,17 @@ class App2(App):
         center.pack_start(pill, False, False, 0)
         center.pack_start(self.menu_btn, False, False, 0)
         hb.set_custom_title(center)
-        # (phpMyAdmin ya está en la pestaña Bases de datos)
-        hb.pack_end(nv_button("web-browser-symbolic", "Localhost", "Abrir http://localhost/",
-                              lambda *_: self.open_uri("http://localhost/"), flat=True))
-        # Correo de pruebas: la bandeja de Mailpit, plano como Localhost y con los correos sin leer (se
+        # Terminal: la de abajo de la ventana, que se enseña y se esconde (en lugar de Localhost; phpMyAdmin
+        # ya está en la pestaña Bases de datos)
+        self.term_btn = Gtk.ToggleButton(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER,
+                                         tooltip_text="Enseñar o esconder la terminal, abajo de la ventana")
+        tbox = Gtk.Box(spacing=6)
+        tbox.pack_start(icon("utilities-terminal-symbolic", 16), False, False, 0)
+        tbox.pack_start(Gtk.Label(label="Terminal"), False, False, 0)
+        self.term_btn.add(tbox)
+        self.term_btn.connect("toggled", lambda b: self.nv_term_show(b.get_active()))
+        hb.pack_end(self.term_btn)
+        # Correo de pruebas: la bandeja de Mailpit, plano como Terminal y con los correos sin leer (se
         # pregunta solo con la ventana activa). Con el correo de pruebas apagado no sale
         self.mail_btn = Gtk.Button(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER)
         mbox = Gtk.Box(spacing=6)
@@ -24879,6 +26495,119 @@ class App2(App):
         self.mail_btn.set_no_show_all(True)
         hb.pack_end(self.mail_btn)
         return hb
+
+    # ------------------------------------------------------------------ terminal (abajo de la ventana)
+    def nv_term_panel(self):
+        """La terminal de abajo: con el aspecto del visor de arriba, un poco hundida. La de verdad (VTE, la de
+        la Terminal de GNOME) se crea la primera vez que se enseña; sigue viva al esconderla."""
+        box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6), "nv-terminal")
+        box.set_size_request(-1, 120)
+        head = Gtk.Box(spacing=8)
+        head.pack_start(icon("utilities-terminal-symbolic", 14), False, False, 0)
+        head.pack_start(label("Terminal", "nv-chico"), False, False, 0)
+        self.term_where = label("", "nv-chico", "nv-tenue")
+        self.term_where.set_ellipsize(2)  # Pango.EllipsizeMode.MIDDLE
+        head.pack_start(self.term_where, True, True, 0)
+        b = nv_button("folder-symbolic", "Proyecto cargado", "Ir a la carpeta del proyecto cargado (cd)",
+                      lambda *_: self.nv_term_cd(), flat=True)
+        head.pack_end(nv_button("window-close-symbolic", None, "Esconder la terminal (sigue abierta)",
+                                lambda *_: self.term_btn.set_active(False), flat=True), False, False, 0)
+        head.pack_end(nv_button("view-refresh-symbolic", None, "Terminal nueva (cierra la de ahora)",
+                                lambda *_: self.nv_term_spawn(restart=True), flat=True), False, False, 0)
+        head.pack_end(b, False, False, 0)
+        box.pack_start(head, False, False, 0)
+        self.term_slot = Gtk.Box()
+        box.pack_start(self.term_slot, True, True, 0)
+        box.show_all()
+        box.set_no_show_all(True)
+        box.hide()
+        self.term_panel, self.term = box, None
+        return box
+
+    def nv_term_show(self, on):
+        if on:
+            if self.term is None and not self.nv_term_spawn():
+                self.term_btn.set_active(False)
+                return
+            first = not self.term_panel.get_visible()
+            self.term_panel.show()
+            if first:
+                # (un tercio de la ventana, como poco 220 px)
+                h = self.term_paned.get_allocated_height()
+                self.term_paned.set_position(max(200, h - max(220, h // 3)))
+            self.term.grab_focus()
+        else:
+            self.term_panel.hide()
+
+    def nv_term_project(self):
+        p = self.projects or {}
+        cur = (p.get("current") or "").rstrip("/")
+        return cur if cur and os.path.isdir(cur) else HTDOCS
+
+    def nv_term_spawn(self, restart=False):
+        """La terminal: tu shell, con tu usuario, en la carpeta del proyecto cargado (o de los proyectos)."""
+        try:
+            gi.require_version("Vte", "2.91")
+            from gi.repository import Pango, Vte
+        except (ValueError, ImportError):
+            message(self.win, "Falta la terminal de GNOME (VTE)",
+                    "Para la terminal de la ventana hace falta su componente. En una terminal:\n\n"
+                    "sudo apt install gir1.2-vte-2.91", Gtk.MessageType.INFO)
+            return False
+        if self.term is not None:
+            if not restart:
+                return True
+            self.term_slot.remove(self.term)
+            self.term.destroy()
+            self.term = None
+        t = css(Vte.Terminal(), "nv-terminal-vte")
+        t.set_scrollback_lines(10000)
+        t.set_font(Pango.FontDescription("Monospace 10.5"))
+        bg, fg = Gdk.RGBA(), Gdk.RGBA()
+        bg.parse("#1D2228")
+        fg.parse("#D7DEE6")
+        # (colores que se leen bien sobre el fondo oscuro del visor: el azul de las carpetas, más claro)
+        palette = []
+        for c in ("#1D2228", "#E06C75", "#98C379", "#E5C07B", "#61AFEF", "#C678DD", "#56B6C2", "#D7DEE6",
+                  "#5C6370", "#EF8A92", "#B5DC97", "#F0D49B", "#8CC8F7", "#DDA3EC", "#7FD3DD", "#FFFFFF"):
+            rgba = Gdk.RGBA()
+            rgba.parse(c)
+            palette.append(rgba)
+        t.set_colors(fg, bg, palette)
+        t.set_hexpand(True)
+        t.set_vexpand(True)
+        # (al terminar el shell, se esconde; al volver a enseñarla, otra nueva)
+        t.connect("child-exited", lambda *_: GLib.idle_add(self.nv_term_exited))
+        cwd = self.nv_term_project()
+        import pwd
+        shell = os.environ.get("SHELL") or pwd.getpwuid(os.getuid()).pw_shell or "/bin/bash"
+        if not os.path.isabs(shell) or not os.access(shell, os.X_OK):
+            shell = "/bin/bash"
+        t.spawn_async(Vte.PtyFlags.DEFAULT, cwd, [shell], None, GLib.SpawnFlags.DEFAULT, None, None, -1, None, None)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        sw.add(t)
+        self.term_slot.pack_start(sw, True, True, 0)
+        sw.show_all()
+        self.term, self.term_sw = sw, t
+        self.term_where.set_label(cwd)
+        return True
+
+    def nv_term_exited(self):
+        if self.term is not None:
+            self.term_slot.remove(self.term)
+            self.term.destroy()
+            self.term = None
+        self.term_btn.set_active(False)
+        return False
+
+    def nv_term_cd(self):
+        """cd a la carpeta del proyecto cargado (escrito en la terminal, como si lo tecleara)."""
+        if self.term is None:
+            return
+        cwd = self.nv_term_project()
+        self.term_sw.feed_child(("cd %s\n" % shlex.quote(cwd)).encode())
+        self.term_where.set_label(cwd)
+        self.term_sw.grab_focus()
 
     def nv_theme(self):
         """Claro u oscuro, solo en esta ventana (se recuerda). Con un tema que ya es oscuro de por si
@@ -24944,6 +26673,7 @@ class App2(App):
         box.set_size_request(230, -1)
         self.tabs, self.tab_lists = {}, []
         for group_name, items in [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"),
+                                                ("repos", "Repositorios", "logo:github"),
                                                 ("versiones", "Versiones de PHP", "logo:php"),
                                                 ("bbdd", "Bases de datos", "drive-multidisk-symbolic"),
                                                 ("docker", "Docker", "logo:docker")]),
@@ -24990,6 +26720,8 @@ class App2(App):
             run_quick(["gui-docker-estadisticas"], self.on_docker_stats)
         elif row.tab_name == "bbdd":
             run_quick(["gui-bbdd-tamanos"], self.on_db_sizes)
+        elif row.tab_name == "repos":
+            self.nv_repos_open()
 
     def on_tick(self):
         res = super().on_tick()
@@ -25058,7 +26790,7 @@ class App2(App):
     def nv_open_mail(self):
         m = self.nv_mail()
         if not m.get("installed"):
-            self.show_tab("config")
+            self.nv_tools_show("Correo de pruebas (Mailpit)")
             self.toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
         elif not m.get("running"):
             self.toast("Mailpit arranca con la versión activa: arráncala arriba")
@@ -25071,12 +26803,14 @@ class App2(App):
         m = self.nv_mail()
         if not m:
             return
-        box, lb = group("Correo de pruebas (Mailpit)",
+        box, lb = tile_group("Correo de pruebas (Mailpit)", columns=3,
+                        description=
                         "Lo que mandan las webs de este equipo (formularios, pedidos, contraseñas) no llega a "
                         "nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, "
                         "PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en "
                         "las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con "
                         "la versión activa y solo se ve desde este equipo.")
+        # (las tres en una fila: los botones de la bandeja, cortos)
         on = m["on"]
         row = ActionRow("Correo de pruebas", "Encendido: el correo de las webs va a Mailpit" if on else
                         "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
@@ -25117,10 +26851,11 @@ class App2(App):
                 b.connect("clicked", lambda *_: self.on_mail_install())
                 b.set_sensitive(not self.busy)
                 row.add_suffix(b)
-            b = Gtk.Button(label="Vaciar la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"] and not self.busy)
+            b = Gtk.Button(label="Vaciar", tooltip_text="Vaciar la bandeja", valign=Gtk.Align.CENTER,
+                           sensitive=m["running"] and not self.busy)
             b.connect("clicked", lambda *_: self.on_mail_clear())
             row.add_suffix(b)
-            b = Gtk.Button(label="Abrir la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"])
+            b = Gtk.Button(label="Abrir", tooltip_text="Abrir la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"])
             b.connect("clicked", lambda *_: self.open_uri(m["url"]))
             row.add_suffix(b)
         else:
@@ -25208,7 +26943,7 @@ class App2(App):
         return res
 
     def nv_power_state(self):
-        """Puntos de Apache y MariaDB (de gui-servicios) y el boton Encendidos / Parados."""
+        """Puntos de Apache y MariaDB (de gui-servicios)."""
         d = self.data
         if not d:
             return
@@ -25219,13 +26954,6 @@ class App2(App):
             ctx.remove_class("nv-gris" if on else "nv-verde")
             ctx.add_class("nv-verde" if on else "nv-gris")
             (ctx.add_class if on else ctx.remove_class)("nv-latido")
-        on = d["running"]
-        ctx = self.power_btn.get_style_context()
-        ctx.remove_class("nv-off" if on else "nv-on")
-        ctx.add_class("nv-on" if on else "nv-off")
-        self.power_btn.get_child().get_children()[1].set_label("Encendidos" if on else "Parados")
-        self.power_btn.set_tooltip_text(("Parar y desactivar lampp-%s" if on else "Arrancar lampp-%s") % d["active"]
-                                        if d["active"] else "Activa una versión")
 
     def update_project_search(self):
         # (la busqueda de siempre sigue funcionando por detras: la usa el asistente de proyecto nuevo)
@@ -25705,9 +27433,12 @@ class App2(App):
                              "BBDD de LAMPP no se tocan.", "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
         combos = {}
+        wp = project_kind(x["name"]) == "wp"
         for key, title, items, current in [("php", "PHP", [(v, "PHP %s" % v) for v in d["php"]], php),
                                            ("maria", "MariaDB", [(v, "MariaDB %s" % v) for v in d["maria"]], maria),
-                                           ("source", "BBDD que se copia", sources, source)]:
+                                           ("source", "BBDD" if wp else "BBDD que se copia", sources, source)] + (
+                [("mode", "Cómo", [("vivo", "En vivo: la misma que web.local (sin copias)"),
+                                   ("copia", "Una copia en Docker")], "vivo")] if wp else []):
             row = ActionRow(title)
             c = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
             for k, text in items:
@@ -25734,6 +27465,7 @@ class App2(App):
         dlg.show_all()
         resp = run_dialog(dlg)
         php, maria, src = (combos[k].get_active_id() for k in ("php", "maria", "source"))
+        live = "mode" in combos and combos["mode"].get_active_id() == "vivo"
         dlg.destroy()
         if resp != Gtk.ResponseType.OK or not (php and maria):
             return
@@ -25741,7 +27473,7 @@ class App2(App):
         args = ["docker-nuevo", x["name"], php, maria]
         if src and src != "@vacia" and "|" in src:
             ver, db = src.split("|", 1)
-            args += ["--bd", db, "--desde", ver]
+            args += ["--bd", db, "--desde", ver] + (["--en-vivo"] if live else [])
 
         def done(ok, *_):
             run_quick(["gui-docker"], self.on_docker_data)
@@ -25750,13 +27482,52 @@ class App2(App):
         self.run_task("Montando %s en Docker" % x["name"], args,
                       done_text="%s en Docker: https://%s" % (x["name"], domain), on_done=done)
 
+    def nv_docker_db_mode(self, p):
+        """La BBDD de un WordPress de Docker: en vivo la de una versión LAMPP (la misma que web.local) o su
+        copia en la MariaDB común de Docker."""
+        x = {"name": p["folder"], "db": p["db"]}
+        versions = []
+        for i, db in (self.project_pairs(x) if self.data else []):
+            if i["folder"] not in versions:
+                versions.append(i["folder"])
+        dlg = Gtk.Dialog(title="BBDD", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(560, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        box.pack_start(label("BBDD de %s en Docker" % p["folder"], "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(label("En vivo, Docker usa la misma BBDD que web.local: lo que cambies en un lado se ve en el otro, "
+                             "sin copias. Si la MariaDB de esa versión no está en marcha, se arranca solo ella (pide la "
+                             "contraseña). La copia de Docker no se borra: se puede volver a ella.",
+                             "nv-tenue", wrap=True, max_width_chars=62), False, False, 0)
+        combo = Gtk.ComboBoxText()
+        for v in versions:
+            combo.append("lampp|" + v, "En vivo: la de lampp-%s (la de web.local)" % v)
+        combo.append("docker", "Su copia en la MariaDB común de Docker")
+        combo.set_active_id("lampp|" + p["lampp"] if p.get("lampp") else "docker")
+        if combo.get_active_id() is None:
+            combo.set_active(0)
+        box.pack_start(combo, False, False, 0)
+        if not versions:
+            box.pack_start(label("Su BBDD no está en ninguna versión de LAMPP.", "nv-chico", "nv-tenue"), False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Usarla", Gtk.ResponseType.OK), "nv-azul")
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        choice = combo.get_active_id()
+        dlg.destroy()
+        if resp != Gtk.ResponseType.OK or not choice or choice == ("lampp|" + p["lampp"] if p.get("lampp") else "docker"):
+            return
+        args = ["docker-bd", p["slug"]] + (["lampp", choice.split("|", 1)[1]] if choice.startswith("lampp|") else ["docker"])
+        self.run_task("BBDD de %s" % p["folder"], args, auto_close=True, done_text="Hecho",
+                      on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+
     def dk_url(self, domain):
         """Dirección de una web del Apache de Docker: con el puerto si no es el 443."""
         port = ((self.docker or {}).get("web") or {}).get("https", "443")
         return "https://%s%s" % (domain, "" if port == "443" else ":" + port)
 
     def dk_pma_url(self, p):
-        return self.dk_url("pma.docker.local") + "/" if p.get("web") else "http://127.0.0.1:%s/" % p["pma"]
+        return self.dk_url(docker_pma_domain()) + "/" if p.get("web") else "http://127.0.0.1:%s/" % p["pma"]
 
     def nv_docker_copy_pass(self, p):
         """Contraseña de root de la BBDD del contenedor (DB_ROOT_PASS de su .env, solo tuyo), al
@@ -25838,8 +27609,7 @@ class App2(App):
 
     def nv_docker_pass(self, p):
         """Un proyecto de antes (con LAMPP delante) pasa al Apache de Docker (docker-pasar)."""
-        new = "https://%s.docker.local" % p["slug"] if project_kind(p["folder"]) == "ps" else \
-            "https://%s-php%s.docker.local" % (p["slug"], p["php"].replace(".", ""))
+        new = self.dk_url(docker_web_domain(dict(p, kind=project_kind(p["folder"])), p["php"]))
         if not confirm(self.win, "¿Pasar %s al Apache de Docker?" % p["folder"],
                        "Ya no necesitará LAMPP y podrás añadirle más versiones de PHP. Antes se guarda una copia de "
                        "su BBDD (%s) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus "
@@ -25876,7 +27646,7 @@ class App2(App):
         tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tt.pack_start(label("Apache de Docker %s" % ("en marcha" if up else "parado")), False, False, 0)
         tt.pack_start(label("En %s (http %s, https %s): sirve los proyectos de Docker sin LAMPP, con las mismas reglas "
-                            "de seguridad. phpMyAdmin: %s" % (w["ip"], w["http"], w["https"], self.dk_url("pma.docker.local")),
+                            "de seguridad. phpMyAdmin: %s" % (w["ip"], w["http"], w["https"], self.dk_url(docker_pma_domain())),
                             "nv-chico", "nv-tenue", ellipsize=3), False, False, 0)
         r.pack_start(tt, True, True, 0)
         r.pack_end(nv_button(None, "Parar" if up else "Arrancar", None, lambda *_: self.run_task(
@@ -26260,9 +28030,10 @@ class App2(App):
             dlg.set_default_size(520, -1)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
             box.pack_start(label("Imágenes de producción de %s" % name, "nv-titulo", wrap=True), False, False, 0)
-            box.pack_start(label("Mientras esté cargado, lo que falte en su carpeta wp-content/uploads (imágenes, "
-                                 "vídeos y PDF) se pide a su web real: no hace falta descargarlo. Lo que ya está "
-                                 "en local se sigue sirviendo desde aquí.", "nv-tenue", wrap=True,
+            box.pack_start(label("Mientras esté cargado (y, si está en el Apache de Docker, también allí), lo que "
+                                 "falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web "
+                                 "real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde "
+                                 "aquí.", "nv-tenue", wrap=True,
                                  max_width_chars=60), False, False, 0)
             entry = Gtk.Entry(text=saved or guess, placeholder_text="ejemplo.com", max_length=80,
                               activates_default=True)
@@ -26280,9 +28051,10 @@ class App2(App):
             def clean():
                 return re.sub(r"^https?://", "", entry.get_text().strip().lower()).rstrip("/")
 
+            # (el mismo de antes también: se vuelve a aplicar, en web.local y en el Apache de Docker)
             def update(*_):
                 d = clean()
-                ok.set_sensitive(bool(DOMAIN_RX.match(d)) and not d.endswith(".local") and d != saved)
+                ok.set_sensitive(bool(DOMAIN_RX.match(d)) and not d.endswith((".local", ".test")))
             entry.connect("changed", update)
             dlg.show_all()
             update()
@@ -26304,7 +28076,9 @@ class App2(App):
         name = x["name"]
         if not confirm(self.win, "¿Descargar las imágenes que le faltan a %s?" % name,
                        "Se descargan de su web real las imágenes de productos, categorías y marcas que no "
-                       "están en su carpeta img (la lista sale de su BBDD, en la versión activa). Lo que ya "
+                       "están en su carpeta img (la lista sale de su BBDD: la de la versión activa o, si no está "
+                       "allí, la de su proyecto del Apache de Docker). Van a su carpeta img, la misma con LAMPP y con "
+                       "Docker. Lo que ya "
                        "está en local no se toca. Con muchos productos puede tardar y ocupar bastante.\n\n"
                        "Su dominio está falseado en este equipo: se busca con DNS cifrado (Cloudflare) y se "
                        "comprueba su certificado real.", "Descargar"):
@@ -26428,7 +28202,7 @@ class App2(App):
     def build_tools(self):
         super().build_tools()
         # Barrera entre webs (lvm-instalador barrera-web): encendida si no existe el fichero
-        box, lb = group("Seguridad entre webs",
+        box, lb = tile_group("Seguridad entre webs",
                         "Otra web abierta en el navegador no puede mandar formularios ni peticiones "
                         "a tus proyectos con tus sesiones. Una pasarela de pago que vuelve a la tienda "
                         "con un POST (Redsys, PayPal…) no pasa: apágala mientras la pruebas.")
@@ -26442,12 +28216,437 @@ class App2(App):
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 1)
         box.show_all()
+        self.nv_components_tools()
         self.nv_docker_tools()
         self.nv_tunnel_tools()
         self.nv_buttons_tools()
         self.nv_mail_tools()
+        self.nv_github_tools()
+        self.nv_tools_sections()
         self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
-                           "Ficheros de configuración, carpetas, registros y el programa")
+                           "Elige un apartado a la izquierda para ver lo que se puede cambiar")
+
+    # Apartados de Configuración: su nombre en la columna de la izquierda, su icono y el orden (los que no
+    # estén aquí, al final)
+    TOOLS_SECTIONS = [("Parches nuevos", "Parches nuevos", "software-update-available-symbolic"),
+                      ("Configuración", "Vhosts y hosts", "network-workgroup-symbolic"),
+                      ("Seguridad entre webs", "Seguridad entre webs", "security-high-symbolic"),
+                      ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
+                      ("Docker", "Docker", "logo:docker"),
+                      ("Túnel de Cloudflare", "Túnel de Cloudflare", "network-transmit-receive-symbolic"),
+                      ("Visor de los proyectos", "Visor de los proyectos", "view-grid-symbolic"),
+                      ("GitHub (Repositorios)", "GitHub", "logo:github"),
+                      ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
+                      ("Carpetas", "Carpetas", "folder-symbolic"),
+                      ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
+                      ("Programa", "Programa", "system-software-install-symbolic"),
+                      ("Información", "Información", "help-about-symbolic")]
+
+    def nv_tools_sections(self):
+        """Configuración en dos columnas: a la izquierda, los encabezados de sus apartados; a la derecha, lo que
+        se puede cambiar del elegido. Los apartados son los de siempre (cada constructor añade el suyo a
+        tools_box): aqui se pasan a una hoja cada uno. El elegido se recuerda al rehacer la pestaña."""
+        groups = list(self.tools_box.get_children())
+        for g in groups:
+            self.tools_box.remove(g)
+        order = {t: n for n, (t, _, _) in enumerate(self.TOOLS_SECTIONS)}
+        info = {t: (name, ic) for t, name, ic in self.TOOLS_SECTIONS}
+
+        def title_of(g):
+            for w in self.nv_walk(g):
+                if isinstance(w, Gtk.Label) and w.get_style_context().has_class("grupo-titulo"):
+                    return w.get_label()
+            return ""
+        found = sorted(((title_of(g) or "Otros", n, g) for n, g in enumerate(groups)),
+                       key=lambda x: (order.get(x[0], len(order)), x[1]))
+        stack = Gtk.Stack(vhomogeneous=False, hhomogeneous=False, hexpand=True,
+                          transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=120)
+        nav = css(Gtk.ListBox(valign=Gtk.Align.START), "nv-nav", "nv-subnav")
+        nav.set_size_request(230, -1)
+        rows = {}
+        for title, _n, g in found:
+            if title in rows:
+                continue
+            stack.add_named(g, title)
+            name, ic = info.get(title, (title, "emblem-system-symbolic"))
+            row = Gtk.ListBoxRow()
+            inner = Gtk.Box(spacing=10)
+            inner.pack_start(MonoLogo(ic[5:], 16) if ic.startswith("logo:") else symbol(ic, 16), False, False, 0)
+            inner.pack_start(label(name, ellipsize=3), True, True, 0)
+            row.add(inner)
+            row.section = title
+            nav.add(row)
+            rows[title] = row
+
+        def picked(_lb, row):
+            if row is not None:
+                self.tools_section = row.section
+                stack.set_visible_child_name(row.section)
+        nav.connect("row-selected", picked)
+        want = getattr(self, "tools_section", None)
+        if want not in rows and found:
+            want = found[0][0]
+        layout = Gtk.Box(spacing=22)
+        side = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-subnav-caja")
+        side.pack_start(nav, False, False, 0)
+        layout.pack_start(side, False, False, 0)
+        layout.pack_start(stack, True, True, 0)
+        self.tools_box.pack_start(layout, True, True, 0)
+        self.tools_nav = rows
+        layout.show_all()
+        if want:
+            nav.select_row(rows[want])
+
+    def nv_tools_show(self, section):
+        """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS)."""
+        self.tools_section = section
+        self.show_tab("config")
+        row = getattr(self, "tools_nav", {}).get(section)
+        if row is not None and row.get_parent() is not None:
+            row.get_parent().select_row(row)
+
+    def nv_components_tools(self):
+        """Configuración, Parches nuevos: lo que tiene un parche publicado (cada versión de PHP con su
+        Apache, MariaDB, phpMyAdmin…, las imágenes de Docker, Mailpit y cloudflared) y «Actualizar todo»."""
+        box, lb = tile_group("Parches nuevos",
+                             "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, "
+                             "MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de "
+                             "Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y "
+                             "cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos "
+                             "arranques. Las versiones de PHP se rehacen (la de ahora sigue funcionando mientras se "
+                             "compila); los contenedores de Docker se rehacen en unos segundos, con sus BBDD.")
+        row = ActionRow("Componentes", "Buscando parches nuevos…")
+        row.add_prefix(icon("software-update-available-symbolic", 18))
+        row.wide = True
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.tools_box.reorder_child(box, 1)
+        box.show_all()
+        cached = getattr(self, "components", None)
+        if cached is not None:
+            self.nv_components_fill(row, cached)
+        else:
+            run_quick(["componentes"], lambda rc, out: (self.nv_components_got(out, row), False)[1])
+
+    def nv_components_got(self, out, row=None):
+        res = {"items": [], "notes": [], "errors": [], "n": 0}
+        for f in parse_lines(out):
+            if f[0] == "L" and len(f) >= 5:
+                res["items"].append("lampp-%s: %s %s → %s" % (f[1], f[2], f[3], f[4]))
+            elif f[0] == "K" and len(f) >= 3:
+                res["items"].append("%s (%s): versión nueva en Docker Hub" % (f[1], f[2]))
+            elif f[0] == "X" and len(f) >= 4:
+                res["items"].append("%s: %s → %s" % (f[1], f[2], f[3]))
+            elif f[0] == "E" and len(f) >= 2:
+                res["errors"].append(f[1])
+            elif f[0] == "S" and len(f) >= 2 and f[1].isdigit():
+                res["n"] = int(f[1])
+        self.components = res
+        # (si Configuración se ha rehecho mientras tanto, esa fila ya no está en la ventana)
+        if row is not None and row.subtitle.get_toplevel() is self.win:
+            self.nv_components_fill(row, res)
+        return res
+
+    def nv_components_fill(self, row, res):
+        if res["items"]:
+            text = "\n".join("• " + i for i in res["items"])
+        elif res["errors"]:
+            text = "No se ha podido consultar: %s" % ", ".join(res["errors"])
+        else:
+            text = "Todo al día: no hay parches nuevos."
+        if res["items"] and res["errors"]:
+            text += "\n(No se ha podido consultar: %s)" % ", ".join(res["errors"])
+        row.subtitle.set_label(text)
+        for ch in row.suffix.get_children():
+            row.suffix.remove(ch)
+        b = Gtk.Button(label="Buscar de nuevo", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b.connect("clicked", lambda *_: (setattr(self, "components", None), self.build_tools()))
+        row.add_suffix(b)
+        if res["items"]:
+            b = css(Gtk.Button(label="Actualizar todo (%d)" % len(res["items"]), valign=Gtk.Align.CENTER,
+                               sensitive=not self.busy), "verde")
+            b.connect("clicked", lambda *_: self.nv_components_update(res))
+            row.add_suffix(b)
+        row.suffix.show_all()
+
+    def nv_components_update(self, res, ask=True):
+        if ask and not confirm(self.win, "¿Actualizar todo?",
+                               "\n".join("• " + i for i in res["items"]) +
+                               "\n\nLas versiones de PHP se rehacen con lo último de su rama (varios minutos; la de "
+                               "ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se "
+                               "rehacen en unos segundos: sus BBDD y su configuración no cambian.", "Actualizar todo"):
+            return
+        self.components = None
+        self.run_task("Actualizando los componentes", ["componentes-actualizar"], progress=True,
+                      reload_branches=True, done_text="Componentes al día",
+                      on_done=lambda *_: self.build_tools())
+
+    def nv_components_auto(self):
+        """Al abrir (cuando toca buscar una versión nueva del programa): si algo tiene un parche nuevo,
+        se dice y se ofrece actualizarlo todo."""
+        def got(_rc, out):
+            res = self.nv_components_got(out)
+            if not res["items"]:
+                return False
+
+            def ask():
+                if self.busy:
+                    return True
+                self.nv_components_update(res)
+                return False
+            GLib.timeout_add_seconds(2, ask)
+            return False
+        run_quick(["componentes"], got)
+        return False
+
+    # ------------------------------------------------------------------ repositorios de GitHub
+    def nv_github_tools(self):
+        """Configuración, GitHub: la conexión (un token en el llavero o la sesión de gh), la organización o
+        cuenta y los prefijos de los repositorios que se ven en Repositorios."""
+        box, lb = tile_group("GitHub (Repositorios)",
+                             "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para "
+                             "clonarlos por SSH (con tu clave) en /opt/htdocs. La lista se lee con un token de GitHub, "
+                             "que se guarda en el llavero de la sesión (no en un fichero), o con tu sesión de gh. "
+                             "Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, "
+                             "«Mostrar todos» enseña el resto).")
+        self.tools_box.pack_start(box, False, False, 0)
+        # (debajo del correo de pruebas)
+        self.tools_box.reorder_child(box, 3)
+
+        def fill(_rc, out):
+            g = next((f for f in parse_lines(out) if f[0] == "G" and len(f) >= 6), None)
+            # (si Configuración se ha rehecho mientras tanto, este apartado ya no está en la ventana)
+            if g is None or box.get_toplevel() is not self.win:
+                return False
+            self.github_out = out
+            self.github = {"on": g[1] == "1", "login": g[2], "source": g[3], "account": g[4], "prefixes": g[5]}
+            gh = self.github
+            how = {"llavero": "con el token del llavero", "gh": "con tu sesión de gh"}.get(gh["source"], "")
+            row = ActionRow("Conexión", ("Conectado como %s, %s" % (gh["login"], how)) if gh["on"] else
+                            "⚠ El token ya no vale (¿caducado?): conéctalo de nuevo" if gh["source"] else
+                            "Sin conectar: hace falta para ver la lista de repositorios (también los privados)")
+            row.add_prefix(logo("github", 18))
+            row.wide = True
+            b = css(Gtk.Button(label="Conectar con un token…", valign=Gtk.Align.CENTER, sensitive=not self.busy),
+                    *(() if gh["on"] else ("verde",)))
+            b.connect("clicked", lambda *_: self.nv_github_token())
+            row.add_suffix(b)
+            if shutil.which("gh") and gh["source"] != "gh":
+                b = Gtk.Button(label="Usar la sesión de gh", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                               tooltip_text="La de la herramienta de GitHub (gh auth login), sin pegar ningún token")
+                b.connect("clicked", lambda *_: run_quick(["github-conectar", "--gh"], self.nv_github_done))
+                row.add_suffix(b)
+            if gh["source"]:
+                b = Gtk.Button(label="Desconectar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b.connect("clicked", lambda *_: run_quick(["github-desconectar"], self.nv_github_done))
+                row.add_suffix(b)
+            lb.add(row)
+            for key, title, sub, value, width in (
+                    ("cuenta", "Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)",
+                     gh["account"], 22),
+                    ("prefijos", "Prefijos de los repositorios",
+                     "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos", gh["prefixes"], 34)):
+                row = ActionRow(title, sub)
+                entry = Gtk.Entry(text=value, width_chars=width, valign=Gtk.Align.CENTER)
+                save = Gtk.Button(label="Guardar", valign=Gtk.Align.CENTER, sensitive=False)
+                entry.connect("changed", lambda e, b=save, v=value: b.set_sensitive(e.get_text().strip() != v))
+                save.connect("clicked", lambda _b, k=key, e=entry: run_quick(["github", k, e.get_text().strip()],
+                                                                            self.nv_github_saved))
+                entry.connect("activate", lambda e, b=save: b.get_sensitive() and b.clicked())
+                row.add_suffix(entry)
+                row.add_suffix(save)
+                lb.add(row)
+            box.show_all()
+            return False
+        # (lo de la última vez, al momento: se lee de nuevo al conectar o cambiar algo)
+        if getattr(self, "github_out", None):
+            fill(0, self.github_out)
+        else:
+            run_quick(["github"], fill)
+
+    def nv_github_done(self, rc, out):
+        lines = [l for l in out.strip().splitlines() if l.strip()]
+        self.toast(lines[-1] if lines else ("Hecho" if rc == 0 else "No se ha podido"))
+        # (la lista de antes puede ser de otra cuenta o con otros prefijos)
+        self.repos, self.github_out = None, None
+        self.build_tools()
+        return False
+
+    def nv_github_saved(self, rc, out):
+        """Guardar la cuenta o los prefijos: si no vale, se dice en una ventana y lo escrito se queda."""
+        lines = [l for l in out.strip().splitlines() if l.strip()]
+        if rc != 0:
+            message(self.win, "No se ha guardado", lines[-1] if lines else "No se ha podido guardar", Gtk.MessageType.WARNING)
+            return False
+        return self.nv_github_done(rc, out)
+
+    def nv_github_token(self):
+        dlg = Gtk.Dialog(title="Conectar con GitHub", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(520, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        head = Gtk.Box(spacing=10)
+        head.pack_start(logo("github", 28), False, False, 0)
+        head.pack_start(label("Token de GitHub", "nv-titulo"), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        box.pack_start(label("Solo para leer la lista de repositorios (también los privados): se clonan por SSH, con tu "
+                             "clave. Créalo en GitHub con el permiso «repo» (y «read:org» para los de una organización) "
+                             "y pégalo aquí. Se guarda en el llavero de la sesión, no en un fichero.",
+                             "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
+        link = Gtk.LinkButton(uri="https://github.com/settings/tokens/new?scopes=repo,read:org&description=Nexum%20Dev%20Stack",
+                              label="Crear un token en GitHub", halign=Gtk.Align.START)
+        box.pack_start(link, False, False, 0)
+        entry = Gtk.Entry(visibility=False, input_purpose=Gtk.InputPurpose.PASSWORD, activates_default=True,
+                          placeholder_text="ghp_… o github_pat_…")
+        box.pack_start(entry, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Conectar", Gtk.ResponseType.OK), "nv-azul")
+        ok.set_sensitive(False)
+        entry.connect("changed", lambda e: ok.set_sensitive(len(e.get_text().strip()) >= 20))
+        dlg.set_default_response(Gtk.ResponseType.OK)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        token = entry.get_text().strip()
+        dlg.destroy()
+        if resp == Gtk.ResponseType.OK and token:
+            self.toast("Comprobando el token con GitHub…")
+            run_quick_input(["github-conectar"], token + "\n", self.nv_github_done)
+
+    def nv_repos_open(self):
+        """Al entrar en Repositorios: la lista de la última vez, al momento, y luego la de GitHub."""
+        if self.repos is None:
+            self.nv_repos_render(loading=True)
+            self.nv_repos_load(cache=True)
+        self.nv_repos_load()
+
+    def nv_repos_load(self, cache=False):
+        args = ["repos"] + (["--todos"] if self.repos_all else []) + (["--cache"] if cache else [])
+        if not cache:
+            self.repos_loading = True
+
+        def got(_rc, out):
+            if not cache:
+                self.repos_loading = False
+            res = {"rows": [], "error": None, "head": None}
+            for f in parse_lines(out):
+                if f[0] == "R" and len(f) >= 11:
+                    res["rows"].append({"full": f[1], "name": f[2], "private": f[3] == "1", "date": f[4],
+                                        "branch": f[5], "prefix": f[6], "web": f[7], "desc": f[8],
+                                        "state": f[9], "folder": f[10]})
+                elif f[0] == "C" and len(f) >= 6:
+                    res["head"] = f
+                elif f[0] == "E" and len(f) >= 2:
+                    res["error"] = f[1]
+            if cache and not res["head"]:
+                return False
+            if not cache and res["error"] and self.repos and self.repos.get("head"):
+                # (sin conexión con GitHub: se queda la lista de la última vez, y se dice)
+                self.repos["error"] = res["error"]
+            else:
+                self.repos = res
+            self.nv_repos_render()
+            return False
+        run_quick(args, got)
+
+    def nv_repos_render(self, loading=False):
+        box = self.repos_page
+        clear(box)
+        head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(MonoLogo("github", 26), False, False, 0)
+        tl.pack_start(label("Repositorios", "nv-titulo-grande"), False, False, 0)
+        head.pack_start(tl, False, False, 0)
+        r = self.repos or {}
+        h = r.get("head")
+        sub = ("%s en GitHub: %s de %s repositorios%s" % (h[2], h[5], h[4], "" if self.repos_all else " (los de sus prefijos)")
+               if h else "Los repositorios de tu organización en GitHub, para clonarlos por SSH en /opt/htdocs")
+        head.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        if r.get("error") and not h:
+            card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "nv-mosaico")
+            card.pack_start(label(r["error"], wrap=True, xalign=0), False, False, 0)
+            b = Gtk.Button(label="Ir a Configuración", halign=Gtk.Align.START)
+            b.connect("clicked", lambda *_: self.nv_tools_show("GitHub (Repositorios)"))
+            card.pack_start(b, False, False, 0)
+            box.pack_start(card, False, False, 0)
+            box.show_all()
+            return
+        bar = Gtk.Box(spacing=10)
+        search = Gtk.SearchEntry(placeholder_text="Buscar por nombre, descripción o web", width_chars=36)
+        bar.pack_start(search, False, False, 0)
+        bar.pack_start(label("Mostrar todos", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
+        sw = Gtk.Switch(active=self.repos_all, valign=Gtk.Align.CENTER,
+                        tooltip_text="También los que no empiezan por ninguno de los prefijos (Configuración, GitHub)")
+        sw.connect("notify::active", lambda w, _p: (setattr(self, "repos_all", w.get_active()),
+                                                    self.nv_repos_load(cache=True), self.nv_repos_load()))
+        bar.pack_start(sw, False, False, 0)
+        if loading or getattr(self, "repos_loading", False):
+            bar.pack_end(Gtk.Spinner(active=True), False, False, 0)
+        else:
+            rb = nv_button("view-refresh-symbolic", None, "Leer de nuevo la lista de GitHub", lambda *_: self.nv_repos_load())
+            bar.pack_end(rb, False, False, 0)
+        if r.get("error"):
+            bar.pack_end(label("⚠ " + r["error"], "nv-chico", wrap=True, max_width_chars=40), False, False, 0)
+        box.pack_start(bar, False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        for repo in r.get("rows", []):
+            lb.add(self.nv_repo_row(repo))
+        if not r.get("rows"):
+            lb.add(ActionRow("Cargando la lista de GitHub…" if loading or getattr(self, "repos_loading", False)
+                             else "Ningún repositorio", ""))
+
+        def match(row):
+            q = search.get_text().strip().lower()
+            return not q or q in getattr(row, "haystack", "")
+        lb.set_filter_func(match)
+        search.connect("search-changed", lambda *_: lb.invalidate_filter())
+        box.pack_start(lb, False, False, 0)
+        box.show_all()
+
+    def nv_repo_row(self, repo):
+        bits = [b for b in (("clonado en %s" % repo["folder"]) if repo["state"] == "clonado" else "", repo["desc"], repo["web"],
+                            ("actualizado el %s" % repo["date"]) if repo["date"] else "") if b]
+        row = ActionRow(repo["name"] + ("  🔒" if repo["private"] else ""), " · ".join(bits))
+        kind = next((k for k in ("wordpress", "prestashop") if k in repo["prefix"] or k in repo["name"]), None)
+        row.add_prefix(logo(kind, 20) if kind else MonoLogo("github", 20))
+        row.haystack = " ".join((repo["full"], repo["desc"], repo["web"])).lower()
+        if repo["state"] == "clonado":
+            b = Gtk.Button(label="Traer cambios", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                           tooltip_text="Ya está clonado: git pull en /opt/htdocs/%s" % repo["folder"])
+            b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
+        elif repo["state"] == "ocupado":
+            b = Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=False,
+                           tooltip_text="Ya hay una carpeta /opt/htdocs/%s que no es un clon de este repositorio" % repo["name"])
+        else:
+            b = css(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                               tooltip_text="Por SSH, con tu clave, en /opt/htdocs/%s" % repo["name"]), "verde")
+            b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
+        row.add_suffix(b)
+        # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así
+        # todos los botones quedan a la misma altura)
+        gh = Gtk.Button(valign=Gtk.Align.CENTER, tooltip_text="Abrir en GitHub (https://github.com/%s)" % repo["full"])
+        gh.add(MonoLogo("github", 18))
+        gh.connect("clicked", lambda *_: self.open_uri("https://github.com/%s" % repo["full"]))
+        row.add_suffix(gh)
+        return row
+
+    def nv_repo_fetch(self, repo):
+        if repo["state"] == "clonado":
+            if not confirm(self.win, "¿Aplastar %s con lo de GitHub?" % repo["folder"],
+                           "Este repositorio ya está clonado en /opt/htdocs/%s. Se traen sus cambios de GitHub (git pull) "
+                           "y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca "
+                           "nada y se dice." % repo["folder"], "Traer los cambios"):
+                return
+            args, title = ["repo-traer", repo["full"], "--actualizar"], "Trayendo los cambios de %s" % repo["name"]
+        else:
+            args, title = ["repo-traer", repo["full"]], "Clonando %s" % repo["name"]
+
+        def done(ok, *_):
+            # (su estado, de nuevo: ya clonado, en su carpeta)
+            self.nv_repos_load(cache=True)
+            if ok and repo["state"] != "clonado":
+                self.toast("%s, en Proyectos" % repo["name"])
+        self.run_task(title, args, auto_close=True, done_text="Hecho", on_done=done)
 
     def nv_docker_tools(self):
         """Configuración del Apache de Docker (docker-web): su dirección y sus puertos, permitir que Docker
@@ -26465,18 +28664,24 @@ class App2(App):
         except (OSError, ValueError):
             start = 1024
         ports_ok = min(int(w["HTTP"]), int(w["HTTPS"])) >= start
-        box, lb = group("Docker",
+        box, lb = tile_group("Docker",
                         "Los proyectos de Docker van con su propio Apache, en otra dirección de este equipo (nunca "
                         "abierta a la red): funcionan sin LAMPP y a la vez que él, con las mismas reglas de seguridad. "
                         "Con los puertos 80 y 443, las direcciones van sin puerto.")
+        # La dirección y los dos puertos, juntos en una tarjeta a lo ancho (con Guardar y, si hace falta, Permitir)
         entries = {}
-        for key, title, sub, width in [("IP", "Dirección", "De este equipo (127.x.x.x). 127.0.0.1 con 80 y 443 es la de LAMPP", 15),
-                                       ("HTTP", "Puerto HTTP", "Lleva siempre a https", 6),
-                                       ("HTTPS", "Puerto HTTPS", "Si no es el 443, las direcciones lo llevan (https://…:8443)", 6)]:
-            row = ActionRow(title, sub)
-            e = Gtk.Entry(text=w[key], width_chars=width, max_length=15, valign=Gtk.Align.CENTER)
-            row.add_suffix(e)
-            lb.add(row)
+        row = ActionRow("Dirección y puertos",
+                        "De este equipo (127.x.x.x; 127.0.0.1 con 80 y 443 es la de LAMPP). HTTP lleva siempre a https; si "
+                        "HTTPS no es el 443, las direcciones lo llevan (https://…:8443). "
+                        + ("Docker sin root ya puede usar sus puertos." if ports_ok else
+                           "Docker sin root aún no puede usar los de menos de 1024: se permite una vez."))
+        row.wide = True
+        for key, text, width in (("IP", "Dirección", 13), ("HTTP", "HTTP", 5), ("HTTPS", "HTTPS", 5)):
+            field = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, valign=Gtk.Align.CENTER)
+            field.pack_start(label(text, "nv-chico", "nv-tenue"), False, False, 0)
+            e = Gtk.Entry(text=w[key], width_chars=width, max_length=15)
+            field.pack_start(e, False, False, 0)
+            row.add_suffix(field)
             entries[key] = e
 
         def save(*_):
@@ -26489,8 +28694,6 @@ class App2(App):
             self.run_task("Dirección y puertos del Apache de Docker", ["docker-web", "puertos", ip, http, https],
                           done_text="Apache de Docker en %s (%s y %s)" % (ip, http, https), auto_close=True,
                           on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
-        row = ActionRow("Puertos", "Docker sin root ya puede usarlos" if ports_ok else
-                        "Docker sin root aún no puede usarlos (los de menos de 1024 son de root): se permite una vez")
         if not ports_ok:
             b = Gtk.Button(label="Permitir", valign=Gtk.Align.CENTER, sensitive=not self.busy,
                            tooltip_text="Baja el límite de los puertos de root hasta el %s (pide la contraseña)"
@@ -26504,29 +28707,75 @@ class App2(App):
         b.connect("clicked", save)
         row.add_suffix(b)
         lb.add(row)
-        row = ActionRow("Certificado de *.docker.local",
+        # DNS comodín de *.docker.test: los dominios de Docker ya no van en /etc/hosts (sin contraseña al
+        # añadir proyectos o versiones). web.local y lo demás, igual
+        conf = {}
+        try:
+            for line in open(os.path.join(LOG_DIR, "docker", "web.conf"), encoding="utf-8", errors="replace"):
+                k, _, v = line.strip().partition("=")
+                conf[k] = v
+        except OSError:
+            pass
+        dns = conf.get("DNS") == "1" and conf.get("TLD") == "docker.test"
+        row = ActionRow("DNS de *.docker.test",
+                        "Puesto: los dominios de Docker (<proyecto>-php83.docker.test) no van en /etc/hosts ni piden la contraseña"
+                        if dns else "Los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts: sin contraseña al "
+                        "añadir proyectos o versiones. web.local, los proyectos de siempre y las tiendas falseadas, igual")
+        b = Gtk.Button(label="Quitar" if dns else "Activar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b.connect("clicked", lambda *_: self.nv_docker_dns(not dns))
+        row.add_suffix(b)
+        lb.add(row)
+        row = ActionRow("Certificado de *.docker.local y *.docker.test",
                         "Chrome y Firefox lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)")
         b = Gtk.Button(label="Confiar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
-        b.connect("clicked", lambda *_: self.run_task("Certificado de *.docker.local en el navegador", ["docker-web", "confiar"],
-                                                      done_text="El navegador acepta *.docker.local", auto_close=True))
+        b.connect("clicked", lambda *_: self.run_task("Certificado de Docker en el navegador", ["docker-web", "confiar"],
+                                                      done_text="El navegador acepta el certificado de Docker", auto_close=True))
         row.add_suffix(b)
+        lb.add(row)
+        # Los proyectos sin visitas se paran solos (docker-reposo): cuántas horas (0: nunca; 3 si no se ha dicho)
+        try:
+            idle = open(os.path.join(LOG_DIR, "docker", "reposo"), encoding="utf-8").read(10).strip()
+        except OSError:
+            idle = "3"
+        idle = idle if re.fullmatch(r"[0-9]|1[0-9]|2[0-4]", idle) else "3"
+        try:
+            last = open(os.path.join(LOG_DIR, "docker-reposo.log"), encoding="utf-8", errors="replace").read().strip().splitlines()[-1]
+        except (OSError, IndexError):
+            last = ""
+        row = ActionRow("Parar los proyectos sin visitas",
+                        ("Un proyecto de Docker que lleva esas horas sin ninguna visita (tampoco por el túnel) se para "
+                         "solo, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker): no gasta "
+                         "memoria ni CPU. Se mira cada 15 minutos, también con la ventana cerrada. Al entrar en uno "
+                         "parado, la web lo dice: se arranca en la pestaña Docker." if idle != "0" else
+                         "Apagado: los proyectos de Docker siguen en marcha hasta que se paren a mano")
+                        + ("\nLo último: %s" % last if last and idle != "0" else ""))
+        row.wide = True
+        combo = Gtk.ComboBoxText(valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        for h in ("0", "1", "2", "3", "4", "6", "8", "12", "24"):
+            combo.append(h, "Nunca" if h == "0" else "A la hora sin visitas" if h == "1" else "A las %s h sin visitas" % h)
+        if not combo.set_active_id(idle):
+            combo.append(idle, "A las %s h sin visitas" % idle)
+            combo.set_active_id(idle)
+        combo.connect("changed", lambda c: c.get_active_id() != idle and run_quick(
+            ["docker-reposo", "horas", c.get_active_id()],
+            lambda rc, out: (self.toast((out.strip().splitlines() or ["Hecho"])[-1]), self.build_tools(), False)[2]))
+        row.add_suffix(combo)
         lb.add(row)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 2)
         box.show_all()
 
     def nv_tunnel_tools(self):
-        """Configuración, Túnel de Cloudflare: cloudflared, la contraseña de los visitantes, cuándo se
-        cierra solo, si el admin se bloquea y el túnel abierto (con Cerrar)."""
-        box, lb = group("Túnel de Cloudflare",
+        """Configuración, Túnel de Cloudflare: cloudflared, el túnel abierto (con Cerrar) y su registro. La
+        contraseña, las horas y el admin de cada túnel se eligen al abrirlo («Compartir»)."""
+        box, lb = tile_group("Túnel de Cloudflare",
                         "Para enseñar una web de este equipo a un cliente o a un compañero: una dirección "
                         "https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, "
                         "que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se "
-                        "cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto.")
+                        "cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto, y "
+                        "ahí se elige su contraseña, cuánto dura y si se bloquea el admin.")
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 3)
-        conf = tunnel_conf()
-
         def fill(rc, out):
             info = next((f for f in parse_lines(out) if f[0] == "I" and len(f) >= 4), None)
             row = ActionRow("cloudflared", "Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)"
@@ -26542,36 +28791,14 @@ class App2(App):
             row.show_all()
             return False
         run_quick(["tunel"], fill)
-        row = ActionRow("Contraseña para los visitantes", "La piden al entrar: pásasela con la dirección. "
-                        "Vale para el siguiente túnel" if conf["CLAVE"] else "Se crea al compartir la primera vez")
-        if conf["CLAVE"]:
-            row.add_suffix(label(conf["CLAVE"], "nv-mono", selectable=True))
-            row.add_suffix(nv_button("edit-copy-symbolic", None, "Copiar la contraseña",
-                                     lambda *_: (Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(conf["CLAVE"], -1),
-                                                 self.toast("Contraseña del túnel copiada")), flat=True))
-        b = Gtk.Button(label="Nueva", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                       tooltip_text="Otra contraseña al azar (el túnel abierto sigue con la suya)")
-        b.connect("clicked", lambda *_: run_quick(["tunel-config", "clave-nueva"], lambda *a: (self.build_tools(), False)[1]))
-        row.add_suffix(b)
-        lb.add(row)
-        row = ActionRow("Se cierra solo", "Horas desde que se abre (de 1 a 12)")
-        spin = Gtk.SpinButton.new_with_range(1, 12, 1)
-        spin.set_value(int(conf["HORAS"]))
-        spin.set_valign(Gtk.Align.CENTER)
-        spin.set_sensitive(not self.busy)
-        spin.connect("value-changed", lambda w: run_quick(["tunel-config", "horas", str(w.get_value_as_int())], lambda *a: False))
-        row.add_suffix(spin)
-        row.add_suffix(label("h", "nv-tenue"))
-        lb.add(row)
-        on = conf["ADMIN"] != "permitir"
-        row = ActionRow("Bloquear el panel de administración", "wp-admin y el admin de PrestaShop no se abren por el túnel "
-                        "(tus BBDD llevan el administrador de pruebas, con una contraseña conocida)" if on else
-                        "⚠ Se pueden abrir por el túnel: cualquiera con la contraseña del túnel puede probar a entrar")
-        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
-        sw.connect("notify::active", lambda w, _p: run_quick(["tunel-config", "admin", "bloquear" if w.get_active() else "permitir"],
-                                                               lambda *a: (self.build_tools(), False)[1]))
-        row.add_suffix(sw)
-        lb.add(row)
+        # (cloudflared y el registro, juntos en una fila; el túnel abierto, debajo a lo ancho)
+        reg = os.path.join(LOG_DIR, "tunel", "registro")
+        if os.path.isfile(reg):
+            row = ActionRow("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)")
+            b = Gtk.Button(label="Ver", valign=Gtk.Align.CENTER)
+            b.connect("clicked", lambda *_: self.show_log_tail(reg))
+            row.add_suffix(b)
+            lb.add(row)
         st = tunnel_state()
         if st:
             row = ActionRow("Túnel abierto", "%s → %s, hasta las %s" % (st["url"], st["target"],
@@ -26581,11 +28808,7 @@ class App2(App):
             b = css(Gtk.Button(label="Cerrar", valign=Gtk.Align.CENTER), "destructive-action")
             b.connect("clicked", lambda *_: self.nv_tunnel_close())
             row.add_suffix(b)
-            lb.add(row)
-        reg = os.path.join(LOG_DIR, "tunel", "registro")
-        if os.path.isfile(reg):
-            row = ActionRow("Registro del túnel", "Quién entra, las contraseñas equivocadas y lo que se bloquea (el último túnel)")
-            row.add_suffix(nv_button("text-x-generic-symbolic", "Ver", None, lambda *_: self.show_log_tail(reg)))
+            row.wide = True
             lb.add(row)
         box.show_all()
 
@@ -26637,14 +28860,21 @@ class App2(App):
         conf = buttons_conf()
         names = dict((k, (n, i)) for k, n, i in VISOR_BUTTONS)
         dlg = Gtk.Dialog(title="Botones del proyecto", transient_for=self.win, modal=True, use_header_bar=True)
-        dlg.set_default_size(480, -1)
+        # (en horizontal: la lista a la izquierda y el estilo, el tamaño y la vista previa a la derecha, para
+        # que quepa en la altura de un portátil)
+        dlg.set_default_size(900, -1)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
         box.pack_start(label("Botones del visor del proyecto", "nv-titulo"), False, False, 0)
         box.pack_start(label("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ "
                              "y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.",
-                             "nv-tenue", wrap=True, max_width_chars=56), False, False, 0)
-        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
-        box.pack_start(lb, False, False, 0)
+                             "nv-tenue", wrap=True, max_width_chars=110), False, False, 0)
+        cols = Gtk.Box(spacing=26)
+        box.pack_start(cols, True, True, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
+        lb.set_size_request(320, -1)
+        cols.pack_start(lb, False, False, 0)
+        side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        cols.pack_start(side, True, True, 0)
 
         def fill():
             for row in lb.get_children():
@@ -26685,13 +28915,13 @@ class App2(App):
         grid.attach(scale, 1, 1, 1, 1)
         size_lbl = label("", "nv-mono", "nv-tenue", width_chars=9)
         grid.attach(size_lbl, 2, 1, 1, 1)
-        box.pack_start(grid, False, False, 0)
+        side.pack_start(grid, False, False, 0)
         # Vista previa: los botones que se ven, como quedarán (con Desmontar y ⋮)
-        box.pack_start(label("Así quedan", "nv-chico", "nv-tenue"), False, False, 0)
+        side.pack_start(label("Así quedan", "nv-chico", "nv-tenue"), False, False, 0)
         # (en varias filas si no caben: se ven todos, del tamaño que tendrán)
         preview = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8, row_spacing=8,
                               max_children_per_line=12, homogeneous=False, margin=4)
-        box.pack_start(preview, False, False, 0)
+        side.pack_start(preview, False, False, 0)
         touched = {"size": False}
 
         def show_preview(*_):
@@ -26714,6 +28944,8 @@ class App2(App):
                 if b.get_parent():
                     b.get_parent().remove(b)
                 b.set_can_focus(False)
+                # (cada uno de su tamaño, sin estirarse al ancho de la columna)
+                b.set_halign(Gtk.Align.START)
                 preview.add(b)
             preview.show_all()
 
@@ -26742,7 +28974,7 @@ class App2(App):
         rb = css(Gtk.Button(label="Como al principio", halign=Gtk.Align.START,
                             tooltip_text="Todos, en el orden de siempre y con su nombre (se aplica al guardar)"), "flat")
         rb.connect("clicked", reset)
-        box.pack_start(rb, False, False, 0)
+        side.pack_end(rb, False, False, 0)
         dlg.get_content_area().add(box)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
@@ -26765,7 +28997,7 @@ class App2(App):
     def nv_buttons_tools(self):
         """Configuración, Visor de los proyectos: sus botones (cuáles, en qué orden y cómo)."""
         conf = buttons_conf()
-        box, lb = group("Visor de los proyectos")
+        box, lb = tile_group("Visor de los proyectos")
         shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]
         row = ActionRow("Botones", "%s · %s" % (", ".join(shown) or "ninguno",
                                                 dict(BUTTON_STYLES)[conf["style"]].split(":")[0].lower()))
@@ -26791,33 +29023,70 @@ class App2(App):
         return b
 
     def nv_share(self, url, folder, name):
-        conf = tunnel_conf()
+        """Abre un túnel a esa web, con lo suyo, que se elige ahora: cuánto dura y si se bloquea el panel de
+        administración. Su contraseña, siempre una nueva al azar (se ve al abrirlo, para copiarla)."""
         st = tunnel_state()
-        hours = int(conf["HORAS"])
-        text = ("Cualquiera que tenga la dirección y la contraseña verá %s tal y como está en este equipo (lo que cambies, "
-                "al momento) mientras el túnel esté abierto. Se cierra solo en %s; también al pulsar «Cerrar el túnel». "
-                "%s" % (url, plural(hours, "hora", "horas"),
-                        "El panel de administración va bloqueado." if conf["ADMIN"] != "permitir" else
-                        "⚠ El panel de administración NO va bloqueado (Configuración, Túnel de Cloudflare)."))
+        dlg = Gtk.Dialog(title="Compartir", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(560, -1)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        head = Gtk.Box(spacing=10)
+        head.pack_start(logo("cloudflare", 30), False, False, 0)
+        head.pack_start(label("Compartir %s" % name, "nv-titulo", wrap=True), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        text = ("Cualquiera que tenga la dirección y la contraseña verá %s tal y como está en este equipo (lo que "
+                "cambies, al momento) mientras el túnel esté abierto." % url)
         if st:
             text += " Se cierra el que hay abierto (%s)." % st["target"]
         if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
             text += " La primera vez se descarga cloudflared, el programa de Cloudflare (unos 40 MB)."
-        if not confirm(self.win, "¿Compartir %s?" % name, text, "Compartir"):
-            return
-        args = ["tunel-abrir", url, folder]
+        text += " Lleva una contraseña nueva al azar: se ve al abrirlo, para copiarla y mandarla."
+        box.pack_start(label(text, "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
+        grid = Gtk.Grid(column_spacing=14, row_spacing=10, margin_top=4)
+        grid.attach(label("Se cierra solo en", valign=Gtk.Align.CENTER), 0, 1, 1, 1)
+        hours = Gtk.Box(spacing=6)
+        spin = Gtk.SpinButton.new_with_range(1, 12, 1)
+        spin.set_value(2)
+        hours.pack_start(spin, False, False, 0)
+        hours.pack_start(label("horas", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
+        grid.attach(hours, 1, 1, 2, 1)
+        grid.attach(label("Bloquear el panel de\nadministración", valign=Gtk.Align.CENTER), 0, 2, 1, 1)
+        sw = Gtk.Switch(active=True, halign=Gtk.Align.START, valign=Gtk.Align.CENTER)
+        grid.attach(sw, 1, 2, 1, 1)
+        note = label("", "nv-chico", wrap=True, max_width_chars=64)
+        box.pack_start(grid, False, False, 0)
+        box.pack_start(note, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Compartir", Gtk.ResponseType.OK), "nv-azul")
+        dlg.set_default_response(Gtk.ResponseType.OK)
 
-        def opened(ok, *_):
+        def update(*_):
+            note.set_label("wp-admin y el admin de PrestaShop no se abren por el túnel (tus BBDD llevan el administrador "
+                           "de pruebas, con una contraseña conocida)" if sw.get_active() else
+                           "⚠ El panel de administración se podrá abrir por el túnel: cualquiera con la contraseña puede "
+                           "probar a entrar")
+        sw.connect("notify::active", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        h, admin = str(spin.get_value_as_int()), "bloquear" if sw.get_active() else "permitir"
+        dlg.destroy()
+        if resp != Gtk.ResponseType.OK:
+            return
+        args = ["tunel-abrir", url, folder, "--horas", h, "--admin", admin]
+
+        def opened(ok_, *_):
             self.nv_tunnel_refresh()
-            if ok and tunnel_state():
+            if ok_ and tunnel_state():
                 self.nv_share_dialog()
         if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
             self.run_task("Instalando cloudflared", ["tunel-instalar"], auto_close=True, done_text="cloudflared instalado",
-                          on_done=lambda ok, *a: ok and GLib.idle_add(
+                          on_done=lambda ok_, *a: ok_ and GLib.idle_add(
                               lambda: self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True,
                                                     done_text="Túnel abierto", on_done=opened) and False))
             return
-        self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True, done_text="Túnel abierto", on_done=opened)
+        self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True, done_text="Túnel abierto",
+                      on_done=opened)
 
     def nv_share_dialog(self):
         """La dirección del túnel abierto y su contraseña, para copiarlas y mandarlas."""
@@ -26826,7 +29095,7 @@ class App2(App):
             self.toast("El túnel ya está cerrado")
             self.nv_tunnel_refresh()
             return
-        conf = tunnel_conf()
+        password, blocked = st.get("password", ""), st.get("admin") != "permitir"
         until = time.strftime("%H:%M", time.localtime(st["expires"]))
         clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         dlg = Gtk.Dialog(title="Túnel de Cloudflare", transient_for=self.win, modal=True, use_header_bar=True)
@@ -26837,7 +29106,7 @@ class App2(App):
         head.pack_start(label("Compartiendo %s" % st["target"], "nv-titulo", wrap=True), False, False, 0)
         box.pack_start(head, False, False, 0)
         grid = Gtk.Grid(column_spacing=14, row_spacing=8, margin_top=4)
-        for n, (title, value) in enumerate((("Dirección", st["url"]), ("Contraseña", conf["CLAVE"]))):
+        for n, (title, value) in enumerate((("Dirección", st["url"]), ("Contraseña", password))):
             grid.attach(label(title, "nv-tenue", xalign=0), 0, n, 1, 1)
             grid.attach(label(value, "nv-mono", selectable=True, xalign=0, hexpand=True), 1, n, 1, 1)
             grid.attach(nv_button("edit-copy-symbolic", None, "Copiar", lambda *_, v=value, w=title: (
@@ -26845,11 +29114,11 @@ class App2(App):
         box.pack_start(grid, False, False, 0)
         box.pack_start(label("Se cierra solo a las %s. %s Quién entra y lo que se bloquea queda en el registro del "
                              "túnel (Configuración, Túnel de Cloudflare)." % (
-                                 until, "El panel de administración va bloqueado." if conf["ADMIN"] != "permitir"
+                                 until, "El panel de administración va bloqueado." if blocked
                                  else "⚠ El panel de administración no va bloqueado."),
                              "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
         acts = Gtk.Box(spacing=8)
-        msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], conf["CLAVE"], until))
+        msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], password, until))
         acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "La dirección, la contraseña y hasta cuándo, "
                                   "en un texto para pegar en un correo o un mensaje",
                                   lambda *_: (clip.set_text(msg, -1), self.toast("Texto para enviar copiado")), "nv-azul"),
@@ -26882,6 +29151,26 @@ class App2(App):
                 fn()
             except Exception:  # noqa: BLE001 - una pestaña aún sin datos
                 pass
+
+    def nv_docker_dns(self, on):
+        """docker-web dns activar|quitar"""
+        if on:
+            if not confirm(self.win, "¿Activar el DNS de *.docker.test?",
+                           "Un DNS mínimo, solo en este equipo (127.0.0.1), que contesta a cualquier <algo>.docker.test. Los "
+                           "proyectos del Apache de Docker pasan a .docker.test (su configuración, el dominio de las tiendas en "
+                           "su BBDD y el certificado) y sus líneas salen de /etc/hosts. Desde entonces, añadir proyectos o "
+                           "versiones de Docker no pide la contraseña por los dominios. web.local, los proyectos de siempre y "
+                           "los dominios falseados de las tiendas no cambian. Si no contesta, se quita y todo sigue como "
+                           "estaba. Pide la contraseña de administrador.", "Activar"):
+                return
+        elif not confirm(self.win, "¿Quitar el DNS de *.docker.test?",
+                         "Los dominios de Docker siguen siendo .docker.test y vuelven a /etc/hosts. Pide la contraseña de "
+                         "administrador.", "Quitar", destructive=True):
+            return
+        self.run_task("Activando el DNS de *.docker.test" if on else "Quitando el DNS de *.docker.test",
+                      ["docker-web", "dns", "activar" if on else "quitar"],
+                      done_text="DNS de *.docker.test " + ("puesto" if on else "quitado"),
+                      on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
 
     def on_cross_site(self, sw, _p):
         on = sw.get_active()
@@ -26960,6 +29249,8 @@ class App2(App):
         stats.pack_start(c, True, True, 0)
         self.nv_db_disk()
         box.pack_start(stats, False, False, 0)
+        # Subir o actualizar una BBDD: antes de la tabla, en un visor hundido
+        box.pack_start(self.nv_db_import(), False, False, 0)
         tools = Gtk.Box(spacing=10)
         only = Gtk.Switch(active=self.db_only_active, valign=Gtk.Align.CENTER)
         only.connect("notify::active", lambda w, _p: (setattr(self, "db_only_active", w.get_active()), self.nv_db_table()))
@@ -26973,9 +29264,115 @@ class App2(App):
         self.db_table = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.pack_start(self.db_table, False, False, 0)
         self.nv_db_table()
-        # Subir o actualizar una BBDD: el formulario de siempre
-        box.pack_start(self.build_import(), False, False, 0)
         box.show_all()
+        self.update_import_button()
+
+    def nv_db_import(self):
+        """Subir o actualizar una BBDD, compacto: el fichero, la BBDD de destino, el proyecto y Cargar en
+        columnas, dentro de un visor hundido. Lo que hace es lo de siempre (on_pick_sql, on_import...)."""
+        d = self.data
+        act = next((i for i in d["installs"] if i["folder"] == d["active"]), None)
+        if act and self.imp["folder"] != act["folder"]:
+            # Otra version activa: sus bases son otras
+            self.imp.update(db=None, folder=act["folder"])
+        box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "nv-hundido")
+        head = Gtk.Box(spacing=8)
+        head.pack_start(symbol("document-send-symbolic", 16), False, False, 0)
+        head.pack_start(label("Subir o actualizar una BBDD", "nv-hundido-titulo"), False, False, 0)
+        head.pack_start(info_icon("Carga una copia .sql, .sql.gz o .zip en el MariaDB de la versión activa. Antes se "
+                                  "borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para "
+                                  "que no quede nada de lo anterior. Los .zip se descomprimen solos."), False, False, 0)
+        if act:
+            head.pack_start(label("en lampp-%s · MariaDB %s" % (act["folder"], act["mariadb"]), "nv-chico", "nv-tenue",
+                                  valign=Gtk.Align.CENTER), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        # (sin version activa: lo dice y no hay nada que elegir; update_import_button no se llama)
+        self.imp_btn = None
+        if not act:
+            box.pack_start(label("Activa una versión en Versiones de PHP para cargar BBDD.", "nv-chico", "nv-tenue"),
+                           False, False, 0)
+            return box
+
+        def column(title, widget, hint=None):
+            c = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            c.pack_start(label(title.upper(), "nv-chico", "nv-tenue"), False, False, 0)
+            c.pack_start(widget, False, False, 0)
+            if hint is not None:
+                c.pack_start(hint, False, False, 0)
+            return c
+        cols = Gtk.Box(spacing=16)
+        # Fichero
+        f = self.imp["file"]
+        name = "Ningún fichero elegido"
+        if f:
+            try:
+                name = "%s · %s" % (os.path.basename(f), fmt_size(os.path.getsize(f)))
+            except OSError:
+                name = "%s · ya no existe" % os.path.basename(f)
+        pick = Gtk.Box(spacing=6)
+        b = Gtk.Button(label="Elegir…", valign=Gtk.Align.CENTER)
+        b.connect("clicked", self.on_pick_sql)
+        pick.pack_start(b, False, False, 0)
+        fl = label(name, "nv-chico", "nv-mono" if f else "nv-tenue", ellipsize=2, max_width_chars=28,
+                   valign=Gtk.Align.CENTER)
+        if f:
+            fl.set_tooltip_text(f)
+        pick.pack_start(fl, True, True, 0)
+        # (lo que falta para poder cargar: debajo del fichero, que tiene sitio)
+        self.imp_hint = label("", "nv-chico", "nv-tenue", wrap=True, max_width_chars=36)
+        self.imp_hint.set_no_show_all(True)
+        cols.pack_start(column("Fichero SQL", pick, self.imp_hint), True, True, 0)
+        # BBDD de destino (con crear y borrar al lado)
+        dest = Gtk.Box(spacing=4)
+        combo = narrow(Gtk.ComboBoxText(valign=Gtk.Align.CENTER), 24)
+        for db in d["dbs"].get(act["folder"], []):
+            combo.append(db, db)
+        if self.imp["db"]:
+            combo.set_active_id(self.imp["db"])
+        if combo.get_active_id() is None:
+            self.imp["db"] = None
+            combo.append("@ninguna", "Elige una BBDD")
+            combo.set_active_id("@ninguna")
+        combo.connect("changed", self.on_pick_db)
+        dest.pack_start(combo, True, True, 0)
+        b = nv_button("list-add-symbolic", None, "Crear una BBDD nueva", self.on_create_db, flat=True)
+        dest.pack_start(b, False, False, 0)
+        self.imp_drop_btn = nv_button("user-trash-symbolic", None, "Borrar la BBDD elegida",
+                                      lambda *_: self.on_drop_db(self.imp["db"]), flat=True)
+        self.imp_drop_btn.set_sensitive(bool(self.imp["db"]))
+        dest.pack_start(self.imp_drop_btn, False, False, 0)
+        cols.pack_start(column("BBDD de destino", dest), True, True, 0)
+        # Proyecto de la base: queda como su base y, si es un WordPress, su wp-config.php la usa
+        folders = project_folders()
+        if self.imp.get("project") not in folders:
+            self.imp["project"] = None
+        # La primera vez con esta base se propone su proyecto; luego se respeta lo elegido
+        if self.imp["db"] and self.imp.get("project_for") != self.imp["db"]:
+            self.imp["project"] = guess_project(self.imp["db"], d["active"]) or self.imp["project"]
+            self.imp["project_for"] = self.imp["db"]
+        combo = narrow(Gtk.ComboBoxText(valign=Gtk.Align.CENTER), 24)
+        combo.append("@ninguno", "Ninguno")
+        for name in folders:
+            combo.append(name, name)
+        combo.set_active_id(self.imp["project"] or "@ninguno")
+        combo.connect("changed", self.on_pick_project)
+        self.imp_proj_combo = combo
+        # (la explicacion de debajo: la cambia on_pick_project)
+        self.imp_proj_hint = label(self.import_project_hint(), "nv-chico", "nv-tenue", wrap=True, max_width_chars=30)
+        cols.pack_start(column("Proyecto (opcional)", combo, self.imp_proj_hint), True, True, 0)
+        # Cargar
+        go = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.END)
+        self.imp_btn = css(Gtk.Button(label="Cargar"), "verde", "pildora")
+        self.imp_btn.connect("clicked", self.on_import)
+        go.pack_start(self.imp_btn, False, False, 0)
+        cols.pack_end(go, False, False, 0)
+        box.pack_start(cols, False, False, 0)
+        return box
+
+    def update_import_button(self):
+        # (sin version activa no hay boton Cargar)
+        if getattr(self, "imp_btn", None) is not None:
+            super().update_import_button()
 
     def nv_db_disk(self):
         """Tarjeta «Ocupan las BBDD»: la suma de las medidas de todas las versiones (cada una se mide
@@ -27465,7 +29862,9 @@ class App2(App):
         if kind:
             tl.pack_start(label(KIND_TEXT[kind], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
         info.pack_start(tl, False, False, 0)
-        info.pack_start(label(("PHP %s · MariaDB %s común · %s" % (" · ".join(p["versions"]), p["maria"], self.dk_url(p["domain"])))
+        info.pack_start(label(("PHP %s · %s · %s" % (" · ".join(p["versions"]),
+                                                    ("BBDD de lampp-%s en vivo (la de web.local)" % p["lampp"]) if p.get("lampp")
+                                                    else "MariaDB %s común" % p["maria"], self.dk_url(p["domain"])))
                               if web else "PHP %s · MariaDB %s · https://%s" % (p["php"], p["maria"], p["domain"]),
                               "nv-mono", "nv-chico", "nv-tenue", selectable=True, ellipsize=3), False, False, 0)
         top.pack_start(info, True, True, 0)
@@ -27544,6 +29943,16 @@ class App2(App):
                            lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
         vb.set_sensitive(not self.busy)
         conf = buttons_conf()
+        if kind in ("wp", "ps"):
+            x = {"name": p["folder"], "kind": kind}
+            ib = nv_button("image-x-generic-symbolic", "Imágenes de producción…",
+                           "Lo que falte de wp-content/uploads se pide a su web real (el mismo dominio que con LAMPP)"
+                           if kind == "wp" else "Descargar de su web real las imágenes de productos, categorías y marcas "
+                           "que faltan en su carpeta img", lambda *_: self.nv_wp_media(x) if kind == "wp" else self.nv_ps_images(x),
+                           "nv-proyecto-btn")
+            ib.set_sensitive(not self.busy)
+            self.nv_restyle(ib, conf, ("icono", "image-x-generic-symbolic"), "Imágenes")
+            acts.pack_start(ib, False, False, 0)
         self.nv_restyle(vb, conf, ("icono", "list-add-symbolic" if web else "go-up-symbolic"),
                         "Versiones de PHP" if web else "Pasar")
         acts.pack_start(vb, False, False, 0)
@@ -27562,8 +29971,11 @@ class App2(App):
         return card
 
     def nv_usage_tick(self):
-        """Cada 3 s, en segundo plano (leer /proc lleva unos milisegundos): CPU y RAM de Nexum y sus servicios."""
-        if getattr(self, "usage_busy", False):
+        """Cada 3 s, en segundo plano (leer /proc lleva unos milisegundos): CPU y RAM de Nexum y sus servicios.
+        Con la ventana minimizada u oculta, nada."""
+        gw = self.win.get_window()
+        if getattr(self, "usage_busy", False) or not self.win.get_visible() or not gw or \
+                gw.get_state() & Gdk.WindowState.ICONIFIED:
             return True
         self.usage_busy = True
 
@@ -27601,11 +30013,16 @@ class App2(App):
         d = self.docker or {}
         up = {c["name"] for c in d.get("containers", []) if c["state"] == "running"}
         m = re.fullmatch(r"nexum-mariadb-(\d+)-(\d+)", name)
-        if not m and name not in ("nexum-web", "nexum-pma"):
+        bridge = re.fullmatch(r"nexum-lampp-bd-(\d+(?:-\d+){1,2})", name)
+        if not m and not bridge and name not in ("nexum-web", "nexum-pma"):
             return []
         users = []
         for p in d.get("projects", []):
-            if not p.get("web") or (m and p["maria"] != "%s.%s" % m.groups()):
+            if not p.get("web"):
+                continue
+            if bridge and p.get("lampp") != bridge.group(1).replace("-", "."):
+                continue
+            if m and (p["maria"] != "%s.%s" % m.groups() or p.get("lampp")):
                 continue
             if any(re.fullmatch(r"nexum-%s-php\d{2}" % re.escape(p["slug"]), n) for n in up):
                 users.append(p["folder"])
@@ -27617,7 +30034,7 @@ class App2(App):
         if not users:
             return True
         many = len(users) > 1
-        if "mariadb" in " ".join(names):
+        if "mariadb" in " ".join(names) or "lampp-bd" in " ".join(names):
             text = ("Es común: ahora %s %s. %s sin BBDD (errores de conexión) hasta que la vuelvas a arrancar; "
                     "al arrancar un proyecto que va con ella, se arranca sola."
                     % ("la usan" if many else "la usa", ", ".join(users), "Se quedarán" if many else "Se quedará"))
@@ -27693,6 +30110,8 @@ class App2(App):
                 title = "Apache de Docker y phpMyAdmin"
             elif not p and re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or ""):
                 title = "MariaDB %s (común)" % proj[len("nexum-mariadb-"):].replace("-", ".")
+            elif not p and re.fullmatch(r"nexum-lampp-bd-\d+-\d+(-\d+)?", proj or ""):
+                title = "Puente a la BBDD de lampp-%s (en vivo)" % proj[len("nexum-lampp-bd-"):].replace("-", ".")
             visible = [c for c in items if (not self.dk_only_up or c["state"] == "running")
                        and (self.dk_query in c["name"].lower() or self.dk_query in title.lower())]
             if not visible:
@@ -27720,7 +30139,7 @@ class App2(App):
                 php.connect("clicked", lambda *_, p=p: self.nv_docker_versions(p) if p.get("web") else self.on_docker_php(p))
                 img_cell = Gtk.Box()
                 img_cell.pack_start(php, False, False, 0)
-                pma = label("pma.docker.local" if web else "%s:80" % p["pma"] if p["pma"].isdigit() else "—",
+                pma = label(docker_pma_domain() if web else "%s:80" % p["pma"] if p["pma"].isdigit() else "—",
                             "nv-mono", "nv-chico", "nv-enlace")
                 acts = actions(([] if web else [
                     ("go-up-symbolic", "Pasarlo al Apache de Docker: sin LAMPP y con varias versiones de PHP a la vez",
@@ -27738,7 +30157,9 @@ class App2(App):
                     ("software-update-available-symbolic", "Actualizar la imagen de PHP %s con lo último de Docker Hub "
                      "(parches de seguridad); la BBDD y la configuración no cambian" % p["php"],
                      lambda p=p: self.nv_docker_update_image(p), True),
-                    ("text-x-generic-symbolic", "Registros", lambda p=p: self.run_task("Registros de %s" % p["folder"], ["docker-registros", p["slug"]]), True),
+                    ("text-x-generic-symbolic", "Registros", lambda p=p: self.run_task("Registros de %s" % p["folder"], ["docker-registros", p["slug"]]), True)] + (
+                    [("network-transmit-receive-symbolic", "BBDD: la de LAMPP en vivo (la misma que web.local) o su copia de Docker",
+                      lambda p=p: self.nv_docker_db_mode(p), True)] if web and p.get("kind") == "wp" else []) + [
                     ("user-trash-symbolic", "Eliminar el proyecto de Docker: sus contenedores y la copia de su BBDD "
                      "(la carpeta y la BBDD de LAMPP no se tocan)", lambda p=p: self.on_docker_delete(p), True)])
             else:
@@ -27751,6 +30172,21 @@ class App2(App):
                                      lambda up=up: (not up or self.nv_stop_shared_ok(["nexum-web"], "el Apache de Docker")) and self.run_task(
                                          "Parando el Apache de Docker" if up else "Arrancando el Apache de Docker",
                                          ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])
+                elif re.fullmatch(r"nexum-lampp-bd-\d+-\d+(-\d+)?", proj or "") and len(items) == 1:
+                    # (el puente de los proyectos de Docker que usan en vivo la BBDD de esa version LAMPP)
+                    ver = proj[len("nexum-lampp-bd-"):].replace("-", ".")
+                    users = [q["folder"] for q in d["projects"] if q.get("lampp") == ver]
+                    name.set_tooltip_text("Lleva las conexiones de %s a la MariaDB de lampp-%s (la misma BBDD que "
+                                          "web.local). Se quita solo cuando ningún proyecto de Docker la usa."
+                                          % (", ".join(users) or "los proyectos de Docker", ver))
+                    acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
+                                     "Parar el puente (%s se queda%s sin BBDD)" % (", ".join(users) or "ningún proyecto",
+                                                                                   "n" if len(users) > 1 else "")
+                                     if up else "Arrancar el puente",
+                                     lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
+                                         ("Parando %s" if up else "Arrancando %s") % t,
+                                         ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
+                                         on_done=done), True)])
                 elif re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or "") and len(items) == 1:
                     acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                                      "Parar %s (los proyectos que van con ella se quedan sin BBDD)" % title if up else
@@ -28993,6 +31429,151 @@ function cli_rebuild() {
     install_plan "rehacer:$full"
 }
 
+# ===========================================================================
+# Componentes: los parches nuevos de todo lo que usa el gestor
+# ===========================================================================
+# Lo que tiene un parche nuevo publicado: cada version de PHP (su PHP, Apache, MariaDB, ProFTPD, Perl y
+# phpMyAdmin, frente a lo ultimo de su rama), las imagenes de Docker que se usan (las MariaDB comunes,
+# phpMyAdmin y la base de cada imagen de PHP, frente a su huella en Docker Hub: sin descargar nada), y
+# Mailpit y cloudflared (frente a los que pone esta version del gestor). componentes [--sin-docker]:
+#   L|carpeta|componente|instalada|nueva   una version de PHP: se rehace entera con lo ultimo de su rama
+#   F|carpeta|motivo                       una version que no se pone al dia sola (parche concreto, XAMPP)
+#   K|imagen|para que                      una imagen de Docker con una version nueva en Docker Hub
+#   X|programa|instalada|nueva             Mailpit o cloudflared
+#   E|lo que no se ha podido consultar
+#   S|cuantos componentes tienen parche nuevo
+function components_check() {
+    local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
+    local a b
+    releases=$(php_releases)
+    [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
+    for dir in $(lampp_dirs); do
+        name=${dir#/opt/lampp-}
+        is_fpm_install "$dir" || { echo "F|$name|XAMPP oficial: no se rehace (instala una versión de PHP nueva al lado)"; continue; }
+        cur=$(stack_fields "$dir")
+        [ "$name" != "$(cut -d'|' -f1 <<< "$cur" | sed 's/\.[0-9]*$//')" ] && { echo "F|$name|parche concreto de PHP: se queda en el suyo"; continue; }
+        [ -z "$releases" ] && continue
+        full=$(rebuild_version "$dir" "$releases")
+        [ -z "$full" ] && { echo "E|la última versión de la rama de lampp-$name"; continue; }
+        new=$(stack_versions "$full")
+        IFS='|' read -r -a a <<< "$cur"
+        IFS='|' read -r -a b <<< "$new"
+        for i in 0 1 2 3 4 5; do
+            # (lo que no se ha podido consultar sale como su rama seguida de .x: no cuenta)
+            [ -z "${b[$i]}" ] || [[ "${b[$i]}" == *.x ]] && continue
+            if [ "${a[$i]}" != "${b[$i]}" ] && [ "$(printf '%s\n%s\n' "${a[$i]}" "${b[$i]}" | sort -V | tail -1)" == "${b[$i]}" ]; then
+                echo "L|$name|${names[$i]}|${a[$i]:-?}|${b[$i]}"
+                n=$((n + 1))
+            fi
+        done
+    done
+    if [ "$1" != --sin-docker ] && docker_ready > /dev/null 2>&1; then
+        for v in $(docker_maria_versions); do
+            img=mariadb:$v
+            docker_image_outdated "$img" && { echo "K|$img|la MariaDB $v común de Docker"; n=$((n + 1)); }
+        done
+        if dk image inspect "$DOCKER_PMA_IMAGE" > /dev/null 2>&1 && docker_image_outdated "$DOCKER_PMA_IMAGE"; then
+            echo "K|$DOCKER_PMA_IMAGE|phpMyAdmin de Docker"
+            n=$((n + 1))
+        fi
+        for v in $DOCKER_PHP_VERSIONS; do
+            dk image inspect "nexum-php:$v" > /dev/null 2>&1 || continue
+            img=php:$v-fpm
+            docker_image_outdated "$img" && { echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1)); }
+        done
+    fi
+    if mailpit_installed && [ "$(mailpit_installed_version)" != "$MAILPIT_VERSION" ]; then
+        echo "X|Mailpit|$(mailpit_installed_version)|$MAILPIT_VERSION"
+        n=$((n + 1))
+    fi
+    if tunnel_installed && [ "$(tunnel_installed_version)" != "$TUNNEL_VERSION" ]; then
+        echo "X|cloudflared|$(tunnel_installed_version)|$TUNNEL_VERSION"
+        n=$((n + 1))
+    fi
+    echo "S|$n"
+}
+
+# ¿Hay en Docker Hub una version nueva de una imagen que ya esta en este equipo? Compara su huella
+# (la de la etiqueta, con una consulta HEAD que no cuenta para los limites de Docker Hub) con la de
+# la descargada. Sin la imagen o sin respuesta: no (no se puede saber)
+function docker_image_outdated() {
+    local img=$1 repo tag token remote local_d
+    repo=${img%%:*} tag=${img#*:}
+    [[ "$repo" == */* ]] || repo=library/$repo
+    local_d=$(dk image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$img" 2> /dev/null | sed -n 's/^[^@]*@//p' | head -1)
+    [ -z "$local_d" ] && return 1
+    token=$(curl -q --proto =https -fsS --max-time 15 "https://auth.docker.io/token?service=registry.docker.io&scope=repository:$repo:pull" 2> /dev/null \
+        | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["token"])' 2> /dev/null) || return 1
+    remote=$(curl -q --proto =https -fsSI --max-time 15 -H "Authorization: Bearer $token" \
+        -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json" \
+        "https://registry-1.docker.io/v2/$repo/manifests/$tag" 2> /dev/null | tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: *//p' | head -1)
+    [[ "$remote" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+    [ "$remote" != "$local_d" ]
+}
+
+# componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
+# (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
+# PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version
+function components_update() {
+    local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    echo "Buscando parches nuevos..."
+    out=$(components_check)
+    while IFS= read -r line; do
+        IFS='|' read -r -a f <<< "$line"
+        case ${f[0]} in
+            L) echo "  lampp-${f[1]}: ${f[2]} ${f[3]} → ${f[4]}"
+               [[ " $folders " == *" ${f[1]} "* ]] || folders+=" ${f[1]}" ;;
+            K) echo "  ${f[1]} (${f[2]}): versión nueva en Docker Hub"; imgs+=" ${f[1]}" ;;
+            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"; progs+=" ${f[1]}" ;;
+            E) echo "  (no se ha podido consultar: ${f[1]})" ;;
+        esac
+    done <<< "$out"
+    if [ -z "$folders$imgs$progs" ]; then
+        echo "Todo está al día: no hay parches nuevos."
+        return 0
+    fi
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
+    for v in $imgs; do
+        case $v in
+            mariadb:*)
+                v=${v#mariadb:}
+                echo "MariaDB $v común de Docker: la imagen nueva y su contenedor de nuevo (sus BBDD no cambian)"
+                # (y, de paso, que se ponga al dia sola al cambiar de parche: MARIADB_AUTO_UPGRADE)
+                cf=$DOCKER_DIR/mariadb-$v/compose.yaml
+                if dk pull "mariadb:$v" && awk '/^      MARIADB_AUTO_UPGRADE:/ { next } { print } /^      MARIADB_ROOT_PASSWORD: / { print "      MARIADB_AUTO_UPGRADE: \"1\"" }' "$cf" > "$cf.nuevo" \
+                        && chmod 600 "$cf.nuevo" && mv -f "$cf.nuevo" "$cf"; then
+                    [ -n "$(dk ps -q --filter "name=^$(docker_maria_name "$v")\$" 2> /dev/null)" ] && { docker_maria_up "$v" > /dev/null || fail=1; }
+                else
+                    fail=1
+                fi ;;
+            "$DOCKER_PMA_IMAGE")
+                echo "phpMyAdmin de Docker: la imagen nueva"
+                dk pull "$DOCKER_PMA_IMAGE" || { fail=1; continue; }
+                [ "$(docker_web_state)" == marcha ] && { docker_web_up > /dev/null || fail=1; } ;;
+            php:*)
+                v=${v#php:}; v=${v%-fpm}
+                echo "Imagen de PHP $v de Docker: de nuevo, con lo último de Docker Hub"
+                docker_php_image "$v" --nueva || { echo "No se ha podido rehacer la imagen de PHP $v: sigue con la anterior"; fail=1; continue; }
+                for slug in $(docker_projects); do
+                    [[ " $(docker_conf "$slug" PHP) " == *" $v "* ]] || continue
+                    dir=$DOCKER_DIR/$slug
+                    running=$(dk ps --filter "label=com.docker.compose.project=nexum-$slug" --format '{{.Label "com.docker.compose.service"}}' 2> /dev/null)
+                    [ -n "$running" ] && { dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d $running > /dev/null || fail=1; }
+                done ;;
+        esac
+    done
+    [ -n "$imgs" ] && dk image prune -f > /dev/null 2>&1
+    [[ " $progs " == *" Mailpit "* ]] && { mailpit_install || fail=1; }
+    [[ " $progs " == *" cloudflared "* ]] && { tunnel_install || fail=1; }
+    for v in $folders; do
+        echo "lampp-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"
+        ( cli_rebuild "$v" ) || fail=1
+    done
+    [ $fail -eq 0 ] && echo "Todo al día." || echo "Algo no se ha podido actualizar: mira lo de arriba."
+    return $fail
+}
+
 # actualizar-a <version> <php>: pasa una version a otro parche de PHP de su rama. Para las que no se
 # actualizan en su carpeta: una lampp-X.Y.Z (se queda en su parche) o un XAMPP (sus binarios no se
 # pueden arreglar). Instala PHP <php> con su pila propia en lampp-<php>, al lado (la de antes no se
@@ -29286,9 +31867,8 @@ case "$1" in
     docker-web) shift; docker_web_command "$@" ;;
     tunel) tunnel_status ;;
     tunel-instalar) tunnel_install ;;
-    tunel-abrir) tunnel_open "$2" "$3" ;;
+    tunel-abrir) shift; tunnel_open "$@" ;;
     tunel-cerrar) tunnel_close ;;
-    tunel-config) shift; tunnel_config "$@" ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
@@ -29347,7 +31927,7 @@ case "$1" in
     media-produccion) media_proxy "$2" "$3" ;;
     media-proyecto) media_project "$2" "$3" ;;
     gui-wp-produccion) gui_wp_prod "$2" ;;
-    ps-imagenes) ps_images "$2" ;;
+    ps-imagenes) ps_images "$2" "$3" ;;
     hosts-enlace) hosts_fix_link ;;
     nuevo-dominio) new_custom_domain "$2" "$3" "$4" ;;
     vhosts|editar-vhosts) edit_vhosts "$2" ;;
@@ -29355,6 +31935,15 @@ case "$1" in
     add) register_lampp "$2" ;;
     add-php) UI=text; install_plan "php:$2" ;;
     rehacer|actualizar) cli_rebuild "$2" ;;
+    github) shift; github_command "$@" ;;
+    github-conectar) github_connect "$2" ;;
+    github-desconectar) github_disconnect ;;
+    repos) shift; repos_list "$@" ;;
+    repo-traer) repo_fetch "$2" "$3" ;;
+    docker-bd) docker_db_mode "$2" "$3" "$4" ;;
+    docker-reposo) shift; docker_idle_command "$@" ;;
+    componentes) components_check "$2" ;;
+    componentes-actualizar) components_update ;;
     actualizar-a) upgrade_to "$2" "$3" ;;
     add-xampp) ( install_xampp "$2" ) ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;

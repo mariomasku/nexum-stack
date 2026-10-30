@@ -1,5 +1,5 @@
 #!/bin/bash
-# Batería de pruebas de seguridad de lvm-instalador. Se pasa entera en cada versión.
+# Batería de pruebas de seguridad de lvm-instalador. Se pasa entera en cada versión (sus grupos, en paralelo).
 # Uso: todas.sh [linux.sh] [mac.sh] [empaquetar-deb.sh] [mac-1.27.1.sh de referencia]
 # Sin argumentos: LVM_SCRIPT (por defecto ../lvm-instalador.sh), LVM_SCRIPT_MAC (por defecto
 # ../macos/lvm-instalador.sh o, si no esta, el lvm-instalador.sh del zip mas reciente de
@@ -23,22 +23,49 @@ fi
 E=${3:-${LVM_EMPAQUETAR:-$RAIZ/empaquetar-deb.sh}}
 OLD=${4:-${LVM_MAC_ANTIGUO:-$HERE/datos/mac-1.27.1-xampp.sh}}
 total=0 bad=0
+# Los grupos van en paralelo (cada uno en su carpeta temporal y con sus puertos): tantos a la vez como
+# nucleos (LVM_PRUEBAS_A_LA_VEZ para cambiarlo; 1, uno detras de otro). El resultado sale en su orden; con
+# LVM_TIEMPOS=1, con lo que tarda cada grupo
+N=${LVM_PRUEBAS_A_LA_VEZ:-$(nproc 2> /dev/null || echo 4)}
+items=() n=0
 suite() {
-    local name=$1; shift
-    local out rc
-    out=$("$@" 2>&1); rc=$?
-    local ok=$(grep -c '^  ok' <<< "$out") ko=$(grep -c 'FALLA' <<< "$out")
-    total=$((total + ok + ko)); bad=$((bad + ko))
-    if [ $rc -eq 0 ] && [ "$ko" -eq 0 ]; then
-        printf '  %-34s %3d ok\n' "$name" "$ok"
-    else
-        printf '  %-34s %3d ok, %d FALLAN (rc %d)\n' "$name" "$ok" "$ko" "$rc"; grep -E 'FALLA|rror' <<< "$out" | head -8 | sed 's/^/      /'
-        [ "$ko" -eq 0 ] && bad=$((bad + 1))
-    fi
+    local name=$1 f
+    shift
+    n=$((n + 1)) f=$LVM_TMP/grupo.$n
+    items+=("s|$n|$name")
+    while [ "$(jobs -rp | wc -l)" -ge "$N" ]; do wait -n; done
+    # (los que arrancan una MariaDB de verdad, de uno en uno: a la vez se quedan sin recursos al crearla)
+    local a lock=()
+    for a in "$@"; do
+        [[ "$a" == *.sh ]] && [ -f "$a" ] && grep -q "mysql_install_db" "$a" && lock=(flock "$LVM_TMP/mariadb.lock")
+    done
+    # (sin entrada: una prueba que se pusiera a leer del teclado se quedaria esperando para siempre)
+    ( t0=$(date +%s%N); "${lock[@]}" "$@" > "$f.out" 2>&1 < /dev/null; echo $? > "$f.rc"; echo $(( ($(date +%s%N) - t0) / 1000000 )) > "$f.ms" ) &
+}
+note() { items+=("e|$*"); }
+report() {
+    local it kind idx name out rc ok ko ms
+    wait
+    for it in "${items[@]}"; do
+        kind=${it%%|*}
+        if [ "$kind" == e ]; then echo "${it#e|}"; continue; fi
+        idx=$(cut -d'|' -f2 <<< "$it") name=$(cut -d'|' -f3- <<< "$it")
+        out=$(cat "$LVM_TMP/grupo.$idx.out" 2> /dev/null) rc=$(cat "$LVM_TMP/grupo.$idx.rc" 2> /dev/null || echo 1)
+        ms=$(cat "$LVM_TMP/grupo.$idx.ms" 2> /dev/null || echo 0)
+        ok=$(grep -c '^  ok' <<< "$out") ko=$(grep -c 'FALLA' <<< "$out")
+        total=$((total + ok + ko)); bad=$((bad + ko))
+        [ "${LVM_TIEMPOS:-0}" == 1 ] && name+=" ($((ms / 1000)),$((ms % 1000 / 100)) s)"
+        if [ "$rc" -eq 0 ] && [ "$ko" -eq 0 ]; then
+            printf '  %-34s %3d ok\n' "$name" "$ok"
+        else
+            printf '  %-34s %3d ok, %d FALLAN (rc %d)\n' "$name" "$ok" "$ko" "$rc"; grep -E 'FALLA|rror' <<< "$out" | head -8 | sed 's/^/      /'
+            [ "$ko" -eq 0 ] && bad=$((bad + 1))
+        fi
+    done
 }
 for s in "$L" "$M" "$E" "$OLD"; do [ -f "$s" ] || { echo "No esta $s"; exit 1; }; done
 for s in "$L" "$M"; do bash -n "$s" || { echo "sintaxis: $s"; exit 1; }; done
-echo "Linux ($L, $(grep -m1 '^APP_VERSION=' "$L" | cut -d'"' -f2))"
+note "Linux ($L, $(grep -m1 '^APP_VERSION=' "$L" | cut -d'"' -f2))"
 suite "ayudante de actualizacion" "$HERE/ayudante.sh" "$E" "$L"
 suite "volcados (MariaDB temporal)" "$HERE/volcados.sh" "$L"
 suite "certificados y dominios" "$HERE/certs.sh" "$L"
@@ -76,7 +103,15 @@ suite "túnel de Cloudflare (1.56.0)" "$HERE/tunel.sh" "$L"
 suite "botones a tu gusto y cuándo se actualiza (1.56.1-1.56.2)" "$HERE/botones-actualizar.sh" "$L"
 suite "parar los contenedores de Nexum (1.56.2)" "$HERE/docker-parar.sh" "$L"
 suite "consumo de Nexum en el visor (1.56.2)" "$HERE/consumo.sh" "$L"
-echo "Mac ($M, $(grep -m1 '^APP_VERSION=' "$M" | cut -d'"' -f2))"
+suite "repositorio privado: se prueba por SSH (1.56.3)" "$HERE/clonar-ssh.sh" "$L"
+suite "parches nuevos de los componentes (1.56.8)" "$HERE/componentes.sh" "$L"
+suite "pestaña Repositorios (1.56.8)" "$HERE/repos.sh" "$L"
+suite "parar los proyectos sin visitas (1.56.8)" "$HERE/reposo.sh" "$L"
+suite "terminal en la ventana (1.56.12)" "$HERE/terminal.sh" "$L"
+suite "asistente de nuevo proyecto (1.56.13)" "$HERE/nuevo-proyecto.sh" "$L"
+suite "dependencias con apt, con repositorios rotos (1.56.15)" "$HERE/apt.sh" "$L"
+suite "BBDD de LAMPP en Docker, en vivo (1.56.10)" "$HERE/bd-vivo.sh" "$L"
+note "Mac ($M, $(grep -m1 '^APP_VERSION=' "$M" | cut -d'"' -f2))"
 suite "volcados (MariaDB temporal)" "$HERE/volcados.sh" "$M"
 suite "certificados y dominios" "$HERE/certs.sh" "$M"
 suite "SECURE_PY" "$HERE/secure.sh" "$M"
@@ -112,5 +147,13 @@ suite "túnel de Cloudflare (1.40.0)" "$HERE/tunel.sh" "$M"
 suite "Docker con su propio Apache (1.40.0)" "$HERE/docker-web-mac.sh" "$M"
 suite "parar los contenedores de Nexum (1.40.0)" "$HERE/docker-parar.sh" "$M"
 suite "ventana 1.40.0 (Swift)" "$HERE/mac-ventana-140.sh" "$M"
+suite "repositorio privado: se prueba por SSH (1.40.1)" "$HERE/clonar-ssh.sh" "$M"
+suite "parches nuevos de los componentes (1.40.1)" "$HERE/componentes.sh" "$M"
+suite "pestaña Repositorios (1.40.1)" "$HERE/repos.sh" "$M"
+suite "parar los proyectos sin visitas (1.40.1)" "$HERE/reposo.sh" "$M"
+suite "terminal en la ventana (1.40.1)" "$HERE/terminal.sh" "$M"
+suite "asistente de nuevo proyecto (1.40.1)" "$HERE/nuevo-proyecto.sh" "$M"
+suite "BBDD de XAMPP-X en Docker, en vivo (1.40.1)" "$HERE/bd-vivo-mac.sh" "$M"
+report
 echo "Total: $total pruebas, $bad fallos"
 [ $bad -eq 0 ]

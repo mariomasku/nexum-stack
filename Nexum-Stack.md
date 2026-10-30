@@ -1,7 +1,7 @@
 # Nexum Dev Stack (lvm-instalador)
 
 **Gestor de entornos locales de desarrollo para Linux y Mac**
-Versión actual: **Linux 1.56.2** · **Mac 1.40.0** · Autor: M. Mascuñano
+Versión actual: **Linux 1.56.13** · **Mac 1.40.1** · Autor: M. Mascuñano
 
 ---
 
@@ -127,6 +127,25 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 - **Solo Linux:** registrar un XAMPP instalado a mano y volver a crear el icono del menú.
 - **Solo Mac:** apartar un **XAMPP oficial** que ya tuviera el compañero (copiando antes sus bases, proyectos y vhosts, sin borrar nada), cargar esas copias en el gestor y volver al XAMPP oficial si hiciera falta.
 
+### 3.5.1 Repositorios (apartado **Repositorios**)
+
+- La lista de los repositorios de la organización de GitHub (por ejemplo, hexer-dev), como en DevHub: solo los que empiezan por los **prefijos** de Configuración (de partida `dob-wordpress-` y `dob-prestashop-`; se añaden otros, como los de Shopify, cuando los haya), o todos con **«Mostrar todos»**, y un buscador.
+- **Clonar** lo clona por SSH, con la clave de cada uno, en la carpeta de proyectos; luego se carga como cualquier proyecto.
+- Si ya está clonado, se pregunta si **aplastarlo**: se traen sus cambios con `git pull`. Si chocan con lo que se tiene sin subir, no se toca nada y se avisa.
+- La lista se lee con un **token de GitHub** que se guarda en el llavero del sistema (no en un fichero), o con la sesión de `gh` si ya está iniciada. Se configura en Configuración, GitHub.
+
+### 3.5.2 Proyectos de Docker que se paran solos (Configuración, Docker)
+
+- Un proyecto de Docker que lleva unas horas (3 de partida, configurable de 1 a 24 o nunca) sin ninguna visita se para solo, y con él su MariaDB y el Apache de Docker si ya no los usa nadie: con varios proyectos abiertos, los que no se tocan dejan de gastar memoria y CPU. Se comprueba cada 15 minutos aunque la ventana esté cerrada. Al entrar en uno parado, la web lo dice; se arranca desde la pestaña Docker.
+
+### 3.5.3 Docker con la BBDD de LAMPP en vivo
+
+- Un WordPress montado en Docker puede usar la BBDD de cualquier versión de PHP de LAMPP en vivo: la misma que web.local, sin copias. Si la MariaDB de esa versión no está en marcha, se arranca solo ella (sin red, sin chocar con la versión activa) y se para cuando ningún proyecto de Docker la usa. Las tiendas PrestaShop siguen con su copia, porque guardan su dominio en la BBDD.
+
+### 3.5.4 Parches nuevos (Configuración)
+
+- Busca los parches publicados de todo lo que usa la aplicación: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP), Mailpit y cloudflared. **Actualizar todo** lo pone al día. Se comprueba sola al abrir la ventana (el primer arranque del día y cada pocos arranques) y, si hay algo, lo ofrece.
+
 ### 3.6 Lo del manual que ahora se hace solo
 
 | Paso del manual | Ahora |
@@ -203,6 +222,8 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 | `lvm-instalador cargar-proyecto <carpeta> [versión]` | Carga un proyecto (y su dominio si es PrestaShop o proyecto nuevo). |
 | `lvm-instalador montar-proyecto <url de git> <carpeta> <versión> <base> [volcado]` | Clona un proyecto de GitHub, crea su base y lo deja cargado. |
 | `lvm-instalador nuevo-dominio <dominio> <carpeta> [base]` | Proyecto nuevo con su dominio de producción falseado. |
+| `lvm-instalador repos` / `repo-traer <dueño/repo> [--actualizar]` | Lista los repositorios de GitHub de la organización; clona uno por SSH o trae sus cambios. |
+| `lvm-instalador componentes` / `componentes-actualizar` | Parches nuevos de todos los componentes, y ponerlos al día. |
 | `lvm-instalador hosts-falsear <dominio> si/no` | Falsea o deja de falsear un dominio. |
 | `lvm-instalador asegurar` | Deja las versiones accesibles solo desde este equipo. |
 | `lvm-instalador --simular <comando>` | Muestra lo que haría sin cambiar nada. |
@@ -226,7 +247,7 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 
 ## 8. Estado y pendientes
 
-- **Linux:** versión 1.56.2, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
+- **Linux:** versión 1.56.13, probada en Ubuntu 24.04. Pendiente de comprobar en un equipo con Ubuntu 20.04.
 - **Mac:** versión 1.36.0, con las mismas funciones que Linux. Se probó a fondo en un Mac real hasta la 1.12.0; las versiones posteriores pasan la batería de pruebas automáticas, pero quedan por comprobar en un Mac real "Apartar" con un XAMPP oficial de un compañero y que el navegador acepte los certificados de los proyectos. La versión de Mac todavía no lleva el nombre Nexum Dev Stack.
 - **Actualizaciones desde GitHub:** desde la 1.50.0. Pendiente de la primera prueba completa: publicar la 1.50.1 e instalarla con **Buscar actualizaciones**.
 - **Manual interactivo:** pendiente de rehacer con datos de ejemplo (las capturas actuales son de un equipo real).

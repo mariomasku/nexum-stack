@@ -8,14 +8,14 @@ W=$(mktemp -d "$TMPBASE/w-tunel.XXXX") || exit 1
 UP=""
 trap '[ -n "$UP" ] && kill $UP 2> /dev/null; [ -n "$(tunnel_pid 2> /dev/null)" ] && tunnel_close > /dev/null; rm -rf "$W"' EXIT
 grep -q '^function tunnel_open() {' "$SRC" || { echo "  ok    (sin tunel de Cloudflare)"; exit 0; }
-extract "$SRC" tunnel_installed tunnel_installed_version tunnel_install tunnel_conf tunnel_new_pass \
-    tunnel_conf_write tunnel_config tunnel_pid tunnel_close tunnel_open tunnel_status || exit 1
+extract "$SRC" tunnel_installed tunnel_installed_version tunnel_install tunnel_new_pass \
+    tunnel_pid tunnel_close tunnel_open tunnel_status || exit 1
 eval "$(sed -n "/^TUNNEL_PY=\$(cat <<'PYEOF'/,/^PYEOF/p" "$SRC"; echo ')')"
 [ -n "$TUNNEL_PY" ] || { echo "no esta TUNNEL_PY"; exit 1; }
 
 LOG_DIR=$W/log DRY=0 HTDOCS_DIR=$W/htdocs TEST_DIR=$W
 TUNNEL_VERSION=$(grep -oP '^TUNNEL_VERSION="\K[^"]+' "$SRC")
-TUNNEL_DIR=$LOG_DIR/tunel TUNNEL_BIN=$LOG_DIR/tunel/cloudflared TUNNEL_CONF=$LOG_DIR/tunel/config
+TUNNEL_DIR=$LOG_DIR/tunel TUNNEL_BIN=$LOG_DIR/tunel/cloudflared
 TUNNEL_STATE=$LOG_DIR/tunel/estado TUNNEL_LOG=$LOG_DIR/tunel/registro
 ICON_PNG_B64=$(printf 'png' | base64)
 mkdir -p "$LOG_DIR" "$HTDOCS_DIR/tienda/admin123abc" "$HTDOCS_DIR/tienda/img"
@@ -39,15 +39,13 @@ out=$(tunnel_install 2>&1); rc=$?
 check "instalar: con su sha256, queda en su carpeta y con su version" '[ $rc -eq 0 ] && tunnel_installed && [ "$(tunnel_installed_version)" == "$TUNNEL_VERSION" ]'
 check "instalar: la carpeta del tunel, solo tuya" '[ "$(stat -c %a "$TUNNEL_DIR")" == 700 ]'
 
-# Configuracion
-tunnel_config horas 0 > /dev/null; rc=$?
-check "config: las horas, de 1 a 12" '[ $rc -ne 0 ] && tunnel_config horas 12 > /dev/null && [ "$(tunnel_conf HORAS)" == 12 ]'
-tunnel_config clave-nueva > /dev/null
-k1=$(tunnel_conf CLAVE); tunnel_config clave-nueva > /dev/null; k2=$(tunnel_conf CLAVE)
-check "config: contraseña al azar, facil de dictar y nueva cada vez" '[[ "$k1" =~ ^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$ ]] && [ "$k1" != "$k2" ]'
-check "config: el fichero, solo tuyo" '[ "$(stat -c %a "$TUNNEL_CONF")" == 600 ]'
-check "config: el admin, bloqueado salvo que se diga" '[ "$(tunnel_conf ADMIN)" == bloquear ] && ! tunnel_config admin abierto > /dev/null'
-tunnel_config horas 2 > /dev/null
+# Lo de cada tunel: sus horas, el admin y su contraseña (sin configuracion comun)
+k1=$(tunnel_new_pass); k2=$(tunnel_new_pass)
+check "contraseña al azar, facil de dictar y nueva cada vez" '[[ "$k1" =~ ^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$ ]] && [ "$k1" != "$k2" ]'
+out=$(tunnel_open http://localhost/ --horas 0 2>&1); rc=$?
+check "abrir: las horas, de 1 a 12" '[ $rc -ne 0 ] && grep -q "de 1 a 12" <<< "$out"'
+out=$(tunnel_open http://localhost/ --admin abierto 2>&1); rc=$?
+check "abrir: el admin, bloquear o permitir" '[ $rc -ne 0 ] && grep -q "bloquear o permitir" <<< "$out"'
 
 # Solo webs de este equipo
 out=$(tunnel_open https://example.com/ 2>&1); rc=$?
@@ -91,10 +89,14 @@ echo "INF |  https://prueba-uno-dos.trycloudflare.com                           
 exec sleep 600
 EOF
 chmod 755 "$TUNNEL_BIN"
-out=$(tunnel_open "http://localhost:$WP/" tienda 2>&1); rc=$?
-check "abrir: dice la direccion del tunel y la contraseña" '[ $rc -eq 0 ] && grep -q "^URL|https://prueba-uno-dos.trycloudflare.com$" <<< "$out" && grep -q "Contraseña para entrar: $k2" <<< "$out"'
+out=$(NEXUM_TUNEL_CLAVE=puesta-a-mano tunnel_open "http://localhost:$WP/" tienda --horas 3 2>&1); rc=$?
+k2=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\"password\"])" "$TUNNEL_STATE")
+check "abrir: la contraseña, siempre nueva al azar (ninguna puesta a mano)" '[[ "$k2" =~ ^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$ ]] && [ "$k2" != "$k1" ]'
+check "abrir: dice la direccion del tunel y su contraseña" '[ $rc -eq 0 ] && grep -q "^URL|https://prueba-uno-dos.trycloudflare.com$" <<< "$out" && grep -q "Contraseña para entrar: $k2" <<< "$out"'
 check "abrir: la contraseña no va en la linea de ordenes ni queda el fichero de datos" '! ps -p "$(tunnel_pid)" -o command= | grep -q -- "$k2" && [ -z "$(ls "$TUNNEL_DIR"/abrir.* 2> /dev/null)" ]'
 check "abrir: cloudflared sin la configuracion de ~/.cloudflared y sin actualizarse solo" 'grep -q -- "--no-autoupdate --config /dev/null --url http://127.0.0.1:" "$W/args"'
+check "estado: lo de ese tunel (su contraseña, sus horas y el admin), solo tuyo" 'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(not (d[\"password\"] == sys.argv[2] and d[\"hours\"] == 3 and d[\"admin\"] == \"bloquear\"))" "$TUNNEL_STATE" "$k2" && [ "$(stat -c %a "$TUNNEL_STATE")" == 600 ]'
+check "estado: se cierra a sus horas" 'e=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\"expires\"])" "$TUNNEL_STATE"); d=$((e - $(date +%s))); [ $d -gt 10700 ] && [ $d -le 10800 ]'
 check "estado: el tunel abierto, con su hora de cierre" 'tunnel_status | grep -qE "^T\|https://prueba-uno-dos.trycloudflare.com\|http://localhost:$WP\|$HTDOCS_DIR/tienda\|[0-9]{10}$"'
 PX=$(grep -oP "127.0.0.1:\K[0-9]+" "$W/args")
 B=http://127.0.0.1:$PX
@@ -133,10 +135,13 @@ out=$(tunnel_close); sleep 0.5
 check "cerrar: se para todo y se olvida" '! kill -0 $P1 2> /dev/null && [ ! -e "$TUNNEL_STATE" ] && ! pgrep -f "$W/log/tunel/cloudflared" > /dev/null && ! tunnel_status | grep -q "^T|"'
 check "cerrado: el proxy ya no contesta" '! curl -s --max-time 3 $B/ > /dev/null'
 # Con el admin permitido
-tunnel_config admin permitir > /dev/null
-tunnel_open "http://localhost:$WP/" tienda > /dev/null 2>&1
+tunnel_open "http://localhost:$WP/" tienda --admin permitir > /dev/null 2>&1
+k3=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\"password\"])" "$TUNNEL_STATE")
+check "sin contraseña: una nueva al azar, distinta de la del tunel de antes" '[[ "$k3" =~ ^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$ ]] && [ "$k3" != "$k2" ]'
 PX=$(grep -oP "127.0.0.1:\K[0-9]+" "$W/args") B=http://127.0.0.1:$PX IPN=3
-h=$(c -D - -o /dev/null -d "clave=$(tunnel_conf CLAVE)" $B/__nexum-tunel/entrar); CK=$(grep -oPi "Set-Cookie: \Knexum_tunel=[0-9a-f]+" <<< "$h")
+check "la contraseña del tunel de antes ya no vale" '[ "$(c -o /dev/null -w "%{http_code}" -d "clave=$k2" $B/__nexum-tunel/entrar)" == 401 ]'
+IPN=4
+h=$(c -D - -o /dev/null -d "clave=$k3" $B/__nexum-tunel/entrar); CK=$(grep -oPi "Set-Cookie: \Knexum_tunel=[0-9a-f]+" <<< "$h")
 check "admin permitido: wp-admin pasa, phpMyAdmin sigue bloqueado" '[ "$(code /wp-admin/)" == 200 ] && [ "$(code /phpmyadmin/)" == 403 ]'
 # Abrir otro cierra el de antes
 P1=$(tunnel_pid)
@@ -151,11 +156,13 @@ check "sin direccion de Cloudflare: lo dice, con lo ultimo de cloudflared" '[ $r
 if grep -q "LVM_SWIFT" "$SRC"; then
     check "ventana (Mac): Compartir en el visor del proyecto cargado y en el de Docker" 'grep -q "items\[\"compartir\"\] = AnyView(model.shareButton(\"http://" "$SRC" && grep -q "model.share(t.1, folder: folder, name: p.folder)" "$SRC"'
     check "ventana (Mac): el logotipo de Cloudflare (solo M, L, C y Z) y su apartado en Configuración" 'grep -qE "^    \"cloudflare\": \"M [0-9. LCMZ-]+\",$" "$SRC" && grep -q "tunnelCard()" "$SRC"'
-    check "ventana (Mac): pregunta antes de abrir un tunel" 'grep -q "guard confirm(\"¿Compartir \\\\(name)?\", text, \"Compartir\") else { return }" "$SRC"'
+    check "ventana (Mac): al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    func share\\(_ url/,/    func shareDialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", String(hours.indexOfSelectedItem + 1)" "$W/share" && ! grep -qi "password\|NSTextField(string" "$W/share" && ! grep -q "\"tunel-config\"" "$SRC"'
+    check "ventana (Mac): el tunel abierto, con su contraseña" 'grep -q "copyText(t.password)" "$SRC"'
 else
 # La ventana: Compartir en los dos visores, con el logotipo de Cloudflare, y su apartado en Configuración
 check "ventana: Compartir en el visor del proyecto cargado y en el de Docker" '[ "$(grep -c "self.nv_share_button(" "$SRC")" -ge 2 ] && grep -q "self.nv_share(t, folder, p\[\"folder\"\])" "$SRC"'
 check "ventana: el logotipo de Cloudflare y su apartado en Configuración" 'grep -q "^    \"cloudflare\": ($" "$SRC" && grep -q "self.nv_tunnel_tools()" "$SRC"'
-check "ventana: pregunta antes de abrir un tunel" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" | grep -q "if not confirm(self.win"'
+check "ventana: al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", h, \"--admin\", admin" "$W/share" && ! grep -q "Gtk.Entry\|password\|env=" "$W/share" && ! grep -q "\"tunel-config\"" "$SRC"'
+check "ventana: el tunel abierto, con su contraseña" 'grep -q "password, blocked = st.get(\"password\", \"\"), st.get(\"admin\") != \"permitir\"" "$SRC"'
 fi
 exit $fail

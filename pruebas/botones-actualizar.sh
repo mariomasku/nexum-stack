@@ -85,4 +85,6 @@ check "ventana: Desmontar, ⋮ y los fijos de Docker, del mismo estilo y tamaño
 check "ventana: sin nombre, el cuadrado mide lo mismo de alto que de ancho" 'grep -q "b.set_size_request(side, side)" "$SRC"'
 check "ventana: al cargar un proyecto, la página sube sola hasta el visor" 'grep -q "smooth_scroll(self.page_projects)" "$SRC"'
 check "ventana: los dos visores colocan sus botones con lo elegido" '[ "$(grep -c "self.nv_place_buttons(acts, btns" "$SRC")" -eq 2 ]'
+check "configuración: sus apartados en tarjetas de dos en dos (Docker: dirección y puertos juntos, a lo ancho)" '[ "$(grep -c "tile_group(\"" "$SRC")" -ge 10 ] && grep -q "^class TileGrid(Gtk.Grid):" "$SRC" && grep -q "row = ActionRow(\"Dirección y puertos\"," "$SRC"'
+check "botones: el configurador en horizontal (cabe en un portátil)" 'grep -q "cols = Gtk.Box(spacing=26)" "$SRC" && grep -q "side.pack_start(preview, False, False, 0)" "$SRC"'
 exit $fail

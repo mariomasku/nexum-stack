@@ -154,8 +154,8 @@ cat > "$W/ps" <<P
   700     1 root     $d /usr/sbin/httpd -D FOREGROUND
 P
 out=$(DRY=0 BASE_DIR=$W/lib APPS_DIR=$W/apps LEGACY_DIR=$W/apps LINK=$W/apps/XAMPP LVM_PS=$W/ps lampp_processes)
-check "procesos: el de /Library/Nexum es de su version (la montada, no sobra)" 'grep -q "^P|500|1|root|8.5.12|0|httpd$" <<< "$out"'
-check "procesos: uno de /Applications de antes de la 1.39.3 se reconoce (y sobra)" 'grep -q "^P|600|1|root|7.4|1|httpd$" <<< "$out"'
+check "procesos: el de /Library/Nexum es de su version (la montada, no sobra)" 'grep -q "^P|500|1|root|8.5.12|0|httpd|0$" <<< "$out"'
+check "procesos: uno de /Applications de antes de la 1.39.3 se reconoce (y sobra)" 'grep -q "^P|600|1|root|7.4|1|httpd|0$" <<< "$out"'
 check "procesos: el Apache de macOS no" '! grep -q "^P|700|" <<< "$out"'
 check "lampp_running: tambien /Applications (oficial y de antes)" 'sed -n "/^function lampp_running() {/,/^}/p" "$SRC" | grep -qF "^(\$BASE_DIR|\$APPS_DIR|\$LEGACY_DIR)/XAMPP"'
 
