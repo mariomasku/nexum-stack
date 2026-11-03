@@ -11,6 +11,7 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'
     check "Mac: la caja de la terminal, con el mismo margen arriba que abajo" 'grep -q "padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))" "$SRC" && grep -q "padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))" "$SRC"'
 else
+    check "Linux: la lista de repositorios enseña su nombre (set_text_column: con text_column al crearla sale vacia)" 'grep -q "comp.set_text_column(0)" "$SRC" && ! grep -q "Gtk.EntryCompletion(model=w\[\"repo_store\"\], text_column=0" "$SRC"'
     check "Linux: cuatro pasos, el ultimo el dominio de produccion" 'grep -q "4: \"Paso 4 de 4: dominio de producción\"" "$SRC" && grep -q "        if page == 5:" "$SRC" && grep -q "w\[\"stack\"\].add_named(p4, \"4\")" "$SRC"'
     check "Linux: el repositorio de la lista de GitHub (la de la ultima vez), por SSH, al escribir parte de su nombre" 'grep -q "run_quick(\[\"repos\", \"--cache\"\], got)" "$SRC" && grep -q "w\[\"url\"\].set_text(\"git@github.com:%s.git\" % full)" "$SRC" && grep -q "Gtk.EntryCompletion(model=w\[\"repo_store\"\]" "$SRC"'
     check "Linux: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'

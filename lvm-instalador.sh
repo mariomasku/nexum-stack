@@ -768,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.18"
+APP_VERSION="1.56.19"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -12174,6 +12174,11 @@ QUE HACE
 
 VERSIONES
 
+1.56.19 (3 nov 2026)
+- Nuevo proyecto: al escribir en el buscador de repositorios, la lista
+  sale con sus nombres (salían las filas vacías: había que adivinar
+  cuál era cada una).
+
 1.56.18 (3 nov 2026)
 - Icono junto al reloj: al cerrar la ventana, Nexum sigue en él. Su
   menú abre la ventana, arranca o para la versión activa (con su
@@ -23298,7 +23303,10 @@ class App(Gtk.Application):
         p1.pack_start(label("¿De qué repositorio de GitHub? (escribe parte de su nombre)"), False, False, 0)
         w["repo"] = Gtk.Entry(placeholder_text="dob-wordpress-…", primary_icon_name="system-search-symbolic")
         w["repo_store"] = Gtk.ListStore(str, str, str)
-        comp = Gtk.EntryCompletion(model=w["repo_store"], text_column=0, minimum_key_length=2, popup_set_width=True)
+        comp = Gtk.EntryCompletion(model=w["repo_store"], minimum_key_length=2, popup_set_width=True)
+        # (con set_text_column, no con text_column al crearla: así lleva la celda que pinta el nombre; sin ella,
+        # la lista sale con las filas vacías)
+        comp.set_text_column(0)
         comp.set_match_func(lambda c, key, it, *_: key.lower() in (c.get_model()[it][0] or "").lower())
         comp.connect("match-selected", lambda c, m, it: (self.new_project_repo(m[it][0], m[it][1], m[it][2]), False)[1])
         w["repo"].set_completion(comp)

@@ -4,6 +4,10 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.19 · 3 nov 2026
+
+- **Nuevo proyecto:** al escribir en el buscador de repositorios, la lista sale con sus nombres (salían las filas vacías: había que adivinar cuál era cada una).
+
 ## 1.56.18 · 3 nov 2026
 
 - **Icono junto al reloj:** al cerrar la ventana, Nexum sigue en él. Su menú abre la ventana, arranca o para la versión activa (con su estado), abre web.local y sale. Se quita en Configuración → Programa («Dejar en la bandeja al cerrar»); sin él, cerrar la ventana cierra el programa como antes. Hace falta gir1.2-ayatanaappindicator3-0.1 (el paquete .deb lo instala).
