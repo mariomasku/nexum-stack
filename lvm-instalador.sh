@@ -768,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.15"
+APP_VERSION="1.56.18"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -6342,14 +6342,33 @@ function secure_all() {
 
 # Versiones a las que les falta algo para ser solo de este equipo (lo que cambiaria secure_lampp),
 # separadas por espacios. Para avisar en la ventana: protegerlas pide la contraseña.
+# La ventana lo pregunta cada 20 s y son unos 400 ms (un python3 por version), pero solo cambia si cambian
+# sus ficheros: con la misma huella (fecha, cambio, dueño y permisos de lo de etc, php/etc, apache2/conf y
+# lampp de cada version, y lo que se le pasa a SECURE_PY) y de hace menos de 10 min, la respuesta de antes.
+# Sin cache con root (escribiria en tu carpeta) ni con LVM_SIN_CACHE
 function unsecured_versions() {
-    local d tmp list out="" HOST_VHOST mail
+    local d tmp list out="" HOST_VHOST mail key="" cache=$LOG_DIR/cache/versiones-abiertas dirs=()
     [ -n "$TEST_DIR" ] && return 0
     host_vhost
     mail=$(mail_secure_spec)
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 0
     for d in $(lampp_dirs); do
-        [ -L "$d" ] || [ ! -f "$d/etc/httpd.conf" ] && continue
+        [ -L "$d" ] || [ ! -f "$d/etc/httpd.conf" ] || dirs+=("$d")
+    done
+    if [ "$EUID" -ne 0 ] && [ -z "${LVM_SIN_CACHE:-}" ]; then
+        key=$({ printf '%s\n' "$APP_VERSION" "$HOST_VHOST" "$mail" "$PHP_SECURE_INI" "$PHP_SECURE_INI_85" \
+                    "$MAIL_WP_PHP" "$UNKNOWN_HOST_SSL" "${dirs[@]}"
+                for d in "${dirs[@]}"; do
+                    find -H "$d/etc" "$d/php/etc" "$d/apache2/conf" "$d/lampp" -maxdepth 6 \
+                        -printf '%C@ %T@ %U %G %m %p\n' 2> /dev/null
+                done; } | md5sum | cut -d' ' -f1)
+        if [ -f "$cache" ] && [ ! -L "$cache" ] && [ -z "$(find "$cache" -mmin +10 2> /dev/null)" ] \
+            && [ "$(head -1 "$cache" 2> /dev/null)" == "$key" ]; then
+            sed -n 2p "$cache"
+            return 0
+        fi
+    fi
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 0
+    for d in "${dirs[@]}"; do
         list=$(LVM_PHP_INI=${PHP_SECURE_INI//$'\n'/;} LVM_PHP_INI_85=$PHP_SECURE_INI_85 LVM_CORREO=$mail LVM_CORREO_PHP=$MAIL_WP_PHP \
             LVM_CORREO_PRUEBA= python3 -I -c "$SECURE_PY" "$d" "$tmp" 1 "$UNKNOWN_HOST_CONF" "$HOST_VHOST" \
             "$UNKNOWN_HOST_SSL" 2> /dev/null)
@@ -6360,10 +6379,14 @@ function unsecured_versions() {
         rm -f "$tmp"/*
     done
     rm -rf "$tmp"
+    if [ -n "$key" ] && mkdir -p -m 700 "$LOG_DIR/cache" 2> /dev/null; then
+        printf '%s\n%s\n' "$key" "$out" > "$cache.$$" && mv -f "$cache.$$" "$cache"
+    fi
     echo "$out"
 }
 
-# ¿Esta en marcha un servicio (apache, mariadb o ftp) de la version montada?
+# ¿Esta en marcha un servicio (apache, mariadb o ftp) de la version montada? Con un segundo argumento, lo
+# que ya ha dado lampp_processes (que recorre /proc con un python3): para no leerlo una vez por servicio
 function service_running() {
     local rx
     case $1 in
@@ -6372,7 +6395,8 @@ function service_running() {
         ftp) rx='^proftpd$' ;;
         *) return 1 ;;
     esac
-    lampp_processes | awk -F'|' -v rx="$rx" '$6 == 0 && $7 ~ rx { f = 1 } END { exit !f }'
+    { if [ $# -ge 2 ]; then printf '%s\n' "$2"; else lampp_processes; fi; } \
+        | awk -F'|' -v rx="$rx" '$6 == 0 && $7 ~ rx { f = 1 } END { exit !f }'
 }
 
 # Puertos de LAMPP que escuchan en toda la red y no solo en este equipo, uno por linea
@@ -6541,13 +6565,14 @@ function service_control() {
 # Para la pestaña Servicios: S|servicio|en marcha (1/0)|puertos|abierto a la red (1/0)|arranca con
 # la version (1/0)|usuario (FTP), de la version montada
 function gui_services() {
-    local dir ports p name running port open auto user
+    local dir ports p name running port open auto user procs
     dir=$(active_dir)
     [ -n "$dir" ] || return 0
     ports=$(exposed_ports)
+    procs=$(lampp_processes)
     for name in apache mariadb ftp; do
         running=0
-        service_running "$name" && running=1
+        service_running "$name" "$procs" && running=1
         case $name in
             apache) port="$PORT_HTTP, $PORT_HTTPS" ;;
             mariadb) port=$PORT_MYSQL ;;
@@ -12149,6 +12174,32 @@ QUE HACE
 
 VERSIONES
 
+1.56.18 (3 nov 2026)
+- Icono junto al reloj: al cerrar la ventana, Nexum sigue en él. Su
+  menú abre la ventana, arranca o para la versión activa (con su
+  estado), abre web.local y sale. Se quita en Configuración → Programa
+  («Dejar en la bandeja al cerrar»); sin él, cerrar la ventana cierra
+  el programa como antes. Hace falta gir1.2-ayatanaappindicator3-0.1
+  (el paquete .deb lo instala).
+
+1.56.17 (3 nov 2026)
+- Terminal: copia y pega con Ctrl+Mayús+C y Ctrl+Mayús+V (también
+  Ctrl+Insert y Mayús+Insert), como en la Terminal de GNOME, y con el
+  botón derecho (Copiar, Pegar y Seleccionar todo).
+- Terminal: «Proyecto cargado» ya lleva a su carpeta (se quedaba en la
+  de los proyectos), y lo mismo al abrirla. Nuevo botón «Vaciar DNS»:
+  escribe sudo resolvectl flush-caches (la contraseña, en la terminal).
+
+1.56.16 (30 oct 2026)
+- Ventana: al cerrarla, el programa se cierra del todo (si algo lo
+  retuviera, a los 5 s se corta). Al abrirla se cierran las ventanas de
+  versiones anteriores que se hubieran quedado en marcha sin ventana.
+- Ventana más ligera: lo que pregunta cada 20 s va en una sola orden y
+  gasta casi la mitad de CPU (la revisión de seguridad de las versiones
+  solo se repite si cambian sus ficheros y las fechas de las BBDD de
+  todas las versiones se leen de una vez); la pestaña Proyectos ya no
+  se rehace si no ha cambiado nada.
+
 1.56.15 (30 oct 2026)
 - Instalar una versión de PHP: un repositorio roto de otro programa
   (un PPA sin versión para tu Ubuntu, una clave caducada como la de
@@ -13996,8 +14047,22 @@ function gui_open() {
 #   Z|procesos de LAMPP que sobran en memoria (de otras versiones)
 #   Y|version montada|bytes del registro de errores: sus tablas del sistema de MariaDB son antiguas
 #   R|carpeta|ok, parche o vulnerable|texto     PHP2Shell en cada version (php2shell_state)
+# gui-vuelta: lo que la ventana pregunta cada 20 s (gui-datos, gui-hosts, gui-servicios y gui-proyectos) en
+# una sola orden: el script se lee una vez y no cuatro (unos 200 ms cada una). Cada parte, en su subshell
+# (un exit no corta las demas), va detras de una linea «@@<orden>|<codigo de salida>»
+function gui_round() {
+    local part out rc
+    for part in gui-datos:gui_data gui-hosts:gui_hosts gui-servicios:gui_services gui-proyectos:gui_projects; do
+        out=$("${part#*:}" 2>&1 < /dev/null)
+        rc=$?
+        echo "@@${part%%:*}|$rc"
+        [ -n "$out" ] && printf '%s\n' "$out"
+    done
+    return 0
+}
+
 function gui_data() {
-    local active=$(active_dir) dir name owner blocker kind
+    local active=$(active_dir) dir name owner blocker kind dates=()
 
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
     echo "A|${active#/opt/lampp-}|$(lampp_running && echo 1 || echo 0)|$([ -e /opt/lampp ] && [ ! -L /opt/lampp ] && echo 1 || echo 0)|$(native_binaries && echo 1 || echo 0)|$([ -f "$LAUNCHER" ] && echo 1 || echo 0)"
@@ -14040,8 +14105,11 @@ function gui_data() {
         local fields=$(stack_fields "$dir")
         echo "V|$name|$fields|$kind|$owner|${blocker//|/ }"
         echo "R|$name|$(php2shell_state "$dir" "${fields%%|*}")"
-        db_dates "/opt/lampp-$owner/var/mysql" | sed "s/^/D|$name|/"
+        dates+=("$name" "/opt/lampp-$owner/var/mysql")
     done
+    # (las fechas de las BBDD de todas las versiones en un solo python3)
+    [ ${#dates[@]} -gt 0 ] && db_dates --varias "${dates[@]}"
+    return 0
 }
 
 # Ramas de PHP para instalar (consulta php.net):
@@ -17474,47 +17542,58 @@ IMPORTS_FILE="$HOME/.lvm-instalador/importaciones"
 
 # Bases de una carpeta de datos de MariaDB con su fecha: base|fecha|tipo. Tipo i: la de su ultima
 # importacion con lvm-instalador. Tipo c: la de su carpeta, que cambia al crear o borrar tablas (al
-# importar desde phpMyAdmin, por ejemplo); se lee sin MariaDB en marcha aunque la carpeta sea suya
+# importar desde phpMyAdmin, por ejemplo); se lee sin MariaDB en marcha aunque la carpeta sea suya.
+# Con --varias <etiqueta> <carpeta>...: las de todas en un solo python3 (la ventana lo pregunta cada 20 s),
+# cada linea con su etiqueta delante: D|etiqueta|base|fecha|tipo
 function db_dates() {
-    python3 -I - "$1" "$IMPORTS_FILE" <<'EOF'
+    if [ "$1" == --varias ]; then
+        shift
+        python3 -I - "$IMPORTS_FILE" "$@" <<< "$DB_DATES_PY"
+    else
+        python3 -I - "$IMPORTS_FILE" "" "$1" <<< "$DB_DATES_PY"
+    fi
+}
+
+DB_DATES_PY='
 import os, re, sys
-data, imports = os.path.realpath(sys.argv[1]), sys.argv[2]
+imports = sys.argv[1]
 done = {}
 try:
     with open(imports, encoding="utf-8") as f:
         for line in f:
             parts = line.rstrip("\n").split("|")
-            if len(parts) == 3 and parts[0] == data and parts[2].isdigit():
-                done[parts[1]] = int(parts[2])
+            if len(parts) == 3 and parts[2].isdigit():
+                done[(parts[0], parts[1])] = int(parts[2])
 except OSError:
     pass
-try:
-    names = os.listdir(data)
-except OSError:
-    names = []
-rows = []
-for raw in names:
-    path = os.path.join(data, raw)
-    if raw in ("mysql", "performance_schema", "phpmyadmin", "test", "sys") or raw.startswith("#") \
-            or os.path.islink(path) or not os.path.isdir(path):
-        continue
-    # MariaDB guarda los caracteres especiales del nombre como @XXXX (wp_mi@002dweb es wp_mi-web)
-    name = re.sub(r"@([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), raw)
-    # Solo nombres que se pueden usar: uno con | o un salto de linea (@007c, @000a) meteria lineas
-    # falsas en lo que lee la ventana
-    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name):
-        continue
-    if name in done:
-        rows.append((name, done[name], "i"))
-    else:
-        try:
-            rows.append((name, int(os.stat(path).st_mtime), "c"))
-        except OSError:
-            rows.append((name, 0, "c"))
-for name, when, kind in sorted(rows, key=lambda r: r[0].lower()):
-    print("%s|%d|%s" % (name, when, kind))
-EOF
-}
+for tag, data in zip(sys.argv[2::2], sys.argv[3::2]):
+    data = os.path.realpath(data)
+    try:
+        names = os.listdir(data)
+    except OSError:
+        names = []
+    rows = []
+    for raw in names:
+        path = os.path.join(data, raw)
+        if raw in ("mysql", "performance_schema", "phpmyadmin", "test", "sys") or raw.startswith("#") \
+                or os.path.islink(path) or not os.path.isdir(path):
+            continue
+        # MariaDB guarda los caracteres especiales del nombre como @XXXX (wp_mi@002dweb es wp_mi-web)
+        name = re.sub(r"@([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), raw)
+        # Solo nombres que se pueden usar: uno con | o un salto de linea (@007c, @000a) meteria lineas
+        # falsas en lo que lee la ventana
+        if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name):
+            continue
+        if (data, name) in done:
+            rows.append((name, done[(data, name)], "i"))
+        else:
+            try:
+                rows.append((name, int(os.stat(path).st_mtime), "c"))
+            except OSError:
+                rows.append((name, 0, "c"))
+    for name, when, kind in sorted(rows, key=lambda r: r[0].lower()):
+        print("%s%s|%d|%s" % ("D|%s|" % tag if tag else "", name, when, kind))
+'
 
 # Apunta la fecha de la importacion de una base (sin fecha: la olvida, al borrarla o crearla vacia)
 function db_note_import() {
@@ -20588,6 +20667,50 @@ def once(callback, *args):
     GLib.idle_add(lambda: (callback(*args), False)[1])
 
 
+def close_stale_windows(script):
+    """Cierra las ventanas de Nexum de este usuario que van con un código anterior al instalado: las de este
+    mismo script (python3 -I - <script>) que arrancaron antes de que se instalara (su ctime). Las de la
+    versión instalada no se tocan: si hay una abierta, el sistema le pasa la petición y se trae al frente."""
+    if not script or not os.path.isfile(script):
+        return
+    try:
+        installed = os.stat(script).st_ctime
+        with open("/proc/stat") as fh:
+            boot = int(next(l for l in fh if l.startswith("btime ")).split()[1])
+    except (OSError, StopIteration, ValueError):
+        return
+    tick, me, uid = os.sysconf("SC_CLK_TCK"), os.getpid(), os.getuid()
+    want = [b"/usr/bin/python3", b"-I", b"-", os.fsencode(script)]
+    stale = []
+    for name in os.listdir("/proc"):
+        if not name.isdigit() or int(name) == me:
+            continue
+        pid = int(name)
+        try:
+            if os.stat("/proc/%d" % pid).st_uid != uid:
+                continue
+            with open("/proc/%d/cmdline" % pid, "rb") as fh:
+                if fh.read().split(b"\0")[:-1] != want:
+                    continue
+            with open("/proc/%d/stat" % pid) as fh:
+                st = fh.read()
+            started = boot + int(st[st.rfind(")") + 2:].split()[19]) / tick
+        except (OSError, ValueError, IndexError):
+            continue
+        if started < installed - 1:
+            stale.append(pid)
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in stale:
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
+        if not stale:
+            break
+        time.sleep(1.5)
+        stale = [pid for pid in stale if os.path.exists("/proc/%d" % pid)]
+
+
 def run_quick(args, callback, env=None, timeout=180):
     """Comando sin sudo ni preguntas, en segundo plano. callback(rc, salida) en la interfaz."""
     def work():
@@ -22199,14 +22322,30 @@ class App(Gtk.Application):
 
     def on_tick(self):
         if not self.busy and self.win.is_active():
-            run_quick(["gui-datos"], self.on_data)
-            run_quick(["gui-hosts"], self.on_hosts_data)
-            run_quick(["gui-servicios"], self.on_services_data)
-            run_quick(["gui-proyectos"], self.on_projects_data)
+            # (las cuatro en una sola orden: el script se lee una vez y no cuatro)
+            run_quick(["gui-vuelta"], self.on_round)
             # (Docker solo mientras se ve su pestaña: pregunta a su servicio)
             if self.stack.get_visible_child_name() == "docker":
                 run_quick(["gui-docker"], self.on_docker_data)
         return True
+
+    def on_round(self, rc, out):
+        """gui-vuelta: cada parte («@@<orden>|<código>» y sus líneas) a lo de siempre."""
+        handlers = {"gui-datos": self.on_data, "gui-hosts": self.on_hosts_data,
+                    "gui-servicios": self.on_services_data, "gui-proyectos": self.on_projects_data}
+        parts, name, code = {}, None, 0
+        for line in out.splitlines():
+            m = re.fullmatch(r"@@(gui-[a-z]+)\|(\d+)", line)
+            if m and m.group(1) in handlers:
+                name, code = m.group(1), int(m.group(2))
+                parts[name] = [code, []]
+            elif name:
+                parts[name][1].append(line)
+        # (sin ninguna parte, algo ha ido mal antes de empezar: la siguiente vuelta)
+        for name, fn in handlers.items():
+            if name in parts:
+                fn(parts[name][0], "\n".join(parts[name][1]) + "\n")
+        return False
 
     def on_data(self, rc, out):
         d = {"installs": [], "dbs": {}, "dbdate": {}, "active": "", "running": False,
@@ -22837,6 +22976,7 @@ class App(Gtk.Application):
         add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Dev Stack» "
                 "si no aparece o no abre esta ventana", "Crear de nuevo",
                 self.on_create_launcher)
+        self.nv_tray_row(lb)
         self.tools_box.pack_start(box, False, False, 0)
 
         box, lb = tile_group("Información")
@@ -22846,6 +22986,20 @@ class App(Gtk.Application):
         add_row(lb, "Acerca de", "%s %s" % (d["name"], d["version"]), "Ver", self.on_about)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.show_all()
+
+    def nv_tray_row(self, lb):
+        """Configuración, Programa: el icono junto al reloj (solo en la ventana nueva)."""
+        if not hasattr(self, "nv_tray_toggle"):
+            return
+        has = tray_lib() is not None
+        row = ActionRow("Dejar en la bandeja al cerrar",
+                        "La X la esconde en un icono junto al reloj (abrir, arrancar o parar, web.local y salir)"
+                        if has else
+                        "Falta su componente. En una terminal: sudo apt install gir1.2-ayatanaappindicator3-0.1")
+        sw = Gtk.Switch(active=has and tray_wanted(), valign=Gtk.Align.CENTER, sensitive=has)
+        sw.connect("notify::active", self.nv_tray_toggle)
+        row.add_suffix(sw)
+        lb.add(row)
 
     def project_error_log(self, link=None):
         """Registro de errores del vhost de los proyectos (web.local) o del dominio que se diga,
@@ -23011,6 +23165,9 @@ class App(Gtk.Application):
             # (en BBDD, el punto verde va en la BBDD que usa el proyecto cargado)
             if self.data:
                 self.build_databases()
+            # (y el menú del icono junto al reloj, su web.local)
+            if hasattr(self, "nv_tray_update"):
+                self.nv_tray_update()
         return False
 
     def build_project_box(self):
@@ -26140,6 +26297,27 @@ KIND_TEXT = {"wp": "WordPress", "ps": "PrestaShop"}
 
 # Tema claro u oscuro de la ventana nueva (solo para ella: el escritorio no se toca)
 THEME_FILE = os.path.join(LOG_DIR, "ventana-tema")
+# Icono junto al reloj: «no» si se ha apagado en Configuración (sin el fichero, encendido)
+TRAY_FILE = os.path.join(LOG_DIR, "ventana-bandeja")
+
+
+def tray_lib():
+    """El módulo del icono junto al reloj (AppIndicator de Ayatana, el de Ubuntu), o None si no está."""
+    for name in ("AyatanaAppIndicator3", "AppIndicator3"):
+        try:
+            gi.require_version(name, "0.1")
+            return getattr(__import__("gi.repository", fromlist=[name]), name)
+        except (ValueError, ImportError, AttributeError):
+            continue
+    return None
+
+
+def tray_wanted():
+    try:
+        with open(TRAY_FILE, encoding="utf-8") as f:
+            return f.read().strip() != "no"
+    except OSError:
+        return True
 
 
 def theme_exists(name):
@@ -26273,6 +26451,12 @@ class App2(App):
             act.connect("activate", cb)
             self.add_action(act)
         self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
+        # Sin ninguna ventana del programa, se cierra del todo
+        self.connect("window-removed", lambda app, _w: app.get_windows() or self.nv_exit())
+        # (con el icono junto al reloj, la X la esconde: se vuelve a abrir o se sale desde él)
+        self.win.connect("delete-event", lambda *_: self.nv_tray_hide())
+        self.tray, self.tray_items, self.tray_ticks = None, {}, 0
+        self.nv_tray_setup()
         self.win.set_default_size(1240, 840)
         self.win.set_titlebar(self.nv_header())
         try:
@@ -26328,6 +26512,116 @@ class App2(App):
         GLib.timeout_add_seconds(6, self.auto_check_package)
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+
+    # ------------------------------------------------------------------ icono junto al reloj
+    def nv_tray_setup(self):
+        """El icono junto al reloj (si está encendido en Configuración y hay AppIndicator): abrir la ventana,
+        arrancar o parar la versión activa, abrir web.local y salir."""
+        if self.tray is not None or not tray_wanted():
+            return
+        lib = tray_lib()
+        if lib is None:
+            return
+        ind = lib.Indicator.new(APP_ID, self.icon, lib.IndicatorCategory.APPLICATION_STATUS)
+        ind.set_title("Nexum Dev Stack")
+        menu = Gtk.Menu()
+
+        def add(key, text, cb=None):
+            item = Gtk.MenuItem(label=text)
+            if cb:
+                item.connect("activate", lambda *_: cb())
+            else:
+                item.set_sensitive(False)
+            menu.append(item)
+            self.tray_items[key] = item
+        add("open", "Abrir Nexum Dev Stack", self.nv_tray_open)
+        menu.append(Gtk.SeparatorMenuItem())
+        add("state", "Ninguna versión activa")
+        add("power", "Arrancar", self.nv_tray_power)
+        add("web", "Abrir web.local", self.nv_tray_web)
+        menu.append(Gtk.SeparatorMenuItem())
+        add("quit", "Salir", self.nv_tray_quit)
+        menu.show_all()
+        ind.set_menu(menu)
+        ind.set_secondary_activate_target(self.tray_items["open"])
+        ind.set_status(lib.IndicatorStatus.ACTIVE)
+        self.tray = (lib, ind, menu)
+        self.nv_tray_update()
+
+    def nv_tray_remove(self):
+        if self.tray is None:
+            return
+        lib, ind, _menu = self.tray
+        ind.set_status(lib.IndicatorStatus.PASSIVE)
+        self.tray, self.tray_items = None, {}
+
+    def nv_tray_update(self):
+        if self.tray is None:
+            return
+        d = self.data or {}
+        act = d.get("active") or ""
+        it = self.tray_items
+        if not act:
+            it["state"].set_label("Ninguna versión activa")
+            it["power"].set_label("Elegir una versión…")
+        else:
+            it["state"].set_label("● lampp-%s en marcha" % act if d.get("running") else "○ lampp-%s parada" % act)
+            it["power"].set_label("Parar y desactivar" if d.get("running") else "Arrancar lampp-%s" % act)
+        it["power"].set_sensitive(bool(d) and not self.busy)
+        link = (self.projects or {}).get("link") or ""
+        it["web"].set_label("Abrir %s" % (link or "web.local"))
+        it["web"].set_sensitive(bool(link) and bool(d.get("running")))
+
+    def nv_tray_hide(self):
+        """La X de la ventana: con el icono, la esconde (True: no se cierra); sin él, se cierra como siempre."""
+        if self.tray is None:
+            return False
+        self.win.hide()
+        return True
+
+    def nv_tray_open(self):
+        self.win.present()
+        # (al volver, sus datos al momento: escondida solo se preguntaba lo del menú)
+        if not self.busy:
+            run_quick(["gui-vuelta"], self.on_round)
+
+    def nv_tray_power(self):
+        if not (self.data or {}).get("active"):
+            self.nv_tray_open()
+        self.nv_power()
+
+    def nv_tray_web(self):
+        link = (self.projects or {}).get("link")
+        if link:
+            self.open_uri("http://%s/" % link)
+
+    def nv_tray_quit(self):
+        self.nv_tray_remove()
+        self.win.destroy()
+
+    def nv_tray_toggle(self, sw, _p):
+        on = sw.get_active()
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(TRAY_FILE, "w", encoding="utf-8") as f:
+                f.write("si\n" if on else "no\n")
+        except OSError as exc:
+            message(self.win, "No se ha podido guardar", str(exc), Gtk.MessageType.ERROR)
+            return
+        if on:
+            self.nv_tray_setup()
+        else:
+            self.nv_tray_remove()
+
+    def nv_exit(self):
+        """Al cerrar la última ventana: se sale y, si algo lo retuviera (un bucle, un hilo, una orden que
+        no acaba), a los 5 s se corta el proceso. Nunca queda un Nexum en marcha sin ventana."""
+        self.quit()
+
+        def watchdog():
+            time.sleep(5)
+            os._exit(0)
+        threading.Thread(target=watchdog, daemon=True).start()
 
     def auto_check_package(self):
         if self.data is None or self.busy:
@@ -26515,6 +26809,10 @@ class App2(App):
         head.pack_end(nv_button("view-refresh-symbolic", None, "Terminal nueva (cierra la de ahora)",
                                 lambda *_: self.nv_term_spawn(restart=True), flat=True), False, False, 0)
         head.pack_end(b, False, False, 0)
+        head.pack_end(nv_button("edit-clear-all-symbolic", "Vaciar DNS",
+                                "Vaciar la caché DNS del sistema (sudo resolvectl flush-caches; la contraseña, aquí)",
+                                lambda *_: self.nv_term_type("sudo resolvectl flush-caches"), flat=True),
+                      False, False, 0)
         box.pack_start(head, False, False, 0)
         self.term_slot = Gtk.Box()
         box.pack_start(self.term_slot, True, True, 0)
@@ -26541,7 +26839,9 @@ class App2(App):
 
     def nv_term_project(self):
         p = self.projects or {}
+        # (gui-proyectos da la carpeta como la tiene el enlace de web.local: su nombre, dentro de los proyectos)
         cur = (p.get("current") or "").rstrip("/")
+        cur = os.path.join(HTDOCS, cur) if cur else ""
         return cur if cur and os.path.isdir(cur) else HTDOCS
 
     def nv_term_spawn(self, restart=False):
@@ -26578,6 +26878,9 @@ class App2(App):
         t.set_vexpand(True)
         # (al terminar el shell, se esconde; al volver a enseñarla, otra nueva)
         t.connect("child-exited", lambda *_: GLib.idle_add(self.nv_term_exited))
+        # (copiar y pegar como en la Terminal de GNOME: Ctrl+Mayús+C/V, Ctrl/Mayús+Insert y el botón derecho)
+        t.connect("key-press-event", self.nv_term_key)
+        t.connect("button-press-event", self.nv_term_click)
         cwd = self.nv_term_project()
         import pwd
         shell = os.environ.get("SHELL") or pwd.getpwuid(os.getuid()).pw_shell or "/bin/bash"
@@ -26590,6 +26893,52 @@ class App2(App):
         sw.show_all()
         self.term, self.term_sw = sw, t
         self.term_where.set_label(cwd)
+        return True
+
+    def nv_term_copy(self):
+        t = self.term_sw
+        if not t.get_has_selection():
+            return
+        try:
+            from gi.repository import Vte
+            t.copy_clipboard_format(Vte.Format.TEXT)
+        except (AttributeError, ImportError):
+            t.copy_clipboard()
+
+    def nv_term_paste(self):
+        self.term_sw.paste_clipboard()
+        self.term_sw.grab_focus()
+
+    def nv_term_key(self, t, ev):
+        mods = ev.state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)
+        both = Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK
+        key = Gdk.keyval_to_lower(ev.keyval)
+        if (mods == both and key == Gdk.KEY_c) or (mods == Gdk.ModifierType.CONTROL_MASK and key == Gdk.KEY_Insert):
+            self.nv_term_copy()
+            return True
+        if (mods == both and key == Gdk.KEY_v) or (mods == Gdk.ModifierType.SHIFT_MASK and key == Gdk.KEY_Insert):
+            self.nv_term_paste()
+            return True
+        return False
+
+    def nv_term_click(self, t, ev):
+        if ev.type != Gdk.EventType.BUTTON_PRESS or ev.button != 3:
+            return False
+        menu = Gtk.Menu()
+        clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        for text, keys, sensitive, cb in (
+                ("Copiar", "<Control><Shift>c", t.get_has_selection(), self.nv_term_copy),
+                ("Pegar", "<Control><Shift>v", clip.wait_is_text_available(), self.nv_term_paste),
+                ("Seleccionar todo", None, True, t.select_all)):
+            item = Gtk.MenuItem(label=text)
+            if keys:
+                item.get_child().set_accel(*Gtk.accelerator_parse(keys))
+            item.set_sensitive(sensitive)
+            item.connect("activate", lambda _i, f=cb: f())
+            menu.append(item)
+        menu.show_all()
+        menu.attach_to_widget(t, None)
+        menu.popup_at_pointer(ev)
         return True
 
     def nv_term_exited(self):
@@ -26605,8 +26954,14 @@ class App2(App):
         if self.term is None:
             return
         cwd = self.nv_term_project()
-        self.term_sw.feed_child(("cd %s\n" % shlex.quote(cwd)).encode())
+        self.nv_term_type("cd %s" % shlex.quote(cwd))
         self.term_where.set_label(cwd)
+
+    def nv_term_type(self, cmd):
+        """Escribe una orden en la terminal y la manda, como si se tecleara."""
+        if self.term is None:
+            return
+        self.term_sw.feed_child((cmd + "\n").encode())
         self.term_sw.grab_focus()
 
     def nv_theme(self):
@@ -26725,6 +27080,11 @@ class App2(App):
 
     def on_tick(self):
         res = super().on_tick()
+        # (escondida en el icono: solo lo que enseña su menú, cada minuto)
+        if self.tray is not None and not self.win.get_visible() and not self.busy:
+            self.tray_ticks = (self.tray_ticks + 1) % 3
+            if self.tray_ticks == 0:
+                run_quick(["gui-datos"], self.on_data)
         if not self.busy and self.win.is_active() and self.stack.get_visible_child_name() == "docker":
             run_quick(["gui-docker-estadisticas"], self.on_docker_stats)
         if self.win.is_active():
@@ -26933,8 +27293,9 @@ class App2(App):
             self.status_lbl.set_label("PHP %s" % act["php"] if act else "Ninguna versión activa")
             self.status_sub.set_label("lampp-%s" % d["active"] if act else "")
             self.nv_power_state()
-            self.nv_build_projects()
+            self.nv_projects_refresh()
             self.nv_mail_header()
+        self.nv_tray_update()
         return res
 
     def on_services_data(self, rc, out):
@@ -26963,8 +27324,19 @@ class App2(App):
 
     def on_docker_data(self, rc, out):
         res = super().on_docker_data(rc, out)
-        self.nv_build_projects()
+        self.nv_projects_refresh()
         return res
+
+    def nv_projects_refresh(self):
+        """Rehace Proyectos solo si ha cambiado algo de lo que enseña: los datos, los proyectos y Docker (on_data
+        y los demás solo los cambian si llega algo distinto) y el túnel abierto. Cada 20 s llegan los datos de
+        siempre: rehacerla entera cada vez costaba unos 400 ms de la interfaz, varias veces por vuelta."""
+        key = (self.data, self.projects, self.docker, repr(tunnel_state()))
+        old = getattr(self, "nv_proj_key", None)
+        if old is not None and all(a is b for a, b in zip(old[:3], key[:3])) and old[3] == key[3]:
+            return
+        self.nv_proj_key = key
+        self.nv_build_projects()
 
     # ------------------------------------------------------------------ versiones y avisos
     def build_versions(self):
@@ -31321,9 +31693,15 @@ if __name__ == "__main__":
     # Mismo identificador que StartupWMClass del acceso: asi el dock agrupa la ventana con su icono
     GLib.set_prgname(APP_ID)
     Gdk.set_program_class(APP_ID)
+    # Las ventanas de versiones anteriores que sigan en marcha se cierran: hasta la 1.56.14 podian quedarse
+    # dando vueltas sin ventana, y la siguiente vez que se abria, el sistema le pasaba la peticion a una de
+    # ellas (con el codigo de antes) en lugar de abrir esta
+    close_stale_windows(sys.argv[1] if len(sys.argv) > 1 else "")
     # La ventana es App2 (desde la 1.54): App lleva toda la logica (datos, tareas y dialogos) y App2 la
-    # organizacion y el aspecto
-    sys.exit(App2().run([sys.argv[0]]))
+    # organizacion y el aspecto. Al acabar, se sale del todo (sin esperar a ningun hilo)
+    rc = App2().run([sys.argv[0]])
+    sys.stdout.flush()
+    os._exit(rc or 0)
 LVM_GUI_PY
 }
 
@@ -31850,6 +32228,7 @@ case "$1" in
     parar|stop) control_lampp stop ;;
     reiniciar|restart) control_lampp restart ;;
     gui-datos) gui_data ;;
+    gui-vuelta) gui_round ;;
     gui-paquete) gui_package ;;
     gui-ramas) gui_branches ;;
     gui-fechas) gui_php_dates ;;

@@ -4,6 +4,20 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.18 · 3 nov 2026
+
+- **Icono junto al reloj:** al cerrar la ventana, Nexum sigue en él. Su menú abre la ventana, arranca o para la versión activa (con su estado), abre web.local y sale. Se quita en Configuración → Programa («Dejar en la bandeja al cerrar»); sin él, cerrar la ventana cierra el programa como antes. Hace falta gir1.2-ayatanaappindicator3-0.1 (el paquete .deb lo instala).
+
+## 1.56.17 · 3 nov 2026
+
+- **Terminal:** copia y pega con Ctrl+Mayús+C y Ctrl+Mayús+V (también Ctrl+Insert y Mayús+Insert), como en la Terminal de GNOME, y con el botón derecho (Copiar, Pegar y Seleccionar todo).
+- **Terminal:** «Proyecto cargado» ya lleva a su carpeta (se quedaba en la de los proyectos), y lo mismo al abrirla. Nuevo botón «Vaciar DNS»: escribe sudo resolvectl flush-caches (la contraseña, en la terminal).
+
+## 1.56.16 · 30 oct 2026
+
+- **Ventana:** al cerrarla, el programa se cierra del todo (si algo lo retuviera, a los 5 s se corta). Al abrirla se cierran las ventanas de versiones anteriores que se hubieran quedado en marcha sin ventana.
+- **Ventana más ligera:** lo que pregunta cada 20 s va en una sola orden y gasta casi la mitad de CPU (la revisión de seguridad de las versiones solo se repite si cambian sus ficheros y las fechas de las BBDD de todas las versiones se leen de una vez); la pestaña Proyectos ya no se rehace si no ha cambiado nada.
+
 ## 1.56.15 · 30 oct 2026
 
 - **Instalar una versión de PHP:** un repositorio roto de otro programa (un PPA sin versión para tu Ubuntu, una clave caducada como la de Warp) ya no impide instalarla. Solo se instalan las librerías que faltan (si están todas, ni se llama a apt); si apt-get update no puede leer algún repositorio, se dice cuál y se sigue con las listas que ya había. Solo se para si de verdad falta un paquete, y entonces dice qué repositorio arreglar.

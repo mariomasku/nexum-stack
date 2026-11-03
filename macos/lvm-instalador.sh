@@ -2135,7 +2135,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.2"
+APP_VERSION="1.40.3"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -7644,24 +7644,50 @@ function secure_all() {
 }
 
 # Versiones a las que les falta algo de lo que pondria secure_version, separadas por espacios
+# La ventana lo pregunta cada 20 s y es un python3 por version, pero solo cambia si cambian sus ficheros:
+# con la misma huella (cambio, fecha, dueño y permisos de la version, de xamppfiles y de lo de etc y
+# apache2/conf, y lo que se le pasa a SECURE_PY) y de hace menos de 10 min, la respuesta de antes. Sin
+# cache con root (escribiria en tu carpeta) ni con LVM_SIN_CACHE
 function unsecured_versions() {
-    local d tmp list out="" mail
+    local d tmp list out="" mail checked="" key="" cache=$LOG_DIR/cache/versiones-abiertas dirs=() deep=() top=()
     [ -n "$TEST_DIR" ] && return 0
     mail=$(mail_secure_spec)
     # (las de /Applications de antes de la 1.39.3: protegerlas es pasarlas a /Library/Nexum)
     for d in $(legacy_dirs); do
         out+="${out:+ }${d##*/XAMPP-}"
     done
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 0
     for d in $(version_dirs); do
         [ -f "$d/xamppfiles/etc/pvm-stack" ] || continue
+        dirs+=("$d") top+=("$d" "$d/xamppfiles") deep+=("$d/xamppfiles/etc" "$d/xamppfiles/apache2/conf")
+    done
+    if [ "$EUID" -ne 0 ] && [ -z "${LVM_SIN_CACHE:-}" ]; then
+        key=$({ printf '%s\n' "$APP_VERSION" "$mail" "$MAIL_WP_PHP" "$(unknown_host_vhost)" "$UNKNOWN_HOST_SSL" \
+                    "$PHP_SECURITY_INI" "$PHP_SECURITY_INI_85" "${dirs[@]}"
+                if [ ${#dirs[@]} -gt 0 ]; then
+                    { find -H "${top[@]}" -maxdepth 0 -print0; find -H "${deep[@]}" -maxdepth 6 -print0; } 2> /dev/null \
+                        | xargs -0 stat -f '%c %m %u %g %p %N' 2> /dev/null
+                fi; } | md5 -q)
+        if [ -f "$cache" ] && [ ! -L "$cache" ] && [ -z "$(find "$cache" -mmin +10 2> /dev/null)" ] \
+            && [ "$(head -1 "$cache" 2> /dev/null)" == "$key" ]; then
+            checked=$(sed -n 2p "$cache")
+            out+="${out:+${checked:+ }}$checked"
+            echo "$out"
+            return 0
+        fi
+    fi
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-seguridad.XXXXXX") || return 0
+    for d in "${dirs[@]}"; do
         list=$(LVM_CORREO=$mail LVM_CORREO_PHP=$MAIL_WP_PHP LVM_CORREO_PRUEBA= python3 -I -c "$SECURE_PY" \
             "$d/xamppfiles" "$tmp" 1 "$UNKNOWN_HOST_CONF" \
             "$(unknown_host_vhost)" "$UNKNOWN_HOST_SSL" "$PHP_SECURITY_INI" "$PHP_SECURITY_INI_85" 2> /dev/null)
-        [ -n "$list" ] || ! trusted_version_dir "$d" && out+="${out:+ }$(version_name "$d")"
+        [ -n "$list" ] || ! trusted_version_dir "$d" && checked+="${checked:+ }$(version_name "$d")"
         rm -f "$tmp"/*
     done
     rm -rf "$tmp"
+    if [ -n "$key" ] && mkdir -p -m 700 "$LOG_DIR/cache" 2> /dev/null; then
+        printf '%s\n%s\n' "$key" "$checked" > "$cache.$$" && mv -f "$cache.$$" "$cache"
+    fi
+    out+="${out:+${checked:+ }}$checked"
     echo "$out"
 }
 
@@ -12944,47 +12970,58 @@ IMPORTS_FILE="$HOME/.lvm-instalador/importaciones"
 
 # Bases de una carpeta de datos de MariaDB con su fecha: base|fecha|tipo. Tipo i: la de su ultima
 # importacion con lvm-instalador. Tipo c: la de su carpeta, que cambia al crear o borrar tablas (al
-# importar desde phpMyAdmin, por ejemplo); se lee sin MariaDB en marcha aunque la carpeta sea suya
+# importar desde phpMyAdmin, por ejemplo); se lee sin MariaDB en marcha aunque la carpeta sea suya.
+# Con --varias <etiqueta> <carpeta>...: las de todas en un solo python3 (la ventana lo pregunta cada 20 s),
+# cada linea con su etiqueta delante: D|etiqueta|base|fecha|tipo
 function db_dates() {
-    python3 -I - "$1" "$IMPORTS_FILE" <<'EOF'
+    if [ "$1" == --varias ]; then
+        shift
+        python3 -I - "$IMPORTS_FILE" "$@" <<< "$DB_DATES_PY"
+    else
+        python3 -I - "$IMPORTS_FILE" "" "$1" <<< "$DB_DATES_PY"
+    fi
+}
+
+DB_DATES_PY='
 import os, re, sys
-data, imports = os.path.realpath(sys.argv[1]), sys.argv[2]
+imports = sys.argv[1]
 done = {}
 try:
     with open(imports, encoding="utf-8") as f:
         for line in f:
             parts = line.rstrip("\n").split("|")
-            if len(parts) == 3 and parts[0] == data and parts[2].isdigit():
-                done[parts[1]] = int(parts[2])
+            if len(parts) == 3 and parts[2].isdigit():
+                done[(parts[0], parts[1])] = int(parts[2])
 except OSError:
     pass
-try:
-    names = os.listdir(data)
-except OSError:
-    names = []
-rows = []
-for raw in names:
-    path = os.path.join(data, raw)
-    if raw in ("mysql", "performance_schema", "phpmyadmin", "test", "sys") or raw.startswith("#") \
-            or os.path.islink(path) or not os.path.isdir(path):
-        continue
-    # MariaDB guarda los caracteres especiales del nombre como @XXXX (wp_mi@002dweb es wp_mi-web)
-    name = re.sub(r"@([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), raw)
-    # Solo nombres que se pueden usar: uno con | o un salto de linea (@007c, @000a) meteria lineas
-    # falsas en lo que lee la ventana
-    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name):
-        continue
-    if name in done:
-        rows.append((name, done[name], "i"))
-    else:
-        try:
-            rows.append((name, int(os.stat(path).st_mtime), "c"))
-        except OSError:
-            rows.append((name, 0, "c"))
-for name, when, kind in sorted(rows, key=lambda r: r[0].lower()):
-    print("%s|%d|%s" % (name, when, kind))
-EOF
-}
+for tag, data in zip(sys.argv[2::2], sys.argv[3::2]):
+    data = os.path.realpath(data)
+    try:
+        names = os.listdir(data)
+    except OSError:
+        names = []
+    rows = []
+    for raw in names:
+        path = os.path.join(data, raw)
+        if raw in ("mysql", "performance_schema", "phpmyadmin", "test", "sys") or raw.startswith("#") \
+                or os.path.islink(path) or not os.path.isdir(path):
+            continue
+        # MariaDB guarda los caracteres especiales del nombre como @XXXX (wp_mi@002dweb es wp_mi-web)
+        name = re.sub(r"@([0-9a-f]{4})", lambda m: chr(int(m.group(1), 16)), raw)
+        # Solo nombres que se pueden usar: uno con | o un salto de linea (@007c, @000a) meteria lineas
+        # falsas en lo que lee la ventana
+        if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", name):
+            continue
+        if (data, name) in done:
+            rows.append((name, done[(data, name)], "i"))
+        else:
+            try:
+                rows.append((name, int(os.stat(path).st_mtime), "c"))
+            except OSError:
+                rows.append((name, 0, "c"))
+    for name, when, kind in sorted(rows, key=lambda r: r[0].lower()):
+        print("%s%s|%d|%s" % ("D|%s|" % tag if tag else "", name, when, kind))
+'
 
 # Apunta la fecha de la importacion de una base (sin fecha: la olvida, al borrarla o crearla vacia)
 function db_note_import() {
@@ -18913,7 +18950,17 @@ final class AppModel: ObservableObject {
     /// Apartados plegados (Instaladas, Instalar): se guardan en FOLDED_FILE
     @Published var folded: Set<String> = Set(((try? String(contentsOfFile: FOLDED_FILE, encoding: .utf8)) ?? "")
         .split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
-    @Published var task: TaskRunner? = nil
+    @Published var task: TaskRunner? = nil {
+        // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea)
+        didSet {
+            if task == nil && oldValue != nil && !TrayIcon.shared.on
+                && !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+                DispatchQueue.main.async { NSApp.terminate(nil) }
+            }
+        }
+    }
+    /// El modelo de la aplicación, para el delegado (que no lo ve de otro modo)
+    static weak var current: AppModel?
     @Published var toastText: String? = nil
     // Formulario «Subir o actualizar una base de datos»
     @Published var impFile: String? = nil
@@ -19007,8 +19054,26 @@ final class AppModel: ObservableObject {
     let term = TermSession()
 
     /// La carpeta del proyecto cargado (o la de los proyectos)
+    /// Icono en la barra de menús (Configuración, Programa): con él, cerrar la ventana no cierra la aplicación
+    @Published var trayOn = trayWanted()
+    private var trayTicks = 0
+
+    func setTray(_ on: Bool) {
+        try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true)
+        do {
+            try (on ? "si\n" : "no\n").write(toFile: TRAY_FILE, atomically: true, encoding: .utf8)
+        } catch {
+            message("No se ha podido guardar", error.localizedDescription, error: true)
+            return
+        }
+        trayOn = on
+        TrayIcon.shared.show(on)
+    }
+
     var termProject: String {
-        let cur = projects?.current ?? ""
+        // (gui-proyectos da la carpeta como la tiene el enlace de web.local: su nombre, dentro de los proyectos)
+        var cur = projects?.current ?? ""
+        if !cur.isEmpty && !cur.hasPrefix("/") { cur = (HTDOCS as NSString).appendingPathComponent(cur) }
         var dir: ObjCBool = false
         return !cur.isEmpty && FileManager.default.fileExists(atPath: cur, isDirectory: &dir) && dir.boolValue ? cur : HTDOCS
     }
@@ -19032,6 +19097,11 @@ final class AppModel: ObservableObject {
         let quoted = "'" + cwd.replacingOccurrences(of: "'", with: "'\\''") + "'"
         term.write(Data("cd \(quoted)\r".utf8))
         termCwd = cwd
+    }
+
+    /// Vaciar la caché DNS del sistema (escrito en la terminal: la contraseña de sudo se pide ahí)
+    func termFlushDns() {
+        term.write(Data("sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder\r".utf8))
     }
     /// Repositorios de GitHub (pestaña Repositorios) y la conexión (Configuración)
     @Published var repos: ReposData? = nil
@@ -19058,15 +19128,21 @@ final class AppModel: ObservableObject {
     }
 
     init() {
+        AppModel.current = self
         reload(branches: true)
         timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+            // (sin ventana y con el icono de la barra de menús: solo lo que enseña su menú, cada minuto)
+            if let self = self, !self.busy, TrayIcon.shared.on,
+               !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+                self.trayTicks = (self.trayTicks + 1) % 3
+                if self.trayTicks == 0 { runQuick(["gui-datos"]) { rc, out in self.onData(rc, out) } }
+                return
+            }
             // (con la ventana cerrada, la aplicacion sigue abierta: sin ventana no hace falta leer nada)
             guard let self = self, !self.busy, NSApp.isActive,
                   NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) else { return }
-            runQuick(["gui-datos"]) { rc, out in self.onData(rc, out) }
-            self.reloadHosts()
-            self.reloadServices()
-            self.reloadProjects()
+            // (las cuatro en una sola orden: el script se lee una vez y no cuatro)
+            runQuick(["gui-vuelta"]) { rc, out in self.onRound(rc, out) }
             if self.tab == "docker" { self.reloadDocker(stats: true) }
         }
         // (al volver a la ventana, los correos sin leer al momento)
@@ -19226,6 +19302,28 @@ final class AppModel: ObservableObject {
             for f in parseLines(out) where f[0] == "F" && f.count >= 4 { dates[f[1]] = [f[2], f[3]] }
             if !dates.isEmpty && dates != self.phpDates { self.phpDates = dates }
         }
+    }
+
+    /// gui-vuelta: cada parte («@@<orden>|<código>» y sus líneas) a lo de siempre
+    private func onRound(_ rc: Int32, _ out: String) {
+        var parts: [String: (Int32, [String])] = [:]
+        var name = ""
+        for line in out.components(separatedBy: "\n") {
+            if line.hasPrefix("@@gui-"), let bar = line.firstIndex(of: "|") {
+                name = String(line[line.index(line.startIndex, offsetBy: 2)..<bar])
+                parts[name] = (Int32(line[line.index(after: bar)...]) ?? 1, [])
+            } else if !name.isEmpty {
+                parts[name]?.1.append(line)
+            }
+        }
+        // (sin ninguna parte, algo ha ido mal antes de empezar: la siguiente vuelta)
+        let text = { (key: String) -> (Int32, String)? in
+            parts[key].map { ($0.0, $0.1.joined(separator: "\n") + "\n") }
+        }
+        if let p = text("gui-datos") { onData(p.0, p.1) }
+        if let p = text("gui-hosts") { onHosts(p.0, p.1) }
+        if let p = text("gui-servicios") { onServices(p.0, p.1) }
+        if let p = text("gui-proyectos") { onProjects(p.0, p.1) }
     }
 
     private func onData(_ rc: Int32, _ out: String) {
@@ -27303,6 +27401,7 @@ struct ToolsView: View {
         ("errores", "Registro de errores", "exclamationmark.triangle"),
         ("carpetas", "Carpetas", "folder"),
         ("oficial", "XAMPP oficial", "externaldrive"),
+        ("programa", "Programa", "menubar.rectangle"),
         ("info", "Información", "info.circle")]
 
     var body: some View {
@@ -27383,6 +27482,14 @@ struct ToolsView: View {
             }
         case "oficial":
             officialCard(d)
+        case "programa":
+            TileCard("Programa", wide: true) {
+                Tile("Dejar en la barra de menús al cerrar",
+                     "Icono junto al reloj: al cerrar la ventana, la aplicación sigue en él. Desde ahí se abre otra vez, se arranca o para la versión, se abre web.local o se sale.") {
+                    Toggle("", isOn: Binding(get: { model.trayOn }, set: { model.setTray($0) }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                }
+            }
         case "info":
             TileCard("Información") {
                 Tile("Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace cada uno") {
@@ -27644,6 +27751,96 @@ struct ToolsView: View {
     }
 }
 
+// MARK: - Icono en la barra de menús (junto al reloj)
+
+/// «no» si se ha quitado en Configuración (sin el fichero, puesto)
+let TRAY_FILE = LOG_DIR + "/ventana-bandeja"
+
+func trayWanted() -> Bool {
+    let s = (try? String(contentsOfFile: TRAY_FILE, encoding: .utf8)) ?? ""
+    return s.trimmingCharacters(in: .whitespacesAndNewlines) != "no"
+}
+
+/// El icono de la barra de menús: abrir la ventana, arrancar o parar la versión activa, abrir web.local y
+/// salir. Su menú se rehace cada vez que se abre, con lo último que se sabe
+final class TrayIcon: NSObject, NSMenuDelegate {
+    static let shared = TrayIcon()
+    private var item: NSStatusItem?
+    var on: Bool { return item != nil }
+
+    func show(_ yes: Bool) {
+        guard yes else {
+            if let i = item { NSStatusBar.system.removeStatusItem(i) }
+            item = nil
+            return
+        }
+        guard item == nil else { return }
+        let i = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let b = i.button {
+            let img = (NSApp.applicationIconImage.copy() as? NSImage) ?? NSImage()
+            img.size = NSSize(width: 18, height: 18)
+            b.image = img
+            b.toolTip = "Nexum Dev Stack"
+        }
+        let m = NSMenu()
+        m.delegate = self
+        // (se activan aquí, según lo que se sabe)
+        m.autoenablesItems = false
+        i.menu = m
+        item = i
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let model = AppModel.current
+        let d = model?.data
+        let act = d?.active ?? ""
+        let running = d?.running ?? false
+        let link = model?.projects?.link ?? ""
+        func add(_ title: String, _ sel: Selector?, _ enabled: Bool = true) {
+            let it = NSMenuItem(title: title, action: sel, keyEquivalent: "")
+            it.target = self
+            it.isEnabled = enabled && sel != nil
+            menu.addItem(it)
+        }
+        add("Abrir Nexum Dev Stack", #selector(openWindow))
+        menu.addItem(.separator())
+        add(act.isEmpty ? "Ninguna versión activa" : running ? "● XAMPP-\(act) en marcha" : "○ XAMPP-\(act) parada", nil)
+        add(act.isEmpty ? "Elegir una versión…" : running ? "Parar y desactivar" : "Arrancar XAMPP-\(act)",
+            #selector(power), d != nil && !(model?.busy ?? true))
+        add("Abrir \(link.isEmpty ? "web.local" : link)", #selector(openWeb), !link.isEmpty && running)
+        menu.addItem(.separator())
+        add("Salir", #selector(quit))
+    }
+
+    /// Como al pulsar el icono del Dock: vuelve la ventana que hay; si no queda ninguna, SwiftUI abre otra
+    @objc func openWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let w = NSApp.windows.first(where: { $0.canBecomeMain && ($0.isVisible || $0.isMiniaturized) }) {
+            if w.isMiniaturized { w.deminiaturize(nil) }
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let ev = NSAppleEventDescriptor(eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEReopenApplication),
+                                        targetDescriptor: NSAppleEventDescriptor(processIdentifier: ProcessInfo.processInfo.processIdentifier),
+                                        returnID: AEReturnID(kAutoGenerateReturnID), transactionID: AETransactionID(kAnyTransactionID))
+        _ = try? ev.sendEvent(options: [.noReply], timeout: 5)
+    }
+
+    @objc func power() {
+        if (AppModel.current?.data?.active ?? "").isEmpty { openWindow() }
+        AppModel.current?.power()
+    }
+
+    @objc func openWeb() {
+        if let link = AppModel.current?.projects?.link, !link.isEmpty { openURL("http://\(link)/") }
+    }
+
+    @objc func quit() {
+        NSApp.terminate(nil)
+    }
+}
+
 // MARK: - Terminal (abajo de la ventana)
 
 /// Tu shell en una pseudoterminal (con su sesión y su terminal de control: Ctrl+C y los trabajos van
@@ -27750,6 +27947,35 @@ final class TermTextView: NSTextView {
         textStorage?.setAttributedString(NSAttributedString(string: ""))
     }
 
+    // (⌘C, ⌘V y ⌘A aquí mismo: con el texto no editable, el menú Edición deja Pegar desactivado)
+    override func performKeyEquivalent(with e: NSEvent) -> Bool {
+        guard window?.firstResponder === self,
+              e.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock) == .command else {
+            return super.performKeyEquivalent(with: e)
+        }
+        switch e.charactersIgnoringModifiers?.lowercased() {
+        case "c": copy(nil); return true
+        case "v": paste(nil); return true
+        case "a": selectAll(nil); return true
+        default: return super.performKeyEquivalent(with: e)
+        }
+    }
+
+    /// Botón derecho: Copiar, Pegar y Seleccionar todo
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let m = NSMenu()
+        m.addItem(withTitle: "Copiar", action: #selector(copy(_:)), keyEquivalent: "c")
+        m.addItem(withTitle: "Pegar", action: #selector(paste(_:)), keyEquivalent: "v")
+        m.addItem(.separator())
+        m.addItem(withTitle: "Seleccionar todo", action: #selector(selectAll(_:)), keyEquivalent: "a")
+        // (se activan aquí: NSTextView deja Pegar desactivado si el texto no es editable)
+        m.autoenablesItems = false
+        m.items[0].isEnabled = selectedRange().length > 0
+        m.items[1].isEnabled = NSPasteboard.general.string(forType: .string) != nil
+        for i in m.items { i.target = self }
+        return m
+    }
+
     override func keyDown(with e: NSEvent) {
         // (⌘: lo del menú, como copiar)
         if e.modifierFlags.contains(.command) { super.keyDown(with: e); return }
@@ -27775,7 +28001,9 @@ final class TermTextView: NSTextView {
     }
 
     override func paste(_ sender: Any?) {
-        if let s = NSPasteboard.general.string(forType: .string) { send?(Data(s.utf8)) }
+        // (como en Terminal, cada salto de línea llega como Intro)
+        guard let s = NSPasteboard.general.string(forType: .string) else { return }
+        send?(Data(s.replacingOccurrences(of: "\r\n", with: "\r").replacingOccurrences(of: "\n", with: "\r").utf8))
     }
 
     /// Lo que sale de la terminal: sin los códigos de escape; \b borra; \r antes de \n no cuenta
@@ -27871,6 +28099,9 @@ struct TermPanel: View {
                 Button(action: { model.termCd() }) { Label("Proyecto cargado", systemImage: "folder") }
                     .buttonStyle(OutlineButton())
                     .tip("Ir a la carpeta del proyecto cargado (cd)")
+                Button(action: { model.termFlushDns() }) { Label("Vaciar DNS", systemImage: "network") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Vaciar la caché DNS del sistema (sudo dscacheutil -flushcache y mDNSResponder; la contraseña, aquí)")
                 Button(action: { model.termStart(restart: true) }) { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(OutlineButton())
                     .tip("Terminal nueva (cierra la de ahora)")
@@ -27994,9 +28225,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = unsafeBitCast(sym, to: Ptrace.self)(31, 0, nil, 0)
         }
     }
-    // Como las demas de macOS: al cerrar la ventana (el boton rojo) la aplicacion sigue abierta, con
-    // su icono en el Dock, y solo se sale desde el menu (Salir, ⌘Q)
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { return false }
+    // Al cerrar la ventana (el boton rojo) la aplicacion se cierra del todo: sin procesos que sigan
+    // gastando sin ventana. Con una tarea en marcha (instalar, cargar...) espera a que acabe y se cierra
+    // entonces (el didSet de task)
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // (con el icono de la barra de menús, sigue abierta en él: se vuelve a abrir o se sale desde ahí)
+        return !(AppModel.current?.busy ?? false) && !TrayIcon.shared.on
+    }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        TrayIcon.shared.show(trayWanted())
+    }
     // Al pulsar su icono del Dock sin ninguna ventana a la vista: vuelve la que estaba (oculta o en el
     // Dock); si no queda ninguna, SwiftUI abre una nueva (por eso se devuelve true)
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -28127,8 +28365,22 @@ function offer_command_install() {
 #   A|activa|en marcha (1/0)|XAMPP oficial en /Applications/XAMPP (1/0)
 #   V|version|php|apache|mariadb|proftpd|perl|phpmyadmin|motivo para no desinstalar
 #   D|version|base de datos|fecha|tipo (i: importada con lvm-instalador, c: ultimo cambio de tablas)
+# gui-vuelta: lo que la ventana pregunta cada 20 s (gui-datos, gui-hosts, gui-servicios y gui-proyectos) en
+# una sola orden: el script se lee una vez y no cuatro. Cada parte, en su subshell (un exit no corta las
+# demas), va detras de una linea «@@<orden>|<codigo de salida>»
+function gui_round() {
+    local part out rc
+    for part in gui-datos:gui_data gui-hosts:gui_hosts gui-servicios:gui_services gui-proyectos:gui_projects; do
+        out=$("${part#*:}" 2>&1 < /dev/null)
+        rc=$?
+        echo "@@${part%%:*}|$rc"
+        [ -n "$out" ] && printf '%s\n' "$out"
+    done
+    return 0
+}
+
 function gui_data() {
-    local active=$(active_dir) dir name blocker
+    local active=$(active_dir) dir name blocker dates=()
 
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
     echo "A|$([ -n "$active" ] && version_name "$active")|$(lampp_running && echo 1 || echo 0)|$(official_xampp && echo 1 || echo 0)"
@@ -28177,8 +28429,11 @@ function gui_data() {
         echo "V|$name|$(stack_fields "$dir")|${blocker//|/ }"
         # X|carpeta|estado frente a PHP2Shell (php2shell_state)
         echo "X|$name|$(php2shell_state "$(stack_fields "$dir" | cut -d'|' -f1)" "$dir")"
-        db_dates "$dir/xamppfiles/var/mysql" | sed "s/^/D|$name|/"
+        dates+=("$name" "$dir/xamppfiles/var/mysql")
     done
+    # (las fechas de las BBDD de todas las versiones en un solo python3)
+    [ ${#dates[@]} -gt 0 ] && db_dates --varias "${dates[@]}"
+    return 0
 }
 
 # Ramas de PHP para instalar, de la mas nueva a la mas antigua:
@@ -31651,6 +31906,20 @@ QUE HACE
 
 VERSIONES
 
+1.40.3 (3 nov 2026)
+- Icono en la barra de menús (junto al reloj): al cerrar la ventana,
+  la aplicación sigue en él. Su menú abre la ventana, arranca o para
+  la versión activa (con su estado), abre web.local y sale. Se quita
+  en Configuración → Programa; sin él, cerrar la ventana la cierra
+  como antes.
+- Terminal: ⌘C y ⌘V copian y pegan (antes Pegar no hacía nada), y
+  con el botón derecho, Copiar, Pegar y Seleccionar todo. Lo pegado
+  con varias líneas llega como si pulsaras Intro en cada una.
+- Terminal: «Proyecto cargado» ya lleva a su carpeta (se quedaba en la
+  de los proyectos), y lo mismo al abrirla. Nuevo botón «Vaciar DNS»:
+  escribe sudo dscacheutil -flushcache y reinicia mDNSResponder (la
+  contraseña, en la terminal).
+
 1.40.2 (30 oct 2026)
 - Descargar una BBDD: ya no falla («Unable to lock ibdata1») si la
   MariaDB de esa versión la tiene en marcha Docker (sin red). Se usa
@@ -31666,6 +31935,11 @@ VERSIONES
 - Configuración: a la izquierda, una columna con sus apartados (Parches
   nuevos, Vhosts y hosts, Correo de pruebas, Docker, GitHub, Carpetas…);
   a la derecha, solo lo que se puede cambiar del elegido.
+- Ventana: al cerrarla, la aplicación se cierra del todo (con una tarea
+  en marcha, al acabar la tarea).
+- Ventana más ligera: lo que pregunta cada 20 s va en una sola orden (la
+  revisión de seguridad de las versiones solo se repite si cambian sus
+  ficheros y las fechas de las BBDD se leen de una vez).
 
 1.40.1 (30 oct 2026)
 - Nuevo proyecto: en el paso 1, el repositorio se elige de los de
@@ -33668,6 +33942,7 @@ case "$1" in
     crear-bd) create_database "$2" ;;
     borrar-bd) drop_database "$2" "$3" ;;
     gui-datos) gui_data ;;
+    gui-vuelta) gui_round ;;
     gui-ramas) gui_branches ;;
     gui-fechas) gui_php_dates ;;
     gui-al-dia) gui_up_to_date "$2" ;;

@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.2)
+# Prueba de la ventana nueva en un Mac (versión 1.40.3)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.1** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.3** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.1/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.3/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.1
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.3
    ```
 
 5. **Comprueba las versiones:**
@@ -136,8 +136,8 @@ Si algo falla, pasa la salida de la tarea («Ver registro») y la de `docker ps 
 
 1. **Rehacer una versión** (por ejemplo XAMPP-8.5.12, menú ⋯ → actualizar o rehacer): en la consola de la tarea, tras «Instalando las librerias de Homebrew para compilar», o «Ya estan todas instaladas» (y no se llama a Homebrew), o «Se instalan con Homebrew: …» solo con las que falten, y el aviso de que en las versiones de macOS sin paquetes hechos se compilan y puede tardar. Ya no sale `gnupg` ni se compilan python, meson o gnutls por él, ni los avisos repetidos de «A newer Command Line Tools release is available». Después: «Firma de httpd.tar.bz2 comprobada (clave …)», lo mismo para apr, apr-util, php.tar.xz, pma.tar.xz y mariadb.tar.gz.
 2. `lvm-instalador preparar-firma` → «Ya no hace falta gnupg…» (no instala nada). Si ya tenías gnupg de Homebrew, puedes quitarlo con `brew uninstall gnupg` (el gestor no lo usa).
-3. **Cerrar la ventana** con el botón rojo: la aplicación sigue abierta (su icono en el Dock, con el punto debajo). Pulsa el icono del Dock: vuelve la ventana, con sus datos. Minimízala (botón amarillo) y pulsa el icono: vuelve también. **⌘Q** (o Nexum Dev Stack → Salir) sí la cierra.
-4. Con una tarea en marcha (por ejemplo, arrancar una versión), cierra la ventana y vuelve a abrirla desde el Dock: la tarea sigue y termina.
+3. **Cerrar la ventana:** desde la 1.40.2 cambia; se prueba en el paso 12. Minimízala (botón amarillo) y pulsa el icono del Dock: vuelve, con sus datos.
+4. (Cerrar la ventana con una tarea en marcha: paso 12.)
 5. **Barra de arriba:** sin el botón de phpMyAdmin (está en Bases de datos y en el menú Gestor → Abrir phpMyAdmin). El nombre: «Nexum» en negrita y «Dev Stack» normal y en azul; cambia el tema (menú ☰) y comprueba que se lee bien en los dos.
 6. **Desplegables plegados:** entra en Bases de datos: todas las versiones plegadas (también la activa). Abre una y después otra: la primera se cierra; pulsa la abierta: se cierra. Ve a otro apartado y vuelve: otra vez todas plegadas. Escribe en el buscador: se despliegan las que tienen algo que coincide. Lo mismo en Docker con los proyectos (plegados al entrar, uno a la vez; con una búsqueda, desplegados).
 
@@ -253,6 +253,31 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 4. **Añade otra versión de PHP** a un proyecto: ya no pide la contraseña.
 5. **`web.local` sigue igual:** carga un proyecto y ábrelo como siempre.
 6. Reinicia el Mac y vuelve a abrir un `*.docker.test`: el DNS arranca solo.
+
+## Paso 12: visor, Bases de datos, Configuración, cerrar la ventana y descargar una BBDD (1.40.2)
+
+1. **Visor de arriba:** ya no está el botón «Encendidos» ni la flecha. Pasa el ratón por «● Apache ● MariaDB»: se marca. Púlsalo: se abre el desplegable de servicios, con **Parar y desactivar** (o **Arrancar XAMPP-…**, en azul, si está parada) arriba a la derecha. Púlsalo: el desplegable se cierra y la versión se para (o arranca).
+2. **Bases de datos:** «Subir o actualizar una BBDD» está antes de la tabla, en un recuadro hundido, con cuatro columnas: **Fichero SQL** (Elegir… y el nombre), **BBDD de destino** (con + y la papelera), **Proyecto (opcional)** y **Cargar**. Sin fichero, debajo de Elegir… dice «Elige el fichero SQL.». La explicación larga, en el ⓘ del título. Carga una copia como siempre.
+3. **Configuración:** a la izquierda, la columna de apartados (Parches nuevos, Vhosts y hosts, Seguridad entre webs, Correo de pruebas, Docker, Túnel de Cloudflare, Visor de los proyectos, GitHub, Registro de errores, Carpetas, XAMPP oficial, Información). Al pulsar uno, a la derecha sale solo lo suyo. Ve a otra pestaña y vuelve: sigue en el mismo apartado. En Repositorios (sin conexión con GitHub), **Ir a Configuración** abre el apartado GitHub.
+4. **Cerrar la ventana** con el botón rojo: la aplicación se cierra del todo (sin punto debajo del icono del Dock). Compruébalo:
+
+   ```bash
+   pgrep -fl "Nexum Dev Stack" || echo "cerrada"
+   ```
+
+5. **Con una tarea en marcha** (por ejemplo, arrancar una versión), cierra la ventana: la aplicación sigue hasta que acaba la tarea y entonces se cierra sola.
+6. **Descargar una BBDD de una versión que usa Docker en vivo:** con un proyecto de Docker con la BBDD de XAMPP-X en vivo en marcha (su MariaDB sin red), descarga una BBDD de esa versión desde Bases de datos. Antes fallaba con «Unable to lock ./ibdata1»; ahora dice «Se usa el MariaDB que ya esta en marcha para Docker (sin red)», la descarga termina y el proyecto de Docker sigue funcionando.
+7. **Consumo:** deja la ventana abierta un par de minutos en reposo y mira en Monitor de Actividad «Nexum Dev Stack» y los procesos bash: cada 20 s se lanza una sola orden (`gui-vuelta`) en lugar de cuatro.
+
+## Paso 13: terminal e icono en la barra de menús (1.40.3)
+
+1. **Terminal, copiar y pegar:** abre la Terminal de abajo, escribe `echo hola`, selecciona `hola` y pulsa **⌘C**; en TextEdit, ⌘V pega «hola». Copia en TextEdit `ls` y pulsa **⌘V** en la terminal: se escribe `ls`. Botón derecho en la terminal: **Copiar** (solo con algo seleccionado), **Pegar** y **Seleccionar todo**. Copia dos líneas (`echo uno` y `echo dos`) y pégalas: salen «uno» y «dos».
+2. **Terminal, proyecto cargado y DNS:** con un proyecto cargado, abre la terminal: empieza en la carpeta del proyecto (`pwd`), no en la de los proyectos. Haz `cd /` y pulsa **Proyecto cargado**: vuelve a ella. Pulsa **Vaciar DNS**: se escribe `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`, pide la contraseña y termina sin error.
+3. Al abrir la aplicación, arriba a la derecha (junto al reloj) sale su icono. Púlsalo: **Abrir Nexum Dev Stack**, el estado de la versión activa («● XAMPP-… en marcha» o «○ … parada», en gris), **Parar y desactivar** o **Arrancar XAMPP-…**, **Abrir web.local** (activo solo con la versión en marcha) y **Salir**.
+4. **Cierra la ventana** con el botón rojo: la aplicación sigue (el icono de arriba y el punto en el Dock). Desde el icono, **Abrir Nexum Dev Stack**: vuelve la ventana, con sus datos. Ciérrala otra vez y pulsa el icono del Dock: también vuelve.
+5. Con la ventana cerrada, **Parar y desactivar** desde el icono: la versión se para. Al minuto, el menú dice «○ … parada». **Arrancar** la vuelve a poner en marcha.
+6. **Salir** desde el icono: la aplicación se cierra del todo (`pgrep -fl "Nexum Dev Stack" || echo "cerrada"`).
+7. **Configuración → Programa:** apaga «Dejar en la barra de menús al cerrar». El icono desaparece al momento; cerrar la ventana cierra la aplicación (como en el paso 12). Vuelve a abrirla: sigue sin icono. Enciéndelo otra vez: el icono vuelve.
 
 ## Qué apuntar
 

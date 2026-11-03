@@ -342,7 +342,8 @@ check "actualizar-gestor: ya sin gpgv de Homebrew" '! body install_update | grep
 
 # --- 1.39.5: sin gnupg, cerrar la ventana sin salir, barra de arriba ---
 check "1.39.5: Buscar actualizaciones ya no ofrece instalar gnupg (ni preparar-firma)" '! grep -q "Falta gnupg\|Instalar gnupg\|\"preparar-firma\"\]" "$SRC"'
-check "1.39.5: cerrar la ventana no sale de la aplicacion" 'grep -q "func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { return false }" "$SRC" && ! grep -q "applicationShouldTerminateAfterLastWindowClosed.*return true" "$SRC"'
+# (desde la 1.40.2, al reves que en la 1.39.5: cerrar la ventana cierra la aplicacion, salvo con una tarea en marcha)
+check "1.40.2: cerrar la ventana sale de la aplicacion (con una tarea en marcha, al acabarla; con el icono de la barra de menus, sigue en el)" 'grep -A2 "func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {" "$SRC" | grep -q "return !(AppModel.current?.busy ?? false)"'
 check "1.39.5: el icono del Dock vuelve a traer la ventana" 'grep -A6 "func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {" "$SRC" | grep -q "makeKeyAndOrderFront(nil)" && grep -A6 "func applicationShouldHandleReopen" "$SRC" | grep -q "return true"'
 check "1.39.5: sin ventana, no se leen los datos cada 20 s" 'grep -A4 "Timer.scheduledTimer(withTimeInterval: 20" "$SRC" | grep -q "NSApp.windows.contains(where: { \$0.isVisible && \$0.canBecomeMain })"'
 check "1.39.5: Salir y relaunchApp siguen cerrando la aplicacion" 'grep -A10 "^func relaunchApp()" "$SRC" | grep -q "NSApp.terminate(nil)" && grep -q "CommandGroup(replacing: .newItem) {}" "$SRC"'
