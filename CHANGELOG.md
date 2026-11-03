@@ -4,6 +4,19 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.22 · 3 nov 2026
+
+- Dominios y hosts, «Crear y falsear»: el botón se veía azul aunque no se pudiera pulsar (le faltaba un dominio válido o la carpeta) y no hacía nada. Ahora se ve apagado y debajo dice lo que falta; con todo puesto, lo que va a crear (https://dominio → carpeta).
+- El dominio se puede pegar como dirección (https://www.mitienda.com/): se queda solo con el nombre.
+
+## 1.56.21 · 3 nov 2026
+
+- **WordPress:** el `wp-config.php` lleva siempre WP_SITEURL y WP_HOME con la dirección local (https://web.local o su dominio propio). Si entraba en la base pero le faltaban, se daba por bueno y la web redirigía a producción: ahora, al cargar el proyecto (o en Nuevo proyecto), se le añaden sin tocar el resto del fichero.
+
+## 1.56.20 · 3 nov 2026
+
+- **Nuevo proyecto con un WordPress:** al acabar de importar su BBDD se prepara su `wp-config.php` para local (la base, root y localhost, y WP_HOME). Se hacía al cargarlo, antes de importarla, y como la base aún no existía se quedaba sin hacer (solo se repetía con PrestaShop). Si después pegas encima el código de producción, vuelve a cargar el proyecto: su `wp-config.php` vuelve a la base local.
+
 ## 1.56.19 · 3 nov 2026
 
 - **Nuevo proyecto:** al escribir en el buscador de repositorios, la lista sale con sus nombres (salían las filas vacías: había que adivinar cuál era cada una).

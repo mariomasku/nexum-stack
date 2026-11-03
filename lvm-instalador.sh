@@ -768,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.19"
+APP_VERSION="1.56.22"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -3182,9 +3182,10 @@ function mount_project() {
     else
         create_database "$db" || return 1
     fi
-    # Tienda PrestaShop: su dominio esta en la base (shop_url), que al cargarla aun no existia. Ahora
-    # que esta, su vhost, su certificado y el dominio falseado
-    if [ -n "$file" ] && is_prestashop "$folder"; then
+    # Al cargarla, la base aun no existia: ahora que esta, su configuracion. Tienda PrestaShop: su dominio
+    # (shop_url de la base), su vhost, su certificado y el dominio falseado. WordPress: wp-config.php con
+    # la base (el repositorio no suele traerlo, o trae el de produccion)
+    if [ -n "$file" ] && { is_prestashop "$folder" || is_wordpress "$folder"; }; then
         load_project_domain "$folder" "$db" || return 1
     fi
     echo "Proyecto nuevo montado: $folder en lampp-$version con la BBDD $db"
@@ -7175,6 +7176,23 @@ function wp_local_url() {
         END { print (https != "" ? https : http != "" ? http : "https://" l) }'
 }
 
+# Si el wp-config.php define WP_SITEURL y WP_HOME con la direccion dada (fuera de comentarios)
+function wp_config_has_url() {
+    python3 -I - "$1" "$2" <<'EOF'
+import re, sys
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as f:
+        text = f.read(2000000)
+except OSError:
+    sys.exit(1)
+url = sys.argv[2].rstrip("/")
+for name in ("WP_SITEURL", "WP_HOME"):
+    rx = r"""(?m)^[ \t]*define\(\s*['"]%s['"]\s*,\s*['"]%s/?['"]\s*\)""" % (name, re.escape(url))
+    if not re.search(rx, text):
+        sys.exit(1)
+EOF
+}
+
 # wp-config <carpeta> [base]: comprueba el wp-config.php de un WordPress y, si no usa la base
 # asociada (la indicada, la recordada para la carpeta o la suya si esta en local) o no entra en el
 # MariaDB local, lo rehace con la plantilla
@@ -7222,8 +7240,11 @@ function wp_config() {
         return 0
     fi
 
-    # Funciona en este equipo con la base asociada: es la plantilla para la proxima vez
-    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+    # Funciona en este equipo con la base asociada y con WP_SITEURL y WP_HOME en su direccion local
+    # (sin ellas WordPress redirige al dominio de produccion): es la plantilla para la proxima vez
+    url=$(wp_local_url "$folder")
+    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options" \
+        && wp_config_has_url "$file" "$url"; then
         if [ "$DRY" -eq 0 ] && ! cmp -s "$file" "$saved"; then
             mkdir -p "$WP_CONFIG_DIR" && cp "$file" "$saved"
         fi
@@ -7232,8 +7253,11 @@ function wp_config() {
         return 0
     fi
 
-    # Plantilla: la copia de este equipo, el propio fichero o wp-config-sample.php
-    if [ -f "$saved" ]; then
+    # Plantilla: la copia de este equipo, el propio fichero o wp-config-sample.php (si solo le faltan
+    # WP_SITEURL y WP_HOME, el propio fichero, que ya entra en la base)
+    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+        src=$file
+    elif [ -f "$saved" ]; then
         src=$saved
     elif [ -f "$file" ]; then
         src=$file
@@ -7267,17 +7291,18 @@ function wp_config() {
 
     if [ "$name" != "$db" ]; then
         echo "WordPress: el wp-config.php de $folder usa la base ${name:-(ninguna)}${host:+ en $host}; la de la carpeta es $db"
+    elif db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+        echo "WordPress: el wp-config.php de $folder no lleva WP_SITEURL y WP_HOME en $url"
     else
         echo "WordPress: el wp-config.php de $folder no entra en el MariaDB local${host:+ (servidor $host, usuario $user)}"
     fi
     case "$src" in
         "$saved") echo "Se rehace con la plantilla de este equipo, con la base $db" ;;
         "$sample") echo "Se crea a partir de wp-config-sample.php, con la base $db y claves nuevas" ;;
-        *) echo "Se cambia a la base $db" ;;
+        *) [ "$name" == "$db" ] && echo "Se le ponen WP_SITEURL y WP_HOME" || echo "Se cambia a la base $db" ;;
     esac
     [ $local_db -eq 1 ] && echo "  Usuario root y servidor localhost (los de MariaDB local)"
     [ "$new_prefix" != "$s_prefix" ] && echo "  Prefijo de las tablas: $new_prefix (era ${s_prefix:-ninguno})"
-    url=$(wp_local_url "$folder")
     echo "  WP_SITEURL y WP_HOME: $url"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] $file con la base $db y copia en $saved"
@@ -12173,6 +12198,29 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.56.22 (3 nov 2026)
+- Dominios y hosts, «Crear y falsear»: el botón se veía azul aunque no
+  se pudiera pulsar (le faltaba un dominio válido o la carpeta) y no
+  hacía nada. Ahora se ve apagado y debajo dice lo que falta; con todo
+  puesto, lo que va a crear (https://dominio → carpeta).
+- El dominio se puede pegar como dirección (https://www.mitienda.com/):
+  se queda solo con el nombre.
+
+1.56.21 (3 nov 2026)
+- WordPress: el wp-config.php lleva siempre WP_SITEURL y WP_HOME con
+  la dirección local (https://web.local o su dominio propio). Si
+  entraba en la base pero le faltaban, se daba por bueno y la web
+  redirigía a producción: ahora, al cargar el proyecto (o en Nuevo
+  proyecto), se le añaden sin tocar el resto del fichero.
+
+1.56.20 (3 nov 2026)
+- Nuevo proyecto con un WordPress: al acabar de importar su BBDD se
+  prepara su wp-config.php para local (la base, root y localhost, y
+  WP_HOME). Se hacía al cargarlo, antes de importarla, y como la base
+  aún no existía se quedaba sin hacer (solo se repetía con PrestaShop).
+  Si después pegas encima el código de producción, vuelve a cargar el
+  proyecto: su wp-config.php vuelve a la base local.
 
 1.56.19 (3 nov 2026)
 - Nuevo proyecto: al escribir en el buscador de repositorios, la lista
@@ -19582,6 +19630,14 @@ def project_db(folder):
 LOG_OPEN_MAX = 20 * 1024 * 1024
 # Dominio de un proyecto nuevo (pestaña Hosts): mitienda.com, sub.mitienda.es…
 DOMAIN_RX = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$")
+
+
+def clean_domain(text):
+    """Dominio escrito o pegado como direccion (https://www.mitienda.com/tienda): solo el nombre."""
+    d = re.sub(r"^[A-Za-z][A-Za-z0-9+.-]*://", "", text.strip())
+    return re.split(r"[/?#:\s]", d, 1)[0].rstrip(".")
+
+
 # Marca con la que sudo pide la contraseña (SUDO_PROMPT). Distinta en cada ventana: un volcado o un
 # fichero de un proyecto que se muestre en el registro no puede imitarla para que salga el cuadro
 SUDO_MARK = "@@LVM-SUDO-%s@@" % os.urandom(8).hex()
@@ -22664,7 +22720,7 @@ class App(Gtk.Application):
         row = ActionRow("Dominio", "El de producción")
         e = Gtk.Entry(text=f["domain"], placeholder_text="mitienda.com", width_chars=COMBO_CHARS,
                       valign=Gtk.Align.CENTER)
-        e.connect("changed", lambda w: (f.__setitem__("domain", w.get_text().strip()),
+        e.connect("changed", lambda w: (f.__setitem__("domain", clean_domain(w.get_text())),
                                         update())[0])
         row.add_suffix(e)
         lb.add(row)
@@ -22721,13 +22777,21 @@ class App(Gtk.Application):
         row.add_suffix(b)
         lb.add(row)
 
-        row = ActionRow("", None)
+        # (debajo, lo que falta para poder crearlo: sin eso el boton no se puede pulsar)
+        row = ActionRow("", " ")
         btn = css(Gtk.Button(label="Crear y falsear"), "suggested-action")
         btn.connect("clicked", lambda *_: self.on_new_domain())
         row.add_suffix(btn)
         lb.add(row)
 
         def update():
+            why = ("Escribe el dominio de producción" if not f["domain"] else
+                   "«%s» no es un dominio (por ejemplo: mitienda.com)" % f["domain"]
+                   if not DOMAIN_RX.match(f["domain"]) else
+                   "Elige su carpeta" if not f["folder"] else
+                   "Espera a que acabe la tarea en marcha" if self.busy else
+                   "https://%s → /opt/htdocs/%s" % (f["domain"].lower(), f["folder"]))
+            row.subtitle.set_label(why)
             btn.set_sensitive(bool(DOMAIN_RX.match(f["domain"])) and bool(f["folder"])
                               and not self.busy)
         self.newdom_update = update
@@ -26182,6 +26246,10 @@ button.verde, button.suggested-action, .nv-azul { background-image: none; backgr
 button.verde:hover, .nv-azul:hover { background-color: shade(%(b)s, 1.12); border-color: shade(%(b)s, 1.35); }
 button.verde label, button.verde image, .nv-azul label, .nv-azul image { color: white; }
 button.verde:disabled, .nv-azul:disabled { background-color: alpha(%(b)s, 0.35); }
+button.suggested-action:hover { background-color: shade(%(b)s, 1.12); border-color: shade(%(b)s, 1.35); }
+button.suggested-action label { color: white; }
+button.suggested-action:disabled { background-color: alpha(%(b)s, 0.35); }
+button.suggested-action:disabled label { color: alpha(white, 0.6); }
 popover { border-radius: 12px; padding: 5px; }
 popover modelbutton { border-radius: 7px; padding: 6px 12px; min-height: 26px; }
 popover modelbutton:hover { background-color: %(b)s; color: white; }

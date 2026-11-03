@@ -187,7 +187,7 @@ done
 check "git: rechaza file://, ext::, opciones, credenciales, http y caracteres raros" '[ $badurl = 1 ]'
 check "git: clon sin submodulos, sin ganchos, sin preguntas y solo https/ssh" 'grep -q "clone --no-recurse-submodules -- \"\$url\" \"\$dest\"" "$SRC" && grep -q "protocol.allow=never" "$SRC" && grep -q "core.hooksPath=/dev/null" "$SRC" && grep -q "GIT_TERMINAL_PROMPT=0" "$SRC"'
 
-check "montar-proyecto: una tienda recupera su dominio tras subir el volcado" 'grep -A3 "aun no existia" "$SRC" | grep -q "load_project_domain \"\$folder\" \"\$db\""'
+check "montar-proyecto: una tienda recupera su dominio tras subir el volcado" 'grep -A6 "aun no existia" "$SRC" | grep -q "load_project_domain \"\$folder\" \"\$db\""'
 
 # --- Bajos arreglados en la 1.44.2 / Mac 1.32.3
 check "lvm-copias: al arrancar se deja solo para ti (700)" 'grep -q "chmod 700 \"\$HOME/lvm-copias\"" "$SRC" && ! grep -qE "mkdir -p \"\\\$HOME/lvm-copias\"" "$SRC"'

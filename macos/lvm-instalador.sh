@@ -2135,7 +2135,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.3"
+APP_VERSION="1.40.6"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -4473,9 +4473,10 @@ function mount_project() {
     else
         create_database "$db" || return 1
     fi
-    # Tienda PrestaShop: su dominio esta en la base (shop_url), que al cargarla aun no existia. Ahora
-    # que esta, su vhost, su certificado y el dominio falseado
-    if [ -n "$file" ] && is_prestashop "$folder"; then
+    # Al cargarla, la base aun no existia: ahora que esta, su configuracion. Tienda PrestaShop: su dominio
+    # (shop_url de la base), su vhost, su certificado y el dominio falseado. WordPress: wp-config.php con
+    # la base (el repositorio no suele traerlo, o trae el de produccion)
+    if [ -n "$file" ] && { is_prestashop "$folder" || is_wordpress "$folder"; }; then
         load_project_domain "$folder" "$db" || return 1
     fi
     echo "Proyecto nuevo montado: $folder en XAMPP-$version con la BBDD $db"
@@ -9532,6 +9533,23 @@ function wp_local_url() {
         END { print (https != "" ? https : http != "" ? http : "https://" l) }'
 }
 
+# Si el wp-config.php define WP_SITEURL y WP_HOME con la direccion dada (fuera de comentarios)
+function wp_config_has_url() {
+    python3 -I - "$1" "$2" <<'EOF'
+import re, sys
+try:
+    with open(sys.argv[1], encoding="utf-8", errors="replace") as f:
+        text = f.read(2000000)
+except OSError:
+    sys.exit(1)
+url = sys.argv[2].rstrip("/")
+for name in ("WP_SITEURL", "WP_HOME"):
+    rx = r"""(?m)^[ \t]*define\(\s*['"]%s['"]\s*,\s*['"]%s/?['"]\s*\)""" % (name, re.escape(url))
+    if not re.search(rx, text):
+        sys.exit(1)
+EOF
+}
+
 # wp-config <carpeta> [base]: comprueba el wp-config.php de un WordPress y, si no usa la base
 # asociada (la indicada, la recordada para la carpeta o la suya si esta en local) o no entra en el
 # MariaDB local, lo rehace con la plantilla
@@ -9579,8 +9597,11 @@ function wp_config() {
         return 0
     fi
 
-    # Funciona en este equipo con la base asociada: es la plantilla para la proxima vez
-    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+    # Funciona en este equipo con la base asociada y con WP_SITEURL y WP_HOME en su direccion local
+    # (sin ellas WordPress redirige al dominio de produccion): es la plantilla para la proxima vez
+    url=$(wp_local_url "$folder")
+    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options" \
+        && wp_config_has_url "$file" "$url"; then
         if [ "$DRY" -eq 0 ] && ! cmp -s "$file" "$saved"; then
             mkdir -p "$WP_CONFIG_DIR" && cp "$file" "$saved"
         fi
@@ -9589,8 +9610,11 @@ function wp_config() {
         return 0
     fi
 
-    # Plantilla: la copia de este equipo, el propio fichero o wp-config-sample.php
-    if [ -f "$saved" ]; then
+    # Plantilla: la copia de este equipo, el propio fichero o wp-config-sample.php (si solo le faltan
+    # WP_SITEURL y WP_HOME, el propio fichero, que ya entra en la base)
+    if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+        src=$file
+    elif [ -f "$saved" ]; then
         src=$saved
     elif [ -f "$file" ]; then
         src=$file
@@ -9624,17 +9648,18 @@ function wp_config() {
 
     if [ "$name" != "$db" ]; then
         echo "WordPress: el wp-config.php de $folder usa la base ${name:-(ninguna)}${host:+ en $host}; la de la carpeta es $db"
+    elif db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options"; then
+        echo "WordPress: el wp-config.php de $folder no lleva WP_SITEURL y WP_HOME en $url"
     else
         echo "WordPress: el wp-config.php de $folder no entra en el MariaDB local${host:+ (servidor $host, usuario $user)}"
     fi
     case "$src" in
         "$saved") echo "Se rehace con la plantilla de este equipo, con la base $db" ;;
         "$sample") echo "Se crea a partir de wp-config-sample.php, con la base $db y claves nuevas" ;;
-        *) echo "Se cambia a la base $db" ;;
+        *) [ "$name" == "$db" ] && echo "Se le ponen WP_SITEURL y WP_HOME" || echo "Se cambia a la base $db" ;;
     esac
     [ $local_db -eq 1 ] && echo "  Usuario root y servidor localhost (los de MariaDB local)"
     [ "$new_prefix" != "$s_prefix" ] && echo "  Prefijo de las tablas: $new_prefix (era ${s_prefix:-ninguno})"
-    url=$(wp_local_url "$folder")
     echo "  WP_SITEURL y WP_HOME: $url"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] $file con la base $db y copia en $saved"
@@ -18164,6 +18189,14 @@ func showLongText(_ title: String, _ text: String, subtitle: String = "", toEnd:
 // Proyectos (htdocs compartido; LVM_HTDOCS solo para pruebas) y dominio de un proyecto nuevo
 let HTDOCS = ProcessInfo.processInfo.environment["LVM_HTDOCS"] ?? "/Library/Nexum/XAMPP-compartido/htdocs"
 let DOMAIN_RX = try! NSRegularExpression(pattern: "^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$")
+/// Dominio escrito o pegado como dirección (https://www.mitienda.com/tienda): solo el nombre
+func cleanDomain(_ text: String) -> String {
+    var d = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let r = d.range(of: "^[A-Za-z][A-Za-z0-9+.-]*://", options: .regularExpression) { d.removeSubrange(r) }
+    if let cut = d.firstIndex(where: { "/?#:".contains($0) || $0.isWhitespace }) { d = String(d[..<cut]) }
+    while d.hasSuffix(".") { d.removeLast() }
+    return d
+}
 let FOLDER_RX = try! NSRegularExpression(pattern: "^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$")
 let ERROR_LOG = "/Applications/XAMPP/xamppfiles/logs/error_log"
 // Registros mayores que esto no se abren en el editor de textos (solo «Ver el final»)
@@ -19800,7 +19833,7 @@ final class AppModel: ObservableObject {
     }
 
     func createNewDomain() {
-        let domain = newDomain.trimmingCharacters(in: .whitespaces).lowercased()
+        let domain = cleanDomain(newDomain).lowercased()
         let folder = newFolder, db = newDb
         guard matches(DOMAIN_RX, domain), !folder.isEmpty, let d = data else { return }
         let exists = projectFolders().contains(folder)
@@ -27284,8 +27317,14 @@ struct HostsView: View {
                                     uniquingKeysWith: { a, _ in a })
         let folderChoices = folders + (model.newFolder.isEmpty || folders.contains(model.newFolder) ? [] : [model.newFolder])
         let dbChoices = dbs + (model.newDb.isEmpty || dbs.contains(model.newDb) ? [] : [model.newDb])
-        let canCreate = matches(DOMAIN_RX, model.newDomain.trimmingCharacters(in: .whitespaces))
-            && !model.newFolder.isEmpty && !model.busy
+        let domain = cleanDomain(model.newDomain)
+        let canCreate = matches(DOMAIN_RX, domain) && !model.newFolder.isEmpty && !model.busy
+        // (junto al botón, lo que falta para poder crearlo: sin eso no se puede pulsar)
+        let why = domain.isEmpty ? "Escribe el dominio de producción"
+            : !matches(DOMAIN_RX, domain) ? "«\(domain)» no es un dominio (por ejemplo: mitienda.com)"
+            : model.newFolder.isEmpty ? "Elige su carpeta"
+            : model.busy ? "Espera a que acabe la tarea en marcha"
+            : "https://\(domain.lowercased()) → htdocs/\(model.newFolder)"
         return Card("Nuevo proyecto con dominio falseado",
                     "Para construir en local un proyecto nuevo con su dominio y su BBDD de producción, sin tocar nada en producción. Elige su carpeta de htdocs (por ejemplo, la de un git clone) o crea una, y su BBDD. Se crea su vhost http y https con certificado, lo que falte de la carpeta y la BBDD, y se falsea el dominio. Al terminar se exporta a producción tal cual.") {
             Row("Dominio", "El de producción") {
@@ -27320,6 +27359,7 @@ struct HostsView: View {
             }
             Divider()
             HStack {
+                Text(why).font(.system(size: 11.5)).foregroundColor(.secondary).lineLimit(1).truncationMode(.middle)
                 Spacer()
                 Button("Crear y falsear") { model.createNewDomain() }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
@@ -31905,6 +31945,28 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.40.6 (3 nov 2026)
+- Dominios y hosts, «Crear y falsear»: junto al botón dice lo que
+  falta para poder crearlo (un dominio válido o la carpeta) y, con todo
+  puesto, lo que va a crear (https://dominio → carpeta).
+- El dominio se puede pegar como dirección (https://www.mitienda.com/):
+  se queda solo con el nombre.
+
+1.40.5 (3 nov 2026)
+- WordPress: el wp-config.php lleva siempre WP_SITEURL y WP_HOME con
+  la dirección local (https://web.local o su dominio propio). Si
+  entraba en la base pero le faltaban, se daba por bueno y la web
+  redirigía a producción: ahora, al cargar el proyecto (o en Nuevo
+  proyecto), se le añaden sin tocar el resto del fichero.
+
+1.40.4 (3 nov 2026)
+- Nuevo proyecto con un WordPress: al acabar de importar su BBDD se
+  prepara su wp-config.php para local (la base, root y localhost, y
+  WP_HOME). Se hacía al cargarlo, antes de importarla, y como la base
+  aún no existía se quedaba sin hacer (solo se repetía con PrestaShop).
+  Si después pegas encima el código de producción, vuelve a cargar el
+  proyecto: su wp-config.php vuelve a la base local.
 
 1.40.3 (3 nov 2026)
 - Icono en la barra de menús (junto al reloj): al cerrar la ventana,
