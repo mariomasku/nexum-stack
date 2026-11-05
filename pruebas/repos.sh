@@ -106,9 +106,20 @@ PULL_RC=1; mkdir -p "$HTDOCS_DIR/dos/.git"; touch "$HTDOCS_DIR/dos/.git/MERGE_HE
 out=$(repo_fetch "hexer/dob-prestashop-dos" --actualizar 2>&1); rc=$?
 check "si choca con lo tuyo: se deshace, no se toca nada y se dice" '[ $rc -ne 0 ] && grep -q "No se ha tocado nada" <<< "$out" && grep -qx abort "$W/git.log"'
 
+# El token de gh no espera a su vigilante (eran 15 s en cada llamada) y la lista de la ultima vez no lo pide
+gh() { echo tok_de_gh; }
+T0=$SECONDS; tok=$(gh_token)
+check "gh_token: contesta al momento (el vigilante no retiene su salida)" '[ "$tok" == tok_de_gh ] && [ $((SECONDS - T0)) -lt 5 ]'
+unset -f gh
+github_token_antes=$(declare -f github_token)
+github_token() { echo "token" > "$W/token-leido"; echo tok_bueno_1234567890abcdef; }
+rm -f "$W/token-leido"; out=$(repos_list --cache)
+check "repos --cache: no lee el token (con el llavero bloqueado se quedaria esperando)" '[ ! -e "$W/token-leido" ] && grep -q "^C|" <<< "$out"'
+eval "$github_token_antes"
+
 # Desconectar
 github_disconnect > /dev/null
-check "desconectar: fuera del llavero" '[ ! -e "$W/llavero" ] && [ -z "$(github_token)" ] && repos_list | grep -q "^E|GitHub no está conectado"'
+check "desconectar: fuera del llavero" '[ ! -e "$W/llavero" ] && [ -z "$(github_token)" ] && repos_list | grep -q "^E|GitHub no está conectado" && repos_list --cache | grep -q "^E|GitHub no está conectado"'
 
 # La ventana
 if [ $MAC -eq 1 ]; then

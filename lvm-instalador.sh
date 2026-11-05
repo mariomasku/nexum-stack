@@ -768,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.24"
+APP_VERSION="1.56.26"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -2774,7 +2774,9 @@ function gh_token() {
     out=$(mktemp "${TMPDIR:-/tmp}/lvm-gh.XXXXXX") || return 1
     gh auth token > "$out" 2> /dev/null < /dev/null &
     pid=$!
-    ( sleep 15; kill $pid 2> /dev/null ) &
+    # (el vigilante, con su salida a /dev/null: si no, $(gh_token) espera a que acabe su sleep, 15 s en
+    # cada llamada aunque gh conteste al momento; y se lleva su sleep al acabar)
+    ( sleep 15 & s=$!; trap 'kill $s 2> /dev/null; exit 0' TERM; wait $s; kill $pid 2> /dev/null ) > /dev/null 2>&1 &
     wait $pid 2> /dev/null
     kill $! 2> /dev/null
     cat "$out"
@@ -2898,7 +2900,13 @@ function repos_list() {
         case $a in --todos) show_all=1 ;; --cache) cached=1 ;; esac
     done
     account=$(github_conf CUENTA)
-    [ -n "$(github_token)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    # (la lista de la ultima vez no necesita el token: con el llavero bloqueado se quedaria esperandolo)
+    if [ $cached -eq 1 ]; then
+        [ -n "$(github_conf ORIGEN)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    elif [ -z "$(github_token)" ]; then
+        echo "E|GitHub no está conectado (Configuración, GitHub)"
+        return 1
+    fi
     [ -n "$account" ] || { echo "E|Falta la organización o cuenta (Configuración, GitHub)"; return 1; }
     # (la primera linea de la cache: usuario, cuenta y tipo; si es de otra cuenta, no vale)
     if [ $cached -eq 1 ]; then
@@ -2930,8 +2938,9 @@ function repos_list() {
         url=$next page=$((page + 1))
     done
     rm -f "$hdr"
-    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.nuevo" \
-        && mv -f "$REPOS_CACHE_FILE.nuevo" "$REPOS_CACHE_FILE" )
+    # (con el numero del proceso: la lista se puede estar pidiendo a la vez al abrir y en la pestaña)
+    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.$$" \
+        && mv -f "$REPOS_CACHE_FILE.$$" "$REPOS_CACHE_FILE" )
     clones=$(repo_clones)
     repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
 }
@@ -12199,6 +12208,21 @@ QUE HACE
 
 VERSIONES
 
+1.56.26 (5 nov 2026)
+- Nuevo proyecto, buscador de repositorios: los resultados salen en la
+  propia ventana, debajo del buscador, en vez de en un desplegable que
+  podía no verse. Se eligen con el ratón, con las flechas o con Intro.
+- Repositorios: botón para copiar el repositorio. Al pegarlo en el
+  buscador de Nuevo proyecto, queda elegido.
+
+1.56.25 (5 nov 2026)
+- Nuevo proyecto, buscador de repositorios: encuentra el repositorio al
+  momento. La lista se carga en segundo plano al abrir el programa y
+  se pone al día con GitHub. También salen los que no llevan uno de
+  los prefijos de Configuración.
+- Repositorios: la lista tardaba unos minutos y a veces no llegaba a
+  cargar. Cada lectura del token de gh esperaba 15 segundos sin motivo.
+
 1.56.24 (5 nov 2026)
 - Los mensajes al dejar el ratón encima de botones, interruptores e
   indicadores son ahora cortos y dicen solo lo que hacen. Las
@@ -20819,6 +20843,20 @@ def close_stale_windows(script):
         stale = [pid for pid in stale if os.path.exists("/proc/%d" % pid)]
 
 
+# Buscador de Nuevo proyecto: al abrir el asistente, si hace más de estos segundos que no se pregunta a
+# GitHub, se le pregunta por detrás
+NP_REPOS_FRESH = 300
+# Cuántos resultados enseña debajo
+NP_REPOS_HITS = 6
+
+
+def repo_query(text):
+    """Lo que se busca en la lista de repositorios: dueño/repo si es una dirección de GitHub."""
+    q = text.strip().lower()
+    q = re.sub(r"^(git@github\.com:|ssh://git@github\.com/|https?://github\.com/)", "", q)
+    return re.sub(r"(\.git)?/?$", "", q)
+
+
 def run_quick(args, callback, env=None, timeout=180):
     """Comando sin sudo ni preguntas, en segundo plano. callback(rc, salida) en la interfaz."""
     def work():
@@ -21943,6 +21981,8 @@ class App(Gtk.Application):
         self.services = None
         # Proyectos de /opt/htdocs (bloque «Cargar proyecto» de Versiones): None hasta leerlos
         self.projects = None
+        # Los repositorios del buscador de Nuevo proyecto (np_repos_load)
+        self.np_repos, self.np_repos_when, self.np_repos_busy = None, 0, False
         # Formulario «Nuevo proyecto con dominio falseado» (se conserva al redibujar la pestaña)
         self.newdom = {"domain": "", "folder": "", "db": ""}
 
@@ -23440,15 +23480,16 @@ class App(Gtk.Application):
         p1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         p1.pack_start(label("¿De qué repositorio de GitHub? (escribe parte de su nombre)"), False, False, 0)
         w["repo"] = Gtk.Entry(placeholder_text="dob-wordpress-…", primary_icon_name="system-search-symbolic")
-        w["repo_store"] = Gtk.ListStore(str, str, str)
-        comp = Gtk.EntryCompletion(model=w["repo_store"], minimum_key_length=2, popup_set_width=True)
-        # (con set_text_column, no con text_column al crearla: así lleva la celda que pinta el nombre; sin ella,
-        # la lista sale con las filas vacías)
-        comp.set_text_column(0)
-        comp.set_match_func(lambda c, key, it, *_: key.lower() in (c.get_model()[it][0] or "").lower())
-        comp.connect("match-selected", lambda c, m, it: (self.new_project_repo(m[it][0], m[it][1], m[it][2]), False)[1])
-        w["repo"].set_completion(comp)
+        w["repo"].connect("changed", lambda *_: self.new_project_search())
+        w["repo"].connect("activate", lambda *_: self.new_project_first_hit())
+        w["repo"].connect("key-press-event", self.new_project_search_key)
         p1.pack_start(w["repo"], False, False, 0)
+        # Los resultados, en la propia ventana: el desplegable de Gtk.EntryCompletion es una ventana
+        # emergente aparte, que en Wayland puede no llegar a verse
+        w["repo_hits"] = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        w["repo_hits"].connect("row-activated", on_row_activated)
+        w["repo_hits"].set_no_show_all(True)
+        p1.pack_start(w["repo_hits"], False, False, 0)
         w["repo_note"] = label("", "dim-label", wrap=True)
         p1.pack_start(w["repo_note"], False, False, 0)
         p1.pack_start(label("o la dirección de otro repositorio (GitHub u otro servidor):"), False, False, 0)
@@ -23552,10 +23593,10 @@ class App(Gtk.Application):
             w["repo_note"].set_label("")
             w["fake"].set_active(False)
             w["domain"].set_text("")
-            self.new_project_repos()
             w["url"].set_text("")
             w["folder"].set_text("")
             w["folder_auto"] = True
+            self.new_project_repos()
             w["db"].set_text("")
             w["db_auto"] = True
             w["file"].unselect_all()
@@ -23696,20 +23737,143 @@ class App(Gtk.Application):
         w["repo_note"].set_label("Se clona por SSH, con tu clave: git@github.com:%s.git%s" % (
             full, ("  ·  web: %s" % dom) if dom else ""))
 
+    def new_project_search(self):
+        """Al escribir en el buscador del paso 1: hasta NP_REPOS_HITS resultados debajo. Un repositorio
+        pegado (botón de copiar de Repositorios) o escrito entero queda elegido."""
+        w = self.np
+        if w.get("repo_setting"):
+            return
+        text = w["repo"].get_text().strip()
+        q = repo_query(text)
+        rows = self.np_repos or []
+        # (si se cambia lo escrito tras elegir uno, deja de estar elegido)
+        if w.get("repo_picked") and q != w["repo_picked"]:
+            w["repo_picked"] = None
+            w["url"].set_text("")
+            self.np_repos_show()
+        hits = w["repo_hits"]
+        clear(hits)
+        exact = next((r for r in rows if r[0].lower() == q), None)
+        if exact:
+            self.new_project_pick(exact)
+            return
+        # (la dirección de un repositorio que no está en la lista, a su campo)
+        if re.match(r"(git@|ssh://|https?://)", text):
+            w["url"].set_text(text)
+            q = ""
+        if len(q) < 2:
+            self.new_project_hits_shown(False)
+            return
+        found = [r for r in rows if q in r[0].lower()]
+        for r in found[:NP_REPOS_HITS]:
+            row = Gtk.ListBoxRow()
+            row.on_activate = lambda r=r: self.new_project_pick(r)
+            line = Gtk.Box(spacing=12, margin_start=12, margin_end=12, margin_top=6, margin_bottom=6)
+            line.pack_start(label(r[0], ellipsize=3), False, True, 0)
+            if r[1]:
+                line.pack_end(label(r[1], "dim-label", "subtitulo", ellipsize=3, max_width_chars=30), False, True, 0)
+            row.add(line)
+            hits.add(row)
+        if len(found) > NP_REPOS_HITS or not found:
+            row = Gtk.ListBoxRow(activatable=False, selectable=False, can_focus=False)
+            row.add(label("Y %d más: sigue escribiendo" % (len(found) - NP_REPOS_HITS) if found else
+                          "Ningún repositorio con «%s»" % text if self.np_repos is not None else "Cargando la lista…",
+                          "dim-label", margin_start=12, margin_end=12, margin_top=6, margin_bottom=6))
+            hits.add(row)
+        self.new_project_hits_shown(True)
+
+    def new_project_hits_shown(self, show):
+        hits = self.np["repo_hits"]
+        if show:
+            for row in hits.get_children():
+                row.show_all()
+            hits.show()
+        else:
+            hits.hide()
+        # (la ventana del asistente, al alto de lo que enseña)
+        top = hits.get_toplevel()
+        if top is getattr(self, "np_dialog", None):
+            top.resize(top.get_size()[0], 1)
+
+    def new_project_pick(self, repo):
+        w = self.np
+        w["repo_setting"] = True
+        w["repo"].set_text(repo[0])
+        w["repo"].set_position(-1)
+        w["repo_setting"] = False
+        w["repo_picked"] = repo[0].lower()
+        clear(w["repo_hits"])
+        self.new_project_hits_shown(False)
+        self.new_project_repo(*repo)
+
+    def new_project_first_hit(self):
+        """Intro en el buscador: el primer resultado."""
+        for row in self.np["repo_hits"].get_children():
+            if getattr(row, "on_activate", None):
+                row.on_activate()
+                return
+
+    def new_project_search_key(self, _entry, event):
+        """Flecha abajo en el buscador: a los resultados."""
+        if event.keyval != Gdk.KEY_Down:
+            return False
+        rows = self.np["repo_hits"].get_children()
+        if self.np["repo_hits"].get_visible() and rows and getattr(rows[0], "on_activate", None):
+            rows[0].grab_focus()
+            return True
+        return False
+
     def new_project_repos(self):
-        """La lista de repositorios de GitHub para el paso 1 (la de la última vez: al momento)."""
+        """La lista de repositorios de GitHub para el paso 1: ya está en memoria (np_repos_load, al abrir
+        el programa). Si hace rato que no se pregunta a GitHub, se pone al día por detrás."""
+        self.np_repos_show()
+        if self.np_repos is None:
+            self.np_repos_load(cache=True)
+        if time.time() - self.np_repos_when > NP_REPOS_FRESH:
+            self.np_repos_load()
+
+    def np_repos_load(self, cache=False):
+        """Los repositorios para el buscador de Nuevo proyecto, en segundo plano: los de la última vez
+        (cache: al momento) o los de GitHub. Sin conexión, se queda la lista que había."""
+        if cache and self.np_repos_when:
+            return
+        if not cache:
+            if self.np_repos_busy:
+                return
+            self.np_repos_busy = True
+
         def got(_rc, out):
-            store = self.np["repo_store"]
-            store.clear()
+            rows = []
             for f in parse_lines(out):
                 if f[0] == "R" and len(f) >= 11:
                     kind = "ps" if "prestashop" in f[6] + f[2] else "wp" if "wordpress" in f[6] + f[2] else ""
-                    store.append([f[1], f[7], kind])
-            n = len(store)
-            self.np["repo_note"].set_label(("%d repositorios de GitHub (los de la pestaña Repositorios)" % n) if n else
-                                           "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo")
+                    rows.append((f[1], f[7], kind))
+            if not cache:
+                self.np_repos_busy = False
+                if rows:
+                    self.np_repos_when = time.time()
+            # (una respuesta de la última vez que llega tarde no pisa la de GitHub)
+            if rows and not (cache and self.np_repos_when):
+                self.np_repos = rows
+            elif self.np_repos is None:
+                self.np_repos = []
+            self.np_repos_show()
             return False
-        run_quick(["repos", "--cache"], got)
+        run_quick(["repos", "--todos"] + (["--cache"] if cache else []), got)
+
+    def np_repos_show(self):
+        """Debajo del buscador, cuántos hay, si el asistente ya existe."""
+        w = getattr(self, "np", None)
+        if not w or self.np_repos is None:
+            return
+        # (con uno ya elegido, debajo sigue lo que se va a clonar)
+        if not w["url"].get_text():
+            n = len(self.np_repos)
+            w["repo_note"].set_label("%d repositorios de GitHub" % n if n else
+                                     "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo")
+            # (si ya se estaba escribiendo cuando ha llegado)
+            if w["repo"].get_text().strip():
+                self.new_project_search()
 
     def on_unload_project(self):
         p = self.projects
@@ -26655,6 +26819,10 @@ class App2(App):
         self.toast_rev.set_reveal_child(False)
         self.reload(branches=True)
         GLib.timeout_add_seconds(20, self.on_tick)
+        # Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
+        # vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
+        self.np_repos_load(cache=True)
+        GLib.timeout_add_seconds(5, lambda: (self.np_repos_load(), False)[1])
         # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
         GLib.timeout_add_seconds(6, self.auto_check_package)
         # (los correos sin leer, tambien al volver a la ventana)
@@ -29164,11 +29332,20 @@ class App2(App):
         row.add_suffix(b)
         # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así
         # todos los botones quedan a la misma altura)
+        # (para pegarlo en Nuevo proyecto)
+        cp = Gtk.Button(valign=Gtk.Align.CENTER, tooltip_text="Copiar repositorio")
+        cp.add(icon("edit-copy-symbolic"))
+        cp.connect("clicked", lambda *_: self.nv_repo_copy(repo))
+        row.add_suffix(cp)
         gh = Gtk.Button(valign=Gtk.Align.CENTER, tooltip_text="Abrir en GitHub")
         gh.add(MonoLogo("github", 18))
         gh.connect("clicked", lambda *_: self.open_uri("https://github.com/%s" % repo["full"]))
         row.add_suffix(gh)
         return row
+
+    def nv_repo_copy(self, repo):
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text("git@github.com:%s.git" % repo["full"], -1)
+        self.toast("Repositorio copiado: %s" % repo["name"])
 
     def nv_repo_fetch(self, repo):
         if repo["state"] == "clonado":

@@ -4,6 +4,16 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.26 · 5 nov 2026
+
+- **Nuevo proyecto, buscador de repositorios:** los resultados salen en la propia ventana, debajo del buscador, en vez de en un desplegable que podía no verse. Se eligen con el ratón, con las flechas o con Intro.
+- **Repositorios:** botón para copiar el repositorio. Al pegarlo en el buscador de Nuevo proyecto, queda elegido.
+
+## 1.56.25 · 5 nov 2026
+
+- **Nuevo proyecto, buscador de repositorios:** encuentra el repositorio al momento. La lista se carga en segundo plano al abrir el programa y se pone al día con GitHub. También salen los que no llevan uno de los prefijos de Configuración.
+- **Repositorios:** la lista tardaba unos minutos y a veces no llegaba a cargar. Cada lectura del token de gh esperaba 15 segundos sin motivo.
+
 ## 1.56.24 · 5 nov 2026
 
 - Los mensajes al dejar el ratón encima de botones, interruptores e indicadores son ahora cortos y dicen solo lo que hacen. Las explicaciones largas siguen en los símbolos ⓘ.

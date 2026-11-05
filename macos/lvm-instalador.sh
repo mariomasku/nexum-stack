@@ -2135,7 +2135,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.7"
+APP_VERSION="1.40.8"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -4066,7 +4066,9 @@ function gh_token() {
     out=$(mktemp "${TMPDIR:-/tmp}/lvm-gh.XXXXXX") || return 1
     gh auth token > "$out" 2> /dev/null < /dev/null &
     pid=$!
-    ( sleep 15; kill $pid 2> /dev/null ) &
+    # (el vigilante, con su salida a /dev/null: si no, $(gh_token) espera a que acabe su sleep, 15 s en
+    # cada llamada aunque gh conteste al momento; y se lleva su sleep al acabar)
+    ( sleep 15 & s=$!; trap 'kill $s 2> /dev/null; exit 0' TERM; wait $s; kill $pid 2> /dev/null ) > /dev/null 2>&1 &
     wait $pid 2> /dev/null
     kill $! 2> /dev/null
     cat "$out"
@@ -4189,7 +4191,13 @@ function repos_list() {
         case $a in --todos) show_all=1 ;; --cache) cached=1 ;; esac
     done
     account=$(github_conf CUENTA)
-    [ -n "$(github_token)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    # (la lista de la ultima vez no necesita el token: con el llavero bloqueado se quedaria esperandolo)
+    if [ $cached -eq 1 ]; then
+        [ -n "$(github_conf ORIGEN)" ] || { echo "E|GitHub no está conectado (Configuración, GitHub)"; return 1; }
+    elif [ -z "$(github_token)" ]; then
+        echo "E|GitHub no está conectado (Configuración, GitHub)"
+        return 1
+    fi
     [ -n "$account" ] || { echo "E|Falta la organización o cuenta (Configuración, GitHub)"; return 1; }
     # (la primera linea de la cache: usuario, cuenta y tipo; si es de otra cuenta, no vale)
     if [ $cached -eq 1 ]; then
@@ -4221,8 +4229,9 @@ function repos_list() {
         url=$next page=$((page + 1))
     done
     rm -f "$hdr"
-    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.nuevo" \
-        && mv -f "$REPOS_CACHE_FILE.nuevo" "$REPOS_CACHE_FILE" )
+    # (con el numero del proceso: la lista se puede estar pidiendo a la vez al abrir y en la pestaña)
+    ( umask 077; mkdir -p "$(dirname "$REPOS_CACHE_FILE")"; { echo "$login|$account|$kind"; printf '%s' "$all"; } > "$REPOS_CACHE_FILE.$$" \
+        && mv -f "$REPOS_CACHE_FILE.$$" "$REPOS_CACHE_FILE" )
     clones=$(repo_clones)
     repos_rows "$login" "$account" "$kind" "$show_all" "$clones" <<< "$all"
 }
@@ -19023,6 +19032,10 @@ final class AppModel: ObservableObject {
     /// Asistente: los repositorios de GitHub (los de la pestaña Repositorios), lo que se busca, el elegido, y
     /// el dominio de producción (falsearlo o no)
     @Published var npRepos: [RepoItem] = []
+    /// ¿Ya se ha leído alguna vez?, ¿se está preguntando a GitHub? y cuándo contestó por última vez
+    var npReposLoaded = false
+    var npReposBusy = false
+    var npReposWhen = Date.distantPast
     @Published var npRepoQuery = ""
     @Published var npRepoNote = ""
     @Published var npFake = false
@@ -19163,6 +19176,10 @@ final class AppModel: ObservableObject {
     init() {
         AppModel.current = self
         reload(branches: true)
+        // Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
+        // vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
+        loadNpRepos(cache: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.loadNpRepos() }
         timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
             // (sin ventana y con el icono de la barra de menús: solo lo que enseña su menú, cada minuto)
             if let self = self, !self.busy, TrayIcon.shared.on,
@@ -20632,14 +20649,51 @@ final class AppModel: ObservableObject {
             npRepoNote = ""
             npFake = false
             npDomain = ""
-            npRepos = []
-            runQuick(["repos", "--cache"]) { _, out in
-                self.npRepos = parseRepos(out).items
-                self.npRepoNote = self.npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo"
-                    : "\(self.npRepos.count) repositorios de GitHub (los de la pestaña Repositorios)"
-            }
+            // (la lista ya está en memoria: loadNpRepos, al abrir el programa. Si hace rato que no se
+            // pregunta a GitHub, se pone al día por detrás)
+            showNpReposNote()
+            if !npReposLoaded { loadNpRepos(cache: true) }
+            if Date().timeIntervalSince(npReposWhen) > NP_REPOS_FRESH { loadNpRepos() }
         }
         npOpen = show
+    }
+
+    /// Los repositorios para el buscador de Nuevo proyecto, en segundo plano: los de la última vez (cache:
+    /// al momento) o los de GitHub. Sin conexión, se queda la lista que había
+    func loadNpRepos(cache: Bool = false) {
+        if cache && npReposWhen != .distantPast { return }
+        if !cache {
+            if npReposBusy { return }
+            npReposBusy = true
+        }
+        runQuick(["repos", "--todos"] + (cache ? ["--cache"] : [])) { _, out in
+            let rows = parseRepos(out).items
+            if !cache {
+                self.npReposBusy = false
+                if !rows.isEmpty { self.npReposWhen = Date() }
+            }
+            // (una respuesta de la última vez que llega tarde no pisa la de GitHub)
+            if !rows.isEmpty && !(cache && self.npReposWhen != .distantPast) { self.npRepos = rows }
+            self.npReposLoaded = true
+            self.showNpReposNote()
+        }
+    }
+
+    /// Debajo del buscador, cuántos hay (con uno ya elegido, sigue lo que se va a clonar)
+    func showNpReposNote() {
+        if !npReposLoaded || !npUrl.isEmpty { return }
+        npRepoNote = npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo"
+            : "\(npRepos.count) repositorios de GitHub"
+    }
+
+    /// Al escribir en el buscador: un repositorio pegado (botón de copiar de Repositorios) o escrito entero
+    /// queda elegido
+    func npRepoTyped(_ text: String) {
+        npRepoQuery = text
+        let q = repoQuery(text)
+        if let r = npRepos.first(where: { $0.full.lowercased() == q }), npUrl != "git@github.com:\(r.full).git" {
+            npPickRepo(r)
+        }
     }
 
     /// Repositorio elegido de la lista de GitHub: su dirección SSH (con tu clave), su carpeta y, si su web es
@@ -25487,6 +25541,22 @@ struct ReposData: Equatable {
     var error: String? = nil
 }
 
+/// Buscador de Nuevo proyecto: al abrir el asistente, si hace más de estos segundos que no se pregunta a
+/// GitHub, se le pregunta por detrás
+let NP_REPOS_FRESH: TimeInterval = 300
+
+/// Lo que se busca en la lista de repositorios: dueño/repo si es una dirección de GitHub
+func repoQuery(_ text: String) -> String {
+    var q = text.trimmingCharacters(in: .whitespaces).lowercased()
+    for p in ["git@github.com:", "ssh://git@github.com/", "https://github.com/", "http://github.com/"] where q.hasPrefix(p) {
+        q = String(q.dropFirst(p.count))
+        break
+    }
+    if q.hasSuffix("/") { q = String(q.dropLast()) }
+    if q.hasSuffix(".git") { q = String(q.dropLast(4)) }
+    return q
+}
+
 func parseRepos(_ out: String) -> ReposData {
     var r = ReposData()
     for f in parseLines(out) {
@@ -25686,6 +25756,15 @@ struct ReposView: View {
                     .disabled(model.busy)
                     .tip("Clonar por SSH en htdocs")
             }
+            // (para pegarlo en Nuevo proyecto)
+            Button(action: {
+                copyText("git@github.com:\(item.full).git")
+                model.toast("Repositorio copiado: \(item.name)")
+            }) {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(OutlineButton())
+            .tip("Copiar repositorio")
             // (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo)
             Button(action: { openURL("https://github.com/" + item.full) }) {
                 LogoShape(d: LOGO_PATHS["github"] ?? "").fill(Color.primary).frame(width: 16, height: 16)
@@ -26299,12 +26378,12 @@ struct NewProjectWizard: View {
     }
 
     func stepRepo() -> some View {
-        let q = model.npRepoQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = repoQuery(model.npRepoQuery)
         let hits = q.count < 2 || model.npRepos.contains(where: { $0.full.lowercased() == q }) ? []
             : Array(model.npRepos.filter { $0.full.lowercased().contains(q) }.prefix(6))
         return VStack(alignment: .leading, spacing: 8) {
             Text("¿De qué repositorio de GitHub? (escribe parte de su nombre)")
-            TextField("dob-wordpress-…", text: $model.npRepoQuery)
+            TextField("dob-wordpress-…", text: Binding(get: { model.npRepoQuery }, set: { model.npRepoTyped($0) }))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
             if !hits.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
@@ -32036,6 +32115,16 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.40.8 (5 nov 2026)
+- Repositorios: botón para copiar el repositorio. Al pegarlo en el
+  buscador de Nuevo proyecto, queda elegido.
+- Nuevo proyecto, buscador de repositorios: encuentra el repositorio al
+  momento. La lista se carga en segundo plano al abrir el programa y
+  se pone al día con GitHub. También salen los que no llevan uno de
+  los prefijos de Configuración.
+- Repositorios: la lista tardaba unos minutos y a veces no llegaba a
+  cargar. Cada lectura del token de gh esperaba 15 segundos sin motivo.
 
 1.40.7 (5 nov 2026)
 - Los mensajes al dejar el ratón encima de botones, interruptores e
