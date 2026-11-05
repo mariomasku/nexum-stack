@@ -19,6 +19,10 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: cuatro pasos, el ultimo el dominio de produccion" 'grep -q "\"Paso 4 de 4: dominio de producción\"" "$SRC" && grep -q "if next >= 5 {" "$SRC" && grep -q "func stepDomain() -> some View" "$SRC"'
     check "Mac: el repositorio de la lista de GitHub (la de la ultima vez), por SSH" 'grep -q "runQuick(\[\"repos\", \"--cache\"\])" "$SRC" && grep -q "npUrl = \"git@github.com:\\\\(r.full).git\"" "$SRC"'
     check "Mac: Crear y falsear dice que falta (dominio, carpeta) y limpia el dominio pegado como direccion" 'grep -q "let canCreate = matches(DOMAIN_RX, domain) && !model.newFolder.isEmpty && !model.busy" "$SRC" && grep -q "Text(why).font" "$SRC" && grep -q "let domain = cleanDomain(newDomain).lowercased()" "$SRC"'
+    check "Mac: el proyecto cargado lleva el interruptor de su dominio (sin .local), con el mismo cambio que Dominios y hosts" 'grep -q "ForEach(model.projectHosts(x.name), id: \\\\.name) { h in" "$SRC" && grep -q "func projectHosts(_ name: String) -> \[HostEntry\]" "$SRC" && grep -q "\$0.folder == name && !\$0.name.lowercased().hasSuffix(\".local\")" "$SRC"'
+    check "Mac: el interruptor dice Falsear Host y, falseado, Host falseado; el boton Log, con su icono" 'grep -q "Text(h.fake ? \"Host falseado\" : \"Falsear Host\")" "$SRC" && grep -q ".tip(h.fake ? \"Host falseado\" : \"Falsear Host\")" "$SRC" && grep -q "name: \"Log\", icon: .logo(\"log\")" "$SRC" && ! grep -q "name: \"Log\", icon: .symbol" "$SRC"'
+    check "Mac: Host falseado en 1/3 y Nuevo proyecto en 2/3" 'grep -q "OneThirdTwoThirds(first: {" "$SRC" && grep -q "first.frame(width: unit, alignment: .topLeading)" "$SRC" && grep -q "second.frame(width: unit \* 2, alignment: .topLeading)" "$SRC"'
+    check "Mac: boton Ver fichero de hosts, solo para leerlo" 'grep -q "Label(\"Ver fichero de hosts\", systemImage: \"doc.text\")" "$SRC" && grep -q "func viewHostsFile()" "$SRC"'
     check "Mac: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'
     check "Mac: la caja de la terminal, con el mismo margen arriba que abajo" 'grep -q "padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))" "$SRC" && grep -q "padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))" "$SRC"'
 else
@@ -30,6 +34,13 @@ else
     CD=$(python3 -c "$(printf 'import re\n'; awk '/^def clean_domain\(text\):/,/rstrip/' "$SRC")
 print(clean_domain(' https://www.mitienda.com/tienda?x=1 '), clean_domain('mitienda.com.'), clean_domain('http://a.es:8080/'))")
     check "Linux: clean_domain deja solo el nombre (sin https://, ruta, puerto ni punto final)" '[ "$CD" == "www.mitienda.com mitienda.com a.es" ]'
+    check "Linux: el proyecto cargado lleva el interruptor de su dominio y sigue a /etc/hosts" 'grep -q "for h in reversed(self.project_hosts(x\[\"name\"\])):" "$SRC" && grep -q "sw.connect(\"state-set\", self.on_host_switch, h)" "$SRC" && grep -q "if self.hosts != old and getattr(self, \"nv_list\", None)" "$SRC"'
+    check "Linux: el interruptor dice Falsear Host y, falseado, Host falseado; el boton Log, con su icono" 'grep -q "label(\"Host falseado\" if fake else \"Falsear Host\"" "$SRC" && grep -q "return \"Host falseado\" if h\[\"fake\"\] else \"Falsear Host\"" "$SRC" && grep -q "(\"log\", \"Log\", (\"logo\", \"log\"))" "$SRC" && ! grep -q "\"text-x-generic-symbolic\", \"Log\"" "$SRC"'
+    check "Linux: Host falseado en 1/3 y Nuevo proyecto en 2/3" 'grep -q "Gtk.Grid(column_spacing=18, column_homogeneous=True)" "$SRC" && grep -q "grid.attach(box, 0, 0, 1, 1)" "$SRC" && grep -q "grid.attach(new_domain, 1, 0, 2, 1)" "$SRC"'
+    HV=$(python3 -c "$(awk '/^def hosts_view_text\(/,/return "\\n".join\(head\)/' "$SRC")
+hs = [dict(name='a.es', folder='x', fake=True), dict(name='bb.local', folder='', fake=False)]
+print(hosts_view_text(hs, '/etc/hosts', '/v.conf', '127.0.0.1 a.es'))")
+    check "Linux: el visor enseña los dominios falseables, con su estado, y el fichero tal cual" 'grep -q "^#   falseado  a.es      ->  x$" <<< "$HV" && grep -q "^#   apagado   bb.local  ->  sin carpeta$" <<< "$HV" && grep -q "tienen vhost en /v.conf" <<< "$HV" && [ "$(tail -1 <<< "$HV")" == "127.0.0.1 a.es" ]'
     check "Linux: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'
     check "Linux: la caja de la terminal, con el mismo margen arriba que abajo" 'grep -q "margin: 12px 14px 12px 14px;" "$SRC" && grep -q "padding: 10px 10px 10px 10px; }" "$SRC"'
 fi

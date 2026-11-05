@@ -114,7 +114,7 @@ check "desconectar: fuera del llavero" '[ ! -e "$W/llavero" ] && [ -z "$(github_
 if [ $MAC -eq 1 ]; then
     check "ventana (Mac): la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")" "$SRC" && grep -q "case \"repos\": ReposView()" "$SRC" && grep -q "^            GitHubCard()$" "$SRC" && grep -q "runQuick(\[\"github-conectar\"\], input:" "$SRC"'
     check "ventana (Mac): si la cuenta no vale, se dice en una ventana y lo escrito se queda" 'grep -q "message(\"No se ha guardado\"" "$SRC"'
-    check "ventana (Mac): el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "Button(action: { openURL(\"https://github.com/\" + item.full) })" "$SRC" && grep -q ".tip(\"Abrir en GitHub (https://github.com/\" + item.full" "$SRC"'
+    check "ventana (Mac): el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "Button(action: { openURL(\"https://github.com/\" + item.full) })" "$SRC" && grep -q ".tip(\"Abrir en GitHub\")" "$SRC"'
     check "ventana (Mac): ya clonado, se pregunta si aplastar antes de git pull" 'grep -q "guard confirm(\"¿Aplastar" "$SRC" && grep -q "args.append(\"--actualizar\")" "$SRC"'
 else
     check "ventana: la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")," "$SRC" && grep -q "        self.nv_github_tools()" "$SRC" && grep -q "run_quick_input(\[\"github-conectar\"\], token" "$SRC"'

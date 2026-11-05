@@ -768,7 +768,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.22"
+APP_VERSION="1.56.24"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -12199,6 +12199,24 @@ QUE HACE
 
 VERSIONES
 
+1.56.24 (5 nov 2026)
+- Los mensajes al dejar el ratón encima de botones, interruptores e
+  indicadores son ahora cortos y dicen solo lo que hacen. Las
+  explicaciones largas siguen en los símbolos ⓘ.
+- Proyecto cargado: el interruptor del dominio lleva el título «Falsear
+  Host» y, cuando está falseado, «Host falseado».
+- Botón Log: icono nuevo, un folio verde con «LOG» escrito.
+
+1.56.23 (5 nov 2026)
+- Proyecto cargado: si su carpeta tiene un dominio en los vhosts, junto
+  a sus botones sale ese dominio con un interruptor para falsearlo o
+  dejar de falsearlo sin ir a Dominios y hosts.
+- Dominios y hosts: «Host falseado» ocupa 1/3 de la pestaña y, a su
+  lado, «Nuevo proyecto con dominio falseado» ocupa los otros 2/3.
+- Dominios y hosts, botón «Ver fichero de hosts»: enseña /etc/hosts,
+  solo para leerlo, con los dominios que se pueden falsear delante (los
+  que tienen vhost, estén o no en el fichero).
+
 1.56.22 (3 nov 2026)
 - Dominios y hosts, «Crear y falsear»: el botón se veía azul aunque no
   se pudiera pulsar (le faltaba un dominio válido o la carpeta) y no
@@ -19459,6 +19477,33 @@ def narrow(combo, chars=COMBO_CHARS):
     return combo
 
 
+def host_switch_tip(h):
+    """Lo que dice el interruptor de un dominio al dejar el ratón encima."""
+    if h["name"].lower().endswith(".local"):
+        return "Apagar este .local" if h["fake"] else "Encender este .local"
+    return "Host falseado" if h["fake"] else "Falsear Host"
+
+
+def hosts_view_text(hosts, path, vhosts, text):
+    """Lo que enseña el visor del fichero de hosts: los dominios que se pueden falsear (los que tienen
+    vhost, estén o no en el fichero) y, debajo, el fichero tal cual."""
+    head = ["# DOMINIOS QUE SE PUEDEN FALSEAR (tienen vhost%s)" % (" en %s" % vhosts if vhosts else "")]
+    states = []
+    for h in hosts:
+        local = h["name"].lower().endswith(".local")
+        states.append(("encendido" if h["fake"] else "apagado") if local
+                      else ("falseado" if h["fake"] else "sin falsear"))
+    state_w = max([len(x) for x in states] or [0])
+    name_w = max([len(h["name"]) for h in hosts] or [0])
+    for h, state in zip(hosts, states):
+        head.append("#   %s  %s  ->  %s" % (state.ljust(state_w), h["name"].ljust(name_w),
+                                            h["folder"] or "sin carpeta"))
+    if not hosts:
+        head.append("#   (ninguno)")
+    head += ["#", "# CONTENIDO DE %s" % path, ""]
+    return "\n".join(head) + "\n" + text
+
+
 def project_folders():
     """Carpetas de proyectos de /opt/htdocs (sin enlaces como web.local ni ocultas)."""
     try:
@@ -19818,6 +19863,8 @@ def icon(name, size=16):
 # Logotipos de los paquetes (Simple Icons, CC0: un solo trazo en una caja de 24x24). Cada marca
 # es de su dueño; se usan solo para identificar cada paquete
 LOGO_PATHS = {
+    # (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
+    "log": "M 2 1 L 15 1 L 15 8 L 22 8 L 22 23 L 2 23 Z M 16.5 1 L 22 6.5 L 16.5 6.5 Z M 3.6 11 L 3.6 20 L 8.6 20 L 8.6 18.3 L 5.3 18.3 L 5.3 11 Z M 9.5 11 L 9.5 20 L 14.5 20 L 14.5 11 Z M 11.2 12.7 L 12.8 12.7 L 12.8 18.3 L 11.2 18.3 Z M 20.4 11 L 15.4 11 L 15.4 20 L 20.4 20 L 20.4 15.1 L 17.9 15.1 L 17.9 16.8 L 18.7 16.8 L 18.7 18.3 L 17.1 18.3 L 17.1 12.7 L 20.4 12.7 Z",
     # Cloudflare (Simple Icons 13.21.0, CC0)
     "cloudflare": (
         "M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8."
@@ -20053,7 +20100,7 @@ LOGO_PATHS = {
 }
 
 # Color de cada logotipo: el de la marca y, con el tema oscuro, uno algo más claro para que se vea
-LOGO_COLORS = {"php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
+LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
@@ -20805,7 +20852,7 @@ def run_quick_input(args, text, callback, timeout=60):
 VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", ("vscode", "text-editor-symbolic")),
                  ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
-                 ("log", "Log", ("icono", "text-x-generic-symbolic"))]
+                 ("log", "Log", ("logo", "log"))]
 BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
                  ("grande", "Icono y nombre (cuadrado)")]
 # Lado del cuadrado (px) de los estilos icono y grande: el de cada uno si no se ha elegido otro
@@ -21206,11 +21253,10 @@ def release_tag(sec):
     o solo de errores"""
     if sec == "1":
         tag = label("Parche de seguridad", "etiqueta-parche", "seguridad-parche")
-        tag.set_tooltip_text("php.net la marca como parche de seguridad: corrige vulnerabilidades. "
-                             "Conviene instalarla.")
+        tag.set_tooltip_text("Parche de seguridad")
     else:
         tag = label("Corrección de errores", "etiqueta-parche", "dim-label")
-        tag.set_tooltip_text("Corrige errores. php.net no la marca como parche de seguridad.")
+        tag.set_tooltip_text("Corrige errores")
     return tag
 
 
@@ -21233,17 +21279,17 @@ def state_pill(state, active_end, security_end):
     """Estado de una rama en su color (sin fondo): Estable, Solo seguridad o Sin soporte"""
     if state == "stable":
         pill = label("Estable", "estado", "estable")
-        pill.set_tooltip_text("Recibe correcciones de errores y de seguridad"
+        pill.set_tooltip_text("Con soporte completo"
                               + (" (hasta %s)" % fmt_month(active_end) if active_end else "")
                               + ". Es la mejor opción para proyectos nuevos.")
     elif state == "security":
         pill = label("Solo seguridad", "estado", "seguridad")
-        pill.set_tooltip_text("Ya no recibe correcciones de errores, solo parches de seguridad"
+        pill.set_tooltip_text("Solo parches de seguridad"
                               + (" hasta %s" % fmt_month(security_end) if security_end else "")
                               + ". Sirve para proyectos que aún no funcionan con las estables.")
     else:
         pill = label("Sin soporte", "estado", "soporte-no")
-        pill.set_tooltip_text("php.net ya no publica parches, ni de seguridad"
+        pill.set_tooltip_text("Sin parches"
                               + (" (desde %s)" % fmt_month(security_end) if security_end else "")
                               + ". Solo para proyectos antiguos.")
     return pill
@@ -22534,9 +22580,7 @@ class App(Gtk.Application):
             badge = label("Abierto a la red", "pastilla", "peligro", valign=Gtk.Align.CENTER)
         else:
             badge = label("Solo desde este equipo", "pastilla", "segura", valign=Gtk.Align.CENTER,
-                          tooltip_text="Solo se puede entrar en ellos desde este equipo (127.0.0.1 "
-                                       "y ::1): los demás equipos de la red no ven los proyectos "
-                                       "ni las BBDD.")
+                          tooltip_text="Solo accesibles desde este equipo")
         head.pack_end(badge, False, False, 0)
         # (en la ventana nueva, arrancar o parar la version entera: lo que hacia el boton Encendidos)
         if hasattr(self, "nv_power"):
@@ -22684,12 +22728,22 @@ class App(Gtk.Application):
                         "en este equipo. Al cargar otro proyecto deja de estar falseado y vuelve "
                         "a llevar a la web real.")
         if not fake:
-            lb.add(ActionRow("Ningún dominio falseado",
-                             "Los dominios de los vhosts llevan a sus webs reales"))
+            row = ActionRow("Ningún dominio falseado",
+                            "Los dominios de los vhosts llevan a sus webs reales")
+            # (en un tercio de la pestaña no cabe en una línea)
+            row.subtitle.set_line_wrap(True)
+            row.subtitle.set_ellipsize(0)
+            lb.add(row)
         for h in fake:
             lb.add(self.host_row(h))
-        self.hosts_box.pack_start(box, False, False, 0)
-        self.hosts_box.pack_start(self.build_new_domain(), False, False, 0)
+        # En la misma fila: el host falseado ocupa 1/3 y el proyecto nuevo, 2/3 (tres columnas iguales)
+        grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
+        box.set_valign(Gtk.Align.START)
+        grid.attach(box, 0, 0, 1, 1)
+        new_domain = self.build_new_domain()
+        new_domain.set_valign(Gtk.Align.START)
+        grid.attach(new_domain, 1, 0, 2, 1)
+        self.hosts_box.pack_start(grid, False, False, 0)
 
         box, lb = group("Dominios de los vhosts",
                         "Encendido, el dominio lleva a este equipo (127.0.0.1); apagado, a la "
@@ -22896,6 +22950,9 @@ class App(Gtk.Application):
         if h.get("media"):
             info.append("imágenes que faltan de %s" % h["media"])
         row = ActionRow(h["name"], "  ·  ".join(info))
+        # (en la tarjeta estrecha se cortan con «…»: enteros al pasar el ratón)
+        row.title.set_tooltip_text(h["name"])
+        row.subtitle.set_tooltip_text("  ·  ".join(info))
         # Logotipo del proyecto: PrestaShop, WordPress (por el nombre de su carpeta) o un globo
         if h["ps"]:
             row.add_prefix(section_icon(("logo", "prestashop"), 16))
@@ -22915,18 +22972,36 @@ class App(Gtk.Application):
             row.add_suffix(b)
         if h["name"].lower().endswith(".local"):
             b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                           tooltip_text="Imágenes de producción: lo que falte aquí de wp-content/uploads o img "
-                           "se pide a la web real" + (" (ahora, a %s)" % h["media"] if h.get("media") else ""))
+                           tooltip_text="Imágenes de producción" + (": %s" % h["media"] if h.get("media") else ""))
             b.add(icon("image-x-generic-symbolic"))
             b.connect("clicked", lambda *_: self.on_media_proxy(h))
             row.add_suffix(b)
         sw = Gtk.Switch(active=h["fake"], valign=Gtk.Align.CENTER)
-        if h["name"].lower().endswith(".local"):
-            sw.set_tooltip_text("Un .local no existe fuera de este equipo: encendido, se mantiene "
-                                "en /etc/hosts; apagado, el equipo lo pregunta a la red")
+        sw.set_tooltip_text(host_switch_tip(h))
         sw.connect("state-set", self.on_host_switch, h)
         row.add_suffix(sw)
         return row
+
+    def project_hosts(self, name):
+        """Dominios falseables de un proyecto: los de los vhosts de su carpeta. Un .local no es un
+        dominio falseado (no hay ninguna web real a la que devolverlo)."""
+        return [h for h in self.hosts or []
+                if h["folder"] == name and not h["name"].lower().endswith(".local")]
+
+    def on_view_hosts(self, *_):
+        """El fichero de hosts, solo para verlo (para cambiarlo: Editar, en Configuración), con los
+        dominios que se pueden falsear delante: un dominio con vhost no sale en él hasta falsearlo."""
+        path = self.data["hosts"] if self.data else "/etc/hosts"
+        vhosts = self.data["vhosts"] if self.data else ""
+        try:
+            with open(path, errors="replace") as f:
+                text = f.read()
+        except OSError as exc:
+            message(self.win, "No se ha podido leer %s" % path, str(exc), Gtk.MessageType.ERROR)
+            return
+        self.show_text(path, "Dominios que se pueden falsear y contenido del fichero (solo lectura)",
+                       hosts_view_text(self.hosts or [], path, vhosts, text), self.on_view_hosts,
+                       lines=1000000, to_end=False)
 
     def on_media_proxy(self, h):
         """media-produccion: el dominio de producción al que se piden las imágenes que faltan en un
@@ -23127,7 +23202,7 @@ class App(Gtk.Application):
         # Un fichero de cientos de MB dejaria colgado el editor de textos
         if st.st_size > LOG_OPEN_MAX:
             b.set_sensitive(False)
-            b.set_tooltip_text("Ocupa %s: demasiado para el editor. Usa «Ver el final»." % size)
+            b.set_tooltip_text("Ocupa %s: usa «Ver el final»" % size)
         b.connect("clicked", lambda *_: self.open_text(path))
         row.add_suffix(b)
         return row
@@ -23168,7 +23243,7 @@ class App(Gtk.Application):
         self.show_text(os.path.basename(path), "Últimas %d líneas de %s" % (lines, path),
                        text, lambda: self.show_log_tail(path, lines), lines)
 
-    def show_text(self, title, subtitle, text, reload=None, lines=400):
+    def show_text(self, title, subtitle, text, reload=None, lines=400, to_end=True):
         """Las últimas líneas de un registro (lo más reciente al final) en un diálogo, con «Copiar
         todo» y, con reload, «Actualizar» (lo vuelve a leer)."""
         # (los de PHP-FPM llegan en una sola línea con \n escritos: se separan para leerlos)
@@ -23197,7 +23272,8 @@ class App(Gtk.Application):
         dlg.get_content_area().add(sw)
         dlg.show_all()
         # Lo más reciente está al final
-        GLib.idle_add(lambda: (tv.scroll_to_iter(buf.get_end_iter(), 0, False, 0, 1), False)[1])
+        if to_end:
+            GLib.idle_add(lambda: (tv.scroll_to_iter(buf.get_end_iter(), 0, False, 0, 1), False)[1])
         run_dialog(dlg)
         dlg.destroy()
 
@@ -23318,8 +23394,7 @@ class App(Gtk.Application):
         nb.pack_start(icon("list-add-symbolic"), False, False, 0)
         nb.pack_start(Gtk.Label(label="Montar nuevo proyecto"), False, False, 0)
         self.proj_new_btn.add(nb)
-        self.proj_new_btn.set_tooltip_text("Clona un proyecto de GitHub en /opt/htdocs, elige su "
-                                           "versión de PHP y créale su BBDD")
+        self.proj_new_btn.set_tooltip_text("Clonar un proyecto de GitHub")
         self.proj_new_btn.connect("clicked", lambda *_: self.toggle_new_project(True))
         # Replicar: el proyecto en otra versión de PHP (su BBDD copiada con otro nombre y vinculada
         # allí a la carpeta que se elija)
@@ -23328,8 +23403,7 @@ class App(Gtk.Application):
         rb.pack_start(icon("edit-copy-symbolic"), False, False, 0)
         rb.pack_start(Gtk.Label(label="Replicar"), False, False, 0)
         self.proj_rep_btn.add(rb)
-        self.proj_rep_btn.set_tooltip_text("Replicar un proyecto en otra versión de PHP: copia su "
-                                           "BBDD con el nombre que elijas y la vincula allí a su carpeta")
+        self.proj_rep_btn.set_tooltip_text("Replicar en otra versión de PHP")
         self.proj_rep_btn.connect("clicked", lambda *_: self.on_replicate())
         search_row.pack_start(self.proj_rep_btn, False, False, 0)
         search_row.pack_start(self.proj_new_btn, False, False, 0)
@@ -23787,7 +23861,7 @@ class App(Gtk.Application):
         current = self.projects and os.path.basename(self.projects["current"].rstrip("/")) == name
         if current:
             row.add_title_tag(label("Cargado", "texto-activa", "subtitulo"))
-        lk = Gtk.Button(tooltip_text="Vincular %s con su BBDD en cada versión de PHP (o desvincularla)"
+        lk = Gtk.Button(tooltip_text="Vincular %s con su BBDD"
                         % name, relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy and bool(self.data))
         lk.add(icon("insert-link-symbolic"))
         lk.connect("clicked", lambda *_: self.on_link_project(x))
@@ -24226,8 +24300,7 @@ class App(Gtk.Application):
             r.add_prefix(section_icon(spec, 16))
             if name == "phpMyAdmin" and pma_outdated(inst["php"], inst["pma"]):
                 r.add_title_tag(label("antiguo", "estado", "seguridad"))
-                up = Gtk.Button(label="Actualizar", tooltip_text="Pone el phpMyAdmin más nuevo que admite "
-                                "su PHP (el anterior queda en phpmyadmin.anterior)")
+                up = Gtk.Button(label="Actualizar", tooltip_text="Actualizar phpMyAdmin")
                 up.connect("clicked", lambda *_, f=folder: self.on_update_pma(f))
                 r.add_suffix(up)
             r.add_suffix(label(val, "dim-label"))
@@ -24770,7 +24843,7 @@ class App(Gtk.Application):
                 exp.add_title_tag(label("Activa", "texto-activa"))
                 pma = Gtk.Button(label="Abrir phpMyAdmin", sensitive=d["running"],
                                  tooltip_text=None if d["running"] else
-                                 "La versión activa está parada: arráncala en Versiones")
+                                 "La versión activa está parada")
                 pma.connect("clicked", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/"))
                 exp.add_suffix(pma)
                 row = ActionRow("Crear BBDD…")
@@ -24819,7 +24892,7 @@ class App(Gtk.Application):
 
     def cache_button(self, db):
         """Vaciar var/cache de la tienda PrestaShop de la base (la carpeta la busca el script)."""
-        b = Gtk.Button(tooltip_text="Vaciar la caché (var/cache) de la tienda de %s" % db,
+        b = Gtk.Button(tooltip_text="Vaciar la caché de %s" % db,
                        relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy)
         b.add(icon("edit-clear-all-symbolic"))
         b.connect("clicked", lambda *_: self.run_task(
@@ -24839,7 +24912,7 @@ class App(Gtk.Application):
         """Copiar la base a otra versión de PHP que no la tenga (para probar el proyecto con ella)."""
         if not self.copy_targets(db, inst):
             return None
-        b = Gtk.Button(tooltip_text="Copiar %s a otra versión de PHP (para probar el proyecto con ella)" % db,
+        b = Gtk.Button(tooltip_text="Copiar %s a otra versión de PHP" % db,
                        relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy)
         b.add(icon("edit-copy-symbolic"))
         b.connect("clicked", lambda *_: self.on_copy_db(db, inst))
@@ -25157,12 +25230,11 @@ class App(Gtk.Application):
         row.add_prefix(dot)
         if active:
             b = Gtk.Button(label="Elegir como destino",
-                           tooltip_text="Elegirla abajo, en «Subir o actualizar una BBDD»")
+                           tooltip_text="Elegirla para subir una BBDD")
             b.connect("clicked", lambda *_: self.use_as_destination(db))
             row.add_suffix(b)
         load = Gtk.Button(label="Cargar proyecto", sensitive=not self.busy,
-                          tooltip_text="Apunta el vhost (web.local) a su carpeta de htdocs y, si "
-                                       "hace falta, cambia a lampp-%s (PHP %s)"
+                          tooltip_text="Cargar en lampp-%s (PHP %s)"
                                        % (folder, inst["php"]))
         load.connect("clicked", lambda *_: self.on_load_project(db, inst))
         row.add_suffix(load)
@@ -25453,8 +25525,7 @@ class App(Gtk.Application):
                                   "parcial": "Algún contenedor está parado"}.get(p["state"], p["state"]))
             row.add_prefix(dot)
             php = Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                             tooltip_text="Cambiar la versión de PHP de %s (su BBDD y su configuración "
-                                          "se quedan)" % p["folder"])
+                             tooltip_text="Cambiar la versión de PHP de %s" % p["folder"])
             php.connect("clicked", lambda *_, p=p: self.on_docker_php(p))
             row.add_suffix(php)
             for ic, tip, fn, ok in [
@@ -26793,8 +26864,7 @@ class App2(App):
         self.status_sub = label("", "nv-tenue", "nv-mono", "nv-chico")
         pill.pack_start(self.status_sub, False, False, 0)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
-        self.status_btn = css(Gtk.MenuButton(tooltip_text="Servicios de la versión activa: arrancarlos, pararlos o "
-                                             "reiniciarlos"), "nv-servicios")
+        self.status_btn = css(Gtk.MenuButton(tooltip_text="Servicios de la versión activa"), "nv-servicios")
         sbox = Gtk.Box(spacing=8)
         self.svc_dots = {}
         for name in ("Apache", "MariaDB"):
@@ -26809,7 +26879,7 @@ class App2(App):
         # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,
-                               tooltip_text="Lo que gastan Nexum Dev Stack y sus servicios juntos")
+                               tooltip_text="Consumo de Nexum y sus servicios")
         pill.pack_start(self.usage_lbl, False, False, 0)
         self.usage = UsageMeter()
         self.nv_usage_tick()
@@ -26842,7 +26912,7 @@ class App2(App):
         # Terminal: la de abajo de la ventana, que se enseña y se esconde (en lugar de Localhost; phpMyAdmin
         # ya está en la pestaña Bases de datos)
         self.term_btn = Gtk.ToggleButton(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER,
-                                         tooltip_text="Enseñar o esconder la terminal, abajo de la ventana")
+                                         tooltip_text="Mostrar u ocultar la terminal")
         tbox = Gtk.Box(spacing=6)
         tbox.pack_start(icon("utilities-terminal-symbolic", 16), False, False, 0)
         tbox.pack_start(Gtk.Label(label="Terminal"), False, False, 0)
@@ -26886,7 +26956,7 @@ class App2(App):
                                 lambda *_: self.nv_term_spawn(restart=True), flat=True), False, False, 0)
         head.pack_end(b, False, False, 0)
         head.pack_end(nv_button("edit-clear-all-symbolic", "Vaciar DNS",
-                                "Vaciar la caché DNS del sistema (sudo resolvectl flush-caches; la contraseña, aquí)",
+                                "Vaciar la caché DNS",
                                 lambda *_: self.nv_term_type("sudo resolvectl flush-caches"), flat=True),
                       False, False, 0)
         box.pack_start(head, False, False, 0)
@@ -27177,9 +27247,9 @@ class App2(App):
         m = self.nv_mail()
         self.mail_btn.set_visible(bool(m.get("on")))
         if not m.get("installed"):
-            tip = "Mailpit no está instalado: instálalo en Configuración (sin él, el correo de las webs no sale)"
+            tip = "Mailpit no está instalado"
         elif not m.get("running"):
-            tip = "Mailpit arranca con la versión activa: arráncala para ver el correo de las webs"
+            tip = "Arranca la versión activa para ver el correo"
         else:
             n = self.mail_unread
             tip = "Correo de las webs (Mailpit)%s" % (": %d sin leer" % n if n else "")
@@ -27267,12 +27337,7 @@ class App2(App):
                           ("nada", "No tocarlos")):
             combo.append(key, text)
         combo.set_active_id(m["wp"])
-        combo.set_tooltip_text("WP Mail SMTP, Easy WP SMTP, Post SMTP, FluentSMTP, Brevo…\n"
-                               "• Llevarlos a Mailpit: los de SMTP siguen funcionando, pero su correo va a Mailpit; "
-                               "los que mandan por una API (Brevo, FluentSMTP, Post SMTP…) se desactivan en la copia local.\n"
-                               "• Desactivarlos: todos fuera de la copia local; WordPress usa mail(), que va a Mailpit.\n"
-                               "• No tocarlos: como en producción; su correo puede llegar de verdad.\n"
-                               "Se aplica al cargar el proyecto o su BBDD.")
+        combo.set_tooltip_text("Qué hacer con sus plugins de correo")
         combo.set_sensitive(on and not self.busy)
         combo.connect("changed", self.on_mail_wp)
         row.add_suffix(combo)
@@ -27461,7 +27526,7 @@ class App2(App):
         head.pack_start(t, True, True, 0)
         head.pack_end(nv_button("list-add-symbolic", "Instalar versión…", None, lambda *_: self.nv_install_dialog(),
                                 "nv-azul"), False, False, 0)
-        head.pack_end(nv_button(logo("apache", 16), "Componentes", "Apache, MariaDB, ProFTPD, Perl y phpMyAdmin de cada versión",
+        head.pack_end(nv_button(logo("apache", 16), "Componentes", "Componentes de cada versión",
                                 lambda *_: self.nv_components_dialog()), False, False, 0)
         self.vers_page.pack_start(head, False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
@@ -27539,9 +27604,7 @@ class App2(App):
             if p2s == "vulnerable":
                 vul = label("Vulnerable (PHP2Shell)", "nv-chico", "error")
                 vul.set_halign(Gtk.Align.START)
-                vul.set_tooltip_text("%s.\nCVE-2026-109618 y CVE-2026-109619: una petición preparada puede ejecutar "
-                                     "código con tu usuario. Pasa a una versión con el arreglo en el menú ⋮ "
-                                     "(«Actualizar a PHP…»)." % p2s_why)
+                vul.set_tooltip_text("Vulnerable: actualízala en el menú ⋮")
                 patch.pack_start(vul, False, False, 0)
                 patch.reorder_child(vul, 0)
                 # (vulnerable no está «Actualizado», aunque tenga el último parche de su rama)
@@ -27552,8 +27615,7 @@ class App2(App):
             php_cell.pack_start(label(inst["php"], "nv-mono"), False, False, 0)
             if p2s == "parche":
                 ps = label("+ parche de seguridad (oct 2026)", "nv-chico", "nv-verde")
-                ps.set_tooltip_text("%s: el arreglo de PHP2Shell que publicó el equipo de seguridad de PHP "
-                                    "para esta rama (no es una versión nueva)" % p2s_why)
+                ps.set_tooltip_text("Parche oficial contra PHP2Shell")
                 php_cell.pack_start(ps, False, False, 0)
             right = Gtk.Box(spacing=2, halign=Gtk.Align.END)
             if act:
@@ -27715,7 +27777,7 @@ class App2(App):
             pma = label(inst["pma"], "nv-mono", "nv-chico")
             if pma_outdated(inst["php"], inst["pma"]):
                 pma.get_style_context().add_class("error")
-                pma.set_tooltip_text("phpMyAdmin antiguo: actualízalo en el menú ⋮ de la versión")
+                pma.set_tooltip_text("phpMyAdmin antiguo: actualízalo en ⋮")
             row([label("lampp-%s" % inst["folder"], "nv-mono"), label(inst["php"], "nv-mono"),
                  label(inst["apache"], "nv-mono", "nv-chico"), label(inst["mariadb"], "nv-mono", "nv-chico"),
                  label(inst["ftp"], "nv-mono", "nv-chico"), label(inst["perl"], "nv-mono", "nv-chico"), pma])
@@ -27756,8 +27818,7 @@ class App2(App):
         self.nv_kind.set_active_id("all")
         self.nv_kind.connect("changed", lambda *_: self.nv_list.invalidate_filter())
         # (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
-        new = nv_button("list-add-symbolic", "Nuevo proyecto…", "Clonar un repositorio de git y montarlo con su "
-                        "versión de PHP y su BBDD", lambda *_: self.nv_new_project(), "nv-azul")
+        new = nv_button("list-add-symbolic", "Nuevo proyecto…", "Clonar y montar un repositorio", lambda *_: self.nv_new_project(), "nv-azul")
         for w in (new, self.nv_kind, self.nv_search):
             head.pack_end(w, False, False, 0)
         self.proj_page.pack_start(head, False, False, 0)
@@ -28025,7 +28086,7 @@ class App2(App):
                 row.add_suffix(b)
             if len(p["versions"]) > 1:
                 b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Quitar PHP %s (su contenedor; la carpeta y la BBDD se quedan)" % v)
+                               tooltip_text="Quitar PHP %s" % v)
                 b.add(icon("user-trash-symbolic"))
                 b.connect("clicked", lambda *_, v=v: act(["docker-php-quitar", p["slug"], v], "Quitando PHP %s de %s" % (v, p["folder"]),
                                                           "PHP %s quitado de %s" % (v, p["folder"])))
@@ -28192,7 +28253,7 @@ class App2(App):
     def nv_size_text(self, lbl, name):
         got = getattr(self, "project_sizes", {}).get(name)
         lbl.set_label(fmt_size(got[0]) if got else "…")
-        lbl.set_tooltip_text("Lo que ocupa la carpeta en el disco, medido el %s"
+        lbl.set_tooltip_text("Tamaño en disco, medido el %s"
                              % time.strftime("%d/%m/%Y a las %H:%M", time.localtime(got[1])) if got
                              else "Midiendo lo que ocupa en el disco…")
 
@@ -28237,8 +28298,7 @@ class App2(App):
         # pregunta cual) y su menu ⋮ (el hueco se guarda: la fila no salta)
         hover, dk = [], None
         if self.nv_docker_of(x["name"]):
-            dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker (con varias versiones, "
-                           "pregunta cuál)" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
+            dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
             dk.set_sensitive(not self.busy)
             hover.append(dk)
         if is_loaded:
@@ -28286,9 +28346,7 @@ class App2(App):
             mail = Gtk.Box(spacing=5)
             mail.pack_start(MonoLogo("mailpit", 13), False, False, 0)
             mail.pack_start(label("su correo va a Mailpit", "nv-chico", "nv-tenue"), False, False, 0)
-            mail.set_tooltip_text("Lo que mande esta web (formularios, pedidos, contraseñas) no llega a nadie: se ve en "
-                                  "Correo, arriba%s" % ("" if m.get("wp") != "nada" or x.get("kind") != "wp" else
-                                                       ". Ojo: sus plugins de correo de WordPress no se tocan"))
+            mail.set_tooltip_text("Se ve en Correo, arriba")
             head.pack_end(mail, False, False, 12)
         self.hero_box.pack_start(head, False, False, 0)
         card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16), "nv-tarjeta")
@@ -28374,28 +28432,27 @@ class App2(App):
                     img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
                     img.set_pixel_size(18)
                 btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
-                                           "Abrir la carpeta en Visual Studio Code", lambda *_: self.open_in_vscode(),
+                                           "Abrir en Visual Studio Code", lambda *_: self.open_in_vscode(),
                                            "nv-proyecto-btn")
             pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
             pma.set_sensitive(bool(self.loaded_project_db()))
             btns["pma"] = pma
             adm = nv_button(logo("prestashop" if kind == "ps" else "wordpress", 18), "Panel",
-                            "Con el administrador de pruebas ya escrito: solo hay que pulsar Entrar",
+                            "Abrir el panel de administración",
                             lambda *_: self.open_project_admin(), "nv-proyecto-btn")
             adm.set_sensitive(bool(admin))
             adm.nv_logo = "prestashop" if kind == "ps" else "wordpress"
             btns["panel"] = adm
-            btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar el proyecto en Docker, con la versión de PHP que elijas",
+            btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
                                        lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
             btns["compartir"] = self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"])
             # El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
             log = self.loaded_project_log()
-            logb = nv_button("text-x-generic-symbolic", "Log", "Ver el final del registro de errores de la web (%s)"
-                             % os.path.basename(log) if log else "Esta web aún no tiene registro de errores",
+            logb = nv_button(logo("log", 18), "Log", "Ver el log de errores" if log else "Aún no hay log de errores",
                              lambda *_: self.show_log_tail(self.loaded_project_log() or log), "nv-proyecto-btn")
             logb.set_sensitive(bool(log))
             btns["log"] = logb
-            eject = nv_button("media-eject-symbolic", None, "Desmontar: %s deja de apuntar aquí" % p["link"],
+            eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",
                               lambda *_: self.on_unload_project(), flat=True)
             self.nv_place_buttons(acts, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
             acts.pack_start(eject, False, False, 0)
@@ -28407,6 +28464,21 @@ class App2(App):
         if is_loaded:
             self.nv_restyle(more, buttons_conf(), ("icono", "view-more-symbolic"), "Más")
         acts.pack_end(more, False, False, 0)
+        # Si su carpeta tiene un dominio en los vhosts: falsearlo o dejar de falsearlo desde aquí, como
+        # en Dominios y hosts
+        if is_loaded:
+            for h in reversed(self.project_hosts(x["name"])):
+                fake = h["fake"]
+                host = Gtk.Box(spacing=10, margin_end=10)
+                texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
+                texts.pack_start(label("Host falseado" if fake else "Falsear Host", halign=Gtk.Align.END), False, False, 0)
+                texts.pack_start(label(h["name"], "nv-chico", "nv-tenue", halign=Gtk.Align.END, ellipsize=2,
+                                       max_width_chars=28, tooltip_text=h["name"]), False, False, 0)
+                host.pack_start(texts, False, False, 0)
+                sw = Gtk.Switch(active=fake, valign=Gtk.Align.CENTER, tooltip_text=host_switch_tip(h))
+                sw.connect("state-set", self.on_host_switch, h)
+                host.pack_start(sw, False, False, 0)
+                acts.pack_end(host, False, False, 0)
         card.pack_start(acts, False, False, 0)
         self.hero_box.pack_start(card, False, False, 0)
         self.hero_box.show_all()
@@ -28625,27 +28697,47 @@ class App2(App):
         if not show and self.np_dialog is not None:
             self.np_dialog.hide()
 
-    def nv_page_title(self, box, symbol_name, title, sub):
+    def nv_page_title(self, box, symbol_name, title, sub, trailing=None):
         """Título grande arriba de una página hecha con los constructores de siempre (como el de las
-        demás pestañas)."""
+        demás pestañas). trailing: un botón, a su derecha."""
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tl = Gtk.Box(spacing=10)
         tl.pack_start(symbol(symbol_name, 26), False, False, 0)
         tl.pack_start(label(title, "nv-titulo-grande"), False, False, 0)
         head.pack_start(tl, False, False, 0)
         head.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
+        if trailing is not None:
+            line = Gtk.Box(spacing=12)
+            line.pack_start(head, True, True, 0)
+            line.pack_end(trailing, False, False, 0)
+            head = line
         box.pack_start(head, False, False, 0)
         box.reorder_child(head, 0)
         head.show_all()
 
     def build_hosts(self):
         super().build_hosts()
-        # (en la ventana nueva hay sitio: los desplegables de Dominios, con el nombre entero)
+        # (los desplegables y el dominio, del mismo ancho: caben en los 2/3 de la tarjeta)
         for w in self.nv_walk(self.hosts_box):
             if isinstance(w, Gtk.ComboBox):
-                narrow(w, 46)
+                narrow(w, 30)
+            elif isinstance(w, Gtk.Entry):
+                w.set_width_chars(30)
+        view = nv_button("text-x-generic-symbolic", "Ver fichero de hosts",
+                         "Ver %s" % (self.data["hosts"] if self.data else "/etc/hosts"),
+                         self.on_view_hosts)
         self.nv_page_title(self.hosts_box, "network-workgroup-symbolic", "Dominios y hosts",
-                           "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts")
+                           "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts", view)
+
+    def on_hosts_data(self, rc, out):
+        old = self.hosts
+        res = super().on_hosts_data(rc, out)
+        # (el interruptor del proyecto cargado sigue a /etc/hosts; solo su recuadro, no toda la lista)
+        if self.hosts != old and getattr(self, "nv_list", None) and self.projects and self.data:
+            loaded = self.loaded_project_entry()
+            if loaded is not None:
+                self.nv_hero(loaded, loaded)
+        return res
 
     def build_tools(self):
         super().build_tools()
@@ -28881,7 +28973,7 @@ class App2(App):
             row.add_suffix(b)
             if shutil.which("gh") and gh["source"] != "gh":
                 b = Gtk.Button(label="Usar la sesión de gh", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="La de la herramienta de GitHub (gh auth login), sin pegar ningún token")
+                               tooltip_text="Usar la sesión de gh auth login")
                 b.connect("clicked", lambda *_: run_quick(["github-conectar", "--gh"], self.nv_github_done))
                 row.add_suffix(b)
             if gh["source"]:
@@ -29024,7 +29116,7 @@ class App2(App):
         bar.pack_start(search, False, False, 0)
         bar.pack_start(label("Mostrar todos", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
         sw = Gtk.Switch(active=self.repos_all, valign=Gtk.Align.CENTER,
-                        tooltip_text="También los que no empiezan por ninguno de los prefijos (Configuración, GitHub)")
+                        tooltip_text="Incluir los que no tienen prefijo")
         sw.connect("notify::active", lambda w, _p: (setattr(self, "repos_all", w.get_active()),
                                                     self.nv_repos_load(cache=True), self.nv_repos_load()))
         bar.pack_start(sw, False, False, 0)
@@ -29060,19 +29152,19 @@ class App2(App):
         row.haystack = " ".join((repo["full"], repo["desc"], repo["web"])).lower()
         if repo["state"] == "clonado":
             b = Gtk.Button(label="Traer cambios", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                           tooltip_text="Ya está clonado: git pull en /opt/htdocs/%s" % repo["folder"])
+                           tooltip_text="Actualizar con git pull")
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
         elif repo["state"] == "ocupado":
             b = Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=False,
-                           tooltip_text="Ya hay una carpeta /opt/htdocs/%s que no es un clon de este repositorio" % repo["name"])
+                           tooltip_text="Ya hay una carpeta con ese nombre")
         else:
             b = css(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Por SSH, con tu clave, en /opt/htdocs/%s" % repo["name"]), "verde")
+                               tooltip_text="Clonar por SSH en /opt/htdocs"), "verde")
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
         row.add_suffix(b)
         # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así
         # todos los botones quedan a la misma altura)
-        gh = Gtk.Button(valign=Gtk.Align.CENTER, tooltip_text="Abrir en GitHub (https://github.com/%s)" % repo["full"])
+        gh = Gtk.Button(valign=Gtk.Align.CENTER, tooltip_text="Abrir en GitHub")
         gh.add(MonoLogo("github", 18))
         gh.connect("clicked", lambda *_: self.open_uri("https://github.com/%s" % repo["full"]))
         row.add_suffix(gh)
@@ -29144,7 +29236,7 @@ class App2(App):
                           on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
         if not ports_ok:
             b = Gtk.Button(label="Permitir", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                           tooltip_text="Baja el límite de los puertos de root hasta el %s (pide la contraseña)"
+                           tooltip_text="Permitir puertos desde el %s"
                            % min(int(w["HTTP"]), int(w["HTTPS"])))
             b.connect("clicked", lambda *_: self.run_task(
                 "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
@@ -29420,7 +29512,7 @@ class App2(App):
             combo.set_active_id("nombre")
             fill()
         rb = css(Gtk.Button(label="Como al principio", halign=Gtk.Align.START,
-                            tooltip_text="Todos, en el orden de siempre y con su nombre (se aplica al guardar)"), "flat")
+                            tooltip_text="Volver a los botones de siempre"), "flat")
         rb.connect("clicked", reset)
         side.pack_end(rb, False, False, 0)
         dlg.get_content_area().add(box)
@@ -29463,8 +29555,8 @@ class App2(App):
         st = tunnel_state()
         mine = bool(st) and st["target"] == url.rstrip("/")
         b = nv_button(logo("cloudflare", 18), "Compartiendo" if mine else "Compartir",
-                      ("Abierta en %s: ver la dirección y la contraseña" % st["url"]) if mine else
-                      "Enseñar %s a otros con un túnel de Cloudflare (con contraseña)%s" % (url, tip_extra),
+                      "Ver dirección y contraseña" if mine else
+                      "Compartir con un túnel de Cloudflare%s" % tip_extra,
                       lambda *_: self.nv_share_dialog() if mine else self.nv_share(url, folder, name), "nv-proyecto-btn")
         if mine:
             css(b, "nv-compartiendo")
@@ -29567,8 +29659,7 @@ class App2(App):
                              "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
         acts = Gtk.Box(spacing=8)
         msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], password, until))
-        acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "La dirección, la contraseña y hasta cuándo, "
-                                  "en un texto para pegar en un correo o un mensaje",
+        acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "Copiar dirección y contraseña",
                                   lambda *_: (clip.set_text(msg, -1), self.toast("Texto para enviar copiado")), "nv-azul"),
                         False, False, 0)
         acts.pack_start(nv_button("web-browser-symbolic", "Abrir", "Abrirla tú en el navegador",
@@ -29660,8 +29751,7 @@ class App2(App):
         t.pack_start(label("Bases de datos", "nv-titulo-grande"), False, False, 0)
         t.pack_start(label("Cada versión con su MariaDB y sus BBDD (sin las del sistema)", "nv-chico", "nv-tenue"), False, False, 0)
         head.pack_start(t, True, True, 0)
-        new = nv_button("list-add-symbolic", "Nueva BBDD…", "Crear una BBDD vacía en la versión activa%s"
-                        % (" (lampp-%s)" % act["folder"] if act else ""), self.on_create_db, "nv-azul")
+        new = nv_button("list-add-symbolic", "Nueva BBDD…", "Crear una BBDD vacía", self.on_create_db, "nv-azul")
         new.set_sensitive(bool(act) and not self.busy)
         head.pack_end(new, False, False, 0)
         pma = nv_button(logo("phpmyadmin", 16), "phpMyAdmin", "phpMyAdmin de la versión activa",
@@ -29834,9 +29924,9 @@ class App2(App):
         got = [self.db_sizes[k][0] for k in all_dbs if k in self.db_sizes]
         val.set_label(fmt_size(sum(got)) if got else "—")
         missing = len(all_dbs) - len(got)
-        box.set_tooltip_text(("%s sin medir: cada BBDD se mide cuando su versión está activa y en marcha"
+        box.set_tooltip_text(("%s sin medir"
                               % plural(missing, "BBDD", "BBDD")) if missing else
-                             "Datos e índices de las BBDD de todas las versiones")
+                             "Tamaño de las BBDD de todas las versiones")
         try:
             st = os.statvfs("/opt")
             total, free = st.f_blocks * st.f_frsize, st.f_bavail * st.f_frsize
@@ -29913,7 +30003,7 @@ class App2(App):
             got = self.db_sizes.get((owner, db))
             if not got:
                 lbl = label("—", "nv-chico", "nv-tenue")
-                lbl.set_tooltip_text("Se mide cuando su versión está activa y en marcha")
+                lbl.set_tooltip_text("Se mide con su versión en marcha")
                 return lbl
             lbl = label(fmt_size(got[0]), "nv-chico", "nv-mono")
             lbl.set_tooltip_text("Datos e índices, medido el %s"
@@ -30027,8 +30117,7 @@ class App2(App):
         # Parar todo lo de Nexum de una vez (proyectos, MariaDB comunes y el Apache de Docker)
         running = [c for c in d.get("containers", []) if c["state"] == "running" and docker_own(c["name"])]
         stop = nv_button("media-playback-stop-symbolic", "Parar todos",
-                         "Parar los %d contenedores de Nexum en marcha (los proyectos, las MariaDB comunes y el Apache "
-                         "de Docker); los de otros programas no se tocan" % len(running) if running else
+                         "Parar %d contenedores de Nexum" % len(running) if running else
                          "No hay ningún contenedor de Nexum en marcha",
                          lambda *_: self.run_task("Parando todos los contenedores de Nexum", ["docker-parar-todo"],
                                                   auto_close=True, done_text="Contenedores de Nexum parados",
@@ -30225,8 +30314,8 @@ class App2(App):
         a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
         ref = "%s:%s" % (i["repo"], i["tag"])
         pullable = i["tag"] != "<none>" and not i["repo"].startswith("nexum-")
-        pull = nv_button("folder-download-symbolic", None, "Volver a descargarla de Docker Hub (lo último de %s)" % ref
-                         if pullable else "Es del gestor: se rehace con «Actualizar imagen» de su proyecto"
+        pull = nv_button("folder-download-symbolic", None, "Volver a descargar de Docker Hub"
+                         if pullable else "Se rehace con «Actualizar imagen»"
                          if i["repo"].startswith("nexum-") else "Sin etiqueta: no se puede volver a descargar",
                          lambda *_: self.run_task("Descargando %s" % ref, ["docker-imagenes", "descargar", ref],
                                                   done_text="%s descargada" % ref,
@@ -30251,7 +30340,7 @@ class App2(App):
 
     def nv_volume_actions(self, v, in_use):
         a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
-        rm = nv_button("user-trash-symbolic", None, "Lo usa un contenedor: bórralo antes (o el proyecto entero)"
+        rm = nv_button("user-trash-symbolic", None, "Lo usa un contenedor: bórralo antes"
                        if in_use else "Borrar el volumen", lambda *_: self.nv_volume_delete(v))
         rm.set_sensitive(not in_use and not self.busy)
         a.pack_start(rm, False, False, 0)
@@ -30324,7 +30413,7 @@ class App2(App):
         card.pack_start(top, False, False, 0)
         card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
         acts = Gtk.Box(spacing=8)
-        stopped = "Está parado: arráncalo antes (Arrancar, a la derecha)"
+        stopped = "Está parado: arráncalo antes"
         if web and p.get("kind") != "ps" and len(p["versions"]) > 1:
             # (varias versiones a la vez: cada una con su dominio)
             wb = self.nv_menu_button("Abrir web", "web-browser-symbolic",
@@ -30342,17 +30431,15 @@ class App2(App):
         if len(targets) > 1 and not (st and st["target"] in [t for _v, t in targets]):
             sb = self.nv_menu_button("Compartir", logo("cloudflare", 18), [("PHP %s  ·  %s" % (v, t), lambda t=t: self.nv_share(t, folder, p["folder"]))
                                                          for v, t in targets],
-                                     "Enseñar una de sus versiones a otros con un túnel de Cloudflare" if up else stopped)
+                                     "Compartir con un túnel de Cloudflare" if up else stopped)
         else:
             mine = next((t for _v, t in targets if st and st["target"] == t), targets[0][1])
             sb = self.nv_share_button(mine, folder, p["folder"])
         sb.set_sensitive(up)
         btns["compartir"] = sb
         adm = nv_button(logo("prestashop" if akind == "ps" else "wordpress", 18), "Panel",
-                        stopped if not up else "Abrir https://%s/%s/ con el administrador de pruebas ya escrito "
-                        "(%s, contraseña local): solo hay que pulsar Entrar" % (p["domain"], admin, "local@local.test")
-                        if admin else "%s no es un WordPress ni una tienda PrestaShop con su carpeta de "
-                        "administración" % p["folder"],
+                        stopped if not up else "Abrir el panel de administración"
+                        if admin else "No tiene panel de administración",
                         lambda *_: self.open_admin_login(akind, admin, self.dk_url(p["domain"]), p["folder"],
                                                          ["docker-usuario-pruebas", p["slug"]]), "nv-proyecto-btn")
         adm.set_sensitive(up and bool(admin))
@@ -30360,8 +30447,7 @@ class App2(App):
         btns["panel"] = adm
         pma_ok = web or p["pma"].isdigit()
         pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin",
-                        stopped if not up else "Abrir phpMyAdmin (%s): usuario root; la contraseña se copia al pulsar, "
-                        "para pegarla" % self.dk_pma_url(p) if pma_ok else "Sin puerto de phpMyAdmin",
+                        stopped if not up else "Abrir phpMyAdmin (copia la contraseña)" if pma_ok else "Sin puerto de phpMyAdmin",
                         lambda *_: (self.nv_docker_copy_pass(p), self.open_uri(self.dk_pma_url(p))),
                         "nv-proyecto-btn")
         pma.set_sensitive(up and pma_ok)
@@ -30372,31 +30458,27 @@ class App2(App):
             if code.get_icon() is not None:
                 cimg = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
                 cimg.set_pixel_size(18)
-            vs = nv_button(cimg or "text-editor-symbolic", "VS Code", "Abrir %s en Visual Studio Code" % folder,
+            vs = nv_button(cimg or "text-editor-symbolic", "VS Code", "Abrir en Visual Studio Code",
                            lambda *_: self.open_in_vscode(folder), "nv-proyecto-btn")
             vs.set_sensitive(os.path.isdir(folder))
             btns["vscode"] = vs
-        lg = nv_button("text-x-generic-symbolic", "Log", "Ver lo último de su PHP (los errores de la web: el "
-                       "registro de su contenedor %s)" % php_c if php_c else "Aún no tiene contenedor de PHP: arráncalo",
+        lg = nv_button(logo("log", 18), "Log", "Ver el log de errores" if php_c else "Arráncalo para ver su log",
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))
         btns["log"] = lg
         self.nv_place_buttons(acts, btns)
         if web:
-            vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Añadir otra versión de PHP, quitarla%s"
-                           % (" o elegir con cuál va la tienda" if p.get("kind") == "ps" else " (todas a la vez, cada una con su dominio)"),
+            vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Gestionar sus versiones de PHP",
                            lambda *_: self.nv_docker_versions(p), "nv-proyecto-btn")
         else:
-            vb = nv_button("go-up-symbolic", "Pasar al Apache de Docker", "Sin LAMPP y con varias versiones de PHP a la vez",
+            vb = nv_button("go-up-symbolic", "Pasar al Apache de Docker", "Varias versiones de PHP a la vez",
                            lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
         vb.set_sensitive(not self.busy)
         conf = buttons_conf()
         if kind in ("wp", "ps"):
             x = {"name": p["folder"], "kind": kind}
             ib = nv_button("image-x-generic-symbolic", "Imágenes de producción…",
-                           "Lo que falte de wp-content/uploads se pide a su web real (el mismo dominio que con LAMPP)"
-                           if kind == "wp" else "Descargar de su web real las imágenes de productos, categorías y marcas "
-                           "que faltan en su carpeta img", lambda *_: self.nv_wp_media(x) if kind == "wp" else self.nv_ps_images(x),
+                           "Pedir a producción las imágenes que faltan" if kind == "wp" else "Descargar las imágenes que faltan", lambda *_: self.nv_wp_media(x) if kind == "wp" else self.nv_ps_images(x),
                            "nv-proyecto-btn")
             ib.set_sensitive(not self.busy)
             self.nv_restyle(ib, conf, ("icono", "image-x-generic-symbolic"), "Imágenes")
@@ -30406,7 +30488,7 @@ class App2(App):
         acts.pack_start(vb, False, False, 0)
         power = nv_button("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                           "Parar" if up else "Arrancar",
-                          "Parar sus contenedores (su BBDD se queda)" if up else "Arrancar sus contenedores",
+                          "Parar sus contenedores" if up else "Arrancar sus contenedores",
                           lambda *_: self.run_task(("Parando %s" if up else "Arrancando %s") % p["folder"],
                                                    ["docker-parar" if up else "docker-arrancar", p["slug"]], auto_close=True,
                                                    on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
@@ -30581,9 +30663,8 @@ class App2(App):
                 web = p.get("web")
                 php = Gtk.Button(label="PHP %s" % " · ".join(p["versions"]) if web else "PHP %s" % p["php"],
                                  valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                                 tooltip_text="Sus versiones de PHP: añadir otra, quitarla%s" % (" o elegir con cuál va la tienda"
-                                                                                                  if p.get("kind") == "ps" else "")
-                                 if web else "Cambiar la versión de PHP (su BBDD y su configuración se quedan)")
+                                 tooltip_text="Gestionar sus versiones de PHP"
+                                 if web else "Cambiar la versión de PHP")
                 php.connect("clicked", lambda *_, p=p: self.nv_docker_versions(p) if p.get("web") else self.on_docker_php(p))
                 img_cell = Gtk.Box()
                 img_cell.pack_start(php, False, False, 0)
@@ -30624,9 +30705,7 @@ class App2(App):
                     # (el puente de los proyectos de Docker que usan en vivo la BBDD de esa version LAMPP)
                     ver = proj[len("nexum-lampp-bd-"):].replace("-", ".")
                     users = [q["folder"] for q in d["projects"] if q.get("lampp") == ver]
-                    name.set_tooltip_text("Lleva las conexiones de %s a la MariaDB de lampp-%s (la misma BBDD que "
-                                          "web.local). Se quita solo cuando ningún proyecto de Docker la usa."
-                                          % (", ".join(users) or "los proyectos de Docker", ver))
+                    name.set_tooltip_text("Conecta Docker a la MariaDB de lampp-%s" % ver)
                     acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                                      "Parar el puente (%s se queda%s sin BBDD)" % (", ".join(users) or "ningún proyecto",
                                                                                    "n" if len(users) > 1 else "")

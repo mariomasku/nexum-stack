@@ -2135,7 +2135,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.6"
+APP_VERSION="1.40.7"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -19797,6 +19797,38 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Dominios falseables de un proyecto: los de los vhosts de su carpeta. Un .local no es un dominio
+    /// falseado (no hay ninguna web real a la que devolverlo)
+    func projectHosts(_ name: String) -> [HostEntry] {
+        return (hosts ?? []).filter { $0.folder == name && !$0.name.lowercased().hasSuffix(".local") }
+    }
+
+    /// El fichero de hosts, solo para verlo (para cambiarlo: Editar, en Configuración), con los dominios
+    /// que se pueden falsear delante: un dominio con vhost no sale en él hasta falsearlo
+    func viewHostsFile() {
+        let d = data ?? AppData()
+        guard let raw = FileManager.default.contents(atPath: d.hosts) else {
+            message("No se ha podido leer \(d.hosts)", "", error: true)
+            return
+        }
+        let list = hosts ?? []
+        let states = list.map { h -> String in
+            h.name.lowercased().hasSuffix(".local") ? (h.fake ? "encendido" : "apagado") : (h.fake ? "falseado" : "sin falsear")
+        }
+        let stateW = states.map { $0.count }.max() ?? 0
+        let nameW = list.map { $0.name.count }.max() ?? 0
+        var head = ["# DOMINIOS QUE SE PUEDEN FALSEAR (tienen vhost en \(d.vhosts))"]
+        for (h, state) in zip(list, states) {
+            let st = state.padding(toLength: stateW, withPad: " ", startingAt: 0)
+            let nm = h.name.padding(toLength: nameW, withPad: " ", startingAt: 0)
+            head.append("#   \(st)  \(nm)  ->  \(h.folder.isEmpty ? "sin carpeta" : h.folder)")
+        }
+        if list.isEmpty { head.append("#   (ninguno)") }
+        head += ["#", "# CONTENIDO DE \(d.hosts)", ""]
+        showLongText(d.hosts, head.joined(separator: "\n") + "\n" + String(decoding: raw, as: UTF8.self),
+                     subtitle: "Dominios que se pueden falsear y contenido del fichero (solo lectura)")
+    }
+
     /// Carpeta del proyecto nuevo: si trae su configuración, se propone su base de datos
     func pickNewFolder(_ folder: String) {
         newFolder = folder
@@ -21335,19 +21367,16 @@ struct StatePill: View {
         switch b.phpState {
         case "stable":
             return ("Estable", GREEN,
-                    "Recibe correcciones de errores y de seguridad"
-                    + (b.activeEnd.isEmpty ? "" : " (hasta \(fmtMonth(b.activeEnd)))")
-                    + ". Es la mejor opción para proyectos nuevos.")
+                    "Con soporte completo"
+                    + (b.activeEnd.isEmpty ? "" : " (hasta \(fmtMonth(b.activeEnd)))"))
         case "security":
             return ("Solo seguridad", Color(red: 0.78, green: 0.53, blue: 0.0),
-                    "Ya no recibe correcciones de errores, solo parches de seguridad"
-                    + (b.securityEnd.isEmpty ? "" : " hasta \(fmtMonth(b.securityEnd))")
-                    + ". Sirve para proyectos que aún no funcionan con las estables.")
+                    "Solo parches de seguridad"
+                    + (b.securityEnd.isEmpty ? "" : " hasta \(fmtMonth(b.securityEnd))"))
         default:
             return ("Sin soporte", RED,
-                    "php.net ya no publica parches, ni de seguridad"
-                    + (b.securityEnd.isEmpty ? "" : " (desde \(fmtMonth(b.securityEnd)))")
-                    + ". Solo para proyectos antiguos.")
+                    "Sin parches"
+                    + (b.securityEnd.isEmpty ? "" : " (desde \(fmtMonth(b.securityEnd)))"))
         }
     }
     var body: some View {
@@ -21366,8 +21395,8 @@ struct ReleaseTag: View {
         Text(security ? "Parche de seguridad" : "Corrección de errores")
             .font(.caption.weight(.bold))
             .foregroundColor(security ? Color(red: 0.21, green: 0.52, blue: 0.89) : .secondary)
-            .tip(security ? "php.net la marca como parche de seguridad: corrige vulnerabilidades. Conviene instalarla."
-                          : "Corrige errores. php.net no la marca como parche de seguridad.")
+            .tip(security ? "Parche de seguridad"
+                          : "Corrige errores")
     }
 }
 
@@ -21413,6 +21442,8 @@ struct Page<Content: View>: View {
 /// Logotipos de los paquetes (Simple Icons, CC0; cada marca es de su dueño y solo se usa para
 /// identificar su paquete). El trazo, pasado a M, L, C y Z absolutos en una caja de 24x24
 let LOGO_PATHS: [String: String] = [
+    // (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
+    "log": "M 2 1 L 15 1 L 15 8 L 22 8 L 22 23 L 2 23 Z M 16.5 1 L 22 6.5 L 16.5 6.5 Z M 3.6 11 L 3.6 20 L 8.6 20 L 8.6 18.3 L 5.3 18.3 L 5.3 11 Z M 9.5 11 L 9.5 20 L 14.5 20 L 14.5 11 Z M 11.2 12.7 L 12.8 12.7 L 12.8 18.3 L 11.2 18.3 Z M 20.4 11 L 15.4 11 L 15.4 20 L 20.4 20 L 20.4 15.1 L 17.9 15.1 L 17.9 16.8 L 18.7 16.8 L 18.7 18.3 L 17.1 18.3 L 17.1 12.7 L 20.4 12.7 Z",
     "github": "M 12 0.297 C 5.37 0.297 0 5.67 0 12.297 C 0 17.6 3.438 22.097 8.205 23.682 C 8.805 23.795 9.025 23.424 9.025 23.105 C 9.025 22.82 9.015 22.065 9.01 21.065 C 5.672 21.789 4.968 19.455 4.968 19.455 C 4.422 18.07 3.633 17.7 3.633 17.7 C 2.546 16.956 3.717 16.971 3.717 16.971 C 4.922 17.055 5.555 18.207 5.555 18.207 C 6.625 20.042 8.364 19.512 9.05 19.205 C 9.158 18.429 9.467 17.9 9.81 17.6 C 7.145 17.3 4.344 16.268 4.344 11.67 C 4.344 10.36 4.809 9.29 5.579 8.45 C 5.444 8.147 5.039 6.927 5.684 5.274 C 5.684 5.274 6.689 4.952 8.984 6.504 C 9.944 6.237 10.964 6.105 11.984 6.099 C 13.004 6.105 14.024 6.237 14.984 6.504 C 17.264 4.952 18.269 5.274 18.269 5.274 C 18.914 6.927 18.509 8.147 18.389 8.45 C 19.154 9.29 19.619 10.36 19.619 11.67 C 19.619 16.28 16.814 17.295 14.144 17.59 C 14.564 17.95 14.954 18.686 14.954 19.81 C 14.954 21.416 14.939 22.706 14.939 23.096 C 14.939 23.411 15.149 23.786 15.764 23.666 C 20.565 22.092 24 17.592 24 12.297 C 24 5.67 18.627 0.297 12 0.297",
     // (Cloudflare: Simple Icons 13.21.0, CC0; sus arcos, pasados a curvas)
     "cloudflare": "M 16.5088 16.8447 C 16.6563 16.3379 16.5996 15.874 16.3535 15.5293 C 16.1289 15.2129 15.749 15.0303 15.292 15.0088 L 6.6328 14.8965 C 6.579 14.8973 6.5287 14.8704 6.4995 14.8252 C 6.4712 14.7832 6.4644 14.7266 6.4785 14.6699 C 6.5063 14.5859 6.5908 14.5215 6.6821 14.5137 L 15.418 14.4014 C 16.4531 14.3525 17.5781 13.5146 17.9717 12.4878 L 18.4707 11.1865 C 18.4922 11.1304 18.5 11.0737 18.4854 11.0185 C 17.9229 8.4722 15.6504 6.5732 12.9355 6.5732 C 10.4316 6.5732 8.3071 8.1909 7.5479 10.4346 C 7.0552 10.0688 6.4292 9.8721 5.7539 9.9356 C 4.5513 10.0546 3.5874 11.0186 3.4678 12.2212 C 3.4395 12.5312 3.4609 12.834 3.5313 13.1152 C 1.5683 13.171 0 14.7754 0 16.752 C 0 16.9268 0.0142 17.1035 0.0352 17.2793 C 0.0493 17.3623 0.1196 17.4268 0.2041 17.4268 L 16.1855 17.4268 C 16.2764 17.4268 16.3613 17.3623 16.3887 17.2715 L 16.5087 16.8447 Z M 19.2656 11.2813 C 19.1885 11.2813 19.1045 11.2813 19.0273 11.2925 C 18.9707 11.2925 18.9219 11.334 18.9003 11.3901 L 18.5625 12.5645 C 18.415 13.0713 18.4707 13.5352 18.7168 13.8809 C 18.9424 14.1973 19.3223 14.3789 19.7793 14.4004 L 21.623 14.5137 C 21.6787 14.5137 21.7285 14.54 21.7559 14.584 C 21.7842 14.627 21.791 14.6914 21.7773 14.7402 C 21.749 14.8242 21.6641 14.8887 21.5733 14.8955 L 19.6523 15.0078 C 18.6113 15.0566 17.4941 15.8945 17.0996 16.9218 L 16.959 17.2803 C 16.9307 17.3516 16.9805 17.4219 17.0576 17.4219 L 23.6553 17.4219 C 23.7324 17.4219 23.8027 17.373 23.8243 17.2959 C 23.9365 16.8877 24 16.4589 24 16.0156 C 24 13.4131 21.875 11.2886 19.2656 11.2886",
@@ -21452,6 +21483,7 @@ func hexColor(_ v: UInt32) -> Color {
 
 /// Color de cada marca (el fondo de su icono)
 let LOGO_COLORS: [String: Color] = [
+    "log": hexColor(0x16A34A),
     "php": hexColor(0x777BB4), "apache": hexColor(0xD22128), "mariadb": hexColor(0x003545),
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
     "wordpress": hexColor(0x21759B), "prestashop": hexColor(0xDF0067), "mailpit": hexColor(0x00A87B), "docker": hexColor(0x2496ED),
@@ -23273,7 +23305,7 @@ struct TopBar: View {
                 Label("Terminal", systemImage: "terminal")
             }
             .buttonStyle(OutlineButton(kind: model.termOpen ? "primary" : ""))
-            .tip("Enseñar o esconder la terminal, abajo de la ventana")
+            .tip("Mostrar u ocultar la terminal")
             warnings()
         }
         .padding(.horizontal, 16)
@@ -23340,7 +23372,7 @@ struct TopBar: View {
             .buttonStyle(PlainButtonStyle())
             .onHover { servicesHover = $0 }
             .hoverPointer()
-            .tip("Servicios de la versión activa: arrancarlos, pararlos o reiniciarlos")
+            .tip("Servicios de la versión activa")
             .popover(isPresented: $servicesOpen, arrowEdge: .bottom) {
                 // (los recuadros de arriba no heredan el estilo de los botones de la ventana)
                 ServicesView(close: { servicesOpen = false }).environmentObject(model).buttonStyle(PointerButtonStyle()).frame(width: 660, height: 470)
@@ -23363,7 +23395,7 @@ struct TopBar: View {
         let total = Double(Swift.max(1, ProcessInfo.processInfo.physicalMemory))
         let cpu = u.values.reduce(0.0) { $0 + $1.cpu } / cores
         let mem = u.values.reduce(Int64(0)) { $0 + $1.mem }
-        var lines = ["Nexum Dev Stack y sus servicios: CPU \(fmtPercent(cpu)) de todo el Mac (\(Int(cores)) núcleos) · RAM \(fmtSize(mem)) (\(fmtPercent(100 * Double(mem) / total)) de \(fmtSize(Int64(total))))", ""]
+        var lines = ["CPU \(fmtPercent(cpu)) · RAM \(fmtSize(mem))", ""]
         for (k, text) in USAGE_GROUPS {
             if let part = u[k], part.mem > 0 || part.cpu > 0 {
                 lines.append("\(text): CPU \(fmtPercent(part.cpu / cores)) · \(fmtSize(part.mem))")
@@ -23400,8 +23432,8 @@ struct TopBar: View {
     }
 
     func mailTip(_ m: MailState) -> String {
-        if !m.installed { return "Mailpit no está instalado: instálalo en Configuración (sin él, el correo de las webs no sale)" }
-        if !m.running { return "Mailpit arranca con la versión activa: arráncala para ver el correo de las webs" }
+        if !m.installed { return "Mailpit no está instalado" }
+        if !m.running { return "Arranca la versión activa para ver el correo" }
         if let n = model.mailUnread, n > 0 { return "Correo de las webs (Mailpit): \(n) sin leer" }
         return "Correo de las webs (Mailpit)"
     }
@@ -23814,8 +23846,7 @@ struct ProjectsView: View {
     }
 
     func mailHint(_ x: Project?, _ m: MailState) -> String {
-        let base = "Lo que mande esta web (formularios, pedidos, contraseñas) no llega a nadie: se ve en Correo, arriba"
-        if m.wp == "nada" && x?.kind == "wp" { return base + ". Ojo: sus plugins de correo de WordPress no se tocan" }
+        let base = "Se ve en Correo, arriba"
         return base
     }
 
@@ -23870,7 +23901,7 @@ struct ProjectsView: View {
                 Button("En Docker…") { model.openDockerForm(folder: x.name) }
             }
             .disabled(model.busy)
-            .tip("Añadir entorno: llevar el proyecto a otra versión de PHP o a Docker")
+            .tip("Añadir entorno")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
                 Picker("", selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) })) {
@@ -23891,7 +23922,7 @@ struct ProjectsView: View {
             Button(action: { model.linkProject(x) }) { Image(systemName: "link") }
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.busy || model.data == nil)
-                .tip("Cambiar la BBDD de cada versión (vincular)")
+                .tip("Vincular su BBDD")
           }
         }
         .padding(.horizontal, 14)
@@ -23907,9 +23938,27 @@ struct ProjectsView: View {
                 Button(action: { model.loadFolder(x) }) { Label("Cargar", systemImage: "play.fill") }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .disabled(model.busy)
-                    .tip("Apunta \(p.link.isEmpty ? "el vhost" : p.link) a \(x.name) y monta la versión de PHP donde está su BBDD")
+                    .tip("Cargar \(x.name)")
             }
             Spacer(minLength: 8)
+            // Si su carpeta tiene un dominio en los vhosts: falsearlo o dejar de falsearlo desde aquí,
+            // como en Dominios y hosts
+            if isLoaded {
+                ForEach(model.projectHosts(x.name), id: \.name) { h in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(h.fake ? "Host falseado" : "Falsear Host")
+                            Text(h.name).font(.caption).foregroundColor(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
+                            .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
+                            .disabled(model.busy)
+                    }
+                    .padding(.trailing, 6)
+                    .tip(h.fake ? "Host falseado" : "Falsear Host")
+                }
+            }
             // (⋮, pegado a la derecha)
             moreMenu(x, square: isLoaded)
         }
@@ -23926,7 +23975,7 @@ struct ProjectsView: View {
         }
         if c.square {
             VisorButton(conf: c, name: "Desmontar", icon: .symbol("eject.fill", Color.secondary),
-                        tip: "Desmontar \(x.name): \(p.link) deja de apuntar a él y enseña una página vacía") {
+                        tip: "Desmontar el proyecto") {
                 model.unloadProject()
             }
             .disabled(model.busy)
@@ -23934,7 +23983,7 @@ struct ProjectsView: View {
             Button(action: { model.unloadProject() }) { Image(systemName: "eject.fill") }
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.busy)
-                .tip("Desmontar \(x.name): \(p.link) deja de apuntar a él y enseña una página vacía")
+                .tip("Desmontar el proyecto")
         }
     }
 
@@ -23946,34 +23995,33 @@ struct ProjectsView: View {
         let link = p.link
         var items: [String: AnyView] = [:]
         items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
-                                           tip: "Abrir http://\(link)/ en el navegador") { openURL("http://\(link)/") })
+                                           tip: "Abrir http://\(link)/") { openURL("http://\(link)/") })
         if let code = vscodeURL(), let f = folder {
             items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
-                                                  tip: "Abrir \(x.name) en Visual Studio Code (si ya está abierto, se trae su ventana delante)") {
+                                                  tip: "Abrir en Visual Studio Code") {
                 openInVSCode(f)
             })
         }
         items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
-                                           tip: db.isEmpty ? "No se sabe qué BBDD usa \(x.name)" : "Abrir la BBDD \(db) en phpMyAdmin") {
+                                           tip: db.isEmpty ? "Sin BBDD" : "Abrir \(db) en phpMyAdmin") {
             openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)")
         }.disabled(db.isEmpty))
         items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
-                                             tip: admin.1.isEmpty ? "\(x.name) no es un WordPress ni una tienda PrestaShop con su carpeta de administración"
-                                                : "Abrir su panel (http://\(link)/\(admin.1)/) con el administrador de pruebas ya escrito (local@local.test, contraseña local): solo hay que pulsar Entrar") {
+                                             tip: admin.1.isEmpty ? "No tiene panel de administración"
+                                                : "Abrir el panel de administración") {
             openProjectAdmin(kind: admin.0, admin: admin.1, link: link, db: db, folder: folder)
         }.disabled(admin.1.isEmpty))
         items["docker"] = AnyView(VisorButton(conf: c, name: "Docker", icon: .logo("docker"),
-                                              tip: model.dockerOf(x.name).isEmpty ? "Montar \(x.name) en Docker (con la versión de PHP que elijas)"
-                                                : "Arrancar \(x.name) en Docker y abrir la pestaña Docker") {
+                                              tip: model.dockerOf(x.name).isEmpty ? "Montar en Docker"
+                                                : "Arrancar en Docker") {
             model.dockerForLoaded(x)
         }.disabled(model.busy))
         items["compartir"] = AnyView(model.shareButton("http://\(link)", folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
             .disabled(model.busy))
         // El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
         let log = model.data.flatMap { projectErrorLogPath(link: link, vhosts: $0.vhosts) }
-        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .symbol("doc.text", Color.primary),
-                                           tip: log.map { "Ver el final del registro de errores de la web (\(($0 as NSString).lastPathComponent))" }
-                                            ?? "Esta web aún no tiene registro de errores") {
+        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
+                                           tip: log == nil ? "Aún no hay log de errores" : "Ver el log de errores") {
             if let l = log { model.showLogTail(l) }
         }.disabled(log == nil))
         return items
@@ -24051,7 +24099,7 @@ struct ProjectsView: View {
             Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
                 .disabled(model.busy)
-                .tip("Montar un proyecto nuevo: se clona de GitHub, se elige su versión de PHP y se le crea su BBDD")
+                .tip("Clonar y montar un repositorio")
         }
         .padding(.top, 10)
     }
@@ -24098,7 +24146,7 @@ struct ProjectsView: View {
             Text(x.name).lineLimit(1).col(nameW).tip(x.name)
             Text(model.projectSizes[x.name].map { fmtSize($0[0]) } ?? "…")
                 .font(.system(size: 11.5, design: .monospaced)).foregroundColor(.secondary).lineLimit(1).col(80)
-                .tip(model.projectSizes[x.name].map { "Lo que ocupa la carpeta en el disco, medido " + fmtAge(max(0, Int(Date().timeIntervalSince1970) - Int($0[1]))) }
+                .tip(model.projectSizes[x.name].map { "Tamaño en disco, medido " + fmtAge(max(0, Int(Date().timeIntervalSince1970) - Int($0[1]))) }
                      ?? "Midiendo lo que ocupa en el disco…")
             Text(db.isEmpty ? "sin BBDD" : db).font(.system(size: 11.5, design: .monospaced)).foregroundColor(.secondary)
                 .lineLimit(1).truncationMode(.middle).col(190)
@@ -24126,7 +24174,7 @@ struct ProjectsView: View {
                     }
                     .buttonStyle(OutlineButton(compact: true))
                     .disabled(model.busy)
-                    .tip("Arrancar \(x.name) en Docker (con varias versiones, pregunta cuál)")
+                    .tip("Arrancar \(x.name) en Docker")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
                 }
@@ -24189,7 +24237,7 @@ struct VersionsView: View {
                         }
                     }
                     .buttonStyle(OutlineButton())
-                    .tip("Apache, MariaDB, ProFTPD, Perl y phpMyAdmin de cada versión")
+                    .tip("Componentes de cada versión")
                     Button(action: { model.panel = .install }) { Label("Instalar versión…", systemImage: "plus") }
                         .buttonStyle(OutlineButton(kind: "primary"))
                         .disabled(model.busy)
@@ -24289,7 +24337,7 @@ struct VersionsView: View {
         VStack(alignment: .leading, spacing: 1) {
             if php2shellVulnerable(st) {
                 Text("Vulnerable (PHP2Shell)").font(.caption.weight(.bold)).foregroundColor(RED)
-                    .tip(php2shellText(st, inst.php))
+                    .tip(php2shellText(st, inst.php).isEmpty ? "" : "Vulnerable a PHP2Shell")
             }
             if let b = b, b.latest == inst.php {
                 if st == "parcheable" {
@@ -24300,7 +24348,7 @@ struct VersionsView: View {
                 }
                 if st == "parche" {
                     Text("+ parche de seguridad (\(PHP2SHELL_DATE))").font(.caption).foregroundColor(.secondary)
-                        .tip("PHP \(inst.php) con el parche oficial del equipo de seguridad de PHP contra PHP2Shell (CVE-2026-109618 y CVE-2026-109619)")
+                        .tip("Parche oficial contra PHP2Shell")
                 }
             } else if let b = b, let n = newer {
                 Text("PHP \(n) disponible").font(.caption).foregroundColor(ACCENT)
@@ -24378,7 +24426,7 @@ struct ComponentsPanel: View {
                     Text(inst.pma).font(.system(size: 11.5, design: .monospaced))
                         .foregroundColor(pmaOutdated(inst.php, inst.pma) ? RED : Color.primary)
                         .col(78)
-                        .tip(pmaOutdated(inst.php, inst.pma) ? "phpMyAdmin antiguo: actualízalo en el menú ⋯ de la versión" : "")
+                        .tip(pmaOutdated(inst.php, inst.pma) ? "phpMyAdmin antiguo: actualízalo en ⋯" : "")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -24430,7 +24478,7 @@ struct DockerView: View {
                 }
                 .buttonStyle(OutlineButton())
                 .disabled(running == 0 || model.busy)
-                .tip(running > 0 ? "Parar los \(running) contenedores de Nexum en marcha (los proyectos, las MariaDB comunes y el Apache de Docker); los de otros programas no se tocan"
+                .tip(running > 0 ? "Parar \(running) contenedores de Nexum"
                      : "No hay ningún contenedor de Nexum en marcha")
                 Button(action: { model.openDockerForm(folder: nil) }) { Label("Proyecto en Docker…", systemImage: "plus") }
                     .buttonStyle(OutlineButton(kind: "primary"))
@@ -24686,12 +24734,12 @@ struct DockerView: View {
                     Button("PHP " + p.versions.joined(separator: " · ")) { model.dockerVersions(p) }
                         .buttonStyle(OutlineButton(compact: true))
                         .disabled(model.busy)
-                        .tip("Sus versiones de PHP: añadir otra, quitarla" + (p.kind == "ps" ? " o elegir con cuál va la tienda" : ""))
+                        .tip("Gestionar sus versiones de PHP")
                 } else if let p = g.project {
                     Button("PHP \(p.php)") { model.dockerSetPhp(p) }
                         .buttonStyle(OutlineButton(compact: true))
                         .disabled(model.busy)
-                        .tip("Cambiar la versión de PHP (su BBDD y su configuración se quedan)")
+                        .tip("Cambiar la versión de PHP")
                 } else {
                     Text(plural(g.items.count, "contenedor", "contenedores")).font(.caption).foregroundColor(.secondary)
                 }
@@ -24799,14 +24847,13 @@ struct DockerView: View {
                 }
                 if p.isWeb {
                     VisorButton(conf: c, name: "Versiones de PHP…", icon: .symbol("plus", Color.primary),
-                                tip: "Añadir otra versión de PHP, quitarla" + (p.kind == "ps" ? " o elegir con cuál va la tienda"
-                                    : " (todas a la vez, cada una con su dominio)")) {
+                                tip: "Gestionar sus versiones de PHP") {
                         model.dockerVersions(p)
                     }
                     .disabled(model.busy)
                 } else {
                     VisorButton(conf: c, name: "Pasar al Apache de Docker", icon: .symbol("arrow.up.circle", Color.primary),
-                                tip: "Sin XAMPP-X y con varias versiones de PHP a la vez") {
+                                tip: "Varias versiones de PHP a la vez") {
                         model.dockerPass(p)
                     }
                     .disabled(model.busy)
@@ -24814,15 +24861,14 @@ struct DockerView: View {
                 // Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga
                 if let x = model.projects?.list.first(where: { $0.name == p.folder }), kind == "wp" || kind == "ps" {
                     VisorButton(conf: c, name: "Imágenes de producción…", icon: .symbol("photo", Color.primary),
-                                tip: kind == "wp" ? "Lo que falte de wp-content/uploads se pide a su web real (el mismo dominio que con XAMPP-X)"
-                                    : "Descargar de su web real las imágenes de productos, categorías y marcas que faltan en su carpeta img") {
+                                tip: kind == "wp" ? "Pedir a producción las imágenes que faltan" : "Descargar las imágenes que faltan") {
                         if kind == "wp" { model.wpMedia(x) } else { model.psImages(x) }
                     }
                     .disabled(model.busy)
                 }
                 Spacer(minLength: 8)
                 VisorButton(conf: c, name: up ? "Parar" : "Arrancar", icon: .symbol(up ? "stop.fill" : "play.fill", up ? RED : GREEN),
-                            tip: up ? "Parar sus contenedores (su BBDD se queda)" : "Arrancar sus contenedores") {
+                            tip: up ? "Parar sus contenedores" : "Arrancar sus contenedores") {
                     model.dockerAction(p, start: !up)
                 }
                 .disabled(model.busy)
@@ -24844,7 +24890,7 @@ struct DockerView: View {
         let folder = HTDOCS + "/" + p.folder
         let admin = projectAdmin(folder)
         let site = model.dockerSite(p)
-        let stopped = "Está parado: arráncalo antes (Arrancar, a la derecha)"
+        let stopped = "Está parado: arráncalo antes"
         // (el contenedor de su web: el de la versión elegida, o el de antes, php-1)
         let webC: String? = p.isWeb ? g.items.first(where: { $0.name == dockerWebContainer(p, p.php) })?.name
             : g.items.first(where: { $0.name.range(of: "^nexum-[a-z0-9-]+-php-[0-9]+$", options: .regularExpression) != nil })?.name
@@ -24865,7 +24911,7 @@ struct DockerView: View {
             items["compartir"] = AnyView(model.shareButton(m.1, folder: folder, name: p.folder, conf: c).disabled(model.busy))
         } else if targets.count > 1 {
             items["compartir"] = AnyView(VisorButton(conf: c, name: "Compartir", icon: .logo("cloudflare"),
-                                                     tip: up ? "Enseñar una de sus versiones a otros con un túnel de Cloudflare" : stopped) {
+                                                     tip: up ? "Compartir con un túnel de Cloudflare" : stopped) {
                 popMenu(targets.map { t in ("PHP \(t.0)  ·  \(t.1)", { model.share(t.1, folder: folder, name: p.folder) }) })
             }.disabled(!up || model.busy))
         } else {
@@ -24873,23 +24919,22 @@ struct DockerView: View {
         }
         items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
                                              tip: !up ? stopped : (admin.1.isEmpty
-                                                ? "\(p.folder) no es un WordPress ni una tienda PrestaShop con su carpeta de administración"
-                                                : "Abrir \(site)/\(admin.1)/ con el administrador de pruebas ya escrito (local@local.test, contraseña local): solo hay que pulsar Entrar")) {
+                                                ? "No tiene panel de administración"
+                                                : "Abrir el panel de administración")) {
             model.dockerPanel(p, kind: admin.0, admin: admin.1)
         }.disabled(!up || admin.1.isEmpty))
         items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
-                                           tip: !up ? stopped : (p.isWeb ? "Abrir phpMyAdmin (\(model.dockerPmaURL)): usuario root; la contraseña se copia al pulsar, para pegarla"
-                                                : "Abrir su phpMyAdmin (http://127.0.0.1:\(p.pma)/): usuario root; la contraseña se copia al pulsar, para pegarla")) {
+                                           tip: !up ? stopped : "Abrir phpMyAdmin (copia la contraseña)") {
             model.dockerOpenPma(p)
         }.disabled(!up || (!p.isWeb && p.pma.isEmpty)))
         if let code = vscodeURL() {
             items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
-                                                  tip: "Abrir \(p.folder) en Visual Studio Code (si ya está abierto, se trae su ventana delante)") {
+                                                  tip: "Abrir en Visual Studio Code") {
                 openInVSCode(folder)
             })
         }
-        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .symbol("doc.text", Color.primary),
-                                           tip: webC.map { "Ver lo último de su web (los errores de PHP: el registro de su contenedor \($0))" }
+        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
+                                           tip: webC.map { _ in "Ver el log de errores" }
                                             ?? "Aún no tiene contenedor de la web: arráncalo") {
             if let n = webC { model.dockerWebLog(p, n) }
         }.disabled(webC == nil))
@@ -25214,7 +25259,7 @@ func visorIcon(_ key: String) -> VisorIcon {
     case "panel": return .logo("wordpress")
     case "docker": return .logo("docker")
     case "compartir": return .logo("cloudflare")
-    default: return .symbol("doc.text", Color.primary)
+    default: return .logo("log")
     }
 }
 
@@ -25385,7 +25430,7 @@ struct ButtonsPanel: View {
                         sizeTouched = false
                     }
                     .buttonStyle(OutlineButton())
-                    .tip("Todos, en el orden de siempre y con su nombre (se aplica al guardar)")
+                    .tip("Volver a los botones de siempre")
                     Spacer()
                     Button("Cancelar") { model.panel = nil }.buttonStyle(OutlineButton())
                     Button("Guardar") { model.saveVisor(conf) }.buttonStyle(OutlineButton(kind: "primary"))
@@ -25521,7 +25566,7 @@ struct GitHubCard: View {
                 if g?.source != "gh" && ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].contains(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
                     Button("Usar la sesión de gh") { runQuick(["github-conectar", "--gh"]) { rc, out in model.githubDone(rc, out) } }
                         .disabled(model.busy)
-                        .tip("La de la herramienta de GitHub (gh auth login), sin pegar ningún token")
+                        .tip("Usar la sesión de gh auth login")
                 }
                 if !(g?.source ?? "").isEmpty {
                     Button("Desconectar") { runQuick(["github-desconectar"]) { rc, out in model.githubDone(rc, out) } }
@@ -25581,7 +25626,7 @@ struct ReposView: View {
                         model.reloadRepos()
                     }))
                     .toggleStyle(SwitchToggleStyle())
-                    .tip("También los que no empiezan por ninguno de los prefijos (Configuración, GitHub)")
+                    .tip("Incluir los que no tienen prefijo")
                     Spacer()
                     if let e = r?.error { Text("⚠ " + e).font(.caption).foregroundColor(.secondary).lineLimit(2) }
                     if model.reposLoading || r == nil {
@@ -25629,24 +25674,24 @@ struct ReposView: View {
                 Button("Traer cambios") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton())
                     .disabled(model.busy)
-                    .tip("Ya está clonado: git pull en \(HTDOCS)/\(item.folder)")
+                    .tip("Actualizar con git pull")
             } else if item.state == "ocupado" {
                 Button("Clonar") {}
                     .buttonStyle(OutlineButton())
                     .disabled(true)
-                    .tip("Ya hay una carpeta \(HTDOCS)/\(item.name) que no es un clon de este repositorio")
+                    .tip("Ya hay una carpeta con ese nombre")
             } else {
                 Button("Clonar") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .disabled(model.busy)
-                    .tip("Por SSH, con tu clave, en \(HTDOCS)/\(item.name)")
+                    .tip("Clonar por SSH en htdocs")
             }
             // (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo)
             Button(action: { openURL("https://github.com/" + item.full) }) {
                 LogoShape(d: LOGO_PATHS["github"] ?? "").fill(Color.primary).frame(width: 16, height: 16)
             }
             .buttonStyle(OutlineButton())
-            .tip("Abrir en GitHub (https://github.com/" + item.full + ")")
+            .tip("Abrir en GitHub")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -25827,8 +25872,8 @@ extension AppModel {
     func shareButton(_ url: String, folder: String, name: String, conf: VisorConf) -> some View {
         let mine = tunnel?.target == url
         return VisorButton(conf: conf, name: mine ? "Compartiendo" : "Compartir", icon: .logo("cloudflare"),
-                           tip: mine ? "Abierta en \(tunnel?.url ?? ""): ver la dirección y la contraseña"
-                                : "Enseñar \(url) a otros con un túnel de Cloudflare (con contraseña)",
+                           tip: mine ? "Ver dirección y contraseña"
+                                : "Compartir con un túnel de Cloudflare",
                            kind: mine ? "compartiendo" : "") {
             if mine { self.shareDialog() } else { self.share(url, folder: folder, name: name) }
         }
@@ -26143,7 +26188,7 @@ struct DockerNewPanel: View {
                 // (las imágenes oficiales de 8.1 y anteriores ya no reciben parches: siguen con PHP2Shell)
                 if verParts(model.dkForm.php).lexicographicallyPrecedes([8, 2]) && !model.dkForm.php.isEmpty {
                     Text("Vulnerable (PHP2Shell)").font(.caption.weight(.bold)).foregroundColor(RED)
-                        .tip("La imagen oficial de PHP \(model.dkForm.php) ya no recibe parches: es vulnerable a PHP2Shell (CVE-2026-109618/109619). Úsala solo con proyectos de confianza.")
+                        .tip("Imagen sin parches: solo con proyectos de confianza")
                 }
             }
             formRow("MariaDB") {
@@ -26446,7 +26491,7 @@ struct InstallSection: View {
             Text("Instalada").foregroundColor(.secondary)
         default:
             Text("Hay un parche nuevo").foregroundColor(.secondary)
-                .tip("Actualízala en la tabla de Versiones de PHP (menú ⋯ de la versión)")
+                .tip("Actualízala en Versiones de PHP (⋯)")
         }
     }
 }
@@ -26500,7 +26545,7 @@ struct DatabasesView: View {
             Button(action: { model.createDb() }) { Label("Nueva BBDD…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
                 .disabled(act == nil || model.busy)
-                .tip("Crear una BBDD vacía en la versión activa" + (act.map { " (XAMPP-\($0.folder))" } ?? ""))
+                .tip("Crear una BBDD vacía")
         }
     }
 
@@ -26526,8 +26571,8 @@ struct DatabasesView: View {
                      sub: disk.map { "Disco: \(fmtSize($0.free)) libres de \(fmtSize($0.total))" } ?? "",
                      progress: disk.map { 1 - Double($0.free) / Double($0.total) })
                 .tip(dbTotal.count < all.count
-                      ? plural(all.count - dbTotal.count, "BBDD", "BBDD") + " sin medir: cada BBDD se mide cuando su versión está activa y en marcha"
-                      : "Datos e índices de las BBDD de todas las versiones")
+                      ? plural(all.count - dbTotal.count, "BBDD", "BBDD") + " sin medir"
+                      : "Tamaño de las BBDD de todas las versiones")
         }
     }
 
@@ -26659,7 +26704,7 @@ struct DatabasesView: View {
             Text(fmtSize(z[0])).font(.system(size: 11.5, design: .monospaced))
                 .tip("Datos e índices, medido el " + fmtMeasured(Int(z[1])))
         } else {
-            Text("—").foregroundColor(.secondary).tip("Se mide cuando su versión está activa y en marcha")
+            Text("—").foregroundColor(.secondary).tip("Se mide con su versión en marcha")
         }
     }
 
@@ -27170,7 +27215,7 @@ struct ServicesView: View {
                 Badge(text: "Abierto a la red", symbol: "exclamationmark.triangle.fill", color: RED)
             } else {
                 Badge(text: "Solo desde este Mac", symbol: "lock.shield.fill", color: GREEN)
-                    .tip("Solo se puede entrar en ellos desde este Mac (127.0.0.1 y ::1): los demás equipos de la red no ven los proyectos ni las BBDD.")
+                    .tip("Solo accesibles desde este Mac")
             }
         }
     }
@@ -27261,13 +27306,54 @@ struct Badge: View {
     }
 }
 
+/// Ancho disponible para OneThirdTwoThirds
+private struct AvailableWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = Swift.max(value, nextValue()) }
+}
+
+/// Dos tarjetas en una fila: la primera ocupa 1/3 y la segunda, 2/3. (Sin Layout ni Grid, que no están
+/// en macOS 12: se mide el ancho disponible y a cada una se le da el suyo)
+struct OneThirdTwoThirds<First: View, Second: View>: View {
+    let first: First
+    let second: Second
+    @State private var width: CGFloat = 0
+    private let spacing: CGFloat = 18
+    init(@ViewBuilder first: () -> First, @ViewBuilder second: () -> Second) {
+        self.first = first()
+        self.second = second()
+    }
+    private var unit: CGFloat { Swift.max(0, width - spacing) / 3 }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            GeometryReader { g in
+                Color.clear.preference(key: AvailableWidthKey.self, value: g.size.width)
+            }
+            .frame(height: 0)
+            if width > 0 {
+                HStack(alignment: .top, spacing: spacing) {
+                    first.frame(width: unit, alignment: .topLeading)
+                    second.frame(width: unit * 2, alignment: .topLeading)
+                }
+            }
+        }
+        .onPreferenceChange(AvailableWidthKey.self) { width = $0 }
+    }
+}
+
 struct HostsView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        Page {
-            PageTitle(title: "Dominios y hosts",
-                      sub: "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts", symbol: "network")
+        WidePage {
+            HStack(alignment: .top) {
+                PageTitle(title: "Dominios y hosts",
+                          sub: "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts", symbol: "network")
+                Spacer(minLength: 12)
+                Button(action: { model.viewHostsFile() }) { Label("Ver fichero de hosts", systemImage: "doc.text") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Ver \(model.data?.hosts ?? "/etc/hosts")")
+            }
             if let hosts = model.hosts {
                 // Primero, si el vhost de los proyectos no lleva a este Mac: el navegador no conecta
                 ForEach(model.hostsLinkFix, id: \.self) { f in
@@ -27280,17 +27366,21 @@ struct HostsView: View {
                         })
                     }
                 }
-                Card("Host falseado",
-                     "Al cargar una tienda PrestaShop se crea lo que le falte (su vhost y su certificado) y su dominio se falsea en /etc/hosts: el navegador la abre en este Mac. Al cargar otro proyecto deja de estar falseado y vuelve a llevar a la web real.") {
-                    if fakes(hosts).isEmpty {
-                        Row("Ningún dominio falseado", "Los dominios de los vhosts llevan a sus webs reales")
+                // En la misma fila: el host falseado ocupa 1/3 y el proyecto nuevo, 2/3
+                OneThirdTwoThirds(first: {
+                    Card("Host falseado",
+                         "Al cargar una tienda PrestaShop se crea lo que le falte (su vhost y su certificado) y su dominio se falsea en /etc/hosts: el navegador la abre en este Mac. Al cargar otro proyecto deja de estar falseado y vuelve a llevar a la web real.") {
+                        if fakes(hosts).isEmpty {
+                            Row("Ningún dominio falseado", "Los dominios de los vhosts llevan a sus webs reales")
+                        }
+                        ForEach(fakes(hosts), id: \.name) { h in
+                            if h.name != fakes(hosts).first?.name { Divider() }
+                            hostRow(h)
+                        }
                     }
-                    ForEach(fakes(hosts), id: \.name) { h in
-                        if h.name != fakes(hosts).first?.name { Divider() }
-                        hostRow(h)
-                    }
-                }
-                newDomainCard(hosts)
+                }, second: {
+                    newDomainCard(hosts)
+                })
                 Card("Dominios de los vhosts",
                      "Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1); apagado, a la web real. Se pide la contraseña de administrador para cambiar /etc/hosts.") {
                     if rest(hosts).isEmpty {
@@ -27402,14 +27492,15 @@ struct HostsView: View {
             if h.name.lowercased().hasSuffix(".local") {
                 Button(action: { model.mediaProxy(h) }) { Image(systemName: "photo") }
                     .disabled(model.busy)
-                    .tip("Imágenes de producción: lo que falte aquí de wp-content/uploads o img se pide a la web real"
-                         + (h.media.isEmpty ? "" : " (ahora, a \(h.media))"))
+                    .tip("Imágenes de producción"
+                         + (h.media.isEmpty ? "" : ": \(h.media)"))
             }
             Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
                 .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
                 .disabled(model.busy)
                 .tip(h.name.lowercased().hasSuffix(".local")
-                     ? "Un .local no existe fuera de este Mac: encendido, se mantiene en /etc/hosts; apagado, el Mac lo pregunta a la red" : "")
+                     ? (h.fake ? "Apagar este .local" : "Encender este .local")
+                     : (h.fake ? "Host falseado" : "Falsear Host"))
         })
     }
 
@@ -27694,7 +27785,7 @@ struct ToolsView: View {
                     .labelsHidden()
                     .frame(width: 250)
                     .disabled(!m.on || model.busy)
-                    .tip("WP Mail SMTP, Easy WP SMTP, Post SMTP, FluentSMTP, Brevo…\n• Llevarlos a Mailpit: los de SMTP siguen funcionando, pero su correo va a Mailpit; los que mandan por una API (Brevo, FluentSMTP, Post SMTP…) se desactivan en la copia local.\n• Desactivarlos: todos fuera de la copia local; WordPress usa mail(), que va a Mailpit.\n• No tocarlos: como en producción; su correo puede llegar de verdad.\nSe aplica al cargar el proyecto o su BBDD.")
+                    .tip("Qué hacer con sus plugins de correo")
                 }
                 if m.installed {
                     Tile("Bandeja de entrada", mailInboxText(m)) {
@@ -27753,7 +27844,7 @@ struct ToolsView: View {
             Button("Ver el final") { model.showLogTail(path) }.disabled(size <= 0)
             Button("Abrir") { model.openInEditor(path) }
                 .disabled(size < 0 || size > LOG_OPEN_MAX)
-                .tip(size > LOG_OPEN_MAX ? "Ocupa \(sizeText): demasiado para el editor. Usa «Ver el final»." : path)
+                .tip(size > LOG_OPEN_MAX ? "Ocupa \(sizeText): usa «Ver el final»" : path)
         }
     }
 
@@ -28141,7 +28232,7 @@ struct TermPanel: View {
                     .tip("Ir a la carpeta del proyecto cargado (cd)")
                 Button(action: { model.termFlushDns() }) { Label("Vaciar DNS", systemImage: "network") }
                     .buttonStyle(OutlineButton())
-                    .tip("Vaciar la caché DNS del sistema (sudo dscacheutil -flushcache y mDNSResponder; la contraseña, aquí)")
+                    .tip("Vaciar la caché DNS")
                 Button(action: { model.termStart(restart: true) }) { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(OutlineButton())
                     .tip("Terminal nueva (cierra la de ahora)")
@@ -31945,6 +32036,22 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.40.7 (5 nov 2026)
+- Los mensajes al dejar el ratón encima de botones, interruptores e
+  indicadores son ahora cortos y dicen solo lo que hacen. Las
+  explicaciones largas siguen en los símbolos ⓘ.
+- Proyecto cargado: el interruptor del dominio lleva el título «Falsear
+  Host» y, cuando está falseado, «Host falseado».
+- Botón Log: icono nuevo, un folio verde con «LOG» escrito.
+- Proyecto cargado: si su carpeta tiene un dominio en los vhosts, junto
+  a sus botones sale ese dominio con un interruptor para falsearlo o
+  dejar de falsearlo sin ir a Dominios y hosts.
+- Dominios y hosts: «Host falseado» ocupa 1/3 de la pestaña y, a su
+  lado, «Nuevo proyecto con dominio falseado» ocupa los otros 2/3.
+- Dominios y hosts, botón «Ver fichero de hosts»: enseña /etc/hosts,
+  solo para leerlo, con los dominios que se pueden falsear delante (los
+  que tienen vhost, estén o no en el fichero).
 
 1.40.6 (3 nov 2026)
 - Dominios y hosts, «Crear y falsear»: junto al botón dice lo que

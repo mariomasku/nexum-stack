@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.6)
+# Prueba de la ventana nueva en un Mac (versión 1.40.7)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.6** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.7** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.6/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.7/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.6
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.7
    ```
 
 5. **Comprueba las versiones:**
@@ -291,6 +291,16 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 1. En **Dominios y hosts**, «Nuevo proyecto con dominio falseado», sin escribir nada: el botón «Crear y falsear» está apagado y a su izquierda pone «Escribe el dominio de producción».
 2. Pega `https://www.prueba-falsa.com/tienda/` en Dominio: pone «Elige su carpeta» (el dominio que cuenta es `www.prueba-falsa.com`). Escribe `mal_dominio`: dice que no es un dominio.
 3. Escribe `prueba-falsa.com` y elige una carpeta, sin BBDD: el botón se enciende y pone «https://prueba-falsa.com → htdocs/<carpeta>». No hace falta crearlo.
+
+## Paso 16: el host falseado, en el proyecto cargado y en Dominios y hosts (1.40.7)
+
+1. **Proyectos**, con un proyecto cargado que tenga dominio en los vhosts (una tienda PrestaShop): junto al botón ⋮ salen su dominio y un interruptor. Con un proyecto sin dominio, no sale.
+2. Apaga el interruptor y pon la contraseña: el dominio deja de estar falseado. Vuelve a encenderlo: al acabar, está encendido. Si cancelas la contraseña, se queda como estaba. En **Dominios y hosts** se ve lo mismo.
+3. **Dominios y hosts**: «Host falseado» ocupa un tercio del ancho y «Nuevo proyecto con dominio falseado», a su lado, los otros dos. Debajo, «Dominios de los vhosts» a lo ancho. Agranda y encoge la ventana: se mantiene el reparto y no se corta el formulario.
+4. Botón **Ver fichero de hosts**, arriba a la derecha: arriba salen los dominios que se pueden falsear (con su estado y su carpeta) y debajo `/etc/hosts` tal cual. No se puede editar.
+
+5. El interruptor del proyecto cargado pone **Falsear Host** y su dominio debajo; falseado, **Host falseado**. Al dejar el ratón encima dice lo mismo.
+6. Deja el ratón encima de los botones del proyecto y de los de Docker: el mensaje es corto y se lee de un vistazo. El botón **Log** lleva un folio verde con «LOG».
 
 ## Qué apuntar
 

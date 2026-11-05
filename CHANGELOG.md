@@ -4,6 +4,18 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.24 · 5 nov 2026
+
+- Los mensajes al dejar el ratón encima de botones, interruptores e indicadores son ahora cortos y dicen solo lo que hacen. Las explicaciones largas siguen en los símbolos ⓘ.
+- **Proyecto cargado:** el interruptor del dominio lleva el título «Falsear Host» y, cuando está falseado, «Host falseado».
+- **Botón Log:** icono nuevo, un folio verde con «LOG» escrito.
+
+## 1.56.23 · 5 nov 2026
+
+- **Proyecto cargado:** si su carpeta tiene un dominio en los vhosts, junto a sus botones sale ese dominio con un interruptor para falsearlo o dejar de falsearlo sin ir a Dominios y hosts.
+- **Dominios y hosts:** «Host falseado» ocupa 1/3 de la pestaña y, a su lado, «Nuevo proyecto con dominio falseado» ocupa los otros 2/3.
+- Dominios y hosts, botón «Ver fichero de hosts»: enseña `/etc/hosts`, solo para leerlo, con los dominios que se pueden falsear delante (los que tienen vhost, estén o no en el fichero).
+
 ## 1.56.22 · 3 nov 2026
 
 - Dominios y hosts, «Crear y falsear»: el botón se veía azul aunque no se pudiera pulsar (le faltaba un dominio válido o la carpeta) y no hacía nada. Ahora se ve apagado y debajo dice lo que falta; con todo puesto, lo que va a crear (https://dominio → carpeta).
