@@ -180,6 +180,9 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version activa (si no existe)
 #
+#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]
+#       El proyecto con lo de produccion: git pull (si se pide), su codigo (lo sustituido, en ~/lvm-copias),
+#       su BBDD (con la carga protegida de importar-bd) y lo vuelve a cargar
 #   lvm-instalador hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1 y ::1) o deja de falsear el dominio de un vhost. Un .local se mantiene
 #       siempre en /etc/hosts salvo que se apague aqui (no): se recuerda en
@@ -2135,7 +2138,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.8"
+APP_VERSION="1.40.12"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -4274,11 +4277,35 @@ for r, pre in shown:
 ' "$1" "$2" "$3" "$(github_conf PREFIJOS)" "$4" "$HTDOCS_DIR" "$5"
 }
 
+# git pull seguro de un clon: repo_pull <carpeta> <direccion SSH o nada> <fichero de servidores conocidos>.
+# Si no se puede (sin conexion, o choca con lo que no se ha subido o guardado), no se toca nada
+function repo_pull() {
+    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up
+    branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
+    origin=$(git -C "$dir" config --get remote.origin.url)
+    # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
+    if [[ "$origin" == https://* ]] && [ -n "$ssh_url" ]; then
+        up=$(git -C "$dir" config --get "branch.$branch.merge")
+        from=("$ssh_url" "${up#refs/heads/}")
+        [ -n "${from[1]}" ] || from[1]=$branch
+    fi
+    # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
+    if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+            GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+            no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
+            -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
+        [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+        echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir, o no hay conexión."
+        echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
+        return 1
+    fi
+}
+
 # repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
 # su nombre. Si ya esta clonado en un proyecto, lo dice (EXISTE|carpeta, y sale con 3) y, con
 # --actualizar, trae sus cambios con git pull (si chocan con los tuyos, no se toca nada y se dice)
 function repo_fetch() {
-    local full=$1 name dir folder known ssh_url branch origin
+    local full=$1 name dir folder known ssh_url branch
     [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
     command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
     name=${full#*/} ssh_url="git@github.com:$full.git"
@@ -4295,26 +4322,11 @@ function repo_fetch() {
         fi
         echo "$full: se traen sus cambios a $dir (git pull)"
         [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git pull en $dir"; return 0; }
-        branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { rm -f "$known"; echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
-        origin=$(git -C "$dir" config --get remote.origin.url)
-        # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
-        local from=() up
-        if [[ "$origin" == https://* ]]; then
-            up=$(git -C "$dir" config --get "branch.$branch.merge")
-            from=("$ssh_url" "${up#refs/heads/}")
-            [ -n "${from[1]}" ] || from[1]=$branch
-        fi
-        # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
-        if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
-                GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
-                no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
-                -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
-            [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+        if ! repo_pull "$dir" "$ssh_url" "$known"; then
             rm -f "$known"
-            echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir."
-            echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
             return 1
         fi
+        branch=$(git -C "$dir" symbolic-ref --short -q HEAD)
         rm -f "$known"
         echo "$folder, al día con GitHub (rama $branch)"
         return 0
@@ -4339,6 +4351,383 @@ function repo_fetch() {
     mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$name" >> "$REPO_PROJECTS_FILE"; }
     echo "Listo: $name está en Proyectos (cárgalo con su versión de PHP y su BBDD)"
+}
+
+# gui-proyecto-git <carpeta>: lo que hay que saber antes de copiar encima el codigo de produccion:
+# G|es un repositorio (1/0)|rama|cambios sin commit|commits sin subir|tiene origin (1/0)
+function gui_project_git() {
+    local dir=$HTDOCS_DIR/${1%/} branch dirty ahead origin=0
+    valid_project "${1%/}" > /dev/null || return 1
+    if [ -L "$dir" ] || [ ! -e "$dir/.git" ] || ! command -v git > /dev/null; then
+        echo "G|0||0|0|0"
+        return 0
+    fi
+    branch=$(git -C "$dir" symbolic-ref --short -q HEAD)
+    # (sin los ayudantes que pudiera traer su configuracion: aqui solo se lee)
+    dirty=$(git -C "$dir" -c core.fsmonitor=false -c core.hooksPath=/dev/null status --porcelain 2> /dev/null | wc -l | tr -d ' ')
+    ahead=$(git -C "$dir" rev-list --count '@{u}..HEAD' 2> /dev/null)
+    [ -n "$(git -C "$dir" config --get remote.origin.url)" ] && origin=1
+    echo "G|1|${branch//|/_}|${dirty:-0}|${ahead:-0}|$origin"
+}
+
+# Copia el codigo de produccion (.zip, .tar.gz o carpeta) en un proyecto:
+#   python3 -c "$PROJECT_CODE_PY" <carpeta del proyecto> <origen> <fusionar|sobrescribir> <copias> <temporal> <simular 1/0>
+# Fusionar copia lo que trae y deja lo demas; sobrescribir ademas quita lo que no trae. .git no se toca
+# nunca. Lo sustituido o quitado se mueve antes a <copias>, y lo que no cambia no se escribe. De un
+# paquete no se saca nada fuera de la carpeta (rutas con .. o absolutas) ni enlaces ni dispositivos: el
+# codigo de produccion es de fuera. Si todo va dentro de una carpeta (public_html), se usa lo de dentro.
+PROJECT_CODE_PY='
+import filecmp, os, shutil, signal, stat, sys, tarfile, tempfile, zipfile
+
+target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
+simulate = simulate == "1"
+SKIP = {".git", "__MACOSX", ".DS_Store"}
+sys.stdout.reconfigure(errors="replace", line_buffering=True)
+counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0}
+errors, seen = [], set()
+
+
+def stop(_sig, _frame):
+    raise SystemExit(130)
+
+
+signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGHUP, stop)
+
+
+def fail(text):
+    print(text)
+    raise SystemExit(1)
+
+
+def safe_path(root, name):
+    """La ruta de un miembro del paquete dentro de root, o None si se saldria o no es valida."""
+    name = name.replace(chr(92), "/")
+    parts = [p for p in name.split("/") if p not in ("", ".")]
+    if name.startswith("/") or not parts or ".." in parts or any(chr(0) in p or ":" in p[:2] for p in parts):
+        return None
+    return os.path.join(root, *parts)
+
+
+def write_member(path, data, executable):
+    os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
+    with open(path, "wb") as out:
+        shutil.copyfileobj(data, out, 1024 * 1024)
+    os.chmod(path, 0o755 if executable else 0o644)
+
+
+def extract_zip(path, root):
+    with zipfile.ZipFile(path) as z:
+        members = z.infolist()
+        need = sum(m.file_size for m in members)
+        free = shutil.disk_usage(root).free
+        if need > free:
+            fail("No cabe: hacen falta %d MB para abrirlo y hay %d MB libres" % (need >> 20, free >> 20))
+        for m in members:
+            if m.flag_bits & 1:
+                fail("El .zip lleva contraseña: quitasela o descomprimelo y elige la carpeta")
+            kind = stat.S_IFMT(m.external_attr >> 16)
+            out = safe_path(root, m.filename)
+            if out is None or kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                counts["skipped"] += 1
+            elif m.is_dir():
+                os.makedirs(out, mode=0o755, exist_ok=True)
+            else:
+                with z.open(m) as data:
+                    write_member(out, data, (m.external_attr >> 16) & 0o111)
+
+
+def extract_tar(path, root):
+    with tarfile.open(path, "r:*") as t:
+        for m in t:
+            out = safe_path(root, m.name)
+            if out is None or not (m.isreg() or m.isdir()):
+                counts["skipped"] += 1
+            elif m.isdir():
+                os.makedirs(out, mode=0o755, exist_ok=True)
+            else:
+                write_member(out, t.extractfile(m), m.mode & 0o111)
+
+
+def entries(path):
+    return [e for e in os.scandir(path) if e.name not in SKIP]
+
+
+def inner_root(root):
+    """Si todo va dentro de una sola carpeta (public_html), lo de dentro. wp-content solo no: si en el
+    proyecto hay una con ese nombre, va en su sitio."""
+    while True:
+        found = entries(root)
+        if len(found) != 1 or not found[0].is_dir(follow_symlinks=False) \
+                or os.path.lexists(os.path.join(target, found[0].name)):
+            return root
+        print("Se usa lo que hay dentro de %s/" % found[0].name)
+        root = found[0].path
+
+
+def save_old(path, rel):
+    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama)."""
+    if simulate:
+        return
+    dest = os.path.join(backup, rel)
+    os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
+    try:
+        os.rename(path, dest)
+    except OSError:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.copytree(path, dest, symlinks=True)
+            shutil.rmtree(path)
+        else:
+            shutil.copy2(path, dest, follow_symlinks=False)
+            os.unlink(path)
+
+
+def tick():
+    done = counts["copied"] + counts["same"] + counts["removed"]
+    if done and done % 5000 == 0:
+        print("  %d ficheros revisados..." % done)
+
+
+def is_real_dir(path):
+    return os.path.isdir(path) and not os.path.islink(path)
+
+
+def sync(src, dst, rel):
+    for e in sorted(entries(src), key=lambda x: x.name):
+        sub = os.path.join(rel, e.name)
+        out = os.path.join(dst, e.name)
+        seen.add(sub)
+        try:
+            if e.is_symlink():
+                counts["skipped"] += 1
+                seen.discard(sub)
+            elif e.is_dir(follow_symlinks=False):
+                # (un enlace en el proyecto no se sigue: escribiria fuera de la carpeta)
+                if os.path.lexists(out) and not is_real_dir(out):
+                    save_old(out, sub)
+                if not simulate and not os.path.lexists(out):
+                    os.mkdir(out, 0o755)
+                sync(e.path, out, sub)
+            elif e.is_file(follow_symlinks=False):
+                copy_file(e, out, sub)
+            else:
+                counts["skipped"] += 1
+                seen.discard(sub)
+            tick()
+        except OSError as exc:
+            errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def copy_file(e, out, sub):
+    exists = os.path.lexists(out)
+    if exists and not os.path.islink(out) and os.path.isfile(out) \
+            and os.path.getsize(out) == e.stat().st_size and filecmp.cmp(e.path, out, shallow=False):
+        counts["same"] += 1
+        return
+    counts["copied"] += 1
+    if simulate:
+        return
+    # (primero la copia nueva y luego se aparta la de antes: si no cabe, el proyecto sigue como estaba)
+    fd, part = tempfile.mkstemp(prefix=".lvm-parte-", dir=os.path.dirname(out))
+    try:
+        with os.fdopen(fd, "wb") as dest, open(e.path, "rb") as data:
+            shutil.copyfileobj(data, dest, 1024 * 1024)
+        os.chmod(part, (e.stat().st_mode & 0o755) | 0o644)
+        if exists:
+            save_old(out, sub)
+        os.replace(part, out)
+    except BaseException:
+        if os.path.exists(part):
+            os.unlink(part)
+        raise
+
+
+def remove_rest(dst, rel):
+    for e in sorted(os.scandir(dst), key=lambda x: x.name):
+        sub = os.path.join(rel, e.name)
+        if e.name == ".git":
+            continue
+        try:
+            if sub not in seen:
+                has_git = is_real_dir(e.path) and any(".git" in dirs for _r, dirs, _f in os.walk(e.path))
+                if has_git:
+                    remove_rest(e.path, sub)
+                else:
+                    counts["removed"] += 1
+                    save_old(e.path, sub)
+            elif is_real_dir(e.path):
+                remove_rest(e.path, sub)
+            tick()
+        except OSError as exc:
+            errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def main():
+    real_target = os.path.realpath(target)
+    work = None
+    if os.path.isdir(source):
+        root = os.path.realpath(source)
+        if root == real_target or (root + os.sep).startswith(real_target + os.sep) \
+                or (real_target + os.sep).startswith(root + os.sep):
+            fail("La carpeta elegida y la del proyecto se solapan: elige otra")
+    else:
+        os.makedirs(tmp_base, mode=0o700, exist_ok=True)
+        work = tempfile.mkdtemp(prefix="actualizar-", dir=tmp_base)
+        root = work
+    try:
+        if work:
+            print("Abriendo %s..." % os.path.basename(source))
+            try:
+                if zipfile.is_zipfile(source):
+                    extract_zip(source, work)
+                elif tarfile.is_tarfile(source):
+                    extract_tar(source, work)
+                else:
+                    fail("%s no es un .zip, un .tar.gz ni una carpeta" % os.path.basename(source))
+            except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError) as exc:
+                fail("No se ha podido abrir %s: %s" % (os.path.basename(source), exc))
+        root = inner_root(root)
+        if not any(True for _ in entries(root)):
+            fail("No trae ningun fichero: no se ha tocado nada")
+        sync(root, target, "")
+        if mode == "sobrescribir":
+            remove_rest(target, "")
+    finally:
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+    print("%s%d copiados, %d iguales (no se tocan), %d quitados"
+          % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
+    if counts["skipped"]:
+        print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
+    if os.path.isdir(backup):
+        print("Lo que se ha sustituido o quitado esta en %s" % backup)
+    if errors:
+        print("No se han podido copiar o quitar %d:" % len(errors))
+        for line in errors[:15]:
+            print("  " + line)
+        raise SystemExit(1)
+
+
+main()
+'
+
+# La BBDD que usa ahora un proyecto, de su configuracion: hay que leerla antes de copiar encima la de produccion
+function project_config_db() {
+    local db=""
+    if is_prestashop "$1"; then
+        db=$(ps_config "$1" | cut -d'|' -f1)
+    elif is_wordpress "$1"; then
+        db=$(wp_config_read "$HTDOCS_DIR/$1/wp-config.php" | head -1)
+    fi
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && echo "$db"
+}
+
+# ¿Ha quedado su configuracion con la BBDD y la direccion locales? (al volver a cargarlo, un aviso no
+# para la carga: sin esto, se diria que esta actualizado con el wp-config.php de produccion)
+function project_config_local() {
+    local folder=$1 db=$2 file=$HTDOCS_DIR/$1/wp-config.php now
+    [ -n "$db" ] || { echo "Aviso: no se sabe qué BBDD usa $folder: revisa su configuración"; return 1; }
+    if is_prestashop "$folder"; then
+        now=$(ps_config "$folder" | cut -d'|' -f1)
+        [ "$now" == "$db" ] && return 0
+        echo "Aviso: la configuración de $folder usa la BBDD ${now:-(ninguna)} y tendría que usar $db"
+        return 1
+    fi
+    is_wordpress "$folder" || return 0
+    now=$(wp_config_read "$file" | head -1)
+    if [ "$now" != "$db" ]; then
+        echo "Aviso: el wp-config.php de $folder usa la BBDD ${now:-(ninguna)} y tendría que usar $db"
+        return 1
+    fi
+    wp_config_has_url "$file" "$(wp_local_url "$folder")" && return 0
+    echo "Aviso: el wp-config.php de $folder no lleva WP_SITEURL y WP_HOME con su dirección local"
+    return 1
+}
+
+# actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
+#                     [--bd <fichero>] [--base <base>]
+# El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
+# protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
+# comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
+# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar)
+function project_update() {
+    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies full ssh_url="" known load_db
+    shift
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --codigo) source=$2; shift ;;
+            --modo) mode=$2; shift ;;
+            --pull) pull=1 ;;
+            --bd) file=$2; shift ;;
+            --base) db=$2; shift ;;
+            *) folder="" ;;
+        esac
+        shift
+    done
+    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
+        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]"
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    dir=$HTDOCS_DIR/$folder
+    if [ -L "$dir" ] || [ ! -d "$dir" ]; then
+        echo "No existe la carpeta $dir"
+        return 1
+    fi
+    [ -z "$source" ] || [ -r "$source" ] || { echo "No se puede leer $source"; return 1; }
+    if [ -n "$file" ]; then
+        [ -f "$file" ] && [ -r "$file" ] || { echo "No se puede leer el fichero $file"; return 1; }
+        db_connect || return $?
+    fi
+    { [ -z "$file" ] && [ -z "$db" ]; } || db_valid_name "$db" || return 1
+    # Con la BBDD de ahora: el codigo de produccion trae la configuracion de produccion
+    load_db=${db:-$(saved_project_db "$folder")}
+    [ -n "$load_db" ] || load_db=$(project_config_db "$folder")
+    # La contraseña antes de cambiar nada: cancelarla deja el proyecto como estaba
+    if [ "$DRY" -eq 0 ] && [ -n "$SUDO" ] && ! sudo -v; then
+        echo "Cancelado: no se ha cambiado nada"
+        return 1
+    fi
+
+    if [ -n "$source" ] && [ "$pull" -eq 1 ]; then
+        echo "== git pull en $dir"
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] git pull en $dir"
+        else
+            full=$(repo_clones | awk -v f="$folder" '$2 == f { print $1; exit }')
+            [ -n "$full" ] && ssh_url="git@github.com:$full.git"
+            known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
+            printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
+            if ! repo_pull "$dir" "$ssh_url" "$known"; then
+                rm -f "$known"
+                echo "No se ha copiado el codigo de produccion ni se ha cargado la BBDD."
+                return 1
+            fi
+            rm -f "$known"
+        fi
+    fi
+    if [ -n "$source" ]; then
+        echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
+        stamp=$(date +%Y%m%d-%H%M%S)
+        copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
+        [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$HOME/lvm-copias"
+        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$HOME/.lvm-instalador/temporal" "$DRY"; then
+            echo "No se ha cargado la BBDD: revisa lo anterior."
+            return 1
+        fi
+        htdocs_close_world "$dir"
+    fi
+    if [ -n "$file" ]; then
+        echo "== BBDD de produccion"
+        import_database "$file" "$db" --crear --proyecto "$folder" || return 1
+    fi
+    echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"
+    load_project "$folder" "" "$load_db" || return 1
+    if [ "$DRY" -eq 0 ] && ! project_config_local "$folder" "$load_db"; then
+        echo "El código y la BBDD están actualizados, pero la web puede no abrir en local: revisa lo anterior."
+        return 1
+    fi
+    echo "Proyecto actualizado: $folder"
 }
 
 # ¿Direccion de un repositorio que se puede clonar? Solo https:// o ssh (git@servidor:ruta o
@@ -17260,6 +17649,7 @@ function swift_source() {
 // ventana y se escribe en esa terminal.
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Constantes y utilidades
 
@@ -19031,6 +19421,17 @@ final class AppModel: ObservableObject {
     @Published var npStep = 1
     /// Asistente: los repositorios de GitHub (los de la pestaña Repositorios), lo que se busca, el elegido, y
     /// el dominio de producción (falsearlo o no)
+    /// Actualizar proyecto: si se ve su diálogo, el proyecto, la BBDD, el código, qué hacer con la carpeta
+    /// (fusionar o sobrescribir) y lo que no vale de lo arrastrado
+    @Published var upShown = false
+    @Published var upFolder = ""
+    @Published var upSql = ""
+    @Published var upCode = ""
+    @Published var upMode = "fusionar"
+    @Published var upDb = ""
+    var upDbKnown = false
+    @Published var upSqlError = ""
+    @Published var upCodeError = ""
     @Published var npRepos: [RepoItem] = []
     /// ¿Ya se ha leído alguna vez?, ¿se está preguntando a GitHub? y cuándo contestó por última vez
     var npReposLoaded = false
@@ -20686,6 +21087,106 @@ final class AppModel: ObservableObject {
             : "\(npRepos.count) repositorios de GitHub"
     }
 
+    // MARK: Actualizar proyecto
+
+    /// Abre el diálogo para actualizar el proyecto cargado con lo de producción
+    func upOpen(_ x: Project) {
+        upFolder = x.name
+        upSql = ""
+        upCode = ""
+        upMode = "fusionar"
+        upDb = loadedDb(x)
+        upDbKnown = !upDb.isEmpty
+        upSqlError = ""
+        upCodeError = ""
+        upShown = true
+    }
+
+    /// Fichero o carpeta elegidos o arrastrados (ruta vacía: quitarlo). Lo que no vale se dice en su zona
+    func upSet(code: Bool, _ path: String) {
+        var isDir: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+        let low = path.lowercased()
+        if code {
+            let ok = path.isEmpty || (exists && (isDir.boolValue || [".zip", ".tar", ".tgz", ".tar.gz", ".tar.bz2", ".tar.xz"].contains(where: { low.hasSuffix($0) })))
+            upCodeError = ok ? "" : "Tiene que ser un .zip, un .tar.gz o una carpeta"
+            upCode = ok ? path : ""
+        } else {
+            let ok = path.isEmpty || (exists && !isDir.boolValue && [".sql", ".gz", ".zip"].contains(where: { low.hasSuffix($0) }))
+            upSqlError = ok ? "" : "Tiene que ser .sql, .sql.gz o .zip"
+            upSql = ok ? path : ""
+        }
+    }
+
+    func upPick(code: Bool, folder: Bool) {
+        let panel = NSOpenPanel()
+        panel.title = code ? "Código de producción" : "Base de datos de producción"
+        panel.prompt = "Elegir"
+        panel.canChooseFiles = !folder
+        panel.canChooseDirectories = folder
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        if panel.runModal() == .OK, let url = panel.url { upSet(code: code, url.path) }
+    }
+
+    /// Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido
+    func upAsk() {
+        upShown = false
+        let folder = upFolder, sql = upSql, db = upDb.trimmingCharacters(in: .whitespaces), code = upCode, mode = upMode
+        var what: [String] = []
+        if !code.isEmpty {
+            let name = (code as NSString).lastPathComponent
+            what.append(mode == "fusionar" ? "Se fusiona «\(name)» con \(HTDOCS)/\(folder)."
+                        : "Se sobrescribe la carpeta con «\(name)» en \(HTDOCS)/\(folder): se borra lo que no traiga.")
+        }
+        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)» (antes se guarda una copia).") }
+        runQuick(["gui-proyecto-git", folder]) { _, out in
+            let f = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 })
+            guard !code.isEmpty, let g = f, g[1] == "1" else {
+                if confirm("¿Actualizar \(folder)?", what.joined(separator: "\n\n"), "Actualizar") {
+                    self.upStart(folder, sql, db, code, mode, pull: false)
+                }
+                return
+            }
+            let dirty = Int(g[3]) ?? 0, ahead = Int(g[4]) ?? 0
+            var state = ["Rama " + (g[2].isEmpty ? "sin rama (HEAD suelto)" : g[2])]
+            if dirty > 0 { state.append(plural(dirty, "cambio", "cambios") + " sin commit") }
+            if ahead > 0 { state.append(plural(ahead, "commit", "commits") + " sin subir") }
+            var text = what + [state.joined(separator: "  ·  ")]
+            if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.") }
+            let canPull = g[5] == "1" && !g[2].isEmpty
+            text.append(canPull ? "Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para sin tocar nada."
+                        : "No se puede hacer pull: no tiene origin o no está en una rama.")
+            let alert = NSAlert()
+            alert.messageText = "¿Hacer git pull antes de copiar?"
+            alert.informativeText = text.joined(separator: "\n\n")
+            if canPull { alert.addButton(withTitle: "Hacer pull y copiar") }
+            alert.addButton(withTitle: "Copiar sin pull")
+            alert.addButton(withTitle: "Cancelar")
+            let resp = alert.runModal()
+            if canPull && resp == .alertFirstButtonReturn {
+                self.upStart(folder, sql, db, code, mode, pull: true)
+            } else if resp == (canPull ? .alertSecondButtonReturn : .alertFirstButtonReturn) {
+                self.upStart(folder, sql, db, code, mode, pull: false)
+            }
+        }
+    }
+
+    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool) {
+        var args = ["actualizar-proyecto", folder]
+        if !code.isEmpty { args += ["--codigo", code, "--modo", mode] + (pull ? ["--pull"] : []) }
+        if !sql.isEmpty { args += ["--bd", sql] }
+        // (también solo con el código: al volver a cargarlo, su configuración vuelve a esta BBDD)
+        if !db.isEmpty { args += ["--base", db] }
+        let go = {
+            _ = self.runTask("Actualizando \(folder)", args, progress: true, doneText: "\(folder) actualizado", env: self.dbEnv(),
+                             cancelText: ("¿Cancelar la actualización?",
+                                          "El proyecto se queda a medias, con lo hecho hasta ahora. Lo sustituido sigue en ~/lvm-copias.",
+                                          "Cancelar la actualización"))
+        }
+        if sql.isEmpty { go() } else { checkDbAccess { go() } }
+    }
+
     /// Al escribir en el buscador: un repositorio pegado (botón de copiar de Repositorios) o escrito entero
     /// queda elegido
     func npRepoTyped(_ text: String) {
@@ -20890,6 +21391,11 @@ final class AppModel: ObservableObject {
             _ = self.runTask("Descargando las imágenes de \(x.name)", ["ps-imagenes", x.name],
                              doneText: "Imágenes de \(x.name) descargadas", env: self.dbEnv())
         }
+    }
+
+    /// Importar imágenes de producción: un WordPress las pide a su web real; una tienda las descarga
+    func importImages(_ x: Project) {
+        if x.kind == "wp" { wpMedia(x) } else { psImages(x) }
     }
 
     /// borrar-proyecto: su carpeta, sus vhosts y dominios, lo de Docker y, si se quiere, su BBDD de la
@@ -21495,7 +22001,30 @@ struct Page<Content: View>: View {
 
 /// Logotipos de los paquetes (Simple Icons, CC0; cada marca es de su dueño y solo se usa para
 /// identificar su paquete). El trazo, pasado a M, L, C y Z absolutos en una caja de 24x24
+// Iconos actualizar e imagenes (upload3 y gallery-import, en outline): de Reicon, https://reicon.dev
+// MIT License
+//
+// Copyright (c) 2025 REICON
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 let LOGO_PATHS: [String: String] = [
+    "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
+    "imagenes": "M 9 10 C 10.105 10 11 9.105 11 8 C 11 6.895 10.105 6 9 6 C 7.895 6 7 6.895 7 8 C 7 9.105 7.895 10 9 10 Z M 13 2 L 9 2 C 4 2 2 4 2 9 L 2 15 C 2 20 4 22 9 22 L 15 22 C 20 22 22 20 22 15 L 22 10 M 18 2 L 18 8 L 20 6 M 18 8 L 16 6 M 2.67 18.95 L 7.6 15.64 C 8.39 15.11 9.53 15.17 10.24 15.78 L 10.57 16.07 C 11.35 16.74 12.61 16.74 13.39 16.07 L 17.55 12.5 C 18.33 11.83 19.59 11.83 20.37 12.5 L 22 13.9",
     // (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
     "log": "M 2 1 L 15 1 L 15 8 L 22 8 L 22 23 L 2 23 Z M 16.5 1 L 22 6.5 L 16.5 6.5 Z M 3.6 11 L 3.6 20 L 8.6 20 L 8.6 18.3 L 5.3 18.3 L 5.3 11 Z M 9.5 11 L 9.5 20 L 14.5 20 L 14.5 11 Z M 11.2 12.7 L 12.8 12.7 L 12.8 18.3 L 11.2 18.3 Z M 20.4 11 L 15.4 11 L 15.4 20 L 20.4 20 L 20.4 15.1 L 17.9 15.1 L 17.9 16.8 L 18.7 16.8 L 18.7 18.3 L 17.1 18.3 L 17.1 12.7 L 20.4 12.7 Z",
     "github": "M 12 0.297 C 5.37 0.297 0 5.67 0 12.297 C 0 17.6 3.438 22.097 8.205 23.682 C 8.805 23.795 9.025 23.424 9.025 23.105 C 9.025 22.82 9.015 22.065 9.01 21.065 C 5.672 21.789 4.968 19.455 4.968 19.455 C 4.422 18.07 3.633 17.7 3.633 17.7 C 2.546 16.956 3.717 16.971 3.717 16.971 C 4.922 17.055 5.555 18.207 5.555 18.207 C 6.625 20.042 8.364 19.512 9.05 19.205 C 9.158 18.429 9.467 17.9 9.81 17.6 C 7.145 17.3 4.344 16.268 4.344 11.67 C 4.344 10.36 4.809 9.29 5.579 8.45 C 5.444 8.147 5.039 6.927 5.684 5.274 C 5.684 5.274 6.689 4.952 8.984 6.504 C 9.944 6.237 10.964 6.105 11.984 6.099 C 13.004 6.105 14.024 6.237 14.984 6.504 C 17.264 4.952 18.269 5.274 18.269 5.274 C 18.914 6.927 18.509 8.147 18.389 8.45 C 19.154 9.29 19.619 10.36 19.619 11.67 C 19.619 16.28 16.814 17.295 14.144 17.59 C 14.564 17.95 14.954 18.686 14.954 19.81 C 14.954 21.416 14.939 22.706 14.939 23.096 C 14.939 23.411 15.149 23.786 15.764 23.666 C 20.565 22.092 24 17.592 24 12.297 C 24 5.67 18.627 0.297 12 0.297",
@@ -21537,12 +22066,15 @@ func hexColor(_ v: UInt32) -> Color {
 
 /// Color de cada marca (el fondo de su icono)
 let LOGO_COLORS: [String: Color] = [
-    "log": hexColor(0x16A34A),
+    "log": hexColor(0x16A34A), "actualizar": hexColor(0x3584E4), "imagenes": hexColor(0x3584E4),
     "php": hexColor(0x777BB4), "apache": hexColor(0xD22128), "mariadb": hexColor(0x003545),
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
     "wordpress": hexColor(0x21759B), "prestashop": hexColor(0xDF0067), "mailpit": hexColor(0x00A87B), "docker": hexColor(0x2496ED),
     "cloudflare": hexColor(0xF38020), "github": hexColor(0x181717),
 ]
+
+/// Los que se dibujan con trazo, no rellenos
+let LOGO_STROKED: Set<String> = ["imagenes"]
 
 func brand(_ name: String) -> Color { return LOGO_COLORS[name] ?? .gray }
 
@@ -23838,6 +24370,104 @@ func projectErrorLogPath(link: String, vhosts: String) -> String? {
     return FileManager.default.fileExists(atPath: path) ? path : nil
 }
 
+/// Actualizar proyecto: la BBDD y el código de producción, arrastrados o elegidos
+struct UpdateProjectSheet: View {
+    @EnvironmentObject var model: AppModel
+    @State private var overSql = false
+    @State private var overCode = false
+
+    var body: some View {
+        let dbOk = validDbName(model.upDb.trimmingCharacters(in: .whitespaces))
+        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk) && !model.busy
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Actualizar proyecto").font(.headline)
+                Text(model.upFolder).font(.caption).foregroundColor(.secondary)
+            }
+            zone("Base de datos de producción", ".sql, .sql.gz o .zip", symbol: "cylinder.split.1x2", path: model.upSql, error: model.upSqlError,
+                 over: $overSql, code: false, folders: false)
+            // (sin fichero de BBDD no se toca: se sigue usando la misma)
+            if model.upDbKnown || !model.upSql.isEmpty {
+                HStack(spacing: 8) {
+                    Text(model.upSql.isEmpty ? "Se sigue usando la BBDD" : "Se carga en la BBDD").foregroundColor(.secondary)
+                    // (su nombre, como texto; solo si el proyecto no tiene ninguna hay que escribirlo)
+                    if model.upDbKnown {
+                        Text(model.upDb).fontWeight(.bold).foregroundColor(.blue)
+                    } else {
+                        TextField("", text: $model.upDb).frame(width: 220)
+                    }
+                    if !model.upSql.isEmpty {
+                        Text("(antes se guarda una copia de la actual)").font(.caption).foregroundColor(.secondary)
+                    }
+                }
+            }
+            zone("Código de producción", ".zip, .tar.gz o carpeta", symbol: "folder", path: model.upCode, error: model.upCodeError,
+                 over: $overCode, code: true, folders: true)
+            // Qué hacer con la carpeta: siempre a la vista, para saber lo que va a pasar
+            VStack(alignment: .leading, spacing: 6) {
+                Picker("", selection: $model.upMode) {
+                    Text("Fusionar: copia lo que trae y deja lo demás de la carpeta").tag("fusionar")
+                    Text("Sobrescribir: además borra lo que no traiga").tag("sobrescribir")
+                }
+                .pickerStyle(RadioGroupPickerStyle())
+                .labelsHidden()
+                Text("Se escribe sobre \(HTDOCS)/\(model.upFolder). Su .git no se toca y lo sustituido o borrado queda en ~/lvm-copias.")
+                    .font(.caption).foregroundColor(RED).fixedSize(horizontal: false, vertical: true)
+            }
+            .disabled(model.upCode.isEmpty)
+            HStack {
+                Spacer()
+                Button("Cancelar") { model.upShown = false }.buttonStyle(OutlineButton(big: true))
+                Button("Actualizar…") { model.upAsk() }
+                    .buttonStyle(OutlineButton(kind: "primary", big: true))
+                    .disabled(!can)
+            }
+        }
+        .padding(22)
+        .frame(width: 640)
+    }
+
+    func zone(_ title: String, _ formats: String, symbol: String, path: String, error: String, over: Binding<Bool>, code: Bool, folders: Bool) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: symbol).font(.system(size: 30)).foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                Text(!error.isEmpty ? error : (path.isEmpty ? "Arrástralo aquí: \(formats)" : path))
+                    .font(.caption).foregroundColor(!error.isEmpty ? RED : .secondary)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+            Spacer(minLength: 8)
+            if !path.isEmpty {
+                Button(action: { model.upSet(code: code, "") }) { Image(systemName: "xmark.circle") }
+                    .buttonStyle(LinkHoverButton())
+                    .tip("Quitar")
+            }
+            Button("Elegir fichero…") { model.upPick(code: code, folder: false) }
+            if folders {
+                Button("Elegir carpeta…") { model.upPick(code: code, folder: true) }
+            }
+        }
+        .padding(.horizontal, 20)
+        // (alta: es donde se suelta, tiene que verse bien)
+        .frame(minHeight: 112)
+        .background(RoundedRectangle(cornerRadius: 12).fill(over.wrappedValue ? Color.blue.opacity(0.30)
+                                                            : !path.isEmpty ? Color.blue.opacity(0.10) : Color.primary.opacity(0.06)))
+        // (el recuadro azul, solo con algo incorporado o al arrastrar encima)
+        .overlay(RoundedRectangle(cornerRadius: 12)
+            .stroke(over.wrappedValue || !path.isEmpty ? Color.blue : Color.primary.opacity(0.28),
+                    style: StrokeStyle(lineWidth: 2, dash: over.wrappedValue || !path.isEmpty ? [] : [5])))
+        .onDrop(of: [UTType.fileURL], isTargeted: over) { providers in
+            guard let item = providers.first else { return false }
+            _ = item.loadObject(ofClass: URL.self) { url, _ in
+                if let url = url {
+                    DispatchQueue.main.async { model.upSet(code: code, url.path) }
+                }
+            }
+            return true
+        }
+    }
+}
+
 struct ProjectsView: View {
     @EnvironmentObject var model: AppModel
 
@@ -23853,6 +24483,9 @@ struct ProjectsView: View {
             } else {
                 Loading()
             }
+        }
+        .sheet(isPresented: $model.upShown) {
+            UpdateProjectSheet().environmentObject(model).buttonStyle(PointerButtonStyle())
         }
     }
 
@@ -24072,12 +24705,22 @@ struct ProjectsView: View {
         }.disabled(model.busy))
         items["compartir"] = AnyView(model.shareButton("http://\(link)", folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
             .disabled(model.busy))
-        // El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
-        let log = model.data.flatMap { projectErrorLogPath(link: link, vhosts: $0.vhosts) }
+        // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
+        let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)
         items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
-                                           tip: log == nil ? "Aún no hay log de errores" : "Ver el log de errores") {
-            if let l = log { model.showLogTail(l) }
-        }.disabled(log == nil))
+                                           tip: hasLog ? "Ver el log de Apache" : "Aún no hay log de Apache") {
+            model.showLogTail(ERROR_LOG)
+        }.disabled(!hasLog))
+        items["actualizar"] = AnyView(VisorButton(conf: c, name: "Actualizar", icon: .logo("actualizar"),
+                                                  tip: "Actualizar proyecto") {
+            model.upOpen(x)
+        }.disabled(model.busy))
+        if x.kind == "wp" || x.kind == "ps" {
+            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Importar", icon: .logo("imagenes"),
+                                                    tip: "Importar imágenes de producción") {
+                model.importImages(x)
+            }.disabled(model.busy))
+        }
         return items
     }
 
@@ -24912,14 +25555,6 @@ struct DockerView: View {
                     }
                     .disabled(model.busy)
                 }
-                // Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga
-                if let x = model.projects?.list.first(where: { $0.name == p.folder }), kind == "wp" || kind == "ps" {
-                    VisorButton(conf: c, name: "Imágenes de producción…", icon: .symbol("photo", Color.primary),
-                                tip: kind == "wp" ? "Pedir a producción las imágenes que faltan" : "Descargar las imágenes que faltan") {
-                        if kind == "wp" { model.wpMedia(x) } else { model.psImages(x) }
-                    }
-                    .disabled(model.busy)
-                }
                 Spacer(minLength: 8)
                 VisorButton(conf: c, name: up ? "Parar" : "Arrancar", icon: .symbol(up ? "stop.fill" : "play.fill", up ? RED : GREEN),
                             tip: up ? "Parar sus contenedores" : "Arrancar sus contenedores") {
@@ -24992,6 +25627,12 @@ struct DockerView: View {
                                             ?? "Aún no tiene contenedor de la web: arráncalo") {
             if let n = webC { model.dockerWebLog(p, n) }
         }.disabled(webC == nil))
+        if let x = model.projects?.list.first(where: { $0.name == p.folder }), x.kind == "wp" || x.kind == "ps" {
+            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Importar", icon: .logo("imagenes"),
+                                                    tip: "Importar imágenes de producción") {
+                model.importImages(x)
+            }.disabled(model.busy))
+        }
         return items
     }
 
@@ -25241,7 +25882,7 @@ func clockTime(_ t: Int) -> String {
 /// nombre. Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre
 let VISOR_BUTTONS: [(String, String)] = [("web", "Abrir web"), ("vscode", "VS Code"), ("pma", "phpMyAdmin"),
                                          ("panel", "Panel"), ("docker", "Docker"), ("compartir", "Compartir"),
-                                         ("log", "Log")]
+                                         ("log", "Log"), ("actualizar", "Actualizar"), ("imagenes", "Importar")]
 let VISOR_STYLES: [(String, String)] = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
                                         ("grande", "Icono y nombre (cuadrado)")]
 /// Lado del cuadrado de cada estilo si no se ha elegido otro, y lo que deja el deslizador (con el nombre
@@ -25313,6 +25954,8 @@ func visorIcon(_ key: String) -> VisorIcon {
     case "panel": return .logo("wordpress")
     case "docker": return .logo("docker")
     case "compartir": return .logo("cloudflare")
+    case "actualizar": return .logo("actualizar")
+    case "imagenes": return .logo("imagenes")
     default: return .logo("log")
     }
 }
@@ -25325,7 +25968,13 @@ struct VisorIconView: View {
         case .symbol(let s, let c):
             Image(systemName: s).font(.system(size: size * 0.8)).foregroundColor(c).frame(width: size, height: size)
         case .logo(let l):
-            LogoShape(d: LOGO_PATHS[l] ?? "").fill(brand(l)).frame(width: size, height: size)
+            if LOGO_STROKED.contains(l) {
+                LogoShape(d: LOGO_PATHS[l] ?? "")
+                    .stroke(brand(l), style: StrokeStyle(lineWidth: size * 1.5 / 24, lineCap: .round, lineJoin: .round))
+                    .frame(width: size, height: size)
+            } else {
+                LogoShape(d: LOGO_PATHS[l] ?? "").fill(brand(l)).frame(width: size, height: size)
+            }
         case .image(let i):
             Image(nsImage: i).resizable().frame(width: size, height: size)
         }
@@ -25399,7 +26048,7 @@ struct VisorButton: View {
         if conf.square {
             Button(action: action) { VisorSquareLabel(conf: conf, name: name, icon: icon) }
                 .buttonStyle(SquareButton(side: conf.side, kind: kind))
-                .tip(conf.style == "icono" ? (tip.isEmpty ? name : name + ": " + tip) : tip)
+                .tip(conf.style == "icono" ? (tip.isEmpty ? name : tip.hasPrefix(name) ? tip : name + ": " + tip) : tip)
         } else {
             Button(action: action) {
                 HStack(spacing: 6) {
@@ -32116,6 +32765,38 @@ QUE HACE
 
 VERSIONES
 
+1.40.12 (6 nov 2026)
+- Proyecto cargado: los botones se llaman «Actualizar» e «Importar». Al
+  pasar por encima dicen «Actualizar proyecto» e «Importar imágenes de
+  producción».
+
+1.40.11 (5 nov 2026)
+- Proyecto cargado y Docker: botón «Importar imágenes» en WordPress y
+  PrestaShop. Se muestra u oculta en Personalizar los botones.
+- Iconos nuevos en «Actualizar proyecto» e «Importar imágenes».
+
+1.40.10 (5 nov 2026)
+- Proyecto cargado: el botón Log abre el error_log de Apache. El de
+  web.local sigue en Herramientas, Registro de errores.
+
+1.40.9 (5 nov 2026)
+- Actualizar proyecto: se puede actualizar la BBDD, el código o los
+  dos. Sin fichero de BBDD, dice que se sigue usando la misma y no la
+  toca.
+- Actualizar proyecto: al acabar se comprueba que wp-config.php o
+  parameters.php han quedado con la BBDD y la dirección locales, sin
+  desmontar ni volver a cargar a mano. Si no, lo dice.
+- Proyecto cargado: botón «Actualizar proyecto». En su ventana se
+  arrastra o se elige la BBDD descargada de producción y su código (un
+  .zip, un .tar.gz o una carpeta), y se elige entre fusionar o
+  sobrescribir la carpeta. Si es un repositorio, antes de copiar
+  pregunta si hacer git pull y avisa de lo que no tiene commit o no se
+  ha subido.
+- Lo sustituido o quitado del proyecto queda en ~/lvm-copias, su .git
+  no se toca y, al acabar, el proyecto se vuelve a cargar para que su
+  configuración apunte a la base y al dominio locales.
+- En la terminal: lvm-instalador actualizar-proyecto.
+
 1.40.8 (5 nov 2026)
 - Repositorios: botón para copiar el repositorio. Al pegarlo en el
   buscador de Nuevo proyecto, queda elegido.
@@ -34234,6 +34915,8 @@ case "$1" in
     docker-imagen) docker_update_image "$2" ;;
     docker-clave) docker_db_password "$2" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
+    actualizar-proyecto) shift; project_update "$@" ;;
+    gui-proyecto-git) gui_project_git "$2" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;

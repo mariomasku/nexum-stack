@@ -215,6 +215,9 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version montada (si no existe)
 #
+#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]
+#       El proyecto con lo de produccion: git pull (si se pide), su codigo (lo sustituido, en ~/lvm-copias),
+#       su BBDD (con la carga protegida de importar-bd) y lo vuelve a cargar
 #   lvm-instalador hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1) o deja de falsear el dominio de un vhost
 #
@@ -768,7 +771,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.26"
+APP_VERSION="1.56.31"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -2983,11 +2986,35 @@ for r, pre in shown:
 ' "$1" "$2" "$3" "$(github_conf PREFIJOS)" "$4" "$HTDOCS_DIR" "$5"
 }
 
+# git pull seguro de un clon: repo_pull <carpeta> <direccion SSH o nada> <fichero de servidores conocidos>.
+# Si no se puede (sin conexion, o choca con lo que no se ha subido o guardado), no se toca nada
+function repo_pull() {
+    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up
+    branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
+    origin=$(git -C "$dir" config --get remote.origin.url)
+    # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
+    if [[ "$origin" == https://* ]] && [ -n "$ssh_url" ]; then
+        up=$(git -C "$dir" config --get "branch.$branch.merge")
+        from=("$ssh_url" "${up#refs/heads/}")
+        [ -n "${from[1]}" ] || from[1]=$branch
+    fi
+    # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
+    if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+            GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
+            no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
+            -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
+        [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+        echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir, o no hay conexión."
+        echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
+        return 1
+    fi
+}
+
 # repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
 # su nombre. Si ya esta clonado en un proyecto, lo dice (EXISTE|carpeta, y sale con 3) y, con
 # --actualizar, trae sus cambios con git pull (si chocan con los tuyos, no se toca nada y se dice)
 function repo_fetch() {
-    local full=$1 name dir folder known ssh_url branch origin
+    local full=$1 name dir folder known ssh_url branch
     [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
     command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
     name=${full#*/} ssh_url="git@github.com:$full.git"
@@ -3004,26 +3031,11 @@ function repo_fetch() {
         fi
         echo "$full: se traen sus cambios a $dir (git pull)"
         [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git pull en $dir"; return 0; }
-        branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { rm -f "$known"; echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
-        origin=$(git -C "$dir" config --get remote.origin.url)
-        # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
-        local from=() up
-        if [[ "$origin" == https://* ]]; then
-            up=$(git -C "$dir" config --get "branch.$branch.merge")
-            from=("$ssh_url" "${up#refs/heads/}")
-            [ -n "${from[1]}" ] || from[1]=$branch
-        fi
-        # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
-        if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
-                GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
-                no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
-                -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
-            [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
+        if ! repo_pull "$dir" "$ssh_url" "$known"; then
             rm -f "$known"
-            echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir."
-            echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
             return 1
         fi
+        branch=$(git -C "$dir" symbolic-ref --short -q HEAD)
         rm -f "$known"
         echo "$folder, al día con GitHub (rama $branch)"
         return 0
@@ -3048,6 +3060,383 @@ function repo_fetch() {
     mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$name" >> "$REPO_PROJECTS_FILE"; }
     echo "Listo: $name está en Proyectos (cárgalo con su versión de PHP y su BBDD)"
+}
+
+# gui-proyecto-git <carpeta>: lo que hay que saber antes de copiar encima el codigo de produccion:
+# G|es un repositorio (1/0)|rama|cambios sin commit|commits sin subir|tiene origin (1/0)
+function gui_project_git() {
+    local dir=$HTDOCS_DIR/${1%/} branch dirty ahead origin=0
+    valid_project "${1%/}" > /dev/null || return 1
+    if [ -L "$dir" ] || [ ! -e "$dir/.git" ] || ! command -v git > /dev/null; then
+        echo "G|0||0|0|0"
+        return 0
+    fi
+    branch=$(git -C "$dir" symbolic-ref --short -q HEAD)
+    # (sin los ayudantes que pudiera traer su configuracion: aqui solo se lee)
+    dirty=$(git -C "$dir" -c core.fsmonitor=false -c core.hooksPath=/dev/null status --porcelain 2> /dev/null | wc -l | tr -d ' ')
+    ahead=$(git -C "$dir" rev-list --count '@{u}..HEAD' 2> /dev/null)
+    [ -n "$(git -C "$dir" config --get remote.origin.url)" ] && origin=1
+    echo "G|1|${branch//|/_}|${dirty:-0}|${ahead:-0}|$origin"
+}
+
+# Copia el codigo de produccion (.zip, .tar.gz o carpeta) en un proyecto:
+#   python3 -c "$PROJECT_CODE_PY" <carpeta del proyecto> <origen> <fusionar|sobrescribir> <copias> <temporal> <simular 1/0>
+# Fusionar copia lo que trae y deja lo demas; sobrescribir ademas quita lo que no trae. .git no se toca
+# nunca. Lo sustituido o quitado se mueve antes a <copias>, y lo que no cambia no se escribe. De un
+# paquete no se saca nada fuera de la carpeta (rutas con .. o absolutas) ni enlaces ni dispositivos: el
+# codigo de produccion es de fuera. Si todo va dentro de una carpeta (public_html), se usa lo de dentro.
+PROJECT_CODE_PY='
+import filecmp, os, shutil, signal, stat, sys, tarfile, tempfile, zipfile
+
+target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
+simulate = simulate == "1"
+SKIP = {".git", "__MACOSX", ".DS_Store"}
+sys.stdout.reconfigure(errors="replace", line_buffering=True)
+counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0}
+errors, seen = [], set()
+
+
+def stop(_sig, _frame):
+    raise SystemExit(130)
+
+
+signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGHUP, stop)
+
+
+def fail(text):
+    print(text)
+    raise SystemExit(1)
+
+
+def safe_path(root, name):
+    """La ruta de un miembro del paquete dentro de root, o None si se saldria o no es valida."""
+    name = name.replace(chr(92), "/")
+    parts = [p for p in name.split("/") if p not in ("", ".")]
+    if name.startswith("/") or not parts or ".." in parts or any(chr(0) in p or ":" in p[:2] for p in parts):
+        return None
+    return os.path.join(root, *parts)
+
+
+def write_member(path, data, executable):
+    os.makedirs(os.path.dirname(path), mode=0o755, exist_ok=True)
+    with open(path, "wb") as out:
+        shutil.copyfileobj(data, out, 1024 * 1024)
+    os.chmod(path, 0o755 if executable else 0o644)
+
+
+def extract_zip(path, root):
+    with zipfile.ZipFile(path) as z:
+        members = z.infolist()
+        need = sum(m.file_size for m in members)
+        free = shutil.disk_usage(root).free
+        if need > free:
+            fail("No cabe: hacen falta %d MB para abrirlo y hay %d MB libres" % (need >> 20, free >> 20))
+        for m in members:
+            if m.flag_bits & 1:
+                fail("El .zip lleva contraseña: quitasela o descomprimelo y elige la carpeta")
+            kind = stat.S_IFMT(m.external_attr >> 16)
+            out = safe_path(root, m.filename)
+            if out is None or kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                counts["skipped"] += 1
+            elif m.is_dir():
+                os.makedirs(out, mode=0o755, exist_ok=True)
+            else:
+                with z.open(m) as data:
+                    write_member(out, data, (m.external_attr >> 16) & 0o111)
+
+
+def extract_tar(path, root):
+    with tarfile.open(path, "r:*") as t:
+        for m in t:
+            out = safe_path(root, m.name)
+            if out is None or not (m.isreg() or m.isdir()):
+                counts["skipped"] += 1
+            elif m.isdir():
+                os.makedirs(out, mode=0o755, exist_ok=True)
+            else:
+                write_member(out, t.extractfile(m), m.mode & 0o111)
+
+
+def entries(path):
+    return [e for e in os.scandir(path) if e.name not in SKIP]
+
+
+def inner_root(root):
+    """Si todo va dentro de una sola carpeta (public_html), lo de dentro. wp-content solo no: si en el
+    proyecto hay una con ese nombre, va en su sitio."""
+    while True:
+        found = entries(root)
+        if len(found) != 1 or not found[0].is_dir(follow_symlinks=False) \
+                or os.path.lexists(os.path.join(target, found[0].name)):
+            return root
+        print("Se usa lo que hay dentro de %s/" % found[0].name)
+        root = found[0].path
+
+
+def save_old(path, rel):
+    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama)."""
+    if simulate:
+        return
+    dest = os.path.join(backup, rel)
+    os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
+    try:
+        os.rename(path, dest)
+    except OSError:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.copytree(path, dest, symlinks=True)
+            shutil.rmtree(path)
+        else:
+            shutil.copy2(path, dest, follow_symlinks=False)
+            os.unlink(path)
+
+
+def tick():
+    done = counts["copied"] + counts["same"] + counts["removed"]
+    if done and done % 5000 == 0:
+        print("  %d ficheros revisados..." % done)
+
+
+def is_real_dir(path):
+    return os.path.isdir(path) and not os.path.islink(path)
+
+
+def sync(src, dst, rel):
+    for e in sorted(entries(src), key=lambda x: x.name):
+        sub = os.path.join(rel, e.name)
+        out = os.path.join(dst, e.name)
+        seen.add(sub)
+        try:
+            if e.is_symlink():
+                counts["skipped"] += 1
+                seen.discard(sub)
+            elif e.is_dir(follow_symlinks=False):
+                # (un enlace en el proyecto no se sigue: escribiria fuera de la carpeta)
+                if os.path.lexists(out) and not is_real_dir(out):
+                    save_old(out, sub)
+                if not simulate and not os.path.lexists(out):
+                    os.mkdir(out, 0o755)
+                sync(e.path, out, sub)
+            elif e.is_file(follow_symlinks=False):
+                copy_file(e, out, sub)
+            else:
+                counts["skipped"] += 1
+                seen.discard(sub)
+            tick()
+        except OSError as exc:
+            errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def copy_file(e, out, sub):
+    exists = os.path.lexists(out)
+    if exists and not os.path.islink(out) and os.path.isfile(out) \
+            and os.path.getsize(out) == e.stat().st_size and filecmp.cmp(e.path, out, shallow=False):
+        counts["same"] += 1
+        return
+    counts["copied"] += 1
+    if simulate:
+        return
+    # (primero la copia nueva y luego se aparta la de antes: si no cabe, el proyecto sigue como estaba)
+    fd, part = tempfile.mkstemp(prefix=".lvm-parte-", dir=os.path.dirname(out))
+    try:
+        with os.fdopen(fd, "wb") as dest, open(e.path, "rb") as data:
+            shutil.copyfileobj(data, dest, 1024 * 1024)
+        os.chmod(part, (e.stat().st_mode & 0o755) | 0o644)
+        if exists:
+            save_old(out, sub)
+        os.replace(part, out)
+    except BaseException:
+        if os.path.exists(part):
+            os.unlink(part)
+        raise
+
+
+def remove_rest(dst, rel):
+    for e in sorted(os.scandir(dst), key=lambda x: x.name):
+        sub = os.path.join(rel, e.name)
+        if e.name == ".git":
+            continue
+        try:
+            if sub not in seen:
+                has_git = is_real_dir(e.path) and any(".git" in dirs for _r, dirs, _f in os.walk(e.path))
+                if has_git:
+                    remove_rest(e.path, sub)
+                else:
+                    counts["removed"] += 1
+                    save_old(e.path, sub)
+            elif is_real_dir(e.path):
+                remove_rest(e.path, sub)
+            tick()
+        except OSError as exc:
+            errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def main():
+    real_target = os.path.realpath(target)
+    work = None
+    if os.path.isdir(source):
+        root = os.path.realpath(source)
+        if root == real_target or (root + os.sep).startswith(real_target + os.sep) \
+                or (real_target + os.sep).startswith(root + os.sep):
+            fail("La carpeta elegida y la del proyecto se solapan: elige otra")
+    else:
+        os.makedirs(tmp_base, mode=0o700, exist_ok=True)
+        work = tempfile.mkdtemp(prefix="actualizar-", dir=tmp_base)
+        root = work
+    try:
+        if work:
+            print("Abriendo %s..." % os.path.basename(source))
+            try:
+                if zipfile.is_zipfile(source):
+                    extract_zip(source, work)
+                elif tarfile.is_tarfile(source):
+                    extract_tar(source, work)
+                else:
+                    fail("%s no es un .zip, un .tar.gz ni una carpeta" % os.path.basename(source))
+            except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError) as exc:
+                fail("No se ha podido abrir %s: %s" % (os.path.basename(source), exc))
+        root = inner_root(root)
+        if not any(True for _ in entries(root)):
+            fail("No trae ningun fichero: no se ha tocado nada")
+        sync(root, target, "")
+        if mode == "sobrescribir":
+            remove_rest(target, "")
+    finally:
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+    print("%s%d copiados, %d iguales (no se tocan), %d quitados"
+          % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
+    if counts["skipped"]:
+        print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
+    if os.path.isdir(backup):
+        print("Lo que se ha sustituido o quitado esta en %s" % backup)
+    if errors:
+        print("No se han podido copiar o quitar %d:" % len(errors))
+        for line in errors[:15]:
+            print("  " + line)
+        raise SystemExit(1)
+
+
+main()
+'
+
+# La BBDD que usa ahora un proyecto, de su configuracion: hay que leerla antes de copiar encima la de produccion
+function project_config_db() {
+    local db=""
+    if is_prestashop "$1"; then
+        db=$(ps_config "$1" | cut -d'|' -f1)
+    elif is_wordpress "$1"; then
+        db=$(wp_config_read "$HTDOCS_DIR/$1/wp-config.php" | head -1)
+    fi
+    [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && echo "$db"
+}
+
+# ¿Ha quedado su configuracion con la BBDD y la direccion locales? (al volver a cargarlo, un aviso no
+# para la carga: sin esto, se diria que esta actualizado con el wp-config.php de produccion)
+function project_config_local() {
+    local folder=$1 db=$2 file=$HTDOCS_DIR/$1/wp-config.php now
+    [ -n "$db" ] || { echo "Aviso: no se sabe qué BBDD usa $folder: revisa su configuración"; return 1; }
+    if is_prestashop "$folder"; then
+        now=$(ps_config "$folder" | cut -d'|' -f1)
+        [ "$now" == "$db" ] && return 0
+        echo "Aviso: la configuración de $folder usa la BBDD ${now:-(ninguna)} y tendría que usar $db"
+        return 1
+    fi
+    is_wordpress "$folder" || return 0
+    now=$(wp_config_read "$file" | head -1)
+    if [ "$now" != "$db" ]; then
+        echo "Aviso: el wp-config.php de $folder usa la BBDD ${now:-(ninguna)} y tendría que usar $db"
+        return 1
+    fi
+    wp_config_has_url "$file" "$(wp_local_url "$folder")" && return 0
+    echo "Aviso: el wp-config.php de $folder no lleva WP_SITEURL y WP_HOME con su dirección local"
+    return 1
+}
+
+# actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
+#                     [--bd <fichero>] [--base <base>]
+# El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
+# protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
+# comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
+# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar)
+function project_update() {
+    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies full ssh_url="" known load_db
+    shift
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --codigo) source=$2; shift ;;
+            --modo) mode=$2; shift ;;
+            --pull) pull=1 ;;
+            --bd) file=$2; shift ;;
+            --base) db=$2; shift ;;
+            *) folder="" ;;
+        esac
+        shift
+    done
+    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
+        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]"
+        return 1
+    fi
+    valid_project "$folder" || return 1
+    dir=$HTDOCS_DIR/$folder
+    if [ -L "$dir" ] || [ ! -d "$dir" ]; then
+        echo "No existe la carpeta $dir"
+        return 1
+    fi
+    [ -z "$source" ] || [ -r "$source" ] || { echo "No se puede leer $source"; return 1; }
+    if [ -n "$file" ]; then
+        [ -f "$file" ] && [ -r "$file" ] || { echo "No se puede leer el fichero $file"; return 1; }
+        db_connect || return $?
+    fi
+    { [ -z "$file" ] && [ -z "$db" ]; } || db_valid_name "$db" || return 1
+    # Con la BBDD de ahora: el codigo de produccion trae la configuracion de produccion
+    load_db=${db:-$(saved_project_db "$folder")}
+    [ -n "$load_db" ] || load_db=$(project_config_db "$folder")
+    # La contraseña antes de cambiar nada: cancelarla deja el proyecto como estaba
+    if [ "$DRY" -eq 0 ] && [ -n "$SUDO" ] && ! sudo -v; then
+        echo "Cancelado: no se ha cambiado nada"
+        return 1
+    fi
+
+    if [ -n "$source" ] && [ "$pull" -eq 1 ]; then
+        echo "== git pull en $dir"
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] git pull en $dir"
+        else
+            full=$(repo_clones | awk -v f="$folder" '$2 == f { print $1; exit }')
+            [ -n "$full" ] && ssh_url="git@github.com:$full.git"
+            known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
+            printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
+            if ! repo_pull "$dir" "$ssh_url" "$known"; then
+                rm -f "$known"
+                echo "No se ha copiado el codigo de produccion ni se ha cargado la BBDD."
+                return 1
+            fi
+            rm -f "$known"
+        fi
+    fi
+    if [ -n "$source" ]; then
+        echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
+        stamp=$(date +%Y%m%d-%H%M%S)
+        copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
+        [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$HOME/lvm-copias"
+        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$HOME/.lvm-instalador/temporal" "$DRY"; then
+            echo "No se ha cargado la BBDD: revisa lo anterior."
+            return 1
+        fi
+        htdocs_close_world "$dir"
+    fi
+    if [ -n "$file" ]; then
+        echo "== BBDD de produccion"
+        import_database "$file" "$db" --crear --proyecto "$folder" || return 1
+    fi
+    echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"
+    load_project "$folder" "" "$load_db" || return 1
+    if [ "$DRY" -eq 0 ] && ! project_config_local "$folder" "$load_db"; then
+        echo "El código y la BBDD están actualizados, pero la web puede no abrir en local: revisa lo anterior."
+        return 1
+    fi
+    echo "Proyecto actualizado: $folder"
 }
 
 # ¿Direccion de un repositorio que se puede clonar? Solo https:// o ssh (git@servidor:ruta o
@@ -12208,6 +12597,43 @@ QUE HACE
 
 VERSIONES
 
+1.56.31 (6 nov 2026)
+- Proyecto cargado: los botones se llaman «Actualizar» e «Importar». Al
+  pasar por encima dicen «Actualizar proyecto» e «Importar imágenes de
+  producción».
+
+1.56.30 (5 nov 2026)
+- Proyecto cargado y Docker: botón «Importar imágenes» en WordPress y
+  PrestaShop. Se muestra u oculta en Personalizar los botones.
+- Iconos nuevos en «Actualizar proyecto» e «Importar imágenes».
+
+1.56.29 (5 nov 2026)
+- Proyecto cargado: el botón Log abre el error_log de Apache. El de
+  web.local sigue en Herramientas, Registro de errores.
+
+1.56.28 (5 nov 2026)
+- Actualizar proyecto: se puede actualizar la BBDD, el código o los
+  dos. Sin fichero de BBDD, dice que se sigue usando la misma y no la
+  toca.
+- Actualizar proyecto: al acabar se comprueba que wp-config.php o
+  parameters.php han quedado con la BBDD y la dirección locales, sin
+  desmontar ni volver a cargar a mano. Si no, lo dice.
+- Actualizar proyecto: el recuadro azul sale solo con el fichero
+  incorporado o al arrastrarlo encima, y el nombre de la BBDD se ve en
+  azul, como texto.
+
+1.56.27 (5 nov 2026)
+- Proyecto cargado: botón «Actualizar proyecto». En su ventana se
+  arrastra o se elige la BBDD descargada de producción y su código (un
+  .zip, un .tar.gz o una carpeta), y se elige entre fusionar o
+  sobrescribir la carpeta. Si es un repositorio, antes de copiar
+  pregunta si hacer git pull y avisa de lo que no tiene commit o no se
+  ha subido.
+- Lo sustituido o quitado del proyecto queda en ~/lvm-copias, su .git
+  no se toca y, al acabar, el proyecto se vuelve a cargar para que su
+  configuración apunte a la base y al dominio locales.
+- En la terminal: lvm-instalador actualizar-proyecto.
+
 1.56.26 (5 nov 2026)
 - Nuevo proyecto, buscador de repositorios: los resultados salen en la
   propia ventana, debajo del buscador, en vez de en un desplegable que
@@ -19697,6 +20123,7 @@ def project_db(folder):
 
 # Registros mayores que esto no se abren en el editor de textos (solo «Ver el final»)
 LOG_OPEN_MAX = 20 * 1024 * 1024
+APACHE_ERROR_LOG = "/opt/lampp/logs/error_log"
 # Dominio de un proyecto nuevo (pestaña Hosts): mitienda.com, sub.mitienda.es…
 DOMAIN_RX = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$")
 
@@ -19886,7 +20313,30 @@ def icon(name, size=16):
 
 # Logotipos de los paquetes (Simple Icons, CC0: un solo trazo en una caja de 24x24). Cada marca
 # es de su dueño; se usan solo para identificar cada paquete
+# Iconos actualizar e imagenes (upload3 y gallery-import, en outline): de Reicon, https://reicon.dev
+# MIT License
+#
+# Copyright (c) 2025 REICON
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 LOGO_PATHS = {
+    "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
+    "imagenes": "M 9 10 C 10.105 10 11 9.105 11 8 C 11 6.895 10.105 6 9 6 C 7.895 6 7 6.895 7 8 C 7 9.105 7.895 10 9 10 Z M 13 2 L 9 2 C 4 2 2 4 2 9 L 2 15 C 2 20 4 22 9 22 L 15 22 C 20 22 22 20 22 15 L 22 10 M 18 2 L 18 8 L 20 6 M 18 8 L 16 6 M 2.67 18.95 L 7.6 15.64 C 8.39 15.11 9.53 15.17 10.24 15.78 L 10.57 16.07 C 11.35 16.74 12.61 16.74 13.39 16.07 L 17.55 12.5 C 18.33 11.83 19.59 11.83 20.37 12.5 L 22 13.9",
     # (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
     "log": "M 2 1 L 15 1 L 15 8 L 22 8 L 22 23 L 2 23 Z M 16.5 1 L 22 6.5 L 16.5 6.5 Z M 3.6 11 L 3.6 20 L 8.6 20 L 8.6 18.3 L 5.3 18.3 L 5.3 11 Z M 9.5 11 L 9.5 20 L 14.5 20 L 14.5 11 Z M 11.2 12.7 L 12.8 12.7 L 12.8 18.3 L 11.2 18.3 Z M 20.4 11 L 15.4 11 L 15.4 20 L 20.4 20 L 20.4 15.1 L 17.9 15.1 L 17.9 16.8 L 18.7 16.8 L 18.7 18.3 L 17.1 18.3 L 17.1 12.7 L 20.4 12.7 Z",
     # Cloudflare (Simple Icons 13.21.0, CC0)
@@ -20124,13 +20574,15 @@ LOGO_PATHS = {
 }
 
 # Color de cada logotipo: el de la marca y, con el tema oscuro, uno algo más claro para que se vea
-LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
+LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
                "globo": ("#1C71D8", "#62A0EA"), "docker": ("#2496ED", "#4FAEF2"),
                "mailpit": ("#00A87B", "#2FD3A4"), "cloudflare": ("#F38020", "#F6A35A"),
                "github": ("#181717", "#E6EDF3")}
+# Los que se dibujan con trazo, no rellenos
+LOGO_STROKED = {"imagenes"}
 _logo_cache = {}
 
 
@@ -20148,9 +20600,10 @@ def logo_pixbuf(name, size, scale, color=None):
     key = (name, size, scale, color)
     if key not in _logo_cache:
         color = color or LOGO_COLORS[name][1 if dark_theme() else 0]
+        paint = ('fill="none" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
+                 if name in LOGO_STROKED else 'fill="%s"') % color
         svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="%d" height="%d">'
-               '<path fill="%s" d="%s"/></svg>' % (size * scale, size * scale, color,
-                                                   LOGO_PATHS[name]))
+               '<path %s d="%s"/></svg>' % (size * scale, size * scale, paint, LOGO_PATHS[name]))
         loader = GdkPixbuf.PixbufLoader.new_with_type("svg")
         loader.write(svg.encode())
         loader.close()
@@ -20890,7 +21343,8 @@ def run_quick_input(args, text, callback, timeout=60):
 VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", ("vscode", "text-editor-symbolic")),
                  ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
-                 ("log", "Log", ("logo", "log"))]
+                 ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
+                 ("imagenes", "Importar", ("logo", "imagenes"))]
 BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
                  ("grande", "Icono y nombre (cuadrado)")]
 # Lado del cuadrado (px) de los estilos icono y grande: el de cada uno si no se ha elegido otro
@@ -23208,19 +23662,6 @@ class App(Gtk.Application):
         path = os.path.join("/opt/lampp/logs", link + "-error_log")
         return path if os.path.isfile(path) else None
 
-    def loaded_project_log(self):
-        """El registro de errores de la web cargada: el de su vhost (web.local) o, si es una tienda
-        con su dominio falseado, el de ese dominio; el que haya cambiado más tarde."""
-        folder = self.loaded_project_folder()
-        paths = [self.project_error_log()]
-        if folder:
-            name = os.path.basename(folder)
-            for h in self.hosts or []:
-                if h.get("folder") == name and h.get("fake"):
-                    paths.append(self.project_error_log(h["name"]))
-        paths = [x for x in paths if x and os.path.isfile(x)]
-        return max(paths, key=os.path.getmtime) if paths else None
-
     def log_row(self, title, path, note=""):
         """Fila de un registro: dónde está, cuánto ocupa y cuándo se cambió."""
         try:
@@ -23260,8 +23701,7 @@ class App(Gtk.Application):
             p = self.projects
             name = os.path.basename(p["current"].rstrip("/")) if p and p.get("current") else ""
             lb.add(self.log_row("error_log de %s%s" % (p["link"], "  (%s)" % name if name else ""), path))
-        main = "/opt/lampp/logs/error_log"
-        lb.add(self.log_row("error_log de Apache (lampp-%s)" % self.data["active"], main))
+        lb.add(self.log_row("error_log de Apache (lampp-%s)" % self.data["active"], APACHE_ERROR_LOG))
         self.tools_box.pack_start(box, False, False, 0)
 
     def show_log_tail(self, path, lines=400):
@@ -26508,6 +26948,11 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-grupo row:last-child { border-bottom: none; }
 .nv-fila { padding: 8px 14px; }
 .nv-cab label { font-size: 0.76em; font-weight: bold; color: alpha(@theme_fg_color, 0.45); }
+.nv-zona { background-color: alpha(@theme_fg_color, 0.06); border: 2px dashed alpha(@theme_fg_color, 0.28); border-radius: 12px; }
+.nv-zona-lista { background-color: alpha(%(b)s, 0.10); border: 2px solid %(b)s; }
+.nv-zona:drop(active) { background-color: alpha(%(b)s, 0.30); border: 2px solid %(b)s; box-shadow: none; }
+.nv-bbdd { color: mix(%(b)s, @theme_fg_color, 0.22); font-weight: bold; }
+.nv-zona-icono { color: %(b)s; }
 .nv-tarjeta { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 14px; padding: 20px 22px; }
 /* (Configuración: cada ajuste en su tarjeta, de dos en dos) */
 .nv-mosaico { background-color: alpha(@theme_fg_color, 0.045); border: 1px solid alpha(@theme_fg_color, 0.08); border-radius: 12px; padding: 14px 16px; }
@@ -28614,12 +29059,17 @@ class App2(App):
             btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
                                        lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
             btns["compartir"] = self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"])
-            # El registro de errores de esta web (el de su vhost): lo primero que se mira con un error 500
-            log = self.loaded_project_log()
-            logb = nv_button(logo("log", 18), "Log", "Ver el log de errores" if log else "Aún no hay log de errores",
-                             lambda *_: self.show_log_tail(self.loaded_project_log() or log), "nv-proyecto-btn")
-            logb.set_sensitive(bool(log))
+            # El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
+            has_log = os.path.isfile(APACHE_ERROR_LOG)
+            logb = nv_button(logo("log", 18), "Log", "Ver el log de Apache" if has_log else "Aún no hay log de Apache",
+                             lambda *_: self.show_log_tail(APACHE_ERROR_LOG), "nv-proyecto-btn")
+            logb.set_sensitive(has_log)
             btns["log"] = logb
+            btns["actualizar"] = nv_button(logo("actualizar", 18), "Actualizar", "Actualizar proyecto",
+                                           lambda *_: self.nv_update_project(x), "nv-proyecto-btn")
+            btns["actualizar"].set_sensitive(not self.busy)
+            if x["kind"] in ("wp", "ps"):
+                btns["imagenes"] = self.nv_images_button(x)
             eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",
                               lambda *_: self.on_unload_project(), flat=True)
             self.nv_place_buttons(acts, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
@@ -28650,6 +29100,214 @@ class App2(App):
         card.pack_start(acts, False, False, 0)
         self.hero_box.pack_start(card, False, False, 0)
         self.hero_box.show_all()
+
+    # --- Actualizar proyecto: la BBDD y el código de producción, arrastrados o elegidos ---
+
+    def nv_drop_zone(self, title, formats, symbol_name, choosers, on_path):
+        """Zona donde arrastrar un fichero o una carpeta, con sus botones de elegir. choosers: (texto,
+        es carpeta). on_path(ruta) devuelve el motivo si no vale. Devuelve (widget, poner la ruta)."""
+        ev = css(Gtk.EventBox(), "nv-zona")
+        # (alta: es donde se suelta, tiene que verse bien)
+        ev.set_size_request(-1, 112)
+        box = Gtk.Box(spacing=16, margin_start=20, margin_end=18, margin_top=16, margin_bottom=16)
+        ev.add(box)
+        box.pack_start(css(icon(symbol_name, 36), "nv-zona-icono"), False, False, 0)
+        # (en una rejilla: airy_dialog centra los textos de las cajas verticales; aquí, junto al icono, a la izquierda)
+        texts = Gtk.Grid(orientation=Gtk.Orientation.VERTICAL, row_spacing=2, valign=Gtk.Align.CENTER)
+        texts.add(label(title, "grupo-titulo", halign=Gtk.Align.START))
+        name = label("Arrástralo aquí: %s" % formats, "dim-label", ellipsize=2, halign=Gtk.Align.START)
+        texts.add(name)
+        box.pack_start(texts, True, True, 0)
+
+        def put(path):
+            why = on_path(path)
+            ctx = name.get_style_context()
+            ctx.remove_class("error")
+            if why:
+                ctx.add_class("error")
+                name.set_label(why)
+            else:
+                name.set_label(path or "Arrástralo aquí: %s" % formats)
+            name.set_tooltip_text(path or None)
+            clear_btn.set_visible(bool(path) and not why)
+            # (el recuadro azul, solo con algo incorporado o al arrastrar encima)
+            zone_ctx = ev.get_style_context()
+            if path and not why:
+                zone_ctx.add_class("nv-zona-lista")
+            else:
+                zone_ctx.remove_class("nv-zona-lista")
+
+        def choose(folder):
+            dlg = Gtk.FileChooserDialog(title=title, transient_for=ev.get_toplevel(), modal=True,
+                                        action=Gtk.FileChooserAction.SELECT_FOLDER if folder else Gtk.FileChooserAction.OPEN)
+            dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+            dlg.add_button("Elegir", Gtk.ResponseType.ACCEPT)
+            dlg.set_current_folder(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD) or os.path.expanduser("~"))
+            resp = run_dialog(dlg)
+            path = dlg.get_filename()
+            dlg.destroy()
+            if resp == Gtk.ResponseType.ACCEPT and path:
+                put(path)
+
+        def dropped(_w, _ctx, _x, _y, data, _info, _time):
+            uris = data.get_uris()
+            if uris:
+                try:
+                    put(GLib.filename_from_uri(uris[0])[0])
+                except GLib.Error:
+                    put("")
+        ev.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
+        ev.drag_dest_add_uri_targets()
+        ev.connect("drag-data-received", dropped)
+        clear_btn = nv_button("window-close-symbolic", None, "Quitar", lambda *_: put(""), flat=True)
+        # (oculto hasta que haya algo elegido, sin dejar oculto su icono)
+        clear_btn.get_child().show_all()
+        clear_btn.set_no_show_all(True)
+        box.pack_start(clear_btn, False, False, 0)
+        for text, folder in choosers:
+            box.pack_start(nv_button(None, text, None, lambda *_, f=folder: choose(f)), False, False, 0)
+        return ev, put
+
+    def nv_update_project(self, x):
+        """Actualizar el proyecto cargado con lo de producción: su BBDD y su código."""
+        folder = x["name"]
+        dlg = Gtk.Dialog(title="Actualizar proyecto", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(680, -1)
+        dlg.get_header_bar().set_subtitle(folder)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=22)
+        state = {"sql": "", "code": ""}
+
+        def set_sql(path):
+            why = ""
+            if path and not (os.path.isfile(path) and path.lower().endswith((".sql", ".gz", ".zip"))):
+                why, path = "Tiene que ser .sql, .sql.gz o .zip", ""
+            state["sql"] = path
+            update()
+            return why
+
+        def set_code(path):
+            why = ""
+            ok = os.path.isdir(path) or (os.path.isfile(path) and path.lower().endswith(
+                (".zip", ".tar", ".tgz", ".tar.gz", ".tar.bz2", ".tar.xz")))
+            if path and not ok:
+                why, path = "Tiene que ser un .zip, un .tar.gz o una carpeta", ""
+            state["code"] = path
+            update()
+            return why
+
+        zone, _put = self.nv_drop_zone("Base de datos de producción", ".sql, .sql.gz o .zip", "drive-multidisk-symbolic",
+                                       [("Elegir fichero…", False)], set_sql)
+        box.pack_start(zone, False, False, 0)
+        line = Gtk.Box(spacing=8)
+        db_text = label("", "dim-label")
+        line.pack_start(db_text, False, False, 0)
+        # (su nombre, como texto; solo si el proyecto no tiene ninguna hay que escribirlo)
+        known_db = self.loaded_project_db() or ""
+        db_entry = Gtk.Entry(text=known_db, width_chars=28, max_length=64)
+        line.pack_start(label(known_db, "nv-bbdd", selectable=True) if known_db else db_entry, False, False, 0)
+        db_copy = label("(antes se guarda una copia de la actual)", "dim-label")
+        line.pack_start(db_copy, False, False, 0)
+        box.pack_start(line, False, False, 0)
+        zone, _put = self.nv_drop_zone("Código de producción", ".zip, .tar.gz o carpeta", "folder-symbolic",
+                                       [("Elegir fichero…", False), ("Elegir carpeta…", True)], set_code)
+        box.pack_start(zone, False, False, 0)
+        # Qué hacer con la carpeta: siempre a la vista, para saber lo que va a pasar
+        merge = Gtk.RadioButton.new_with_label(None, "Fusionar: copia lo que trae y deja lo demás de la carpeta")
+        over = Gtk.RadioButton.new_with_label_from_widget(merge, "Sobrescribir: además borra lo que no traiga")
+        modes = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        modes.pack_start(merge, False, False, 0)
+        modes.pack_start(over, False, False, 0)
+        modes.pack_start(label("Se escribe sobre %s/%s. Su .git no se toca y lo sustituido o borrado queda en "
+                               "~/lvm-copias." % (HTDOCS, folder), "aviso-rojo", wrap=True), False, False, 0)
+        box.pack_start(modes, False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        go = css(dlg.add_button("Actualizar…", Gtk.ResponseType.ACCEPT), "nv-azul")
+
+        def update(*_):
+            db_ok = bool(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", db_entry.get_text().strip()))
+            go.set_sensitive(bool(state["sql"] or state["code"]) and (not state["sql"] or db_ok))
+            modes.set_sensitive(bool(state["code"]))
+            # (sin fichero de BBDD no se toca: se sigue usando la misma)
+            db_text.set_label("Se carga en la BBDD" if state["sql"] else "Se sigue usando la BBDD")
+            db_copy.set_visible(bool(state["sql"]))
+            line.set_visible(bool(known_db or state["sql"]))
+            if not known_db:
+                db_entry.set_sensitive(bool(state["sql"]))
+        db_entry.connect("changed", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        db = db_entry.get_text().strip()
+        mode = "sobrescribir" if over.get_active() else "fusionar"
+        dlg.destroy()
+        if resp == Gtk.ResponseType.ACCEPT:
+            self.nv_update_project_ask(folder, state["sql"], db, state["code"], mode)
+
+    def nv_update_project_ask(self, folder, sql, db, code, mode):
+        """Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido."""
+        def start(pull):
+            args = ["actualizar-proyecto", folder]
+            if code:
+                args += ["--codigo", code, "--modo", mode] + (["--pull"] if pull else [])
+            if sql:
+                args += ["--bd", sql]
+            # (también solo con el código: al volver a cargarlo, su configuración vuelve a esta BBDD)
+            if db:
+                args += ["--base", db]
+
+            def run(_pwd=None):
+                self.run_task("Actualizando %s" % folder, args, progress=True, env=self.db_env(),
+                              done_text="%s actualizado" % folder,
+                              cancel_text=("¿Cancelar la actualización?",
+                                           "El proyecto se queda a medias, con lo hecho hasta ahora. Lo sustituido "
+                                           "sigue en ~/lvm-copias.", "Cancelar la actualización"))
+            if sql:
+                self.check_db_access(run)
+            else:
+                run()
+
+        what = []
+        if code:
+            what.append(("Se fusiona «%s» con %s/%s." if mode == "fusionar" else
+                         "Se sobrescribe la carpeta con «%s» en %s/%s: se borra lo que no traiga.")
+                        % (os.path.basename(code), HTDOCS, folder))
+        if sql:
+            what.append("La BBDD %s se vacía y se carga «%s» (antes se guarda una copia)." % (db, os.path.basename(sql)))
+
+        def got(_rc, out):
+            f = next((x for x in parse_lines(out) if x[0] == "G" and len(x) >= 6), None)
+            is_git = bool(code) and f is not None and f[1] == "1"
+            if not is_git:
+                if confirm(self.win, "¿Actualizar %s?" % folder, "\n\n".join(what), "Actualizar"):
+                    start(False)
+                return False
+            dirty, ahead = int(f[3] or 0), int(f[4] or 0)
+            state = ["Rama %s" % (f[2] or "sin rama (HEAD suelto)")]
+            if dirty:
+                state.append("%s sin commit" % plural(dirty, "cambio", "cambios"))
+            if ahead:
+                state.append("%s sin subir" % plural(ahead, "commit", "commits"))
+            text = what + ["  ·  ".join(state)]
+            if dirty or ahead:
+                text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.")
+            has_pull = f[5] == "1" and bool(f[2])
+            text.append("Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para "
+                        "sin tocar nada." if has_pull else "No se puede hacer pull: no tiene origin o no está en una rama.")
+            dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                    buttons=Gtk.ButtonsType.NONE, text="¿Hacer git pull antes de copiar?")
+            dlg.format_secondary_text("\n\n".join(text))
+            widen(dlg)
+            dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+            dlg.add_button("Copiar sin pull", Gtk.ResponseType.NO)
+            if has_pull:
+                css(dlg.add_button("Hacer pull y copiar", Gtk.ResponseType.YES), "nv-azul")
+            resp = run_dialog(dlg)
+            dlg.destroy()
+            if resp in (Gtk.ResponseType.YES, Gtk.ResponseType.NO):
+                start(resp == Gtk.ResponseType.YES)
+            return False
+        run_quick(["gui-proyecto-git", folder], got)
 
     def nv_menu_button(self, text, icon_name, items, tip=None):
         m = css(Gtk.MenuButton(tooltip_text=tip), "nv-proyecto-btn")
@@ -28705,6 +29363,13 @@ class App2(App):
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
+
+    def nv_images_button(self, x):
+        """Importar imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""
+        b = nv_button(logo("imagenes", 18), "Importar", "Importar imágenes de producción",
+                      lambda *_: self.nv_wp_media(x) if x["kind"] == "wp" else self.nv_ps_images(x), "nv-proyecto-btn")
+        b.set_sensitive(not self.busy)
+        return b
 
     def nv_wp_media(self, x):
         """media-proyecto: lo que le falte a un WordPress de wp-content/uploads se pide a su web real
@@ -30643,6 +31308,8 @@ class App2(App):
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))
         btns["log"] = lg
+        if kind in ("wp", "ps"):
+            btns["imagenes"] = self.nv_images_button({"name": p["folder"], "kind": kind})
         self.nv_place_buttons(acts, btns)
         if web:
             vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Gestionar sus versiones de PHP",
@@ -30652,14 +31319,6 @@ class App2(App):
                            lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
         vb.set_sensitive(not self.busy)
         conf = buttons_conf()
-        if kind in ("wp", "ps"):
-            x = {"name": p["folder"], "kind": kind}
-            ib = nv_button("image-x-generic-symbolic", "Imágenes de producción…",
-                           "Pedir a producción las imágenes que faltan" if kind == "wp" else "Descargar las imágenes que faltan", lambda *_: self.nv_wp_media(x) if kind == "wp" else self.nv_ps_images(x),
-                           "nv-proyecto-btn")
-            ib.set_sensitive(not self.busy)
-            self.nv_restyle(ib, conf, ("icono", "image-x-generic-symbolic"), "Imágenes")
-            acts.pack_start(ib, False, False, 0)
         self.nv_restyle(vb, conf, ("icono", "list-add-symbolic" if web else "go-up-symbolic"),
                         "Versiones de PHP" if web else "Pasar")
         acts.pack_start(vb, False, False, 0)
@@ -32601,6 +33260,8 @@ case "$1" in
     gui-bd-info) gui_db_info "$2" ;;
     gui-proyectos) gui_projects ;;
     vincular-bd) link_database "$2" "$3" "$4" ;;
+    actualizar-proyecto) shift; project_update "$@" ;;
+    gui-proyecto-git) gui_project_git "$2" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;

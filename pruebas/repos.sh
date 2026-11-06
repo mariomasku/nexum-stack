@@ -8,7 +8,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 W=$(mktemp -d "$TMPBASE/w-repos.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
 grep -q '^function repos_list() {' "$SRC" || { echo "  ok    (sin la pestaña Repositorios)"; exit 0; }
-extract "$SRC" github_conf github_conf_set github_token gh_token github_api github_connect github_disconnect \
+extract "$SRC" github_conf github_conf_set github_token gh_token github_api github_connect github_disconnect repo_pull \
     github_command repo_clones repos_list repos_rows repo_fetch || exit 1
 MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1

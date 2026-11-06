@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.8)
+# Prueba de la ventana nueva en un Mac (versión 1.40.12)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.8** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.12** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.8/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.12/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.8
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.12
    ```
 
 5. **Comprueba las versiones:**
@@ -310,6 +310,30 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 4. **Repositorios**: si tu GitHub está conectado con gh, «Leer de nuevo» tarda unos segundos, no minutos.
 
 5. **Repositorios**: cada fila lleva un botón con el icono de copiar. Púlsalo, abre **Nuevo proyecto** y pega en el buscador: el repositorio queda elegido («Se clona por SSH…») y se rellena su carpeta.
+
+## Paso 18: Actualizar proyecto (1.40.9)
+
+**Prueba con un proyecto que no te importe** o con su trabajo ya subido a git.
+
+1. **Proyecto cargado → Actualizar**: sale el diálogo con sus dos zonas. Sin nada elegido, «Actualizar…» está apagado.
+2. Arrastra un `.sql` a la primera zona y un `.zip` a la segunda (un `.txt` dice que no vale). También se pueden elegir con sus botones. Prueba a arrastrar una carpeta a la segunda.
+3. Elige **Fusionar** y pulsa **Actualizar…**: si es un repositorio, pregunta **¿Hacer git pull antes de copiar?** con la rama y lo que no tiene commit o no se ha subido, con tres opciones.
+4. Al acabar, los ficheros del zip están en la carpeta, lo demás sigue, y lo sustituido en `~/lvm-copias/<carpeta>-antes-de-actualizar-<fecha>`. El `wp-config.php` apunta a la base local y la web abre en local.
+   Sin desmontar ni volver a cargar nada a mano. Si la configuración no ha quedado en local, la tarea acaba con un aviso que lo dice.
+   Prueba también solo con el código: pone «Se sigue usando la BBDD» y la BBDD no se toca. Y solo con la BBDD: la carpeta no se toca y no pregunta por el pull.
+5. Repite con **Sobrescribir** y comprueba que `.git` sigue ahí, que lo que no traía el zip ya no está y que está en `~/lvm-copias`.
+
+## Paso 19: botón Log del proyecto cargado (1.40.10)
+
+1. **Proyecto cargado → Log**: se abre `error_log` y arriba pone `/Applications/XAMPP/xamppfiles/logs/error_log`, no `web.local-error_log`.
+2. **Herramientas → Registro de errores**: siguen los dos, el de `web.local` y el de Apache.
+
+## Paso 20: iconos y botones Actualizar e Importar (1.40.12)
+
+1. **Proyecto cargado**: «Actualizar» lleva una flecha hacia arriba sobre una bandeja, en azul. Al pasar por encima dice «Actualizar proyecto», también con el estilo de solo icono.
+2. Con un WordPress o un PrestaShop cargado sale **Importar**, una foto con una flecha hacia abajo y dibujada con línea fina. Al pasar por encima dice «Importar imágenes de producción». Con un proyecto de otro tipo no sale. Lo mismo en el visor de Docker.
+3. Púlsalo: un WordPress abre «Imágenes de producción» y una tienda pregunta si descargar las que faltan.
+4. **⋮ → Personalizar los botones**: «Importar» está en la lista con su icono. Ocúltalo y desaparece de los dos visores; vuelve a marcarlo y regresa.
 
 ## Qué apuntar
 

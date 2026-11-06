@@ -4,6 +4,31 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.31 · 6 nov 2026
+
+- **Proyecto cargado:** los botones se llaman «Actualizar» e «Importar». Al pasar por encima dicen «Actualizar proyecto» e «Importar imágenes de producción».
+
+## 1.56.30 · 5 nov 2026
+
+- **Proyecto cargado y Docker:** botón «Importar imágenes» en WordPress y PrestaShop. Se muestra u oculta en Personalizar los botones.
+- Iconos nuevos en «Actualizar proyecto» e «Importar imágenes».
+
+## 1.56.29 · 5 nov 2026
+
+- **Proyecto cargado:** el botón Log abre el error_log de Apache. El de web.local sigue en Herramientas, Registro de errores.
+
+## 1.56.28 · 5 nov 2026
+
+- **Actualizar proyecto:** se puede actualizar la BBDD, el código o los dos. Sin fichero de BBDD, dice que se sigue usando la misma y no la toca.
+- **Actualizar proyecto:** al acabar se comprueba que `wp-config.php` o `parameters.php` han quedado con la BBDD y la dirección locales, sin desmontar ni volver a cargar a mano. Si no, lo dice.
+- **Actualizar proyecto:** el recuadro azul sale solo con el fichero incorporado o al arrastrarlo encima, y el nombre de la BBDD se ve en azul, como texto.
+
+## 1.56.27 · 5 nov 2026
+
+- **Proyecto cargado:** botón «Actualizar proyecto». En su ventana se arrastra o se elige la BBDD descargada de producción y su código (un .zip, un .`tar.gz` o una carpeta), y se elige entre fusionar o sobrescribir la carpeta. Si es un repositorio, antes de copiar pregunta si hacer git pull y avisa de lo que no tiene commit o no se ha subido.
+- Lo sustituido o quitado del proyecto queda en `~/lvm-copias`, su .git no se toca y, al acabar, el proyecto se vuelve a cargar para que su configuración apunte a la base y al dominio locales.
+- **En la terminal:** lvm-instalador actualizar-proyecto.
+
 ## 1.56.26 · 5 nov 2026
 
 - **Nuevo proyecto, buscador de repositorios:** los resultados salen en la propia ventana, debajo del buscador, en vez de en un desplegable que podía no verse. Se eligen con el ratón, con las flechas o con Intro.

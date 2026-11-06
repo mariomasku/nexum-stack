@@ -13,7 +13,7 @@ check "actualizaciones: al abrir, solo si toca (y ya no se apunta la versión re
 check "actualizaciones: cada tantos arranques como en Linux, en el mismo fichero" '[ "$(grep -oP "^let UPDATE_EVERY = \K[0-9]+" "$SRC")" == "$(grep -oP "^UPDATE_EVERY = \K[0-9]+" "$LINUX")" ] && grep -q "\"/actualizaciones-arranques\"" "$SRC"'
 # Botones del visor
 mac_keys=$(grep -A2 "^let VISOR_BUTTONS:" "$SRC" | grep -oP '\("\K[a-z]+(?=", "[^"]+"\))' | tr '\n' ' ')
-lin_keys=$(grep -A3 "^VISOR_BUTTONS = " "$LINUX" | grep -oP '\("\K[a-z]+(?=", "[^"]+", \()' | tr '\n' ' ')
+lin_keys=$(grep -A4 "^VISOR_BUTTONS = " "$LINUX" | grep -oP '\("\K[a-z]+(?=", "[^"]+", \()' | tr '\n' ' ')
 check "botones: los mismos que en Linux y en el mismo orden ($mac_keys)" '[ -n "$mac_keys" ] && [ "$mac_keys" == "$lin_keys" ]'
 check "botones: los mismos estilos y tamaños que en Linux" 'grep -q "(\"nombre\", \"Con su nombre\"), (\"icono\", \"Solo el icono (cuadrado)\")" "$SRC" && grep -q "let VISOR_SIZES: \[String: Int\] = \[\"icono\": 44, \"grande\": 88\]" "$SRC" && grep -q "^BUTTON_SIZES = {\"icono\": 44, \"grande\": 88}" "$LINUX"'
 check "botones: el mismo fichero que en Linux" 'grep -q "let VISOR_FILE = LOG_DIR + \"/botones-visor\"" "$SRC"'
