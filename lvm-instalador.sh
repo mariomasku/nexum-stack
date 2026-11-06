@@ -771,7 +771,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.31"
+APP_VERSION="1.56.33"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -3398,7 +3398,14 @@ function project_update() {
         return 1
     fi
 
+    local steps=()
+    [ -n "$source" ] && [ "$pull" -eq 1 ] && steps+=("Traer los cambios con git pull")
+    [ -n "$source" ] && steps+=("Copiar el código de producción")
+    [ -n "$file" ] && steps+=("Cargar la BBDD $db")
+    steps+=("Volver a cargar el proyecto" "Comprobar su configuración")
+    task_plan "Actualizando $folder" "${steps[@]}"
     if [ -n "$source" ] && [ "$pull" -eq 1 ]; then
+        task_step
         echo "== git pull en $dir"
         if [ "$DRY" -eq 1 ]; then
             echo "  [simulacion] git pull en $dir"
@@ -3416,6 +3423,7 @@ function project_update() {
         fi
     fi
     if [ -n "$source" ]; then
+        task_step
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
         copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
@@ -3427,11 +3435,14 @@ function project_update() {
         htdocs_close_world "$dir"
     fi
     if [ -n "$file" ]; then
+        task_step
         echo "== BBDD de produccion"
         import_database "$file" "$db" --crear --proyecto "$folder" || return 1
     fi
+    task_step
     echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"
     load_project "$folder" "" "$load_db" || return 1
+    task_step
     if [ "$DRY" -eq 0 ] && ! project_config_local "$folder" "$load_db"; then
         echo "El código y la BBDD están actualizados, pero la web puede no abrir en local: revisa lo anterior."
         return 1
@@ -3529,6 +3540,8 @@ function mount_project() {
         return 1
     fi
 
+    task_plan "Montando el proyecto $folder" "Clonar el repositorio" "Cargarlo en lampp-$version" "Preparar la BBDD $db"
+    task_step
     echo "1/3 Clonando $url en $dest..."
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] git clone --no-recurse-submodules -- $url $dest"
@@ -3571,9 +3584,11 @@ function mount_project() {
     mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$folder" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$folder" >> "$REPO_PROJECTS_FILE"; }
 
+    task_step
     echo "2/3 Cargando $folder en lampp-$version..."
     load_project "$folder" "$version" "$db" || { echo "El proyecto esta clonado en $dest, pero no se ha podido cargar."; return 1; }
 
+    task_step
     echo "3/3 BBDD $db..."
     if [ -n "$file" ]; then
         import_database "$file" "$db" --crear || return 1
@@ -5940,6 +5955,7 @@ function mailpit_install() {
         echo "Mailpit $MAILPIT_VERSION ya esta instalado en $MAILPIT_DIR"
         return 0
     fi
+    task_plan "Instalando Mailpit $MAILPIT_VERSION" "Descargar Mailpit" "Comprobar la descarga" "Instalar Mailpit"
     echo "Instalando Mailpit $MAILPIT_VERSION (correo de pruebas) en $MAILPIT_DIR"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga de $url, comprobacion de su sha256 y copia de root en $MAILPIT_BIN"
@@ -5953,6 +5969,7 @@ function mailpit_install() {
     fi
     mkdir -p -m 700 "$LOG_DIR" || return 1
     tmp=$(mktemp -d "$LOG_DIR/mailpit-descarga.XXXXXX") || return 1
+    task_step
     echo "Descargando $(basename "$url")..."
     if ! curl -fsSL "${tls[@]}" --retry 2 --max-time 600 -o "$tmp/mailpit.tar.gz" "$url"; then
         rm -rf "$tmp"
@@ -5963,6 +5980,7 @@ function mailpit_install() {
     rtmp=$($SUDO mktemp -d "${TEST_DIR:-/tmp}/lvm-mailpit.XXXXXX") && $SUDO chmod 700 "$rtmp" || { rm -rf "$tmp"; return 1; }
     $SUDO cp "$tmp/mailpit.tar.gz" "$rtmp/mailpit.tar.gz"
     rm -rf "$tmp"
+    task_step
     got=$($SUDO sha256sum "$rtmp/mailpit.tar.gz" 2> /dev/null | cut -d' ' -f1)
     if [ "$got" != "$sha" ]; then
         $SUDO rm -rf "$rtmp"
@@ -5972,6 +5990,7 @@ function mailpit_install() {
     # Se abre entero en su carpeta (ya comprobado con su sha256) y se busca el programa: segun la
     # version, el paquete lo guarda como mailpit o ./mailpit, con o sin LICENSE al lado
     local x=$rtmp/x bin lic err
+    task_step
     if ! err=$({ $SUDO mkdir "$x" && $SUDO tar -xzf "$rtmp/mailpit.tar.gz" -C "$x" --no-same-owner --no-same-permissions; } 2>&1); then
         $SUDO rm -rf "$rtmp"
         echo "No se ha podido abrir el paquete de Mailpit: no se instala."
@@ -8318,6 +8337,33 @@ function install_xampp() {
 function progress_parts() {
     [ -n "$PROGRESS" ] && echo "C|$(IFS=';'; echo "$*")" >> "$PROGRESS"
     return 0
+}
+
+# Pasos de una tarea de la ventana (LVM_PROGRESO): la lista que se va marcando. task_plan <titulo>
+# <paso>... y un task_step al empezar cada paso. Solo manda quien hizo el plan: lo que llame por dentro
+# (una instalacion dentro de otra) no cambia la lista. Fuera de la ventana no hace nada.
+TASK_OWNER="" TASK_CUR=0
+TASK_NAMES=()
+function task_plan() {
+    [ -n "$LVM_PROGRESO" ] && [ -z "$TASK_OWNER" ] || return 0
+    local name=${1//[|$'\n']/ } parts
+    shift
+    TASK_OWNER=${FUNCNAME[1]} TASK_CUR=0
+    TASK_NAMES=("$@")
+    parts=$(IFS=';'; echo "${TASK_NAMES[*]//;/,}")
+    { echo "I|1|1|$name|$(date +%s)"; echo "C|${parts//[|$'\n']/ }"; } >> "$LVM_PROGRESO"
+    return 0
+}
+function task_step() {
+    [ -n "$LVM_PROGRESO" ] && [ "$TASK_OWNER" == "${FUNCNAME[1]}" ] && [ "$TASK_CUR" -lt "${#TASK_NAMES[@]}" ] || return 0
+    TASK_CUR=$(( TASK_CUR + 1 ))
+    local what=${TASK_NAMES[TASK_CUR - 1]}
+    task_detail "${what//[|$'\n']/ }" "" "" 0 "$(date +%s)"
+}
+# El avance por dentro del paso de ahora: task_detail <texto> <modo> <fichero> <total> <inicio>
+function task_detail() {
+    local n=${#TASK_NAMES[@]}
+    echo "S|$TASK_CUR|$(( (TASK_CUR - 1) * 100 / n ))|$(( TASK_CUR * 100 / n ))|$1|$2|$3|$4|$5" >> "$LVM_PROGRESO"
 }
 
 # Cuando MariaDB se compila (MARIADB_SRC=1) es lo que mas tarda: los tramos de los componentes
@@ -12597,6 +12643,18 @@ QUE HACE
 
 VERSIONES
 
+1.56.33 (6 nov 2026)
+- Correo de pruebas: la bandeja de Mailpit se ve dentro de la ventana,
+  debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de
+  abrir el navegador. Los enlaces de los correos sí se abren en el
+  navegador al pulsarlos.
+
+1.56.32 (6 nov 2026)
+- Instalaciones y actualizaciones: encima de «Ver registro» sale la
+  lista de lo que se está haciendo y cada paso se marca con un check al
+  acabar. También al actualizar un proyecto o los componentes, al montar
+  un proyecto nuevo, en Docker, Mailpit, cloudflared y phpMyAdmin.
+
 1.56.31 (6 nov 2026)
 - Proyecto cargado: los botones se llaman «Actualizar» e «Importar». Al
   pasar por encima dicen «Actualizar proyecto» e «Importar imágenes de
@@ -15011,9 +15069,15 @@ function docker_update_image() {
         echo "$slug: imagenes de PHP $(docker_conf "$slug" PHP) de nuevo, con lo ultimo de Docker Hub (la BBDD y la configuracion no cambian)"
         [ "$DRY" -eq 1 ] && return 0
         docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+        local steps=()
+        for v in $(docker_conf "$slug" PHP); do steps+=("Imagen de PHP $v"); done
+        steps+=("Volver a crear sus contenedores")
+        task_plan "$slug: imágenes de PHP" "${steps[@]}"
         for v in $(docker_conf "$slug" PHP); do
+            task_step
             docker_php_image "$v" --nueva || { echo "No se ha podido rehacer la imagen de PHP $v: sigue con la anterior"; return 1; }
         done
+        task_step
         running=$(dk ps --filter "label=com.docker.compose.project=nexum-$slug" --format '{{.Label "com.docker.compose.service"}}' 2> /dev/null)
         [ -n "$running" ] && { dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate $running || return 1; }
         dk image prune -f > /dev/null 2>&1
@@ -15028,7 +15092,10 @@ function docker_update_image() {
         return 0
     fi
     docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
+    task_plan "$slug: imagen de PHP $php" "Imagen de PHP $php" "Volver a crear su contenedor"
+    task_step
     docker_php_image "$php" --nueva || { echo "No se ha podido rehacer la imagen de PHP $php: sigue con la anterior"; return 1; }
+    task_step
     mkdir -p -m 700 "$(docker_run_dir "$slug")"
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate php || return 1
     dk image prune -f > /dev/null 2>&1
@@ -15137,6 +15204,8 @@ function docker_install() {
     for p in $DOCKER_PACKAGES; do
         dpkg-query -W -f='${Status}' "$p" 2> /dev/null | grep -q "install ok installed" || missing+=" $p"
     done
+    task_plan "Preparando Docker sin root" "Paquetes del sistema" "Docker del sistema, apagado" "Docker sin root" "Comprobar que responde"
+    task_step
     if [ -n "$missing" ]; then
         echo "1/4 Paquetes:$missing"
         # (sin preguntas de debconf: la tarea no tiene una terminal donde contestarlas)
@@ -15145,6 +15214,7 @@ function docker_install() {
         echo "1/4 Paquetes: ya estan instalados"
     fi
     # (el paquete deja en marcha el demonio con root: con el, el grupo docker seria como ser root)
+    task_step
     echo "2/4 Docker y containerd del sistema (con root), apagados: se usa solo el tuyo"
     if systemctl is-enabled -q docker.service docker.socket containerd.service 2> /dev/null \
             || systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null; then
@@ -15167,6 +15237,7 @@ function docker_install() {
                 && sudo apparmor_parser -r /etc/apparmor.d/usr.bin.rootlesskit || return 1
         fi
     fi
+    task_step
     echo "3/4 Docker sin root para $me (servicio de tu usuario)"
     local unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
     if [ "$DRY" -eq 1 ]; then
@@ -15186,6 +15257,7 @@ function docker_install() {
         journalctl --user -u docker.service -n 30 --no-pager 2> /dev/null
         return 1
     }
+    task_step
     echo "4/4 Comprobando"
     local i
     for i in $(seq 20); do docker_ready && break; [ "$DRY" -eq 1 ] && break; sleep 1; done
@@ -15412,10 +15484,14 @@ function docker_create() {
         if [ "$rel" == app/config/parameters.php ]; then printf '  cache: {}\n'; fi
     } > "$dir/compose.yaml" || return 1
 
+    task_plan "Creando $folder en Docker" "Imagen de PHP $php" "Contenedores" "BBDD $dbname" "Vhost de $domain"
+    task_step
     echo "1/4 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "2/4 Contenedores"
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d || return 1
+    task_step
     echo "3/4 BBDD $dbname"
     local i
     # (la contraseña no va en ninguna orden, que se ve en ps: el cliente la toma dentro del contenedor
@@ -15447,6 +15523,7 @@ function docker_create() {
             grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
+    task_step
     echo "4/4 Vhost de $domain"
     local crt=$OWN_SSL_DIR/$domain-selfsigned.crt key=$OWN_SSL_DIR/$domain-selfsigned.key copy
     [ -f "$crt" ] || make_selfsigned "$domain" "" "$crt" "$key" || return 1
@@ -16540,6 +16617,8 @@ function docker_web_create() {
         docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
         return
     fi
+    task_plan "Montando $folder en Docker" "MariaDB $maria común" "Imagen de PHP $php" "BBDD $dbname" "Apache de Docker" "Certificado en el navegador"
+    task_step
     echo "1/5 MariaDB $maria comun"
     docker_maria_up "$maria" || return 1
     if [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$dbname'" < /dev/null 2> /dev/null | tr -d '\r')" != 0 ]; then
@@ -16560,8 +16639,10 @@ function docker_web_create() {
     # (el dominio: el de la tienda o el de la version)
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    task_step
     echo "2/5 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "3/5 BBDD $dbname"
     docker_maria_sql "$maria" << EOF || return 1
 CREATE DATABASE \`$dbname\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -16590,10 +16671,12 @@ EOF
             grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
+    task_step
     echo "4/5 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    task_step
     echo "5/5 Certificado en el navegador"
     docker_web_trust
     echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url "$(docker_web_pma)")"
@@ -16613,14 +16696,19 @@ function docker_web_create_live() {
       docker_fpm_conf > "$dir/fpm.conf" ) || return 1
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    task_plan "Montando $folder en Docker" "Imagen de PHP $php" "BBDD en vivo" "Apache de Docker" "Certificado en el navegador"
+    task_step
     echo "1/4 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "2/4 BBDD $(docker_conf "$slug" BBDD) de lampp-$owner, en vivo (la misma que web.local)"
     lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    task_step
     echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    task_step
     echo "4/4 Certificado en el navegador"
     docker_web_trust
     echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php), con la BBDD de lampp-$owner en vivo"
@@ -17196,6 +17284,8 @@ function docker_pass() {
     docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
     docker_web_ports_ok || { echo "Docker sin root aun no puede usar los puertos del Apache de Docker: pulsa «Permitir» en Configuracion"; return 1; }
     sudo_first || return 1
+    task_plan "Pasando $folder al Apache de Docker" "Copiar su BBDD" "Quitar el proyecto de antes" "Montarlo en el Apache de Docker"
+    task_step
     echo "Copia de su BBDD ($db)"
     mkdir -p -m 700 "$HOME/lvm-copias" || return 1
     backup="$HOME/lvm-copias/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
@@ -17217,7 +17307,9 @@ function docker_pass() {
         return 1
     fi
     echo "Copia de $db: $backup"
+    task_step
     docker_action borrar "$slug" || { echo "No se ha podido quitar el proyecto de antes (la copia de su BBDD esta en $backup)"; return 1; }
+    task_step
     if [ -n "$target" ]; then
         docker_web_add "$target" "$php" || return 1
         echo "$folder ya tenia BBDD en el sistema nuevo: la de $slug no se carga (esta en $backup)"
@@ -17276,6 +17368,7 @@ function tunnel_install() {
         echo "cloudflared $TUNNEL_VERSION ya esta instalado en $TUNNEL_DIR"
         return 0
     fi
+    task_plan "Instalando cloudflared $TUNNEL_VERSION" "Descargar cloudflared" "Comprobar la descarga" "Instalar cloudflared"
     echo "Instalando cloudflared $TUNNEL_VERSION (tunel de Cloudflare) en $TUNNEL_DIR"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga de $url y comprobacion de su sha256"
@@ -17287,18 +17380,21 @@ function tunnel_install() {
     fi
     mkdir -p -m 700 "$TUNNEL_DIR" || return 1
     tmp=$(mktemp "$TUNNEL_DIR/cloudflared-descarga.XXXXXX") || return 1
+    task_step
     echo "Descargando cloudflared-linux-$arch (unos 40 MB)..."
     if ! curl -fsSL "${tls[@]}" --retry 2 --max-time 900 -o "$tmp" "$url"; then
         rm -f "$tmp"
         echo "No se ha podido descargar cloudflared ($url)"
         return 1
     fi
+    task_step
     got=$(sha256sum "$tmp" 2> /dev/null | cut -d' ' -f1)
     if [ "$got" != "$sha" ]; then
         rm -f "$tmp"
         echo "La descarga de cloudflared no coincide con su suma sha256 (${got:-ninguna}): no se instala."
         return 1
     fi
+    task_step
     chmod 755 "$tmp" && mv -f "$tmp" "$TUNNEL_BIN" && echo "$TUNNEL_VERSION" > "$TUNNEL_DIR/version" || { rm -f "$tmp"; return 1; }
     echo "cloudflared $TUNNEL_VERSION instalado: $TUNNEL_BIN"
 }
@@ -19406,7 +19502,9 @@ function import_database() {
     local start=$(date +%s)
 
     exec 3< "$file"
-    if [ -n "$LVM_PROGRESO" ]; then
+    if [ -n "$TASK_OWNER" ]; then
+        task_detail "cargando" fdpos "/proc/$BASHPID/fdinfo/3" "$size" "$start"
+    elif [ -n "$LVM_PROGRESO" ]; then
         { echo "I|1|1|Cargando $name en $db|$start"
           echo "S|1|0|100|cargando|fdpos|/proc/$BASHPID/fdinfo/3|$size|$start"; } >> "$LVM_PROGRESO"
     fi
@@ -19439,7 +19537,7 @@ function import_database() {
         [ -n "$saved" ] && echo "Lo que tenia antes esta en $saved (se vuelve a cargar con importar-bd)."
         return 130
     fi
-    [ -n "$LVM_PROGRESO" ] && echo "R|bd:$db|$rc" >> "$LVM_PROGRESO"
+    [ -n "$LVM_PROGRESO" ] && [ -z "$TASK_OWNER" ] && echo "R|bd:$db|$rc" >> "$LVM_PROGRESO"
 
     local secs=$(( $(date +%s) - start ))
     if [ $rc -ne 0 ]; then
@@ -21926,7 +22024,7 @@ def db_date_text(when, kind):
 class Task:
     """Ejecuta un comando del script en una pseudoterminal y muestra su avance en una ventana.
 
-    progress=True: instalaciones (barra y componentes a partir de LVM_PROGRESO).
+    progress=True: instalaciones (barra y lista de pasos a partir de LVM_PROGRESO).
     El resto: barra en movimiento y la salida en el registro."""
 
     def __init__(self, app, title, args, progress=False, done_text=None, on_done=None,
@@ -22285,6 +22383,7 @@ class Task:
         else:
             self.head.set_label("No se ha podido completar")
             self.what.set_label("Error")
+            self.pct.set_label("")
             css(self.bar, "nv-progreso-error")
             self.expander.set_expanded(True)
             self.report_btn.show()
@@ -23161,7 +23260,7 @@ class App(Gtk.Application):
                       done_text="%s %s" % (title, done), auto_close=True)
 
     def on_update_pma(self, folder):
-        self.run_task("Actualizando phpMyAdmin", ["actualizar-phpmyadmin", folder],
+        self.run_task("Actualizando phpMyAdmin", ["actualizar-phpmyadmin", folder], progress=True,
                       done_text="phpMyAdmin actualizado", auto_close=True)
 
     def on_secure_all(self, *_):
@@ -24161,7 +24260,7 @@ class App(Gtk.Application):
                                                         ["nuevo-dominio", domain, folder], auto_close=True,
                                                         done_text="%s falseado: se abre en local" % domain,
                                                         on_done=faked) and False)
-        self.run_task("Montando el proyecto %s" % folder, args,
+        self.run_task("Montando el proyecto %s" % folder, args, progress=True,
                       done_text="%s está clonado, cargado en lampp-%s y con su BBDD %s" % (folder, version, db),
                       on_done=done)
 
@@ -26079,7 +26178,7 @@ class App(Gtk.Application):
             row.add_prefix(label("●", "punto-gris"))
             b = css(Gtk.Button(label="Prepararlo", sensitive=not self.busy), "verde")
             b.connect("clicked", lambda *_: self.run_task(
-                "Preparando Docker sin root", ["docker-instalar"], done_text="Docker sin root listo",
+                "Preparando Docker sin root", ["docker-instalar"], progress=True, done_text="Docker sin root listo",
                 on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
             row.add_suffix(b)
             lb.add(row)
@@ -26317,7 +26416,7 @@ class App(Gtk.Application):
         text += " La primera vez con cada PHP se prepara su imagen (unos minutos)."
         if not confirm(self.win, "¿Crear %s en Docker?" % folder, text, "Crear en Docker"):
             return
-        self.run_task("Creando %s en Docker" % folder, args,
+        self.run_task("Creando %s en Docker" % folder, args, progress=True,
                       done_text="%s en Docker: https://%s" % (folder, domain),
                       on_done=lambda *a: (f.clear(), run_quick(["gui-docker"], self.on_docker_data)))
 
@@ -27913,9 +28012,139 @@ class App2(App):
             self.toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
         elif not m.get("running"):
             self.toast("Mailpit arranca con la versión activa: arráncala arriba")
-        else:
+        elif self.nv_mail_webkit() is None or getattr(self, "mail_web_dead", False):
+            # (sin el componente del visor, o si se ha caído: como antes, en el navegador)
             self.open_uri(m["url"])
             GLib.timeout_add_seconds(3, lambda: (self.nv_mail_poll(), False)[1])
+        else:
+            self.nv_tools_show("Correo de pruebas (Mailpit)")
+
+    def nv_mail_webkit(self):
+        """El módulo del visor web (WebKitGTK para GTK 3) o None si no está instalado. Se carga la primera
+        vez que hace falta: tarda y la ventana arranca igual sin él."""
+        if not hasattr(self, "mail_webkit"):
+            self.mail_webkit = None
+            for version in ("4.1", "4.0"):
+                try:
+                    gi.require_version("WebKit2", version)
+                    from gi.repository import WebKit2
+                    self.mail_webkit = WebKit2
+                    break
+                except (ImportError, ValueError):
+                    continue
+        return self.mail_webkit
+
+    def nv_mail_web(self):
+        """El visor de la bandeja, siempre el mismo (al rehacer la pestaña no se pierde el correo abierto):
+        sin nada en disco y sin proxy, porque Mailpit está en este equipo."""
+        web = getattr(self, "mail_web", None)
+        kit = self.nv_mail_webkit()
+        if web is not None or kit is None:
+            return web
+        data = kit.WebsiteDataManager.new_ephemeral()
+        data.set_network_proxy_settings(kit.NetworkProxyMode.NO_PROXY, None)
+        ctx = kit.WebContext.new_with_website_data_manager(data)
+        web = kit.WebView.new_with_context(ctx)
+        web.get_settings().set_javascript_can_open_windows_automatically(False)
+        web.connect("decide-policy", self.nv_mail_policy)
+        web.connect("load-failed", self.nv_mail_load_failed)
+        web.connect("web-process-terminated", self.nv_mail_crashed)
+        web.connect("destroy", self.nv_mail_destroyed)
+        ctx.connect("download-started", self.nv_mail_download)
+        # (también su contexto: si Python lo suelta, el visor carga la página pero no la pinta)
+        self.mail_web, self.mail_web_url, self.mail_web_ctx = web, None, (data, ctx)
+        # (mientras se ve, el número de sin leer de arriba sigue a lo que se lee o se borra aquí)
+        GLib.timeout_add_seconds(5, self.nv_mail_tick, web)
+        return web
+
+    def nv_mail_tick(self, web):
+        if getattr(self, "mail_web", None) is not web:
+            return False
+        if web.get_mapped():
+            self.nv_mail_poll()
+        return True
+
+    def nv_mail_policy(self, _web, decision, kind):
+        """Solo se navega dentro de Mailpit. Un enlace de un correo va al navegador, y solo si se ha pulsado:
+        un correo no puede abrir nada por su cuenta."""
+        kit = self.mail_webkit
+        if kind == kit.PolicyDecisionType.RESPONSE:
+            if decision.is_mime_type_supported():
+                return False
+            uri = decision.get_request().get_uri()
+            decision.ignore()
+            self.nv_mail_external(uri)
+            return True
+        action = decision.get_navigation_action()
+        uri = action.get_request().get_uri() or ""
+        new_window = kind == kit.PolicyDecisionType.NEW_WINDOW_ACTION
+        if not new_window and (uri.startswith(("about:", self.mail_web_url or "\0", "blob:" + (self.mail_web_url or "\0")))):
+            return False
+        decision.ignore()
+        if new_window and action.is_user_gesture() \
+                or action.get_navigation_type() == kit.NavigationType.LINK_CLICKED:
+            self.nv_mail_external(uri)
+        return True
+
+    def nv_mail_external(self, uri):
+        if (uri or "").startswith(("http://", "https://")):
+            self.open_uri(uri)
+
+    def nv_mail_download(self, _ctx, download):
+        """Un adjunto: lo descarga el navegador, que pregunta dónde guardarlo."""
+        uri = download.get_request().get_uri()
+        download.cancel()
+        self.nv_mail_external(uri)
+
+    def nv_mail_load_failed(self, *_):
+        # (parado o sin responder: se vuelve a pedir la próxima vez que se vea en marcha)
+        self.mail_web_url = None
+        return False
+
+    def nv_mail_destroyed(self, web):
+        # (destruido, su página ya no vale: la próxima vez se crea otro)
+        if getattr(self, "mail_web", None) is web:
+            self.mail_web = None
+
+    def nv_mail_crashed(self, *_):
+        """El proceso del visor se ha caído o no puede arrancar: se ofrece el navegador."""
+        self.mail_web_dead = True
+        self.mail_web = None
+        GLib.idle_add(lambda: (self.build_tools(), False)[1])
+
+    def nv_mail_view(self, m):
+        """Debajo de las tarjetas: la bandeja de Mailpit o por qué no se ve."""
+        box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin_top=12), "caja")
+        box.set_size_request(-1, 620)
+        old = getattr(self, "mail_web", None)
+
+        def note(text, command=None):
+            inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, valign=Gtk.Align.CENTER, vexpand=True, margin=24)
+            inner.pack_start(label(text, "nv-tenue", wrap=True, xalign=0.5, justify=Gtk.Justification.CENTER), False, False, 0)
+            if command:
+                inner.pack_start(label(command, "nv-chico", selectable=True, xalign=0.5), False, False, 0)
+            if m["running"]:
+                b = Gtk.Button(label="Abrir en el navegador", halign=Gtk.Align.CENTER)
+                b.connect("clicked", lambda *_: self.open_uri(m["url"]))
+                inner.pack_start(b, False, False, 0)
+            box.pack_start(inner, True, True, 0)
+            return box
+        if SIMULATE:
+            return note("En la simulación no se abre la bandeja: desde ella se pueden borrar correos.")
+        if not m["running"]:
+            if old is not None:
+                self.mail_web_url = None
+            return note("Mailpit está parado: arranca con la versión activa.")
+        if getattr(self, "mail_web_dead", False):
+            return note("La bandeja no se puede ver dentro de la ventana en este equipo.")
+        web = self.nv_mail_web()
+        if web is None:
+            return note("Para ver la bandeja dentro de la ventana falta su componente:", "sudo apt install gir1.2-webkit2-4.1")
+        box.pack_start(web, True, True, 0)
+        if self.mail_web_url != m["url"]:
+            self.mail_web_url = m["url"]
+            web.load_uri(m["url"])
+        return box
 
     def nv_mail_tools(self):
         """Configuración, Correo de pruebas: encenderlo, el modo de WordPress y Mailpit."""
@@ -27969,9 +28198,6 @@ class App2(App):
                            sensitive=m["running"] and not self.busy)
             b.connect("clicked", lambda *_: self.on_mail_clear())
             row.add_suffix(b)
-            b = Gtk.Button(label="Abrir", tooltip_text="Abrir la bandeja", valign=Gtk.Align.CENTER, sensitive=m["running"])
-            b.connect("clicked", lambda *_: self.open_uri(m["url"]))
-            row.add_suffix(b)
         else:
             row = ActionRow("Mailpit no está instalado",
                             "Sin él, el correo de las webs no sale ni se ve. Se descarga de GitHub (Mailpit %s) y se "
@@ -27982,6 +28208,8 @@ class App2(App):
             b.connect("clicked", lambda *_: self.on_mail_install())
             row.add_suffix(b)
         lb.add(row)
+        if m["installed"]:
+            box.pack_start(self.nv_mail_view(m), True, True, 0)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 2)
         box.show_all()
@@ -28018,7 +28246,7 @@ class App2(App):
                       on_done=lambda *_: self.build_tools())
 
     def on_mail_install(self):
-        self.run_task("Instalando Mailpit", ["correo", "instalar"], auto_close=True,
+        self.run_task("Instalando Mailpit", ["correo", "instalar"], progress=True, auto_close=True,
                       done_text="Mailpit instalado", on_done=lambda *_: self.build_tools())
 
     def on_mail_clear(self):
@@ -28468,7 +28696,7 @@ class App2(App):
                            % ("arranca" if installed else "instala"),
                            "Arrancar Docker" if installed else "Instalar Docker"):
                     self.run_task("Arrancando Docker sin root" if installed else "Instalando Docker sin root",
-                                  ["docker-instalar"], done_text="Docker sin root listo",
+                                  ["docker-instalar"], progress=True, done_text="Docker sin root listo",
                                   on_done=lambda ok, *_: ok and self.nv_docker_loaded(x))
             elif not envs:
                 self.nv_docker_loaded_dialog(x)
@@ -28601,7 +28829,7 @@ class App2(App):
             run_quick(["gui-docker"], self.on_docker_data)
             if ok:
                 self.show_tab("docker")
-        self.run_task("Montando %s en Docker" % x["name"], args,
+        self.run_task("Montando %s en Docker" % x["name"], args, progress=True,
                       done_text="%s en Docker: https://%s" % (x["name"], domain), on_done=done)
 
     def nv_docker_db_mode(self, p):
@@ -28738,7 +28966,7 @@ class App2(App):
                        "contenedores de ahora, su vhost de LAMPP y su línea de /etc/hosts. Se abrirá en %s. "
                        "Pide la contraseña de administrador." % (p["db"], new), "Pasarlo"):
             return
-        self.run_task("Pasando %s al Apache de Docker" % p["folder"], ["docker-pasar", p["slug"]],
+        self.run_task("Pasando %s al Apache de Docker" % p["folder"], ["docker-pasar", p["slug"]], progress=True,
                       done_text="%s ya va con el Apache de Docker" % p["folder"],
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 
@@ -28782,7 +29010,7 @@ class App2(App):
                        "%s. Su BBDD y su configuración no cambian." % p["folder"],
                        "Actualizar la imagen"):
             return
-        self.run_task("%s: imagen de PHP %s" % (p["folder"], p["php"]), ["docker-imagen", p["slug"]],
+        self.run_task("%s: imagen de PHP %s" % (p["folder"], p["php"]), ["docker-imagen", p["slug"]], progress=True,
                       done_text="%s ya usa la imagen nueva de PHP %s" % (p["folder"], p["php"]),
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 
@@ -29573,6 +29801,10 @@ class App2(App):
         return res
 
     def build_tools(self):
+        # (antes de vaciar la pestaña: al soltar su tarjeta, GTK destruiría también el visor del correo)
+        web = getattr(self, "mail_web", None)
+        if web is not None and web.get_parent() is not None:
+            web.get_parent().remove(web)
         super().build_tools()
         # Barrera entre webs (lvm-instalador barrera-web): encendida si no existe el fichero
         box, lb = tile_group("Seguridad entre webs",
@@ -30165,7 +30397,7 @@ class App2(App):
             if info and (info[1] != "1" or info[2] != info[3]):
                 b = Gtk.Button(label="Instalar" if info[1] != "1" else "Actualizar a la %s" % info[3],
                                valign=Gtk.Align.CENTER, sensitive=not self.busy)
-                b.connect("clicked", lambda *_: self.run_task("Instalando cloudflared", ["tunel-instalar"], auto_close=True,
+                b.connect("clicked", lambda *_: self.run_task("Instalando cloudflared", ["tunel-instalar"], progress=True, auto_close=True,
                                                               done_text="cloudflared instalado",
                                                               on_done=lambda *a: self.build_tools()))
                 row.add_suffix(b)
@@ -30462,7 +30694,7 @@ class App2(App):
             if ok_ and tunnel_state():
                 self.nv_share_dialog()
         if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
-            self.run_task("Instalando cloudflared", ["tunel-instalar"], auto_close=True, done_text="cloudflared instalado",
+            self.run_task("Instalando cloudflared", ["tunel-instalar"], progress=True, auto_close=True, done_text="cloudflared instalado",
                           on_done=lambda ok_, *a: ok_ and GLib.idle_add(
                               lambda: self.run_task("Abriendo el túnel de %s" % name, args, auto_close=True,
                                                     done_text="Túnel abierto", on_done=opened) and False))
@@ -32903,7 +33135,20 @@ function components_update() {
         return 0
     fi
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
+    local steps=()
     for v in $imgs; do
+        case $v in
+            mariadb:*) steps+=("MariaDB ${v#mariadb:} de Docker") ;;
+            "$DOCKER_PMA_IMAGE") steps+=("phpMyAdmin de Docker") ;;
+            php:*) v=${v#php:}; steps+=("Imagen de PHP ${v%-*}") ;;
+            *) steps+=("$v") ;;
+        esac
+    done
+    for v in $progs; do steps+=("$v"); done
+    for v in $folders; do steps+=("lampp-$v"); done
+    task_plan "Actualizando los componentes" "${steps[@]}"
+    for v in $imgs; do
+        task_step
         case $v in
             mariadb:*)
                 v=${v#mariadb:}
@@ -32933,9 +33178,10 @@ function components_update() {
         esac
     done
     [ -n "$imgs" ] && dk image prune -f > /dev/null 2>&1
-    [[ " $progs " == *" Mailpit "* ]] && { mailpit_install || fail=1; }
-    [[ " $progs " == *" cloudflared "* ]] && { tunnel_install || fail=1; }
+    [[ " $progs " == *" Mailpit "* ]] && { task_step; mailpit_install || fail=1; }
+    [[ " $progs " == *" cloudflared "* ]] && { task_step; tunnel_install || fail=1; }
     for v in $folders; do
+        task_step
         echo "lampp-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"
         ( cli_rebuild "$v" ) || fail=1
     done
@@ -33106,6 +33352,7 @@ function update_pma() {
         echo "phpMyAdmin de $version ya esta al dia ($cur, PHP $php)"
         return 0
     fi
+    task_plan "Actualizando phpMyAdmin de $version" "Descargar y comprobar phpMyAdmin $want" "Preparar su configuración" "Cambiar la carpeta"
     echo "phpMyAdmin de $version: ${cur:-version antigua} -> $want (PHP $php)"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga, comprobacion sha256 y cambio de $dir (el anterior en phpmyadmin.anterior)"
@@ -33118,6 +33365,7 @@ function update_pma() {
         echo "No se cambia phpMyAdmin: /opt o $root no son del administrador (lvm-instalador asegurar --todas)"
         return 1
     fi
+    task_step
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-pma.XXXXXX") || return 1
     sum=$(pma_sum "$want")
     if ! download_signed "https://files.phpmyadmin.net/phpMyAdmin/$want/phpMyAdmin-$want-all-languages.tar.xz" "$tmp/pma.tar.xz" "$sum" "$GPG_FPR_PMA" \
@@ -33128,6 +33376,7 @@ function update_pma() {
     new=$tmp/phpMyAdmin-$want-all-languages
     [ -d "$new" ] || { rm -rf "$tmp"; echo "El paquete de phpMyAdmin no es el esperado"; return 1; }
     # La configuracion de antes; la clave de las cookies de XAMPP es la misma en todos (xampp)
+    task_step
     cp "$dir/config.inc.php" "$new/config.inc.php" || { rm -rf "$tmp"; return 1; }
     python3 -I - "$new/config.inc.php" <<'PY'
 import re, secrets, string, sys
@@ -33152,6 +33401,7 @@ PY
         echo "El phpMyAdmin descargado tiene enlaces (no deberia): no se cambia nada"
         return 1
     fi
+    task_step
     if ! { sudo rm -rf "$root/phpmyadmin.anterior" && sudo mv "$dir" "$root/phpmyadmin.anterior"; }; then
         echo "No se ha podido apartar $dir: no se cambia nada"
         rm -rf "$tmp"

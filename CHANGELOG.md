@@ -4,6 +4,14 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.56.33 · 6 nov 2026
+
+- **Correo de pruebas:** la bandeja de Mailpit se ve dentro de la ventana, debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de abrir el navegador. Los enlaces de los correos sí se abren en el navegador al pulsarlos.
+
+## 1.56.32 · 6 nov 2026
+
+- **Instalaciones y actualizaciones:** encima de «Ver registro» sale la lista de lo que se está haciendo y cada paso se marca con un check al acabar. También al actualizar un proyecto o los componentes, al montar un proyecto nuevo, en Docker, Mailpit, cloudflared y phpMyAdmin.
+
 ## 1.56.31 · 6 nov 2026
 
 - **Proyecto cargado:** los botones se llaman «Actualizar» e «Importar». Al pasar por encima dicen «Actualizar proyecto» e «Importar imágenes de producción».

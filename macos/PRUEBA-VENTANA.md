@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.12)
+# Prueba de la ventana nueva en un Mac (versión 1.40.14)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.12** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.40.14** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.12/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.40.14/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.12
+   lvm-instalador version                                                         # Nexum Dev Stack 1.40.14
    ```
 
 5. **Comprueba las versiones:**
@@ -334,6 +334,21 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 2. Con un WordPress o un PrestaShop cargado sale **Importar**, una foto con una flecha hacia abajo y dibujada con línea fina. Al pasar por encima dice «Importar imágenes de producción». Con un proyecto de otro tipo no sale. Lo mismo en el visor de Docker.
 3. Púlsalo: un WordPress abre «Imágenes de producción» y una tienda pregunta si descargar las que faltan.
 4. **⋮ → Personalizar los botones**: «Importar» está en la lista con su icono. Ocúltalo y desaparece de los dos visores; vuelve a marcarlo y regresa.
+
+## Paso 21: lista de pasos en las instalaciones (1.40.13)
+
+1. **Proyecto cargado → Actualizar** con un `.sql` y un `.zip`: encima de «Ver registro» sale la lista (git pull si lo eliges, código, BBDD, volver a cargar y comprobar). El paso en curso gira y los acabados llevan su check.
+2. Al cargar la BBDD, la barra avanza dentro de su tramo y el último paso acaba con check.
+3. Repite con **Instalando cloudflared** o **Instalando Mailpit**, y **Actualizar componentes** si hay parches.
+4. Si un paso falla, ese paso sale con una X roja, el registro se abre y los siguientes se quedan sin check.
+
+## Paso 22: bandeja de correo dentro de la ventana (1.40.14)
+
+1. **Configuración → Correo de pruebas**, con la versión activa arrancada: debajo de las tarjetas se ve la bandeja de Mailpit. El botón «Abrir» ya no está.
+2. Pulsa el botón **Correo** de arriba: lleva a ese apartado, sin abrir el navegador.
+3. Manda un correo de prueba desde una web local: aparece solo. Ábrelo, ve a otro apartado de Configuración y vuelve: sigue abierto.
+4. Pulsa un enlace dentro del correo: se abre en el navegador y la bandeja sigue en su sitio.
+5. Para la versión activa: sale «Mailpit está parado». Arráncala de nuevo: vuelve la bandeja.
 
 ## Qué apuntar
 

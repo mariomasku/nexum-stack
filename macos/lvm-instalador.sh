@@ -2138,7 +2138,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.12"
+APP_VERSION="1.40.14"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -4689,7 +4689,14 @@ function project_update() {
         return 1
     fi
 
+    local steps=()
+    [ -n "$source" ] && [ "$pull" -eq 1 ] && steps+=("Traer los cambios con git pull")
+    [ -n "$source" ] && steps+=("Copiar el código de producción")
+    [ -n "$file" ] && steps+=("Cargar la BBDD $db")
+    steps+=("Volver a cargar el proyecto" "Comprobar su configuración")
+    task_plan "Actualizando $folder" "${steps[@]}"
     if [ -n "$source" ] && [ "$pull" -eq 1 ]; then
+        task_step
         echo "== git pull en $dir"
         if [ "$DRY" -eq 1 ]; then
             echo "  [simulacion] git pull en $dir"
@@ -4707,6 +4714,7 @@ function project_update() {
         fi
     fi
     if [ -n "$source" ]; then
+        task_step
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
         copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
@@ -4718,11 +4726,14 @@ function project_update() {
         htdocs_close_world "$dir"
     fi
     if [ -n "$file" ]; then
+        task_step
         echo "== BBDD de produccion"
         import_database "$file" "$db" --crear --proyecto "$folder" || return 1
     fi
+    task_step
     echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"
     load_project "$folder" "" "$load_db" || return 1
+    task_step
     if [ "$DRY" -eq 0 ] && ! project_config_local "$folder" "$load_db"; then
         echo "El código y la BBDD están actualizados, pero la web puede no abrir en local: revisa lo anterior."
         return 1
@@ -4820,6 +4831,8 @@ function mount_project() {
         return 1
     fi
 
+    task_plan "Montando el proyecto $folder" "Clonar el repositorio" "Cargarlo en XAMPP-$version" "Preparar la BBDD $db"
+    task_step
     echo "1/3 Clonando $url en $dest..."
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] git clone --no-recurse-submodules -- $url $dest"
@@ -4862,9 +4875,11 @@ function mount_project() {
     mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$folder" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$folder" >> "$REPO_PROJECTS_FILE"; }
 
+    task_step
     echo "2/3 Cargando $folder en XAMPP-$version..."
     load_project "$folder" "$version" "$db" || { echo "El proyecto esta clonado en $dest, pero no se ha podido cargar."; return 1; }
 
+    task_step
     echo "3/3 BBDD $db..."
     if [ -n "$file" ]; then
         import_database "$file" "$db" --crear || return 1
@@ -7214,6 +7229,7 @@ function mailpit_install() {
         echo "Mailpit $MAILPIT_VERSION ya esta instalado en $MAILPIT_DIR"
         return 0
     fi
+    task_plan "Instalando Mailpit $MAILPIT_VERSION" "Descargar Mailpit" "Comprobar la descarga" "Instalar Mailpit"
     echo "Instalando Mailpit $MAILPIT_VERSION (correo de pruebas) en $MAILPIT_DIR"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga de $url, comprobacion de su sha256 y copia de root en $MAILPIT_BIN"
@@ -7227,6 +7243,7 @@ function mailpit_install() {
     fi
     mkdir -p -m 700 "$LOG_DIR" || return 1
     tmp=$(mktemp -d "$LOG_DIR/mailpit-descarga.XXXXXX") || return 1
+    task_step
     echo "Descargando $(basename "$url")..."
     if ! curl -q -fsSL "${tls[@]}" --retry 2 --max-time 600 -o "$tmp/mailpit.tar.gz" "$url"; then
         rm -rf "$tmp"
@@ -7237,6 +7254,7 @@ function mailpit_install() {
     rtmp=$($SUDO mktemp -d "${TEST_DIR:-/tmp}/lvm-mailpit.XXXXXX") && $SUDO chmod 700 "$rtmp" || { rm -rf "$tmp"; return 1; }
     $SUDO cp "$tmp/mailpit.tar.gz" "$rtmp/mailpit.tar.gz"
     rm -rf "$tmp"
+    task_step
     got=$($SUDO shasum -a 256 "$rtmp/mailpit.tar.gz" 2> /dev/null | cut -d' ' -f1)
     if [ "$got" != "$sha" ]; then
         $SUDO rm -rf "$rtmp"
@@ -7246,6 +7264,7 @@ function mailpit_install() {
     # Se abre entero en su carpeta (ya comprobado con su sha256) y se busca el programa; si falla, con
     # el error de tar y la pagina de descarga
     local x=$rtmp/x bin lic err
+    task_step
     if ! err=$({ $SUDO /bin/mkdir "$x" && $SUDO /usr/bin/tar -xzf "$rtmp/mailpit.tar.gz" -C "$x" --no-same-owner; } 2>&1); then
         $SUDO rm -rf "$rtmp"
         echo "No se ha podido abrir el paquete de Mailpit: no se instala."
@@ -9287,11 +9306,14 @@ function install_update() {
     else
         work=$($SUDO mktemp -d /private/tmp/lvm-actualizar.XXXXXX) && $SUDO chmod 755 "$work" || return 1
     fi
+    task_plan "Actualizando Nexum Dev Stack a la $v" "Copiar el paquete" "Comprobar su firma" "Instalar la versión"
+    task_step
     if ! { $SUDO install -m 644 "$zip" "$work/nuevo.zip" && $SUDO install -m 644 "$zip.sig" "$work/nuevo.zip.sig"; }; then
         $SUDO rm -rf "$work"
         echo "No se ha podido copiar $zip"
         return 1
     fi
+    task_step
     if [ "$($SUDO /usr/bin/python3 -I -c "$UPDATE_VERIFY_PY" "$work/nuevo.zip" "$work/nuevo.zip.sig" "$UPDATE_KEY_B64" "$UPDATE_KEY_FPR")" != FIRMA-BUENA ]; then
         $SUDO rm -rf "$work"
         echo "$zip no lleva la firma de quien publica el programa: no se instala."
@@ -9310,6 +9332,7 @@ function install_update() {
         echo "El lvm-instalador.sh de $zip no es la $v o esta dañado: no se instala."
         return 1
     fi
+    task_step
     echo "Instalando la $v en $dest..."
     # Al lado del instalado y despues con mv: si algo falla, el de antes sigue entero
     if ! { $SUDO install "${owner[@]}" -m 755 "$work/lvm-instalador.sh" "$dest.nuevo" && $SUDO mv -f "$dest.nuevo" "$dest"; }; then
@@ -10757,6 +10780,33 @@ function remove_version() {
 function progress_parts() {
     [ -n "$PROGRESS" ] && echo "C|$(IFS=';'; echo "$*")" >> "$PROGRESS"
     return 0
+}
+
+# Pasos de una tarea de la ventana (LVM_PROGRESO): la lista que se va marcando. task_plan <titulo>
+# <paso>... y un task_step al empezar cada paso. Solo manda quien hizo el plan: lo que llame por dentro
+# (una instalacion dentro de otra) no cambia la lista. Fuera de la ventana no hace nada.
+TASK_OWNER="" TASK_CUR=0
+TASK_NAMES=()
+function task_plan() {
+    [ -n "$LVM_PROGRESO" ] && [ -z "$TASK_OWNER" ] || return 0
+    local name=${1//[|$'\n']/ } parts
+    shift
+    TASK_OWNER=${FUNCNAME[1]} TASK_CUR=0
+    TASK_NAMES=("$@")
+    parts=$(IFS=';'; echo "${TASK_NAMES[*]//;/,}")
+    { echo "I|1|1|$name|$(date +%s)"; echo "C|${parts//[|$'\n']/ }"; } >> "$LVM_PROGRESO"
+    return 0
+}
+function task_step() {
+    [ -n "$LVM_PROGRESO" ] && [ "$TASK_OWNER" == "${FUNCNAME[1]}" ] && [ "$TASK_CUR" -lt "${#TASK_NAMES[@]}" ] || return 0
+    TASK_CUR=$(( TASK_CUR + 1 ))
+    local what=${TASK_NAMES[TASK_CUR - 1]}
+    task_detail "${what//[|$'\n']/ }" "" "" 0 "$(date +%s)"
+}
+# El avance por dentro del paso de ahora: task_detail <texto> <modo> <fichero> <total> <inicio>
+function task_detail() {
+    local n=${#TASK_NAMES[@]}
+    echo "S|$TASK_CUR|$(( (TASK_CUR - 1) * 100 / n ))|$(( TASK_CUR * 100 / n ))|$1|$2|$3|$4|$5" >> "$LVM_PROGRESO"
 }
 
 function progress() {
@@ -14769,7 +14819,9 @@ function import_database() {
     local start=$(date +%s)
 
     exec 3< "$file"
-    if [ -n "$progress" ]; then
+    if [ -n "$TASK_OWNER" ]; then
+        task_detail "cargando" lsof "$BASHPID:3" "$size" "$start"
+    elif [ -n "$progress" ]; then
         { echo "I|1|1|Cargando $name en $db|$start"
           echo "S|1|0|100|cargando|lsof|$BASHPID:3|$size|$start"; } >> "$progress"
     fi
@@ -14802,7 +14854,7 @@ function import_database() {
         [ -n "$saved" ] && echo "Lo que tenia antes esta en $saved (se vuelve a cargar con importar-bd)."
         return 130
     fi
-    [ -n "$progress" ] && echo "R|bd:$db|$rc" >> "$progress"
+    [ -n "$progress" ] && [ -z "$TASK_OWNER" ] && echo "R|bd:$db|$rc" >> "$progress"
 
     local secs=$(( $(date +%s) - start ))
     if [ $rc -ne 0 ]; then
@@ -17650,6 +17702,7 @@ function swift_source() {
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import WebKit
 
 // MARK: - Constantes y utilidades
 
@@ -19138,6 +19191,7 @@ final class TaskRunner: ObservableObject, Identifiable {
         } else {
             head = "No se ha podido completar"
             barText = "Error"
+            pctText = ""
             if fraction == nil { fraction = 0 }
             showLog = true
             failed = true
@@ -19918,7 +19972,7 @@ final class AppModel: ObservableObject {
                 guard confirm("Hay una versión nueva de Nexum Dev Stack",
                               "Tienes la \(current); en GitHub está la \(u[1]) (\(u[2])), firmada por quien hace el programa. Huella SHA-256:\n\(u[3])\n\nSe cambia el gestor y la ventana se vuelve a abrir. Tus versiones de PHP, proyectos y BBDD no se tocan.",
                               "Actualizar a la \(u[1])") else { return }
-                self.runTask("Actualizando Nexum Dev Stack a la \(u[1])", ["actualizar-gestor", path],
+                self.runTask("Actualizando Nexum Dev Stack a la \(u[1])", ["actualizar-gestor", path], progress: true,
                              doneText: "Instalada la \(u[1])", autoClose: true) { ok, _, _ in
                     if !ok { self.toast("No se ha actualizado"); return }
                     if !SIMULATE { relaunchApp() }
@@ -20142,7 +20196,7 @@ final class AppModel: ObservableObject {
 
     /// phpMyAdmin más nuevo que admite el PHP de una versión ("--todas": todas las que lo necesiten)
     func updatePma(_ folder: String) {
-        runTask("Actualizando phpMyAdmin", ["actualizar-phpmyadmin", folder],
+        runTask("Actualizando phpMyAdmin", ["actualizar-phpmyadmin", folder], progress: true,
                 doneText: "phpMyAdmin actualizado", autoClose: true)
     }
 
@@ -20465,6 +20519,9 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// El visor de la bandeja, siempre el mismo: al cambiar de apartado no se pierde el correo abierto
+    lazy var mailWeb = MailWebHost()
+
     /// Botón Correo de arriba: la bandeja de Mailpit o, si no está instalado o parado, por qué
     func openMail() {
         guard let m = data?.mail else { return }
@@ -20475,8 +20532,8 @@ final class AppModel: ObservableObject {
         } else if !m.running {
             toast("Mailpit arranca con la versión activa: arráncala arriba")
         } else {
-            openURL(m.url)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.pollMail() }
+            toolsSection = "correo"
+            tab = "config"
         }
     }
 
@@ -20506,7 +20563,7 @@ final class AppModel: ObservableObject {
     }
 
     func installMail() {
-        runTask("Instalando Mailpit", ["correo", "instalar"], doneText: "Mailpit instalado", autoClose: true)
+        runTask("Instalando Mailpit", ["correo", "instalar"], progress: true, doneText: "Mailpit instalado", autoClose: true)
     }
 
     func clearMail() {
@@ -21290,7 +21347,7 @@ final class AppModel: ObservableObject {
         var args = ["montar-proyecto", url, folder, version, db]
         if let f = npFile { args.append(f) }
         let domain = npFake ? npDomain.trimmingCharacters(in: .whitespaces).lowercased() : ""
-        runTask("Montando el proyecto \(folder)", args,
+        runTask("Montando el proyecto \(folder)", args, progress: true,
                 doneText: "\(folder) está clonado, cargado en XAMPP-\(version) y con su BBDD \(db)") { ok, _, _ in
             guard ok else { return }
             self.npOpen = false
@@ -23482,7 +23539,7 @@ extension AppModel {
             openURL(DOCKER_DOWNLOAD)
             return
         }
-        runTask("Abriendo Docker Desktop", ["docker-instalar"], doneText: "Docker Desktop listo", autoClose: true)
+        runTask("Abriendo Docker Desktop", ["docker-instalar"], progress: true, doneText: "Docker Desktop listo", autoClose: true)
     }
 
     func openDockerForm(folder: String?) {
@@ -23529,7 +23586,7 @@ extension AppModel {
         }
         text += " La primera vez con cada PHP se prepara su imagen (unos minutos). Pide la contraseña de administrador.\n\n\(HTDOCS) tiene que estar en Docker Desktop, Settings › Resources › File sharing."
         guard confirm("¿Crear \(f.folder) en Docker?", text, "Crear en Docker") else { return }
-        runTask("Creando \(f.folder) en Docker", args, doneText: "\(f.folder) en Docker: \(site)") { ok, _, _ in
+        runTask("Creando \(f.folder) en Docker", args, progress: true, doneText: "\(f.folder) en Docker: \(site)") { ok, _, _ in
             if ok { self.dkForm = DockerForm() }
             self.reloadDocker()
         }
@@ -23619,7 +23676,7 @@ extension AppModel {
         guard confirm("¿Actualizar la imagen de PHP \(vs)?",
                       "Se descarga otra vez la imagen oficial (php:<versión>-apache, con sus últimos parches), se rehace y se vuelve a crear el contenedor de PHP de \(p.folder). Su BBDD y su configuración no se tocan. Tarda unos minutos.",
                       "Actualizar la imagen") else { return }
-        runTask("Actualizando la imagen de PHP \(vs)", ["docker-imagen", p.slug],
+        runTask("Actualizando la imagen de PHP \(vs)", ["docker-imagen", p.slug], progress: true,
                 doneText: "\(p.folder) con la imagen nueva de PHP \(vs)")
     }
 
@@ -23696,7 +23753,7 @@ extension AppModel {
                 guard confirm("Docker Desktop no está en marcha",
                               "Se abre Docker Desktop y, cuando responda, se sigue con \(x.name).",
                               "Abrir Docker Desktop") else { return }
-                self.runTask("Abriendo Docker Desktop", ["docker-instalar"], doneText: "Docker Desktop listo",
+                self.runTask("Abriendo Docker Desktop", ["docker-instalar"], progress: true, doneText: "Docker Desktop listo",
                              autoClose: true) { ok, _, _ in
                     if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.dockerForLoaded(x) } }
                 }
@@ -23812,7 +23869,7 @@ extension AppModel {
             let src = sources[si].0.split(separator: "|", maxSplits: 1).map(String.init)
             if src.count == 2 { args += ["--bd", src[1], "--desde", src[0]] + (wp && modePop.indexOfSelectedItem == 0 ? ["--en-vivo"] : []) }
         }
-        runTask("Montando \(x.name) en Docker", args, doneText: "\(x.name) en Docker") { ok, _, _ in
+        runTask("Montando \(x.name) en Docker", args, progress: true, doneText: "\(x.name) en Docker") { ok, _, _ in
             self.reloadDocker()
             if ok { self.openTab("docker") }
         }
@@ -26653,7 +26710,7 @@ extension AppModel {
         if installed {
             open()
         } else {
-            runTask("Instalando cloudflared", ["tunel-instalar"], doneText: "cloudflared instalado", autoClose: true) { ok, _, _ in
+            runTask("Instalando cloudflared", ["tunel-instalar"], progress: true, doneText: "cloudflared instalado", autoClose: true) { ok, _, _ in
                 self.reloadTunnelInfo()
                 if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { open() } }
             }
@@ -26873,7 +26930,7 @@ extension AppModel {
         guard confirm("¿Pasar \(p.folder) al Apache de Docker?",
                       "Ya no necesitará XAMPP-X y podrás añadirle más versiones de PHP. Antes se guarda una copia de su BBDD (\(p.db)) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus contenedores de ahora, su vhost de XAMPP-X, su clave y su línea de /etc/hosts. Pide la contraseña de administrador.",
                       "Pasarlo") else { return }
-        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug],
+        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug], progress: true,
                 doneText: "\(p.folder) ya va con el Apache de Docker") { _, _, _ in self.reloadDocker() }
     }
 }
@@ -28430,7 +28487,7 @@ struct ToolsView: View {
                 leading: { LogoShape(d: LOGO_PATHS["cloudflare"] ?? "").fill(brand("cloudflare")).frame(width: 20, height: 20) }) {
                 if let f = info, f[1] != "1" || f[2] != f[3] {
                     Button(f[1] != "1" ? "Instalar" : "Actualizar a la \(f[3])") {
-                        model.runTask("Instalando cloudflared", ["tunel-instalar"], doneText: "cloudflared instalado", autoClose: true) { _, _, _ in
+                        model.runTask("Instalando cloudflared", ["tunel-instalar"], progress: true, doneText: "cloudflared instalado", autoClose: true) { _, _, _ in
                             model.reloadTunnelInfo()
                         }
                     }
@@ -28523,7 +28580,6 @@ struct ToolsView: View {
                                 .disabled(model.busy)
                         }
                         Button("Vaciar") { model.clearMail() }.disabled(!m.running || model.busy)
-                        Button("Abrir") { openURL(m.url) }.disabled(!m.running)
                     }
                 } else {
                     Tile("Mailpit no está instalado",
@@ -28534,7 +28590,29 @@ struct ToolsView: View {
                     }
                 }
             }
+            if m.installed {
+                mailInbox(m)
+            }
         }
+    }
+
+    /// Debajo de las tarjetas: la bandeja de Mailpit o por qué no se ve
+    @ViewBuilder
+    func mailInbox(_ m: MailState) -> some View {
+        Group {
+            if m.running {
+                MailWebView(host: model.mailWeb, url: m.url)
+                    // (mientras se ve, el número de sin leer de arriba sigue a lo que se lee o se borra aquí)
+                    .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.pollMail() }
+            } else {
+                Text("Mailpit está parado: arranca con la versión activa.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(height: 620)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.1), lineWidth: 1))
     }
 
     func mailInboxText(_ m: MailState) -> String {
@@ -28907,6 +28985,84 @@ final class TermTextView: NSTextView {
 }
 
 /// El texto de la terminal en su caja con barra de desplazamiento
+/// La bandeja de Mailpit dentro de la ventana, sin nada en disco. Solo se navega dentro de Mailpit: un
+/// enlace de un correo va al navegador, y solo si se ha pulsado
+final class MailWebHost: NSObject, WKNavigationDelegate, WKUIDelegate {
+    let view: WKWebView
+    private var loaded = ""
+
+    override init() {
+        let conf = WKWebViewConfiguration()
+        conf.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+        view = WKWebView(frame: .zero, configuration: conf)
+        super.init()
+        view.navigationDelegate = self
+        view.uiDelegate = self
+    }
+
+    func show(_ url: String) {
+        guard loaded != url, let u = URL(string: url) else { return }
+        loaded = url
+        view.load(URLRequest(url: u))
+    }
+
+    private func external(_ url: URL?) {
+        if let u = url, u.scheme == "http" || u.scheme == "https" { openURL(u.absoluteString) }
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let target = action.request.url?.absoluteString ?? ""
+        if !loaded.isEmpty && (target.hasPrefix(loaded) || target.hasPrefix("about:") || target.hasPrefix("blob:" + loaded)) {
+            decisionHandler(.allow)
+            return
+        }
+        decisionHandler(.cancel)
+        if action.navigationType == .linkActivated { external(action.request.url) }
+    }
+
+    /// Un adjunto que no se puede enseñar: lo descarga el navegador, que pregunta dónde guardarlo
+    func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse,
+                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if response.canShowMIMEType {
+            decisionHandler(.allow)
+        } else {
+            decisionHandler(.cancel)
+            external(response.response.url)
+        }
+    }
+
+    /// target=_blank: nada de ventanas nuevas; al navegador si se ha pulsado
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if action.navigationType == .linkActivated { external(action.request.url) }
+        return nil
+    }
+
+    // (parado o sin responder: se vuelve a pedir la próxima vez que se vea en marcha)
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loaded = ""
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        webView.reload()
+    }
+}
+
+struct MailWebView: NSViewRepresentable {
+    let host: MailWebHost
+    let url: String
+
+    func makeNSView(context: Context) -> WKWebView {
+        host.show(url)
+        return host.view
+    }
+
+    func updateNSView(_ view: WKWebView, context: Context) {
+        host.show(url)
+    }
+}
+
 struct TermHost: NSViewRepresentable {
     let session: TermSession
 
@@ -29388,6 +29544,7 @@ function tunnel_install() {
         echo "cloudflared $TUNNEL_VERSION ya esta instalado en $TUNNEL_DIR"
         return 0
     fi
+    task_plan "Instalando cloudflared $TUNNEL_VERSION" "Descargar cloudflared" "Comprobar la descarga" "Instalar cloudflared"
     echo "Instalando cloudflared $TUNNEL_VERSION (tunel de Cloudflare) en $TUNNEL_DIR"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga de $url y comprobacion de su sha256"
@@ -29399,18 +29556,21 @@ function tunnel_install() {
     fi
     mkdir -p -m 700 "$TUNNEL_DIR" || return 1
     tmp=$(mktemp -d "$TUNNEL_DIR/cloudflared-descarga.XXXXXX") || return 1
+    task_step
     echo "Descargando cloudflared-darwin-$arch.tgz (unos 20 MB)..."
     if ! curl -fsSL "${tls[@]}" --retry 2 --max-time 900 -o "$tmp/cloudflared.tgz" "$url"; then
         rm -rf "$tmp"
         echo "No se ha podido descargar cloudflared ($url)"
         return 1
     fi
+    task_step
     got=$(shasum -a 256 "$tmp/cloudflared.tgz" 2> /dev/null | cut -d' ' -f1)
     if [ "$got" != "$sha" ]; then
         rm -rf "$tmp"
         echo "La descarga de cloudflared no coincide con su suma sha256 (${got:-ninguna}): no se instala."
         return 1
     fi
+    task_step
     if ! tar -xzf "$tmp/cloudflared.tgz" -C "$tmp" cloudflared 2> /dev/null || [ ! -f "$tmp/cloudflared" ] || [ -L "$tmp/cloudflared" ]; then
         rm -rf "$tmp"
         echo "El paquete de cloudflared no trae su programa: no se instala."
@@ -30324,8 +30484,11 @@ function docker_install() {
         echo "Docker Desktop ya esta en marcha (socket $(docker_sock))."
         return 0
     fi
+    task_plan "Abriendo Docker Desktop" "Abrir Docker Desktop" "Esperar a que responda"
+    task_step
     echo "Abriendo Docker Desktop..."
     run open -a "$DOCKER_APP" || return 1
+    task_step
     local i
     for i in $(seq 90); do docker_ready && break; [ "$DRY" -eq 1 ] && break; sleep 1; done
     if [ "$DRY" -eq 0 ] && ! docker_ready; then
@@ -30636,8 +30799,11 @@ function docker_create() {
     [ -n "$rel" ] && echo "CONFIG=$rel" >> "$dir/proyecto.conf"
     docker_compose_file "$slug" > "$dir/compose.yaml" || return 1
 
+    task_plan "Creando $folder en Docker" "Imagen de PHP $php" "Contenedores" "BBDD $dbname" "Vhost de $domain"
+    task_step
     echo "1/4 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "2/4 Contenedores"
     if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d; then
         # (Docker Desktop solo comparte con los contenedores las carpetas de su lista: /Applications no esta)
@@ -30645,6 +30811,7 @@ function docker_create() {
         echo "Desktop, Settings > Resources > File sharing, pulsa Apply y vuelve a probar (Docker, Arrancar)."
         return 1
     fi
+    task_step
     echo "3/4 BBDD $dbname"
     local i
     for i in $(seq 60); do
@@ -30672,6 +30839,7 @@ function docker_create() {
             grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
+    task_step
     echo "4/4 Vhost de $domain"
     local crt=$OWN_SSL_DIR/$domain-selfsigned.crt key=$OWN_SSL_DIR/$domain-selfsigned.key copy
     [ -f "$crt" ] || make_selfsigned "$domain" "" "$crt" "$key" || return 1
@@ -30792,10 +30960,16 @@ function docker_update_image() {
     if docker_web_project "$slug"; then
         [ "$DRY" -eq 1 ] && { echo "  [simulacion] dk build --pull --no-cache de nexum-php:$(docker_conf "$slug" PHP | tr ' ' ',')"; return 0; }
         docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
+        local steps=()
+        for php in $(docker_conf "$slug" PHP); do steps+=("Imagen de PHP $php"); done
+        steps+=("Volver a crear sus contenedores")
+        task_plan "$slug: imágenes de PHP" "${steps[@]}"
         for php in $(docker_conf "$slug" PHP); do
+            task_step
             echo "Imagen de PHP $php: se descarga otra vez la oficial (php:$php-apache) y se rehace"
             docker_php_image "$php" --nueva || { echo "No se ha podido rehacer la imagen de PHP $php: sigue la de antes"; return 1; }
         done
+        task_step
         dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate $(docker_web_services "$slug") || return 1
         echo "Imagenes de PHP de $slug al dia"
         return 0
@@ -30805,8 +30979,11 @@ function docker_update_image() {
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] dk build --pull --no-cache -t nexum-php:$php y contenedor de PHP nuevo"; return 0; }
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
     state=$(docker_state "$slug")
+    task_plan "$slug: imagen de PHP $php" "Imagen de PHP $php" "Volver a crear su contenedor"
+    task_step
     echo "Imagen de PHP $php: se descarga otra vez la oficial (php:$php-apache) y se rehace"
     docker_php_image "$php" --nueva || { echo "No se ha podido rehacer la imagen: sigue la de antes"; return 1; }
+    task_step
     if [ "$state" == marcha ] || [ "$state" == parcial ]; then
         dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d --force-recreate php || return 1
     fi
@@ -31950,6 +32127,8 @@ function docker_web_create() {
         docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
         return
     fi
+    task_plan "Montando $folder en Docker" "MariaDB $maria común" "Imagen de PHP $php" "BBDD $dbname" "Apache de Docker" "Certificado en el navegador"
+    task_step
     echo "1/5 MariaDB $maria comun"
     docker_maria_up "$maria" || return 1
     if [ "$(docker_maria_sql "$maria" -N -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '$dbname'" < /dev/null 2> /dev/null | tr -d '\r')" != 0 ]; then
@@ -31970,8 +32149,10 @@ function docker_web_create() {
     # (el dominio: el de la tienda o el de la version)
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    task_step
     echo "2/5 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "3/5 BBDD $dbname"
     docker_maria_sql "$maria" << EOF || return 1
 CREATE DATABASE \`$dbname\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -32000,10 +32181,12 @@ EOF
             grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
         fi
     fi
+    task_step
     echo "4/5 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    task_step
     echo "5/5 Certificado en el navegador"
     docker_web_trust
     echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php). phpMyAdmin: $(docker_web_url "$(docker_web_pma)")"
@@ -32023,14 +32206,19 @@ function docker_web_create_live() {
       docker_fpm_conf > "$dir/fpm.conf" ) || return 1
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
+    task_plan "Montando $folder en Docker" "Imagen de PHP $php" "BBDD en vivo" "Apache de Docker" "Certificado en el navegador"
+    task_step
     echo "1/4 Imagen de PHP $php"
     docker_php_image "$php" || { echo "No se ha podido preparar la imagen de PHP $php"; return 1; }
+    task_step
     echo "2/4 BBDD $(docker_conf "$slug" BBDD) de XAMPP-$owner, en vivo (la misma que web.local)"
     lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    task_step
     echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
     docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
+    task_step
     echo "4/4 Certificado en el navegador"
     docker_web_trust
     echo "Proyecto en Docker listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php), con la BBDD de XAMPP-$owner en vivo"
@@ -32615,6 +32803,8 @@ function docker_pass() {
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
     docker_web_ports_ok || { echo "La direccion del Apache de Docker aun no esta en este Mac: pulsa «Permitir» en Configuracion, Docker"; return 1; }
     sudo_first || return 1
+    task_plan "Pasando $folder al Apache de Docker" "Copiar su BBDD" "Quitar el proyecto de antes" "Montarlo en el Apache de Docker"
+    task_step
     echo "Copia de su BBDD ($db)"
     mkdir -p -m 700 "$HOME/lvm-copias" || return 1
     backup="$HOME/lvm-copias/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
@@ -32636,7 +32826,9 @@ function docker_pass() {
         return 1
     fi
     echo "Copia de $db: $backup"
+    task_step
     docker_action borrar "$slug" || { echo "No se ha podido quitar el proyecto de antes (la copia de su BBDD esta en $backup)"; return 1; }
+    task_step
     if [ -n "$target" ]; then
         docker_web_add "$target" "$php" || return 1
         echo "$folder ya tenia BBDD en el sistema nuevo: la de $slug no se carga (esta en $backup)"
@@ -32764,6 +32956,18 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.40.14 (6 nov 2026)
+- Correo de pruebas: la bandeja de Mailpit se ve dentro de la ventana,
+  debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de
+  abrir el navegador. Los enlaces de los correos sí se abren en el
+  navegador al pulsarlos.
+
+1.40.13 (6 nov 2026)
+- Instalaciones y actualizaciones: encima de «Ver registro» sale la
+  lista de lo que se está haciendo y cada paso se marca con un check al
+  acabar. También al actualizar un proyecto o los componentes, al montar
+  un proyecto nuevo, en Docker, Mailpit, cloudflared y phpMyAdmin.
 
 1.40.12 (6 nov 2026)
 - Proyecto cargado: los botones se llaman «Actualizar» e «Importar». Al
@@ -34630,7 +34834,20 @@ function components_update() {
         return 0
     fi
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
+    local steps=()
     for v in $imgs; do
+        case $v in
+            mariadb:*) steps+=("MariaDB ${v#mariadb:} de Docker") ;;
+            "$DOCKER_PMA_IMAGE") steps+=("phpMyAdmin de Docker") ;;
+            php:*) v=${v#php:}; steps+=("Imagen de PHP ${v%-*}") ;;
+            *) steps+=("$v") ;;
+        esac
+    done
+    for v in $progs; do steps+=("$v"); done
+    for v in $folders; do steps+=("XAMPP-$v"); done
+    task_plan "Actualizando los componentes" "${steps[@]}"
+    for v in $imgs; do
+        task_step
         case $v in
             mariadb:*)
                 v=${v#mariadb:}
@@ -34660,9 +34877,10 @@ function components_update() {
         esac
     done
     [ -n "$imgs" ] && dk image prune -f > /dev/null 2>&1
-    [[ " $progs " == *" Mailpit "* ]] && { mailpit_install || fail=1; }
-    [[ " $progs " == *" cloudflared "* ]] && { tunnel_install || fail=1; }
+    [[ " $progs " == *" Mailpit "* ]] && { task_step; mailpit_install || fail=1; }
+    [[ " $progs " == *" cloudflared "* ]] && { task_step; tunnel_install || fail=1; }
     for v in $folders; do
+        task_step
         echo "XAMPP-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"
         ( cli_rebuild "$v" ) || fail=1
     done
@@ -34750,6 +34968,7 @@ function update_pma() {
         echo "phpMyAdmin de $version ya esta al dia ($cur, PHP $php)"
         return 0
     fi
+    task_plan "Actualizando phpMyAdmin de $version" "Descargar y comprobar phpMyAdmin $want" "Preparar su configuración" "Cambiar la carpeta"
     echo "phpMyAdmin de $version: ${cur:-version antigua} -> $want (PHP $php)"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] descarga, comprobacion sha256 y cambio de $dir (el anterior en phpmyadmin.anterior)"
@@ -34761,6 +34980,7 @@ function update_pma() {
         echo "No se cambia phpMyAdmin: XAMPP-$version no es de root (lvm-instalador asegurar --todas)"
         return 1
     fi
+    task_step
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-pma.XXXXXX") || return 1
     sum=$(pma_sum "$want")
     if ! download "https://files.phpmyadmin.net/phpMyAdmin/$want/phpMyAdmin-$want-all-languages.tar.xz" "$tmp/pma.tar.xz" "$sum" \
@@ -34772,6 +34992,7 @@ function update_pma() {
     new=$tmp/phpMyAdmin-$want-all-languages
     [ -d "$new" ] || { rm -rf "$tmp"; echo "El paquete de phpMyAdmin no es el esperado"; return 1; }
     # La configuracion de antes; la clave de las cookies de XAMPP es la misma en todos (xampp)
+    task_step
     cp "$dir/config.inc.php" "$new/config.inc.php" || { rm -rf "$tmp"; return 1; }
     python3 -I - "$new/config.inc.php" <<'PY'
 import re, secrets, string, sys
@@ -34796,6 +35017,7 @@ PY
         echo "El phpMyAdmin descargado tiene enlaces (no deberia): no se cambia nada"
         return 1
     fi
+    task_step
     if ! { $SUDO rm -rf "$root/phpmyadmin.anterior" && $SUDO mv "$dir" "$root/phpmyadmin.anterior"; }; then
         echo "No se ha podido apartar $dir: no se cambia nada"
         rm -rf "$tmp"
