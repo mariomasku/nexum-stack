@@ -150,6 +150,9 @@
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y permitir que Docker sin root use los de
 #       menos de 1024. dns activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test
 #       y dejan de ir en /etc/hosts; web.local y lo demas, igual)
+#   lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
+#   lvm-instalador node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
+#   lvm-instalador node-registro <carpeta>     lo ultimo que ha dicho su servidor
 #   lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
 #   lvm-instalador tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
@@ -771,7 +774,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.56.33"
+APP_VERSION="1.57.2"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -12643,6 +12646,37 @@ QUE HACE
 
 VERSIONES
 
+1.57.2 (7 nov 2026)
+- Configuración: sus apartados, en una columna pegada al menú
+  lateral, y en filas (Docker y el correo de pruebas siguen en
+  tarjetas). El correo de pruebas se enciende con el interruptor de su
+  título; en la dirección del Apache de Docker, Guardar va debajo de
+  sus campos.
+- Parches nuevos: en lugar de preguntar al abrir, sale un aviso arriba
+  (al lado del visor) con lo que tiene un parche y si conviene ponerlo.
+  «Ahora no» lo deja hasta que salga otro.
+
+1.57.1 (7 nov 2026)
+- Instalaciones en segundo plano: la ventana de una instalación o
+  actualización tiene «Seguir en segundo plano» (también con Esc) y
+  el programa se puede usar mientras tanto. Al lado del visor sale una
+  flecha verde que late, con lo que hace
+  («Actualizando…», «Instalando…») y el porcentaje; al pulsarla vuelve la
+  ventana. Si acaba bien, avisa; si falla, la ventana vuelve sola. No
+  se puede lanzar otra tarea hasta que acabe.
+- Apariencia, en Configuración: los iconos del menú lateral en color
+  o de un color, como el texto; Docker, Node y PHP con su logotipo y su
+  tipografía; qué apartados salen en el menú (Proyectos y Configuración,
+  siempre), y los botones del proyecto. Bases de datos, con su icono de
+  discos apilados.
+
+1.57.0 (6 nov 2026)
+- Proyectos de Node: nueva pestaña Node para los proyectos de htdocs
+  hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno se arranca en
+  desarrollo o compilado, con la versión de Node que pide y sus
+  dependencias, y el compilado se puede compartir con un túnel de
+  Cloudflare. En la terminal: node-arrancar, node-parar y node-registro.
+
 1.56.33 (6 nov 2026)
 - Correo de pruebas: la bandeja de Mailpit se ve dentro de la ventana,
   debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de
@@ -19934,6 +19968,7 @@ function gui_source() {
 # los comandos gui-* (datos) y con los de siempre (use, instalar, actualizar, desinstalar...)
 # dentro de una pseudoterminal, para que sudo funcione igual que en la terminal; la contraseña
 # se pide en una ventana y se escribe en esa terminal.
+import base64
 import codecs
 import fcntl
 import html
@@ -19942,6 +19977,7 @@ import json
 import os
 import pty
 import re
+import zlib
 import shlex
 import shutil
 import signal
@@ -20433,6 +20469,11 @@ def icon(name, size=16):
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 LOGO_PATHS = {
+    # (bases de datos: discos apilados; Node: su hexágono)
+    "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
+    "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
+    # (flecha de descarga: la tarea en segundo plano)
+    "descarga": "M 10.6 3 L 13.4 3 L 13.4 11.6 L 17.2 7.8 L 19.2 9.8 L 12 17 L 4.8 9.8 L 6.8 7.8 L 10.6 11.6 Z M 4 19 L 20 19 L 20 21.6 L 4 21.6 Z",
     "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
     "imagenes": "M 9 10 C 10.105 10 11 9.105 11 8 C 11 6.895 10.105 6 9 6 C 7.895 6 7 6.895 7 8 C 7 9.105 7.895 10 9 10 Z M 13 2 L 9 2 C 4 2 2 4 2 9 L 2 15 C 2 20 4 22 9 22 L 15 22 C 20 22 22 20 22 15 L 22 10 M 18 2 L 18 8 L 20 6 M 18 8 L 16 6 M 2.67 18.95 L 7.6 15.64 C 8.39 15.11 9.53 15.17 10.24 15.78 L 10.57 16.07 C 11.35 16.74 12.61 16.74 13.39 16.07 L 17.55 12.5 C 18.33 11.83 19.59 11.83 20.37 12.5 L 22 13.9",
     # (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
@@ -20672,7 +20713,7 @@ LOGO_PATHS = {
 }
 
 # Color de cada logotipo: el de la marca y, con el tema oscuro, uno algo más claro para que se vea
-LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
+LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "node": ("#5FA04E", "#6CC24A"), "descarga": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
@@ -20717,19 +20758,148 @@ def logo(name, size=18):
     return img
 
 
+# Logotipos con su tipografía (Apariencia): los oficiales de Docker (docker.com), Node.js (nodejs.org; con
+# letra oscura en el tema claro y clara en el oscuro) y PHP (php.net), en SVG comprimido
+BRAND_SVG = {
+    "docker": "eNqFVk1v2zgQvfdXCOqlC5AUvyWmtg976qEB9tRDLkXgOJaxWiewvHKKRf/7vkfKSdEmbhBLQ3I4M2/mzdiLcdpWu7tl/fn22+bw1dTV0z/DflzW/fH4eNU0p9NJnZx6OGwbq7VuoD6rXD0Nu/3frymalFKTT+tq2hzG3cN+WRsF29Nuc/rz4WlZ60pXxgZd2djVq8Xd5n5cLcbjt2GzelflPzUedfXfvKiq+90wXFX7h/3m47z3/d2LpvlF870NUd/fv6Zsf1BeD7tH+Xh77K+qfw/Dh/dcc/nHy0U+F02JbcHzv3CeU3ZWBoDDZn2EsdsRmUPgdXXa3R17oLY+qVRX/Wa37Y/LmnCb1aI524FYsG9fblvY264WtPyyieTB47VzXhijlVnLTjkZVJROKys76aMy0qlWqiRNUJ1M0iacWC+9Vt0A3ZDP8RG4t5atsrAlYc0JG3ACdeGSUJ3oKEHPtMoLblsP61Zzy0qXoJLgHuhwF9InvZbQNEkZYWkfAQgbRQdH2Igw5uDUi6gCjAfcidDmv295bFUSSePAORGpqOHIKC9dwE0TGLyB/w4RK4uAiElYOnISjqDJywDBiOf3M+Ze31wjFCsSguuli6qd+OizlNc318Yx0IsabWKYFzSsbZmQCxquZe6g8AkN8etxjhKldJejvKiRo/y9hv75+Iu+ITdf5Z33ubQuM885BKllJPFAnFSkiLqOwJ8lVFGjJllCqVDsCNyeZWYVv2Av9J4pMB1OenI0ThIEcmtpUUpPeoGUwlowz7tZurn20ZAFtqMm+KOlMySyh+MsMbrR2FkSz3uQpPF8ciWpUaR5523wMTEiA8dxrTMc3BExyRYR4T1mQSIkX6SYBDLV4o3zeWeWhGVvzReJJwZk4Wxcmg6d+0NotJIB0SMwBr4zGij5M675TWXqiOdrb2NqY8pGShpbpDEHll1kqaRxTl5g2H6WHGBiaHgOBcwaLHtMBAwUwyxxLLGtwYrAOiI7kaDOzOhKdkpGyI9Z8ozaighyJ1LXZ6ohBch2hw/9YJjN0tvAOt8Wzp35paNKQ0AFJTIdejwwDCOZGDnPYmQ9NDkY4Aszg6MuwOXEBwKBlczXt30aY2PmuFVuapXpkR+9tiR9yCll+hKnXJFGS1ScVGifnEzTw0MCXkHSyzzp0C3oIIZHCSRzhWSpSDlteVnIpc+pbPNAB+oiYa9Dz+s8moxHY/WhpS/HmeoKZ9DIhkWiOUojG9sLMjqHzr1L+DtDJbqYE5bwDVAKACxxbVl38pyYMjp+iWSpJ90mdhUHElIAcOxqK1h2vAhlioixLwOq2c4f/BZZ/Q9szgOv",
+    "node-claro": "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",
+    "node-oscuro": "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",
+    "php": "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",
+}
+BRAND_RATIO = {"docker": 4.6642, "node-claro": 3.3375, "node-oscuro": 3.3375, "php": 1.854}
+_brand_cache = {}
+
+
+def brand_pixbuf(key, height, scale):
+    k = (key, height, scale)
+    if k not in _brand_cache:
+        loader = GdkPixbuf.PixbufLoader.new_with_type("svg")
+        h = height * scale
+        loader.set_size(int(round(h * BRAND_RATIO[key])), h)
+        loader.write(zlib.decompress(base64.b64decode(BRAND_SVG[key])))
+        loader.close()
+        _brand_cache[k] = loader.get_pixbuf()
+    return _brand_cache[k]
+
+
+def row_selected(widget):
+    """¿Va en la fila elegida de una lista? (GTK no les pasa ese estado a los dibujos de dentro)"""
+    row = widget.get_ancestor(Gtk.ListBoxRow)
+    return row is not None and row.is_selected()
+
+
+class BrandLogo(Gtk.DrawingArea):
+    """El logotipo de Docker, Node o PHP con su tipografía. De un color (mono, o en la fila elegida) se
+    pinta con el del texto; PHP, siempre en el suyo (de un color su óvalo taparía las letras)."""
+
+    def __init__(self, name, height, mono=False):
+        super().__init__()
+        self.name, self.height, self.mono = name, height, mono
+        key = "node-claro" if name == "node" else name
+        self.set_size_request(int(round(height * BRAND_RATIO[key])), height)
+        self.set_valign(Gtk.Align.CENTER)
+
+    def do_draw(self, cr):
+        scale = max(1, self.get_scale_factor())
+        key = ("node-oscuro" if dark_theme() else "node-claro") if self.name == "node" else self.name
+        pix = brand_pixbuf(key, self.height, scale)
+        y = (self.get_allocated_height() * scale - pix.get_height()) / 2
+        cr.save()
+        cr.scale(1.0 / scale, 1.0 / scale)
+        if self.name != "php" and (self.mono or row_selected(self)):
+            c = self.get_style_context().get_color(self.get_state_flags())
+            cr.set_source_rgba(c.red, c.green, c.blue, c.alpha)
+            cr.mask_surface(Gdk.cairo_surface_create_from_pixbuf(pix, 1, None), 0, y)
+        else:
+            Gdk.cairo_set_source_pixbuf(cr, pix, 0, y)
+            cr.paint()
+        cr.restore()
+        return False
+
+
+# Parches nuevos dejados para luego («Ahora no»): la lista de entonces; el aviso vuelve si cambia
+IGNORED_UPDATES_FILE = os.path.join(LOG_DIR, "parches-para-luego")
+_ignored_sim = []
+
+
+def updates_ignored(items):
+    if _ignored_sim:
+        return _ignored_sim[0] == "\n".join(sorted(items))
+    try:
+        with open(IGNORED_UPDATES_FILE, encoding="utf-8") as fh:
+            return fh.read(20000) == "\n".join(sorted(items))
+    except OSError:
+        return False
+
+
+def updates_ignore(items):
+    text = "\n".join(sorted(items))
+    if SIMULATE:
+        _ignored_sim[:] = [text]
+        return
+    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+    with open(IGNORED_UPDATES_FILE + ".nuevo", "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(IGNORED_UPDATES_FILE + ".nuevo", IGNORED_UPDATES_FILE)
+
+
+# Menú lateral: sus apartados (clave, texto e icono) y cómo se ven (Apariencia: ~/.lvm-instalador/apariencia)
+SIDEBAR = [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"), ("repos", "Repositorios", "logo:github"),
+                        ("versiones", "Versiones de PHP", "logo:php"), ("bbdd", "Bases de datos", "logo:bbdd"),
+                        ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node")]),
+           ("SISTEMA", [("dominios", "Dominios y hosts", "network-workgroup-symbolic"),
+                        ("config", "Configuración", "emblem-system-symbolic")])]
+# (siempre se ven: sin Configuración no se podrían volver a enseñar)
+SIDEBAR_FIXED = ("proyectos", "config")
+LOOK_FILE = os.path.join(LOG_DIR, "apariencia")
+_look_sim = {}
+
+
+def look_conf():
+    """color (iconos en color), marcas (Docker, Node y PHP con su logotipo) y ocultos (apartados que no se ven)."""
+    conf = dict(_look_sim)
+    if not conf:
+        try:
+            with open(LOOK_FILE, encoding="utf-8") as fh:
+                conf = json.loads(fh.read(4000))
+        except (OSError, ValueError):
+            conf = {}
+    if not isinstance(conf, dict):
+        conf = {}
+    keys = {k for _g, items in SIDEBAR for k, _t, _i in items} - set(SIDEBAR_FIXED)
+    hidden = conf.get("ocultos")
+    return {"color": conf.get("color") is True, "marcas": conf.get("marcas") is True,
+            "ocultos": {k for k in hidden if k in keys} if isinstance(hidden, list) else set()}
+
+
+def look_save(conf):
+    data = {"color": conf["color"], "marcas": conf["marcas"], "ocultos": sorted(conf["ocultos"])}
+    if SIMULATE:
+        _look_sim.clear()
+        _look_sim.update(data)
+        return
+    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+    with open(LOOK_FILE + ".nuevo", "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.replace(LOOK_FILE + ".nuevo", LOOK_FILE)
+
+
 class MonoLogo(Gtk.DrawingArea):
     """Logotipo de un solo color, el del texto de donde va (como los iconos simbólicos del tema): en
     la barra lateral, igual que los demás iconos, también al elegir el apartado o cambiar de tema."""
 
-    def __init__(self, name, size=16):
+    def __init__(self, name, size=16, colored=False):
         super().__init__()
-        self.name, self.size = name, size
+        self.name, self.size, self.colored = name, size, colored
         self.set_size_request(size, size)
         self.set_valign(Gtk.Align.CENTER)
 
     def do_draw(self, cr):
         c = self.get_style_context().get_color(self.get_state_flags())
         color = "#%02x%02x%02x" % (int(c.red * 255), int(c.green * 255), int(c.blue * 255))
+        # (en color, el suyo; en la fila elegida, el del texto, que se lea sobre el azul)
+        if self.colored and not row_selected(self):
+            color, c = None, Gdk.RGBA(0, 0, 0, 1)
         scale = max(1, self.get_scale_factor())
         pix = logo_pixbuf(self.name, self.size, scale, color)
         cr.save()
@@ -21105,16 +21275,20 @@ class TileGrid(Gtk.Grid):
         self.show_all()
 
 
-def group(title=None, description=None, tiles=False, columns=2):
+def group(title=None, description=None, tiles=False, columns=2, lead=None, tail=None):
     """Bloque con titulo (con su simbolo de informacion si hay descripcion) y una lista con
     bordes redondeados (o, con tiles, sus filas en tarjetas de dos en dos: TileGrid)."""
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     if title or description:
         head = Gtk.Box(spacing=6)
+        if lead is not None:
+            head.pack_start(lead, False, False, 2)
         if title:
             head.pack_start(label(title, "grupo-titulo"), False, False, 0)
         if description:
             head.pack_start(info_icon(description), False, False, 0)
+        if tail is not None:
+            head.pack_start(tail, False, False, 6)
         box.pack_start(head, False, False, 0)
     if tiles:
         lb = TileGrid(columns)
@@ -21125,9 +21299,10 @@ def group(title=None, description=None, tiles=False, columns=2):
     return box, lb
 
 
-def tile_group(title=None, description=None, columns=2):
-    """group() con sus filas en tarjetas de dos en dos, o de columns en columns (Configuración)."""
-    return group(title, description, tiles=True, columns=columns)
+def tile_group(title=None, description=None, columns=2, tiles=False, lead=None, tail=None):
+    """Un apartado de Configuración: en filas (desde la 1.57.1) o, con tiles, en tarjetas de dos en dos o de
+    columns en columns (Docker y el correo de pruebas)."""
+    return group(title, description, tiles=tiles, columns=columns, lead=lead, tail=tail)
 
 
 def fold_group(title, description, opened, on_toggle, summary=""):
@@ -22032,6 +22207,8 @@ class Task:
         self.app, self.args, self.progress = app, args, progress
         self.env, self.cancel_text = env or {}, cancel_text
         self.done_text, self.on_done, self.auto_close = done_text, on_done, auto_close
+        # (escondida con «Seguir en segundo plano»: el aviso de al lado del visor la trae de vuelta)
+        self.background = False
         self.finished = self.cancelled = False
         self.prompts = 0
         self.since_prompt = ""
@@ -22047,7 +22224,8 @@ class Task:
                          use_header_bar=True)
         dlg.set_default_size(620, -1)
         dlg.get_header_bar().set_show_close_button(False)
-        dlg.connect("delete-event", lambda *_: not self.finished)
+        # (Esc o cerrarla con la tarea en marcha: sigue en segundo plano, si la ventana tiene su aviso)
+        dlg.connect("delete-event", self.on_delete)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=24)
         # Al terminar bien, un check verde grande: «Terminado» en gris no se ve de un vistazo
         ok_icon = "emblem-ok-symbolic" if Gtk.IconTheme.get_default().has_icon(
@@ -22098,6 +22276,11 @@ class Task:
         self.extra_btn = css(Gtk.Button(), "verde", "pildora")
         self.extra_btn.set_no_show_all(True)
         buttons.pack_start(self.extra_btn, False, False, 0)
+        self.bg_btn = css(Gtk.Button(label="Seguir en segundo plano",
+                                     tooltip_text="Esconder esta ventana y seguir usando el programa"), "pildora")
+        self.bg_btn.connect("clicked", self.to_background)
+        self.bg_btn.set_no_show_all(not hasattr(self.app, "nv_task_badge"))
+        buttons.pack_start(self.bg_btn, False, False, 0)
         self.close_btn = css(Gtk.Button(label="Cancelar"), "pildora")
         self.close_btn.connect("clicked", self.on_close)
         buttons.pack_start(self.close_btn, False, False, 0)
@@ -22358,8 +22541,37 @@ class Task:
             pass
         self.finish(rc)
 
+    def on_delete(self, *_):
+        if self.finished:
+            return False
+        if hasattr(self.app, "nv_task_badge"):
+            self.to_background()
+        return True
+
+    def to_background(self, *_):
+        """La tarea sigue sin su ventana: el programa se puede usar (sin lanzar otra tarea a la vez) y, al
+        lado del visor, una flecha verde que late la trae de vuelta."""
+        if self.finished or not hasattr(self.app, "nv_task_badge"):
+            return
+        self.background = True
+        self.dlg.set_modal(False)
+        self.dlg.hide()
+        self.app.nv_task_badge(self)
+
+    def to_front(self, *_):
+        self.background = False
+        if hasattr(self.app, "nv_task_badge"):
+            self.app.nv_task_badge(None)
+        self.dlg.set_modal(True)
+        self.dlg.present()
+
     def finish(self, rc):
         self.finished = True
+        self.bg_btn.hide()
+        hidden = self.background
+        if hidden:
+            self.background = False
+            self.app.nv_task_badge(None)
         p = read_progress(self.pfile) if self.pfile else None
         if self.pfile:
             try:
@@ -22401,6 +22613,10 @@ class Task:
         if ok and self.auto_close:
             self.dlg.destroy()
             self.app.toast(self.done_text or "Terminado")
+        elif hidden:
+            # (en segundo plano: vuelve para enseñar cómo ha ido; si ha fallado, con su registro)
+            self.dlg.set_modal(True)
+            self.dlg.present()
 
     def log_text(self):
         return self.console.text()
@@ -25041,6 +25257,12 @@ class App(Gtk.Application):
 
     # acciones
     def run_task(self, title, args, **kw):
+        bg = getattr(self, "bg_task", None)
+        if self.busy and bg is not None and not bg.finished:
+            # (otra tarea en segundo plano: no van dos a la vez, que tocarían lo mismo)
+            self.toast("Hay una tarea en marcha: espera a que acabe")
+            bg.to_front()
+            return None
         self.busy = True
         user_done = kw.pop("on_done", None)
 
@@ -26983,7 +27205,12 @@ NEW_CSS = """
 .nv-nav row:hover { background-color: alpha(@theme_fg_color, 0.06); }
 .nv-nav row:selected { background-color: %(b)s; color: white; }
 .nv-nav row:selected label, .nv-nav row:selected image { color: white; }
+/* Apariencia, iconos en color: los del tema, cada uno con el suyo (en la fila elegida, en blanco) */
+.nv-nav image.nv-tinte-proyectos { color: #E8A23A; }
+.nv-nav image.nv-tinte-dominios { color: #1C9C6B; }
+.nv-nav image.nv-tinte-config { color: #7C6FD8; }
 /* Configuración: la columna de sus apartados */
+.nv-subnav-lateral { background-color: alpha(@theme_fg_color, 0.018); border-right: 1px solid alpha(@theme_fg_color, 0.08); }
 .nv-subnav-caja { background-color: alpha(@theme_fg_color, 0.035); border: 1px solid alpha(@theme_fg_color, 0.08);
                   border-radius: 12px; padding: 6px 0; }
 .nv-subnav row { padding: 9px 12px; margin: 1px 6px; border-radius: 8px; }
@@ -27099,6 +27326,15 @@ button.nv-activa label, button.nv-activa:disabled label { color: %(b)s; }
 /* Punto que parpadea: lo que esta en marcha */
 @keyframes nv-latido { 0%% { opacity: 1; } 50%% { opacity: 0.25; } 100%% { opacity: 1; } }
 .nv-latido { animation: nv-latido 1.6s ease-in-out infinite; }
+/* Tarea en segundo plano, al lado del visor: verde, con la flecha que baja y late */
+button.nv-tarea-fondo { background-image: none; box-shadow: none; border-radius: 999px; padding: 2px 10px;
+                        border: 1px solid alpha(%(g)s, 0.55); background-color: alpha(%(g)s, 0.12); }
+button.nv-tarea-fondo:hover { background-color: alpha(%(g)s, 0.22); }
+button.nv-tarea-fondo label, button.nv-tarea-fondo image { color: %(g)s; }
+@keyframes nv-baja { 0%% { opacity: 1; -gtk-icon-transform: translateY(-2px); }
+                     50%% { opacity: 0.35; -gtk-icon-transform: translateY(2px); }
+                     100%% { opacity: 1; -gtk-icon-transform: translateY(-2px); } }
+.nv-tarea-flecha { animation: nv-baja 1.1s ease-in-out infinite; }
 /* Opciones de los desplegables: fondo azul y letra blanca al pasar el raton */
 menu menuitem:hover, .menu menuitem:hover { background-color: %(b)s; }
 menu menuitem:hover label, menu menuitem:hover cellview, .menu menuitem:hover label { color: white; }
@@ -27333,17 +27569,25 @@ class App2(App):
         self.services_box.set_size_request(520, -1)
         self.services_pop.add(self.services_box)
         self.page_dbs, self.db_box = new_page()
-        self.page_tools, self.tools_box = new_page()
+        self.page_tools, self.tools_box = new_page(620)
+        # (los apartados de Configuración, en una columna pegada al menú lateral)
+        self.tools_side = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-subnav-lateral")
+        self.tools_side.set_size_request(220, -1)
+        self.tools_wrap = Gtk.Box()
+        self.tools_wrap.pack_start(self.tools_side, False, False, 0)
+        self.tools_wrap.pack_start(self.page_tools, True, True, 0)
         self.page_hosts, self.hosts_box = new_page()
         self.page_docker, self.docker_box = new_page(940)
         self.page_projects, self.proj_page = new_page(940)
         self.page_repos, self.repos_page = new_page(940)
         self.repos, self.repos_all, self.github = None, False, None
+        self.page_node, self.node_page = new_page(940)
+        self.node_rows = None
         self.page_vers, self.vers_page = new_page(900)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
-                        ("bbdd", self.page_dbs), ("docker", self.page_docker),
-                        ("dominios", self.page_hosts), ("config", self.page_tools)]:
+                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node),
+                        ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
             self.stack.add_named(w, name)
         body = Gtk.Box()
         body.pack_start(self.nv_sidebar(), False, False, 0)
@@ -27615,8 +27859,20 @@ class App2(App):
         pop.add(sw)
         self.warn_btn.set_popover(pop)
         self.warn_btn.set_no_show_all(True)
+        # Tarea en segundo plano: una flecha verde que late, con su porcentaje; al pulsarla, su ventana
+        self.bg_task = None
+        self.task_badge = css(Gtk.Button(valign=Gtk.Align.CENTER), "nv-tarea-fondo")
+        tb = Gtk.Box(spacing=5)
+        tb.pack_start(css(logo("descarga", 16), "nv-tarea-flecha"), False, False, 0)
+        self.task_badge_lbl = label("", "nv-chico", "nv-mono")
+        tb.pack_start(self.task_badge_lbl, False, False, 0)
+        self.task_badge.add(tb)
+        tb.show_all()
+        self.task_badge.set_no_show_all(True)
+        self.task_badge.connect("clicked", lambda *_: self.bg_task and self.bg_task.to_front())
         # Los avisos, a la izquierda del visor, y el menu, justo a su derecha (antes de Localhost)
         center = Gtk.Box(spacing=10, valign=Gtk.Align.CENTER)
+        center.pack_start(self.task_badge, False, False, 0)
         center.pack_start(self.warn_btn, False, False, 0)
         center.pack_start(pill, False, False, 0)
         center.pack_start(self.menu_btn, False, False, 0)
@@ -27881,26 +28137,68 @@ class App2(App):
         self.on_control(None, "parar" if d["running"] else "arrancar",
                         "Parar y desactivar" if d["running"] else "Arrancar")
 
+    def nv_task_badge(self, task):
+        """El aviso de la tarea en segundo plano (None: se quita)."""
+        self.bg_task = task
+        if task is None:
+            self.task_badge.hide()
+            return
+        self.nv_task_badge_tick(task)
+        self.task_badge.show()
+        GLib.timeout_add(700, self.nv_task_badge_tick, task)
+
+    def nv_task_badge_tick(self, task):
+        if self.bg_task is not task or task.finished:
+            return False
+        m = re.search(r"\d+ ?%", task.pct.get_label() or "")
+        # (lo que hace, con la primera palabra del título: «Actualizando…», «Instalando…»)
+        verb = (task.dlg.get_title() or "En marcha").split()[0].rstrip(".,:")
+        self.task_badge_lbl.set_label("%s…%s" % (verb, "  " + m.group(0) if m else ""))
+        self.task_badge.set_tooltip_text("%s\n%s\nPulsa para ver la ventana" % (
+            task.dlg.get_title(), task.what.get_label() or "En marcha"))
+        return True
+
     def nv_sidebar(self):
         box = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4), "nv-lateral")
         box.set_size_request(230, -1)
+        self.side_box, self.tabs, self.tab_lists = box, {}, []
+        self.foot = label("", "nv-chico", "nv-tenue", xalign=0.5, wrap=True, max_width_chars=26, margin=12)
+        box.pack_end(self.foot, False, False, 0)
+        self.nv_sidebar_fill()
+        return box
+
+    def nv_sidebar_fill(self):
+        """Los apartados del menú lateral, como diga Apariencia (también al cambiarla: solo se rehace esto)."""
+        box, look = self.side_box, look_conf()
+        current = next((lb.get_selected_row().tab_name for lb in self.tab_lists if lb.get_selected_row()), "proyectos")
+        for w in box.get_children():
+            if w is not self.foot:
+                w.destroy()
         self.tabs, self.tab_lists = {}, []
-        for group_name, items in [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"),
-                                                ("repos", "Repositorios", "logo:github"),
-                                                ("versiones", "Versiones de PHP", "logo:php"),
-                                                ("bbdd", "Bases de datos", "drive-multidisk-symbolic"),
-                                                ("docker", "Docker", "logo:docker")]),
-                                  ("SISTEMA", [("dominios", "Dominios y hosts", "network-workgroup-symbolic"),
-                                               ("config", "Configuración", "emblem-system-symbolic")])]:
+        for group_name, items in SIDEBAR:
+            items = [it for it in items if it[0] in SIDEBAR_FIXED or it[0] not in look["ocultos"]]
+            if not items:
+                continue
             box.pack_start(label(group_name, "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2), False, False, 0)
             lb = css(Gtk.ListBox(), "nv-nav")
             for name, text, ic in items:
                 row = Gtk.ListBoxRow()
                 inner = Gtk.Box(spacing=12)
-                # (logo: de un color, como los iconos del tema; color: el logotipo en su color, como Docker)
-                inner.pack_start(MonoLogo(ic[5:], 20) if ic.startswith("logo:") else
-                                 logo(ic[6:], 20) if ic.startswith("color:") else symbol(ic, 20), False, False, 0)
-                inner.pack_start(label(text), False, False, 0)
+                if look["marcas"] and name in ("docker", "node"):
+                    # (el logotipo con su nombre, en su tipografía: ya dice qué es)
+                    inner.pack_start(BrandLogo(name, 22 if name == "docker" else 20, mono=not look["color"]), False, False, 0)
+                else:
+                    if look["marcas"] and look["color"] and name == "versiones":
+                        w = BrandLogo("php", 20)
+                    elif ic.startswith("logo:"):
+                        # (en color, cada uno el suyo; si no, de un color, como los iconos del tema)
+                        w = MonoLogo(ic[5:], 20, colored=look["color"] and ic != "logo:github")
+                    else:
+                        w = symbol(ic, 20)
+                        if look["color"]:
+                            css(w, "nv-tinte-" + name)
+                    inner.pack_start(w, False, False, 0)
+                    inner.pack_start(label(text), False, False, 0)
                 row.add(inner)
                 row.tab_name = name
                 lb.add(row)
@@ -27908,14 +28206,51 @@ class App2(App):
             lb.connect("row-selected", self.nv_on_tab)
             self.tab_lists.append(lb)
             box.pack_start(lb, False, False, 0)
-        self.tab_lists[0].select_row(self.tabs["proyectos"][1])
-        self.foot = label("", "nv-chico", "nv-tenue", xalign=0.5, wrap=True, max_width_chars=26, margin=12)
-        box.pack_end(self.foot, False, False, 0)
-        return box
+        box.show_all()
+        lb, row = self.tabs.get(current) or self.tabs["proyectos"]
+        lb.select_row(row)
+
+    def nv_look_set(self, key, value):
+        conf = look_conf()
+        if key.startswith("@"):
+            (conf["ocultos"].discard if value else conf["ocultos"].add)(key[1:])
+        else:
+            conf[key] = value
+        look_save(conf)
+        self.nv_sidebar_fill()
+
+    def nv_look_tools(self):
+        """Configuración, Apariencia: el menú lateral (iconos en color, logotipos y qué apartados salen) y los
+        botones del proyecto."""
+        box, lb = tile_group("Apariencia",
+                             "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Mac.")
+        self.tools_box.pack_start(box, False, False, 0)
+        look = look_conf()
+
+        def switch(title, sub, key, on):
+            row = ActionRow(title, sub)
+            s = Gtk.Switch(active=on, valign=Gtk.Align.CENTER)
+            s.connect("notify::active", lambda w, _p: self.nv_look_set(key, w.get_active()))
+            row.add_suffix(s)
+            lb.add(row)
+        switch("Iconos en color", "Cada apartado del menú lateral con su color; apagado, de un color, como el texto",
+               "color", look["color"])
+        switch("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre", "marcas", look["marcas"])
+        row = ActionRow("Botones del proyecto", "Cuáles se ven en el visor, en qué orden y cómo")
+        b = Gtk.Button(label="Personalizar…", valign=Gtk.Align.CENTER)
+        b.connect("clicked", lambda *_: self.nv_buttons_dialog())
+        row.add_suffix(b)
+        lb.add(row)
+        for _g, items in SIDEBAR:
+            for name, text, _ic in items:
+                if name not in SIDEBAR_FIXED:
+                    switch(text, "Mostrar en el menú lateral", "@" + name, name not in look["ocultos"])
 
     def nv_on_tab(self, lb, row):
         if row is None:
             return
+        # (los logotipos dibujados cambian de color en la fila elegida: GTK no se lo dice, se repintan)
+        self.side_box.queue_draw()
         for other in self.tab_lists:
             if other is not lb:
                 other.unselect_all()
@@ -27935,6 +28270,8 @@ class App2(App):
             run_quick(["gui-bbdd-tamanos"], self.on_db_sizes)
         elif row.tab_name == "repos":
             self.nv_repos_open()
+        elif row.tab_name == "node":
+            self.nv_node_load()
 
     def on_tick(self):
         res = super().on_tick()
@@ -28151,22 +28488,23 @@ class App2(App):
         m = self.nv_mail()
         if not m:
             return
-        box, lb = tile_group("Correo de pruebas (Mailpit)", columns=3,
+        on = m["on"]
+        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                        tooltip_text="Encendido: el correo de las webs va a Mailpit" if on else
+                        "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+        sw.connect("notify::active", self.on_mail_switch)
+        tail = Gtk.Box(spacing=8)
+        tail.pack_start(sw, False, False, 0)
+        if not on:
+            tail.pack_start(label("Apagado: lo que manden las webs puede llegar de verdad a los clientes",
+                                  "nv-chico", "nv-correo-aviso", valign=Gtk.Align.CENTER), False, False, 0)
+        box, lb = tile_group("Correo de pruebas (Mailpit)", tiles=True, lead=logo("mailpit", 20), tail=tail,
                         description=
                         "Lo que mandan las webs de este equipo (formularios, pedidos, contraseñas) no llega a "
                         "nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, "
                         "PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en "
                         "las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con "
                         "la versión activa y solo se ve desde este equipo.")
-        # (las tres en una fila: los botones de la bandeja, cortos)
-        on = m["on"]
-        row = ActionRow("Correo de pruebas", "Encendido: el correo de las webs va a Mailpit" if on else
-                        "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
-        row.add_prefix(logo("mailpit", 18))
-        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
-        sw.connect("notify::active", self.on_mail_switch)
-        row.add_suffix(sw)
-        lb.add(row)
         texts = {"mailpit": "Siguen funcionando, con su correo a Mailpit (los que usan una API, como Brevo, se desactivan en la copia local)",
                  "desactivar": "Se desactivan en la copia local: WordPress manda con mail(), a Mailpit",
                  "nada": "⚠ No se tocan: lo que manden puede llegar de verdad a los clientes"}
@@ -28335,9 +28673,7 @@ class App2(App):
             self.legacy_box.remove(child)
             self.warn_box.pack_start(child, False, False, 0)
             n += 1
-        self.warn_box.show_all()
-        self.warn_num.set_label(str(n))
-        self.warn_btn.set_visible(n > 0)
+        self.nv_warn_refresh()
         if self.inst_box.get_parent() is self.legacy_box:
             self.legacy_box.remove(self.inst_box)
         self.nv_build_versions()
@@ -29827,9 +30163,10 @@ class App2(App):
         self.nv_buttons_tools()
         self.nv_mail_tools()
         self.nv_github_tools()
+        self.nv_look_tools()
         self.nv_tools_sections()
         self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
-                           "Elige un apartado a la izquierda para ver lo que se puede cambiar")
+                           "Elige un apartado en la columna de la izquierda")
 
     # Apartados de Configuración: su nombre en la columna de la izquierda, su icono y el orden (los que no
     # estén aquí, al final)
@@ -29842,6 +30179,7 @@ class App2(App):
                       ("Visor de los proyectos", "Visor de los proyectos", "view-grid-symbolic"),
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
                       ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
+                      ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
                       ("Carpetas", "Carpetas", "folder-symbolic"),
                       ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
                       ("Programa", "Programa", "system-software-install-symbolic"),
@@ -29867,7 +30205,6 @@ class App2(App):
         stack = Gtk.Stack(vhomogeneous=False, hhomogeneous=False, hexpand=True,
                           transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=120)
         nav = css(Gtk.ListBox(valign=Gtk.Align.START), "nv-nav", "nv-subnav")
-        nav.set_size_request(230, -1)
         rows = {}
         for title, _n, g in found:
             if title in rows:
@@ -29891,14 +30228,15 @@ class App2(App):
         want = getattr(self, "tools_section", None)
         if want not in rows and found:
             want = found[0][0]
-        layout = Gtk.Box(spacing=22)
-        side = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-subnav-caja")
-        side.pack_start(nav, False, False, 0)
-        layout.pack_start(side, False, False, 0)
-        layout.pack_start(stack, True, True, 0)
-        self.tools_box.pack_start(layout, True, True, 0)
+        for w in self.tools_side.get_children():
+            w.destroy()
+        self.tools_side.pack_start(label("CONFIGURACIÓN", "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2),
+                                   False, False, 0)
+        self.tools_side.pack_start(nav, False, False, 0)
+        self.tools_side.show_all()
+        self.tools_box.pack_start(stack, True, True, 0)
         self.tools_nav = rows
-        layout.show_all()
+        stack.show_all()
         if want:
             nav.select_row(rows[want])
 
@@ -29947,6 +30285,7 @@ class App2(App):
             elif f[0] == "S" and len(f) >= 2 and f[1].isdigit():
                 res["n"] = int(f[1])
         self.components = res
+        self.nv_warn_refresh()
         # (si Configuración se ha rehecho mientras tanto, esa fila ya no está en la ventana)
         if row is not None and row.subtitle.get_toplevel() is self.win:
             self.nv_components_fill(row, res)
@@ -29991,18 +30330,51 @@ class App2(App):
         se dice y se ofrece actualizarlo todo."""
         def got(_rc, out):
             res = self.nv_components_got(out)
-            if not res["items"]:
-                return False
-
-            def ask():
-                if self.busy:
-                    return True
-                self.nv_components_update(res)
-                return False
-            GLib.timeout_add_seconds(2, ask)
+            # (sin preguntar: el aviso de arriba lo dice, y se puede dejar para luego)
+            if res["items"] and not updates_ignored(res["items"]):
+                self.toast("Hay parches nuevos: míralos en los avisos de arriba")
             return False
         run_quick(["componentes"], got)
         return False
+
+    def nv_warn_refresh(self):
+        """Los avisos de arriba: los de las versiones y, si hay parches nuevos que no se han dejado para
+        luego, el suyo, el primero."""
+        if not hasattr(self, "warn_box"):
+            return
+        for ch in self.warn_box.get_children():
+            if getattr(ch, "nv_updates", False):
+                ch.destroy()
+        res = getattr(self, "components", None)
+        if res and res["items"] and not updates_ignored(res["items"]):
+            n = len(res["items"])
+            box, lb = group("Hay parches nuevos (%d)" % n, None)
+            box.nv_updates = True
+            shown = res["items"][:6] + (["…y %d más" % (n - 6)] if n > 6 else [])
+            row = ActionRow("Conviene ponerlos: son parches de seguridad",
+                            "\n".join("• " + i for i in shown) + "\nLo de ahora sigue funcionando mientras se actualiza "
+                            "(se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta "
+                            "que salga otro parche; siguen en Configuración, Parches nuevos.")
+            row.add_prefix(icon("software-update-available-symbolic", 18))
+            # (entero, sin cortar: en el aviso hay sitio)
+            for lbl in (row.title, row.subtitle):
+                lbl.set_ellipsize(0)
+                lbl.set_line_wrap(True)
+                lbl.set_max_width_chars(46)
+            later = Gtk.Button(label="Ahora no", valign=Gtk.Align.CENTER)
+            later.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), updates_ignore(res["items"]),
+                                                 self.nv_warn_refresh()))
+            row.add_suffix(later)
+            go = css(Gtk.Button(label="Actualizar todo", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            go.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), self.nv_components_update(res)))
+            row.add_suffix(go)
+            lb.add(row)
+            self.warn_box.pack_start(box, False, False, 0)
+            self.warn_box.reorder_child(box, 0)
+        self.warn_box.show_all()
+        n = len(self.warn_box.get_children())
+        self.warn_num.set_label(str(n))
+        self.warn_btn.set_visible(n > 0)
 
     # ------------------------------------------------------------------ repositorios de GitHub
     def nv_github_tools(self):
@@ -30116,6 +30488,117 @@ class App2(App):
         if resp == Gtk.ResponseType.OK and token:
             self.toast("Comprobando el token con GitHub…")
             run_quick_input(["github-conectar"], token + "\n", self.nv_github_done)
+
+    def nv_node_load(self):
+        """Pestaña Node: los proyectos de htdocs con su package.json y cómo están."""
+        def got(_rc, out):
+            self.nv_node_parse(out)
+            self.nv_node_render()
+            return False
+        run_quick(["gui-node"], got)
+
+    def nv_node_parse(self, out):
+        self.node_rows = [{"folder": f[1], "kind": f[2], "running": f[3] == "marcha", "mode": f[4], "url": f[5],
+                           "need": f[6], "deps": f[7] == "1", "scripts": f[8]}
+                          for f in parse_lines(out) if f[0] == "P" and len(f) >= 9]
+
+    def nv_node_render(self):
+        if self.node_rows is None:
+            return
+        box = self.node_page
+        clear(box)
+        head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        head.pack_start(label("Node", "nv-titulo-grande"), False, False, 0)
+        head.pack_start(label("Proyectos de %s hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en "
+                              "este equipo, con tu usuario y con la versión de Node que pide." % HTDOCS,
+                              "nv-chico", "nv-tenue", wrap=True, xalign=0), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        for p in self.node_rows:
+            lb.add(self.nv_node_row(p))
+        if not self.node_rows:
+            lb.add(ActionRow("Ningún proyecto de Node", "Se buscan las carpetas de %s con su package.json" % HTDOCS))
+        box.pack_start(lb, False, False, 0)
+        box.show_all()
+
+    def nv_node_row(self, p):
+        bits = [p["kind"], "Node %s" % p["need"] if p["need"] else ""]
+        if p["running"]:
+            bits.append("en marcha (%s): %s" % (p["mode"], p["url"]))
+        elif not p["deps"]:
+            bits.append("sin dependencias instaladas: se instalan al arrancar")
+        row = ActionRow(p["folder"], " · ".join(b for b in bits if b))
+        row.add_prefix(label("●", "punto-verde" if p["running"] else "punto-gris"))
+        path = os.path.join(HTDOCS, p["folder"])
+
+        def add(image, text, tip, cb, *classes, task=True):
+            b = nv_button(image, text, tip, lambda *_: cb(), "nv-proyecto-btn", *classes)
+            b.set_sensitive(not (task and self.busy))
+            row.add_suffix(b)
+        # (los de siempre, solo con su icono: el proyecto en el editor, en su carpeta y lo que dice su servidor)
+        code = vscode_app()
+        if code is not None:
+            img = None
+            if code.get_icon() is not None:
+                img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                img.set_pixel_size(18)
+            add(img or "text-editor-symbolic", None, "Abrir en Visual Studio Code", lambda: self.open_in_vscode(path), task=False)
+        add("folder-open-symbolic", None, "Abrir su carpeta", lambda: self.open_uri(GLib.filename_to_uri(path, None)), task=False)
+        add(logo("log", 18), None, "Registro: lo último que ha dicho su servidor", lambda: self.run_task(
+            "Registro de %s" % p["folder"], ["node-registro", p["folder"]]))
+        if p["running"]:
+            add("view-refresh-symbolic", None, "Volver a compilar y arrancar" if p["mode"] == "compilado" else "Reiniciar su servidor",
+                lambda: self.nv_node_start(p, p["mode"]))
+            add(logo("globo", 18), "Abrir web", "Abrir %s" % p["url"], lambda: self.open_uri(p["url"]), task=False)
+        else:
+            add("media-playback-start-symbolic", "Arrancar", "En desarrollo: los cambios se ven al momento",
+                lambda: self.nv_node_start(p, "desarrollo"))
+            add("system-run-symbolic", "Compilar", "Compilar y arrancar, como en producción",
+                lambda: self.nv_node_start(p, "compilado"))
+        st = tunnel_state()
+        if p["running"] and st and st["target"] == p["url"]:
+            add(logo("cloudflare", 18), "Compartiendo", "Ver dirección y contraseña del túnel",
+                lambda: self.nv_share_dialog(), "nv-compartiendo", task=False)
+        else:
+            add(logo("cloudflare", 18), "Túnel", "Compartir con un túnel de Cloudflare" if p["running"] and p["mode"] == "compilado"
+                else "Compilar, arrancar y compartir con un túnel de Cloudflare", lambda: self.nv_node_share(p))
+        if p["running"]:
+            add("media-playback-stop-symbolic", "Parar", "Parar su servidor (y su túnel, si se está compartiendo)",
+                lambda: self.nv_node_stop(p))
+        return row
+
+    def nv_node_share(self, p):
+        """Túnel: solo se comparte lo compilado (el túnel no deja pasar /node_modules/.vite y así el código
+        fuente no sale del equipo). Si no lo está, se compila y arranca antes."""
+        path = os.path.join(HTDOCS, p["folder"])
+        if p["running"] and p["mode"] == "compilado":
+            self.nv_share(p["url"], path, p["folder"], live=False)
+            return
+        if p["running"] and not confirm(self.win, "¿Compilar %s para compartirlo?" % p["folder"],
+                                        "Está en desarrollo, y lo que se comparte es la versión compilada. Se para y "
+                                        "arranca compilado: los cambios ya no se verán al momento.", "Compilar y compartir"):
+            return
+
+        def got(_rc, out):
+            self.nv_node_parse(out)
+            self.nv_node_render()
+            now = next((r for r in self.node_rows if r["folder"] == p["folder"]), None)
+            if now and now["running"]:
+                GLib.idle_add(lambda: self.nv_share(now["url"], path, p["folder"], live=False) and False)
+            return False
+        self.run_task("Arrancando %s" % p["folder"], ["node-arrancar", p["folder"], "compilado"], progress=True, auto_close=True,
+                      done_text="%s en marcha" % p["folder"],
+                      on_done=lambda ok, *_: run_quick(["gui-node"], got) if ok else self.nv_node_load())
+
+    def nv_node_start(self, p, mode):
+        self.run_task("Arrancando %s" % p["folder"], ["node-arrancar", p["folder"], mode], progress=True, auto_close=True,
+                      done_text="%s en marcha" % p["folder"], on_done=lambda *_: self.nv_node_load())
+
+    def nv_node_stop(self, p):
+        def done(*_):
+            self.nv_node_load()
+        self.run_task("Parando %s" % p["folder"], ["node-parar", p["folder"]], auto_close=True,
+                      done_text="%s parado" % p["folder"], on_done=done)
 
     def nv_repos_open(self):
         """Al entrar en Repositorios: la lista de la última vez, al momento, y luego la de GitHub."""
@@ -30281,7 +30764,7 @@ class App2(App):
         box, lb = tile_group("Docker",
                         "Los proyectos de Docker van con su propio Apache, en otra dirección de este equipo (nunca "
                         "abierta a la red): funcionan sin LAMPP y a la vez que él, con las mismas reglas de seguridad. "
-                        "Con los puertos 80 y 443, las direcciones van sin puerto.")
+                        "Con los puertos 80 y 443, las direcciones van sin puerto.", tiles=True)
         # La dirección y los dos puertos, juntos en una tarjeta a lo ancho (con Guardar y, si hace falta, Permitir)
         entries = {}
         row = ActionRow("Dirección y puertos",
@@ -30290,12 +30773,19 @@ class App2(App):
                         + ("Docker sin root ya puede usar sus puertos." if ports_ok else
                            "Docker sin root aún no puede usar los de menos de 1024: se permite una vez."))
         row.wide = True
+        # (los campos en una línea y, debajo, a la derecha, Guardar y, si hace falta, Permitir)
+        form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, valign=Gtk.Align.CENTER)
+        fields = Gtk.Box(spacing=8)
+        form.pack_start(fields, False, False, 0)
+        buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+        form.pack_start(buttons, False, False, 0)
+        row.add_suffix(form)
         for key, text, width in (("IP", "Dirección", 13), ("HTTP", "HTTP", 5), ("HTTPS", "HTTPS", 5)):
-            field = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, valign=Gtk.Align.CENTER)
+            field = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
             field.pack_start(label(text, "nv-chico", "nv-tenue"), False, False, 0)
             e = Gtk.Entry(text=w[key], width_chars=width, max_length=15)
             field.pack_start(e, False, False, 0)
-            row.add_suffix(field)
+            fields.pack_start(field, False, False, 0)
             entries[key] = e
 
         def save(*_):
@@ -30309,17 +30799,17 @@ class App2(App):
                           done_text="Apache de Docker en %s (%s y %s)" % (ip, http, https), auto_close=True,
                           on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
         if not ports_ok:
-            b = Gtk.Button(label="Permitir", valign=Gtk.Align.CENTER, sensitive=not self.busy,
+            b = Gtk.Button(label="Permitir", sensitive=not self.busy,
                            tooltip_text="Permitir puertos desde el %s"
                            % min(int(w["HTTP"]), int(w["HTTPS"])))
             b.connect("clicked", lambda *_: self.run_task(
                 "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
                 done_text="Docker ya puede usar sus puertos",
                 on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools())))
-            row.add_suffix(b)
-        b = css(Gtk.Button(label="Guardar", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            buttons.pack_start(b, False, False, 0)
+        b = css(Gtk.Button(label="Guardar", sensitive=not self.busy), "verde")
         b.connect("clicked", save)
-        row.add_suffix(b)
+        buttons.pack_start(b, False, False, 0)
         lb.add(row)
         # DNS comodín de *.docker.test: los dominios de Docker ya no van en /etc/hosts (sin contraseña al
         # añadir proyectos o versiones). web.local y lo demás, igual
@@ -30636,7 +31126,7 @@ class App2(App):
             css(b, "nv-compartiendo")
         return b
 
-    def nv_share(self, url, folder, name):
+    def nv_share(self, url, folder, name, live=True):
         """Abre un túnel a esa web, con lo suyo, que se elige ahora: cuánto dura y si se bloquea el panel de
         administración. Su contraseña, siempre una nueva al azar (se ve al abrirlo, para copiarla)."""
         st = tunnel_state()
@@ -30647,8 +31137,8 @@ class App2(App):
         head.pack_start(logo("cloudflare", 30), False, False, 0)
         head.pack_start(label("Compartir %s" % name, "nv-titulo", wrap=True), False, False, 0)
         box.pack_start(head, False, False, 0)
-        text = ("Cualquiera que tenga la dirección y la contraseña verá %s tal y como está en este equipo (lo que "
-                "cambies, al momento) mientras el túnel esté abierto." % url)
+        text = ("Cualquiera que tenga la dirección y la contraseña verá %s tal y como está en este equipo%s mientras "
+                "el túnel esté abierto." % (url, " (lo que cambies, al momento)" if live else ""))
         if st:
             text += " Se cierra el que hay abierto (%s)." % st["target"]
         if not os.path.isfile(os.path.join(LOG_DIR, "tunel", "cloudflared")):
@@ -30759,7 +31249,7 @@ class App2(App):
 
     def nv_tunnel_refresh(self):
         """Los botones de Compartir y Configuración, con el túnel como esté ahora."""
-        for fn in (self.nv_build_projects, self.nv_dk_table, self.build_tools):
+        for fn in (self.nv_build_projects, self.nv_dk_table, self.nv_node_render, self.build_tools):
             try:
                 fn()
             except Exception:  # noqa: BLE001 - una pestaña aún sin datos
@@ -33425,12 +33915,426 @@ PY
     echo "phpMyAdmin $want instalado en $version"
 }
 
+# Proyectos de Node (Astro, Next, Nuxt, SvelteKit, Vite...): carpetas de htdocs con su package.json, cada
+# una con su propio servidor en 127.0.0.1, siempre con tu usuario (nunca root ni sudo). En Desarrollo, con
+# el servidor del proyecto; Compilado, como en produccion: es el unico que se comparte por el tunel, porque
+# el proxy no deja pasar ficheros ocultos (/node_modules/.vite) y asi el codigo fuente no sale del equipo.
+NODE_DIR=$LOG_DIR/node
+NODE_RUN_DIR=$NODE_DIR/proyectos
+NODE_DEFAULT_MAJOR=26
+NODE_PORT_FROM=4321
+NODE_PORT_TO=4399
+
+# P|carpeta|tipo|parado o marcha|modo|direccion|Node que pide (26, o 24+ si vale de ahi en adelante)|
+# dependencias instaladas (1/0)|scripts (d de dev, b de build, s de start). Con una carpeta, solo esa.
+# No son de Node las webs de PHP que usan npm para sus estilos (wp-config.php, index.php, artisan)
+NODE_LIST_PY='
+import json, os, re, subprocess, sys
+htdocs, run = sys.argv[1:3]
+only = sys.argv[3] if len(sys.argv) > 3 else None
+KINDS = (("astro", "Astro"), ("next", "Next"), ("nuxt", "Nuxt"), ("@sveltejs/kit", "SvelteKit"), ("vite", "Vite"))
+
+
+def need(d, pkg):
+    for name in (".nvmrc", ".node-version"):
+        try:
+            with open(os.path.join(d, name), encoding="utf-8") as f:
+                m = re.match(r"v?(\d+)", f.read(40).strip())
+        except (OSError, UnicodeError):
+            m = None
+        if m:
+            return m.group(1)
+    engines = pkg.get("engines")
+    text = str(engines.get("node") or "") if isinstance(engines, dict) else ""
+    m = re.search(r"\d+", text)
+    if not m:
+        return ""
+    return m.group(0) + ("+" if text.strip().startswith(">") else "")
+
+
+def running(name):
+    conf = {}
+    try:
+        with open(os.path.join(run, name + ".conf"), encoding="utf-8") as f:
+            for line in f:
+                k, _, v = line.rstrip("\n").partition("=")
+                conf[k] = v
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", conf["PID"]], capture_output=True, text=True,
+                             env={"LC_ALL": "C", "PATH": "/usr/bin:/bin"}, timeout=5).stdout.strip()
+    except (OSError, KeyError, ValueError, subprocess.SubprocessError):
+        return None
+    return conf if out and out == conf.get("LSTART") else None
+
+
+try:
+    names = [only] if only else sorted(os.listdir(htdocs), key=str.lower)
+except OSError:
+    names = []
+for name in names:
+    d = os.path.join(htdocs, name)
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9 ._-]*", name) or os.path.islink(d):
+        continue
+    if any(os.path.exists(os.path.join(d, f)) for f in ("wp-config.php", "index.php", "artisan")):
+        continue
+    try:
+        with open(os.path.join(d, "package.json"), encoding="utf-8") as f:
+            pkg = json.load(f)
+    except (OSError, ValueError):
+        continue
+    if not isinstance(pkg, dict):
+        continue
+    deps = {}
+    for key in ("dependencies", "devDependencies"):
+        if isinstance(pkg.get(key), dict):
+            deps.update(pkg[key])
+    scripts = pkg.get("scripts") if isinstance(pkg.get("scripts"), dict) else {}
+    kind = next((label for dep, label in KINDS if dep in deps), "")
+    if not kind and not ("dev" in scripts or "start" in scripts):
+        continue
+    conf = running(name)
+    print("|".join(("P", name, kind or "Node", "marcha" if conf else "parado", conf.get("MODE", "") if conf else "",
+                    "http://127.0.0.1:%s" % conf["PORT"] if conf and conf.get("PORT", "").isdigit() else "",
+                    need(d, pkg), "1" if os.path.isdir(os.path.join(d, "node_modules")) else "0",
+                    ("d" if "dev" in scripts else "") + ("b" if "build" in scripts else "") + ("s" if "start" in scripts else ""))))
+'
+
+function node_lines() {
+    python3 -I -c "$NODE_LIST_PY" "$HTDOCS_DIR" "$NODE_RUN_DIR" "$@"
+}
+
+function gui_node() {
+    node_lines | tr -d '\000-\011\013-\037'
+}
+
+# La carpeta bin de un Node que valga para lo que pide el proyecto (26, 24+ o nada: el mas nuevo de los
+# que coincidan). De Nexum, de nvm o el del sistema; los nuevos, primero.
+function node_find() {
+    local want=$1 min=${1%+} d v major key best="" best_key=-1 sys
+    for d in "$NODE_DIR"/v*/bin "$HOME"/.nvm/versions/node/v*/bin; do
+        [ -x "$d/node" ] && [ -x "$d/npm" ] || continue
+        v=$(basename "$(dirname "$d")")
+        [[ "$v" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || continue
+        major=${BASH_REMATCH[1]}
+        key=$(( major * 1000000 + BASH_REMATCH[2] * 1000 + BASH_REMATCH[3] ))
+        if [ -n "$want" ]; then
+            if [[ "$want" == *+ ]]; then [ "$major" -ge "$min" ] || continue; else [ "$major" -eq "$min" ] || continue; fi
+        fi
+        [ "$key" -gt "$best_key" ] && { best=$d; best_key=$key; }
+    done
+    if [ -z "$best" ]; then
+        sys=$(command -v node 2> /dev/null)
+        if [ -n "$sys" ] && [ -x "$(dirname "$sys")/npm" ]; then
+            major=$("$sys" -v 2> /dev/null | sed -E 's/^v([0-9]+).*/\1/')
+            if [[ "$major" =~ ^[0-9]+$ ]] && { [ -z "$want" ] \
+                    || { [[ "$want" == *+ ]] && [ "$major" -ge "$min" ]; } || [ "$major" -eq "${min:-0}" ]; }; then
+                best=$(dirname "$sys")
+            fi
+        fi
+    fi
+    [ -n "$best" ] && echo "$best"
+}
+
+# Descarga Node <mayor> de nodejs.org en ~/.lvm-instalador/node y lo comprueba con su lista de sumas sha256
+function node_install() {
+    local major=$1 base=https://nodejs.org/dist os arch sums name sha got tmp top version tls=(--proto =https --tlsv1.2)
+    [[ "$major" =~ ^[0-9]+$ ]] || { echo "Versión de Node no válida: $major"; return 1; }
+    case "$(uname -s)" in
+        Darwin) os=darwin ;;
+        Linux) os=linux ;;
+        *) echo "Sistema sin Node descargable: $(uname -s)"; return 1 ;;
+    esac
+    case "$(uname -m)" in
+        arm64|aarch64) arch=arm64 ;;
+        x86_64|amd64) arch=x64 ;;
+        *) echo "Procesador sin Node descargable: $(uname -m)"; return 1 ;;
+    esac
+    # (en las pruebas, de una carpeta local)
+    [ -n "$TEST_DIR" ] && [ -n "$LVM_NODE_BASE" ] && { base=$LVM_NODE_BASE; tls=(); }
+    echo "Descargando Node $major de nodejs.org ($os, $arch)..."
+    mkdir -p -m 700 "$NODE_DIR" || return 1
+    tmp=$(mktemp -d "$NODE_DIR/descarga.XXXXXX") || return 1
+    if ! sums=$(curl -q -fsSL "${tls[@]}" --retry 2 --max-time 60 "$base/latest-v$major.x/SHASUMS256.txt"); then
+        rm -rf "$tmp"
+        echo "No se ha podido leer la lista de Node $major en nodejs.org"
+        return 1
+    fi
+    name=$(awk -v rx="^node-v$major\\\\.[0-9]+\\\\.[0-9]+-$os-$arch\\\\.tar\\\\.gz$" '$2 ~ rx { print $2; exit }' <<< "$sums")
+    sha=$(awk -v n="$name" '$2 == n { print $1; exit }' <<< "$sums")
+    if [ -z "$name" ] || [[ ! "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+        rm -rf "$tmp"
+        echo "Node $major no tiene paquete para $os $arch"
+        return 1
+    fi
+    if ! curl -q -fsSL "${tls[@]}" --retry 2 --max-time 900 -o "$tmp/node.tar.gz" "$base/latest-v$major.x/$name"; then
+        rm -rf "$tmp"
+        echo "No se ha podido descargar $name"
+        return 1
+    fi
+    if command -v sha256sum > /dev/null; then got=$(sha256sum "$tmp/node.tar.gz" | cut -d' ' -f1); else got=$(shasum -a 256 "$tmp/node.tar.gz" | cut -d' ' -f1); fi
+    if [ "$got" != "$sha" ]; then
+        rm -rf "$tmp"
+        echo "La descarga de Node no coincide con su suma sha256 (${got:-ninguna}): no se instala."
+        return 1
+    fi
+    top=${name%.tar.gz}
+    version=${top#node-}
+    version=${version%%-*}
+    if ! tar -xzf "$tmp/node.tar.gz" -C "$tmp" "$top" 2> /dev/null || [ ! -x "$tmp/$top/bin/node" ]; then
+        rm -rf "$tmp"
+        echo "El paquete de Node no trae su programa: no se instala."
+        return 1
+    fi
+    rm -rf "${NODE_DIR:?}/$version"
+    mv "$tmp/$top" "$NODE_DIR/$version" || { rm -rf "$tmp"; return 1; }
+    rm -rf "$tmp"
+    echo "Node $version instalado en $NODE_DIR"
+}
+
+# El pid del servidor de un proyecto, si sigue siendo aquel (misma hora de arranque)
+function node_pid() {
+    local conf=$NODE_RUN_DIR/$1.conf pid start
+    [ -f "$conf" ] || return 1
+    pid=$(sed -n 's/^PID=//p' "$conf")
+    start=$(sed -n 's/^LSTART=//p' "$conf")
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "$start" ] || return 1
+    [ "$(LC_ALL=C ps -o lstart= -p "$pid" 2> /dev/null | sed -E 's/^ +//; s/ +$//')" == "$start" ] || return 1
+    echo "$pid"
+}
+
+function node_free_port() {
+    python3 -I -c '
+import socket, sys
+for port in range(int(sys.argv[1]), int(sys.argv[2]) + 1):
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        continue
+    finally:
+        s.close()
+    print(port)
+    break
+' "$NODE_PORT_FROM" "$NODE_PORT_TO"
+}
+
+# Instala lo que le falte: lo pide su fichero de bloqueo. Los scripts de sus paquetes se ejecutan con tu usuario
+function node_deps() {
+    local dir=$1 bin=$2 lock=""
+    shift 2
+    for lock in package-lock.json pnpm-lock.yaml yarn.lock; do
+        [ -f "$dir/$lock" ] && break
+        lock=""
+    done
+    if [ -d "$dir/node_modules" ] && { [ -z "$lock" ] || [ ! "$dir/$lock" -nt "$dir/node_modules" ]; }; then
+        echo "Dependencias: ya están instaladas"
+        return 0
+    fi
+    echo "Instalando las dependencias..."
+    case "$lock" in
+        package-lock.json) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" ci --no-audit --no-fund ) ;;
+        pnpm-lock.yaml) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --yes pnpm install --frozen-lockfile ) ;;
+        yarn.lock) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --yes yarn install --frozen-lockfile ) ;;
+        *) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" install --no-audit --no-fund ) ;;
+    esac || { echo "No se han podido instalar las dependencias"; return 1; }
+    touch "$dir/node_modules"
+}
+
+# Astro con un adaptador de un alojamiento (Vercel, Netlify, Cloudflare) no se puede servir en este equipo:
+# se compila con el de Node, sin tocar su configuracion ni su package.json (todo dentro de node_modules)
+function node_build_astro() {
+    local dir=$1 bin=$2 conf="" c
+    shift 2
+    for c in astro.config.mjs astro.config.ts astro.config.mts astro.config.js astro.config.cjs; do
+        [ -f "$dir/$c" ] && { conf=$c; break; }
+    done
+    if [ -z "$conf" ] || ! grep -qE "@astrojs/(vercel|netlify|cloudflare)" "$dir/$conf"; then
+        ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --no-install astro build )
+        return
+    fi
+    if [ ! -f "$dir/node_modules/@astrojs/node/package.json" ]; then
+        if [ -f "$dir/pnpm-lock.yaml" ] || [ -f "$dir/yarn.lock" ]; then
+            echo "Este proyecto usa un adaptador de alojamiento: añade @astrojs/node a sus dependencias para compilarlo aquí."
+            return 1
+        fi
+        ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" install --no-save --no-audit --no-fund @astrojs/node ) || return 1
+    fi
+    printf "import base from '../%s';\nimport node from '@astrojs/node';\nexport default { ...base, adapter: node({ mode: 'standalone' }) };\n" "$conf" \
+        > "$dir/node_modules/.nexum-astro.config.mjs" || return 1
+    echo "(compilando con @astrojs/node en lugar de su adaptador de alojamiento; el proyecto no cambia)"
+    ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --no-install astro build --config node_modules/.nexum-astro.config.mjs )
+}
+
+# Lo que deja el servidor en marcha, en NODE_CMD: node_command <carpeta> <tipo> <modo> <scripts> <bin> <puerto>
+NODE_CMD=()
+function node_command() {
+    local dir=$1 kind=$2 mode=$3 scripts=$4 bin=$5 port=$6 root
+    NODE_CMD=()
+    if [ "$mode" == desarrollo ]; then
+        case "$kind" in
+            Astro) NODE_CMD=("$bin/npx" --no-install astro dev --host 127.0.0.1 --port "$port") ;;
+            Next) NODE_CMD=("$bin/npx" --no-install next dev -H 127.0.0.1 -p "$port") ;;
+            Nuxt) NODE_CMD=("$bin/npx" --no-install nuxt dev --host 127.0.0.1 --port "$port") ;;
+            SvelteKit|Vite) NODE_CMD=("$bin/npx" --no-install vite --host 127.0.0.1 --port "$port" --strictPort) ;;
+            *) if [[ "$scripts" == *d* ]]; then NODE_CMD=("$bin/npm" run dev); elif [[ "$scripts" == *s* ]]; then NODE_CMD=("$bin/npm" start); fi ;;
+        esac
+    else
+        case "$kind" in
+            Astro)
+                if [ -f "$dir/dist/server/entry.mjs" ]; then
+                    NODE_CMD=("$bin/node" dist/server/entry.mjs)
+                else
+                    root=dist
+                    [ -d "$dir/dist/client" ] && root=dist/client
+                    NODE_CMD=(python3 -I -m http.server --bind 127.0.0.1 --directory "$root" "$port")
+                fi
+                ;;
+            Next) NODE_CMD=("$bin/npx" --no-install next start -H 127.0.0.1 -p "$port") ;;
+            Nuxt) NODE_CMD=("$bin/node" .output/server/index.mjs) ;;
+            SvelteKit|Vite) NODE_CMD=("$bin/npx" --no-install vite preview --host 127.0.0.1 --port "$port" --strictPort) ;;
+            *) [[ "$scripts" == *s* ]] && NODE_CMD=("$bin/npm" start) ;;
+        esac
+    fi
+    [ "${#NODE_CMD[@]}" -gt 0 ]
+}
+
+# node-arrancar <carpeta> [desarrollo|compilado]
+function node_start() {
+    local folder=${1%/} mode=${2:-desarrollo} dir line kind state need deps scripts bin port log conf pid n x steps=() e=()
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        echo "Los proyectos de Node no se arrancan como root."
+        return 1
+    fi
+    [[ "$mode" =~ ^(desarrollo|compilado)$ ]] || { echo "El modo es desarrollo o compilado"; return 1; }
+    valid_project "$folder" || return 1
+    dir=$HTDOCS_DIR/$folder
+    line=$(node_lines "$folder")
+    if [ -z "$line" ]; then
+        echo "$folder no es un proyecto de Node"
+        return 1
+    fi
+    IFS='|' read -r x x kind state x x need deps scripts <<< "$line"
+    if [ "$mode" == compilado ] && [ "$kind" == Node ] && [[ "$scripts" != *s* ]]; then
+        echo "$folder no tiene un script start: no se sabe cómo servirlo compilado"
+        return 1
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $folder ($kind, $mode): Node ${need:-el que haya}, dependencias y servidor en 127.0.0.1"
+        return 0
+    fi
+    steps=("Preparar Node ${need:-}" "Instalar las dependencias")
+    [ "$mode" == compilado ] && steps+=("Compilar el proyecto")
+    steps+=("Arrancar el servidor")
+    task_plan "Arrancando $folder" "${steps[@]}"
+    [ "$state" == marcha ] && node_stop "$folder" > /dev/null
+
+    task_step
+    bin=$(node_find "$need")
+    if [ -z "$bin" ]; then
+        x=${need%+}
+        node_install "${x:-$NODE_DEFAULT_MAJOR}" || return 1
+        bin=$(node_find "$need")
+        [ -n "$bin" ] || { echo "No se encuentra el Node recién instalado"; return 1; }
+    fi
+    echo "Node $("$bin/node" -v) ($bin)"
+    port=$(node_free_port)
+    [ -n "$port" ] || { echo "No hay ningún puerto libre entre $NODE_PORT_FROM y $NODE_PORT_TO"; return 1; }
+    e=("HOME=$HOME" "USER=${USER:-$(id -un)}" "LANG=${LANG:-es_ES.UTF-8}" "TERM=dumb" "CI=1"
+       "PATH=$bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "HOST=127.0.0.1" "PORT=$port" "NO_COLOR=1"
+       "ASTRO_TELEMETRY_DISABLED=1" "NEXT_TELEMETRY_DISABLED=1")
+
+    task_step
+    node_deps "$dir" "$bin" "${e[@]}" || return 1
+
+    if [ "$mode" == compilado ]; then
+        task_step
+        echo "Compilando..."
+        if [ "$kind" == Astro ]; then
+            node_build_astro "$dir" "$bin" "${e[@]}"
+        elif [[ "$scripts" == *b* ]]; then
+            ( cd "$dir" && /usr/bin/env -i "${e[@]}" "$bin/npm" run build )
+        fi || { echo "No se ha podido compilar $folder"; return 1; }
+    fi
+
+    task_step
+    node_command "$dir" "$kind" "$mode" "$scripts" "$bin" "$port" || { echo "$folder no tiene un script dev ni start"; return 1; }
+    mkdir -p -m 700 "$NODE_RUN_DIR" || return 1
+    log=$NODE_RUN_DIR/$folder.log conf=$NODE_RUN_DIR/$folder.conf
+    : > "$log" && chmod 600 "$log" || return 1
+    # (en su propia sesion, para pararlo con todos sus hijos y que siga al cerrar la ventana)
+    ( cd "$dir" && exec python3 -I -c 'import os, sys
+os.setsid()
+os.execv("/usr/bin/env", ["env", "-i"] + sys.argv[1:])' "${e[@]}" "${NODE_CMD[@]}" >> "$log" 2>&1 < /dev/null ) &
+    pid=$!
+    ( umask 077; printf 'PID=%s\nLSTART=%s\nPORT=%s\nMODE=%s\n' "$pid" \
+        "$(LC_ALL=C ps -o lstart= -p "$pid" 2> /dev/null | sed -E 's/^ +//; s/ +$//')" "$port" "$mode" > "$conf" ) || return 1
+    echo "Arrancando el servidor en http://127.0.0.1:$port ..."
+    for n in $(seq 360); do
+        if ! kill -0 "$pid" 2> /dev/null; then
+            rm -f "$conf"
+            echo "El servidor de $folder se ha parado al arrancar. Lo último que ha dicho:"
+            tail -20 "$log" | sed 's/^/  /'
+            return 1
+        fi
+        curl -q -s -o /dev/null --noproxy '*' --max-time 2 "http://127.0.0.1:$port/" && break
+        sleep 0.5
+    done
+    if [ "$n" -ge 360 ]; then
+        node_stop "$folder" > /dev/null
+        echo "El servidor de $folder no responde en http://127.0.0.1:$port tras 3 minutos: se para. Lo último que ha dicho:"
+        tail -20 "$log" | sed 's/^/  /'
+        return 1
+    fi
+    echo "$folder en marcha ($mode): http://127.0.0.1:$port"
+    echo "URL|http://127.0.0.1:$port"
+}
+
+# node-parar <carpeta>: el servidor con todos sus hijos y, si se esta compartiendo, tambien su tunel (ese
+# puerto podria acabar siendo de otro proyecto)
+function node_stop() {
+    local folder=${1%/} pid conf=$NODE_RUN_DIR/${1%/}.conf port n
+    [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] || { echo "Carpeta no válida: $folder"; return 1; }
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se para $folder"
+        return 0
+    fi
+    pid=$(node_pid "$folder")
+    if [ -z "$pid" ]; then
+        rm -f "$conf"
+        echo "$folder no está en marcha"
+        return 0
+    fi
+    port=$(sed -n 's/^PORT=//p' "$conf")
+    if [[ "$port" =~ ^[0-9]+$ ]] && [ -f "$TUNNEL_STATE" ] && grep -qF "\"target\": \"http://127.0.0.1:$port\"" "$TUNNEL_STATE"; then
+        tunnel_close > /dev/null
+        echo "Túnel cerrado: compartía este proyecto"
+    fi
+    kill -TERM -- "-$pid" 2> /dev/null
+    for n in $(seq 20); do
+        kill -0 -- "-$pid" 2> /dev/null || break
+        sleep 0.25
+    done
+    kill -KILL -- "-$pid" 2> /dev/null
+    rm -f "$conf"
+    echo "$folder parado"
+}
+
+# node-registro <carpeta>: lo ultimo que ha dicho su servidor
+function node_log() {
+    local folder=${1%/} log=$NODE_RUN_DIR/${1%/}.log
+    [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] || { echo "Carpeta no válida: $folder"; return 1; }
+    if [ -f "$log" ]; then
+        tail -300 "$log"
+    else
+        echo "$folder aún no ha arrancado desde aquí"
+    fi
+}
+
 # Tareas de la ventana (LVM_TAREA=1): lo que cambia algo pide la contraseña de administrador antes de
 # empezar, no a mitad. Si se cancela, no se ha hecho nada (antes, lo hecho hasta el primer sudo se
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -33489,6 +34393,10 @@ case "$1" in
     tunel-instalar) tunnel_install ;;
     tunel-abrir) shift; tunnel_open "$@" ;;
     tunel-cerrar) tunnel_close ;;
+    node-arrancar) shift; node_start "$@" ;;
+    node-parar) node_stop "$2" ;;
+    node-registro) node_log "$2" ;;
+    gui-node) gui_node ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;

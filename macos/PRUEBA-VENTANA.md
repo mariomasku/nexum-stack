@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.40.14)
+# Prueba de la ventana nueva en un Mac (versión 1.41.1)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.40.14** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.41.1** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.40.14/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.41.1/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.40.14
+   lvm-instalador version                                                         # Nexum Dev Stack 1.41.1
    ```
 
 5. **Comprueba las versiones:**
@@ -349,6 +349,42 @@ Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/ap
 3. Manda un correo de prueba desde una web local: aparece solo. Ábrelo, ve a otro apartado de Configuración y vuelve: sigue abierto.
 4. Pulsa un enlace dentro del correo: se abre en el navegador y la bandeja sigue en su sitio.
 5. Para la versión activa: sale «Mailpit está parado». Arráncala de nuevo: vuelve la bandeja.
+
+## Paso 23: pestaña Node (1.41.0)
+
+Hace falta un proyecto de Astro, Next o Vite en htdocs.
+
+1. Abre **Node** en la barra lateral: sale el proyecto con su tipo y la versión de Node que pide. Una web de PHP con `package.json` no sale.
+2. Parado, la fila lleva VS Code, carpeta y registro (solo con su icono), **Arrancar**, **Compilar** y **Túnel**. Los iconos abren lo suyo.
+3. Pulsa **Compilar**: la lista de pasos llega hasta «Arrancar el servidor» y la fila pasa a verde con su dirección, **Abrir web**, reiniciar, **Túnel** y **Parar**.
+4. **Túnel** abre el diálogo de compartir. Comprueba desde el móvil, sin Wi-Fi, que la web carga entera. El botón pasa a **Compartiendo** y enseña la dirección y la contraseña.
+5. **Parar**: el túnel se cierra también y la dirección deja de responder. `pgrep -fl node` no enseña nada de ese proyecto.
+6. **Arrancar** (desarrollo): cambia un fichero y se ve al momento. Pulsa **Túnel**: pregunta si compilarlo, lo compila y abre el diálogo de compartir.
+7. Si el proyecto pide una versión de Node que no tienes, se descarga en `~/.lvm-instalador/node`.
+
+## Paso 24: tareas en segundo plano (1.41.0)
+
+1. Lanza algo largo (Actualizar componentes, o instalar una versión) y pulsa **Seguir en segundo plano**: la hoja se va y el programa se puede usar (pestañas, abrir webs, VS Code).
+2. A la izquierda del visor sale una flecha verde que baja y late, con «Actualizando…» (o lo que haga) y el porcentaje. Al pasar el ratón dice qué se hace.
+3. Púlsala: vuelve la hoja, con la lista de pasos al día. Escóndela otra vez.
+4. Con la tarea escondida, intenta otra (por ejemplo, Arrancar en la pestaña Node): dice «Hay una tarea en marcha» y vuelve la hoja.
+5. Al acabar bien una que se cierra sola: la flecha se va y sale el aviso de abajo. Si falla, la hoja vuelve sola con su registro.
+
+## Paso 25: Apariencia (1.41.0)
+
+1. **Configuración → Apariencia**: dos interruptores (iconos en color y logotipos), «Botones del proyecto» y uno por apartado del menú lateral (sin Proyectos ni Configuración).
+2. **Iconos en color**: cada icono del menú con su color; Bases de datos son discos apilados. Elige otro apartado: el elegido se sigue leyendo.
+3. **Logotipos**: Docker y Node con su logotipo y su letra; con los iconos en color, PHP con su óvalo. Prueba el tema claro y el oscuro: el «node» cambia de color de letra.
+4. Quita **Node** del menú: desaparece. Ábrelo antes y quítalo: se pasa a Proyectos.
+5. Cierra y abre la ventana: se acuerda de todo. En la simulación no se guarda.
+
+## Paso 26: Configuración, avisos de parches y terminal (1.41.1)
+
+1. **Configuración**: los apartados van en una columna pegada al menú lateral, sin hueco; lo de cada apartado, en filas (Docker y Correo de pruebas, en tarjetas).
+2. **Correo de pruebas**: el interruptor va al lado del título, con el logotipo de Mailpit delante; ya no hay tarjeta de encender ni se pisan las tarjetas.
+3. **Docker**: «Guardar» va debajo de los campos de la dirección y los puertos.
+4. Con algún parche pendiente (**Parches nuevos**), arriba sale el aviso «Hay parches nuevos»: «Ahora no» lo quita hasta que salga otro; «Actualizar todo» los pone. Al abrir ya no salta la pregunta.
+5. **Terminal**: va pegada a la ventana, de lado a lado. El prompt sale al principio de la línea (sin «%» delante). Escribe, borra con ⌫ y usa ↑: se ve bien. Una descarga con porcentaje se queda en una línea.
 
 ## Qué apuntar
 

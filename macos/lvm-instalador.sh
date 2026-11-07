@@ -275,6 +275,9 @@
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y dar de alta esa direccion en este Mac. dns
 #       activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test y dejan de ir en
 #       /etc/hosts; web.local y lo demas, igual)
+#   lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
+#   lvm-instalador node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
+#   lvm-instalador node-registro <carpeta>     lo ultimo que ha dicho su servidor
 #   lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
 #   lvm-instalador tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
@@ -2138,7 +2141,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.40.14"
+APP_VERSION="1.41.1"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -18865,6 +18868,8 @@ func itemFolder(_ item: String) -> String {
 
 final class TaskRunner: ObservableObject, Identifiable {
     let id = UUID()
+    /// El título con que se lanzó (head cambia al acabar)
+    let title: String
     let args: [String]
     let withProgress: Bool
     let doneText: String
@@ -18913,6 +18918,7 @@ final class TaskRunner: ObservableObject, Identifiable {
     init(title: String, args: [String], withProgress: Bool, doneText: String, autoClose: Bool,
          env: [String: String], cancelText: (String, String, String)?) {
         self.head = title
+        self.title = title
         self.args = args
         self.withProgress = withProgress
         self.doneText = doneText
@@ -19202,6 +19208,9 @@ final class TaskRunner: ObservableObject, Identifiable {
         if ok && autoClose {
             model?.task = nil
             model?.toast(doneText)
+        } else if model?.taskHidden == true {
+            // (en segundo plano: vuelve para enseñar cómo ha ido; si ha fallado, con su registro)
+            model?.taskHidden = false
         }
     }
 
@@ -19436,9 +19445,20 @@ final class AppModel: ObservableObject {
     /// Apartados plegados (Instaladas, Instalar): se guardan en FOLDED_FILE
     @Published var folded: Set<String> = Set(((try? String(contentsOfFile: FOLDED_FILE, encoding: .utf8)) ?? "")
         .split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+    /// La tarea sigue sin su hoja («Seguir en segundo plano»): al lado del visor, su aviso la trae de vuelta
+    @Published var taskHidden = false
+    /// Apariencia (Configuración): se guarda al cambiarla; si se oculta el apartado abierto, a Proyectos
+    @Published var look = loadLook() {
+        didSet {
+            guard look != oldValue else { return }
+            saveLook(look)
+            if look.ocultos.contains(tab) { openTab("proyectos") }
+        }
+    }
     @Published var task: TaskRunner? = nil {
         // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea)
         didSet {
+            if task == nil && taskHidden { taskHidden = false }
             if task == nil && oldValue != nil && !TrayIcon.shared.on
                 && !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
                 DispatchQueue.main.async { NSApp.terminate(nil) }
@@ -19546,6 +19566,22 @@ final class AppModel: ObservableObject {
     @Published var tunnelInfo: [String]? = nil
     /// Lo que tiene un parche nuevo (componentes): nil mientras no se ha mirado
     @Published var components: ComponentsState? = nil
+    /// Parches nuevos dejados para luego («Ahora no»): la lista de entonces; el aviso vuelve si cambia
+    @Published var updatesIgnored = (try? String(contentsOfFile: IGNORED_UPDATES_FILE, encoding: .utf8)) ?? ""
+    /// Los parches nuevos que van en los avisos de arriba (no si se han dejado para luego)
+    var updatesPending: ComponentsState? {
+        guard let c = components, !c.items.isEmpty, c.items.sorted().joined(separator: "\n") != updatesIgnored else { return nil }
+        return c
+    }
+
+    func ignoreUpdates(_ c: ComponentsState) {
+        let text = c.items.sorted().joined(separator: "\n")
+        updatesIgnored = text
+        if SIMULATE { return }
+        try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? text.write(toFile: IGNORED_UPDATES_FILE, atomically: true, encoding: .utf8)
+    }
     /// La terminal de abajo: a la vista o no (sigue abierta al esconderla), su alto y la sesión
     @Published var termOpen = false {
         didSet { if termOpen { termStart() } }
@@ -19606,6 +19642,8 @@ final class AppModel: ObservableObject {
     }
     /// Repositorios de GitHub (pestaña Repositorios) y la conexión (Configuración)
     @Published var repos: ReposData? = nil
+    /// Proyectos de Node (pestaña Node)
+    @Published var nodeItems: [NodeItem]? = nil
     @Published var reposAll = false
     @Published var reposLoading = false
     @Published var github: GitHubState? = nil
@@ -19690,12 +19728,8 @@ final class AppModel: ObservableObject {
     /// dice y se ofrece actualizarlo todo
     func autoCheckComponents() {
         reloadComponents { c in
-            guard !c.items.isEmpty else { return }
-            func ask() {
-                if self.busy { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { ask() }; return }
-                self.updateComponents(c)
-            }
-            ask()
+            // (sin preguntar: el aviso de arriba lo dice, y se puede dejar para luego)
+            if self.updatesPending != nil { self.toast("Hay parches nuevos: míralos en los avisos de arriba") }
         }
     }
 
@@ -19736,6 +19770,57 @@ final class AppModel: ObservableObject {
                 return
             }
             self.githubDone(rc, out)
+        }
+    }
+
+    func reloadNode() {
+        runQuick(["gui-node"]) { _, out in
+            let items = parseNode(out)
+            if items != self.nodeItems { self.nodeItems = items }
+        }
+    }
+
+    func startNode(_ p: NodeItem, mode: String) {
+        runTask("Arrancando \(p.folder)", ["node-arrancar", p.folder, mode], progress: true,
+                doneText: "\(p.folder) en marcha", autoClose: true) { _, _, _ in self.reloadNode() }
+    }
+
+    /// Túnel: solo se comparte lo compilado (el túnel no deja pasar /node_modules/.vite y así el código
+    /// fuente no sale del Mac). Si no lo está, se compila y arranca antes
+    func shareNode(_ p: NodeItem) {
+        let path = HTDOCS + "/" + p.folder
+        if p.running && p.mode == "compilado" {
+            share(p.url, folder: path, name: p.folder, live: false)
+            return
+        }
+        if p.running {
+            guard confirm("¿Compilar \(p.folder) para compartirlo?",
+                          "Está en desarrollo, y lo que se comparte es la versión compilada. Se para y arranca compilado: los cambios ya no se verán al momento.",
+                          "Compilar y compartir") else { return }
+        }
+        runTask("Arrancando \(p.folder)", ["node-arrancar", p.folder, "compilado"], progress: true,
+                doneText: "\(p.folder) en marcha", autoClose: true) { ok, _, _ in
+            guard ok else {
+                self.reloadNode()
+                return
+            }
+            runQuick(["gui-node"]) { _, out in
+                let items = parseNode(out)
+                self.nodeItems = items
+                if let now = items.first(where: { $0.folder == p.folder }), now.running {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.share(now.url, folder: path, name: p.folder, live: false)
+                    }
+                }
+            }
+        }
+    }
+
+    func stopNode(_ p: NodeItem) {
+        runTask("Parando \(p.folder)", ["node-parar", p.folder],
+                doneText: "\(p.folder) parado", autoClose: true) { _, _, _ in
+            self.reloadNode()
+            self.refreshTunnel()
         }
     }
 
@@ -20407,8 +20492,15 @@ final class AppModel: ObservableObject {
                  autoClose: Bool = false, env: [String: String] = [:],
                  cancelText: (String, String, String)? = nil, reloadBranches: Bool = false,
                  onDone: ((Bool, TaskRunner, InstallProgress?) -> Void)? = nil) -> TaskRunner {
+        // (otra tarea en segundo plano: no van dos a la vez, que tocarían lo mismo)
+        if let cur = task, !cur.finished {
+            taskHidden = false
+            toast("Hay una tarea en marcha: espera a que acabe")
+            return cur
+        }
         // (la ventana que hubiera encima de la página se cierra: la tarea va en su hoja)
         panel = nil
+        taskHidden = false
         let t = TaskRunner(title: title, args: args, withProgress: progress, doneText: doneText,
                            autoClose: autoClose, env: env, cancelText: cancelText)
         t.model = self
@@ -22080,6 +22172,9 @@ struct Page<Content: View>: View {
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 let LOGO_PATHS: [String: String] = [
+    // (bases de datos: discos apilados; Node: su hexágono)
+    "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
+    "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
     "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
     "imagenes": "M 9 10 C 10.105 10 11 9.105 11 8 C 11 6.895 10.105 6 9 6 C 7.895 6 7 6.895 7 8 C 7 9.105 7.895 10 9 10 Z M 13 2 L 9 2 C 4 2 2 4 2 9 L 2 15 C 2 20 4 22 9 22 L 15 22 C 20 22 22 20 22 15 L 22 10 M 18 2 L 18 8 L 20 6 M 18 8 L 16 6 M 2.67 18.95 L 7.6 15.64 C 8.39 15.11 9.53 15.17 10.24 15.78 L 10.57 16.07 C 11.35 16.74 12.61 16.74 13.39 16.07 L 17.55 12.5 C 18.33 11.83 19.59 11.83 20.37 12.5 L 22 13.9",
     // (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
@@ -22128,6 +22223,7 @@ let LOGO_COLORS: [String: Color] = [
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
     "wordpress": hexColor(0x21759B), "prestashop": hexColor(0xDF0067), "mailpit": hexColor(0x00A87B), "docker": hexColor(0x2496ED),
     "cloudflare": hexColor(0xF38020), "github": hexColor(0x181717),
+    "bbdd": hexColor(0x0284C7), "node": hexColor(0x5FA04E),
 ]
 
 /// Los que se dibujan con trazo, no rellenos
@@ -22420,7 +22516,15 @@ private struct TileWideKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+struct TileRowKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    var tileRow: Bool {
+        get { self[TileRowKey.self] }
+        set { self[TileRowKey.self] = newValue }
+    }
     var tileWide: Bool {
         get { self[TileWideKey.self] }
         set { self[TileWideKey.self] = newValue }
@@ -22434,34 +22538,50 @@ struct TileCard<Content: View>: View {
     let description: String?
     let wide: Bool
     let columns: Int
+    /// Con tiles, en tarjetas (Docker y el correo de pruebas); si no, en filas (desde la 1.41.0)
+    let tiles: Bool
+    let lead: AnyView?
+    let tail: AnyView?
     let content: Content
-    init(_ title: String? = nil, _ description: String? = nil, wide: Bool = false, columns: Int = 2,
-         @ViewBuilder content: () -> Content) {
+    init(_ title: String? = nil, _ description: String? = nil, wide: Bool = false, columns: Int = 2, tiles: Bool = false,
+         lead: AnyView? = nil, tail: AnyView? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.description = description
         self.wide = wide
         self.columns = columns
+        self.tiles = tiles
+        self.lead = lead
+        self.tail = tail
         self.content = content()
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if title != nil || description != nil {
                 HStack(spacing: 6) {
+                    if let l = lead { l }
                     if let t = title { Text(t).font(.headline) }
                     if let d = description {
                         Image(systemName: "info.circle").foregroundColor(.secondary).tip(d)
                     }
+                    if let r = tail { r.padding(.leading, 6) }
                 }
             }
             Group {
-                if wide {
+                if !tiles {
+                    // (en filas: una lista con sus líneas, como en Linux)
+                    VStack(spacing: 0) { content }
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+                } else if wide {
                     VStack(spacing: 12) { content }
                 } else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: columns),
                               alignment: .leading, spacing: 12) { content }
                 }
             }
-            .environment(\.tileWide, wide)
+            .environment(\.tileWide, wide || !tiles)
+            .environment(\.tileRow, !tiles)
             .padding(.top, 4)
         }
     }
@@ -22475,6 +22595,7 @@ struct Tile<Leading: View, Trailing: View>: View {
     let leading: Leading
     let trailing: Trailing
     @Environment(\.tileWide) var wide
+    @Environment(\.tileRow) var row
     init(_ title: String, _ subtitle: String? = nil, @ViewBuilder leading: () -> Leading,
          @ViewBuilder trailing: () -> Trailing) {
         self.title = title
@@ -22505,10 +22626,12 @@ struct Tile<Leading: View, Trailing: View>: View {
                 }
             }
         }
-        .padding(14)
+        .padding(row ? 12 : 14)
         .frame(maxWidth: .infinity, minHeight: wide ? 0 : 118, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        .background(row ? nil : RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
+        .overlay(row ? nil : RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        // (en filas, una línea debajo de cada una)
+        .overlay(row ? Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1) : nil, alignment: .bottom)
     }
     @ViewBuilder var icon: some View {
         if Leading.self == EmptyView.self, let ic = rowIcon(title) {
@@ -23288,6 +23411,7 @@ extension AppModel {
         expanded = expanded.filter { !$0.hasPrefix("@db") }
         dkOpen = []
         if key == "docker" { reloadDocker(stats: true) }
+        if key == "node" { reloadNode() }
         if key == "repos" {
             if repos == nil { reloadRepos(cache: true) }
             reloadRepos()
@@ -23918,6 +24042,42 @@ extension AppModel {
 /// Siempre a la vista: el nombre, el menú, el visor de la versión montada (PHP, Apache y MariaDB con su
 /// punto, encender o apagar y, en la flecha, sus servicios), Localhost y los avisos (phpMyAdmin, desde
 /// la 1.39.5, en Bases de datos y en el menú Gestor)
+/// Tarea en segundo plano: una flecha verde que baja y late, con su porcentaje; al pulsarla, su hoja
+struct TaskBadge: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject var task: TaskRunner
+    @State private var pulse = false
+
+    var body: some View {
+        Button(action: { model.taskHidden = false }) {
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .opacity(pulse ? 0.35 : 1)
+                    .offset(y: pulse ? 2 : -2)
+                // (lo que hace, con la primera palabra del título: «Actualizando…», «Instalando…»)
+                Text((task.title.split(separator: " ").first.map(String.init) ?? "En marcha") + "…")
+                    .font(.system(size: 11.5, weight: .semibold))
+                if let r = task.pctText.range(of: "%") {
+                    Text(String(task.pctText[..<r.upperBound])).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                }
+            }
+            .foregroundColor(.green)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.green.opacity(0.13)))
+            .overlay(Capsule().stroke(Color.green.opacity(0.5), lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .hoverPointer()
+        .tip("\(task.title)\n\(task.barText)\nPulsa para ver la ventana")
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { pulse = true }
+        }
+    }
+}
+
 struct TopBar: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.colorScheme) var scheme
@@ -23938,7 +24098,10 @@ struct TopBar: View {
                 }
             }
             Spacer(minLength: 12)
-            // (el menú, justo a la derecha del visor, como en Linux)
+            // (la tarea en segundo plano, a la izquierda del visor; el menú, justo a su derecha, como en Linux)
+            if model.taskHidden, let t = model.task {
+                TaskBadge(task: t)
+            }
             visor()
             menuButton()
             Spacer(minLength: 12)
@@ -24084,11 +24247,12 @@ struct TopBar: View {
     /// Los avisos (lo que antes iba arriba de Versiones) en un solo botón con cuántos hay
     @ViewBuilder
     func warnings() -> some View {
-        if let d = model.data, warningCount(d) > 0 {
+        let n = (model.data.map { warningCount($0) } ?? 0) + (model.updatesPending != nil ? 1 : 0)
+        if model.data != nil, n > 0 {
             Button(action: { warnOpen.toggle() }) {
                 HStack(spacing: 5) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
-                    Text("\(warningCount(d))").font(.system(size: 12, weight: .bold))
+                    Text("\(n)").font(.system(size: 12, weight: .bold))
                 }
             }
             .buttonStyle(OutlineButton())
@@ -24166,8 +24330,21 @@ struct WarningsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if let c = model.updatesPending {
+                Card("Hay parches nuevos (\(c.items.count))",
+                     "Lo de ahora sigue funcionando mientras se actualiza (se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta que salga otro parche; siguen en Configuración, Parches nuevos.") {
+                    Row("Conviene ponerlos: son parches de seguridad",
+                        (c.items.prefix(6).map { "• " + $0 } + (c.items.count > 6 ? ["…y \(c.items.count - 6) más"] : [])).joined(separator: "\n"),
+                        trailing: {
+                            Button("Ahora no") { model.ignoreUpdates(c) }
+                            Button("Actualizar todo") { model.updateComponents(c) }
+                                .buttonStyle(OutlineButton(kind: "primary"))
+                                .disabled(model.busy)
+                        })
+                }
+            }
             if let d = model.data {
-                if warningCount(d) == 0 {
+                if warningCount(d) == 0 && model.updatesPending == nil {
                     Text("No hay avisos.").foregroundColor(.secondary)
                 }
                 if d.official {
@@ -24282,23 +24459,129 @@ struct WarningsView: View {
 let NAV: [(String, [(String, String, String)])] = [
     ("ENTORNO", [("proyectos", "Proyectos", "folder"), ("repos", "Repositorios", "logo:github"),
                  ("versiones", "Versiones de PHP", "logo:php"),
-                 ("bbdd", "Bases de datos", "internaldrive"), ("docker", "Docker", "logo:docker")]),
+                 ("bbdd", "Bases de datos", "logo:bbdd"), ("docker", "Docker", "logo:docker"),
+                 ("node", "Node", "logo:node")]),
     ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("config", "Configuración", "gearshape")]),
 ]
+
+/// Apariencia (~/.lvm-instalador/apariencia, el mismo fichero que en Linux): iconos en color, Docker, Node
+/// y PHP con su logotipo, y qué apartados no salen en el menú lateral (Proyectos y Configuración, siempre)
+let LOOK_FILE = LOG_DIR + "/apariencia"
+let NAV_FIXED: Set<String> = ["proyectos", "config"]
+/// Color de los símbolos del sistema con los iconos en color
+let NAV_TINTS: [String: Color] = ["proyectos": hexColor(0xE8A23A), "dominios": hexColor(0x1C9C6B), "config": hexColor(0x7C6FD8)]
+
+struct LookConf: Equatable {
+    var color = false
+    var marcas = false
+    var ocultos: Set<String> = []
+}
+
+func loadLook() -> LookConf {
+    var c = LookConf()
+    guard let data = FileManager.default.contents(atPath: LOOK_FILE),
+          let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return c }
+    let keys = Set(NAV.flatMap { $0.1.map { $0.0 } }).subtracting(NAV_FIXED)
+    c.color = o["color"] as? Bool ?? false
+    c.marcas = o["marcas"] as? Bool ?? false
+    c.ocultos = Set((o["ocultos"] as? [String] ?? []).filter { keys.contains($0) })
+    return c
+}
+
+func saveLook(_ c: LookConf) {
+    if SIMULATE { return }
+    let o: [String: Any] = ["color": c.color, "marcas": c.marcas, "ocultos": c.ocultos.sorted()]
+    guard let data = try? JSONSerialization.data(withJSONObject: o) else { return }
+    try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
+                                             attributes: [.posixPermissions: 0o700])
+    let tmp = LOOK_FILE + ".nuevo"
+    if FileManager.default.createFile(atPath: tmp, contents: data) {
+        _ = try? FileManager.default.replaceItemAt(URL(fileURLWithPath: LOOK_FILE), withItemAt: URL(fileURLWithPath: tmp))
+        if !FileManager.default.fileExists(atPath: LOOK_FILE) { try? FileManager.default.moveItem(atPath: tmp, toPath: LOOK_FILE) }
+    }
+}
+
+/// Los logotipos con su tipografía: los oficiales de Docker (docker.com), Node.js (nodejs.org; letra oscura en
+/// el tema claro y clara en el oscuro) y PHP (php.net), en PDF (vectoriales, nítidos a cualquier tamaño)
+let BRAND_PDF: [String: String] = [
+    "docker": "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",
+    "node-claro": "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blR5cGUgMgogICAvRG9tYWluIFsgMCAxIF0KICAgL0MwIFsgMC4yNDcwNTkgMC41Mjk0MTIgMC4yNDcwNTkgXQogICAvQzEgWyAwLjIzOTIxNiAwLjY2Mjc0NSAwLjE4MDM5MiBdCiAgIC9OIDEKPj4KZW5kb2JqCjI3IDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMgogICAvRG9tYWluIFsgMCAxIF0KICAgL0MwIFsgMC4yMzkyMTYgMC42NjI3NDUgMC4xODAzOTIgXQogICAvQzEgWyAwLjIzOTIxNiAwLjY4MjM1MyAwLjE2ODYyNyBdCiAgIC9OIDEKPj4KZW5kb2JqCjI4IDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMwogICAvRG9tYWluIFsgMCAxIF0KICAgL0Z1bmN0aW9ucyBbIDI1IDAgUiAyNiAwIFIgMjcgMCBSIF0KICAgL0JvdW5kcyBbIDAuNjQgMC45MyBdCiAgIC9FbmNvZGUgWyAwIDEgMCAxIDAgMSBdCj4+CmVuZG9iagoyMiAwIG9iagogICAgICA8PCAvU2hhZGluZ1R5cGUgMgogICAgICAgICAvQ29sb3JTcGFjZSAvRGV2aWNlUkdCCiAgICAgICAgIC9Db29yZHMgWyAzMC4zMyA4LjU2IDE0LjkgNDQuNzAwMDAxIF0KICAgICAgICAgL0RvbWFpbiBbIDAgMSBdCiAgICAgICAgIC9FeHRlbmQgWyB0cnVlIHRydWUgXQogICAgICAgICAvRnVuY3Rpb24gMjggMCBSCiAgICAgID4+CmVuZG9iagoyOSAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMjQ3MDU5IDAuNTI5NDEyIDAuMjQ3MDU5IF0KICAgL0MxIFsgMC4zMjE1NjkgMC42Mjc0NTEgMC4yNjY2NjcgXQogICAvTiAxCj4+CmVuZG9iagozMCAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMzIxNTY5IDAuNjI3NDUxIDAuMjY2NjY3IF0KICAgL0MxIFsgMC4zOTIxNTcgMC43MTc2NDcgMC4yODYyNzUgXQogICAvTiAxCj4+CmVuZG9iagozMSAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMzkyMTU3IDAuNzE3NjQ3IDAuMjg2Mjc1IF0KICAgL0MxIFsgMC40MTU2ODYgMC43NDkwMiAwLjI5NDExOCBdCiAgIC9OIDEKPj4KZW5kb2JqCjMyIDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMwogICAvRG9tYWluIFsgMC4xNCAwLjkxIF0KICAgL0Z1bmN0aW9ucyBbIDI5IDAgUiAzMCAwIFIgMzEgMCBSIF0KICAgL0JvdW5kcyBbIDAuNCAwLjcxIF0KICAgL0VuY29kZSBbIDAgMSAwIDEgMCAxIF0KPj4KZW5kb2JqCjIzIDAgb2JqCiAgICAgIDw8IC9TaGFkaW5nVHlwZSAyCiAgICAgICAgIC9Db2xvclNwYWNlIC9EZXZpY2VSR0IKICAgICAgICAgL0Nvb3JkcyBbIDI1LjY4Nzk5OSAyMy4xMDM5OTkgNjMuNTcyMDAxIDIuNzc1OTk5IF0KICAgICAgICAgL0RvbWFpbiBbIDAuMTQgMC45MSBdCiAgICAgICAgIC9FeHRlbmQgWyB0cnVlIHRydWUgXQogICAgICAgICAvRnVuY3Rpb24gMzIgMCBSCiAgICAgID4+CmVuZG9iagozMyAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuNDE1Njg2IDAuNzQ5MDIgMC4yOTQxMTggXQogICAvQzEgWyAwLjM5MjE1NyAwLjcxNzY0NyAwLjI4NjI3NSBdCiAgIC9OIDEKPj4KZW5kb2JqCjM0IDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMgogICAvRG9tYWluIFsgMCAxIF0KICAgL0MwIFsgMC4zOTIxNTcgMC43MTc2NDcgMC4yODYyNzUgXQogICAvQzEgWyAwLjMyMTU2OSAwLjYyNzQ1MSAwLjI2NjY2NyBdCiAgIC9OIDEKPj4KZW5kb2JqCjM1IDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMgogICAvRG9tYWluIFsgMCAxIF0KICAgL0MwIFsgMC4zMjE1NjkgMC42Mjc0NTEgMC4yNjY2NjcgXQogICAvQzEgWyAwLjI0NzA1OSAwLjUyOTQxMiAwLjI0NzA1OSBdCiAgIC9OIDEKPj4KZW5kb2JqCjM2IDAgb2JqCjw8IC9GdW5jdGlvblR5cGUgMwogICAvRG9tYWluIFsgMC4wOSAwLjg2IF0KICAgL0Z1bmN0aW9ucyBbIDMzIDAgUiAzNCAwIFIgMzUgMCBSIF0KICAgL0JvdW5kcyBbIDAuMjkgMC42IF0KICAgL0VuY29kZSBbIDAgMSAwIDEgMCAxIF0KPj4KZW5kb2JqCjI0IDAgb2JqCiAgICAgIDw8IC9TaGFkaW5nVHlwZSAyCiAgICAgICAgIC9Db2xvclNwYWNlIC9EZXZpY2VSR0IKICAgICAgICAgL0Nvb3JkcyBbIDQuMTg3NSAyNC41IDM3Ljg3NTAwMSAyNC41IF0KICAgICAgICAgL0RvbWFpbiBbIDAuMDkgMC44NiBdCiAgICAgICAgIC9FeHRlbmQgWyB0cnVlIHRydWUgXQogICAgICAgICAvRnVuY3Rpb24gMzYgMCBSCiAgICAgID4+CmVuZG9iago4IDAgb2JqCjw8IC9UeXBlIC9PYmpTdG0KICAgL0xlbmd0aCAzNyAwIFIKICAgL04gMQogICAvRmlyc3QgNAogICAvRmlsdGVyIC9GbGF0ZURlY29kZQo+PgpzdHJlYW0KeJwzUzDgiuaK5QIABjgBXQplbmRzdHJlYW0KZW5kb2JqCjM3IDAgb2JqCiAgIDE2CmVuZG9iagozOCAwIG9iago8PCAvVHlwZSAvT2JqU3RtCiAgIC9MZW5ndGggNDEgMCBSCiAgIC9OIDQKICAgL0ZpcnN0IDIzCiAgIC9GaWx0ZXIgL0ZsYXRlRGVjb2RlCj4+CnN0cmVhbQp4nFWRwWrDMBBE7/qKuZTGFOKVnThpMDnEhlBKISS9lR6EIhxBsYwkl+bvKzmxS9FpH7OaGZaDWP6MJbEMfMnZgpCvclaWSN+vnUJ6EI1yDED6qs8OH8hAOOJzQJXpWw/Ottth42DNuZfKYiaFtgZ8ztdzwuzifec2aTrQxoruoqWbG9skye0bq4TXpq2FV5jVm4yygnNa8YKWlD8RfyRKRpO/WHgI1nH/IKyKOWKyAbypsxY78xPiUnhZscKapsytD2qHxSTfW9N3KMs4xPlmMdARnQK1onVdtJLXEb/A216NUxVUtfrWUh33uwhD5MiPypneSuWQT56nsCj9LbkLR/jXrhJefJnmXi4c4N4tiH4BvtJungplbmRzdHJlYW0KZW5kb2JqCjQxIDAgb2JqCiAgIDI3OAplbmRvYmoKNDIgMCBvYmoKPDwgL1R5cGUgL1hSZWYKICAgL0xlbmd0aCAxNDgKICAgL0ZpbHRlciAvRmxhdGVEZWNvZGUKICAgL1NpemUgNDMKICAgL1cgWzEgMiAyXQogICAvUm9vdCA0MCAwIFIKICAgL0luZm8gMzkgMCBSCj4+CnN0cmVhbQp4nCXOuw4BURSF4XXGhOlE3G8ziUKhVuj1el5EpeMBtAqNRq0TDdET7yDxEBKsP5ov56y1d7Ilfb+R+hJEQRspqAgrsoTXx3TPJhpBz+RnJl7wvZnC3SQvihQOZEeyhymfYGdqFM2r6TBcmZtqDGtadutL0yjBluGBae1NewgXdicmHcP0f3iAXMiezrK39AOkKBjYCmVuZHN0cmVhbQplbmRvYmoKc3RhcnR4cmVmCjgxODcKJSVFT0YK",
+    "node-oscuro": "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eXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMjQ3MDU5IDAuNTI5NDEyIDAuMjQ3MDU5IF0KICAgL0MxIFsgMC4yMzkyMTYgMC42NjI3NDUgMC4xODAzOTIgXQogICAvTiAxCj4+CmVuZG9iagoyNyAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMjM5MjE2IDAuNjYyNzQ1IDAuMTgwMzkyIF0KICAgL0MxIFsgMC4yMzkyMTYgMC42ODIzNTMgMC4xNjg2MjcgXQogICAvTiAxCj4+CmVuZG9iagoyOCAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDMKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9GdW5jdGlvbnMgWyAyNSAwIFIgMjYgMCBSIDI3IDAgUiBdCiAgIC9Cb3VuZHMgWyAwLjY0IDAuOTMgXQogICAvRW5jb2RlIFsgMCAxIDAgMSAwIDEgXQo+PgplbmRvYmoKMjIgMCBvYmoKICAgICAgPDwgL1NoYWRpbmdUeXBlIDIKICAgICAgICAgL0NvbG9yU3BhY2UgL0RldmljZVJHQgogICAgICAgICAvQ29vcmRzIFsgMzAuMzMgOC41NiAxNC45IDQ0LjcwMDAwMSBdCiAgICAgICAgIC9Eb21haW4gWyAwIDEgXQogICAgICAgICAvRXh0ZW5kIFsgdHJ1ZSB0cnVlIF0KICAgICAgICAgL0Z1bmN0aW9uIDI4IDAgUgogICAgICA+PgplbmRvYmoKMjkgMCBvYmoKPDwgL0Z1bmN0aW9uVHlwZSAyCiAgIC9Eb21haW4gWyAwIDEgXQogICAvQzAgWyAwLjI0NzA1OSAwLjUyOTQxMiAwLjI0NzA1OSBdCiAgIC9DMSBbIDAuMzIxNTY5IDAuNjI3NDUxIDAuMjY2NjY3IF0KICAgL04gMQo+PgplbmRvYmoKMzAgMCBvYmoKPDwgL0Z1bmN0aW9uVHlwZSAyCiAgIC9Eb21haW4gWyAwIDEgXQogICAvQzAgWyAwLjMyMTU2OSAwLjYyNzQ1MSAwLjI2NjY2NyBdCiAgIC9DMSBbIDAuMzkyMTU3IDAuNzE3NjQ3IDAuMjg2Mjc1IF0KICAgL04gMQo+PgplbmRvYmoKMzEgMCBvYmoKPDwgL0Z1bmN0aW9uVHlwZSAyCiAgIC9Eb21haW4gWyAwIDEgXQogICAvQzAgWyAwLjM5MjE1NyAwLjcxNzY0NyAwLjI4NjI3NSBdCiAgIC9DMSBbIDAuNDE1Njg2IDAuNzQ5MDIgMC4yOTQxMTggXQogICAvTiAxCj4+CmVuZG9iagozMiAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDMKICAgL0RvbWFpbiBbIDAuMTQgMC45MSBdCiAgIC9GdW5jdGlvbnMgWyAyOSAwIFIgMzAgMCBSIDMxIDAgUiBdCiAgIC9Cb3VuZHMgWyAwLjQgMC43MSBdCiAgIC9FbmNvZGUgWyAwIDEgMCAxIDAgMSBdCj4+CmVuZG9iagoyMyAwIG9iagogICAgICA8PCAvU2hhZGluZ1R5cGUgMgogICAgICAgICAvQ29sb3JTcGFjZSAvRGV2aWNlUkdCCiAgICAgICAgIC9Db29yZHMgWyAyNS42ODc5OTkgMjMuMTAzOTk5IDYzLjU3MjAwMSAyLjc3NTk5OSBdCiAgICAgICAgIC9Eb21haW4gWyAwLjE0IDAuOTEgXQogICAgICAgICAvRXh0ZW5kIFsgdHJ1ZSB0cnVlIF0KICAgICAgICAgL0Z1bmN0aW9uIDMyIDAgUgogICAgICA+PgplbmRvYmoKMzMgMCBvYmoKPDwgL0Z1bmN0aW9uVHlwZSAyCiAgIC9Eb21haW4gWyAwIDEgXQogICAvQzAgWyAwLjQxNTY4NiAwLjc0OTAyIDAuMjk0MTE4IF0KICAgL0MxIFsgMC4zOTIxNTcgMC43MTc2NDcgMC4yODYyNzUgXQogICAvTiAxCj4+CmVuZG9iagozNCAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMzkyMTU3IDAuNzE3NjQ3IDAuMjg2Mjc1IF0KICAgL0MxIFsgMC4zMjE1NjkgMC42Mjc0NTEgMC4yNjY2NjcgXQogICAvTiAxCj4+CmVuZG9iagozNSAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDIKICAgL0RvbWFpbiBbIDAgMSBdCiAgIC9DMCBbIDAuMzIxNTY5IDAuNjI3NDUxIDAuMjY2NjY3IF0KICAgL0MxIFsgMC4yNDcwNTkgMC41Mjk0MTIgMC4yNDcwNTkgXQogICAvTiAxCj4+CmVuZG9iagozNiAwIG9iago8PCAvRnVuY3Rpb25UeXBlIDMKICAgL0RvbWFpbiBbIDAuMDkgMC44NiBdCiAgIC9GdW5jdGlvbnMgWyAzMyAwIFIgMzQgMCBSIDM1IDAgUiBdCiAgIC9Cb3VuZHMgWyAwLjI5IDAuNiBdCiAgIC9FbmNvZGUgWyAwIDEgMCAxIDAgMSBdCj4+CmVuZG9iagoyNCAwIG9iagogICAgICA8PCAvU2hhZGluZ1R5cGUgMgogICAgICAgICAvQ29sb3JTcGFjZSAvRGV2aWNlUkdCCiAgICAgICAgIC9Db29yZHMgWyA0LjE4NzUgMjQuNSAzNy44NzUwMDEgMjQuNSBdCiAgICAgICAgIC9Eb21haW4gWyAwLjA5IDAuODYgXQogICAgICAgICAvRXh0ZW5kIFsgdHJ1ZSB0cnVlIF0KICAgICAgICAgL0Z1bmN0aW9uIDM2IDAgUgogICAgICA+PgplbmRvYmoKOCAwIG9iago8PCAvVHlwZSAvT2JqU3RtCiAgIC9MZW5ndGggMzcgMCBSCiAgIC9OIDEKICAgL0ZpcnN0IDQKICAgL0ZpbHRlciAvRmxhdGVEZWNvZGUKPj4Kc3RyZWFtCnicM1Mw4IrmiuUCAAY4AV0KZW5kc3RyZWFtCmVuZG9iagozNyAwIG9iagogICAxNgplbmRvYmoKMzggMCBvYmoKPDwgL1R5cGUgL09ialN0bQogICAvTGVuZ3RoIDQxIDAgUgogICAvTiA0CiAgIC9GaXJzdCAyMwogICAvRmlsdGVyIC9GbGF0ZURlY29kZQo+PgpzdHJlYW0KeJxVkcFqwzAQRO/6irmUxhTilZ04aTA5xIZQSiEkvZUehCIcQbGMJJfm7ys5sUvRaR+zmhmWg1j+jCWxDHzJ2YKQr3JWlkjfr51CehCNcgxA+qrPDh/IQDjic0CV6VsPzrbbYeNgzbmXymImhbYGfM7Xc8Ls4n3nNmk60MaK7qKlmxvbJMntG6uE16athVeY1ZuMsoJzWvGClpQ/EX8kSkaTv1h4CNZx/yCsijlisgG8qbMWO/MT4lJ4WbHCmqbMrQ9qh8Uk31vTdyjLOMT5ZjHQEZ0CtaJ1XbSS1xG/wNtejVMVVLX61lId97sIQ+TIj8qZ3krlkE+ep7Ao/S25C0f4164SXnyZ5l4uHODeLYh+Ab7Sbp4KZW5kc3RyZWFtCmVuZG9iago0MSAwIG9iagogICAyNzgKZW5kb2JqCjQyIDAgb2JqCjw8IC9UeXBlIC9YUmVmCiAgIC9MZW5ndGggMTU0CiAgIC9GaWx0ZXIgL0ZsYXRlRGVjb2RlCiAgIC9TaXplIDQzCiAgIC9XIFsxIDIgMl0KICAgL1Jvb3QgNDAgMCBSCiAgIC9JbmZvIDM5IDAgUgo+PgpzdHJlYW0KeJwlzqEKwmAUBeDz/4quGeZ0bnODBTGbrHa74HssWgTz+rBYlofNovgCE19BkD2DxXkOlo97z70XLoC2tZgBwhoUgMFAHJQ5qr5keiV2KVLS25LuTm1N+g/iNBrE4qzsouxJXFXuiYwqMrmT6E2GGfGsyDWNyHhPfH3gH7U8J0FJwoW46XZN4pXY/B83omOSF7PkA/wAmKAYrAplbmRzdHJlYW0KZW5kb2JqCnN0YXJ0eHJlZgo4MTg1CiUlRU9GCg==",
+    "php": "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",
+]
+private var brandImages: [String: NSImage] = [:]
+
+func brandImage(_ key: String) -> NSImage? {
+    if let i = brandImages[key] { return i }
+    guard let b = BRAND_PDF[key], let d = Data(base64Encoded: b), let i = NSImage(data: d) else { return nil }
+    brandImages[key] = i
+    return i
+}
+
+/// Configuración, Apariencia: el menú lateral (iconos en color, logotipos y qué apartados salen) y los
+/// botones del proyecto. Se guarda al momento
+struct AppearanceCard: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        TileCard("Apariencia", "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Linux.", wide: true) {
+            Tile("Iconos en color", "Cada apartado del menú lateral con su color; apagado, de un color, como el texto") {
+                Toggle("", isOn: Binding(get: { model.look.color }, set: { model.look.color = $0 }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+            }
+            Tile("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre") {
+                Toggle("", isOn: Binding(get: { model.look.marcas }, set: { model.look.marcas = $0 }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+            }
+            Tile("Botones del proyecto", "Cuáles se ven en el visor, en qué orden y cómo") {
+                Button("Personalizar…") { model.panel = .buttons }
+            }
+            ForEach(NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) }, id: \.0) { item in
+                Tile(item.1, "Mostrar en el menú lateral") {
+                    Toggle("", isOn: Binding(get: { !model.look.ocultos.contains(item.0) }, set: { on in
+                        if on { model.look.ocultos.remove(item.0) } else { model.look.ocultos.insert(item.0) }
+                    }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                }
+            }
+        }
+    }
+}
+
+/// Un logotipo con su tipografía; con tint, de ese color (PHP, siempre en el suyo: de un color, su óvalo
+/// taparía las letras)
+struct BrandImage: View {
+    let key: String
+    let height: CGFloat
+    var tint: Color? = nil
+    @Environment(\.colorScheme) var scheme
+
+    var body: some View {
+        let k = key == "node" ? (scheme == .dark ? "node-oscuro" : "node-claro") : key
+        if let img = brandImage(k) {
+            if let c = tint, key != "php" {
+                Image(nsImage: img).renderingMode(.template).resizable().aspectRatio(contentMode: .fit)
+                    .frame(height: height).foregroundColor(c)
+            } else {
+                Image(nsImage: img).resizable().aspectRatio(contentMode: .fit).frame(height: height)
+            }
+        }
+    }
+}
 
 struct Sidebar: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(NAV, id: \.0) { group in
+            ForEach(NAV.filter { g in g.1.contains { NAV_FIXED.contains($0.0) || !model.look.ocultos.contains($0.0) } }, id: \.0) { group in
                 Text(group.0)
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundColor(.secondary)
                     .padding(.leading, 12)
                     .padding(.top, 14)
                     .padding(.bottom, 3)
-                ForEach(group.1, id: \.0) { item in
+                ForEach(group.1.filter { NAV_FIXED.contains($0.0) || !model.look.ocultos.contains($0.0) }, id: \.0) { item in
                     NavRow(key: item.0, text: item.1, icon: item.2)
                 }
             }
@@ -24333,8 +24616,19 @@ struct NavRow: View {
         let on = model.tab == key
         return Button(action: { model.openTab(key) }) {
             HStack(spacing: 10) {
-                navIcon(on)
-                Text(text).font(.system(size: 13, weight: on ? .semibold : .regular))
+                let look = model.look
+                if look.marcas && (key == "docker" || key == "node") {
+                    // (el logotipo con su nombre, en su tipografía: ya dice qué es)
+                    BrandImage(key: key, height: key == "docker" ? 21 : 19,
+                               tint: look.color ? nil : (on ? ACCENT : Color.primary))
+                } else {
+                    if look.marcas && look.color && key == "versiones" {
+                        BrandImage(key: "php", height: 19)
+                    } else {
+                        navIcon(on, color: look.color)
+                    }
+                    Text(text).font(.system(size: 13, weight: on ? .semibold : .regular))
+                }
                 Spacer(minLength: 0)
             }
             .foregroundColor(on ? ACCENT : Color.primary)
@@ -24351,14 +24645,16 @@ struct NavRow: View {
     /// (los logotipos de un color, como los símbolos; desde la 1.39.4 también la ballena de Docker,
     /// como en Linux). Algo más grandes desde la 1.39, como en Linux (de 16 a 20)
     @ViewBuilder
-    func navIcon(_ on: Bool) -> some View {
+    func navIcon(_ on: Bool, color: Bool) -> some View {
+        // (en color, cada uno el suyo; GitHub, el del texto, que en el tema oscuro su negro no se vería)
         if icon.hasPrefix("logo:") {
-            LogoShape(d: LOGO_PATHS[String(icon.dropFirst(5))] ?? "")
-                .fill(on ? ACCENT : Color.secondary)
+            let name = String(icon.dropFirst(5))
+            LogoShape(d: LOGO_PATHS[name] ?? "")
+                .fill(color ? (name == "github" ? Color.primary : brand(name)) : (on ? ACCENT : Color.secondary))
                 .frame(width: 21, height: 21)
         } else {
             Image(systemName: icon).font(.system(size: 17)).frame(width: 21, height: 21)
-                .foregroundColor(on ? ACCENT : Color.secondary)
+                .foregroundColor(color ? (NAV_TINTS[key] ?? ACCENT) : (on ? ACCENT : Color.secondary))
         }
     }
 }
@@ -26371,6 +26667,119 @@ struct GitHubCard: View {
 }
 
 /// Pestaña Repositorios: los de la organización o cuenta de GitHub (Configuración), para clonarlos por SSH
+/// Un proyecto de Node (gui-node: P|carpeta|tipo|parado o marcha|modo|dirección|Node que pide|dependencias|scripts)
+struct NodeItem: Equatable, Identifiable {
+    var id: String { folder }
+    let folder, kind: String
+    let running: Bool
+    let mode, url, need: String
+    let deps: Bool
+}
+
+func parseNode(_ out: String) -> [NodeItem] {
+    parseLines(out).compactMap { f in
+        guard f.first == "P", f.count >= 9 else { return nil }
+        return NodeItem(folder: f[1], kind: f[2], running: f[3] == "marcha", mode: f[4], url: f[5], need: f[6], deps: f[7] == "1")
+    }
+}
+
+struct NodeView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        WidePage {
+            PageTitle(title: "Node",
+                      sub: "Proyectos de \(HTDOCS) hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en este Mac, con tu usuario y con la versión de Node que pide.",
+                      symbol: "chevron.left.forwardslash.chevron.right")
+            let items = model.nodeItems ?? []
+            Card {
+                if items.isEmpty {
+                    Text(model.nodeItems == nil ? "Cargando…" : "Ningún proyecto de Node: se buscan las carpetas con su package.json")
+                        .foregroundColor(.secondary).padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                LazyVStack(spacing: 0) {
+                    ForEach(items) { item in
+                        row(item)
+                        if item != items.last { Divider().padding(.leading, 34) }
+                    }
+                }
+            }
+        }
+    }
+
+    func row(_ p: NodeItem) -> some View {
+        var bits = [p.kind, p.need.isEmpty ? "" : "Node \(p.need)"]
+        if p.running {
+            bits.append("en marcha (\(p.mode)): \(p.url)")
+        } else if !p.deps {
+            bits.append("sin dependencias instaladas: se instalan al arrancar")
+        }
+        let text = bits.filter { !$0.isEmpty }.joined(separator: " · ")
+        let path = HTDOCS + "/" + p.folder
+        let c = VisorConf()
+        let sharing = p.running && model.tunnel?.target == p.url
+        return HStack(spacing: 8) {
+            Circle().fill(p.running ? Color.green : Color.secondary.opacity(0.4)).frame(width: 9, height: 9)
+                .padding(.trailing, 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(p.folder).font(.system(size: 13, weight: .medium))
+                Text(text).font(.caption).foregroundColor(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            // (los de siempre, solo con su icono: el proyecto en el editor, en su carpeta y lo que dice su servidor)
+            if let code = vscodeURL() {
+                iconButton(.image(NSWorkspace.shared.icon(forFile: code.path)), "Abrir en Visual Studio Code") { openInVSCode(path) }
+            }
+            iconButton(.symbol("folder", Color.primary), "Abrir su carpeta") { showFolder(path) }
+            iconButton(.logo("log"), "Registro: lo último que ha dicho su servidor") {
+                model.runTask("Registro de \(p.folder)", ["node-registro", p.folder])
+            }
+            .disabled(model.busy)
+            if p.running {
+                iconButton(.symbol("arrow.clockwise", Color.primary), p.mode == "compilado" ? "Volver a compilar y arrancar" : "Reiniciar su servidor") {
+                    model.startNode(p, mode: p.mode)
+                }
+                .disabled(model.busy)
+                VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue), tip: "Abrir \(p.url)") { openURL(p.url) }
+            } else {
+                VisorButton(conf: c, name: "Arrancar", icon: .symbol("play.fill", Color.green), tip: "En desarrollo: los cambios se ven al momento") {
+                    model.startNode(p, mode: "desarrollo")
+                }
+                .disabled(model.busy)
+                VisorButton(conf: c, name: "Compilar", icon: .symbol("hammer.fill", Color.primary), tip: "Compilar y arrancar, como en producción") {
+                    model.startNode(p, mode: "compilado")
+                }
+                .disabled(model.busy)
+            }
+            if sharing {
+                VisorButton(conf: c, name: "Compartiendo", icon: .logo("cloudflare"), tip: "Ver dirección y contraseña del túnel", kind: "compartiendo") {
+                    model.shareDialog()
+                }
+            } else {
+                VisorButton(conf: c, name: "Túnel", icon: .logo("cloudflare"),
+                            tip: p.running && p.mode == "compilado" ? "Compartir con un túnel de Cloudflare" : "Compilar, arrancar y compartir con un túnel de Cloudflare") {
+                    model.shareNode(p)
+                }
+                .disabled(model.busy)
+            }
+            if p.running {
+                VisorButton(conf: c, name: "Parar", icon: .symbol("stop.fill", Color.red), tip: "Parar su servidor (y su túnel, si se está compartiendo)") {
+                    model.stopNode(p)
+                }
+                .disabled(model.busy)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    func iconButton(_ icon: VisorIcon, _ tip: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { VisorIconView(icon: icon, size: 16) }
+            .buttonStyle(OutlineButton())
+            .tip(tip)
+    }
+}
+
 struct ReposView: View {
     @EnvironmentObject var model: AppModel
     @State private var query = ""
@@ -26487,6 +26896,9 @@ struct ReposView: View {
 
 /// Lo que dice componentes: lo que tiene un parche nuevo (para enseñarlo), lo que no se pone al día solo y
 /// lo que no se ha podido consultar
+/// (el mismo fichero que en Linux)
+let IGNORED_UPDATES_FILE = LOG_DIR + "/parches-para-luego"
+
 struct ComponentsState: Equatable {
     var items: [String] = []
     var notes: [String] = []
@@ -26666,8 +27078,8 @@ extension AppModel {
 
     /// Abre un túnel a esa web, con lo suyo, que se elige ahora: cuánto dura y si se bloquea el panel de
     /// administración. Su contraseña, siempre una nueva al azar (se ve al abrirlo, para copiarla)
-    func share(_ url: String, folder: String, name: String) {
-        var text = "Cualquiera que tenga la dirección y la contraseña verá \(url) tal y como está en este Mac (lo que cambies, al momento) mientras el túnel esté abierto."
+    func share(_ url: String, folder: String, name: String, live: Bool = true) {
+        var text = "Cualquiera que tenga la dirección y la contraseña verá \(url) tal y como está en este Mac\(live ? " (lo que cambies, al momento)" : "") mientras el túnel esté abierto."
         if let t = tunnel { text += " Se cierra el que hay abierto (\(t.target))." }
         let installed = FileManager.default.isExecutableFile(atPath: TUNNEL_DIR + "/cloudflared")
         if !installed { text += " La primera vez se descarga cloudflared, el programa de Cloudflare (unos 20 MB)." }
@@ -27791,6 +28203,11 @@ struct TaskView: View {
                     Button(label) { task.extraAction?() }
                         .buttonStyle(OutlineButton(kind: "primary", big: true))
                 }
+                if !task.finished {
+                    Button("Seguir en segundo plano") { task.model?.taskHidden = true }
+                        .buttonStyle(OutlineButton(big: true))
+                        .tip("Esconder esta ventana y seguir usando el programa")
+                }
                 Button(task.finished ? "Cerrar" : "Cancelar") { task.closeTapped() }
                     .buttonStyle(OutlineButton(big: true))
                     .keyboardShortcut(.cancelAction)
@@ -28313,6 +28730,7 @@ struct ToolsView: View {
         ("docker", "Docker", "logo:docker"),
         ("tunel", "Túnel de Cloudflare", "cloud"),
         ("visor", "Visor de los proyectos", "square.grid.2x2"),
+        ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
         ("errores", "Registro de errores", "exclamationmark.triangle"),
         ("carpetas", "Carpetas", "folder"),
@@ -28321,28 +28739,36 @@ struct ToolsView: View {
         ("info", "Información", "info.circle")]
 
     var body: some View {
-        WidePage {
-            PageTitle(title: "Configuración", sub: "Elige un apartado a la izquierda para ver lo que se puede cambiar",
-                      symbol: "gearshape")
-            if let d = model.data {
-                // A la izquierda, los encabezados de los apartados; a la derecha, lo que se puede cambiar del elegido
-                HStack(alignment: .top, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(ToolsView.sections, id: \.0) { sec in
-                            SubNavRow(key: sec.0, text: sec.1, icon: sec.2)
-                        }
+        // Los apartados, en una columna pegada al menú lateral; a la derecha, lo que se puede cambiar del elegido
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("CONFIGURACIÓN")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 12)
+                        .padding(.top, 14)
+                        .padding(.bottom, 3)
+                    ForEach(ToolsView.sections, id: \.0) { sec in
+                        SubNavRow(key: sec.0, text: sec.1, icon: sec.2)
                     }
-                    .padding(6)
-                    .frame(width: 230, alignment: .topLeading)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.035)))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
+            }
+            .frame(width: 220)
+            .background(Color.primary.opacity(0.018))
+            .overlay(Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1), alignment: .trailing)
+            WidePage {
+                PageTitle(title: "Configuración", sub: "Elige un apartado en la columna de la izquierda", symbol: "gearshape")
+                if let d = model.data {
                     VStack(alignment: .leading, spacing: 12) {
                         section(model.toolsSection, d)
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
+                } else {
+                    Loading()
                 }
-            } else {
-                Loading()
             }
         }
     }
@@ -28377,6 +28803,8 @@ struct ToolsView: View {
             tunnelCard()
         case "visor":
             buttonsCard()
+        case "apariencia":
+            AppearanceCard()
         case "github":
             GitHubCard()
         case "errores":
@@ -28428,21 +28856,28 @@ struct ToolsView: View {
     func dockerCard() -> some View {
         let w = model.docker?.web ?? DockerWeb()
         return VStack(alignment: .leading, spacing: 12) {
-          TileCard("Docker", "Los proyectos de Docker van con su propio Apache, en otra dirección de este Mac (nunca abierta a la red): funcionan sin XAMPP-X y a la vez que él, con las mismas reglas de seguridad. Con los puertos 80 y 443, las direcciones van sin puerto. macOS solo tiene 127.0.0.1: la otra se da de alta una vez («Permitir», pide la contraseña).", wide: true) {
+          TileCard("Docker", "Los proyectos de Docker van con su propio Apache, en otra dirección de este Mac (nunca abierta a la red): funcionan sin XAMPP-X y a la vez que él, con las mismas reglas de seguridad. Con los puertos 80 y 443, las direcciones van sin puerto. macOS solo tiene 127.0.0.1: la otra se da de alta una vez («Permitir», pide la contraseña).", wide: true, tiles: true) {
             Tile("Dirección y puertos", "De este Mac (127.x.x.x; 127.0.0.1 con 80 y 443 es la de XAMPP-X). HTTP lleva siempre a https; si HTTPS no es el 443, las direcciones lo llevan. "
                  + (w.ok ? "\(w.ip) ya está en este Mac." : "\(w.ip) aún no está: se da de alta una vez y queda puesta en cada arranque.")) {
-                field("Dirección", $dkIP, 120)
-                field("HTTP", $dkHTTP, 60)
-                field("HTTPS", $dkHTTPS, 60)
-                if !w.ok {
-                    Button("Permitir") { model.dockerWebCommand("permitir") }.disabled(model.busy)
+                // (los campos en una línea y, debajo, a la derecha, Guardar y, si hace falta, Permitir)
+                VStack(alignment: .trailing, spacing: 10) {
+                    HStack(spacing: 8) {
+                        field("Dirección", $dkIP, 120)
+                        field("HTTP", $dkHTTP, 60)
+                        field("HTTPS", $dkHTTPS, 60)
+                    }
+                    HStack(spacing: 8) {
+                        if !w.ok {
+                            Button("Permitir") { model.dockerWebCommand("permitir") }.disabled(model.busy)
+                        }
+                        Button("Guardar") { model.dockerWebPorts(dkIP, dkHTTP, dkHTTPS) }
+                            .buttonStyle(OutlineButton(kind: "primary"))
+                            .disabled(model.busy)
+                    }
                 }
-                Button("Guardar") { model.dockerWebPorts(dkIP, dkHTTP, dkHTTPS) }
-                    .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
             }
           }
-          TileCard {
+          TileCard(tiles: true) {
             Tile("DNS de *.docker.test", w.dns ? "Puesto: los dominios de Docker (<proyecto>-php83.docker.test) no van en /etc/hosts ni piden la contraseña"
                 : "Los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts: sin contraseña al añadir proyectos o versiones. web.local, los proyectos de siempre y las tiendas falseadas, igual") {
                 Button(w.dns ? "Quitar" : "Activar") { model.dockerDNS(!w.dns) }.disabled(model.busy)
@@ -28460,11 +28895,15 @@ struct ToolsView: View {
         .onChange(of: model.docker?.web) { _ in fillDocker() }
     }
 
-    /// Campo con su nombre encima (la dirección y los puertos de Docker)
+    /// Campo con su nombre encima (la dirección y los puertos de Docker), tan alto como los botones
     func field(_ title: String, _ text: Binding<String>, _ width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title).font(.caption).foregroundColor(.secondary)
-            TextField("", text: text).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: width)
+            TextField("", text: text).textFieldStyle(PlainTextFieldStyle())
+                .padding(.horizontal, 8)
+                .frame(width: width, height: 28)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.textBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.2), lineWidth: 1))
         }
     }
 
@@ -28554,13 +28993,18 @@ struct ToolsView: View {
     @ViewBuilder
     func mailCard(_ d: AppData) -> some View {
         if let m = d.mail {
-            TileCard("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.", columns: 3) {
-                Tile("Correo de pruebas", m.on ? "Encendido: el correo de las webs va a Mailpit"
-                    : "Apagado: lo que manden las webs puede llegar de verdad a los clientes") {
-                    Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
-                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                        .disabled(model.busy)
-                }
+            TileCard("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.", tiles: true,
+                     lead: AnyView(LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 20, height: 20)),
+                     tail: AnyView(HStack(spacing: 8) {
+                         Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
+                             .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                             .disabled(model.busy)
+                             .tip(m.on ? "Encendido: el correo de las webs va a Mailpit" : "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+                         if !m.on {
+                             Text("Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+                                 .font(.caption).foregroundColor(.orange)
+                         }
+                     })) {
                 Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
                     Picker("", selection: Binding(get: { m.wp }, set: { model.setMailWp($0) })) {
                         Text("Llevarlos a Mailpit").tag("mailpit")
@@ -28881,8 +29325,22 @@ final class TermTextView: NSTextView {
 
     func reset() {
         pending = []
+        line = []
+        col = 0
+        lineStart = 0
         textStorage?.setAttributedString(NSAttributedString(string: ""))
     }
+
+    private func trimmed(_ l: [Character]) -> String {
+        var end = l.count
+        while end > 0 && l[end - 1] == " " { end -= 1 }
+        return String(l[..<end])
+    }
+
+    /// La última línea (la que se escribe ahora), su cursor y dónde empieza en el texto
+    private var line: [Character] = []
+    private var col = 0
+    private var lineStart = 0
 
     // (⌘C, ⌘V y ⌘A aquí mismo: con el texto no editable, el menú Edición deja Pegar desactivado)
     override func performKeyEquivalent(with e: NSEvent) -> Bool {
@@ -28943,7 +29401,7 @@ final class TermTextView: NSTextView {
         send?(Data(s.replacingOccurrences(of: "\r\n", with: "\r").replacingOccurrences(of: "\n", with: "\r").utf8))
     }
 
-    /// Lo que sale de la terminal: sin los códigos de escape; \b borra; \r antes de \n no cuenta
+    /// Lo que sale de la terminal: sin los códigos de escape; \r vuelve al principio de la línea y \b retrocede
     func feed(_ bytes: [UInt8]) {
         var data = pending + bytes
         pending = []
@@ -28964,22 +29422,41 @@ final class TermTextView: NSTextView {
         text = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\u{07}", with: "")
         guard let ts = textStorage else { return }
         let attrs: [NSAttributedString.Key: Any] = [.font: font0, .foregroundColor: NSColor(calibratedRed: 0xD7 / 255.0, green: 0xDE / 255.0, blue: 0xE6 / 255.0, alpha: 1)]
-        var chunk = ""
-        func flush() {
-            if !chunk.isEmpty { ts.append(NSAttributedString(string: chunk, attributes: attrs)); chunk = "" }
-        }
+        // La línea de ahora se lleva aparte, con su cursor: \r vuelve al principio y lo que sigue escribe
+        // encima (zsh, antes del prompt, pone «%» y espacios hasta el borde y vuelve con \r: sin esto, el
+        // prompt salía a la derecha); \b retrocede. Al acabar, solo se cambia esa última línea
+        if lineStart > ts.length { lineStart = ts.length }
+        var done = ""
         for ch in text {
-            if ch == "\u{08}" {
-                if !chunk.isEmpty { chunk.removeLast() } else if ts.length > 0 { ts.deleteCharacters(in: NSRange(location: ts.length - 1, length: 1)) }
+            if ch == "\n" {
+                done += trimmed(line) + "\n"
+                line = []
+                col = 0
             } else if ch == "\r" {
-                continue
+                col = 0
+            } else if ch == "\u{08}" {
+                col = max(0, col - 1)
             } else {
-                chunk.append(ch)
+                if col < line.count {
+                    line[col] = ch
+                } else {
+                    if col > line.count { line += Array(repeating: Character(" "), count: col - line.count) }
+                    line.append(ch)
+                }
+                col += 1
             }
         }
-        flush()
+        // (sin los espacios del final: los de zsh hasta el borde harían saltar una línea vacía)
+        let tail = trimmed(line)
+        ts.replaceCharacters(in: NSRange(location: lineStart, length: ts.length - lineStart),
+                             with: NSAttributedString(string: done + tail, attributes: attrs))
+        lineStart = ts.length - (tail as NSString).length
         // (como mucho las últimas 200.000 letras)
-        if ts.length > 250_000 { ts.deleteCharacters(in: NSRange(location: 0, length: ts.length - 200_000)) }
+        if ts.length > 250_000 {
+            let cut = ts.length - 200_000
+            ts.deleteCharacters(in: NSRange(location: 0, length: cut))
+            lineStart = max(0, lineStart - cut)
+        }
         scrollToEndOfDocument(nil)
     }
 }
@@ -29069,7 +29546,9 @@ struct TermHost: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let sv = NSScrollView()
         sv.hasVerticalScroller = true
-        sv.drawsBackground = false
+        sv.scrollerStyle = .overlay
+        sv.drawsBackground = true
+        sv.backgroundColor = NSColor(calibratedRed: 0x1D / 255.0, green: 0x22 / 255.0, blue: 0x28 / 255.0, alpha: 1)
         sv.borderType = .noBorder
         let tv = session.view
         tv.isEditable = false
@@ -29089,23 +29568,22 @@ struct TermHost: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {}
 }
 
-/// La terminal de abajo: con el aspecto del visor de arriba, un poco hundida; el borde de arriba se
-/// arrastra para cambiar su alto
+/// La terminal de abajo, pegada a la ventana: una barra con sus botones y, debajo, la terminal de lado a
+/// lado. El borde de arriba se arrastra para cambiar su alto
 struct TermPanel: View {
     @EnvironmentObject var model: AppModel
     @State private var dragStart: CGFloat? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // (asa para cambiar el alto)
-            Capsule().fill(Color.secondary.opacity(0.35)).frame(width: 44, height: 4)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .gesture(DragGesture().onChanged { v in
-                    if dragStart == nil { dragStart = model.termHeight }
-                    model.termHeight = min(700, max(140, (dragStart ?? 260) - v.translation.height))
-                }.onEnded { _ in dragStart = nil })
-                .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+        VStack(spacing: 0) {
+            // (el borde de arriba: se arrastra para cambiar el alto)
+            Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                .overlay(Color.clear.frame(height: 7).contentShape(Rectangle())
+                    .gesture(DragGesture().onChanged { v in
+                        if dragStart == nil { dragStart = model.termHeight }
+                        model.termHeight = min(700, max(140, (dragStart ?? 260) - v.translation.height))
+                    }.onEnded { _ in dragStart = nil })
+                    .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } })
             HStack(spacing: 8) {
                 Image(systemName: "terminal").foregroundColor(.secondary)
                 Text("Terminal").font(.caption)
@@ -29124,19 +29602,11 @@ struct TermPanel: View {
                     .buttonStyle(OutlineButton())
                     .tip("Esconder la terminal (sigue abierta)")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             TermHost(session: model.term)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
         .frame(height: model.termHeight)
-        // (como el visor de arriba, hundida: fondo algo más oscuro y sombra por dentro)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(model.isDark ? 0.28 : 0.10))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.25), lineWidth: 1))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.35), lineWidth: 4).blur(radius: 4).mask(RoundedRectangle(cornerRadius: 12)))
-        )
-        .padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
     }
 }
 
@@ -29167,7 +29637,11 @@ struct ContentView: View {
         .buttonStyle(PointerButtonStyle())
         .overlay(panel())
         .overlay(toastView(), alignment: .bottom)
-        .sheet(item: $model.task) { t in TaskView(task: t).buttonStyle(PointerButtonStyle()) }
+        // (escondida en segundo plano, la hoja no se ve; la tarea sigue y su aviso está al lado del visor)
+        .sheet(item: Binding(get: { model.taskHidden ? nil : model.task },
+                             set: { t in if t == nil && !model.taskHidden { model.task = nil } })) { t in
+            TaskView(task: t).buttonStyle(PointerButtonStyle())
+        }
         .onAppear { model.applyTheme() }
     }
 
@@ -29178,6 +29652,7 @@ struct ContentView: View {
         case "bbdd": DatabasesView()
         case "docker": DockerView()
         case "repos": ReposView()
+        case "node": NodeView()
         case "dominios": HostsView()
         case "config": ToolsView()
         default: ProjectsView()
@@ -32957,6 +33432,37 @@ QUE HACE
 
 VERSIONES
 
+1.41.1 (7 nov 2026)
+- Configuración: sus apartados, en una columna pegada al menú
+  lateral, y en filas (Docker y el correo de pruebas siguen en
+  tarjetas). El correo de pruebas se enciende con el interruptor de su
+  título; en la dirección del Apache de Docker, Guardar va debajo de
+  sus campos.
+- Parches nuevos: en lugar de preguntar al abrir, sale un aviso arriba
+  (al lado del visor) con lo que tiene un parche y si conviene ponerlo.
+  «Ahora no» lo deja hasta que salga otro.
+- Terminal: pegada a la ventana, de lado a lado y sin márgenes, y
+  el prompt sale bien (antes, zsh lo dejaba a la derecha de un «%»).
+
+1.41.0 (6 nov 2026)
+- Proyectos de Node: nueva pestaña Node para los proyectos de htdocs
+  hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno se arranca en
+  desarrollo o compilado, con la versión de Node que pide y sus
+  dependencias, y el compilado se puede compartir con un túnel de
+  Cloudflare. En la terminal: node-arrancar, node-parar y node-registro.
+- Instalaciones en segundo plano: la ventana de una instalación o
+  actualización tiene «Seguir en segundo plano» (también con Esc) y
+  el programa se puede usar mientras tanto. Al lado del visor sale una
+  flecha verde que late, con lo que hace
+  («Actualizando…», «Instalando…») y el porcentaje; al pulsarla vuelve la
+  ventana. Si acaba bien, avisa; si falla, la ventana vuelve sola. No
+  se puede lanzar otra tarea hasta que acabe.
+- Apariencia, en Configuración: los iconos del menú lateral en color
+  o de un color, como el texto; Docker, Node y PHP con su logotipo y su
+  tipografía; qué apartados salen en el menú (Proyectos y Configuración,
+  siempre), y los botones del proyecto. Bases de datos, con su icono de
+  discos apilados.
+
 1.40.14 (6 nov 2026)
 - Correo de pruebas: la bandeja de Mailpit se ve dentro de la ventana,
   debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de
@@ -35052,12 +35558,426 @@ if [ -z "$TEST_DIR" ] && [ "$DRY" -eq 0 ] && [[ "$1" != gui-* ]] && [ "$1" != mi
     fi
 fi
 
+# Proyectos de Node (Astro, Next, Nuxt, SvelteKit, Vite...): carpetas de htdocs con su package.json, cada
+# una con su propio servidor en 127.0.0.1, siempre con tu usuario (nunca root ni sudo). En Desarrollo, con
+# el servidor del proyecto; Compilado, como en produccion: es el unico que se comparte por el tunel, porque
+# el proxy no deja pasar ficheros ocultos (/node_modules/.vite) y asi el codigo fuente no sale del equipo.
+NODE_DIR=$LOG_DIR/node
+NODE_RUN_DIR=$NODE_DIR/proyectos
+NODE_DEFAULT_MAJOR=26
+NODE_PORT_FROM=4321
+NODE_PORT_TO=4399
+
+# P|carpeta|tipo|parado o marcha|modo|direccion|Node que pide (26, o 24+ si vale de ahi en adelante)|
+# dependencias instaladas (1/0)|scripts (d de dev, b de build, s de start). Con una carpeta, solo esa.
+# No son de Node las webs de PHP que usan npm para sus estilos (wp-config.php, index.php, artisan)
+NODE_LIST_PY='
+import json, os, re, subprocess, sys
+htdocs, run = sys.argv[1:3]
+only = sys.argv[3] if len(sys.argv) > 3 else None
+KINDS = (("astro", "Astro"), ("next", "Next"), ("nuxt", "Nuxt"), ("@sveltejs/kit", "SvelteKit"), ("vite", "Vite"))
+
+
+def need(d, pkg):
+    for name in (".nvmrc", ".node-version"):
+        try:
+            with open(os.path.join(d, name), encoding="utf-8") as f:
+                m = re.match(r"v?(\d+)", f.read(40).strip())
+        except (OSError, UnicodeError):
+            m = None
+        if m:
+            return m.group(1)
+    engines = pkg.get("engines")
+    text = str(engines.get("node") or "") if isinstance(engines, dict) else ""
+    m = re.search(r"\d+", text)
+    if not m:
+        return ""
+    return m.group(0) + ("+" if text.strip().startswith(">") else "")
+
+
+def running(name):
+    conf = {}
+    try:
+        with open(os.path.join(run, name + ".conf"), encoding="utf-8") as f:
+            for line in f:
+                k, _, v = line.rstrip("\n").partition("=")
+                conf[k] = v
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", conf["PID"]], capture_output=True, text=True,
+                             env={"LC_ALL": "C", "PATH": "/usr/bin:/bin"}, timeout=5).stdout.strip()
+    except (OSError, KeyError, ValueError, subprocess.SubprocessError):
+        return None
+    return conf if out and out == conf.get("LSTART") else None
+
+
+try:
+    names = [only] if only else sorted(os.listdir(htdocs), key=str.lower)
+except OSError:
+    names = []
+for name in names:
+    d = os.path.join(htdocs, name)
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9 ._-]*", name) or os.path.islink(d):
+        continue
+    if any(os.path.exists(os.path.join(d, f)) for f in ("wp-config.php", "index.php", "artisan")):
+        continue
+    try:
+        with open(os.path.join(d, "package.json"), encoding="utf-8") as f:
+            pkg = json.load(f)
+    except (OSError, ValueError):
+        continue
+    if not isinstance(pkg, dict):
+        continue
+    deps = {}
+    for key in ("dependencies", "devDependencies"):
+        if isinstance(pkg.get(key), dict):
+            deps.update(pkg[key])
+    scripts = pkg.get("scripts") if isinstance(pkg.get("scripts"), dict) else {}
+    kind = next((label for dep, label in KINDS if dep in deps), "")
+    if not kind and not ("dev" in scripts or "start" in scripts):
+        continue
+    conf = running(name)
+    print("|".join(("P", name, kind or "Node", "marcha" if conf else "parado", conf.get("MODE", "") if conf else "",
+                    "http://127.0.0.1:%s" % conf["PORT"] if conf and conf.get("PORT", "").isdigit() else "",
+                    need(d, pkg), "1" if os.path.isdir(os.path.join(d, "node_modules")) else "0",
+                    ("d" if "dev" in scripts else "") + ("b" if "build" in scripts else "") + ("s" if "start" in scripts else ""))))
+'
+
+function node_lines() {
+    python3 -I -c "$NODE_LIST_PY" "$HTDOCS_DIR" "$NODE_RUN_DIR" "$@"
+}
+
+function gui_node() {
+    node_lines | tr -d '\000-\011\013-\037'
+}
+
+# La carpeta bin de un Node que valga para lo que pide el proyecto (26, 24+ o nada: el mas nuevo de los
+# que coincidan). De Nexum, de nvm o el del sistema; los nuevos, primero.
+function node_find() {
+    local want=$1 min=${1%+} d v major key best="" best_key=-1 sys
+    for d in "$NODE_DIR"/v*/bin "$HOME"/.nvm/versions/node/v*/bin; do
+        [ -x "$d/node" ] && [ -x "$d/npm" ] || continue
+        v=$(basename "$(dirname "$d")")
+        [[ "$v" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || continue
+        major=${BASH_REMATCH[1]}
+        key=$(( major * 1000000 + BASH_REMATCH[2] * 1000 + BASH_REMATCH[3] ))
+        if [ -n "$want" ]; then
+            if [[ "$want" == *+ ]]; then [ "$major" -ge "$min" ] || continue; else [ "$major" -eq "$min" ] || continue; fi
+        fi
+        [ "$key" -gt "$best_key" ] && { best=$d; best_key=$key; }
+    done
+    if [ -z "$best" ]; then
+        sys=$(command -v node 2> /dev/null)
+        if [ -n "$sys" ] && [ -x "$(dirname "$sys")/npm" ]; then
+            major=$("$sys" -v 2> /dev/null | sed -E 's/^v([0-9]+).*/\1/')
+            if [[ "$major" =~ ^[0-9]+$ ]] && { [ -z "$want" ] \
+                    || { [[ "$want" == *+ ]] && [ "$major" -ge "$min" ]; } || [ "$major" -eq "${min:-0}" ]; }; then
+                best=$(dirname "$sys")
+            fi
+        fi
+    fi
+    [ -n "$best" ] && echo "$best"
+}
+
+# Descarga Node <mayor> de nodejs.org en ~/.lvm-instalador/node y lo comprueba con su lista de sumas sha256
+function node_install() {
+    local major=$1 base=https://nodejs.org/dist os arch sums name sha got tmp top version tls=(--proto =https --tlsv1.2)
+    [[ "$major" =~ ^[0-9]+$ ]] || { echo "Versión de Node no válida: $major"; return 1; }
+    case "$(uname -s)" in
+        Darwin) os=darwin ;;
+        Linux) os=linux ;;
+        *) echo "Sistema sin Node descargable: $(uname -s)"; return 1 ;;
+    esac
+    case "$(uname -m)" in
+        arm64|aarch64) arch=arm64 ;;
+        x86_64|amd64) arch=x64 ;;
+        *) echo "Procesador sin Node descargable: $(uname -m)"; return 1 ;;
+    esac
+    # (en las pruebas, de una carpeta local)
+    [ -n "$TEST_DIR" ] && [ -n "$LVM_NODE_BASE" ] && { base=$LVM_NODE_BASE; tls=(); }
+    echo "Descargando Node $major de nodejs.org ($os, $arch)..."
+    mkdir -p -m 700 "$NODE_DIR" || return 1
+    tmp=$(mktemp -d "$NODE_DIR/descarga.XXXXXX") || return 1
+    if ! sums=$(curl -q -fsSL "${tls[@]}" --retry 2 --max-time 60 "$base/latest-v$major.x/SHASUMS256.txt"); then
+        rm -rf "$tmp"
+        echo "No se ha podido leer la lista de Node $major en nodejs.org"
+        return 1
+    fi
+    name=$(awk -v rx="^node-v$major\\\\.[0-9]+\\\\.[0-9]+-$os-$arch\\\\.tar\\\\.gz$" '$2 ~ rx { print $2; exit }' <<< "$sums")
+    sha=$(awk -v n="$name" '$2 == n { print $1; exit }' <<< "$sums")
+    if [ -z "$name" ] || [[ ! "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+        rm -rf "$tmp"
+        echo "Node $major no tiene paquete para $os $arch"
+        return 1
+    fi
+    if ! curl -q -fsSL "${tls[@]}" --retry 2 --max-time 900 -o "$tmp/node.tar.gz" "$base/latest-v$major.x/$name"; then
+        rm -rf "$tmp"
+        echo "No se ha podido descargar $name"
+        return 1
+    fi
+    if command -v sha256sum > /dev/null; then got=$(sha256sum "$tmp/node.tar.gz" | cut -d' ' -f1); else got=$(shasum -a 256 "$tmp/node.tar.gz" | cut -d' ' -f1); fi
+    if [ "$got" != "$sha" ]; then
+        rm -rf "$tmp"
+        echo "La descarga de Node no coincide con su suma sha256 (${got:-ninguna}): no se instala."
+        return 1
+    fi
+    top=${name%.tar.gz}
+    version=${top#node-}
+    version=${version%%-*}
+    if ! tar -xzf "$tmp/node.tar.gz" -C "$tmp" "$top" 2> /dev/null || [ ! -x "$tmp/$top/bin/node" ]; then
+        rm -rf "$tmp"
+        echo "El paquete de Node no trae su programa: no se instala."
+        return 1
+    fi
+    rm -rf "${NODE_DIR:?}/$version"
+    mv "$tmp/$top" "$NODE_DIR/$version" || { rm -rf "$tmp"; return 1; }
+    rm -rf "$tmp"
+    echo "Node $version instalado en $NODE_DIR"
+}
+
+# El pid del servidor de un proyecto, si sigue siendo aquel (misma hora de arranque)
+function node_pid() {
+    local conf=$NODE_RUN_DIR/$1.conf pid start
+    [ -f "$conf" ] || return 1
+    pid=$(sed -n 's/^PID=//p' "$conf")
+    start=$(sed -n 's/^LSTART=//p' "$conf")
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "$start" ] || return 1
+    [ "$(LC_ALL=C ps -o lstart= -p "$pid" 2> /dev/null | sed -E 's/^ +//; s/ +$//')" == "$start" ] || return 1
+    echo "$pid"
+}
+
+function node_free_port() {
+    python3 -I -c '
+import socket, sys
+for port in range(int(sys.argv[1]), int(sys.argv[2]) + 1):
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", port))
+    except OSError:
+        continue
+    finally:
+        s.close()
+    print(port)
+    break
+' "$NODE_PORT_FROM" "$NODE_PORT_TO"
+}
+
+# Instala lo que le falte: lo pide su fichero de bloqueo. Los scripts de sus paquetes se ejecutan con tu usuario
+function node_deps() {
+    local dir=$1 bin=$2 lock=""
+    shift 2
+    for lock in package-lock.json pnpm-lock.yaml yarn.lock; do
+        [ -f "$dir/$lock" ] && break
+        lock=""
+    done
+    if [ -d "$dir/node_modules" ] && { [ -z "$lock" ] || [ ! "$dir/$lock" -nt "$dir/node_modules" ]; }; then
+        echo "Dependencias: ya están instaladas"
+        return 0
+    fi
+    echo "Instalando las dependencias..."
+    case "$lock" in
+        package-lock.json) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" ci --no-audit --no-fund ) ;;
+        pnpm-lock.yaml) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --yes pnpm install --frozen-lockfile ) ;;
+        yarn.lock) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --yes yarn install --frozen-lockfile ) ;;
+        *) ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" install --no-audit --no-fund ) ;;
+    esac || { echo "No se han podido instalar las dependencias"; return 1; }
+    touch "$dir/node_modules"
+}
+
+# Astro con un adaptador de un alojamiento (Vercel, Netlify, Cloudflare) no se puede servir en este equipo:
+# se compila con el de Node, sin tocar su configuracion ni su package.json (todo dentro de node_modules)
+function node_build_astro() {
+    local dir=$1 bin=$2 conf="" c
+    shift 2
+    for c in astro.config.mjs astro.config.ts astro.config.mts astro.config.js astro.config.cjs; do
+        [ -f "$dir/$c" ] && { conf=$c; break; }
+    done
+    if [ -z "$conf" ] || ! grep -qE "@astrojs/(vercel|netlify|cloudflare)" "$dir/$conf"; then
+        ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --no-install astro build )
+        return
+    fi
+    if [ ! -f "$dir/node_modules/@astrojs/node/package.json" ]; then
+        if [ -f "$dir/pnpm-lock.yaml" ] || [ -f "$dir/yarn.lock" ]; then
+            echo "Este proyecto usa un adaptador de alojamiento: añade @astrojs/node a sus dependencias para compilarlo aquí."
+            return 1
+        fi
+        ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npm" install --no-save --no-audit --no-fund @astrojs/node ) || return 1
+    fi
+    printf "import base from '../%s';\nimport node from '@astrojs/node';\nexport default { ...base, adapter: node({ mode: 'standalone' }) };\n" "$conf" \
+        > "$dir/node_modules/.nexum-astro.config.mjs" || return 1
+    echo "(compilando con @astrojs/node en lugar de su adaptador de alojamiento; el proyecto no cambia)"
+    ( cd "$dir" && /usr/bin/env -i "$@" "$bin/npx" --no-install astro build --config node_modules/.nexum-astro.config.mjs )
+}
+
+# Lo que deja el servidor en marcha, en NODE_CMD: node_command <carpeta> <tipo> <modo> <scripts> <bin> <puerto>
+NODE_CMD=()
+function node_command() {
+    local dir=$1 kind=$2 mode=$3 scripts=$4 bin=$5 port=$6 root
+    NODE_CMD=()
+    if [ "$mode" == desarrollo ]; then
+        case "$kind" in
+            Astro) NODE_CMD=("$bin/npx" --no-install astro dev --host 127.0.0.1 --port "$port") ;;
+            Next) NODE_CMD=("$bin/npx" --no-install next dev -H 127.0.0.1 -p "$port") ;;
+            Nuxt) NODE_CMD=("$bin/npx" --no-install nuxt dev --host 127.0.0.1 --port "$port") ;;
+            SvelteKit|Vite) NODE_CMD=("$bin/npx" --no-install vite --host 127.0.0.1 --port "$port" --strictPort) ;;
+            *) if [[ "$scripts" == *d* ]]; then NODE_CMD=("$bin/npm" run dev); elif [[ "$scripts" == *s* ]]; then NODE_CMD=("$bin/npm" start); fi ;;
+        esac
+    else
+        case "$kind" in
+            Astro)
+                if [ -f "$dir/dist/server/entry.mjs" ]; then
+                    NODE_CMD=("$bin/node" dist/server/entry.mjs)
+                else
+                    root=dist
+                    [ -d "$dir/dist/client" ] && root=dist/client
+                    NODE_CMD=(python3 -I -m http.server --bind 127.0.0.1 --directory "$root" "$port")
+                fi
+                ;;
+            Next) NODE_CMD=("$bin/npx" --no-install next start -H 127.0.0.1 -p "$port") ;;
+            Nuxt) NODE_CMD=("$bin/node" .output/server/index.mjs) ;;
+            SvelteKit|Vite) NODE_CMD=("$bin/npx" --no-install vite preview --host 127.0.0.1 --port "$port" --strictPort) ;;
+            *) [[ "$scripts" == *s* ]] && NODE_CMD=("$bin/npm" start) ;;
+        esac
+    fi
+    [ "${#NODE_CMD[@]}" -gt 0 ]
+}
+
+# node-arrancar <carpeta> [desarrollo|compilado]
+function node_start() {
+    local folder=${1%/} mode=${2:-desarrollo} dir line kind state need deps scripts bin port log conf pid n x steps=() e=()
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        echo "Los proyectos de Node no se arrancan como root."
+        return 1
+    fi
+    [[ "$mode" =~ ^(desarrollo|compilado)$ ]] || { echo "El modo es desarrollo o compilado"; return 1; }
+    valid_project "$folder" || return 1
+    dir=$HTDOCS_DIR/$folder
+    line=$(node_lines "$folder")
+    if [ -z "$line" ]; then
+        echo "$folder no es un proyecto de Node"
+        return 1
+    fi
+    IFS='|' read -r x x kind state x x need deps scripts <<< "$line"
+    if [ "$mode" == compilado ] && [ "$kind" == Node ] && [[ "$scripts" != *s* ]]; then
+        echo "$folder no tiene un script start: no se sabe cómo servirlo compilado"
+        return 1
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $folder ($kind, $mode): Node ${need:-el que haya}, dependencias y servidor en 127.0.0.1"
+        return 0
+    fi
+    steps=("Preparar Node ${need:-}" "Instalar las dependencias")
+    [ "$mode" == compilado ] && steps+=("Compilar el proyecto")
+    steps+=("Arrancar el servidor")
+    task_plan "Arrancando $folder" "${steps[@]}"
+    [ "$state" == marcha ] && node_stop "$folder" > /dev/null
+
+    task_step
+    bin=$(node_find "$need")
+    if [ -z "$bin" ]; then
+        x=${need%+}
+        node_install "${x:-$NODE_DEFAULT_MAJOR}" || return 1
+        bin=$(node_find "$need")
+        [ -n "$bin" ] || { echo "No se encuentra el Node recién instalado"; return 1; }
+    fi
+    echo "Node $("$bin/node" -v) ($bin)"
+    port=$(node_free_port)
+    [ -n "$port" ] || { echo "No hay ningún puerto libre entre $NODE_PORT_FROM y $NODE_PORT_TO"; return 1; }
+    e=("HOME=$HOME" "USER=${USER:-$(id -un)}" "LANG=${LANG:-es_ES.UTF-8}" "TERM=dumb" "CI=1"
+       "PATH=$bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "HOST=127.0.0.1" "PORT=$port" "NO_COLOR=1"
+       "ASTRO_TELEMETRY_DISABLED=1" "NEXT_TELEMETRY_DISABLED=1")
+
+    task_step
+    node_deps "$dir" "$bin" "${e[@]}" || return 1
+
+    if [ "$mode" == compilado ]; then
+        task_step
+        echo "Compilando..."
+        if [ "$kind" == Astro ]; then
+            node_build_astro "$dir" "$bin" "${e[@]}"
+        elif [[ "$scripts" == *b* ]]; then
+            ( cd "$dir" && /usr/bin/env -i "${e[@]}" "$bin/npm" run build )
+        fi || { echo "No se ha podido compilar $folder"; return 1; }
+    fi
+
+    task_step
+    node_command "$dir" "$kind" "$mode" "$scripts" "$bin" "$port" || { echo "$folder no tiene un script dev ni start"; return 1; }
+    mkdir -p -m 700 "$NODE_RUN_DIR" || return 1
+    log=$NODE_RUN_DIR/$folder.log conf=$NODE_RUN_DIR/$folder.conf
+    : > "$log" && chmod 600 "$log" || return 1
+    # (en su propia sesion, para pararlo con todos sus hijos y que siga al cerrar la ventana)
+    ( cd "$dir" && exec python3 -I -c 'import os, sys
+os.setsid()
+os.execv("/usr/bin/env", ["env", "-i"] + sys.argv[1:])' "${e[@]}" "${NODE_CMD[@]}" >> "$log" 2>&1 < /dev/null ) &
+    pid=$!
+    ( umask 077; printf 'PID=%s\nLSTART=%s\nPORT=%s\nMODE=%s\n' "$pid" \
+        "$(LC_ALL=C ps -o lstart= -p "$pid" 2> /dev/null | sed -E 's/^ +//; s/ +$//')" "$port" "$mode" > "$conf" ) || return 1
+    echo "Arrancando el servidor en http://127.0.0.1:$port ..."
+    for n in $(seq 360); do
+        if ! kill -0 "$pid" 2> /dev/null; then
+            rm -f "$conf"
+            echo "El servidor de $folder se ha parado al arrancar. Lo último que ha dicho:"
+            tail -20 "$log" | sed 's/^/  /'
+            return 1
+        fi
+        curl -q -s -o /dev/null --noproxy '*' --max-time 2 "http://127.0.0.1:$port/" && break
+        sleep 0.5
+    done
+    if [ "$n" -ge 360 ]; then
+        node_stop "$folder" > /dev/null
+        echo "El servidor de $folder no responde en http://127.0.0.1:$port tras 3 minutos: se para. Lo último que ha dicho:"
+        tail -20 "$log" | sed 's/^/  /'
+        return 1
+    fi
+    echo "$folder en marcha ($mode): http://127.0.0.1:$port"
+    echo "URL|http://127.0.0.1:$port"
+}
+
+# node-parar <carpeta>: el servidor con todos sus hijos y, si se esta compartiendo, tambien su tunel (ese
+# puerto podria acabar siendo de otro proyecto)
+function node_stop() {
+    local folder=${1%/} pid conf=$NODE_RUN_DIR/${1%/}.conf port n
+    [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] || { echo "Carpeta no válida: $folder"; return 1; }
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se para $folder"
+        return 0
+    fi
+    pid=$(node_pid "$folder")
+    if [ -z "$pid" ]; then
+        rm -f "$conf"
+        echo "$folder no está en marcha"
+        return 0
+    fi
+    port=$(sed -n 's/^PORT=//p' "$conf")
+    if [[ "$port" =~ ^[0-9]+$ ]] && [ -f "$TUNNEL_STATE" ] && grep -qF "\"target\": \"http://127.0.0.1:$port\"" "$TUNNEL_STATE"; then
+        tunnel_close > /dev/null
+        echo "Túnel cerrado: compartía este proyecto"
+    fi
+    kill -TERM -- "-$pid" 2> /dev/null
+    for n in $(seq 20); do
+        kill -0 -- "-$pid" 2> /dev/null || break
+        sleep 0.25
+    done
+    kill -KILL -- "-$pid" 2> /dev/null
+    rm -f "$conf"
+    echo "$folder parado"
+}
+
+# node-registro <carpeta>: lo ultimo que ha dicho su servidor
+function node_log() {
+    local folder=${1%/} log=$NODE_RUN_DIR/${1%/}.log
+    [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] || { echo "Carpeta no válida: $folder"; return 1; }
+    if [ -f "$log" ]; then
+        tail -300 "$log"
+    else
+        echo "$folder aún no ha arrancado desde aquí"
+    fi
+}
+
 # Tareas de la ventana (LVM_TAREA=1): lo que cambia algo pide la contraseña de administrador antes de
 # empezar, no a mitad. Si se cancela, no se ha hecho nada (antes, lo hecho hasta el primer sudo se
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -35119,6 +36039,10 @@ case "$1" in
     tunel-instalar) tunnel_install ;;
     tunel-abrir) shift; tunnel_open "$@" ;;
     tunel-cerrar) tunnel_close ;;
+    node-arrancar) shift; node_start "$@" ;;
+    node-parar) node_stop "$2" ;;
+    node-registro) node_log "$2" ;;
+    gui-node) gui_node ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-nuevo) shift; docker_web_create "$@" ;;
     docker-php-anadir) docker_web_add "$2" "$3" ;;

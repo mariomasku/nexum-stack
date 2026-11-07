@@ -4,7 +4,7 @@ Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
-**Versión actual: 1.56.33** · [Novedades de todas las versiones](CHANGELOG.md)
+**Versión actual: 1.57.2** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe
 
@@ -201,6 +201,37 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
 - **Menú (☰):** abrir localhost o phpMyAdmin, volver a leer las versiones, abrir el panel en la terminal, la carpeta de registros, «Novedades» y «Acerca de».
 - La ventana no repite la lógica del instalador: ejecuta los mismos comandos que la terminal. El código de la ventana (Python, GTK 3) va dentro de `lvm-instalador.sh` y se escribe en `~/.lvm-instalador/ventana.py` al abrirla.
 - `lvm-instalador --simular ventana` abre la ventana en modo simulación.
+
+## Apariencia
+
+En **Configuración → Apariencia** (desde la 1.57.1). Se guarda al momento, en `~/.lvm-instalador/apariencia`, el mismo fichero en Linux y en Mac, y no hace más lenta la ventana: solo se rehace el menú lateral y los logotipos se dibujan una vez.
+
+- **Iconos en color:** cada apartado del menú lateral con su color (Docker, PHP, Node, Bases de datos…). Apagado, de un color, como el texto.
+- **Logotipos de Docker, Node y PHP:** Docker y Node con su logotipo y su tipografía en lugar del nombre, y PHP con su óvalo (este, solo con los iconos en color). Son los oficiales de docker.com, nodejs.org y php.net.
+- **Qué apartados salen en el menú lateral:** se puede quitar cualquiera menos Proyectos y Configuración, que siempre se ven. Si se quita el que está abierto, se pasa a Proyectos.
+- **Botones del proyecto:** cuáles se ven en el visor, en qué orden y cómo, lo mismo que en el menú ⋮ del proyecto.
+
+## Tareas en segundo plano
+
+Desde la 1.57.1, la ventana de una instalación o actualización tiene **Seguir en segundo plano** (también con Esc). La tarea sigue, la ventana se esconde y el programa se puede usar: cambiar de pestaña, abrir webs, VS Code, la terminal… A la izquierda del visor sale una **flecha verde que baja y late**, con lo que hace («Actualizando…», «Instalando…») y el porcentaje; al pasar el ratón dice qué se hace y al pulsarla vuelve la ventana.
+
+- Si acaba bien y es de las que se cierran solas, la flecha se va y sale el aviso de abajo. Si no, o si falla, la ventana vuelve sola para enseñar cómo ha ido.
+- **No van dos tareas a la vez:** si se pide otra, avisa y trae la que está en marcha. Dos instalaciones que tocan lo mismo (Apache, `sudo`, la misma versión) podrían chocar.
+
+## Proyectos de Node (pestaña Node)
+
+Desde la 1.57.0, los proyectos de `/opt/htdocs` hechos con **Astro, Next, Nuxt, SvelteKit o Vite** (o con un script `dev` o `start`) salen en la pestaña **Node**. No dependen de ninguna versión de PHP: cada uno lleva su propio servidor, solo en `127.0.0.1` y con tu usuario. No salen las webs de PHP que usan npm para sus estilos (con `wp-config.php`, `index.php` o `artisan`).
+
+- **Arrancar:** en modo desarrollo, para trabajar. Los cambios se ven al momento.
+- **Compilar:** como en producción.
+- **Túnel:** lo comparte con el mismo túnel de Cloudflare, con contraseña y con cierre automático. Siempre comparte la versión compilada: si el proyecto está parado o en desarrollo, lo compila y arranca antes (en desarrollo te lo pregunta). El código fuente no sale del equipo. El túnel no deja pasar rutas ocultas como `/node_modules/.vite`, por eso el modo desarrollo no se comparte.
+- **Con el proyecto en marcha:** **Abrir web**, **Parar** y un botón para reiniciarlo o volver a compilarlo. Con su icono, siempre: **VS Code**, su **carpeta** y su **registro**.
+- **Node:** usa la versión que pide el proyecto (`.nvmrc`, `.node-version` o `engines`). Si no la encuentra ni en nvm ni en el sistema, la descarga de nodejs.org en `~/.lvm-instalador/node` y la comprueba con la lista `SHASUMS256.txt` de esa misma web.
+- **Dependencias:** se instalan si faltan o si cambió el fichero de bloqueo. Instalarlas ejecuta los scripts de los paquetes con tu usuario: arranca solo proyectos de los que te fíes.
+- **Astro con el adaptador de Vercel, Netlify o Cloudflare:** se compila con `@astrojs/node` sin tocar la configuración ni el `package.json` del proyecto, porque esos adaptadores no se pueden servir en local. Las tareas programadas de esos alojamientos no se ejecutan.
+- **Parar** cierra el servidor con todos sus procesos y, si se estaba compartiendo, también su túnel. Cerrar la ventana no lo para.
+
+En la terminal: `lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]`, `node-parar <carpeta>` y `node-registro <carpeta>`.
 
 ## Uso del panel
 

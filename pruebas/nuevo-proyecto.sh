@@ -26,7 +26,7 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: Host falseado en 1/3 y Nuevo proyecto en 2/3" 'grep -q "OneThirdTwoThirds(first: {" "$SRC" && grep -q "first.frame(width: unit, alignment: .topLeading)" "$SRC" && grep -q "second.frame(width: unit \* 2, alignment: .topLeading)" "$SRC"'
     check "Mac: boton Ver fichero de hosts, solo para leerlo" 'grep -q "Label(\"Ver fichero de hosts\", systemImage: \"doc.text\")" "$SRC" && grep -q "func viewHostsFile()" "$SRC"'
     check "Mac: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'
-    check "Mac: la caja de la terminal, con el mismo margen arriba que abajo" 'grep -q "padding(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))" "$SRC" && grep -q "padding(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))" "$SRC"'
+    check "Mac: la terminal, sin márgenes alrededor (pegada a la ventana, 1.41.1)" '! sed -n "/^struct TermPanel: View {/,/^}/p" "$SRC" | grep -q "padding(EdgeInsets"'
 else
     check "Linux: los resultados, en la propia ventana (el desplegable de Gtk.EntryCompletion puede no verse en Wayland)" '! grep -q "Gtk.EntryCompletion(" "$SRC" && grep -q "w\[\"repo_hits\"\] = css(Gtk.ListBox" "$SRC" && grep -q "found = \[r for r in rows if q in r\[0\].lower()\]" "$SRC"' 
     RQ=$(python3 -c "import re

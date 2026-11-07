@@ -4,7 +4,7 @@ Versión para Mac del instalador de Linux. Instala varias versiones de PHP en un
 
 Todo va en un solo archivo: `lvm-instalador.sh`.
 
-**Versión 1.40.14.** La lista de cambios de cada versión está en «Novedades» (menú ☰ de la ventana, menú Gestor y Configuración) y en `lvm-instalador novedades`.
+**Versión 1.41.1.** La lista de cambios de cada versión está en «Novedades» (menú ☰ de la ventana, menú Gestor y Configuración) y en `lvm-instalador novedades`.
 
 ## Qué instala
 
@@ -102,6 +102,7 @@ Desde la 1.39.0 la ventana es como la de Linux (1.54): mismas órdenes, otra org
 | **Versiones de PHP** | Una tabla con cada versión: si está en marcha, su PHP, su **soporte** en php.net (**Estable**, **Solo seguridad** o **Sin soporte**, con su fecha) y su **último parche** («al día» o el que hay más nuevo). **Activar** sale al pasar el ratón; **Activa** va en azul, del mismo tamaño. En el menú ⋯ de cada una: Componentes, **Actualizar** (solo si hay un parche más nuevo; si ya está al día, lo dice), actualizar phpMyAdmin y Desinstalar. **Componentes** (Apache, MariaDB, ProFTPD, Perl y phpMyAdmin de todas, con sus logotipos) e **Instalar versión…** se abren en un diálogo |
 | **Bases de datos** | Tarjetas con cuántas BBDD hay, cuántas en la versión activa, la última que ha cambiado y lo que ocupan las **copias de seguridad** de `~/lvm-copias`. Una tabla plegable por versión (desde la 1.39.5, todas plegadas al entrar y una desplegada a la vez; con una búsqueda, las que la cumplen), con el **proyecto** de cada BBDD, la **fecha exacta** de su último cambio y sus acciones: vaciar la caché (tiendas), copiar a otra versión, descargar, **cargar su proyecto** y borrar (en la activa). La BBDD que usa el proyecto cargado lleva un **punto verde**. Busca por el nombre de la BBDD o de su proyecto, y se puede ver solo la versión activa. Debajo, **Subir o actualizar una BBDD** |
 | **Docker** | [Proyectos en Docker Desktop](#docker) |
+| **Node** | [Proyectos de Astro, Next, Vite…](#proyectos-de-node-pestaña-node) |
 | **Dominios y hosts** | Los dominios de los vhosts de `XAMPP-compartido/httpd-vhosts.conf` y si están falseados en `/etc/hosts` (llevan a este Mac). Arriba, **Host falseado**: el de la tienda PrestaShop cargada, con el interruptor encendido y **Abrir**. Debajo, el resto, con su interruptor. En medio, **Nuevo proyecto con dominio falseado** (`lvm-instalador nuevo-dominio <dominio> <carpeta> [base]`) |
 | **Configuración** | Lo que se usa de vez en cuando: **Editar** los vhosts y los hosts, la **barrera entre webs**, el **Correo de pruebas (Mailpit)** (encenderlo o apagarlo, los plugins de correo de WordPress, instalar Mailpit, abrir o vaciar su bandeja), el **XAMPP oficial** (apartarlo, cargar las copias de sus bases y volver a él), las carpetas de copias y de registros, el **Registro de errores**, **Comandos de lvm-instalador**, **Novedades** y **Acerca de** |
 
@@ -151,6 +152,37 @@ Desde la 1.39.0, como en Linux (1.53 y 1.54): proyectos con **cualquier versión
 ## Parches nuevos
 
 - En Configuración, **Parches nuevos** dice qué tiene un parche publicado: cada versión XAMPP-X (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin), las imágenes de Docker (MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. **Actualizar todo** lo pone al día. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones `XAMPP-X.Y.Z` llevan su parche en el nombre: la nueva se instala a su lado. En Terminal: `lvm-instalador componentes` y `componentes-actualizar`.
+
+## Apariencia
+
+En **Configuración → Apariencia** (desde la 1.41.0). Se guarda al momento, en `~/.lvm-instalador/apariencia`, el mismo fichero en Linux y en Mac, y no hace más lenta la ventana: solo se rehace el menú lateral y los logotipos se dibujan una vez.
+
+- **Iconos en color:** cada apartado del menú lateral con su color (Docker, PHP, Node, Bases de datos…). Apagado, de un color, como el texto.
+- **Logotipos de Docker, Node y PHP:** Docker y Node con su logotipo y su tipografía en lugar del nombre, y PHP con su óvalo (este, solo con los iconos en color). Son los oficiales de docker.com, nodejs.org y php.net.
+- **Qué apartados salen en el menú lateral:** se puede quitar cualquiera menos Proyectos y Configuración, que siempre se ven. Si se quita el que está abierto, se pasa a Proyectos.
+- **Botones del proyecto:** cuáles se ven en el visor, en qué orden y cómo, lo mismo que en el menú ⋮ del proyecto.
+
+## Tareas en segundo plano
+
+Desde la 1.41.0, la ventana de una instalación o actualización tiene **Seguir en segundo plano** (también con Esc). La tarea sigue, la ventana se esconde y el programa se puede usar: cambiar de pestaña, abrir webs, VS Code, la terminal… A la izquierda del visor sale una **flecha verde que baja y late**, con lo que hace («Actualizando…», «Instalando…») y el porcentaje; al pasar el ratón dice qué se hace y al pulsarla vuelve la ventana.
+
+- Si acaba bien y es de las que se cierran solas, la flecha se va y sale el aviso de abajo. Si no, o si falla, la ventana vuelve sola para enseñar cómo ha ido.
+- **No van dos tareas a la vez:** si se pide otra, avisa y trae la que está en marcha. Dos instalaciones que tocan lo mismo (Apache, `sudo`, la misma versión) podrían chocar.
+
+## Proyectos de Node (pestaña Node)
+
+Desde la 1.41.0, los proyectos de `htdocs` hechos con **Astro, Next, Nuxt, SvelteKit o Vite** (o con un script `dev` o `start`) salen en la pestaña **Node**. No dependen de ninguna versión de PHP: cada uno lleva su propio servidor, solo en `127.0.0.1` y con tu usuario. No salen las webs de PHP que usan npm para sus estilos (con `wp-config.php`, `index.php` o `artisan`).
+
+- **Arrancar:** en modo desarrollo, para trabajar. Los cambios se ven al momento.
+- **Compilar:** como en producción.
+- **Túnel:** lo comparte con el mismo túnel de Cloudflare, con contraseña y con cierre automático. Siempre comparte la versión compilada: si el proyecto está parado o en desarrollo, lo compila y arranca antes (en desarrollo te lo pregunta). El código fuente no sale del Mac. El túnel no deja pasar rutas ocultas como `/node_modules/.vite`, por eso el modo desarrollo no se comparte.
+- **Con el proyecto en marcha:** **Abrir web**, **Parar** y un botón para reiniciarlo o volver a compilarlo. Con su icono, siempre: **VS Code**, su **carpeta** y su **registro**.
+- **Node:** usa la versión que pide el proyecto (`.nvmrc`, `.node-version` o `engines`). Si no la encuentra ni en nvm ni en el sistema, la descarga de nodejs.org en `~/.lvm-instalador/node` y la comprueba con la lista `SHASUMS256.txt` de esa misma web.
+- **Dependencias:** se instalan si faltan o si cambió el fichero de bloqueo. Instalarlas ejecuta los scripts de los paquetes con tu usuario: arranca solo proyectos de los que te fíes.
+- **Astro con el adaptador de Vercel, Netlify o Cloudflare:** se compila con `@astrojs/node` sin tocar la configuración ni el `package.json` del proyecto, porque esos adaptadores no se pueden servir en local. Las tareas programadas de esos alojamientos no se ejecutan.
+- **Parar** cierra el servidor con todos sus procesos y, si se estaba compartiendo, también su túnel. Cerrar la ventana no lo para.
+
+En la terminal: `lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]`, `node-parar <carpeta>` y `node-registro <carpeta>`.
 
 ## Correo de pruebas (Mailpit)
 

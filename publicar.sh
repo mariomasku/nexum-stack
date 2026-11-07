@@ -143,9 +143,44 @@ fi
 
 # Novedades de esta version (las de la publicacion)
 NOTES=$DIST/novedades-$VERSION.md
-bash "$SRC" novedades | awk -v head="## $VERSION " 'index($0, head) == 1 { on = 1; next } /^## / { if (on) exit } on' \
+# (todas las versiones desde la última publicada, cada una con su título: si hubo versiones sin publicar
+# entre medias, sus novedades también llegan a la publicación)
+bash "$SRC" novedades | awk -v head="## $VERSION " -v stop="## ${LATEST#v} " \
+        'index($0, head) == 1 { on = 1 } on && stop != "## " && index($0, stop) == 1 { exit } on { sub(/^## /, "### "); print }' \
     | sed '/./,$!d' > "$NOTES"
 [ -s "$NOTES" ] || fail "no hay novedades de la $VERSION"
+# Las de Mac, desde su última versión publicada (las saca del texto de VERSIONES de su script)
+if [ -n "$MAC_ZIP" ]; then
+    MAC_LAST=$(grep -oE '^lvm-instalador-mac-[0-9.]+\.zip$' <<< "$MAC_ASSETS" | sed -E 's/^lvm-instalador-mac-//; s/\.zip$//' | sort -V | tail -1)
+    python3 -I - "$MAC_SRC" "$MAC_VERSION" "$MAC_LAST" >> "$NOTES" << 'EOF_MAC' || fail "no se han podido leer las novedades de Mac"
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read()
+text = text[text.index("\nVERSIONES\n") + 11:]
+want, last = sys.argv[2], sys.argv[3]
+out, on = [], False
+for block in re.split(r"\n(?=\d+\.\d+\.\d+ \()", text):
+    m = re.match(r"(\d+\.\d+\.\d+) \(([^)]*)\)\n", block)
+    if not m:
+        continue
+    if m.group(1) == want:
+        on = True
+    if not on or m.group(1) == last:
+        if on:
+            break
+        continue
+    items = re.split(r"\n- ", "\n" + block[m.end():].split("\n\n")[0])
+    out.append("### Mac %s · %s\n" % (m.group(1), m.group(2)))
+    for it in items:
+        it = " ".join(x.strip() for x in it.strip().lstrip("- ").splitlines()).strip()
+        if it:
+            title, sep, rest = it.partition(": ")
+            out.append("- **%s:** %s" % (title, rest) if sep and len(title) < 60 else "- " + it)
+    out.append("")
+if out:
+    print("\n## Nexum Dev Stack para Mac %s\n" % want)
+    print("\n".join(out).rstrip())
+EOF_MAC
+fi
 cat >> "$NOTES" << EOF
 
 ---

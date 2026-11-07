@@ -4,6 +4,20 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.2 · 7 nov 2026
+
+- **Configuración:** sus apartados, en una columna pegada al menú lateral, y en filas (Docker y el correo de pruebas siguen en tarjetas). El correo de pruebas se enciende con el interruptor de su título; en la dirección del Apache de Docker, Guardar va debajo de sus campos.
+- **Parches nuevos:** en lugar de preguntar al abrir, sale un aviso arriba (al lado del visor) con lo que tiene un parche y si conviene ponerlo. «Ahora no» lo deja hasta que salga otro.
+
+## 1.57.1 · 7 nov 2026
+
+- **Instalaciones en segundo plano:** la ventana de una instalación o actualización tiene «Seguir en segundo plano» (también con Esc) y el programa se puede usar mientras tanto. Al lado del visor sale una flecha verde que late, con lo que hace («Actualizando…», «Instalando…») y el porcentaje; al pulsarla vuelve la ventana. Si acaba bien, avisa; si falla, la ventana vuelve sola. No se puede lanzar otra tarea hasta que acabe.
+- **Apariencia, en Configuración:** los iconos del menú lateral en color o de un color, como el texto; Docker, Node y PHP con su logotipo y su tipografía; qué apartados salen en el menú (Proyectos y Configuración, siempre), y los botones del proyecto. Bases de datos, con su icono de discos apilados.
+
+## 1.57.0 · 6 nov 2026
+
+- **Proyectos de Node:** nueva pestaña Node para los proyectos de htdocs hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno se arranca en desarrollo o compilado, con la versión de Node que pide y sus dependencias, y el compilado se puede compartir con un túnel de Cloudflare. En la terminal: node-arrancar, node-parar y node-registro.
+
 ## 1.56.33 · 6 nov 2026
 
 - **Correo de pruebas:** la bandeja de Mailpit se ve dentro de la ventana, debajo de sus tarjetas, y el botón Correo lleva a ella en lugar de abrir el navegador. Los enlaces de los correos sí se abren en el navegador al pulsarlos.

@@ -13,7 +13,7 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: se ve como texto (sin codigos de color ni de cursor) y sigue abierta al esconderla" 'grep -q "env\[\"TERM\"\] = \"dumb\"" "$SRC" && grep -q "Esconder la terminal (sigue abierta)" "$SRC" && grep -q "if termOpen { termStart() }" "$SRC"'
     check "Mac: copiar y pegar con ⌘C/⌘V (sin pasar por el menú Edición) y con el botón derecho" 'grep -q "override func performKeyEquivalent(with e: NSEvent) -> Bool {" "$SRC" && grep -q "case \"v\": paste(nil); return true" "$SRC" && grep -q "m.addItem(withTitle: \"Pegar\", action: #selector(paste(_:)), keyEquivalent: \"v\")" "$SRC"'
     check "Mac: el proyecto cargado (su nombre) se busca dentro de los proyectos; boton Vaciar DNS" 'grep -q "cur = (HTDOCS as NSString).appendingPathComponent(cur)" "$SRC" && grep -q "sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder" "$SRC" && grep -q "model.termFlushDns()" "$SRC"'
-    check "Mac: con el aspecto del visor, hundida (sombra por dentro)" 'grep -q "(como el visor de arriba, hundida: fondo algo más oscuro y sombra por dentro)" "$SRC"'
+    check "Mac: pegada a la ventana, de lado a lado (1.41.1)" 'grep -q "^/// La terminal de abajo, pegada a la ventana" "$SRC" && sed -n "/^struct TermPanel: View {/,/^}/p" "$SRC" | grep -qF "TermHost(session: model.term)"'
 else
     check "Linux: Terminal en la cabecera en lugar de Localhost" 'grep -q "self.term_btn = Gtk.ToggleButton(" "$SRC" && ! grep -q "nv_button(\"web-browser-symbolic\", \"Localhost\"" "$SRC"'
     check "Linux: abajo del contenido (se cambia de alto arrastrando), escondida hasta que se pulsa" 'grep -q "self.term_paned.pack2(self.nv_term_panel(), False, False)" "$SRC" && grep -A3 "        box.show_all()" "$SRC" | grep -q "box.set_no_show_all(True)"'
