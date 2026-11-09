@@ -6,16 +6,13 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.57.5 · 9 nov 2026
 
-- **La versión de Mac lleva desde ahora el mismo número que la de Linux** (hasta ahora iba por la 1.41), porque las dos llevan lo mismo.
-- **Mac, Otro parche concreto:** como en Linux, se puede instalar una versión anterior de cualquier rama (8.3.10…) en su propia carpeta XAMPP-X.Y.Z (en la terminal, `instalar --php 8.3.10`).
-
 - **Configuración:** arriba, en grande, el nombre del apartado abierto (con su icono y lo que hace), no «Configuración»; el correo de pruebas se enciende con el interruptor de al lado.
 - **Apariencia:** en tres bloques, cada uno con su título (iconos del menú lateral, apartados del menú lateral y visor de los proyectos). Los botones del visor están aquí: ya no hay un apartado aparte (salían dos veces).
 - **Seguridad entre webs:** explicada en cuatro puntos (el problema, lo que hace la barrera, cuándo apagarla y dónde se aplica).
 
 ## 1.57.4 · 9 nov 2026
 
-- **Diálogos que piden confirmar varios cambios** (crear un dominio, copiar o replicar una BBDD, cargar o actualizar un proyecto, instalar versiones, Actualizar todo): empiezan por «Qué se va a realizar» y los cambios van numerados, a la izquierda y separados entre sí.
+- Diálogos que piden confirmar varios cambios (crear un dominio, copiar o replicar una BBDD, cargar o actualizar un proyecto, instalar versiones, Actualizar todo): empiezan por «Qué se va a realizar» y los cambios van numerados, a la izquierda y separados entre sí.
 
 ## 1.57.3 · 8 nov 2026
 
