@@ -11726,12 +11726,11 @@ print(next((a["id"] for a in json.load(sys.stdin).get("assets", []) if a.get("na
 
 function download() {
     local url=$1 file=$2 sum=$3 sig_url=$4 keys=$5 name=${6:-$(basename "$1")}
-    DL_CACHED=0 DL_SUM=$sum
+    DL_SUM=$sum
 
     # (de la cache de descargas, si esta con esa suma o, si su web no la da, con la que se guardo: su
     # firma ya se comprobo al guardarlo)
     if dl_from_cache "$name" "$file" "$sum"; then
-        DL_CACHED=1
         if [ -z "$sum" ]; then
             echo "  Su web no da la suma sha256 de $name: se usa el de la cache de descargas (ya comprobado)"
         else
