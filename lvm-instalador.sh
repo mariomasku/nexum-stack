@@ -13007,16 +13007,17 @@ QUE HACE
 
 VERSIONES
 
-1.57.6 (9 nov 2026)
+1.57.6 (10 nov 2026)
 - Caché de descargas: el código de cada componente que se instala
   (PHP, Apache, MariaDB, phpMyAdmin...) se guarda ya comprobado en
   /var/cache/nexum-stack. Al reintentar una instalación que falló no se
   descarga otra vez, y si la web de un componente no responde se usa
   el de la caché en vez de cancelar. Se ve y se vacía en
   Configuración, Carpetas (o lvm-instalador descargas).
-- Mantenimiento: el código va ahora en ficheros por partes y se revisa
-  solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
-  nada cambia por fuera.
+- Mantenimiento: el código va ahora en ficheros por partes, también
+  las dos ventanas (un fichero por apartado), y se revisa solo
+  (ShellCheck, ruff y la compilación de la ventana del Mac) en cada
+  cambio. Se quita lo que no se usaba; nada cambia por fuera.
 - Arreglar los certificados: usado dos veces seguidas, ya no vuelve a
   rehacer la lista de certificados del sistema sin hacer falta.
 
