@@ -35,6 +35,9 @@ function fail() {
     exit 1
 }
 
+# (desde la 1.57.5 los scripts se construyen desde src/: se publica solo lo que es de src/)
+"$HERE/construir.sh" --comprobar > /dev/null || fail "los scripts no son los de src/: ejecuta ./construir.sh"
+
 [ -n "$VERSION" ] && [ -n "$FPR" ] && [ -n "$REPO" ] || fail "faltan APP_VERSION, UPDATE_KEY_FPR o UPDATE_REPO en $SRC"
 echo "== Nexum Dev Stack $VERSION → github.com/$REPO"
 

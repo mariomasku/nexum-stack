@@ -1,12 +1,13 @@
-# Comprobaciones en cada envío: que la ventana del Mac compila (en un Mac de GitHub, con el mismo
-# swiftc y las mismas opciones que usa build_native_app) y que los dos scripts no tienen errores de
-# sintaxis (bash y el Python de la ventana de Linux). No firma, no empaqueta y no publica nada.
+# Comprobaciones en cada envío: que los dos scripts son los de src/ (./construir.sh --comprobar), que la
+# ventana del Mac compila (en un Mac de GitHub, con el mismo swiftc y las mismas opciones que usa
+# build_native_app) y que no hay errores de sintaxis (bash y el Python de las ventanas). No firma, no
+# empaqueta y no publica nada.
 name: Comprobar
 
 on:
   push:
     branches: [main]
-    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", ".github/workflows/comprobar.yml"]
+    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", "src/**", "construir.sh", ".github/workflows/comprobar.yml"]
   pull_request:
   workflow_dispatch:
 
@@ -26,10 +27,11 @@ jobs:
           [ -x "$b" ] || brew install bash
           "$b" --version | head -1
           "$b" -n macos/lvm-instalador.sh
-      - name: Sacar el Swift del script (lo mismo que swift_source)
+      - name: El script es el de src/
+        run: ./construir.sh --comprobar
+      - name: El Swift, de src/mac/ventana.swift (lo mismo que swift_source)
         run: |
-          awk "/cat <<'LVM_SWIFT'\$/{f=1;next} /^LVM_SWIFT\$/{f=0} f" macos/lvm-instalador.sh > main.swift
-          test -s main.swift
+          cp src/mac/ventana.swift main.swift
           wc -l main.swift
       - name: Compilar (como build_native_app)
         run: |
@@ -53,8 +55,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sintaxis de bash
         run: bash -n lvm-instalador.sh
-      - name: Sintaxis del Python de la ventana
+      - name: Los dos scripts son los de src/
+        run: ./construir.sh --comprobar
+      - name: Sintaxis de cada sección de bash
+        run: for f in src/linux/bash/*.sh src/mac/bash/*.sh; do bash -n "$f" || exit 1; done
+      - name: Sintaxis del Python (ventana de Linux y túnel)
         run: |
-          awk "/cat <<'LVM_GUI_PY'\$/{f=1;next} /^LVM_GUI_PY\$/{f=0} f" lvm-instalador.sh > ventana.py
-          test -s ventana.py
-          python3 -I -c "import ast, sys; ast.parse(open('ventana.py', encoding='utf-8').read()); print('ok')"
+          for f in src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py; do
+            python3 -I -c "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())" "$f" || exit 1
+          done
+          echo ok
