@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Sintaxis de bash (con bash 5, como en el Mac; el /bin/bash 3.2 del sistema no lo lee)
         run: |
           b=$(brew --prefix)/bin/bash
@@ -40,7 +40,7 @@ jobs:
           test -x lvm-app
       - name: Guardar el registro si falla
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: compilar-log
           path: |
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Sintaxis de bash
         run: bash -n lvm-instalador.sh
       - name: Los dos scripts son los de src/
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: ShellCheck (los dos scripts construidos)
         run: |
           shellcheck --version | head -2
