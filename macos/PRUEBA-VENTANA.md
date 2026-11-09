@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.41.1)
+# Prueba de la ventana nueva en un Mac (versión 1.41.4)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.41.1** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.41.4** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.41.1/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/lvm-instalador-mac-1.41.4/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.41.1
+   lvm-instalador version                                                         # Nexum Dev Stack 1.41.4
    ```
 
 5. **Comprueba las versiones:**
@@ -385,6 +385,19 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 3. **Docker**: «Guardar» va debajo de los campos de la dirección y los puertos.
 4. Con algún parche pendiente (**Parches nuevos**), arriba sale el aviso «Hay parches nuevos»: «Ahora no» lo quita hasta que salga otro; «Actualizar todo» los pone. Al abrir ya no salta la pregunta.
 5. **Terminal**: va pegada a la ventana, de lado a lado. El prompt sale al principio de la línea (sin «%» delante). Escribe, borra con ⌫ y usa ↑: se ve bien. Una descarga con porcentaje se queda en una línea.
+
+## Paso 27: diálogos con los cambios numerados (1.41.3)
+
+1. En **Proyectos**, rellena un dominio nuevo y pulsa **Crear y falsear**: el diálogo dice «Qué se va a realizar» y debajo los cambios numerados (1., 2., 3.…), a la izquierda y separados; «Pide la contraseña de administrador» va al final, en gris. Cancela.
+2. Lo mismo al **copiar una BBDD** a otra versión, al **cargar un proyecto** en otra versión de PHP y con **Actualizar todo** en Parches nuevos (cancela en todos).
+3. Las líneas largas parten por debajo del texto, no por debajo del número.
+
+## Paso 28: Configuración, Apariencia y Seguridad entre webs (1.41.4)
+
+1. En **Configuración**, pulsa varios apartados: arriba, en grande, sale el nombre del que está abierto (con su icono y su explicación), no «Configuración», y su tarjeta no repite el título.
+2. **Correo de pruebas**: el interruptor va al lado del título grande.
+3. Ya no hay apartado **Visor de los proyectos**. En **Apariencia** hay tres bloques con su título: «Iconos del menú lateral», «Apartados del menú lateral» y «Visor de los proyectos» (con «Personalizar…»).
+4. **Seguridad entre webs**: el interruptor arriba y, debajo, «Qué es» con cuatro puntos (El problema, Lo que hace la barrera, Cuándo apagarla, Dónde se aplica).
 
 ## Qué apuntar
 

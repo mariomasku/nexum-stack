@@ -4,6 +4,20 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.5 · 9 nov 2026
+
+- **Configuración:** arriba, en grande, el nombre del apartado abierto (con su icono y lo que hace), no «Configuración»; el correo de pruebas se enciende con el interruptor de al lado.
+- **Apariencia:** en tres bloques, cada uno con su título (iconos del menú lateral, apartados del menú lateral y visor de los proyectos). Los botones del visor están aquí: ya no hay un apartado aparte (salían dos veces).
+- **Seguridad entre webs:** explicada en cuatro puntos (el problema, lo que hace la barrera, cuándo apagarla y dónde se aplica).
+
+## 1.57.4 · 9 nov 2026
+
+- **Diálogos que piden confirmar varios cambios** (crear un dominio, copiar o replicar una BBDD, cargar o actualizar un proyecto, instalar versiones, Actualizar todo): empiezan por «Qué se va a realizar» y los cambios van numerados, a la izquierda y separados entre sí.
+
+## 1.57.3 · 8 nov 2026
+
+- **Actualizar versiones de PHP:** si GitHub no da la suma sha256 de ProFTPD (su descarga respondía 504 y la actualización fallaba al momento), se pide por la API de GitHub, del mismo repositorio. Si una descarga falla, el informe del error dice por qué.
+
 ## 1.57.2 · 7 nov 2026
 
 - **Configuración:** sus apartados, en una columna pegada al menú lateral, y en filas (Docker y el correo de pruebas siguen en tarjetas). El correo de pruebas se enciende con el interruptor de su título; en la dirección del Apache de Docker, Guardar va debajo de sus campos.

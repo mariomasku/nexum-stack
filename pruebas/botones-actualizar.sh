@@ -80,7 +80,7 @@ while IFS='|' read -r st name; do
     [ "$st" == ok ] && ok "$name" || bad "$name"
 done <<< "$out"
 check "actualizaciones: si se dice que no, ya no se apunta la versión rechazada" '! grep -q "declined_update" "$SRC"'
-check "ventana: «Personalizar los botones…» en el menú ⋮ y en Configuración" 'grep -q "(\"Personalizar los botones…\", lambda: self.nv_buttons_dialog())" "$SRC" && grep -q "self.nv_buttons_tools()" "$SRC"'
+check "ventana: «Personalizar los botones…» en el menú ⋮ y en Configuración" 'grep -q "(\"Personalizar los botones…\", lambda: self.nv_buttons_dialog())" "$SRC" && grep -q "lb = block(\"Visor de los proyectos\"" "$SRC"'
 check "ventana: Desmontar, ⋮ y los fijos de Docker, del mismo estilo y tamaño" 'grep -q "\[(eject, (\"icono\", \"media-eject-symbolic\"), \"Desmontar\")\]" "$SRC" && grep -q "self.nv_restyle(more, buttons_conf()" "$SRC" && grep -q "self.nv_restyle(power, conf" "$SRC" && grep -q "self.nv_restyle(vb, conf" "$SRC"'
 check "ventana: sin nombre, el cuadrado mide lo mismo de alto que de ancho" 'grep -q "b.set_size_request(side, side)" "$SRC"'
 check "ventana: al cargar un proyecto, la página sube sola hasta el visor" 'grep -q "smooth_scroll(self.page_projects)" "$SRC"'

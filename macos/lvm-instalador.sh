@@ -2141,7 +2141,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.41.1"
+APP_VERSION="1.41.4"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -11403,20 +11403,46 @@ function gpg_verify() {
 
 # download <url> <archivo> <sha256> [<url de la firma> <PHP|APACHE|MARIADB|PMA>]: descarga un archivo y
 # comprueba su suma y, si se indica, su firma GPG (gpg_verify)
+# La suma sha256 del codigo de ProFTPD <version>: la publica con cada version en GitHub. A veces su
+# descarga directa responde 504 durante horas: entonces se pide el mismo fichero por la API de GitHub
+# (del mismo repositorio), que lo sirve por otro camino
+function proftpd_sum() {
+    local ftp=$1 sum id
+    sum=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+        "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" 2> /dev/null | grep -oE '^[0-9a-f]{64}')
+    if [ -z "$sum" ]; then
+        id=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+            "https://api.github.com/repos/proftpd/proftpd/releases/tags/v$ftp" 2> /dev/null \
+            | python3 -I -c 'import json, sys
+print(next((a["id"] for a in json.load(sys.stdin).get("assets", []) if a.get("name") == sys.argv[1]), ""))' "proftpd-$ftp.tar.gz.sha256" 2> /dev/null)
+        [[ "$id" =~ ^[0-9]+$ ]] && sum=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+            -H 'Accept: application/octet-stream' "https://api.github.com/repos/proftpd/proftpd/releases/assets/$id" 2> /dev/null \
+            | grep -oE '^[0-9a-f]{64}')
+    fi
+    echo "$sum"
+}
+
 function download() {
     local url=$1 file=$2 sum=$3 sig_url=$4 keys=$5
 
+    # (STEP_DESC: el motivo, para el informe del error si falla aqui, antes de compilar nada)
     if [ -z "$sum" ]; then
         echo "  No se ha encontrado la suma sha256 de $(basename "$url")"
+        STEP_DESC="no se ha podido leer la suma sha256 de $(basename "$url") (su web no responde: prueba en un rato)"
 
         return 1
     fi
 
     echo "  Descargando $(basename "$url")..."
-    curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || { echo "  No se pudo descargar $url"; return 1; }
+    curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || {
+        echo "  No se pudo descargar $url"
+        STEP_DESC="no se ha podido descargar $url (su web no responde: prueba en un rato)"
+        return 1
+    }
 
     if [ "$(sha256_of "$file")" != "$sum" ]; then
         echo "  $(basename "$url") no coincide con su suma sha256. Se cancela."
+        STEP_DESC="$(basename "$url") no coincide con su suma sha256: no se instala"
 
         return 1
     fi
@@ -11463,6 +11489,9 @@ function error_report() {
             [ -n "$errors" ] && printf '\n== Primeros errores ==\n%s\n' "$errors"
             printf '\n== Ultimas 60 lineas de %s ==\n' "$(basename "$log")"
             tail -60 "$log"
+        elif [ -n "$desc" ]; then
+            # (falló antes de compilar: al descargar o comprobar el código)
+            echo "Motivo: $desc"
         fi
         if [ -n "$config" ] && [ -f "$config" ]; then
             printf '\n== config.log: lo ultimo antes del error ==\n'
@@ -12588,9 +12617,9 @@ function install_stack() {
     download "https://www.php.net/distributions/php-$version.tar.xz" php.tar.xz "$php_sha" \
         "https://www.php.net/distributions/php-$version.tar.xz.asc" PHP || stack_fail
     download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+        "$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
     download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+        "$(proftpd_sum "$ftp")" || stack_fail
     download "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
         "$(pma_sum "$pma")" "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz.asc" PMA || stack_fail
     if needs_openssl11 "$short"; then
@@ -18197,6 +18226,41 @@ func dialogLabel(_ text: String, font: NSFont = NSFont.systemFont(ofSize: NSFont
     return l
 }
 
+/// Lo que va a hacer un diálogo que pide confirmar varios cambios: «Qué se va a realizar» y los
+/// cambios numerados, a la izquierda y separados entre sí (cada uno con sangría francesa)
+func dialogSteps(_ steps: [String]) -> NSTextField {
+    let out = NSMutableAttributedString()
+    let body = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    let bold = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+    let green = NSColor(red: 0x45 / 255.0, green: 0xA5 / 255.0, blue: 0x7C / 255.0, alpha: 1)
+    let head = NSMutableParagraphStyle()
+    head.paragraphSpacing = 4
+    out.append(NSAttributedString(string: "Qué se va a realizar\n", attributes: [
+        .font: bold, .foregroundColor: NSColor.labelColor, .paragraphStyle: head]))
+    for (i, step) in steps.enumerated() {
+        let p = NSMutableParagraphStyle()
+        p.tabStops = [NSTextTab(textAlignment: .left, location: 28)]
+        p.defaultTabInterval = 28
+        p.firstLineHeadIndent = 6
+        p.headIndent = 28
+        p.lineSpacing = 3
+        p.paragraphSpacingBefore = 10
+        let end = i == steps.count - 1 ? "" : "\n"
+        out.append(NSAttributedString(string: "\(i + 1).", attributes: [
+            .font: bold, .foregroundColor: green, .paragraphStyle: p]))
+        out.append(NSAttributedString(string: "\t" + step + end, attributes: [
+            .font: body, .foregroundColor: NSColor.labelColor, .paragraphStyle: p]))
+    }
+    let l = NSTextField(wrappingLabelWithString: "")
+    l.alignment = .left
+    l.preferredMaxLayoutWidth = DIALOG_WIDTH
+    l.isSelectable = true
+    // (sin esto, al seleccionar se pierden los colores y las sangrías)
+    l.allowsEditingTextAttributes = true
+    l.attributedStringValue = out
+    return l
+}
+
 /// Accesorio de un diálogo: las vistas en columna, centradas y con aire entre ellas
 func dialogStack(_ views: [NSView], spacing: CGFloat = 16) -> NSStackView {
     let stack = NSStackView()
@@ -18267,6 +18331,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
                value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
+               steps: [String] = [],
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -18288,8 +18353,15 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
     stack.alignment = .centerX
     stack.spacing = 16
     stack.edgeInsets = NSEdgeInsets(top: 6, left: 0, bottom: 8, right: 0)
+    if !steps.isEmpty {
+        let l = dialogSteps(steps)
+        l.translatesAutoresizingMaskIntoConstraints = false
+        l.widthAnchor.constraint(equalToConstant: width).isActive = true
+        stack.addArrangedSubview(l)
+    }
     if !text.isEmpty {
-        let l = dialogLabel(text)
+        // (con los cambios numerados encima, el texto es una nota: a la izquierda, como ellos)
+        let l = steps.isEmpty ? dialogLabel(text) : dialogLabel(text, color: .secondaryLabelColor, align: .left)
         l.translatesAutoresizingMaskIntoConstraints = false
         l.widthAnchor.constraint(equalToConstant: width).isActive = true
         stack.addArrangedSubview(l)
@@ -18514,9 +18586,12 @@ func message(_ title: String, _ text: String = "", error: Bool = false) {
     alert.runStyled()
 }
 
-func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false) -> Bool {
+/// steps: los cambios que se van a hacer (numerados, con «Qué se va a realizar»); text va entonces
+/// debajo, como nota
+func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
+             steps: [String] = []) -> Bool {
     return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
-                     destructive: destructive).ok
+                     destructive: destructive, steps: steps).ok
 }
 
 /// Markdown de «lvm-instalador novedades»: «## versión · fecha», viñetas «- » (con dos espacios
@@ -19858,9 +19933,8 @@ final class AppModel: ObservableObject {
     }
 
     func updateComponents(_ c: ComponentsState) {
-        guard confirm("¿Actualizar todo?", c.items.map { "• " + $0 }.joined(separator: "\n")
-                      + "\n\nLas versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
-                      "Actualizar todo") else { return }
+        guard confirm("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+                      "Actualizar todo", steps: c.items) else { return }
         components = nil
         _ = runTask("Actualizando los componentes", ["componentes-actualizar"], progress: true,
                     doneText: "Componentes al día", reloadBranches: true) { _, _, _ in self.reloadComponents() }
@@ -20433,8 +20507,8 @@ final class AppModel: ObservableObject {
             steps.append("BBDD \(db) en XAMPP-\(d.active)\(have ? " (ya existe: se deja como está)" : " (se crea vacía)").")
         }
         steps.append("\(domain) se falsea en /etc/hosts; los demás dominios dejan de estarlo.")
-        if !confirm("¿Crear \(domain)?", steps.map { "• " + $0 }.joined(separator: "\n")
-                    + "\n\nPide la contraseña de administrador.", "Crear y falsear") { return }
+        if !confirm("¿Crear \(domain)?", "Pide la contraseña de administrador.", "Crear y falsear",
+                    steps: steps) { return }
         runTask("Creando \(domain)", ["nuevo-dominio", domain, folder] + (db.isEmpty ? [] : [db]),
                 doneText: "\(domain) listo", env: dbEnv()) { ok, _, _ in
             if ok {
@@ -20755,7 +20829,8 @@ final class AppModel: ObservableObject {
         let names = list.map { "PHP \($0)" }.joined(separator: ", ")
         if !confirm("¿Instalar \(names)?",
                     "Cada versión se compila en tu Mac con su Apache, MariaDB, ProFTPD, Perl y phpMyAdmin (20-40 min cada una). Pide la contraseña de administrador una vez. Las instaladas no se tocan.",
-                    list.count == 1 ? "Instalar \(names)" : "Instalar \(list.count) versiones") { return }
+                    list.count == 1 ? "Instalar \(names)" : "Instalar \(list.count) versiones",
+                    steps: list.map { "Se instala PHP \($0)." }) { return }
         runTask("Instalando", ["instalar", "--php", list.joined(separator: ","), "--si"], progress: true,
                 doneText: "Instalación terminada", reloadBranches: true) { [weak self] _, task, p in
             guard let self = self, let p = p else { return }
@@ -21146,8 +21221,8 @@ final class AppModel: ObservableObject {
             }
             if !notes.isEmpty {
                 let title = version != d.active && confirmSwitch ? "¿Cambiar a PHP \(php)?" : "¿Crear \(req.link)?"
-                if !confirm(title, notes.joined(separator: "\n\n") + "\n\n\(req.link) apuntará a \(folder). Se pide la contraseña de administrador.",
-                            "Cargar proyecto") { return }
+                if !confirm(title, "Se pide la contraseña de administrador.", "Cargar proyecto",
+                            steps: notes + ["\(req.link) apuntará a \(folder)."]) { return }
             }
             if manual { self.rememberProject(req.db, folder, version) }
             var env: [String: String] = [:]
@@ -21292,7 +21367,7 @@ final class AppModel: ObservableObject {
         runQuick(["gui-proyecto-git", folder]) { _, out in
             let f = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 })
             guard !code.isEmpty, let g = f, g[1] == "1" else {
-                if confirm("¿Actualizar \(folder)?", what.joined(separator: "\n\n"), "Actualizar") {
+                if confirm("¿Actualizar \(folder)?", "", "Actualizar", steps: what) {
                     self.upStart(folder, sql, db, code, mode, pull: false)
                 }
                 return
@@ -21301,14 +21376,16 @@ final class AppModel: ObservableObject {
             var state = ["Rama " + (g[2].isEmpty ? "sin rama (HEAD suelto)" : g[2])]
             if dirty > 0 { state.append(plural(dirty, "cambio", "cambios") + " sin commit") }
             if ahead > 0 { state.append(plural(ahead, "commit", "commits") + " sin subir") }
-            var text = what + [state.joined(separator: "  ·  ")]
+            var text = [state.joined(separator: "  ·  ")]
             if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.") }
             let canPull = g[5] == "1" && !g[2].isEmpty
             text.append(canPull ? "Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para sin tocar nada."
                         : "No se puede hacer pull: no tiene origin o no está en una rama.")
             let alert = NSAlert()
             alert.messageText = "¿Hacer git pull antes de copiar?"
-            alert.informativeText = text.joined(separator: "\n\n")
+            let steps = dialogSteps(what)
+            let note = dialogLabel(text.joined(separator: "\n\n"), color: .secondaryLabelColor, align: .left)
+            alert.accessoryView = dialogStack([steps, note])
             if canPull { alert.addButton(withTitle: "Hacer pull y copiar") }
             alert.addButton(withTitle: "Copiar sin pull")
             alert.addButton(withTitle: "Cancelar")
@@ -21642,7 +21719,7 @@ final class AppModel: ObservableObject {
             args.append("--sustituir")
         }
         guard confirm(replace ? "¿Sustituir \(db) en XAMPP-\(dst)?" : "¿Copiar \(db) a XAMPP-\(dst)?",
-                      notes.joined(separator: "\n\n"), replace ? "Sustituir \(db)" : "Copiar a XAMPP-\(dst)", destructive: replace) else { return }
+                      "", replace ? "Sustituir \(db)" : "Copiar a XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
         runTask("Copiando \(db) a XAMPP-\(dst)", args, doneText: "\(db) copiada a XAMPP-\(dst)", autoClose: true)
     }
 
@@ -21787,8 +21864,8 @@ final class AppModel: ObservableObject {
             notes.append("XAMPP-\(dst) ya tiene \(name): se guarda una copia suya en ~/lvm-copias y se sustituye. Lo que tenía se pierde (salvo en esa copia).")
             args.append("--sustituir")
         }
-        guard confirm("¿Replicar en XAMPP-\(dst)?", notes.joined(separator: "\n\n"),
-                      replace ? "Sustituir y replicar" : "Replicar en XAMPP-\(dst)", destructive: replace) else { return }
+        guard confirm("¿Replicar en XAMPP-\(dst)?", "",
+                      replace ? "Sustituir y replicar" : "Replicar en XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
         runTask("Replicando en XAMPP-\(dst)", args, doneText: "\(db) replicada en XAMPP-\(dst) como \(name)", autoClose: true)
     }
 
@@ -22520,10 +22597,27 @@ struct TileRowKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+/// En Configuración, el nombre del apartado abierto: su tarjeta no repite el título (va arriba, en grande)
+struct ToolsSectionKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+/// La explicación de la tarjeta del apartado abierto, para ponerla debajo del título grande
+struct ToolsDescKey: PreferenceKey {
+    static var defaultValue: String? = nil
+    static func reduce(value: inout String?, nextValue: () -> String?) {
+        if value == nil { value = nextValue() }
+    }
+}
+
 extension EnvironmentValues {
     var tileRow: Bool {
         get { self[TileRowKey.self] }
         set { self[TileRowKey.self] = newValue }
+    }
+    var toolsSection: String? {
+        get { self[ToolsSectionKey.self] }
+        set { self[ToolsSectionKey.self] = newValue }
     }
     var tileWide: Bool {
         get { self[TileWideKey.self] }
@@ -22543,6 +22637,7 @@ struct TileCard<Content: View>: View {
     let lead: AnyView?
     let tail: AnyView?
     let content: Content
+    @Environment(\.toolsSection) var toolsSection
     init(_ title: String? = nil, _ description: String? = nil, wide: Bool = false, columns: Int = 2, tiles: Bool = false,
          lead: AnyView? = nil, tail: AnyView? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
@@ -22554,9 +22649,17 @@ struct TileCard<Content: View>: View {
         self.tail = tail
         self.content = content()
     }
+    /// La tarjeta del apartado abierto de Configuración: su título y su explicación van arriba, en grande
+    var isSectionCard: Bool {
+        guard let s = toolsSection, let t = title else { return false }
+        return t.hasPrefix(s)
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if title != nil || description != nil {
+            if isSectionCard {
+                // (su icono y su interruptor van con el título grande)
+                EmptyView()
+            } else if title != nil || description != nil {
                 HStack(spacing: 6) {
                     if let l = lead { l }
                     if let t = title { Text(t).font(.headline) }
@@ -22584,6 +22687,7 @@ struct TileCard<Content: View>: View {
             .environment(\.tileRow, !tiles)
             .padding(.top, 4)
         }
+        .preference(key: ToolsDescKey.self, value: isSectionCard ? description : nil)
     }
 }
 
@@ -24520,31 +24624,71 @@ func brandImage(_ key: String) -> NSImage? {
 
 /// Configuración, Apariencia: el menú lateral (iconos en color, logotipos y qué apartados salen) y los
 /// botones del proyecto. Se guarda al momento
+/// Configuración, Seguridad entre webs: qué es, en cuatro puntos (el mismo texto que en Linux)
+let CROSS_SITE_HELP: [(String, String, String)] = [
+    ("exclamationmark.triangle", "El problema",
+     "Mientras trabajas, el navegador tiene abierta tu sesión en tus proyectos (el panel de WordPress, el de PrestaShop…). Cualquier otra web que abras a la vez podría mandarles a escondidas un formulario o una petición, y el navegador la enviaría con tu sesión: crear un administrador, cambiar una contraseña, borrar productos…"),
+    ("lock.shield", "Lo que hace la barrera",
+     "Apache rechaza lo que llega a tus proyectos desde otra web, salvo abrir una página con un enlace normal. Lo que hagas dentro del propio proyecto, o escribiendo su dirección, funciona igual."),
+    ("info.circle", "Cuándo apagarla",
+     "Al probar una pasarela de pago (Redsys, PayPal, Stripe…): al acabar el pago, el banco te devuelve a la tienda mandando un formulario desde su web, y la barrera lo para (sale «Otra web ha intentado mandar algo a esta»). Apágala mientras pruebas los pagos y vuelve a encenderla al acabar."),
+    ("network", "Dónde se aplica",
+     "En todas tus versiones de PHP: localhost, los dominios falseados y los vhosts de los proyectos. Al cambiarla se reinicia Apache."),
+]
+
 struct AppearanceCard: View {
     @EnvironmentObject var model: AppModel
 
+    /// En tres bloques, cada uno con su título, porque hacen cosas distintas: cómo se ven los iconos del menú
+    /// lateral, qué apartados salen en él y los botones del visor de los proyectos
     var body: some View {
-        TileCard("Apariencia", "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Linux.", wide: true) {
-            Tile("Iconos en color", "Cada apartado del menú lateral con su color; apagado, de un color, como el texto") {
-                Toggle("", isOn: Binding(get: { model.look.color }, set: { model.look.color = $0 }))
-                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+        VStack(alignment: .leading, spacing: 26) {
+            block("Iconos del menú lateral", "Cómo se dibujan los iconos de la columna de la izquierda") {
+                Tile("Iconos en color", "Cada apartado con su color; apagado, de un color, como el texto") {
+                    Toggle("", isOn: Binding(get: { model.look.color }, set: { model.look.color = $0 }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                }
+                Tile("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre") {
+                    Toggle("", isOn: Binding(get: { model.look.marcas }, set: { model.look.marcas = $0 }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                }
             }
-            Tile("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre") {
-                Toggle("", isOn: Binding(get: { model.look.marcas }, set: { model.look.marcas = $0 }))
-                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+            block("Apartados del menú lateral", "Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)") {
+                ForEach(NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) }, id: \.0) { item in
+                    Tile(item.1) {
+                        Toggle("", isOn: Binding(get: { !model.look.ocultos.contains(item.0) }, set: { on in
+                            if on { model.look.ocultos.remove(item.0) } else { model.look.ocultos.insert(item.0) }
+                        }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                    }
+                }
             }
-            Tile("Botones del proyecto", "Cuáles se ven en el visor, en qué orden y cómo") {
-                Button("Personalizar…") { model.panel = .buttons }
-            }
-            ForEach(NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) }, id: \.0) { item in
-                Tile(item.1, "Mostrar en el menú lateral") {
-                    Toggle("", isOn: Binding(get: { !model.look.ocultos.contains(item.0) }, set: { on in
-                        if on { model.look.ocultos.remove(item.0) } else { model.look.ocultos.insert(item.0) }
-                    }))
-                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+            block("Visor de los proyectos", "Los botones de cada proyecto: cuáles se ven, en qué orden y cómo") {
+                Tile("Botones", buttonsSummary()) {
+                    Button("Personalizar…") { model.panel = .buttons }
                 }
             }
         }
+        // (debajo del título grande de Configuración)
+        .preference(key: ToolsDescKey.self, value: "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Linux.")
+    }
+
+    /// Un bloque: su título y lo que hace, y sus filas en una lista
+    func block<C: View>(_ title: String, _ sub: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.system(size: 13.5, weight: .semibold))
+            Text(sub).font(.caption).foregroundColor(.secondary)
+            TileCard(wide: true) { content() }
+                .padding(.top, 6)
+        }
+    }
+
+    func buttonsSummary() -> String {
+        let c = model.visorConf
+        let names = Dictionary(uniqueKeysWithValues: VISOR_BUTTONS)
+        let shown = c.order.filter { !c.hidden.contains($0) }.map { names[$0] ?? $0 }
+        let style = (VISOR_STYLES.first(where: { $0.0 == c.style })?.1 ?? "").lowercased()
+        return (shown.isEmpty ? "ninguno" : shown.joined(separator: ", ")) + " · " + style + (c.square ? " de \(Int(c.side)) px" : "")
     }
 }
 
@@ -28720,6 +28864,8 @@ struct ToolsView: View {
     @State private var dkIP = ""
     @State private var dkHTTP = ""
     @State private var dkHTTPS = ""
+    /// La explicación del apartado abierto (la de su tarjeta)
+    @State private var toolsDesc: String? = nil
 
     /// Apartados de Configuración (como en Linux): su clave, su nombre en la columna de la izquierda y su icono
     static let sections: [(String, String, String)] = [
@@ -28729,7 +28875,6 @@ struct ToolsView: View {
         ("correo", "Correo de pruebas", "envelope"),
         ("docker", "Docker", "logo:docker"),
         ("tunel", "Túnel de Cloudflare", "cloud"),
-        ("visor", "Visor de los proyectos", "square.grid.2x2"),
         ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
         ("errores", "Registro de errores", "exclamationmark.triangle"),
@@ -28760,11 +28905,22 @@ struct ToolsView: View {
             .background(Color.primary.opacity(0.018))
             .overlay(Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1), alignment: .trailing)
             WidePage {
-                PageTitle(title: "Configuración", sub: "Elige un apartado en la columna de la izquierda", symbol: "gearshape")
+                // (el título, el del apartado abierto: su icono, su nombre y su explicación)
+                let sec = ToolsView.sections.first(where: { $0.0 == model.toolsSection })
+                HStack(alignment: .firstTextBaseline, spacing: 14) {
+                    PageTitle(title: sec?.1 ?? "Configuración", sub: toolsDesc ?? "Configuración",
+                              symbol: (sec?.2 ?? "gearshape").hasPrefix("logo:") ? nil : (sec?.2 ?? "gearshape"),
+                              logo: (sec?.2 ?? "").hasPrefix("logo:") ? String((sec?.2 ?? "").dropFirst(5)) : nil)
+                    // (el correo se enciende con el interruptor de su título)
+                    if model.toolsSection == "correo", let m = model.data?.mail { mailSwitch(m) }
+                    Spacer(minLength: 0)
+                }
                 if let d = model.data {
                     VStack(alignment: .leading, spacing: 12) {
                         section(model.toolsSection, d)
                     }
+                    .environment(\.toolsSection, sec?.1)
+                    .onPreferenceChange(ToolsDescKey.self) { toolsDesc = $0 }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 } else {
                     Loading()
@@ -28787,22 +28943,29 @@ struct ToolsView: View {
                 }
             }
         case "seguridad":
-            TileCard("Seguridad entre webs", wide: true) {
-                Tile("Barrera entre webs",
-                    "Otra web no puede mandar formularios ni peticiones a tus proyectos. Apágala si una pasarela de pago vuelve a tu tienda con un POST.") {
+            TileCard("Seguridad entre webs", "Impide que otra web abierta en tu navegador use tus proyectos locales sin que lo sepas.",
+                     wide: true) {
+                Tile("Barrera entre webs", d.barrier ? "Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos"
+                     : "Apagada: enciéndela cuando acabes de probar los pagos") {
                     Toggle("", isOn: Binding(get: { d.barrier }, set: { model.setBarrier($0) }))
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                         .disabled(model.busy || d.installs.isEmpty)
                 }
             }
+            // Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
+            TileCard("Qué es", wide: true) {
+                ForEach(CROSS_SITE_HELP, id: \.1) { h in
+                    Tile(h.1, h.2, leading: { Image(systemName: h.0).font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                         trailing: { EmptyView() })
+                }
+            }
+            .padding(.top, 10)
         case "correo":
             mailCard(d)
         case "docker":
             dockerCard()
         case "tunel":
             tunnelCard()
-        case "visor":
-            buttonsCard()
         case "apariencia":
             AppearanceCard()
         case "github":
@@ -28951,20 +29114,6 @@ struct ToolsView: View {
         .onAppear { model.reloadTunnelInfo() }
     }
 
-    /// Visor de los proyectos: sus botones (cuáles, en qué orden y cómo)
-    func buttonsCard() -> some View {
-        let c = model.visorConf
-        let names = Dictionary(uniqueKeysWithValues: VISOR_BUTTONS)
-        let shown = c.order.filter { !c.hidden.contains($0) }.map { names[$0] ?? $0 }
-        let style = (VISOR_STYLES.first(where: { $0.0 == c.style })?.1 ?? "").lowercased()
-        return TileCard("Visor de los proyectos", wide: true) {
-            Tile("Botones", (shown.isEmpty ? "ninguno" : shown.joined(separator: ", ")) + " · " + style
-                + (c.square ? " de \(Int(c.side)) px" : "")) {
-                Button("Personalizar…") { model.panel = .buttons }
-            }
-        }
-    }
-
     /// Parches nuevos: lo que tiene un parche publicado y «Actualizar todo»
     func componentsCard() -> some View {
         let c = model.components
@@ -28989,22 +29138,27 @@ struct ToolsView: View {
         .onAppear { if model.components == nil { model.reloadComponents() } }
     }
 
+    /// El interruptor del correo de pruebas (al lado del título del apartado)
+    func mailSwitch(_ m: MailState) -> some View {
+        HStack(spacing: 8) {
+            Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
+                .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                .disabled(model.busy)
+                .tip(m.on ? "Encendido: el correo de las webs va a Mailpit" : "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+            if !m.on {
+                Text("Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+                    .font(.caption).foregroundColor(.orange)
+            }
+        }
+    }
+
     /// Correo de pruebas (Mailpit): encenderlo, los plugins de correo de WordPress y la bandeja
     @ViewBuilder
     func mailCard(_ d: AppData) -> some View {
         if let m = d.mail {
             TileCard("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.", tiles: true,
                      lead: AnyView(LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 20, height: 20)),
-                     tail: AnyView(HStack(spacing: 8) {
-                         Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
-                             .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                             .disabled(model.busy)
-                             .tip(m.on ? "Encendido: el correo de las webs va a Mailpit" : "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
-                         if !m.on {
-                             Text("Apagado: lo que manden las webs puede llegar de verdad a los clientes")
-                                 .font(.caption).foregroundColor(.orange)
-                         }
-                     })) {
+                     tail: AnyView(mailSwitch(m))) {
                 Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
                     Picker("", selection: Binding(get: { m.wp }, set: { model.setMailWp($0) })) {
                         Text("Llevarlos a Mailpit").tag("mailpit")
@@ -33431,6 +33585,29 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.41.4 (9 nov 2026)
+- Configuración: arriba, en grande, el nombre del apartado abierto
+  (con su icono y lo que hace), no «Configuración»; el correo de
+  pruebas se enciende con el interruptor de al lado.
+- Apariencia: en tres bloques, cada uno con su título (iconos del
+  menú lateral, apartados del menú lateral y visor de los proyectos).
+  Los botones del visor están aquí: ya no hay un apartado aparte (salían
+  dos veces).
+- Seguridad entre webs: explicada en cuatro puntos (el problema, lo
+  que hace la barrera, cuándo apagarla y dónde se aplica).
+
+1.41.3 (9 nov 2026)
+- Diálogos que piden confirmar varios cambios (crear un dominio,
+  copiar o replicar una BBDD, cargar o actualizar un proyecto, instalar
+  versiones, Actualizar todo): empiezan por «Qué se va a realizar» y
+  los cambios van numerados, a la izquierda y separados entre sí.
+
+1.41.2 (8 nov 2026)
+- Actualizar versiones de PHP: si GitHub no da la suma sha256 de
+  ProFTPD (su descarga respondía 504 y la actualización fallaba al
+  momento), se pide por la API de GitHub, del mismo repositorio. Si
+  una descarga falla, el informe del error dice por qué.
 
 1.41.1 (7 nov 2026)
 - Configuración: sus apartados, en una columna pegada al menú

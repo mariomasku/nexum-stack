@@ -774,7 +774,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.2"
+APP_VERSION="1.57.5"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -10005,20 +10005,46 @@ function download_signed() {
 }
 
 # download <url> <archivo> <sha256>: descarga un archivo y comprueba su suma
+# La suma sha256 del codigo de ProFTPD <version>: la publica con cada version en GitHub. A veces su
+# descarga directa responde 504 durante horas: entonces se pide el mismo fichero por la API de GitHub
+# (del mismo repositorio), que lo sirve por otro camino
+function proftpd_sum() {
+    local ftp=$1 sum id
+    sum=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+        "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" 2> /dev/null | grep -oE '^[0-9a-f]{64}')
+    if [ -z "$sum" ]; then
+        id=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+            "https://api.github.com/repos/proftpd/proftpd/releases/tags/v$ftp" 2> /dev/null \
+            | python3 -I -c 'import json, sys
+print(next((a["id"] for a in json.load(sys.stdin).get("assets", []) if a.get("name") == sys.argv[1]), ""))' "proftpd-$ftp.tar.gz.sha256" 2> /dev/null)
+        [[ "$id" =~ ^[0-9]+$ ]] && sum=$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 \
+            -H 'Accept: application/octet-stream' "https://api.github.com/repos/proftpd/proftpd/releases/assets/$id" 2> /dev/null \
+            | grep -oE '^[0-9a-f]{64}')
+    fi
+    echo "$sum"
+}
+
 function download() {
     local url=$1 file=$2 sum=$3
 
+    # (STEP_DESC: el motivo, para el informe del error si falla aqui, antes de compilar nada)
     if [ -z "$sum" ]; then
         echo "  No se ha encontrado la suma sha256 de $(basename "$url")"
+        STEP_DESC="no se ha podido leer la suma sha256 de $(basename "$url") (su web no responde: prueba en un rato)"
 
         return 1
     fi
 
     echo "  Descargando $(basename "$url")..."
-    curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || { echo "  No se pudo descargar $url"; return 1; }
+    curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || {
+        echo "  No se pudo descargar $url"
+        STEP_DESC="no se ha podido descargar $url (su web no responde: prueba en un rato)"
+        return 1
+    }
 
     if [ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sum" ]; then
         echo "  $(basename "$url") no coincide con su suma sha256. Se cancela."
+        STEP_DESC="$(basename "$url") no coincide con su suma sha256: no se instala"
 
         return 1
     fi
@@ -10059,6 +10085,9 @@ function error_report() {
             [ -n "$errors" ] && printf '\n== Primeros errores ==\n%s\n' "$errors"
             printf '\n== Ultimas 60 lineas de %s ==\n' "$(basename "$log")"
             tail -60 "$log"
+        elif [ -n "$desc" ]; then
+            # (falló antes de compilar: al descargar o comprobar el código)
+            echo "Motivo: $desc"
         fi
         if [ -n "$config" ] && [ -f "$config" ]; then
             printf '\n== config.log: lo ultimo antes del error ==\n'
@@ -10875,9 +10904,9 @@ function stack_build_phase() {
         download "https://github.com/unicode-org/icu/releases/download/release-72-1/icu4c-72_1-src.tgz" icu72.tgz "$ICU72_SHA" || stack_fail
     fi
     download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+        "$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
     download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
-        "$(curl -q --proto =https --proto-redir =https -fsSL "https://github.com/proftpd/proftpd/releases/download/v$ftp/proftpd-$ftp.tar.gz.sha256" | grep -oE '^[0-9a-f]{64}')" || stack_fail
+        "$(proftpd_sum "$ftp")" || stack_fail
     download_signed "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
         "$(pma_sum "$pma")" "$GPG_FPR_PMA" || stack_fail
     local mariadb_sig
@@ -12645,6 +12674,29 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.57.5 (9 nov 2026)
+- Configuración: arriba, en grande, el nombre del apartado abierto
+  (con su icono y lo que hace), no «Configuración»; el correo de
+  pruebas se enciende con el interruptor de al lado.
+- Apariencia: en tres bloques, cada uno con su título (iconos del
+  menú lateral, apartados del menú lateral y visor de los proyectos).
+  Los botones del visor están aquí: ya no hay un apartado aparte (salían
+  dos veces).
+- Seguridad entre webs: explicada en cuatro puntos (el problema, lo
+  que hace la barrera, cuándo apagarla y dónde se aplica).
+
+1.57.4 (9 nov 2026)
+- Diálogos que piden confirmar varios cambios (crear un dominio,
+  copiar o replicar una BBDD, cargar o actualizar un proyecto, instalar
+  versiones, Actualizar todo): empiezan por «Qué se va a realizar» y
+  los cambios van numerados, a la izquierda y separados entre sí.
+
+1.57.3 (8 nov 2026)
+- Actualizar versiones de PHP: si GitHub no da la suma sha256 de
+  ProFTPD (su descarga respondía 504 y la actualización fallaba al
+  momento), se pide por la API de GitHub, del mismo repositorio. Si
+  una descarga falla, el informe del error dice por qué.
 
 1.57.2 (7 nov 2026)
 - Configuración: sus apartados, en una columna pegada al menú
@@ -20277,6 +20329,7 @@ GREEN = "#45A57C"
 # Tramos de la barra de la pila propia (los mismos que usa el script en whiptail)
 CSS = """
 .grupo-titulo { font-weight: bold; }
+.nv-apartado-titulo { font-weight: bold; font-size: 1.05em; }
 /* Título de un apartado plegable: sin el relleno del botón, alineado con los demás títulos */
 button.plegable { padding: 0 4px 0 0; min-height: 0; }
 /* Arrancar, reiniciar y parar la versión activa */
@@ -21379,7 +21432,8 @@ def airy_dialog(dlg):
     area = dlg.get_message_area() if isinstance(dlg, Gtk.MessageDialog) else dlg.get_content_area()
 
     def walk(w):
-        if isinstance(w, (Gtk.ListBox, Gtk.Button, Gtk.ScrolledWindow, Gtk.TextView, Gtk.ComboBox)):
+        if isinstance(w, (Gtk.ListBox, Gtk.Button, Gtk.ScrolledWindow, Gtk.TextView, Gtk.ComboBox)) \
+                or getattr(w, "nv_pasos", False):
             return
         if isinstance(w, Gtk.Box) and w.get_orientation() == Gtk.Orientation.VERTICAL:
             if w.get_spacing() >= 6:
@@ -21473,12 +21527,44 @@ def markdown_to_buffer(buf, text):
                 buf.insert_with_tags_by_name(buf.get_end_iter(), part, block)
 
 
-def confirm(parent, title, text, ok_label, destructive=False, extra=None):
-    """Pregunta con Cancelar / ok_label. extra: widget opcional debajo del texto."""
+def steps_box(steps, note=""):
+    """Lo que va a hacer un diálogo que pide confirmar varios cambios: «Qué se va a realizar» y
+    los cambios numerados, a la izquierda y separados entre sí; debajo, la nota (si la hay)."""
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=4)
+    box.nv_pasos = True
+    head = Gtk.Label(xalign=0)
+    head.set_markup("<b>Qué se va a realizar</b>")
+    box.pack_start(head, False, False, 0)
+    longest = max([len(x) for x in steps] + [len(note)])
+    width = min(64, max(longest, 40))
+    lst = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_start=4)
+    for i, step in enumerate(steps, 1):
+        row = Gtk.Box(spacing=8)
+        num = Gtk.Label(xalign=1, yalign=0, width_chars=3)
+        num.set_markup('<span foreground="%s" weight="bold">%d.</span>' % (GREEN, i))
+        row.pack_start(num, False, False, 0)
+        t = Gtk.Label(label=step, xalign=0, yalign=0, wrap=True, selectable=True,
+                      max_width_chars=64, width_chars=width)
+        row.pack_start(t, True, True, 0)
+        lst.pack_start(row, False, False, 0)
+    box.pack_start(lst, False, False, 0)
+    if note:
+        n = css(Gtk.Label(label=note, xalign=0, wrap=True, selectable=True, max_width_chars=64,
+                          width_chars=width, margin_top=6), "dim-label")
+        box.pack_start(n, False, False, 0)
+    return box
+
+
+def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=None):
+    """Pregunta con Cancelar / ok_label. extra: widget opcional debajo del texto. steps: los
+    cambios que se van a hacer (numerados); text va entonces debajo, como nota."""
     dlg = Gtk.MessageDialog(transient_for=parent, modal=True,
                             message_type=Gtk.MessageType.QUESTION,
                             buttons=Gtk.ButtonsType.NONE, text=title)
-    dlg.format_secondary_text(text)
+    if steps:
+        dlg.get_message_area().pack_start(steps_box(steps, text), False, False, 0)
+    else:
+        dlg.format_secondary_text(text)
     widen(dlg)
     if extra:
         dlg.get_message_area().pack_start(extra, False, False, 0)
@@ -21618,6 +21704,25 @@ VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", 
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
                  ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
                  ("imagenes", "Importar", ("logo", "imagenes"))]
+# Configuración, Seguridad entre webs: qué es, en cuatro puntos (el mismo texto en el Mac)
+CROSS_SITE_HELP = [
+    ("dialog-warning-symbolic", "El problema",
+     "Mientras trabajas, el navegador tiene abierta tu sesión en tus proyectos (el panel de WordPress, el de "
+     "PrestaShop…). Cualquier otra web que abras a la vez podría mandarles a escondidas un formulario o una "
+     "petición, y el navegador la enviaría con tu sesión: crear un administrador, cambiar una contraseña, borrar "
+     "productos…"),
+    ("security-high-symbolic", "Lo que hace la barrera",
+     "Apache rechaza lo que llega a tus proyectos desde otra web, salvo abrir una página con un enlace normal. Lo "
+     "que hagas dentro del propio proyecto, o escribiendo su dirección, funciona igual."),
+    ("dialog-information-symbolic", "Cuándo apagarla",
+     "Al probar una pasarela de pago (Redsys, PayPal, Stripe…): al acabar el pago, el banco te devuelve a la "
+     "tienda mandando un formulario desde su web, y la barrera lo para (sale «Otra web ha intentado mandar algo a "
+     "esta»). Apágala mientras pruebas los pagos y vuelve a encenderla al acabar."),
+    ("network-workgroup-symbolic", "Dónde se aplica",
+     "En todas tus versiones de PHP: localhost, web.local, los dominios falseados y los vhosts de los proyectos. "
+     "Al cambiarla se reinicia Apache."),
+]
+
 BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
                  ("grande", "Icono y nombre (cuadrado)")]
 # Lado del cuadrado (px) de los estilos icono y grande: el de cada uno si no se ha elegido otro
@@ -23737,8 +23842,8 @@ class App(Gtk.Application):
             steps.append("BBDD %s en lampp-%s%s." % (
                 db, active, " (ya existe: se deja como está)" if have else " (se crea vacía)"))
         steps.append("%s se falsea en /etc/hosts; los demás dominios dejan de estarlo." % domain)
-        if not confirm(self.win, "¿Crear %s?" % domain, "\n".join("• " + x for x in steps) +
-                       "\n\nSe pide la contraseña de sudo.", "Crear y falsear"):
+        if not confirm(self.win, "¿Crear %s?" % domain, "Se pide la contraseña de sudo.", "Crear y falsear",
+                       steps=steps):
             return
         args = ["nuevo-dominio", domain, folder] + ([db] if db else [])
 
@@ -25710,10 +25815,10 @@ class App(Gtk.Application):
         php = [self.checks[k][1] for k in sel if not k.startswith("xampp:")]
         xampp = [self.checks[k][1] for k in sel if k.startswith("xampp:")]
         names = ["XAMPP %s" % x for x in xampp] + ["PHP %s" % v for v in php]
-        text = ("%s. Cada PHP se compila aquí (unos minutos). Las versiones instaladas no se tocan."
-                % ", ".join(names))
+        text = "Cada PHP se compila aquí (unos minutos). Las versiones instaladas no se tocan."
         if not confirm(self.win, "¿Instalar %s?" % plural(len(names), "versión", "versiones"),
-                       text, "Instalar %s" % (names[0] if len(names) == 1 else plural(len(names), "versión", "versiones"))):
+                       text, "Instalar %s" % (names[0] if len(names) == 1 else plural(len(names), "versión", "versiones")),
+                       steps=["Se instala %s." % n for n in names]):
             return
         args = ["instalar"]
         if xampp:
@@ -25901,8 +26006,9 @@ class App(Gtk.Application):
                          "se pierde (salvo en esa copia)." % (dst, db, inst["folder"]))
             args.append("--sustituir")
         if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (db, dst) if replace else
-                       "¿Copiar %s a lampp-%s?" % (db, dst), "\n\n".join(notes),
-                       ("Sustituir en lampp-%s" if replace else "Copiar a lampp-%s") % dst, destructive=replace):
+                       "¿Copiar %s a lampp-%s?" % (db, dst), "",
+                       ("Sustituir en lampp-%s" if replace else "Copiar a lampp-%s") % dst, destructive=replace,
+                       steps=notes):
             return
         self.run_task("Copiando %s a lampp-%s" % (db, dst), args,
                       done_text="%s copiada a lampp-%s" % (db, dst), auto_close=True)
@@ -26053,8 +26159,9 @@ class App(Gtk.Application):
                          "~/lvm-copias y se pone en su lugar. Lo que tuviera se pierde (salvo en esa "
                          "copia)." % (dst, name))
             args.append("--sustituir")
-        if not confirm(self.win, "¿Replicar en lampp-%s?" % dst, "\n\n".join(notes),
-                       ("Sustituir en lampp-%s" if replace else "Replicar en lampp-%s") % dst, destructive=replace):
+        if not confirm(self.win, "¿Replicar en lampp-%s?" % dst, "",
+                       ("Sustituir en lampp-%s" if replace else "Replicar en lampp-%s") % dst, destructive=replace,
+                       steps=notes):
             return
         self.run_task("Replicando en lampp-%s" % dst, args,
                       done_text="%s replicada en lampp-%s como %s" % (db, dst, name), auto_close=True)
@@ -26241,8 +26348,8 @@ class App(Gtk.Application):
         if notes:
             title = "¿Cambiar a PHP %s?" % inst["php"] if target != self.data["active"] \
                 and confirm_switch else "¿Crear %s?" % link
-            if not confirm(self.win, title, "\n\n".join(notes) + "\n\n%s apuntará a %s." % (link, folder),
-                           "Cargar %s" % folder):
+            if not confirm(self.win, title, "", "Cargar %s" % folder,
+                           steps=notes + ["%s apuntará a %s." % (link, folder)]):
                 return
         if remember:
             self.remember_project(db, folder, target)
@@ -28220,31 +28327,53 @@ class App2(App):
         self.nv_sidebar_fill()
 
     def nv_look_tools(self):
-        """Configuración, Apariencia: el menú lateral (iconos en color, logotipos y qué apartados salen) y los
-        botones del proyecto."""
-        box, lb = tile_group("Apariencia",
-                             "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Mac.")
-        self.tools_box.pack_start(box, False, False, 0)
+        """Configuración, Apariencia: en tres bloques, cada uno con su título, porque hacen cosas distintas:
+        cómo se ve el menú lateral, qué apartados salen en él y los botones del visor de los proyectos."""
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=26)
+        head = Gtk.Box(spacing=6)
+        head.pack_start(label("Apariencia", "grupo-titulo"), False, False, 0)
+        head.pack_start(info_icon("Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Mac."),
+                        False, False, 0)
+        page.pack_start(head, False, False, 0)
         look = look_conf()
 
-        def switch(title, sub, key, on):
+        def block(title, sub):
+            b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            b.pack_start(label(title, "nv-apartado-titulo", xalign=0), False, False, 0)
+            b.pack_start(label(sub, "dim-label", "subtitulo", xalign=0, wrap=True), False, False, 0)
+            lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=8), "caja")
+            lb.connect("row-activated", on_row_activated)
+            b.pack_start(lb, False, False, 0)
+            page.pack_start(b, False, False, 0)
+            return lb
+
+        def switch(lb, title, sub, key, on):
             row = ActionRow(title, sub)
             s = Gtk.Switch(active=on, valign=Gtk.Align.CENTER)
             s.connect("notify::active", lambda w, _p: self.nv_look_set(key, w.get_active()))
             row.add_suffix(s)
             lb.add(row)
-        switch("Iconos en color", "Cada apartado del menú lateral con su color; apagado, de un color, como el texto",
+        lb = block("Iconos del menú lateral", "Cómo se dibujan los iconos de la columna de la izquierda")
+        switch(lb, "Iconos en color", "Cada apartado con su color; apagado, de un color, como el texto",
                "color", look["color"])
-        switch("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre", "marcas", look["marcas"])
-        row = ActionRow("Botones del proyecto", "Cuáles se ven en el visor, en qué orden y cómo")
+        switch(lb, "Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre",
+               "marcas", look["marcas"])
+        lb = block("Apartados del menú lateral",
+                   "Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)")
+        for _g, items in SIDEBAR:
+            for name, text, _ic in items:
+                if name not in SIDEBAR_FIXED:
+                    switch(lb, text, None, "@" + name, name not in look["ocultos"])
+        lb = block("Visor de los proyectos", "Los botones de cada proyecto: cuáles se ven, en qué orden y cómo")
+        conf = buttons_conf()
+        shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]
+        row = ActionRow("Botones", "%s · %s" % (", ".join(shown) or "ninguno",
+                                                dict(BUTTON_STYLES)[conf["style"]].split(":")[0].lower()))
         b = Gtk.Button(label="Personalizar…", valign=Gtk.Align.CENTER)
         b.connect("clicked", lambda *_: self.nv_buttons_dialog())
         row.add_suffix(b)
         lb.add(row)
-        for _g, items in SIDEBAR:
-            for name, text, _ic in items:
-                if name not in SIDEBAR_FIXED:
-                    switch(text, "Mostrar en el menú lateral", "@" + name, name not in look["ocultos"])
+        self.tools_box.pack_start(page, False, False, 0)
 
     def nv_on_tab(self, lb, row):
         if row is None:
@@ -29843,7 +29972,7 @@ class App2(App):
             f = next((x for x in parse_lines(out) if x[0] == "G" and len(x) >= 6), None)
             is_git = bool(code) and f is not None and f[1] == "1"
             if not is_git:
-                if confirm(self.win, "¿Actualizar %s?" % folder, "\n\n".join(what), "Actualizar"):
+                if confirm(self.win, "¿Actualizar %s?" % folder, "", "Actualizar", steps=what):
                     start(False)
                 return False
             dirty, ahead = int(f[3] or 0), int(f[4] or 0)
@@ -29852,7 +29981,7 @@ class App2(App):
                 state.append("%s sin commit" % plural(dirty, "cambio", "cambios"))
             if ahead:
                 state.append("%s sin subir" % plural(ahead, "commit", "commits"))
-            text = what + ["  ·  ".join(state)]
+            text = ["  ·  ".join(state)]
             if dirty or ahead:
                 text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.")
             has_pull = f[5] == "1" and bool(f[2])
@@ -29860,12 +29989,12 @@ class App2(App):
                         "sin tocar nada." if has_pull else "No se puede hacer pull: no tiene origin o no está en una rama.")
             dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
                                     buttons=Gtk.ButtonsType.NONE, text="¿Hacer git pull antes de copiar?")
-            dlg.format_secondary_text("\n\n".join(text))
-            widen(dlg)
+            dlg.get_message_area().pack_start(steps_box(what, "\n\n".join(text)), False, False, 0)
             dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
             dlg.add_button("Copiar sin pull", Gtk.ResponseType.NO)
             if has_pull:
                 css(dlg.add_button("Hacer pull y copiar", Gtk.ResponseType.YES), "nv-azul")
+            dlg.show_all()
             resp = run_dialog(dlg)
             dlg.destroy()
             if resp in (Gtk.ResponseType.YES, Gtk.ResponseType.NO):
@@ -30100,9 +30229,12 @@ class App2(App):
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tl = Gtk.Box(spacing=10)
         tl.pack_start(symbol(symbol_name, 26), False, False, 0)
-        tl.pack_start(label(title, "nv-titulo-grande"), False, False, 0)
+        title_lbl = label(title, "nv-titulo-grande")
+        tl.pack_start(title_lbl, False, False, 0)
         head.pack_start(tl, False, False, 0)
-        head.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
+        sub_lbl = label(sub, "nv-chico", "nv-tenue", xalign=0, wrap=True)
+        head.pack_start(sub_lbl, False, False, 0)
+        parts = (tl, title_lbl, sub_lbl)
         if trailing is not None:
             line = Gtk.Box(spacing=12)
             line.pack_start(head, True, True, 0)
@@ -30111,6 +30243,7 @@ class App2(App):
         box.pack_start(head, False, False, 0)
         box.reorder_child(head, 0)
         head.show_all()
+        return parts
 
     def build_hosts(self):
         super().build_hosts()
@@ -30144,29 +30277,38 @@ class App2(App):
         super().build_tools()
         # Barrera entre webs (lvm-instalador barrera-web): encendida si no existe el fichero
         box, lb = tile_group("Seguridad entre webs",
-                        "Otra web abierta en el navegador no puede mandar formularios ni peticiones "
-                        "a tus proyectos con tus sesiones. Una pasarela de pago que vuelve a la tienda "
-                        "con un POST (Redsys, PayPal…) no pasa: apágala mientras la pruebas.")
+                             "Impide que otra web abierta en tu navegador use tus proyectos locales sin que lo sepas.")
         on = not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))
-        row = ActionRow("Barrera entre webs", "Encendida: solo se puede llegar a tus proyectos desde otra "
-                        "web con un enlace" if on else "Apagada: enciéndela cuando acabes de probar los pagos")
+        row = ActionRow("Barrera entre webs", "Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos"
+                        if on else "Apagada: enciéndela cuando acabes de probar los pagos")
         sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
         sw.connect("notify::active", self.on_cross_site)
         row.add_suffix(sw)
         lb.add(row)
+        # Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
+        box.pack_start(label("Qué es", "nv-apartado-titulo", xalign=0, margin_top=20), False, False, 0)
+        why = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
+        for ic, title, text in CROSS_SITE_HELP:
+            r = ActionRow(title, text)
+            r.add_prefix(symbol(ic, 18))
+            r.subtitle.set_ellipsize(0)
+            r.subtitle.set_line_wrap(True)
+            r.subtitle.set_xalign(0)
+            why.add(r)
+        box.pack_start(why, False, False, 0)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 1)
         box.show_all()
         self.nv_components_tools()
         self.nv_docker_tools()
         self.nv_tunnel_tools()
-        self.nv_buttons_tools()
         self.nv_mail_tools()
         self.nv_github_tools()
         self.nv_look_tools()
         self.nv_tools_sections()
-        self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
-                           "Elige un apartado en la columna de la izquierda")
+        self.tools_title = self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
+                                              "Elige un apartado en la columna de la izquierda")
+        self.nv_tools_title()
 
     # Apartados de Configuración: su nombre en la columna de la izquierda, su icono y el orden (los que no
     # estén aquí, al final)
@@ -30176,7 +30318,6 @@ class App2(App):
                       ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
                       ("Docker", "Docker", "logo:docker"),
                       ("Túnel de Cloudflare", "Túnel de Cloudflare", "network-transmit-receive-symbolic"),
-                      ("Visor de los proyectos", "Visor de los proyectos", "view-grid-symbolic"),
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
                       ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
                       ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
@@ -30206,9 +30347,36 @@ class App2(App):
                           transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=120)
         nav = css(Gtk.ListBox(valign=Gtk.Align.START), "nv-nav", "nv-subnav")
         rows = {}
+        self.tools_desc = {}
+        self.tools_extra = {}
         for title, _n, g in found:
             if title in rows:
                 continue
+            # (su nombre va en el título grande de arriba: aquí, sin repetirlo; su explicación, debajo de él)
+            tlbl = next((w for w in self.nv_walk(g) if isinstance(w, Gtk.Label)
+                         and w.get_style_context().has_class("grupo-titulo")), None)
+            if tlbl is not None:
+                head = tlbl.get_parent()
+                kids = head.get_children()
+                extra = []
+                for n, c in enumerate(kids):
+                    if c is not tlbl and isinstance(c, Gtk.EventBox) and c.get_tooltip_text():
+                        self.tools_desc[title] = c.get_tooltip_text()
+                    elif n > kids.index(tlbl):
+                        # (lo de detrás del título, como el interruptor del correo, va al lado del título grande)
+                        extra.append(c)
+                    if c not in extra:
+                        c.set_no_show_all(True)
+                        c.hide()
+                for c in extra:
+                    head.remove(c)
+                    c.set_valign(Gtk.Align.CENTER)
+                    c.set_margin_start(14)
+                    c.set_no_show_all(False)
+                if extra:
+                    self.tools_extra[title] = extra
+                head.set_no_show_all(True)
+                head.hide()
             stack.add_named(g, title)
             name, ic = info.get(title, (title, "emblem-system-symbolic"))
             row = Gtk.ListBoxRow()
@@ -30224,6 +30392,7 @@ class App2(App):
             if row is not None:
                 self.tools_section = row.section
                 stack.set_visible_child_name(row.section)
+                self.nv_tools_title()
         nav.connect("row-selected", picked)
         want = getattr(self, "tools_section", None)
         if want not in rows and found:
@@ -30239,6 +30408,31 @@ class App2(App):
         stack.show_all()
         if want:
             nav.select_row(rows[want])
+
+    def nv_tools_title(self):
+        """El título grande de Configuración: el del apartado abierto (su icono, su nombre y su explicación)."""
+        parts = getattr(self, "tools_title", None)
+        sec = getattr(self, "tools_section", None)
+        if not parts or not sec:
+            return
+        tl, title_lbl, sub_lbl = parts
+        info = {t: (name, ic) for t, name, ic in self.TOOLS_SECTIONS}
+        name, ic = info.get(sec, (sec, "emblem-system-symbolic"))
+        old = tl.get_children()[0]
+        tl.remove(old)
+        old.destroy()
+        new = MonoLogo(ic[5:], 26) if ic.startswith("logo:") else symbol(ic, 26)
+        tl.pack_start(new, False, False, 0)
+        tl.reorder_child(new, 0)
+        new.show()
+        title_lbl.set_label(name)
+        sub_lbl.set_label(getattr(self, "tools_desc", {}).get(sec) or "Configuración")
+        # (lo que iba al lado del título del apartado: el de antes sale y entra el del abierto)
+        for c in tl.get_children()[2:]:
+            tl.remove(c)
+        for c in getattr(self, "tools_extra", {}).get(sec, []):
+            tl.pack_start(c, False, False, 0)
+            c.show_all()
 
     def nv_tools_show(self, section):
         """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS)."""
@@ -30315,10 +30509,10 @@ class App2(App):
 
     def nv_components_update(self, res, ask=True):
         if ask and not confirm(self.win, "¿Actualizar todo?",
-                               "\n".join("• " + i for i in res["items"]) +
-                               "\n\nLas versiones de PHP se rehacen con lo último de su rama (varios minutos; la de "
+                               "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de "
                                "ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se "
-                               "rehacen en unos segundos: sus BBDD y su configuración no cambian.", "Actualizar todo"):
+                               "rehacen en unos segundos: sus BBDD y su configuración no cambian.", "Actualizar todo",
+                               steps=res["items"]):
             return
         self.components = None
         self.run_task("Actualizando los componentes", ["componentes-actualizar"], progress=True,
@@ -31097,21 +31291,6 @@ class App2(App):
             return
         self.nv_tunnel_refresh()
         self.toast("Botones del proyecto guardados")
-
-    def nv_buttons_tools(self):
-        """Configuración, Visor de los proyectos: sus botones (cuáles, en qué orden y cómo)."""
-        conf = buttons_conf()
-        box, lb = tile_group("Visor de los proyectos")
-        shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]
-        row = ActionRow("Botones", "%s · %s" % (", ".join(shown) or "ninguno",
-                                                dict(BUTTON_STYLES)[conf["style"]].split(":")[0].lower()))
-        b = Gtk.Button(label="Personalizar…", valign=Gtk.Align.CENTER)
-        b.connect("clicked", lambda *_: self.nv_buttons_dialog())
-        row.add_suffix(b)
-        lb.add(row)
-        self.tools_box.pack_start(box, False, False, 0)
-        self.tools_box.reorder_child(box, 4)
-        box.show_all()
 
     def nv_share_button(self, url, folder, name, tip_extra=""):
         """«Compartir» del visor de un proyecto: abre un túnel de Cloudflare a esa dirección; si ya lo

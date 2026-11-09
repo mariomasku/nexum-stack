@@ -1,0 +1,56 @@
+# Comprobaciones en cada envío: que la ventana del Mac compila (en un Mac de GitHub, con el mismo
+# swiftc y las mismas opciones que usa build_native_app) y que los dos scripts no tienen errores de
+# sintaxis (bash y el Python de la ventana de Linux). No firma, no empaqueta y no publica nada.
+name: Comprobar
+
+on:
+  push:
+    branches: [main]
+    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", ".github/workflows/comprobar.yml"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Ventana del Mac (Swift)
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sintaxis de bash
+        run: bash -n macos/lvm-instalador.sh
+      - name: Sacar el Swift del script (lo mismo que swift_source)
+        run: |
+          awk "/cat <<'LVM_SWIFT'\$/{f=1;next} /^LVM_SWIFT\$/{f=0} f" macos/lvm-instalador.sh > main.swift
+          test -s main.swift
+          wc -l main.swift
+      - name: Compilar (como build_native_app)
+        run: |
+          xcrun --sdk macosx swiftc --version
+          xcrun --sdk macosx swiftc -O -parse-as-library -target arm64-apple-macos12.0 -o lvm-app main.swift 2>&1 | tee compilar.log
+          test -x lvm-app
+      - name: Guardar el registro si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilar-log
+          path: |
+            compilar.log
+            main.swift
+
+  linux:
+    name: Linux (bash y Python de la ventana)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sintaxis de bash
+        run: bash -n lvm-instalador.sh
+      - name: Sintaxis del Python de la ventana
+        run: |
+          awk "/cat <<'LVM_GUI_PY'\$/{f=1;next} /^LVM_GUI_PY\$/{f=0} f" lvm-instalador.sh > ventana.py
+          test -s ventana.py
+          python3 -I -c "import ast, sys; ast.parse(open('ventana.py', encoding='utf-8').read()); print('ok')"
