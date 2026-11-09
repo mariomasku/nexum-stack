@@ -566,7 +566,7 @@ class NvProyectos:
         if x["kind"]:
             tl.pack_start(label(KIND_TEXT[x["kind"]], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
         info.pack_start(tl, False, False, 0)
-        info.pack_start(label("%s/%s" % (HTDOCS, x["name"]), "nv-mono", "nv-chico", "nv-tenue", selectable=True,
+        info.pack_start(label("%s/%s" % ("/opt/htdocs" if DEMO else HTDOCS, x["name"]), "nv-mono", "nv-chico", "nv-tenue", selectable=True,
                               ellipsize=1, max_width_chars=40), False, False, 0)
         top.pack_start(info, True, True, 0)
         # Selectores: el entorno (version y su BBDD) y la BBDD de ese entorno

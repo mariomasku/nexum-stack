@@ -22861,6 +22861,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
+    ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),
     ("Comandos de lvm-instalador", "terminal.fill", .black),
     // Los pasos de una instalación o actualización (la lista de la ventana de la tarea)
@@ -29522,8 +29523,8 @@ struct ToolsView: View {
                 }
                 // Caché de descargas de las pilas propias: lo que ocupa y vaciarla
                 let cache = downloadsCacheSize()
-                Tile("Caché de descargas", "\(DL_CACHE_DIR): el código de los componentes ya comprobado, para no descargarlo otra vez y para instalar aunque su web no responda. "
-                     + (cache.files > 0 ? "Ocupa \(fmtSize(cache.size)) (\(cache.files) \(cache.files == 1 ? "fichero" : "ficheros"))." : "Está vacía.")) {
+                Tile("Caché de descargas", "\(DL_CACHE_DIR): lo ya descargado de PHP, Apache, MariaDB… · "
+                     + (cache.files > 0 ? "\(fmtSize(cache.size)), \(cache.files) \(cache.files == 1 ? "fichero" : "ficheros")" : "vacía")) {
                     Button("Vaciar…") { model.clearDownloads(cache.size) }.disabled(model.busy || cache.files == 0)
                 }
             }

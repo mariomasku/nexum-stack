@@ -501,8 +501,8 @@ struct ToolsView: View {
                 }
                 // Caché de descargas de las pilas propias: lo que ocupa y vaciarla
                 let cache = downloadsCacheSize()
-                Tile("Caché de descargas", "\(DL_CACHE_DIR): el código de los componentes ya comprobado, para no descargarlo otra vez y para instalar aunque su web no responda. "
-                     + (cache.files > 0 ? "Ocupa \(fmtSize(cache.size)) (\(cache.files) \(cache.files == 1 ? "fichero" : "ficheros"))." : "Está vacía.")) {
+                Tile("Caché de descargas", "\(DL_CACHE_DIR): lo ya descargado de PHP, Apache, MariaDB… · "
+                     + (cache.files > 0 ? "\(fmtSize(cache.size)), \(cache.files) \(cache.files == 1 ? "fichero" : "ficheros")" : "vacía")) {
                     Button("Vaciar…") { model.clearDownloads(cache.size) }.disabled(model.busy || cache.files == 0)
                 }
             }

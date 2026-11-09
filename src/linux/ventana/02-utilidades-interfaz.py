@@ -560,6 +560,7 @@ ROW_ICONS = [
     ("Hosts del sistema", ("icono", "network-server-symbolic", "")),
     ("Copias de seguridad", ("icono", "drive-harddisk-symbolic", "")),
     ("Registros de instalaciones", ("icono", "document-open-recent-symbolic", "")),
+    ("Caché de descargas", ("icono", "folder-download-symbolic", "")),
     ("error_log de ", ("logo", "apache")),
     ("Buscar una versión nueva", ("icono", "software-update-available-symbolic", "")),
     ("Icono en el menú de aplicaciones", ("icono", "view-app-grid-symbolic", "")),

@@ -20399,6 +20399,10 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GObject, Gtk
 
 SCRIPT = os.path.abspath(sys.argv[1])
 SIMULATE = os.environ.get("LVM_SIMULAR") == "1"
+# Modo demostración (las capturas del manual): con LVM_DEMO=<carpeta> y solo en simulación, los comandos
+# gui-* no llegan al script: sus respuestas son las de esa carpeta, con datos inventados
+# (ayuda/herramientas/demo-linux.py). Nada de este equipo sale en la ventana
+DEMO = os.environ.get("LVM_DEMO", "") if SIMULATE else ""
 # Programas del sistema: el PATH de la sesion puede llevar delante carpetas tuyas (~/.local/bin),
 # donde un sudo, un bash o un pkexec falso recibiria la contraseña que se escribe en la ventana
 os.environ["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
@@ -20422,6 +20426,9 @@ def is_ps_db(db):
 
 # Proyectos de /opt/htdocs (LVM_HTDOCS solo para pruebas)
 HTDOCS = os.environ.get("LVM_HTDOCS", "/opt/htdocs")
+# (en la demostración, la de ejemplo: nunca la de verdad. El script quita LVM_HTDOCS fuera de las pruebas)
+if DEMO:
+    HTDOCS = os.path.join(DEMO, "htdocs")
 DB_RULES = [
     ("wp-config.php", r"""^[ \t]*define\(\s*['"]DB_NAME['"]\s*,\s*['"]([^'"]+)"""),
     ("app/config/parameters.php", r"""['"]database_name['"]\s*=>\s*['"]([^'"]+)"""),
@@ -21388,6 +21395,7 @@ ROW_ICONS = [
     ("Hosts del sistema", ("icono", "network-server-symbolic", "")),
     ("Copias de seguridad", ("icono", "drive-harddisk-symbolic", "")),
     ("Registros de instalaciones", ("icono", "document-open-recent-symbolic", "")),
+    ("Caché de descargas", ("icono", "folder-download-symbolic", "")),
     ("error_log de ", ("logo", "apache")),
     ("Buscar una versión nueva", ("icono", "software-update-available-symbolic", "")),
     ("Icono en el menú de aplicaciones", ("icono", "view-app-grid-symbolic", "")),
@@ -21931,7 +21939,24 @@ def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=
 # ---------------------------------------------------------------- llamadas al script
 
 def script_cmd(*args):
+    if DEMO:
+        return ["/usr/bin/python3", "-I", "-c", DEMO_PY, DEMO] + list(args)
     return ["/bin/bash", SCRIPT] + (["--simular"] if SIMULATE else []) + list(args)
+
+
+# Respuesta de un comando en el modo demostración: <comando>_<argumento>.txt o <comando>.txt de la carpeta
+# (nada si no está), con @DEMO@ cambiado por la carpeta
+DEMO_PY = r"""
+import os, re, sys
+folder, args = sys.argv[1], sys.argv[2:]
+for n in range(len(args), 0, -1):
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", "_".join(args[:n])) + ".txt"
+    path = os.path.join(folder, name)
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            sys.stdout.write(f.read().replace("@DEMO@", folder))
+        break
+"""
 
 
 # Solo estas variables de la sesion pasan a las tareas: el resto podria cambiar lo que hace bash
@@ -23646,7 +23671,7 @@ class AppPrograma:
         self.data = d
         # (solo la versión: la firma está en Acerca de, en el menú)
         # (la versión va arriba, detrás de «Entornos LAMPP y Docker»; abajo solo el aviso de la simulación)
-        self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE else "")
+        self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE and not DEMO else "")
         if getattr(self, "brand_sub", None) is not None:
             self.brand_sub.set_label("Entornos LAMPP y Docker  ·  v%s" % d["version"] if d["version"]
                                      else "Entornos LAMPP y Docker")
@@ -24258,9 +24283,10 @@ class AppHerramientas:
         # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
         n, size = downloads_cache_size()
         row = ActionRow("Caché de descargas",
-                        "%s: el código de los componentes ya comprobado, para no descargarlo otra vez y para "
-                        "instalar aunque su web no responda. %s" % (DL_CACHE_DIR, "Ocupa %s (%s)." % (
-                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "Está vacía."))
+                        "%s: lo ya descargado de PHP, Apache, MariaDB… · %s" % (DL_CACHE_DIR, "%s, %s" % (
+                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "vacía"))
+        row.set_tooltip_text("El código de los componentes ya comprobado: no se descarga otra vez al reintentar, "
+                             "y se usa si su web no responde.")
         b = Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
         b.connect("clicked", lambda *_: self.on_clear_downloads(size))
         row.add_suffix(b)
@@ -30002,7 +30028,7 @@ class NvProyectos:
         if x["kind"]:
             tl.pack_start(label(KIND_TEXT[x["kind"]], "nv-etiqueta", valign=Gtk.Align.CENTER), False, False, 0)
         info.pack_start(tl, False, False, 0)
-        info.pack_start(label("%s/%s" % (HTDOCS, x["name"]), "nv-mono", "nv-chico", "nv-tenue", selectable=True,
+        info.pack_start(label("%s/%s" % ("/opt/htdocs" if DEMO else HTDOCS, x["name"]), "nv-mono", "nv-chico", "nv-tenue", selectable=True,
                               ellipsize=1, max_width_chars=40), False, False, 0)
         top.pack_start(info, True, True, 0)
         # Selectores: el entorno (version y su BBDD) y la BBDD de ese entorno
@@ -32991,6 +33017,30 @@ class App2(NvBandeja,
         GLib.timeout_add_seconds(6, self.auto_check_package)
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+        # Capturas de cada página (LVM_CAPTURA=<carpeta>: las del manual, con LVM_DEMO)
+        if os.environ.get("LVM_CAPTURA"):
+            GLib.timeout_add(6000, self.nv_capture_all)
+
+    def nv_capture_all(self):
+        """Una captura de cada página y de cada apartado de Configuración en LVM_CAPTURA (nombre-de-pagina.png),
+        y se cierra. Para el manual (ayuda/herramientas/capturas-linux.sh) y para revisar la ventana."""
+        steps = [(lambda n=n: self.show_tab(n), "pagina-" + n)
+                 for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
+        for title, _name, _ic in self.TOOLS_SECTIONS:
+            slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")
+            steps.append((lambda t=title: self.nv_tools_show(t), "config-" + slug))
+
+        def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
+            if i[0] >= len(steps):
+                self.nv_exit()
+                return False
+            fn, shot = steps[i[0]]
+            fn()
+            GLib.timeout_add(1800, lambda: (self.capture(self.win, shot), False)[1])
+            i[0] += 1
+            return True
+        GLib.timeout_add(2500, step)
+        return False
 
 
 def load_fonts():

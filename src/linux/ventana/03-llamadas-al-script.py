@@ -1,7 +1,24 @@
 # ---------------------------------------------------------------- llamadas al script
 
 def script_cmd(*args):
+    if DEMO:
+        return ["/usr/bin/python3", "-I", "-c", DEMO_PY, DEMO] + list(args)
     return ["/bin/bash", SCRIPT] + (["--simular"] if SIMULATE else []) + list(args)
+
+
+# Respuesta de un comando en el modo demostración: <comando>_<argumento>.txt o <comando>.txt de la carpeta
+# (nada si no está), con @DEMO@ cambiado por la carpeta
+DEMO_PY = r"""
+import os, re, sys
+folder, args = sys.argv[1], sys.argv[2:]
+for n in range(len(args), 0, -1):
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", "_".join(args[:n])) + ".txt"
+    path = os.path.join(folder, name)
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            sys.stdout.write(f.read().replace("@DEMO@", folder))
+        break
+"""
 
 
 # Solo estas variables de la sesion pasan a las tareas: el resto podria cambiar lo que hace bash

@@ -439,6 +439,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
+    ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),
     ("Comandos de lvm-instalador", "terminal.fill", .black),
     // Los pasos de una instalación o actualización (la lista de la ventana de la tarea)

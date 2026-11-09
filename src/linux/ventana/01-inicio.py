@@ -34,6 +34,10 @@ from gi.repository import Gdk, GdkPixbuf, Gio, GLib, GObject, Gtk
 
 SCRIPT = os.path.abspath(sys.argv[1])
 SIMULATE = os.environ.get("LVM_SIMULAR") == "1"
+# Modo demostración (las capturas del manual): con LVM_DEMO=<carpeta> y solo en simulación, los comandos
+# gui-* no llegan al script: sus respuestas son las de esa carpeta, con datos inventados
+# (ayuda/herramientas/demo-linux.py). Nada de este equipo sale en la ventana
+DEMO = os.environ.get("LVM_DEMO", "") if SIMULATE else ""
 # Programas del sistema: el PATH de la sesion puede llevar delante carpetas tuyas (~/.local/bin),
 # donde un sudo, un bash o un pkexec falso recibiria la contraseña que se escribe en la ventana
 os.environ["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
@@ -57,6 +61,9 @@ def is_ps_db(db):
 
 # Proyectos de /opt/htdocs (LVM_HTDOCS solo para pruebas)
 HTDOCS = os.environ.get("LVM_HTDOCS", "/opt/htdocs")
+# (en la demostración, la de ejemplo: nunca la de verdad. El script quita LVM_HTDOCS fuera de las pruebas)
+if DEMO:
+    HTDOCS = os.path.join(DEMO, "htdocs")
 DB_RULES = [
     ("wp-config.php", r"""^[ \t]*define\(\s*['"]DB_NAME['"]\s*,\s*['"]([^'"]+)"""),
     ("app/config/parameters.php", r"""['"]database_name['"]\s*=>\s*['"]([^'"]+)"""),

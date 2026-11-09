@@ -136,3 +136,27 @@ class App2(NvBandeja,
         GLib.timeout_add_seconds(6, self.auto_check_package)
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+        # Capturas de cada página (LVM_CAPTURA=<carpeta>: las del manual, con LVM_DEMO)
+        if os.environ.get("LVM_CAPTURA"):
+            GLib.timeout_add(6000, self.nv_capture_all)
+
+    def nv_capture_all(self):
+        """Una captura de cada página y de cada apartado de Configuración en LVM_CAPTURA (nombre-de-pagina.png),
+        y se cierra. Para el manual (ayuda/herramientas/capturas-linux.sh) y para revisar la ventana."""
+        steps = [(lambda n=n: self.show_tab(n), "pagina-" + n)
+                 for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
+        for title, _name, _ic in self.TOOLS_SECTIONS:
+            slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")
+            steps.append((lambda t=title: self.nv_tools_show(t), "config-" + slug))
+
+        def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
+            if i[0] >= len(steps):
+                self.nv_exit()
+                return False
+            fn, shot = steps[i[0]]
+            fn()
+            GLib.timeout_add(1800, lambda: (self.capture(self.win, shot), False)[1])
+            i[0] += 1
+            return True
+        GLib.timeout_add(2500, step)
+        return False

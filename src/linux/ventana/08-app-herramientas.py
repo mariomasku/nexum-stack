@@ -42,9 +42,10 @@ class AppHerramientas:
         # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
         n, size = downloads_cache_size()
         row = ActionRow("Caché de descargas",
-                        "%s: el código de los componentes ya comprobado, para no descargarlo otra vez y para "
-                        "instalar aunque su web no responda. %s" % (DL_CACHE_DIR, "Ocupa %s (%s)." % (
-                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "Está vacía."))
+                        "%s: lo ya descargado de PHP, Apache, MariaDB… · %s" % (DL_CACHE_DIR, "%s, %s" % (
+                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "vacía"))
+        row.set_tooltip_text("El código de los componentes ya comprobado: no se descarga otra vez al reintentar, "
+                             "y se usa si su web no responde.")
         b = Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
         b.connect("clicked", lambda *_: self.on_clear_downloads(size))
         row.add_suffix(b)

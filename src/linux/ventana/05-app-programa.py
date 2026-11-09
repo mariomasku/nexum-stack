@@ -450,7 +450,7 @@ class AppPrograma:
         self.data = d
         # (solo la versión: la firma está en Acerca de, en el menú)
         # (la versión va arriba, detrás de «Entornos LAMPP y Docker»; abajo solo el aviso de la simulación)
-        self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE else "")
+        self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE and not DEMO else "")
         if getattr(self, "brand_sub", None) is not None:
             self.brand_sub.set_label("Entornos LAMPP y Docker  ·  v%s" % d["version"] if d["version"]
                                      else "Entornos LAMPP y Docker")
