@@ -399,6 +399,13 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 3. Ya no hay apartado **Visor de los proyectos**. En **Apariencia** hay tres bloques con su título: «Iconos del menú lateral», «Apartados del menú lateral» y «Visor de los proyectos» (con «Personalizar…»).
 4. **Seguridad entre webs**: el interruptor arriba y, debajo, «Qué es» con cuatro puntos (El problema, Lo que hace la barrera, Cuándo apagarla, Dónde se aplica).
 
+## Paso 29: Otro parche concreto (1.57.5)
+
+1. En **Versiones de PHP → Instalar**, debajo de la lista de ramas está **Otro parche concreto**. Elige una rama: salen todos sus parches de php.net, con su fecha y si son de seguridad.
+2. El último de la rama dice «márcalo en la lista de arriba»; los ya instalados salen atenuados. Marca uno antiguo (por ejemplo, el penúltimo): arriba sale en «Marcados» (la ✕ lo quita) y el botón dice «Instalar 1 versión».
+3. Instálalo (20-40 min): va a /Library/Nexum/XAMPP-X.Y.Z. Al acabar, «Activar XAMPP-X.Y.Z» activa esa carpeta.
+4. En la terminal: `lvm-instalador instalar --php 8.3.10` instala ese parche; uno que no exista en php.net dice que se omite.
+
 ## Qué apuntar
 
 - El paso que falla y lo que sale en Terminal, en «Ver registro» o en `compilar.log`.

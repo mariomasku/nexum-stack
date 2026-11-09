@@ -61,7 +61,7 @@
 #
 # === INSTALAR, ACTUALIZAR Y DESINSTALAR ======================================================
 #
-#   lvm-instalador instalar --php 7.4,8.4 [--si]
+#   lvm-instalador instalar --php 7.4,8.4[,8.3.10] [--si]   (una rama: su ultimo parche; X.Y.Z: ese parche)
 #       Instala sin preguntas (--si confirma)
 #
 #   lvm-instalador actualizar <version>
@@ -18939,11 +18939,12 @@ func readProgress(_ path: String) -> InstallProgress? {
     return p
 }
 
-/// Carpeta (XAMPP-<version>) de un elemento del plan: php:8.4.26 -> 8.4
+/// Carpeta (XAMPP-<version>) de un elemento del plan, como en install_stack: php:8.4.26 -> 8.4.26 (desde
+/// la 1.38, cada versión en su carpeta con la versión entera; también un parche concreto, php:8.3.10, y
+/// parchear:7.4.33); rehacer:8.4.26 -> 8.4 (rehace una XAMPP-X.Y de antes de la 1.38, la de su rama)
 func itemFolder(_ item: String) -> String {
     let name = item.components(separatedBy: ":").last ?? item
-    // (parchear:7.4.33 rehace XAMPP-7.4.33, con la versión entera en el nombre)
-    if item.hasPrefix("parchear:") { return name }
+    if !item.hasPrefix("rehacer:") { return name }
     var parts = name.components(separatedBy: ".")
     if parts.count > 2 { parts.removeLast() }
     return parts.joined(separator: ".")
@@ -19506,6 +19507,13 @@ struct Service: Equatable, Identifiable {
     var id: String { return name }
 }
 
+/// Un parche de una rama (gui-parches), para «Otro parche concreto» de Instalar
+struct PatchItem: Identifiable, Equatable {
+    let version, date, state: String
+    let security, latest: Bool
+    var id: String { return version }
+}
+
 struct Branch: Identifiable, Equatable {
     let branch, latest: String
     let supported: Bool
@@ -19525,7 +19533,12 @@ final class AppModel: ObservableObject {
     @Published var branchesError: String? = nil
     /// Versión -> [php, fecha de publicación en php.net] (gui-fechas: llega después)
     @Published var phpDates: [String: [String]] = [:]
+    /// Lo que se va a instalar: ramas (8.4, su último parche) y parches concretos (8.3.10)
     @Published var selected: Set<String> = []
+    /// Otro parche concreto: la rama elegida y sus parches (nil mientras se consultan)
+    @Published var patchBranch = ""
+    @Published var patches: [PatchItem]? = nil
+    @Published var patchesError: String? = nil
     @Published var expanded: Set<String> = []
     /// Apartados plegados (Instaladas, Instalar): se guardan en FOLDED_FILE
     @Published var folded: Set<String> = Set(((try? String(contentsOfFile: FOLDED_FILE, encoding: .utf8)) ?? "")
@@ -20833,6 +20846,28 @@ final class AppModel: ObservableObject {
                 reloadBranches: true)
     }
 
+    /// Los parches de una rama, de php.net (gui-parches), para elegir uno concreto
+    func loadPatches(_ branch: String) {
+        patchBranch = branch
+        patches = nil
+        patchesError = nil
+        if branch.isEmpty { return }
+        runQuick(["gui-parches", branch]) { rc, out in
+            // (si mientras tanto se ha elegido otra rama, esta respuesta ya no vale)
+            guard self.patchBranch == branch else { return }
+            let lines = parseLines(out)
+            if let e = lines.first(where: { $0[0] == "ERROR" }) {
+                self.patchesError = e.count > 1 ? e[1] : "No se ha podido consultar php.net."
+                return
+            }
+            let items = lines.filter { $0[0] == "P" && $0.count >= 6 }.map {
+                PatchItem(version: $0[1], date: $0[2] == "-" ? "" : $0[2], state: $0[3], security: $0[4] == "1", latest: $0[5] == "1")
+            }
+            if rc != 0 || items.isEmpty { self.patchesError = "No se ha podido consultar php.net."; return }
+            self.patches = items
+        }
+    }
+
     func install() {
         let list = selected.sorted { $0.compare($1, options: .numeric) == .orderedAscending }
         if list.isEmpty { return }
@@ -20846,6 +20881,7 @@ final class AppModel: ObservableObject {
             guard let self = self, let p = p else { return }
             let good = p.results.filter { $0.1 == "0" }.map { $0.0 }
             self.selected.removeAll()
+            if !self.patchBranch.isEmpty { self.loadPatches(self.patchBranch) }
             if good.count == 1 && !SIMULATE {
                 let folder = itemFolder(good[0])
                 task.offer("Activar XAMPP-\(folder)") {
@@ -27781,6 +27817,7 @@ struct InstallSection: View {
                         }
                     }
                 }
+                patchCard(list)
                 VStack(spacing: 6) {
                     Button(model.selected.isEmpty ? "Instalar" : "Instalar \(plural(model.selected.count, "versión", "versiones"))") {
                         model.install()
@@ -27795,6 +27832,95 @@ struct InstallSection: View {
                 Loading(text: "Consultando las versiones de PHP en php.net…")
             }
         }
+    }
+
+    /// Otro parche concreto (como en Linux): una versión anterior de cualquier rama, en su propia carpeta
+    /// (XAMPP-X.Y.Z). Se elige la rama y se marcan sus parches; se instalan con los de arriba
+    func patchCard(_ list: [Branch]) -> some View {
+        let marked = model.selected.filter { $0.components(separatedBy: ".").count == 3 }
+            .sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+        let names = ["stable": "estable", "security": "solo seguridad", "eol": "sin soporte"]
+        return FoldCard("parche", "Otro parche concreto",
+                        "Una versión anterior de cualquier rama, en su propia carpeta (XAMPP-X.Y.Z), con el Apache, MariaDB, ProFTPD y Perl de su rama. Las versiones de php.net son todas definitivas, pero los parches anteriores al último no llevan sus correcciones de seguridad: úsalos solo si un proyecto necesita esa versión.",
+                        summary: marked.isEmpty ? "" : plural(marked.count, "parche marcado", "parches marcados")) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Text("Rama:")
+                    Picker("", selection: Binding(get: { model.patchBranch }, set: { model.loadPatches($0) })) {
+                        Text("Elige una rama").tag("")
+                        ForEach(list) { b in
+                            Text("PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? "")).tag(b.branch)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 240)
+                    .disabled(model.busy)
+                    Spacer(minLength: 8)
+                }
+                if !marked.isEmpty {
+                    // (los marcados de cualquier rama, para quitarlos aunque se mire otra)
+                    HStack(spacing: 6) {
+                        Text("Marcados:").font(.caption).foregroundColor(.secondary)
+                        ForEach(marked, id: \.self) { v in
+                            Button(action: { model.selected.remove(v) }) {
+                                HStack(spacing: 3) {
+                                    Text("PHP \(v)").font(.caption)
+                                    Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .tip("Quitar de la lista")
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            if let err = model.patchesError {
+                Divider()
+                Text(err).foregroundColor(RED).padding(.horizontal, 14).padding(.vertical, 10)
+            } else if let ps = model.patches {
+                ForEach(ps) { p in
+                    Divider()
+                    patchRow(p)
+                }
+            } else if !model.patchBranch.isEmpty {
+                Divider()
+                Loading(text: "Consultando los parches de PHP \(model.patchBranch)…").padding(.horizontal, 14).padding(.vertical, 10)
+            }
+        }
+    }
+
+    func patchRow(_ p: PatchItem) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text("PHP \(p.version)")
+                    if !p.date.isEmpty {
+                        Text(fmtDay(p.date)).font(.caption).foregroundColor(.secondary)
+                    }
+                    ReleaseTag(security: p.security)
+                }
+                Text(p.latest ? "El último de su rama: márcalo en la lista de arriba"
+                     : p.state == "instalada" ? "Ya instalada"
+                     : p.state == "existe" ? "Ya existe XAMPP-\(p.version)"
+                     : "→ /Library/Nexum/XAMPP-\(p.version)")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            Spacer(minLength: 8)
+            if p.state == "nueva" && !p.latest {
+                Toggle("", isOn: Binding(get: { model.selected.contains(p.version) },
+                                         set: { on in
+                                             if on { model.selected.insert(p.version) } else { model.selected.remove(p.version) }
+                                         }))
+                    .labelsHidden()
+                    .disabled(model.busy)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .opacity(p.state == "nueva" && !p.latest ? 1 : 0.55)
     }
 
     /// Fila de una rama: «PHP 8.5.12», a su lado la fecha en que se publicó y si es un parche de
@@ -30118,6 +30244,41 @@ function gui_branches() {
         [ "$sec" == "seguridad" ] && sec=1 || sec=0
         echo "B|$branch|$latest|$sup|${b[1]}|${b[3]}|$state|$st|${date:--}|$sec"
     done <<< "$releases"
+}
+
+# Parches de una rama (como en Linux, desde la 1.57.5): todos los de php.net, del mas nuevo al mas
+# antiguo. Cada uno se instala en su carpeta (XAMPP-X.Y.Z), con la pila de su rama.
+function php_patches() {
+    php_all_releases | awk -v b="$1." 'index($1, b) == 1'
+}
+
+# gui-parches <rama>: P|version|fecha|estado|seguridad (1/0)|ultimo (1/0)
+#   estado: nueva, instalada (ya hay una version con ese PHP) o existe (ya hay una XAMPP-X.Y.Z)
+function gui_patches() {
+    local branch=$1 version date sec state first=1
+
+    if ! [[ "$branch" =~ ^[0-9]+\.[0-9]+$ ]] || ! awk -v b="$branch" '$1 == b { f = 1 } END { exit !f }' <<< "$(php_releases)"; then
+        echo "ERROR|PHP $branch no se puede instalar en este Mac."
+
+        return 1
+    fi
+    local list=$(php_patches "$branch")
+    if [ -z "$list" ]; then
+        echo "ERROR|No se ha podido consultar php.net. Comprueba la conexion a internet."
+
+        return 1
+    fi
+    while read -r version date sec; do
+        [ -z "$version" ] && continue
+        state=nueva
+        if php_installed_in "$version" > /dev/null; then
+            state=instalada
+        elif [ -e "$BASE_DIR/XAMPP-$version" ]; then
+            state=existe
+        fi
+        echo "P|$version|${date:--}|$state|$([ "$sec" == "seguridad" ] && echo 1 || echo 0)|$first"
+        first=0
+    done <<< "$list"
 }
 
 # Fecha de publicacion en php.net del PHP de cada version instalada: F|carpeta|php|AAAA-MM-DD
@@ -33599,6 +33760,11 @@ VERSIONES
 1.57.5 (9 nov 2026)
 - Mismo número de versión que la de Linux, porque las dos llevan lo
   mismo (hasta ahora iba por la 1.41).
+- Instalar, «Otro parche concreto» (como en Linux): una versión
+  anterior de cualquier rama (8.3.10…), en su propia carpeta
+  XAMPP-X.Y.Z. En la terminal: instalar --php 8.3.10.
+- Al acabar de instalar, «Activar» ofrece la carpeta de verdad
+  (XAMPP-8.4.27, no XAMPP-8.4).
 - Configuración: arriba, en grande, el nombre del apartado abierto
   (con su icono y lo que hace), no «Configuración»; el correo de
   pruebas se enciende con el interruptor de al lado.
@@ -35346,11 +35512,24 @@ function cli_install() {
         esac
     done
 
-    [ -z "$php" ] && echo "Indica las ramas de PHP, por ejemplo: lvm-instalador instalar --php 7.4,8.4" && return 1
+    [ -z "$php" ] && echo "Indica las ramas de PHP (o un parche concreto), por ejemplo: lvm-instalador instalar --php 7.4,8.4,8.3.10" && return 1
 
-    local releases=$(php_releases)
+    local releases=$(php_releases) all=""
     for branch in $php; do
-        full=$(awk -v b="$branch" '$1 == b {print $2}' <<< "$releases")
+        if [[ "$branch" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Un parche concreto (8.3.10): de una rama que se puede instalar y publicado en php.net
+            full=$branch
+            branch=${full%.*}
+            if ! awk -v b="$branch" '$1 == b { f = 1 } END { exit !f }' <<< "$releases"; then
+                echo "PHP $branch no esta disponible, se omite $full" && continue
+            fi
+            [ -n "$all" ] || all=$(php_all_releases)
+            if ! awk -v v="$full" '$1 == v { f = 1 } END { exit !f }' <<< "$all"; then
+                echo "PHP $full no esta en php.net, se omite" && continue
+            fi
+        else
+            full=$(awk -v b="$branch" '$1 == b {print $2}' <<< "$releases")
+        fi
         [ -z "$full" ] && echo "PHP $branch no esta disponible, se omite" && continue
         [ -e "$BASE_DIR/XAMPP-$full" ] && echo "XAMPP-$full ya existe, se omite" && continue
         php_installed_in "$full" > /dev/null && echo "PHP $full ya esta instalada, se omite" && continue
@@ -36214,6 +36393,7 @@ case "$1" in
     gui-datos) gui_data ;;
     gui-vuelta) gui_round ;;
     gui-ramas) gui_branches ;;
+    gui-parches) gui_patches "$2" ;;
     gui-fechas) gui_php_dates ;;
     gui-al-dia) gui_up_to_date "$2" ;;
     gui-bd-comprobar) gui_db_check ;;

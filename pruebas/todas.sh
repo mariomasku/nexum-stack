@@ -177,6 +177,7 @@ suite "configuración, avisos y terminal (1.41.1)" "$HERE/configuracion.sh" "$M"
 suite "descargas: suma de ProFTPD y motivo del error (1.41.2)" "$HERE/descargas.sh" "$M"
 suite "diálogos con los cambios numerados (1.41.3)" "$HERE/dialogos.sh" "$M"
 suite "Configuración: título del apartado, Apariencia y seguridad entre webs (1.57.5)" "$HERE/apartados.sh" "$M"
+suite "otro parche concreto de PHP (1.57.5)" "$HERE/parches-mac.sh" "$M"
 suite "BBDD de XAMPP-X en Docker, en vivo (1.40.1)" "$HERE/bd-vivo-mac.sh" "$M"
 report
 echo "Total: $total pruebas, $bad fallos"

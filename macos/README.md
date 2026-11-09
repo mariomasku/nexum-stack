@@ -232,6 +232,7 @@ Comandos:
 ```bash
 lvm-instalador                         # panel
 lvm-instalador instalar --php 7.4,8.4  # instalar sin panel (--si para no preguntar)
+lvm-instalador instalar --php 8.3.10   # un parche concreto, en XAMPP-8.3.10
 lvm-instalador use 8.4                 # activar una versión
 lvm-instalador estado                  # versiones instaladas
 lvm-instalador list-db                 # bases de datos de cada versión
@@ -363,6 +364,7 @@ Hasta la 1.39.2, lo que se ejecutaba con tu contraseña de administrador salía 
 - **Desmontar el proyecto cargado:** el botón de expulsar, junto a «web.local → proyecto», hace que `web.local` deje de apuntar a él y enseñe una página vacía («No hay ningún proyecto cargado»). El enlace sigue existiendo y apunta a la carpeta oculta `htdocs/.lvm-sin-proyecto`. Si era una tienda PrestaShop, su dominio deja de estar falseado. En la terminal: `lvm-instalador desmontar-proyecto`.
 - **Aviso en rojo en Cargar proyecto:** si la versión de PHP montada no tiene la BBDD del proyecto cargado (por ejemplo, al activar otra versión a mano), sale «El proyecto vinculado a web.local no está disponible para esa versión», con las versiones que sí la tienen.
 - **Fecha y parches de seguridad:** en **Instalar nuevas versiones de PHP**, cada versión dice cuándo se publicó y si php.net la marca como **Parche de seguridad** (corrige vulnerabilidades) o **Corrección de errores**.
+- **Otro parche concreto** (desde la 1.57.5, como en Linux): debajo de la lista, elige una rama y marca uno de sus parches anteriores (8.3.10…). Va en su propia carpeta, `XAMPP-X.Y.Z`, con el Apache, MariaDB, ProFTPD y Perl de su rama. Los parches anteriores al último no llevan sus correcciones de seguridad: solo para proyectos que necesiten esa versión.
 - **Octavo repaso de seguridad (1.44.0 / Mac 1.32.0):** Cerrar procesos ya no se puede engañar con un proceso de nombre trucado; copiar una BBDD a otra versión ya no deja un programa tuyo en la terminal que tiene el permiso de administrador; los volcados se cargan con sus vistas y funciones `INVOKER` cambiadas a `DEFINER` desde el principio, y al terminar el usuario de la BBDD se vuelve a crear solo con su BBDD; el MariaDB temporal nunca corre como administrador; y si una versión no se puede dejar solo para este Mac, no se arranca. No hay que hacer nada: se aplica al actualizar.
 - **Noveno repaso de seguridad (Linux 1.45.0 / Mac 1.33.0):** se aplica al actualizar y, lo de Apache, con **Protegerlas**.
   - El cliente de MariaDB y `mysqldump` ya no leen `~/.my.cnf` (un programa tuyo podía prepararlo para que cargaran una biblioteca suya en la terminal que ya tenía el permiso de administrador). Por lo mismo, git y ssh van fuera de esa terminal y curl sin `~/.curlrc`.
