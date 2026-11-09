@@ -30785,7 +30785,7 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         if body and len(body) < 10_000_000 and ctype.startswith(("application/x-www-form-urlencoded", "text/", "application/json")):
             body = to_local(body.decode("latin-1")).encode("latin-1")
         path = to_local(self.path)
-        for hop in range(4):
+        for _hop in range(4):
             with origin_lock:
                 o = dict(origin)
             headers = {}

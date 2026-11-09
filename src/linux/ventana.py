@@ -301,7 +301,7 @@ DOMAIN_RX = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([
 def clean_domain(text):
     """Dominio escrito o pegado como direccion (https://www.mitienda.com/tienda): solo el nombre."""
     d = re.sub(r"^[A-Za-z][A-Za-z0-9+.-]*://", "", text.strip())
-    return re.split(r"[/?#:\s]", d, 1)[0].rstrip(".")
+    return re.split(r"[/?#:\s]", d, maxsplit=1)[0].rstrip(".")
 
 
 # Marca con la que sudo pide la contraseña (SUDO_PROMPT). Distinta en cada ventana: un volcado o un
@@ -1840,7 +1840,7 @@ class UsageMeter:
             procs[pid] = {"ppid": int(f[1]), "cpu": int(f[11]) + int(f[12]), "argv": argv, "group": group}
         self.known = seen
         # Los hijos van con su padre (los PHP-FPM de LAMPP, las tareas de la ventana: solo las suyas)
-        for pid, pr in procs.items():
+        for _pid, pr in procs.items():
             q, depth = pr["ppid"], 0
             while pr["group"] is None and q in procs and depth < 6:
                 g = procs[q]["group"]
@@ -9287,7 +9287,7 @@ class App2(App):
         copia en la MariaDB común de Docker."""
         x = {"name": p["folder"], "db": p["db"]}
         versions = []
-        for i, db in (self.project_pairs(x) if self.data else []):
+        for i, _db in (self.project_pairs(x) if self.data else []):
             if i["folder"] not in versions:
                 versions.append(i["folder"])
         dlg = Gtk.Dialog(title="BBDD", transient_for=self.win, modal=True, use_header_bar=True)
@@ -9670,7 +9670,7 @@ class App2(App):
         envs = [("lampp", inst, db) for inst, db in pairs] + [("docker", dp, dp["db"]) for dp in dockers]
         env = Gtk.ComboBoxText()
         env.set_size_request(230, -1)
-        for kind, obj, db in envs:
+        for kind, obj, _db in envs:
             env.append_text("PHP %s · lampp-%s" % (obj["php"], obj["folder"]) if kind == "lampp"
                             else "PHP %s · Docker" % obj["php"])
         if not envs:
@@ -11497,7 +11497,7 @@ class App2(App):
                   ("lampp-%s · MariaDB %s" % (act["folder"], act["mariadb"])) if act else "ninguna activa", None),
                  ("La última que ha cambiado", latest[1][1] if latest[1] else "—",
                   ("lampp-%s · %s" % (latest[1][0], fmt_age(max(0, int(time.time()) - latest[0])))) if latest[1] else "", None)]
-        for title, value, sub, extra in cards:
+        for title, value, sub, _extra in cards:
             c = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4), "nv-stat")
             top = Gtk.Box(spacing=6)
             top.pack_start(label(title, "nv-chico", "nv-tenue", ellipsize=3), True, True, 0)
