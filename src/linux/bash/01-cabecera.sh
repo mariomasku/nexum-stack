@@ -92,6 +92,11 @@
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
 #       ponerlo todo al dia
 #
+#   lvm-instalador descargas [vaciar]
+#       La cache de descargas de las pilas propias (/var/cache/nexum-stack): el codigo de cada
+#       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
+#       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
+#
 #   lvm-instalador actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
@@ -757,6 +762,9 @@ if [ -n "$TEST_DIR" ]; then
 else
     SUDO=sudo PORT_HTTP=80 PORT_HTTPS=443 PORT_MYSQL=3306 PORT_FTP=21
 fi
+# Cache de descargas de las pilas propias (de root; descargas_cache.sh)
+DL_CACHE_DIR=/var/cache/nexum-stack
+[ -n "$TEST_DIR" ] && DL_CACHE_DIR=$TEST_DIR/descargas
 
 # Versiones de XAMPP disponibles
 # carpeta|release|PHP|Apache|MariaDB|ProFTPD|Perl|phpMyAdmin|md5 del instalador|sha256 del instalador

@@ -1793,6 +1793,8 @@ LEGACY_DIR=/Applications
 # /Applications/XAMPP: enlace a la version activa. XAMPP-compartido: htdocs y vhosts de todas.
 LINK=$APPS_DIR/XAMPP
 COMMON=$BASE_DIR/XAMPP-compartido
+# Cache de descargas de las pilas propias (de root; descargas_cache.sh)
+DL_CACHE_DIR=$BASE_DIR/descargas
 # Proyectos y vhosts compartidos (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-$COMMON/htdocs}
 VHOSTS_FILE=${LVM_VHOSTS:-$COMMON/httpd-vhosts.conf}

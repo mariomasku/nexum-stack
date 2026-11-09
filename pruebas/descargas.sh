@@ -8,6 +8,10 @@ grep -q "^function proftpd_sum()" "$SRC" || { echo "  ok    (sin proftpd_sum)"; 
 W=$(mktemp -d "$TMPBASE/descargas.XXXXXX") || exit 1
 trap 'rm -rf "${W:?}"' EXIT
 extract "$SRC" proftpd_sum download error_report
+# (desde la 1.57.6, con la cache de descargas)
+grep -q "^function download_checked()" "$SRC" && extract "$SRC" download_checked
+grep -q "^function dl_from_cache()" "$SRC" && extract "$SRC" dl_sha256 dl_cache_trusted dl_cache_sum dl_from_cache dl_note
+TEST_DIR=$W DL_CACHE_DIR=$W/descargas build=$W
 SUM=7db91f229f8c3ad18e233f38a3c1749bd11bf92e1079b6c7f86e51a3fcfce5eb
 # curl falso: la descarga directa, como el 504 de GitHub; la API, con su lista y el fichero
 curl() {
@@ -28,7 +32,7 @@ check "si la directa responde, no se usa la API" '[ "$(proftpd_sum 1.3.9e)" = "$
 rm -f "$W/directa-bien"
 check "una versión que no existe: sin suma (y no se instala)" '[ -z "$(proftpd_sum 9.9.9z)" ]'
 check "la de la API es la del mismo fichero (solo ese nombre)" 'grep -qF "if a.get(\"name\") == sys.argv[1]" "$SRC" && grep -qF "\"proftpd-\$ftp.tar.gz.sha256\"" "$SRC"'
-check "y se usa al compilar" 'grep -qF "\"\$(proftpd_sum \"\$ftp\")\" || stack_fail" "$SRC"'
+check "y se usa al compilar" 'grep -qE "\"\\\$\(proftpd_sum \"\\\$ftp\"\)\"( \"\")*( \"proftpd-\\\$ftp.tar.gz\")? \|\| stack_fail" "$SRC"'
 # El motivo en el informe
 STEP_DESC=""
 ( cd "$W" && download "https://example.org/x.tar.gz" x.tar.gz "" > /dev/null; echo "$STEP_DESC" > "$W/motivo" )

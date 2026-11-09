@@ -359,6 +359,7 @@ case "$1" in
     componentes) components_check "$2" ;;
     componentes-actualizar) components_update ;;
     actualizar-a) upgrade_to "$2" "$3" ;;
+    descargas) downloads_command "$2" ;;
     add-xampp) ( install_xampp "$2" ) ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;

@@ -365,6 +365,7 @@ case "$1" in
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     componentes) components_check "$2" ;;
     componentes-actualizar) components_update ;;
+    descargas) downloads_command "$2" ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;
     novedades) changes_text ;;

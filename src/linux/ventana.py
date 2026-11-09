@@ -2072,6 +2072,24 @@ def item_folder(item):
     return name.rsplit(".", 1)[0] if kind in ("php", "rehacer") else name
 
 
+# Caché de descargas de las pilas propias (lvm-instalador descargas)
+DL_CACHE_DIR = "/var/cache/nexum-stack"
+
+
+def downloads_cache_size():
+    """Ficheros de la caché de descargas y lo que ocupan (sin sus .sha256)."""
+    n = size = 0
+    try:
+        with os.scandir(DL_CACHE_DIR) as it:
+            for e in it:
+                if e.is_file(follow_symlinks=False) and not e.name.endswith(".sha256"):
+                    n += 1
+                    size += e.stat(follow_symlinks=False).st_size
+    except OSError:
+        pass
+    return n, size
+
+
 def fmt_size(n):
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024 or unit == "GB":
@@ -4009,6 +4027,16 @@ class App(Gtk.Application):
                          self.open_uri(GLib.filename_to_uri(copies))))
         add_row(lb, "Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones "
                 "y de la ventana", "Abrir", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))
+        # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
+        n, size = downloads_cache_size()
+        row = ActionRow("Caché de descargas",
+                        "%s: el código de los componentes ya comprobado, para no descargarlo otra vez y para "
+                        "instalar aunque su web no responda. %s" % (DL_CACHE_DIR, "Ocupa %s (%s)." % (
+                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "Está vacía."))
+        b = Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
+        b.connect("clicked", lambda *_: self.on_clear_downloads(size))
+        row.add_suffix(b)
+        lb.add(row)
         self.tools_box.pack_start(box, False, False, 0)
 
         self.build_error_logs(add_row)
@@ -5564,6 +5592,17 @@ class App(Gtk.Application):
             return
         self.run_task("Registrando lampp-%s" % name, ["add", name],
                       done_text="XAMPP registrado como lampp-%s" % name)
+
+    def on_clear_downloads(self, size):
+        """Configuración, Carpetas: vacía la caché de descargas (es de root: pide la contraseña)."""
+        if not confirm(self.win, "¿Vaciar la caché de descargas?",
+                       "Las versiones instaladas no se tocan. La próxima instalación descargará todo otra vez.",
+                       "Vaciar la caché", destructive=True,
+                       steps=["Se borra lo que hay en %s (%s)." % (DL_CACHE_DIR, fmt_size(size)),
+                              "Se pide la contraseña de administrador: la carpeta es suya."]):
+            return
+        self.run_task("Vaciando la caché de descargas", ["descargas", "vaciar"],
+                      done_text="Caché de descargas vacía", auto_close=True)
 
     def on_create_launcher(self, *_):
         def done(rc, out):

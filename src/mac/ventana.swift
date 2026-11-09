@@ -125,6 +125,23 @@ func diskSpace(_ path: String) -> (free: Int64, total: Int64)? {
     return (free, Int64(total))
 }
 
+/// Caché de descargas de las pilas propias (lvm-instalador descargas)
+let DL_CACHE_DIR = "/Library/Nexum/descargas"
+
+/// Ficheros de la caché de descargas y lo que ocupan (sin sus .sha256)
+func downloadsCacheSize() -> (files: Int, size: Int64) {
+    var files = 0
+    var size: Int64 = 0
+    let fm = FileManager.default
+    for name in (try? fm.contentsOfDirectory(atPath: DL_CACHE_DIR)) ?? [] where !name.hasSuffix(".sha256") {
+        guard let a = try? fm.attributesOfItem(atPath: DL_CACHE_DIR + "/" + name),
+              a[.type] as? FileAttributeType == .typeRegular else { continue }
+        files += 1
+        size += (a[.size] as? NSNumber)?.int64Value ?? 0
+    }
+    return (files, size)
+}
+
 func fmtSize(_ n: Int64) -> String {
     let units = ["B", "KB", "MB", "GB", "TB"]
     var v = Double(n)
@@ -3026,6 +3043,15 @@ final class AppModel: ObservableObject {
 
     func installMail() {
         runTask("Instalando Mailpit", ["correo", "instalar"], progress: true, doneText: "Mailpit instalado", autoClose: true)
+    }
+
+    /// Configuración, Carpetas: vacía la caché de descargas (es de root: pide la contraseña)
+    func clearDownloads(_ size: Int64) {
+        guard confirm("¿Vaciar la caché de descargas?", "Las versiones instaladas no se tocan. La próxima instalación descargará todo otra vez.",
+                      "Vaciar la caché", destructive: true,
+                      steps: ["Se borra lo que hay en \(DL_CACHE_DIR) (\(fmtSize(size))).",
+                              "Se pide la contraseña de administrador: la carpeta es suya."]) else { return }
+        _ = runTask("Vaciando la caché de descargas", ["descargas", "vaciar"], doneText: "Caché de descargas vacía", autoClose: true)
     }
 
     func clearMail() {
@@ -11394,6 +11420,12 @@ struct ToolsView: View {
                 }
                 Tile("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
+                }
+                // Caché de descargas de las pilas propias: lo que ocupa y vaciarla
+                let cache = downloadsCacheSize()
+                Tile("Caché de descargas", "\(DL_CACHE_DIR): el código de los componentes ya comprobado, para no descargarlo otra vez y para instalar aunque su web no responda. "
+                     + (cache.files > 0 ? "Ocupa \(fmtSize(cache.size)) (\(cache.files) \(cache.files == 1 ? "fichero" : "ficheros"))." : "Está vacía.")) {
+                    Button("Vaciar…") { model.clearDownloads(cache.size) }.disabled(model.busy || cache.files == 0)
                 }
             }
         case "oficial":

@@ -3,6 +3,7 @@
 # ===========================================================================
 
 #@incluir comun/pila-propia-version-php/progress_parts.sh
+#@incluir comun/pila-propia-version-php/descargas_cache.sh
 # Cuando MariaDB se compila (MARIADB_SRC=1) es lo que mas tarda: los tramos de los componentes
 # anteriores (0-93) se reparten en 0-53 y MariaDB usa 53-96.
 function bar_pct() {
@@ -1625,17 +1626,21 @@ function verify_sig() {
     return 1
 }
 
-# download_signed <url> <archivo> <sha256> <huellas> [url de la firma, por defecto <url>.asc]: como
-# download y, ademas, su firma. Si no esta o no es de quien lo publica, no se usa
+# download_signed <url> <archivo> <sha256> <huellas> [url de la firma, por defecto <url>.asc] [nombre]:
+# como download y, ademas, su firma. Si no esta o no es de quien lo publica, no se usa. (La de la
+# cache de descargas ya se comprobo al guardarla)
 function download_signed() {
-    local url=$1 file=$2 sum=$3 fprs=$4 sig_url=${5:-$1.asc}
-    download "$url" "$file" "$sum" || return 1
-    if ! curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file.asc" "$sig_url" 2> /dev/null \
-            || ! verify_sig "$file" "$file.asc" "$fprs"; then
-        echo "  La firma de $(basename "$url") no es buena o no es de quien lo publica. Se cancela."
-        return 1
+    local url=$1 file=$2 sum=$3 fprs=$4 sig_url=${5:-$1.asc} name=${6:-$(basename "$1")}
+    download_checked "$url" "$file" "$sum" "$name" || return 1
+    if [ "$DL_CACHED" -eq 0 ]; then
+        if ! curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file.asc" "$sig_url" 2> /dev/null \
+                || ! verify_sig "$file" "$file.asc" "$fprs"; then
+            echo "  La firma de $name no es buena o no es de quien lo publica. Se cancela."
+            return 1
+        fi
+        echo "  Firma de $name: buena"
     fi
-    echo "  Firma de $(basename "$url"): buena"
+    dl_note "$file" "$name" "$DL_SUM"
 }
 
 # download <url> <archivo> <sha256>: descarga un archivo y comprueba su suma
@@ -1658,18 +1663,37 @@ print(next((a["id"] for a in json.load(sys.stdin).get("assets", []) if a.get("na
     echo "$sum"
 }
 
+# download <url> <archivo> <sha256> [nombre en la cache de descargas, por defecto el de la url]
 function download() {
-    local url=$1 file=$2 sum=$3
+    download_checked "$@" && dl_note "$2" "${4:-$(basename "$1")}" "$DL_SUM"
+}
+
+# download_checked <url> <archivo> <sha256> [nombre]: el fichero de la cache de descargas si esta con esa
+# suma (o, si su web no la da, con la que se guardo) o, si no, descargado y comprobado. Deja la suma
+# en DL_SUM y DL_CACHED=1 si sale de la cache
+function download_checked() {
+    local url=$1 file=$2 sum=$3 name=${4:-$(basename "$1")}
+    DL_CACHED=0 DL_SUM=$sum
+
+    if dl_from_cache "$name" "$file" "$sum"; then
+        DL_CACHED=1
+        if [ -z "$sum" ]; then
+            echo "  Su web no da la suma sha256 de $name: se usa el de la cache de descargas (ya comprobado)"
+        else
+            echo "  $name: de la cache de descargas (sha256 comprobada)"
+        fi
+        return 0
+    fi
 
     # (STEP_DESC: el motivo, para el informe del error si falla aqui, antes de compilar nada)
     if [ -z "$sum" ]; then
-        echo "  No se ha encontrado la suma sha256 de $(basename "$url")"
-        STEP_DESC="no se ha podido leer la suma sha256 de $(basename "$url") (su web no responde: prueba en un rato)"
+        echo "  No se ha encontrado la suma sha256 de $name"
+        STEP_DESC="no se ha podido leer la suma sha256 de $name (su web no responde: prueba en un rato)"
 
         return 1
     fi
 
-    echo "  Descargando $(basename "$url")..."
+    echo "  Descargando $name..."
     curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || {
         echo "  No se pudo descargar $url"
         STEP_DESC="no se ha podido descargar $url (su web no responde: prueba en un rato)"
@@ -1677,8 +1701,8 @@ function download() {
     }
 
     if [ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sum" ]; then
-        echo "  $(basename "$url") no coincide con su suma sha256. Se cancela."
-        STEP_DESC="$(basename "$url") no coincide con su suma sha256: no se instala"
+        echo "  $name no coincide con su suma sha256. Se cancela."
+        STEP_DESC="$name no coincide con su suma sha256: no se instala"
 
         return 1
     fi
@@ -1694,7 +1718,8 @@ function download_apache() {
         [ -n "$sum" ] && download_signed "$base/$1" "$2" "$sum" "$GPG_FPR_APACHE" && return 0
     done
 
-    return 1
+    # (ninguna de las dos responde: el de la cache de descargas, si esta)
+    [ -z "$sum" ] && download_signed "" "$2" "" "$GPG_FPR_APACHE" "" "$(basename "$1")"
 }
 
 # step <componente> <desde> <hasta> <lineas> <descripcion> <log> <comando...>
@@ -2520,7 +2545,7 @@ function stack_build_phase() {
     download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
         "$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
     download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
-        "$(proftpd_sum "$ftp")" || stack_fail
+        "$(proftpd_sum "$ftp")" "proftpd-$ftp.tar.gz" || stack_fail
     download_signed "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
         "$(pma_sum "$pma")" "$GPG_FPR_PMA" || stack_fail
     local mariadb_sig
@@ -2531,14 +2556,20 @@ function stack_build_phase() {
         echo "  MariaDB $mariadb ocupa unos 450 MB, puede tardar."
         progress 1 2 10 "MariaDB (450 MB)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
     fi
-    download "$mariadb_url" mariadb.tar.gz "$mariadb_sha" || stack_fail
-    # (la firma de MariaDB viene con la sha256 en su API: se comprueba con su clave)
-    if ! base64 -d <<< "$mariadb_sig" > mariadb.tar.gz.asc 2> /dev/null \
-            || ! verify_sig mariadb.tar.gz mariadb.tar.gz.asc "$GPG_FPR_MARIADB"; then
-        echo "  La firma de MariaDB $mariadb no es buena o no es de MariaDB. Se cancela."
-        stack_fail
+    local mariadb_name=mariadb-$mariadb-binario.tar.gz
+    [ $MARIADB_SRC -eq 1 ] && mariadb_name=mariadb-$mariadb-fuente.tar.gz
+    download_checked "$mariadb_url" mariadb.tar.gz "$mariadb_sha" "$mariadb_name" || stack_fail
+    # (la firma de MariaDB viene con la sha256 en su API: se comprueba con su clave; la de la cache ya
+    # se comprobo al guardarla)
+    if [ "$DL_CACHED" -eq 0 ]; then
+        if ! base64 -d <<< "$mariadb_sig" > mariadb.tar.gz.asc 2> /dev/null \
+                || ! verify_sig mariadb.tar.gz mariadb.tar.gz.asc "$GPG_FPR_MARIADB"; then
+            echo "  La firma de MariaDB $mariadb no es buena o no es de MariaDB. Se cancela."
+            stack_fail
+        fi
+        echo "  Firma de MariaDB $mariadb: buena"
     fi
-    echo "  Firma de MariaDB $mariadb: buena"
+    dl_note mariadb.tar.gz "$mariadb_name" "$DL_SUM"
 
     echo "Apache $apache (con APR $apr y APR-util $aprutil)"
     tar -xjf httpd.tar.bz2 && tar -xjf apr.tar.bz2 && tar -xjf apr-util.tar.bz2 || stack_fail
@@ -2635,7 +2666,8 @@ function stack_build_phase() {
 
     if [ $MARIADB_SRC -eq 1 ]; then
         echo "MariaDB $mariadb (se compila: no hay binario oficial para $(uname -m); es lo que mas tarda)"
-        tar -xzf mariadb.tar.gz && rm -f mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
+        # (mariadb.tar.gz se queda hasta el final: se guarda en la cache de descargas)
+        tar -xzf mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
         step 6 53 55 0 "Configurando" "$build/mariadb-configure.log" cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$target/mysql" \
             -DCMAKE_INSTALL_RPATH="$target/mysql/lib" -DWITH_SSL=system -DWITH_PCRE=system \
@@ -2654,7 +2686,6 @@ function stack_build_phase() {
         mkdir -p "$S/mysql"
         step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
             --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
-        rm -f mariadb.tar.gz
     fi
     # Sin simbolos de depuracion ocupa unos 600 MB menos
     find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \
@@ -2739,6 +2770,9 @@ function install_stack() {
     local pma=$(latest_pma)
     local php_sha=$(curl -q --proto =https --proto-redir =https -fsSL "https://www.php.net/releases/index.php?json&version=$version" \
         | python3 -I -c 'import json,sys; print([s["sha256"] for s in json.load(sys.stdin)["source"] if s["filename"].endswith(".tar.xz")][0])' 2> /dev/null)
+
+    # (lo que no responda, de la cache de descargas si esta)
+    stack_cache_fallback "$(native_binaries && echo binario || echo fuente)"
 
     local missing=""
     [ -z "$php_sha" ] && missing+=" PHP-$version"
@@ -2849,6 +2883,8 @@ function install_stack() {
                 [ -f "$f" ] && config="$logs/${f#"$build/fallo-"}" && cp "$f" "$config"
             done
         fi
+        # (lo ya descargado y comprobado, a la cache: al reintentar no se descarga otra vez)
+        stack_cache_store -n
         stack_rm_build
         error_report "$logs/informe-error.txt" "$stack_line" "${STEP_LOG:+$logs/$(basename "$STEP_LOG")}" "$STEP_DESC" "$config"
         echo "No se ha instalado nada. Logs de la compilacion en $logs"
@@ -2943,6 +2979,7 @@ function install_stack() {
     fi
 
     [ -n "$aside" ] && $SUDO rm -R --one-file-system "$aside"
+    stack_cache_store
     stack_rm_build
 
     if [ $was_running -eq 1 ]; then

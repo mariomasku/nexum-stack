@@ -89,6 +89,11 @@
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
 #       ponerlo todo al dia
 #
+#   lvm-instalador descargas [vaciar]
+#       La cache de descargas de las pilas propias (/Library/Nexum/descargas): el codigo de cada
+#       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
+#       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
+#
 #   lvm-instalador pasar-version <origen> <destino>
 #       Tras instalar el parche nuevo a su lado: copia a la nueva las BBDD de la anterior, con sus
 #       vinculos, y la activa si la anterior era la activa (la anterior no se toca)

@@ -92,6 +92,11 @@
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
 #       ponerlo todo al dia
 #
+#   lvm-instalador descargas [vaciar]
+#       La cache de descargas de las pilas propias (/var/cache/nexum-stack): el codigo de cada
+#       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
+#       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
+#
 #   lvm-instalador actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
@@ -757,6 +762,9 @@ if [ -n "$TEST_DIR" ]; then
 else
     SUDO=sudo PORT_HTTP=80 PORT_HTTPS=443 PORT_MYSQL=3306 PORT_FTP=21
 fi
+# Cache de descargas de las pilas propias (de root; descargas_cache.sh)
+DL_CACHE_DIR=/var/cache/nexum-stack
+[ -n "$TEST_DIR" ] && DL_CACHE_DIR=$TEST_DIR/descargas
 
 # Versiones de XAMPP disponibles
 # carpeta|release|PHP|Apache|MariaDB|ProFTPD|Perl|phpMyAdmin|md5 del instalador|sha256 del instalador
@@ -8371,6 +8379,291 @@ function task_detail() {
     echo "S|$TASK_CUR|$(( (TASK_CUR - 1) * 100 / n ))|$(( TASK_CUR * 100 / n ))|$1|$2|$3|$4|$5" >> "$LVM_PROGRESO"
 }
 
+# Cache de descargas de las pilas propias (DL_CACHE_DIR, de root): el codigo de cada componente ya
+# comprobado (su sha256 y, si la tiene, su firma), con su suma al lado (<nombre>.sha256). Al instalar:
+# - si un fichero esta y su suma es la que publica su web, no se vuelve a descargar;
+# - si su web no da la suma (no responde), se usa el de la cache, que se comprobo al guardarlo;
+# - si no se puede consultar el ultimo parche de un componente, se usa el mas nuevo de su rama que
+#   haya en la cache (stack_cache_fallback), con un aviso.
+# Lo guarda root al terminar (bien o mal: un reintento ya no lo descarga otra vez). De cada componente
+# y rama se queda solo el ultimo que se ha usado. Nada de lo tuyo (tu usuario) puede cambiarla.
+
+# dl_sha256 <archivo>: su suma sha256
+function dl_sha256() {
+    if command -v sha256sum > /dev/null; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+# dl_cache_trusted: ¿la cache y la carpeta que la contiene son de root y solo root escribe en ellas?
+# (si no, no se usa: en las pruebas, la de TEST_DIR)
+function dl_cache_trusted() {
+    [ -n "$TEST_DIR" ] && return 0
+    [ -d "$DL_CACHE_DIR" ] && [ ! -L "$DL_CACHE_DIR" ] || return 1
+    [ $(( $(find "$DL_CACHE_DIR" "${DL_CACHE_DIR%/*}" -maxdepth 0 -user 0 ! -perm -020 ! -perm -002 2> /dev/null | wc -l) )) -eq 2 ]
+}
+
+# dl_cache_sum <nombre>: la suma con la que se guardo <nombre> en la cache (nada si no esta)
+function dl_cache_sum() {
+    local f=$DL_CACHE_DIR/$1
+    [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] && dl_cache_trusted || return 0
+    [ -f "$f" ] && [ ! -L "$f" ] && [ -f "$f.sha256" ] && [ ! -L "$f.sha256" ] || return 0
+    grep -m 1 -oE '^[0-9a-f]{64}' "$f.sha256"
+}
+
+# dl_from_cache <nombre> <archivo> <sha256 o "">: copia <nombre> de la cache a <archivo> si su suma es
+# esa (o, sin suma, la guardada) y lo comprueba otra vez. Deja la suma en DL_SUM. 1 si no esta
+function dl_from_cache() {
+    local name=$1 file=$2 sum=$3 saved
+    saved=$(dl_cache_sum "$name")
+    [ -n "$saved" ] || return 1
+    [ -z "$sum" ] && sum=$saved
+    [ "$saved" == "$sum" ] || return 1
+    cp "$DL_CACHE_DIR/$name" "$file" 2> /dev/null || return 1
+    if [ "$(dl_sha256 "$file")" != "$sum" ]; then
+        rm -f "$file"
+        return 1
+    fi
+    DL_SUM=$sum
+}
+
+# dl_note <archivo> <nombre> <sha256>: apunta una descarga ya comprobada, para guardarla en la cache
+function dl_note() {
+    printf '%s|%s|%s\n' "$1" "$2" "$3" >> "$build/descargas.lista"
+}
+
+# dl_cache_latest <antes> <despues> <expresion de la version>: la version mas nueva de la cache entre
+# los <antes><version><despues> (httpd- .tar.bz2 '2\.4\.[0-9]+' -> 2.4.62)
+function dl_cache_latest() {
+    local f n v found=()
+    dl_cache_trusted || return 0
+    for f in "$DL_CACHE_DIR/$1"*"$2"; do
+        n=${f##*/} v=${n#"$1"} v=${v%"$2"}
+        [[ "$v" =~ ^($3)$ ]] && [ -n "$(dl_cache_sum "$n")" ] && found+=("$v")
+    done
+    [ ${#found[@]} -eq 0 ] || printf '%s\n' "${found[@]}" | sort -V | tail -1
+}
+
+# Una rama (2.4) como expresion (2\.4)
+function dl_re() {
+    sed 's/\./\\./g' <<< "$1"
+}
+
+# stack_cache_fallback <binario|fuente>: lo que install_stack no ha podido consultar (su web no
+# responde) sale de la cache, si esta: el ultimo parche de cada componente que haya ahi de su rama y
+# la suma de PHP. Cambia las variables de install_stack (php_sha, apache, apr, aprutil, mariadb,
+# mariadb_info, ftp, perl; branches son sus ramas)
+function stack_cache_fallback() {
+    local kind=$1 v
+    if [ -z "$php_sha" ]; then
+        php_sha=$(dl_cache_sum "php-$version.tar.xz")
+        [ -n "$php_sha" ] && echo "Aviso: php.net no responde: PHP $version sale de la cache de descargas (ya comprobado)"
+    fi
+    if [ -z "$apache" ]; then
+        apache=$(dl_cache_latest httpd- .tar.bz2 "$(dl_re "${branches[0]}")\.[0-9]+")
+        [ -n "$apache" ] && dl_fallback_note "Apache ${branches[0]}" "$apache"
+    fi
+    if [ -z "$apr" ]; then
+        apr=$(dl_cache_latest apr- .tar.bz2 '1\.[0-9]+\.[0-9]+')
+        [ -n "$apr" ] && dl_fallback_note "APR" "$apr"
+    fi
+    if [ -z "$aprutil" ]; then
+        aprutil=$(dl_cache_latest apr-util- .tar.bz2 '1\.[0-9]+\.[0-9]+')
+        [ -n "$aprutil" ] && dl_fallback_note "APR-util" "$aprutil"
+    fi
+    if [ -z "$mariadb" ]; then
+        v=$(dl_cache_latest mariadb- "-$kind.tar.gz" "$(dl_re "${branches[1]}")\.[0-9]+")
+        if [ -n "$v" ]; then
+            mariadb=$v mariadb_info="$v||$(dl_cache_sum "mariadb-$v-$kind.tar.gz")|"
+            dl_fallback_note "MariaDB ${branches[1]}" "$v"
+        fi
+    fi
+    if [ -z "$ftp" ]; then
+        ftp=$(dl_cache_latest proftpd- .tar.gz "$(dl_re "${branches[2]}")[a-z]?")
+        [ -n "$ftp" ] && dl_fallback_note "ProFTPD ${branches[2]}" "$ftp"
+    fi
+    if [ -z "$perl" ]; then
+        perl=$(dl_cache_latest perl- .tar.xz "$(dl_re "${branches[3]}")\.[0-9]+")
+        [ -n "$perl" ] && dl_fallback_note "Perl ${branches[3]}" "$perl"
+    fi
+    return 0
+}
+
+function dl_fallback_note() {
+    echo "Aviso: no se ha podido consultar el ultimo parche de $1 (su web no responde): se usa $2, el mas"
+    echo "  nuevo de la cache de descargas (ya comprobado; si hay uno mas nuevo, actualiza despues)"
+}
+
+# Guarda en la cache, como root, lo apuntado en <compilacion>/descargas.lista: cada fichero se copia
+# sin seguir enlaces y se comprueba otra vez su suma al copiarlo. Despues, de cada componente y rama
+# (php-8.4, httpd-2.4, mariadb-11.4-binario...) solo se deja el ultimo que se ha usado.
+# Uso: <compilacion> <cache>. Escribe G|<nombre> por cada uno guardado y B|<nombre> por cada uno borrado
+DL_CACHE_PY='
+import hashlib, os, re, stat, sys
+build, cache = sys.argv[1:3]
+NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SUM = re.compile(r"^[0-9a-f]{64}$")
+# (php-8.4.27.tar.xz -> php-8.4.tar.xz; proftpd-1.3.9a.tar.gz -> proftpd-1.3.tar.gz)
+FAMILY = re.compile(r"^(.*?[0-9]+\.[0-9]+)\.[0-9]+[a-z]?(\D.*)$")
+me = os.getuid()
+
+def private_dir(p):
+    st = os.lstat(p)
+    return stat.S_ISDIR(st.st_mode) and st.st_uid == me and not st.st_mode & 0o022
+
+def unlink(p):
+    try:
+        os.unlink(p)
+    except OSError:
+        pass
+
+def sha256_of(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def write_sum(dst, s, name):
+    tmp = dst + ".sha256.tmp"
+    unlink(tmp)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "w") as f:
+        f.write("%s  %s\n" % (s, name))
+    os.rename(tmp, dst + ".sha256")
+
+try:
+    if not os.path.lexists(cache):
+        os.makedirs(cache, 0o755)
+    if not private_dir(cache) or not private_dir(os.path.dirname(cache)):
+        sys.exit("La cache de descargas %s no es solo de root: no se usa" % cache)
+    os.chmod(cache, 0o755)
+except OSError as e:
+    sys.exit("No se puede usar la cache de descargas: %s" % e)
+
+try:
+    with open(os.path.join(build, "descargas.lista")) as f:
+        lines = f.read().splitlines()
+except OSError:
+    lines = []
+
+for line in lines:
+    parts = line.split("|")
+    if len(parts) != 3:
+        continue
+    rel, name, s = parts
+    if not NAME.match(rel) or not NAME.match(name) or name.endswith((".sha256", ".tmp")) or not SUM.match(s):
+        continue
+    dst = os.path.join(cache, name)
+    # (si ya esta, y bien, solo se marca como usado)
+    try:
+        with open(dst + ".sha256") as f:
+            if f.read().split()[:1] == [s] and stat.S_ISREG(os.lstat(dst).st_mode) and sha256_of(dst) == s:
+                os.utime(dst)
+                os.utime(dst + ".sha256")
+                continue
+    except OSError:
+        pass
+    tmp = dst + ".tmp"
+    unlink(tmp)
+    try:
+        src = os.open(os.path.join(build, rel), os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        continue
+    h = hashlib.sha256()
+    try:
+        with os.fdopen(src, "rb") as fin:
+            if not stat.S_ISREG(os.fstat(fin.fileno()).st_mode):
+                continue
+            out = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+            with os.fdopen(out, "wb") as fout:
+                for chunk in iter(lambda: fin.read(1 << 20), b""):
+                    h.update(chunk)
+                    fout.write(chunk)
+        if h.hexdigest() != s:
+            unlink(tmp)
+            continue
+        os.rename(tmp, dst)
+        write_sum(dst, s, name)
+        print("G|" + name)
+    except OSError:
+        unlink(tmp)
+
+# De cada familia, el ultimo usado; y nada a medias
+files = {}
+for n in os.listdir(cache):
+    p = os.path.join(cache, n)
+    if n.endswith(".tmp"):
+        unlink(p)
+        continue
+    if n.endswith(".sha256") or not stat.S_ISREG(os.lstat(p).st_mode):
+        continue
+    m = FAMILY.match(n)
+    files.setdefault(m.group(1) + m.group(2) if m else n, []).append((os.lstat(p).st_mtime, n))
+for group in files.values():
+    group.sort(reverse=True)
+    for _, n in group[1:]:
+        unlink(os.path.join(cache, n))
+        unlink(os.path.join(cache, n + ".sha256"))
+        print("B|" + n)
+for n in os.listdir(cache):
+    if n.endswith(".sha256") and not os.path.exists(os.path.join(cache, n[:-7])):
+        unlink(os.path.join(cache, n))
+'
+
+# stack_cache_store [-n]: guarda en la cache lo que ha descargado esta instalacion (en $build). Con -n,
+# sin pedir la contraseña (al fallar: si ya no vale la de antes, no se guarda y ya esta)
+function stack_cache_store() {
+    local sudo=$SUDO out n
+    [ -n "$sudo" ] && [ "$1" == "-n" ] && sudo="sudo -n"
+    [ -s "$build/descargas.lista" ] || return 0
+    out=$($sudo /usr/bin/python3 -I -c "$DL_CACHE_PY" "$build" "$DL_CACHE_DIR" 2>&1 < /dev/null) || {
+        [ -n "$out" ] && echo "  $out"
+        return 0
+    }
+    n=$(grep -c '^G|' <<< "$out")
+    [ "$n" -gt 0 ] && echo "Guardado en la cache de descargas ($DL_CACHE_DIR): $n fichero(s)"
+    return 0
+}
+
+# lvm-instalador descargas [vaciar]: lo que hay en la cache de descargas y cuanto ocupa, o vaciarla
+function downloads_command() {
+    local f total=0 n=0 size
+    case "${1:-}" in
+        ""|lista)
+            if [ ! -d "$DL_CACHE_DIR" ] || ! dl_cache_trusted; then
+                echo "La cache de descargas ($DL_CACHE_DIR) esta vacia"
+                return 0
+            fi
+            for f in "$DL_CACHE_DIR"/*; do
+                [ -f "$f" ] && [ ! -L "$f" ] && [[ "$f" != *.sha256 ]] || continue
+                size=$(wc -c < "$f" | tr -d ' ')
+                total=$((total + size)) n=$((n + 1))
+                printf '  %-50s %6s MB\n' "${f##*/}" "$(( (size + 524288) / 1048576 ))"
+            done
+            echo "Cache de descargas ($DL_CACHE_DIR): $n fichero(s), $(( (total + 524288) / 1048576 )) MB"
+            ;;
+        vaciar)
+            if [ ! -d "$DL_CACHE_DIR" ]; then
+                echo "La cache de descargas ya esta vacia"
+                return 0
+            fi
+            [ -L "$DL_CACHE_DIR" ] && { echo "$DL_CACHE_DIR es un enlace: no se toca"; return 1; }
+            if [ "$DRY" -eq 1 ]; then
+                echo "  [simulacion] se borraria todo lo de $DL_CACHE_DIR"
+                return 0
+            fi
+            $SUDO find "$DL_CACHE_DIR" -mindepth 1 -maxdepth 1 -type f -delete || return 1
+            echo "Cache de descargas vacia: la proxima instalacion lo descarga todo otra vez"
+            ;;
+        *)
+            echo "Uso: lvm-instalador descargas [vaciar]"
+            return 1
+            ;;
+    esac
+}
 # Cuando MariaDB se compila (MARIADB_SRC=1) es lo que mas tarda: los tramos de los componentes
 # anteriores (0-93) se reparten en 0-53 y MariaDB usa 53-96.
 function bar_pct() {
@@ -9993,17 +10286,21 @@ function verify_sig() {
     return 1
 }
 
-# download_signed <url> <archivo> <sha256> <huellas> [url de la firma, por defecto <url>.asc]: como
-# download y, ademas, su firma. Si no esta o no es de quien lo publica, no se usa
+# download_signed <url> <archivo> <sha256> <huellas> [url de la firma, por defecto <url>.asc] [nombre]:
+# como download y, ademas, su firma. Si no esta o no es de quien lo publica, no se usa. (La de la
+# cache de descargas ya se comprobo al guardarla)
 function download_signed() {
-    local url=$1 file=$2 sum=$3 fprs=$4 sig_url=${5:-$1.asc}
-    download "$url" "$file" "$sum" || return 1
-    if ! curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file.asc" "$sig_url" 2> /dev/null \
-            || ! verify_sig "$file" "$file.asc" "$fprs"; then
-        echo "  La firma de $(basename "$url") no es buena o no es de quien lo publica. Se cancela."
-        return 1
+    local url=$1 file=$2 sum=$3 fprs=$4 sig_url=${5:-$1.asc} name=${6:-$(basename "$1")}
+    download_checked "$url" "$file" "$sum" "$name" || return 1
+    if [ "$DL_CACHED" -eq 0 ]; then
+        if ! curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file.asc" "$sig_url" 2> /dev/null \
+                || ! verify_sig "$file" "$file.asc" "$fprs"; then
+            echo "  La firma de $name no es buena o no es de quien lo publica. Se cancela."
+            return 1
+        fi
+        echo "  Firma de $name: buena"
     fi
-    echo "  Firma de $(basename "$url"): buena"
+    dl_note "$file" "$name" "$DL_SUM"
 }
 
 # download <url> <archivo> <sha256>: descarga un archivo y comprueba su suma
@@ -10026,18 +10323,37 @@ print(next((a["id"] for a in json.load(sys.stdin).get("assets", []) if a.get("na
     echo "$sum"
 }
 
+# download <url> <archivo> <sha256> [nombre en la cache de descargas, por defecto el de la url]
 function download() {
-    local url=$1 file=$2 sum=$3
+    download_checked "$@" && dl_note "$2" "${4:-$(basename "$1")}" "$DL_SUM"
+}
+
+# download_checked <url> <archivo> <sha256> [nombre]: el fichero de la cache de descargas si esta con esa
+# suma (o, si su web no la da, con la que se guardo) o, si no, descargado y comprobado. Deja la suma
+# en DL_SUM y DL_CACHED=1 si sale de la cache
+function download_checked() {
+    local url=$1 file=$2 sum=$3 name=${4:-$(basename "$1")}
+    DL_CACHED=0 DL_SUM=$sum
+
+    if dl_from_cache "$name" "$file" "$sum"; then
+        DL_CACHED=1
+        if [ -z "$sum" ]; then
+            echo "  Su web no da la suma sha256 de $name: se usa el de la cache de descargas (ya comprobado)"
+        else
+            echo "  $name: de la cache de descargas (sha256 comprobada)"
+        fi
+        return 0
+    fi
 
     # (STEP_DESC: el motivo, para el informe del error si falla aqui, antes de compilar nada)
     if [ -z "$sum" ]; then
-        echo "  No se ha encontrado la suma sha256 de $(basename "$url")"
-        STEP_DESC="no se ha podido leer la suma sha256 de $(basename "$url") (su web no responde: prueba en un rato)"
+        echo "  No se ha encontrado la suma sha256 de $name"
+        STEP_DESC="no se ha podido leer la suma sha256 de $name (su web no responde: prueba en un rato)"
 
         return 1
     fi
 
-    echo "  Descargando $(basename "$url")..."
+    echo "  Descargando $name..."
     curl -q --proto =https --proto-redir =https -fsSL --retry 2 -o "$file" "$url" || {
         echo "  No se pudo descargar $url"
         STEP_DESC="no se ha podido descargar $url (su web no responde: prueba en un rato)"
@@ -10045,8 +10361,8 @@ function download() {
     }
 
     if [ "$(sha256sum "$file" | cut -d' ' -f1)" != "$sum" ]; then
-        echo "  $(basename "$url") no coincide con su suma sha256. Se cancela."
-        STEP_DESC="$(basename "$url") no coincide con su suma sha256: no se instala"
+        echo "  $name no coincide con su suma sha256. Se cancela."
+        STEP_DESC="$name no coincide con su suma sha256: no se instala"
 
         return 1
     fi
@@ -10062,7 +10378,8 @@ function download_apache() {
         [ -n "$sum" ] && download_signed "$base/$1" "$2" "$sum" "$GPG_FPR_APACHE" && return 0
     done
 
-    return 1
+    # (ninguna de las dos responde: el de la cache de descargas, si esta)
+    [ -z "$sum" ] && download_signed "" "$2" "" "$GPG_FPR_APACHE" "" "$(basename "$1")"
 }
 
 # step <componente> <desde> <hasta> <lineas> <descripcion> <log> <comando...>
@@ -10908,7 +11225,7 @@ function stack_build_phase() {
     download "https://www.cpan.org/src/5.0/perl-$perl.tar.xz" perl.tar.xz \
         "$(curl -q --proto =https --proto-redir =https -fsSL --retry 2 --max-time 60 "https://www.cpan.org/src/5.0/perl-$perl.tar.xz.sha256.txt" | grep -oE '^[0-9a-f]{64}')" || stack_fail
     download "https://github.com/proftpd/proftpd/archive/refs/tags/v$ftp.tar.gz" proftpd.tar.gz \
-        "$(proftpd_sum "$ftp")" || stack_fail
+        "$(proftpd_sum "$ftp")" "proftpd-$ftp.tar.gz" || stack_fail
     download_signed "https://files.phpmyadmin.net/phpMyAdmin/$pma/phpMyAdmin-$pma-all-languages.tar.xz" pma.tar.xz \
         "$(pma_sum "$pma")" "$GPG_FPR_PMA" || stack_fail
     local mariadb_sig
@@ -10919,14 +11236,20 @@ function stack_build_phase() {
         echo "  MariaDB $mariadb ocupa unos 450 MB, puede tardar."
         progress 1 2 10 "MariaDB (450 MB)" bytes "$build/mariadb.tar.gz" "$(remote_size "$mariadb_url")"
     fi
-    download "$mariadb_url" mariadb.tar.gz "$mariadb_sha" || stack_fail
-    # (la firma de MariaDB viene con la sha256 en su API: se comprueba con su clave)
-    if ! base64 -d <<< "$mariadb_sig" > mariadb.tar.gz.asc 2> /dev/null \
-            || ! verify_sig mariadb.tar.gz mariadb.tar.gz.asc "$GPG_FPR_MARIADB"; then
-        echo "  La firma de MariaDB $mariadb no es buena o no es de MariaDB. Se cancela."
-        stack_fail
+    local mariadb_name=mariadb-$mariadb-binario.tar.gz
+    [ $MARIADB_SRC -eq 1 ] && mariadb_name=mariadb-$mariadb-fuente.tar.gz
+    download_checked "$mariadb_url" mariadb.tar.gz "$mariadb_sha" "$mariadb_name" || stack_fail
+    # (la firma de MariaDB viene con la sha256 en su API: se comprueba con su clave; la de la cache ya
+    # se comprobo al guardarla)
+    if [ "$DL_CACHED" -eq 0 ]; then
+        if ! base64 -d <<< "$mariadb_sig" > mariadb.tar.gz.asc 2> /dev/null \
+                || ! verify_sig mariadb.tar.gz mariadb.tar.gz.asc "$GPG_FPR_MARIADB"; then
+            echo "  La firma de MariaDB $mariadb no es buena o no es de MariaDB. Se cancela."
+            stack_fail
+        fi
+        echo "  Firma de MariaDB $mariadb: buena"
     fi
-    echo "  Firma de MariaDB $mariadb: buena"
+    dl_note mariadb.tar.gz "$mariadb_name" "$DL_SUM"
 
     echo "Apache $apache (con APR $apr y APR-util $aprutil)"
     tar -xjf httpd.tar.bz2 && tar -xjf apr.tar.bz2 && tar -xjf apr-util.tar.bz2 || stack_fail
@@ -11023,7 +11346,8 @@ function stack_build_phase() {
 
     if [ $MARIADB_SRC -eq 1 ]; then
         echo "MariaDB $mariadb (se compila: no hay binario oficial para $(uname -m); es lo que mas tarda)"
-        tar -xzf mariadb.tar.gz && rm -f mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
+        # (mariadb.tar.gz se queda hasta el final: se guarda en la cache de descargas)
+        tar -xzf mariadb.tar.gz && cd "mariadb-$mariadb" || stack_fail
         step 6 53 55 0 "Configurando" "$build/mariadb-configure.log" cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$target/mysql" \
             -DCMAKE_INSTALL_RPATH="$target/mysql/lib" -DWITH_SSL=system -DWITH_PCRE=system \
@@ -11042,7 +11366,6 @@ function stack_build_phase() {
         mkdir -p "$S/mysql"
         step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
             --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
-        rm -f mariadb.tar.gz
     fi
     # Sin simbolos de depuracion ocupa unos 600 MB menos
     find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \
@@ -11127,6 +11450,9 @@ function install_stack() {
     local pma=$(latest_pma)
     local php_sha=$(curl -q --proto =https --proto-redir =https -fsSL "https://www.php.net/releases/index.php?json&version=$version" \
         | python3 -I -c 'import json,sys; print([s["sha256"] for s in json.load(sys.stdin)["source"] if s["filename"].endswith(".tar.xz")][0])' 2> /dev/null)
+
+    # (lo que no responda, de la cache de descargas si esta)
+    stack_cache_fallback "$(native_binaries && echo binario || echo fuente)"
 
     local missing=""
     [ -z "$php_sha" ] && missing+=" PHP-$version"
@@ -11237,6 +11563,8 @@ function install_stack() {
                 [ -f "$f" ] && config="$logs/${f#"$build/fallo-"}" && cp "$f" "$config"
             done
         fi
+        # (lo ya descargado y comprobado, a la cache: al reintentar no se descarga otra vez)
+        stack_cache_store -n
         stack_rm_build
         error_report "$logs/informe-error.txt" "$stack_line" "${STEP_LOG:+$logs/$(basename "$STEP_LOG")}" "$STEP_DESC" "$config"
         echo "No se ha instalado nada. Logs de la compilacion en $logs"
@@ -11331,6 +11659,7 @@ function install_stack() {
     fi
 
     [ -n "$aside" ] && $SUDO rm -R --one-file-system "$aside"
+    stack_cache_store
     stack_rm_build
 
     if [ $was_running -eq 1 ]; then
@@ -12679,6 +13008,12 @@ QUE HACE
 VERSIONES
 
 1.57.6 (9 nov 2026)
+- Caché de descargas: el código de cada componente que se instala
+  (PHP, Apache, MariaDB, phpMyAdmin...) se guarda ya comprobado en
+  /var/cache/nexum-stack. Al reintentar una instalación que falló no se
+  descarga otra vez, y si la web de un componente no responde se usa
+  el de la caché en vez de cancelar. Se ve y se vacía en
+  Configuración, Carpetas (o lvm-instalador descargas).
 - Mantenimiento: el código va ahora en ficheros por partes y se revisa
   solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
   nada cambia por fuera.
@@ -22101,6 +22436,24 @@ def item_folder(item):
     return name.rsplit(".", 1)[0] if kind in ("php", "rehacer") else name
 
 
+# Caché de descargas de las pilas propias (lvm-instalador descargas)
+DL_CACHE_DIR = "/var/cache/nexum-stack"
+
+
+def downloads_cache_size():
+    """Ficheros de la caché de descargas y lo que ocupan (sin sus .sha256)."""
+    n = size = 0
+    try:
+        with os.scandir(DL_CACHE_DIR) as it:
+            for e in it:
+                if e.is_file(follow_symlinks=False) and not e.name.endswith(".sha256"):
+                    n += 1
+                    size += e.stat(follow_symlinks=False).st_size
+    except OSError:
+        pass
+    return n, size
+
+
 def fmt_size(n):
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024 or unit == "GB":
@@ -24038,6 +24391,16 @@ class App(Gtk.Application):
                          self.open_uri(GLib.filename_to_uri(copies))))
         add_row(lb, "Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones "
                 "y de la ventana", "Abrir", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))
+        # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
+        n, size = downloads_cache_size()
+        row = ActionRow("Caché de descargas",
+                        "%s: el código de los componentes ya comprobado, para no descargarlo otra vez y para "
+                        "instalar aunque su web no responda. %s" % (DL_CACHE_DIR, "Ocupa %s (%s)." % (
+                            fmt_size(size), plural(n, "fichero", "ficheros")) if n else "Está vacía."))
+        b = Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
+        b.connect("clicked", lambda *_: self.on_clear_downloads(size))
+        row.add_suffix(b)
+        lb.add(row)
         self.tools_box.pack_start(box, False, False, 0)
 
         self.build_error_logs(add_row)
@@ -25593,6 +25956,17 @@ class App(Gtk.Application):
             return
         self.run_task("Registrando lampp-%s" % name, ["add", name],
                       done_text="XAMPP registrado como lampp-%s" % name)
+
+    def on_clear_downloads(self, size):
+        """Configuración, Carpetas: vacía la caché de descargas (es de root: pide la contraseña)."""
+        if not confirm(self.win, "¿Vaciar la caché de descargas?",
+                       "Las versiones instaladas no se tocan. La próxima instalación descargará todo otra vez.",
+                       "Vaciar la caché", destructive=True,
+                       steps=["Se borra lo que hay en %s (%s)." % (DL_CACHE_DIR, fmt_size(size)),
+                              "Se pide la contraseña de administrador: la carpeta es suya."]):
+            return
+        self.run_task("Vaciando la caché de descargas", ["descargas", "vaciar"],
+                      done_text="Caché de descargas vacía", auto_close=True)
 
     def on_create_launcher(self, *_):
         def done(rc, out):
@@ -34669,6 +35043,7 @@ case "$1" in
     componentes) components_check "$2" ;;
     componentes-actualizar) components_update ;;
     actualizar-a) upgrade_to "$2" "$3" ;;
+    descargas) downloads_command "$2" ;;
     add-xampp) ( install_xampp "$2" ) ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;

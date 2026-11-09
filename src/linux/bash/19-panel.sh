@@ -1119,6 +1119,12 @@ QUE HACE
 VERSIONES
 
 1.57.6 (9 nov 2026)
+- Caché de descargas: el código de cada componente que se instala
+  (PHP, Apache, MariaDB, phpMyAdmin...) se guarda ya comprobado en
+  /var/cache/nexum-stack. Al reintentar una instalación que falló no se
+  descarga otra vez, y si la web de un componente no responde se usa
+  el de la caché en vez de cancelar. Se ve y se vacía en
+  Configuración, Carpetas (o lvm-instalador descargas).
 - Mantenimiento: el código va ahora en ficheros por partes y se revisa
   solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
   nada cambia por fuera.
