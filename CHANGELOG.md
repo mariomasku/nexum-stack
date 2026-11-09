@@ -6,6 +6,8 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.57.5 · 9 nov 2026
 
+- **La versión de Mac lleva desde ahora el mismo número que la de Linux** (hasta ahora iba por la 1.41), porque las dos llevan lo mismo.
+
 - **Configuración:** arriba, en grande, el nombre del apartado abierto (con su icono y lo que hace), no «Configuración»; el correo de pruebas se enciende con el interruptor de al lado.
 - **Apariencia:** en tres bloques, cada uno con su título (iconos del menú lateral, apartados del menú lateral y visor de los proyectos). Los botones del visor están aquí: ya no hay un apartado aparte (salían dos veces).
 - **Seguridad entre webs:** explicada en cuatro puntos (el problema, lo que hace la barrera, cuándo apagarla y dónde se aplica).

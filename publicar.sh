@@ -62,6 +62,8 @@ if [ $SOLO_LINUX -eq 1 ]; then
 elif [ -f "$MAC_SRC" ]; then
     MAC_VERSION=$(grep -m1 '^APP_VERSION=' "$MAC_SRC" | cut -d'"' -f2)
     [ -n "$MAC_VERSION" ] || fail "falta APP_VERSION en $MAC_SRC"
+    # (desde la 1.57.5, las dos llevan el mismo número: lo mismo en Linux y en Mac)
+    [ "$MAC_VERSION" == "$VERSION" ] || fail "la versión de Mac ($MAC_VERSION) no es la de Linux ($VERSION): súbelas a la vez"
     [ "$(grep -m1 '^UPDATE_KEY_FPR=' "$MAC_SRC" | cut -d'"' -f2)" == "$FPR" ] \
         || fail "$MAC_SRC no lleva la misma UPDATE_KEY_FPR que $SRC"
     MAC_ASSETS=$(gh api --paginate "repos/$REPO/releases?per_page=100" -q '.[].assets[].name') \

@@ -2141,7 +2141,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.41.4"
+APP_VERSION="1.57.5"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -18201,6 +18201,16 @@ func openInVSCode(_ folder: String) {
     }
 }
 
+/// Los tipos de fichero que se pueden elegir en un panel de abrir, por su extensión (en mayúsculas o
+/// minúsculas: el tipo es el mismo). allowedFileTypes, con las extensiones, está obsoleto desde macOS 12
+func fileTypes(_ exts: [String]) -> [UTType] {
+    var out: [UTType] = []
+    for e in exts {
+        if let t = UTType(filenameExtension: e.lowercased()), !out.contains(t) { out.append(t) }
+    }
+    return out
+}
+
 // MARK: - Dialogos (NSAlert)
 
 /// Ancho del texto de los dialogos. Va en una vista propia: NSAlert lo pondria en una columna
@@ -20956,7 +20966,7 @@ final class AppModel: ObservableObject {
         panel.prompt = "Elegir"
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.allowedFileTypes = ["sql", "SQL", "gz", "GZ", "zip", "ZIP"]
+        panel.allowedContentTypes = fileTypes(["sql", "gz", "zip"])
         if let f = impFile {
             panel.directoryURL = URL(fileURLWithPath: f).deletingLastPathComponent()
         } else {
@@ -21502,7 +21512,7 @@ final class AppModel: ObservableObject {
         panel.prompt = "Elegir"
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.allowedFileTypes = ["sql", "SQL", "gz", "GZ", "zip", "ZIP"]
+        panel.allowedContentTypes = fileTypes(["sql", "gz", "zip"])
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         if panel.runModal() == .OK, let url = panel.url { npFile = url.path }
     }
@@ -21875,7 +21885,7 @@ final class AppModel: ObservableObject {
         let panel = NSSavePanel()
         panel.title = "Descargar la BBDD \(db)"
         panel.prompt = "Descargar"
-        panel.allowedFileTypes = ["zip"]
+        panel.allowedContentTypes = fileTypes(["zip"])
         let stamp = DateFormatter()
         stamp.dateFormat = "yyyyMMdd-HHmm"
         panel.nameFieldStringValue = "\(db)-XAMPP-\(folder)-\(stamp.string(from: Date())).zip"
@@ -33586,7 +33596,9 @@ QUE HACE
 
 VERSIONES
 
-1.41.4 (9 nov 2026)
+1.57.5 (9 nov 2026)
+- Mismo número de versión que la de Linux, porque las dos llevan lo
+  mismo (hasta ahora iba por la 1.41).
 - Configuración: arriba, en grande, el nombre del apartado abierto
   (con su icono y lo que hace), no «Configuración»; el correo de
   pruebas se enciende con el interruptor de al lado.
