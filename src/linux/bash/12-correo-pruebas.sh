@@ -95,35 +95,7 @@ if (!isset($GLOBALS['wp_filter']) || is_array($GLOBALS['wp_filter'])) {
 PHP
 )
 
-function mail_on() {
-    [ ! -e "$MAIL_OFF_FILE" ]
-}
-
-# Modo de los plugins de correo de WordPress: mailpit, desactivar o nada
-function mail_wp_mode() {
-    local m=""
-    [ -f "$MAIL_WP_FILE" ] && m=$(head -c 20 "$MAIL_WP_FILE" | tr -d ' \n')
-    case $m in
-        desactivar|nada) echo "$m" ;;
-        *) echo mailpit ;;
-    esac
-}
-
-function mailpit_installed() {
-    [ -f "$MAILPIT_BIN" ] && [ -x "$MAILPIT_BIN" ] && [ ! -L "$MAILPIT_BIN" ]
-}
-
-function mailpit_installed_version() {
-    head -c 20 "$MAILPIT_DIR/version" 2> /dev/null | head -1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'
-}
-
-# Lo que SECURE_PY pone en el PHP de cada version (LVM_CORREO): binario|puerto|WordPress a Mailpit
-# (1/0). Nada con el correo apagado. Sin Mailpit instalado tambien: mail() falla en lugar de salir
-function mail_secure_spec() {
-    mail_on || return 0
-    echo "$MAILPIT_BIN|$MAIL_SMTP_PORT|$([ "$(mail_wp_mode)" == mailpit ] && echo 1 || echo 0)"
-}
-
+#@incluir comun/correo-pruebas/mail_on.sh
 # Numero del proceso de Mailpit: el de su .pid si es tuyo y es el del gestor o, si se ha perdido, el
 # que este en marcha con su binario
 function mailpit_pid() {
@@ -184,37 +156,7 @@ function mailpit_start() {
     echo "Mailpit en marcha: el correo de las webs se ve en $MAIL_UI_URL"
 }
 
-function mailpit_stop() {
-    local p i
-    p=$(mailpit_pid)
-    if [ -z "$p" ]; then
-        rm -f "$MAILPIT_DATA/mailpit.pid"
-        return 0
-    fi
-    if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] se para Mailpit ($p)"
-        return 0
-    fi
-    kill "$p" 2> /dev/null
-    for i in $(seq 50); do
-        kill -0 "$p" 2> /dev/null || break
-        sleep 0.1
-    done
-    kill -0 "$p" 2> /dev/null && kill -9 "$p" 2> /dev/null
-    rm -f "$MAILPIT_DATA/mailpit.pid"
-    echo "Mailpit parado"
-}
-
-# Mailpit en marcha solo con el correo de pruebas encendido, instalado y la version activa en marcha
-# (--suave: lo pasa a mailpit_start)
-function mailpit_sync() {
-    if mail_on && mailpit_installed && lampp_running; then
-        mailpit_start "$1"
-    else
-        mailpit_stop
-    fi
-}
-
+#@incluir comun/correo-pruebas/mailpit_stop.sh
 # Instala (o pone al dia) Mailpit en MAILPIT_DIR: el .tar.gz oficial de GitHub para este equipo,
 # comprobado con su sha256 y abierto como root en una carpeta de root (asi ningun programa tuyo puede
 # cambiarlo entre la comprobacion y la copia). Solo el programa y su licencia, de root
@@ -319,25 +261,7 @@ function mail_apply() {
     return 0
 }
 
-# Texto del modo de WordPress
-function mail_wp_text() {
-    case $1 in
-        mailpit) echo "los plugins de SMTP de WordPress siguen, con su correo a Mailpit (los que mandan por una API, como Brevo, se desactivan en la copia local)" ;;
-        desactivar) echo "los plugins de SMTP y de envio de correo de WordPress se desactivan en la copia local (WordPress usa mail(), que va a Mailpit)" ;;
-        nada) echo "los plugins de correo de WordPress no se tocan: lo que manden por SMTP o por su API puede llegar de verdad" ;;
-    esac
-}
-
-# correo [estado] | si | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>
-# Un ajuste que se aplica como root (interruptores de la ventana): la contraseña antes de cambiar
-# nada. Cancelarla deja el ajuste como estaba
-function sudo_first() {
-    { [ "$DRY" -eq 1 ] || [ -z "$SUDO" ]; } && return 0
-    sudo -v && return 0
-    echo "Cancelado: no se ha cambiado nada"
-    return 1
-}
-
+#@incluir comun/correo-pruebas/mail_wp_text.sh
 function mail_command() {
     local mode old
     case $1 in

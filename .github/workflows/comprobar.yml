@@ -58,7 +58,7 @@ jobs:
       - name: Los dos scripts son los de src/
         run: ./construir.sh --comprobar
       - name: Sintaxis de cada sección de bash
-        run: for f in src/linux/bash/*.sh src/mac/bash/*.sh; do bash -n "$f" || exit 1; done
+        run: for f in src/linux/bash/*.sh src/mac/bash/*.sh src/comun/*/*.sh; do bash -n "$f" || exit 1; done
       - name: Sintaxis del Python (ventana de Linux y túnel)
         run: |
           for f in src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py; do

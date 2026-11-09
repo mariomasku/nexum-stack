@@ -153,24 +153,7 @@ function create_project_vhost() {
     return 0
 }
 
-# Carpeta de proyecto valida: existe en htdocs, no es un enlace y su nombre solo lleva letras sin
-# acentos, numeros, espacios, punto, _ y - (se escribe entre comillas en los vhosts: unas comillas
-# o un salto de linea en el nombre meterian directivas en la configuracion de Apache)
-function valid_project() {
-    local folder=$1 rx='^[A-Za-z0-9_][A-Za-z0-9 ._-]*$'
-    if [ -z "$folder" ] || [ ! -d "$HTDOCS_DIR/$folder" ] || [ -L "$HTDOCS_DIR/$folder" ] || [[ "$folder" == */* ]]; then
-        echo "No existe el proyecto $HTDOCS_DIR/$folder"
-
-        return 1
-    fi
-    if ! [[ "$folder" =~ $rx ]]; then
-        echo "El nombre de la carpeta $folder lleva caracteres que no se admiten (solo letras sin"
-        echo "acentos, numeros, espacios, punto, _ y -). Cambiale el nombre y vuelve a intentarlo."
-
-        return 1
-    fi
-}
-
+#@incluir comun/proyectos-opt-htdocs/valid_project.sh
 # ¿Se puede escribir este fichero sin salirse de la carpeta del proyecto? Ni el fichero ni las
 # carpetas de su ruta pueden ser enlaces que lleven fuera: un repositorio podria traer wp-config.php
 # como enlace a un fichero del sistema, y con sudo se escribiria encima.

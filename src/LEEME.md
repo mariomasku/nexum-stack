@@ -12,8 +12,17 @@ Los dos scripts que se instalan y se publican, `lvm-instalador.sh` (Linux) y `ma
 | `mac/bash/NN-*.sh` | El bash del Mac, igual | `macos/lvm-instalador.sh` |
 | `mac/ventana.swift` | La ventana del Mac (SwiftUI) | heredoc `LVM_SWIFT` (sección `23-accesos`) |
 | `mac/tunel.py` | El proxy del túnel en el Mac | heredoc `PYEOF` (sección `28-…`) |
+| `comun/<sección>/<función>.sh` | Funciones que son **iguales en Linux y en Mac**, una sola vez (desde la 1.57.6) | los dos scripts, cada una en su sitio |
 
-En el bash, la línea `#@incluir ventana.py` (dentro de su heredoc) es donde va ese fichero entero.
+En el bash, la línea `#@incluir ventana.py` (dentro de su heredoc) es donde va ese fichero entero, y `#@incluir comun/…` es donde van esas funciones comunes.
+
+## Lo común a Linux y Mac (`comun/`)
+
+Cada fichero es un tramo de funciones enteras (con sus comentarios) que está igual, y en el mismo orden, en los dos sistemas. Su nombre es el de su sección y el de su primera función: `comun/repositorios-github/github_command.sh` lleva `github_command` y las que la siguen.
+
+- **Se cambia una vez y vale para los dos.** Es lo que se busca: que un arreglo no se quede en un solo sistema.
+- **Si una función común tiene que ser distinta en un sistema:** se copia el tramo de vuelta a la sección de cada sistema (donde está su `#@incluir comun/…`), se borra de `comun/` y se cambia donde haga falta.
+- `construir.sh` falla si un fichero de `comun/` no se incluye en los dos sistemas.
 
 ## Cómo se trabaja
 
@@ -30,4 +39,4 @@ En el bash, la línea `#@incluir ventana.py` (dentro de su heredoc) es donde va 
 - **Lo que se instala no cambia:** sigue siendo un solo fichero, con la misma firma y la misma forma de actualizarse.
 - **Comprobado:** la primera vez se separó de forma que, al construir, los dos scripts salen idénticos byte a byte a los de la 1.57.5 publicada.
 
-Lo común a Linux y Mac sigue repetido en `linux/bash` y `mac/bash`. Juntarlo es el paso siguiente del mantenimiento.
+En `comun/` está, de momento, lo que ya era idéntico (147 funciones, unas 3.500 líneas). Lo casi igual (otras 75 funciones, que cambian en rutas como `/opt/lampp` y `/Library/Nexum` o en nombres como `lampp-` y `XAMPP-`) sigue en cada sistema: juntarlo pide cambiar código, con sus pruebas, y se irá haciendo por partes.

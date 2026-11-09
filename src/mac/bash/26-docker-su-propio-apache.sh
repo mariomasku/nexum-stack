@@ -24,55 +24,7 @@ DOCKER_WEB_FILE="$DOCKER_DIR/web.conf"
 # Servicio del sistema que da de alta la direccion del Apache de Docker en lo0 en cada arranque
 DOCKER_LOOPBACK_PLIST=${LVM_LOOPBACK_PLIST:-/Library/LaunchDaemons/dev.hexer.nexum-direccion.plist}
 
-# Direccion (IP) y puertos (HTTP, HTTPS) del Apache de Docker. Siempre de 127.x: nunca abiertos a la red
-function docker_web_get() {
-    local v def
-    case $1 in IP) def=127.0.0.2 ;; HTTP) def=80 ;; HTTPS) def=443 ;; TLD) def=docker.local ;; DNS) def=0 ;; *) return 1 ;; esac
-    v=$(awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$DOCKER_WEB_FILE" 2> /dev/null)
-    case $1 in
-        IP) docker_web_valid_ip "$v" || v=$def ;;
-        TLD) [ "$v" == docker.test ] || v=$def ;;
-        DNS) [ "$v" == 1 ] || v=$def ;;
-        *) [[ "$v" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$v" -le 65535 ] || v=$def ;;
-    esac
-    echo "$v"
-}
-
-# Guarda web.conf (solo tuyo): docker_web_conf_write <ip> <http> <https> <tld> <dns>
-function docker_web_conf_write() {
-    mkdir -p -m 700 "$DOCKER_DIR" || return 1
-    ( umask 077; printf 'IP=%s\nHTTP=%s\nHTTPS=%s\nTLD=%s\nDNS=%s\n' "$@" > "$DOCKER_WEB_FILE.nuevo" ) \
-        && mv -f "$DOCKER_WEB_FILE.nuevo" "$DOCKER_WEB_FILE"
-}
-
-# Final de los dominios del Apache de Docker: docker.local (en /etc/hosts, uno a uno) o, con el DNS
-# comodin, docker.test. .local es de mDNS: un DNS para *.docker.local no se consultaria
-function docker_web_tld() {
-    docker_web_get TLD
-}
-
-# ¿Va el DNS comodin de *.docker.test? (sus dominios ya no van en /etc/hosts)
-function docker_dns_on() {
-    [ "$(docker_web_get DNS)" == 1 ] && [ "$(docker_web_get TLD)" == docker.test ]
-}
-
-# Dominio de phpMyAdmin
-function docker_web_pma() {
-    echo "pma.$(docker_web_tld)"
-}
-
-function docker_web_valid_ip() {
-    [[ "$1" =~ ^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
-        && [ "${BASH_REMATCH[1]}" -le 255 ] && [ "${BASH_REMATCH[2]}" -le 255 ] && [ "${BASH_REMATCH[3]}" -le 254 ] \
-        && [ "${BASH_REMATCH[3]}" -ge 1 ]
-}
-
-# Direccion de una web del Apache de Docker: https://<dominio>, con el puerto si no es el 443
-function docker_web_url() {
-    local port=$(docker_web_get HTTPS)
-    echo "https://$1$([ "$port" == 443 ] || echo ":$port")"
-}
-
+#@incluir comun/docker-su-propio-apache/docker_web_get.sh
 # ¿Esta la direccion del Apache de Docker en este Mac? (127.0.0.1 siempre; otra, si se ha dado de alta en
 # lo0). Docker Desktop abre los puertos de menos de 1024 sin pedir nada mas
 function docker_web_ports_ok() {
@@ -86,98 +38,7 @@ function docker_web_ports_ok() {
     /sbin/ifconfig lo0 2> /dev/null | grep -q "inet ${ip//./\\.} "
 }
 
-# Nombres de lo comun: la MariaDB de una version (nexum-mariadb-11-8) y el contenedor de PHP de una
-# version de un proyecto (nexum-<proyecto>-php83)
-function docker_maria_name() {
-    echo "nexum-mariadb-${1//./-}"
-}
-function docker_web_container() {
-    echo "nexum-$1-php${2//./}"
-}
-
-# ¿Es un proyecto del sistema nuevo (con el Apache de Docker)?
-function docker_web_project() {
-    docker_valid_slug "$1" && [ "$(docker_conf "$1" MODO)" == web ]
-}
-
-# Dominio de una version de PHP de un proyecto: el de la tienda (uno solo) o <proyecto>-php83.docker.local
-function docker_web_domain() {
-    if [ "$(docker_conf "$1" TIPO)" == ps ]; then
-        echo "$1.$(docker_web_tld)"
-    else
-        echo "$1-php${2//./}.$(docker_web_tld)"
-    fi
-}
-
-# Dominios de un proyecto (todas sus versiones)
-function docker_web_domains() {
-    local v
-    for v in $(docker_conf "$1" PHP); do docker_web_domain "$1" "$v"; done | awk '!seen[$0]++'
-}
-
-# Proyectos del sistema nuevo
-function docker_web_projects() {
-    local p
-    for p in $(docker_projects); do
-        [ "$(docker_conf "$p" MODO)" == web ] && echo "$p"
-    done
-}
-
-# La red interna de Docker que comparten el Apache, las MariaDB y los PHP (sin puertos fuera)
-function docker_net() {
-    dk network inspect nexum > /dev/null 2>&1 || dk network create nexum > /dev/null
-}
-
-# SQL como root en la MariaDB comun de una version: docker_maria_sql <version> [argumentos de mariadb].
-# La contraseña no va en ninguna orden (se ve en ps): el cliente la toma dentro del contenedor
-function docker_maria_sql() {
-    local v=$1
-    shift
-    dk exec -i "$(docker_maria_name "$v")" \
-        sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb || command -v mysql) -uroot "$@"' mariadb "$@"
-}
-
-# La MariaDB comun de una version: la crea (su compose.yaml y su contraseña de root al azar, en
-# ficheros solo tuyos) si no existe, la arranca y espera a que responda
-function docker_maria_up() {
-    local v=$1 name dir i
-    [[ " $DOCKER_MARIADB_VERSIONS " == *" $v "* ]] || { echo "MariaDB $v no se ofrece en Docker ($DOCKER_MARIADB_VERSIONS)"; return 1; }
-    name=$(docker_maria_name "$v") dir=$DOCKER_DIR/mariadb-$v
-    if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] MariaDB $v comun ($name) en marcha"
-        return 0
-    fi
-    if [ ! -f "$dir/compose.yaml" ]; then
-        mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
-        ( umask 077
-          printf 'DB_ROOT_PASS=%s\n' "$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')" > "$dir/.env"
-          { printf 'name: %s\nservices:\n  db:\n    image: mariadb:%s\n    container_name: %s\n    restart: "no"\n' "$name" "$v" "$name"
-            printf '    environment:\n      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}\n      MARIADB_AUTO_UPGRADE: "1"\n'
-            printf '    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-allowed-packet=512M"]\n'
-            printf '    volumes:\n      - "datos:/var/lib/mysql"\n    networks: [nexum]\n'
-            printf 'volumes:\n  datos:\n    name: %s\n' "$name"
-            printf 'networks:\n  nexum:\n    external: true\n    name: nexum\n'; } > "$dir/compose.yaml" ) || return 1
-    fi
-    docker_net || return 1
-    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d || return 1
-    for i in $(seq 90); do
-        docker_maria_sql "$v" -e "SELECT 1" < /dev/null > /dev/null 2>&1 && return 0
-        sleep 1
-    done
-    echo "La MariaDB $v de Docker no responde (mira sus registros en la pestaña Docker)"
-    return 1
-}
-
-# MariaDB comunes que hay (sus versiones)
-function docker_maria_versions() {
-    local d
-    for d in "$DOCKER_DIR"/mariadb-*/; do
-        d=$(basename "$d")
-        d=${d#mariadb-}
-        [[ " $DOCKER_MARIADB_VERSIONS " == *" $d "* ]] && [ -f "$DOCKER_DIR/mariadb-$d/compose.yaml" ] && echo "$d"
-    done
-}
-
+#@incluir comun/docker-su-propio-apache/docker_maria_name.sh
 # Certificado propio de *.docker.local (no es de una CA: solo vale para esos dominios), en una carpeta
 # solo tuya que Docker Desktop comparte con el Apache de Docker (825 dias: lo maximo que acepta Safari)
 function docker_web_cert() {
@@ -224,58 +85,7 @@ function docker_web_trust() {
     echo "El navegador acepta el certificado de *.docker.local (Safari, Chrome; Firefox, si usa los certificados del Mac)"
 }
 
-# Lineas de /etc/hosts de los dominios de Docker: docker_web_hosts poner|quitar <dominio...>. poner: a la
-# direccion del Apache de Docker (y fuera de cualquier otra linea); quitar: fuera. Solo esos dominios
-function docker_web_hosts() {
-    local mode=$1 copy rc n names=()
-    shift
-    # (con el DNS comodin, los *.docker.test los contesta el; solo se tocan los de antes)
-    for n in "$@"; do
-        docker_dns_on && [[ "$n" == *.docker.test ]] && continue
-        names+=("$n")
-    done
-    set -- "${names[@]}"
-    [ $# -gt 0 ] || return 0
-    mkdir -p -m 700 "$LOG_DIR" || return 1
-    copy=$(mktemp "$LOG_DIR/hosts-docker-XXXXXX") || return 1
-    python3 -I - "$HOSTS_FILE" "$copy" "$mode" "$(docker_web_get IP)" "$@" << 'EOF'
-import re, sys
-src, dst, mode, ip = sys.argv[1:5]
-names = [n.lower() for n in sys.argv[5:]]
-lines = open(src).read().splitlines()
-now = {}
-for line in lines:
-    w = line.split("#", 1)[0].split()
-    for n in w[1:]:
-        now.setdefault(n.lower(), w[0])
-if mode == "poner" and all(now.get(n) == ip for n in names):
-    out = lines
-else:
-    out = []
-    for line in lines:
-        body, sep, comment = line.partition("#")
-        w = body.split()
-        if len(w) >= 2 and re.match(r"^(127\.\d+\.\d+\.\d+|::1)$", w[0]):
-            keep = [n for n in w[1:] if n.lower() not in names]
-            if len(keep) != len(w) - 1:
-                if not keep:
-                    continue
-                line = w[0] + " " + " ".join(keep) + (" " + sep + comment if sep else "")
-        out.append(line)
-    if mode == "poner":
-        out.append(ip + " " + " ".join(names))
-open(dst, "w").write("\n".join(out) + "\n")
-EOF
-    if cmp -s "$copy" "$HOSTS_FILE"; then
-        rm -f "$copy"
-        return 0
-    fi
-    edit_hosts --aplicar "$copy"
-    rc=$?
-    rm -f "$copy"
-    return $rc
-}
-
+#@incluir comun/docker-su-propio-apache/docker_web_hosts.sh
 # Reglas de seguridad de todas las webs, las mismas que en XAMPP-X (de UNKNOWN_HOST_VHOST: CORS y la
 # barrera entre webs, si esta encendida; las de los ficheros que no se sirven van tambien dentro de cada
 # contenedor de PHP, que es el que tiene los ficheros)
@@ -313,24 +123,7 @@ function docker_web_site() {
     done
 }
 
-# Reglas de las imagenes de produccion de un WordPress en el Apache de Docker (su dominio, el de media-proyecto,
-# el mismo que con LAMPP): lo que falte de wp-content/uploads (imagenes, videos y PDF; solo GET y HEAD) se pide
-# a su web real con una redireccion 302. Nada si no tiene dominio de produccion
-function docker_web_media() {
-    local folder=$1 prod
-    prod=$(media_saved "$folder")
-    valid_domain "$prod" && [[ "$prod" != *.local && "$prod" != *.test && "$prod" != localhost && "$prod" != *.localhost ]] || return 0
-    printf '    # nexum-media %s: lo que falte de wp-content/uploads se pide a produccion (media-proyecto)\n' "$prod"
-    printf '    RewriteEngine On\n    RewriteCond %%{REQUEST_METHOD} ^(GET|HEAD)$\n'
-    printf '    RewriteCond /opt/lampp/htdocs/%s%%{REQUEST_URI} !-f\n' "$folder"
-    printf '    RewriteRule ^/(wp-content/uploads/.+\\.(%s))$ https://%s/$1 [NC,R=302,L]\n' "$MEDIA_EXT" "$prod"
-}
-
-# Configuracion del Apache de Docker (httpd.conf, las reglas, un vhost por proyecto y el de phpMyAdmin,
-# en DOCKER_WEB_DIR/conf) y su compose.yaml. Se escribe entera cada vez (lo sabe todo de proyecto.conf).
-# La carpeta conf va montada en el contenedor: se cambia lo de dentro, nunca la carpeta (el contenedor
-# seguiria viendo la de antes)
-DOCKER_WEB_CONF=/usr/local/apache2/conf/nexum/httpd.conf
+#@incluir comun/docker-su-propio-apache/docker_web_media.sh
 function docker_web_write() {
     local d=$DOCKER_WEB_DIR p tmp pma_hosts="" v
     [ "$DRY" -eq 1 ] && return 0
@@ -463,21 +256,7 @@ function docker_web_up() {
     return 0
 }
 
-# Vuelve a escribir la configuracion del Apache de Docker y, si esta en marcha, la recarga sin cortar las
-# conexiones (si Apache no la acepta, lo dice y sigue con la de antes)
-function docker_web_reload() {
-    local out
-    [ "$DRY" -eq 1 ] && return 0
-    [ "$1" == --sin-escribir ] || docker_web_write || return 1
-    [ "$(docker_web_state)" == marcha ] || return 0
-    if ! out=$(dk exec nexum-web httpd -f "$DOCKER_WEB_CONF" -t 2>&1); then
-        echo "El Apache de Docker no acepta su configuracion nueva: sigue con la de antes"
-        sed 's/^/  /' <<< "$out" | tail -5
-        return 1
-    fi
-    dk exec nexum-web httpd -f "$DOCKER_WEB_CONF" -k graceful > /dev/null 2>&1
-}
-
+#@incluir comun/docker-su-propio-apache/docker_web_reload.sh
 # docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
 function docker_web_command() {
@@ -740,116 +519,7 @@ udp.serve_forever()
 DNSPY
 )
 
-# ¿Contesta el DNS comodin? (como lo buscan los navegadores: con el sistema)
-function docker_dns_works() {
-    local ip got i
-    ip=$(docker_web_get IP)
-    for i in $(seq 20); do
-        got=$(python3 -I -c 'import socket, sys
-try:
-    print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])
-except OSError:
-    pass' "nexum-comprobacion.docker.test" 2> /dev/null)
-        [ "$got" == "$ip" ] && return 0
-        sleep 0.5
-    done
-    return 1
-}
-
-# docker_web_retld: los proyectos del Apache de Docker con el final de los dominios de ahora (docker_web_tld):
-# su dominio, su configuracion de cada version (WordPress: WP_HOME), el dominio de una tienda en su BBDD y
-# sus contenedores de PHP en marcha, rehechos (su configuracion va montada fichero a fichero)
-function docker_web_retld() {
-    local p state
-    for p in $(docker_web_projects); do
-        docker_conf_set "$p" DOMINIO "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")" || return 1
-        for v in $(docker_conf "$p" PHP); do
-            docker_web_config "$p" "$v" || return 1
-        done
-        docker_web_compose "$p" || return 1
-        if docker_ready; then
-            if [ "$(docker_conf "$p" TIPO)" == ps ] && docker_maria_up "$(docker_conf "$p" MARIADB)" > /dev/null; then
-                docker_web_ps_domain "$p"
-            fi
-            state=$(docker_state "$p")
-            if [ "$state" == marcha ] || [ "$state" == parcial ]; then
-                dk compose --project-directory "$DOCKER_DIR/$p" -f "$DOCKER_DIR/$p/compose.yaml" up -d --force-recreate \
-                    $(docker_web_services "$p") > /dev/null || return 1
-            fi
-        fi
-        echo "  $(docker_conf "$p" CARPETA): $(docker_web_url "$(docker_web_domain "$p" "$(docker_conf "$p" ACTIVA)")")"
-    done
-}
-
-# docker-web dns activar: pone el DNS comodin y pasa los proyectos del Apache de Docker a *.docker.test
-# (sus lineas de /etc/hosts se quitan). Si no contesta, se quita y todo sigue como estaba. Pide la
-# contraseña de administrador una vez
-function docker_dns_activate() {
-    local old p olds=()
-    if docker_dns_on && docker_dns_works; then
-        echo "El DNS de *.docker.test ya va: los dominios de Docker no van en /etc/hosts"
-        return 0
-    fi
-    echo "DNS de *.docker.test: los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts"
-    echo "(web.local, los proyectos de siempre y los dominios falseados de las tiendas siguen igual)"
-    if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] DNS en 127.0.0.1:$DOCKER_DNS_PORT para *.docker.test y los proyectos de Docker a .docker.test"
-        return 0
-    fi
-    sudo_first || return 1
-    docker_dns_install || { echo "No se ha podido poner el DNS de *.docker.test"; docker_dns_uninstall; return 1; }
-    if ! docker_dns_works; then
-        echo "El DNS de *.docker.test no contesta: se quita y todo sigue como estaba"
-        docker_dns_uninstall
-        return 1
-    fi
-    old=$(docker_web_tld)
-    if [ "$old" != docker.test ]; then
-        olds+=("pma.$old")
-        for p in $(docker_web_projects); do
-            mapfile -t -O "${#olds[@]}" olds < <(docker_web_domains "$p")
-        done
-    fi
-    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" docker.test 1 || return 1
-    if [ "$old" != docker.test ] && [ -n "$(docker_web_projects)" ]; then
-        echo "Los proyectos del Apache de Docker pasan a .docker.test:"
-        docker_web_retld || return 1
-    fi
-    [ ${#olds[@]} -gt 0 ] && docker_web_hosts quitar "${olds[@]}"
-    if [ -d "$DOCKER_WEB_DIR" ]; then
-        docker_web_cert && docker_web_trust
-        if docker_ready && [ "$(docker_web_state)" != nuevo ]; then
-            docker_web_up || return 1
-        else
-            docker_web_write
-        fi
-    fi
-    echo "Listo: los proyectos de Docker se abren en $(docker_web_url "<proyecto>.docker.test") y phpMyAdmin en $(docker_web_url "$(docker_web_pma)")"
-}
-
-# docker-web dns quitar: sin el DNS comodin. Los dominios siguen siendo .docker.test y vuelven a /etc/hosts
-function docker_dns_deactivate() {
-    local p domains=()
-    echo "Se quita el DNS de *.docker.test: sus dominios vuelven a /etc/hosts"
-    [ "$DRY" -eq 1 ] && return 0
-    sudo_first || return 1
-    docker_web_conf_write "$(docker_web_get IP)" "$(docker_web_get HTTP)" "$(docker_web_get HTTPS)" "$(docker_web_tld)" 0 || return 1
-    docker_dns_uninstall
-    for p in $(docker_web_projects); do
-        mapfile -t -O "${#domains[@]}" domains < <(docker_web_domains "$p")
-    done
-    [ -d "$DOCKER_WEB_DIR" ] && { docker_web_hosts poner "$(docker_web_pma)" "${domains[@]}" || return 1; }
-    echo "Listo: los dominios de Docker van otra vez en /etc/hosts"
-}
-
-function docker_dns_command() {
-    case $1 in
-        activar) docker_dns_activate ;;
-        quitar) docker_dns_deactivate ;;
-        *) echo "Uso: lvm-instalador docker-web dns activar|quitar"; return 1 ;;
-    esac
-}
-
+#@incluir comun/docker-su-propio-apache/docker_dns_works.sh
 # Configuracion de una version de PHP de un proyecto para su contenedor (config-83.php: su BBDD en la
 # MariaDB comun y, en WordPress, el dominio de esa version). Nada si el proyecto no la tiene
 function docker_web_config() {
@@ -917,50 +587,7 @@ function docker_prefork_conf() {
     printf '# Nexum Dev Stack: pocos procesos esperando (se rehace solo)\n<IfModule mpm_prefork_module>\n    StartServers 1\n    MinSpareServers 1\n    MaxSpareServers 2\n    MaxRequestWorkers 20\n    MaxConnectionsPerChild 200\n</IfModule>\n'
 }
 
-# Servicios que van en marcha: todas las versiones o, en una tienda, la elegida
-function docker_web_services() {
-    local v
-    if [ "$(docker_conf "$1" TIPO)" == ps ]; then
-        v=$(docker_conf "$1" ACTIVA)
-        echo "php${v//./}"
-    else
-        for v in $(docker_conf "$1" PHP); do echo "php${v//./}"; done
-    fi
-}
-
-# Cambia una clave de proyecto.conf
-function docker_conf_set() {
-    local f=$DOCKER_DIR/$1/proyecto.conf
-    [ -f "$f" ] && [ ! -L "$f" ] || return 1
-    awk -F= -v k="$2" -v v="$3" 'BEGIN { done = 0 } $1 == k { print k "=" v; done = 1; next } { print } END { if (!done) print k "=" v }' \
-        "$f" > "$f.nuevo" && chmod 600 "$f.nuevo" && mv -f "$f.nuevo" "$f"
-}
-
-# Tienda PrestaShop en la MariaDB comun: su dominio pasa a ser el de Docker (la BBDD es una copia)
-function docker_web_ps_domain() {
-    local slug=$1 v db dom prefix
-    v=$(docker_conf "$slug" MARIADB) db=$(docker_conf "$slug" BBDD)
-    dom=$(docker_web_domain "$slug" "")
-    [ "$(docker_web_get HTTPS)" == 443 ] || dom+=":$(docker_web_get HTTPS)"
-    prefix=$(docker_maria_sql "$v" -N -e "SELECT LEFT(table_name, LENGTH(table_name) - 8) FROM information_schema.tables
-        WHERE table_schema = '$db' AND table_name LIKE '%shop\\_url' AND table_type = 'BASE TABLE' LIMIT 1" < /dev/null 2> /dev/null | tr -d '\r')
-    [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || return 0
-    # (el de produccion, para traer de alli sus imagenes: ps-imagenes)
-    local prod
-    prod=$(docker_maria_sql "$v" -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" \
-        < /dev/null 2> /dev/null | tr -d '\r' | tr 'A-Z' 'a-z')
-    prod=${prod%%:*}
-    if valid_domain "$prod" && [[ "$prod" != *.docker.local && "$prod" != *.docker.test && "$prod" != *.local ]]; then
-        docker_conf_set "$slug" PRODUCCION "$prod"
-    fi
-    echo "Tienda PrestaShop: su dominio pasa a $dom en la BBDD de Docker"
-    docker_maria_sql "$v" "$db" << EOF
-UPDATE \`${prefix}shop_url\` SET domain = '$dom', domain_ssl = '$dom';
-UPDATE \`${prefix}configuration\` SET value = '$dom' WHERE name IN ('PS_SHOP_DOMAIN', 'PS_SHOP_DOMAIN_SSL');
-UPDATE \`${prefix}configuration\` SET value = '1' WHERE name IN ('PS_SSL_ENABLED', 'PS_SSL_ENABLED_EVERYWHERE');
-EOF
-}
-
+#@incluir comun/docker-su-propio-apache/docker_web_services.sh
 # docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version XAMPP-X> | --volcado <fichero>]:
 # proyecto en Docker con el Apache de Docker. Su BBDD (vacia, la de una version XAMPP-X o un volcado) va en
 # la MariaDB comun de esa version, con su propio usuario. Mas versiones de PHP: docker-php-añadir
@@ -1164,39 +791,7 @@ function docker_web_add() {
     echo "Listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php)"
 }
 
-# docker-php-quitar <nombre> <php>: quita una version de PHP de un proyecto (su contenedor, su
-# configuracion y su dominio). La ultima no: para eso, borrar el proyecto de Docker
-function docker_web_remove() {
-    local slug=$1 php=$2 dir list rest dom
-    docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
-    dir=$DOCKER_DIR/$slug
-    list=$(docker_conf "$slug" PHP)
-    [[ " $list " == *" $php "* ]] || { echo "$slug no tiene PHP $php"; return 1; }
-    rest=$(tr ' ' '\n' <<< "$list" | grep -vxF "$php" | tr '\n' ' ' | sed 's/ $//')
-    [ -n "$rest" ] || { echo "PHP $php es la unica version de $slug: para quitarla, borra el proyecto de Docker"; return 1; }
-    dom=$(docker_web_domain "$slug" "$php")
-    echo "$slug: se quita PHP $php (la carpeta y la BBDD se quedan)"
-    if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] fuera el contenedor $(docker_web_container "$slug" "$php")"
-        return 0
-    fi
-    docker_dns_on || sudo_first || return 1
-    if [ "$(docker_conf "$slug" TIPO)" == ps ] && [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
-        docker_web_switch "$slug" "${rest%% *}" || return 1
-    fi
-    dk compose --project-directory "$dir" -f "$dir/compose.yaml" rm -sf "php${php//./}" > /dev/null 2>&1
-    dk volume rm "nexum-${slug}_cache-${php//./}" > /dev/null 2>&1
-    rm -f "$dir/config-${php//./}.php"
-    docker_conf_set "$slug" PHP "$rest" && docker_web_compose "$slug" || return 1
-    # (la que se enseña como suya, si era esa: la siguiente)
-    if [ "$(docker_conf "$slug" ACTIVA)" == "$php" ]; then
-        docker_conf_set "$slug" ACTIVA "${rest%% *}" && docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "${rest%% *}")"
-    fi
-    [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_hosts quitar "$dom"
-    docker_web_reload
-    echo "Listo: $slug sigue con PHP $rest"
-}
-
+#@incluir comun/docker-su-propio-apache/docker_web_remove.sh
 # docker-php-elegir <nombre> <php>: la version de PHP con la que va una tienda PrestaShop (va con un
 # solo dominio): se arranca esa, el dominio pasa a ella y se para la de antes
 function docker_web_switch() {
