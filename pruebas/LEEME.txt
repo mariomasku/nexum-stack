@@ -3,7 +3,7 @@ BATERÍA DE PRUEBAS AUTOMÁTICAS DE LVM-INSTALADOR
 
 Pruebas de seguridad y de funcionamiento de lvm-instalador.sh (Linux) y del
 lvm-instalador.sh del Mac. Se pasan enteras en cada versión, antes de
-publicarla. Con Linux 1.45.1 y Mac 1.33.1 dan 799 pruebas, 0 fallos.
+publicarla. Con Linux y Mac 1.57.6 dan 3127 pruebas, 0 fallos.
 
 
 CÓMO SE EJECUTA
@@ -35,7 +35,7 @@ Para probar otros, con variables:
 
 Tarda menos de un minuto. Al final escribe una línea por bloque y el total:
 
-    Total: 799 pruebas, 0 fallos
+    Total: 3127 pruebas, 0 fallos
 
 Si algo falla, el bloque sale con "FALLAN" y debajo las primeras líneas con
 el fallo. todas.sh devuelve 0 solo si no falla nada.

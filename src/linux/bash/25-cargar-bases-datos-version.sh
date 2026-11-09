@@ -1503,7 +1503,7 @@ function import_project() {
 # Codigo de la ventana (Python). No puede contener una linea con solo LVM_GUI_PY.
 function gui_source() {
     cat <<'LVM_GUI_PY'
-#@incluir ventana.py
+#@incluir ventana/
 LVM_GUI_PY
 }
 

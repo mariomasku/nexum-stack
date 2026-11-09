@@ -23193,157 +23193,8 @@ class Task:
         self.cancel()
 
 
-# ---------------------------------------------------------------- aplicacion
-
-class App(Gtk.Application):
-    def __init__(self):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        self.data = None
-        self.branches = None
-        self.php_dates = {}
-        # Pestaña Docker: datos de gui-docker (None hasta leerlos) y el formulario de proyecto nuevo
-        self.docker = None
-        self.docker_form = {}
-        self.branches_error = None
-        self.expanded = set()
-        try:
-            with open(FOLDED_FILE, encoding="utf-8") as f:
-                self.folded = {l.strip() for l in f if l.strip()}
-        except OSError:
-            self.folded = set()
-        self.extra_patches = []
-        self.busy = False
-        # Formulario «Subir o actualizar una base de datos» (se conserva al redibujar la pestaña)
-        self.imp = {"file": None, "db": None, "folder": None, "project": None}
-        self.db_pwd = {}
-        # Dominios de los vhosts (pestaña Hosts): None hasta leerlos
-        self.hosts = None
-        # Apache, MariaDB y FTP de la version montada (pestaña Servicios): None hasta leerlos
-        self.services = None
-        # Proyectos de /opt/htdocs (bloque «Cargar proyecto» de Versiones): None hasta leerlos
-        self.projects = None
-        # Los repositorios del buscador de Nuevo proyecto (np_repos_load)
-        self.np_repos, self.np_repos_when, self.np_repos_busy = None, 0, False
-        # Formulario «Nuevo proyecto con dominio falseado» (se conserva al redibujar la pestaña)
-        self.newdom = {"domain": "", "folder": "", "db": ""}
-
-    # ventana
-    def do_activate(self):
-        if getattr(self, "win", None):
-            self.win.present()
-            return
-        # Mano al pasar el ratón por cualquier botón (GTK 3 no tiene cursor en CSS): se pone en la
-        # ventana de eventos del botón cada vez que el ratón entra, según esté activo o no
-        hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
-
-        def pointer_hook(widget, event, *_):
-            if isinstance(widget, (Gtk.Button, Gtk.Switch)) and event.window is not None:
-                event.window.set_cursor(hand if widget.is_sensitive() else None)
-            return True
-        GObject.add_emission_hook(Gtk.Widget, "enter-notify-event", pointer_hook)
-        prov = Gtk.CssProvider()
-        prov.load_from_data(CSS.encode())
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        theme = Gtk.IconTheme.get_default()
-        # El icono es un PNG suelto en ~/.local/share/icons (no de un tema): has_icon no lo ve
-        self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
-        Gtk.Window.set_default_icon_name(self.icon)
-
-        for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
-                         ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
-                         ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
-                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
-                         ("update", lambda *_: self.check_package(manual=True)),
-                         ("terminal", self.on_terminal), ("refresh", self.on_refresh),
-                         ("changes", self.on_changes), ("about", self.on_about)]:
-            act = Gio.SimpleAction.new(name, None)
-            act.connect("activate", cb)
-            self.add_action(act)
-
-        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
-        self.win.set_default_size(920, 760)
-
-        header = Gtk.HeaderBar(show_close_button=True)
-        title = Gtk.Box(spacing=8)
-        title.pack_start(icon(self.icon, 24), False, False, 0)
-        self.title_lbl = label("Nexum Dev Stack", "title")
-        title.pack_start(self.title_lbl, False, False, 0)
-        header.set_custom_title(title)
-        menu = Gio.Menu()
-        sec = Gio.Menu()
-        sec.append("Abrir localhost", "app.localhost")
-        sec.append("Abrir phpMyAdmin", "app.phpmyadmin")
-        sec.append("Editar vhosts", "app.vhosts")
-        sec.append("Editar hosts", "app.hosts")
-        menu.append_section(None, sec)
-        sec = Gio.Menu()
-        sec.append("Volver a leer las versiones", "app.refresh")
-        # De momento, el .deb de Descargas; mas adelante, un repositorio
-        sec.append("Buscar actualizaciones", "app.update")
-        sec.append("Abrir el panel en la terminal", "app.terminal")
-        sec.append("Carpeta de registros", "app.logs")
-        menu.append_section(None, sec)
-        sec = Gio.Menu()
-        sec.append("Novedades", "app.changes")
-        sec.append("Acerca de Nexum Dev Stack", "app.about")
-        menu.append_section(None, sec)
-        mb = Gtk.MenuButton(menu_model=menu)
-        mb.add(icon("open-menu-symbolic"))
-        header.pack_end(mb)
-        self.win.set_titlebar(header)
-
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
-        self.page_versions, self.ver_box = page()
-        # Instalar va dentro de Versiones, debajo de las instaladas
-        self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        self.page_dbs, self.db_box = page()
-        self.page_tools, self.tools_box = page()
-        self.page_hosts, self.hosts_box = page()
-        self.page_services, self.services_box = page()
-        self.page_docker, self.docker_box = page()
-        self.stack.add_named(self.page_versions, "versiones")
-        self.stack.add_named(self.page_services, "servicios")
-        self.stack.add_named(self.page_hosts, "hosts")
-        self.stack.add_named(self.page_dbs, "bbdd")
-        self.stack.add_named(self.page_tools, "herramientas")
-        self.stack.add_named(self.page_docker, "docker")
-
-        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        # Apartados en una barra a la izquierda, como Configuración de Ubuntu
-        body = Gtk.Box()
-        self.tabs_box = self.build_tabs()
-        body.pack_start(self.tabs_box, False, False, 0)
-        body.pack_start(self.stack, True, True, 0)
-        main.pack_start(body, True, True, 0)
-        main.pack_start(Gtk.Separator(), False, False, 0)
-        self.foot = label("", "dim-label", "firma", xalign=0.5, margin=6)
-        main.pack_start(self.foot, False, False, 0)
-
-        overlay = Gtk.Overlay()
-        overlay.add(main)
-        overlay.add_overlay(self.build_toast())
-        self.win.add(overlay)
-        for box in (self.ver_box, self.db_box, self.inst_box):
-            self.loading(box)
-        # Los datos se leen antes de mostrar la ventana (tarda poco) para abrirla ya con el tamaño
-        # que necesita la pestaña Bases de datos, sin saltos
-        try:
-            res = subprocess.run(script_cmd("gui-datos"), stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 env=script_env(), timeout=10)
-            self.on_data(res.returncode, res.stdout.decode("utf-8", "replace"))
-            self.fit_height()
-        except Exception:  # noqa: BLE001 - si falla, se abre con el tamaño por defecto
-            pass
-        self.win.show_all()
-        self.toast_rev.set_reveal_child(False)
-        self.reload(branches=True)
-        GLib.timeout_add_seconds(20, self.on_tick)
-        # El paquete nuevo de Descargas ya no se busca solo al abrir: se instala como root y
-        # cualquier web puede dejar un fichero en Descargas. Se busca desde Herramientas
-        if os.environ.get("LVM_CAPTURA"):
-            GLib.timeout_add(2500, self.capture_all)
+class AppPrograma:
+    """Buscar e instalar una versión nueva del programa (el paquete .deb)."""
 
     # ------------------------------------------- paquete .deb nuevo en Descargas
     def check_package(self, manual=False, auto=False):
@@ -23819,6 +23670,10 @@ class App(Gtk.Application):
     def installs(self):
         return self.data["installs"] if self.data else []
 
+
+class AppServicios:
+    """Servicios de la versión activa: arrancar, parar y proteger."""
+
     # -------------------------------------------------------------- servicios
     def on_services_data(self, _rc, out):
         rows = [{"name": f[1], "running": f[2] == "1", "ports": f[3], "open": f[4] == "1",
@@ -23958,6 +23813,10 @@ class App(Gtk.Application):
     def on_secure(self, *_):
         self.run_task("Cerrando a la red", ["asegurar"],
                       done_text="Solo se puede entrar desde este equipo", auto_close=True)
+
+
+class AppHosts:
+    """Dominios y hosts del sistema."""
 
     # -------------------------------------------------------------- hosts
     def on_hosts_data(self, _rc, out):
@@ -24353,6 +24212,10 @@ class App(Gtk.Application):
         # El interruptor cambia cuando se vuelva a leer /etc/hosts
         return True
 
+
+class AppHerramientas:
+    """Configuración: ficheros, carpetas, programa e información."""
+
     # ------------------------------------------------------- herramientas
     def build_tools(self):
         """Lo que se usa de vez en cuando: ficheros de configuración, carpetas, actualizar el
@@ -24553,6 +24416,10 @@ class App(Gtk.Application):
             GLib.idle_add(lambda: (tv.scroll_to_iter(buf.get_end_iter(), 0, False, 0, 1), False)[1])
         run_dialog(dlg)
         dlg.destroy()
+
+
+class AppVersiones:
+    """Versiones de PHP y cargar un proyecto."""
 
     # ---------------------------------------------------------- versiones
     def on_close_stray(self, *_):
@@ -25976,6 +25843,10 @@ class App(Gtk.Application):
             return False
         run_quick(["gui-crear-acceso"], done)
 
+
+class AppInstalar:
+    """Instalar versiones y parches de PHP."""
+
     # ------------------------------------------------------------ instalar
     def build_install(self):
         clear(self.inst_box)
@@ -26231,6 +26102,10 @@ class App(Gtk.Application):
 
         self.run_task("Instalando", args, progress=True, reload_branches=True, on_done=done,
                       done_text="Instalación terminada")
+
+
+class AppBasesDatos:
+    """Bases de datos: lista, buscador y cargar el proyecto de una base."""
 
     # ------------------------------------------------------- bases de datos
     def build_databases(self):
@@ -26829,6 +26704,10 @@ class App(Gtk.Application):
         if err:
             self.toast("No se ha podido recordar la carpeta: %s" % err)
 
+
+class AppDocker:
+    """Docker (la parte de la ventana base)."""
+
     # ------------------------------------------------------------------ Docker
     def on_docker_data(self, rc, out):
         d = {"installed": False, "ready": False, "version": "", "lampp": False,
@@ -27136,6 +27015,10 @@ class App(Gtk.Application):
         self.run_task("Creando %s en Docker" % folder, args, progress=True,
                       done_text="%s en Docker: https://%s" % (folder, domain),
                       on_done=lambda *a: (f.clear(), run_quick(["gui-docker"], self.on_docker_data)))
+
+
+class AppSubirBajarBD:
+    """Descargar, subir o actualizar una base de datos."""
 
     # ------------------------------------------------- descargar una base de datos
     def on_download_db(self, db, folder):
@@ -27575,6 +27458,10 @@ class App(Gtk.Application):
                                    "La BBDD «%s» se queda a medias: tendrá lo que se haya "
                                    "cargado hasta ahora." % db, "Cancelar la carga"))
 
+
+class AppAcerca:
+    """Acerca de, comandos, novedades y capturas para revisar la ventana."""
+
     # -------------------------------------------------------------- acerca
     def on_about(self, *_):
         d = self.data or {}
@@ -27671,6 +27558,169 @@ class App(Gtk.Application):
             return i[0] < len(steps)
         GLib.timeout_add(2500, step)
         return False
+
+
+# ---------------------------------------------------------------- aplicacion
+
+class App(AppPrograma,
+          AppServicios,
+          AppHosts,
+          AppHerramientas,
+          AppVersiones,
+          AppInstalar,
+          AppBasesDatos,
+          AppDocker,
+          AppSubirBajarBD,
+          AppAcerca,
+          Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.data = None
+        self.branches = None
+        self.php_dates = {}
+        # Pestaña Docker: datos de gui-docker (None hasta leerlos) y el formulario de proyecto nuevo
+        self.docker = None
+        self.docker_form = {}
+        self.branches_error = None
+        self.expanded = set()
+        try:
+            with open(FOLDED_FILE, encoding="utf-8") as f:
+                self.folded = {l.strip() for l in f if l.strip()}
+        except OSError:
+            self.folded = set()
+        self.extra_patches = []
+        self.busy = False
+        # Formulario «Subir o actualizar una base de datos» (se conserva al redibujar la pestaña)
+        self.imp = {"file": None, "db": None, "folder": None, "project": None}
+        self.db_pwd = {}
+        # Dominios de los vhosts (pestaña Hosts): None hasta leerlos
+        self.hosts = None
+        # Apache, MariaDB y FTP de la version montada (pestaña Servicios): None hasta leerlos
+        self.services = None
+        # Proyectos de /opt/htdocs (bloque «Cargar proyecto» de Versiones): None hasta leerlos
+        self.projects = None
+        # Los repositorios del buscador de Nuevo proyecto (np_repos_load)
+        self.np_repos, self.np_repos_when, self.np_repos_busy = None, 0, False
+        # Formulario «Nuevo proyecto con dominio falseado» (se conserva al redibujar la pestaña)
+        self.newdom = {"domain": "", "folder": "", "db": ""}
+
+    # ventana
+    def do_activate(self):
+        if getattr(self, "win", None):
+            self.win.present()
+            return
+        # Mano al pasar el ratón por cualquier botón (GTK 3 no tiene cursor en CSS): se pone en la
+        # ventana de eventos del botón cada vez que el ratón entra, según esté activo o no
+        hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
+
+        def pointer_hook(widget, event, *_):
+            if isinstance(widget, (Gtk.Button, Gtk.Switch)) and event.window is not None:
+                event.window.set_cursor(hand if widget.is_sensitive() else None)
+            return True
+        GObject.add_emission_hook(Gtk.Widget, "enter-notify-event", pointer_hook)
+        prov = Gtk.CssProvider()
+        prov.load_from_data(CSS.encode())
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        theme = Gtk.IconTheme.get_default()
+        # El icono es un PNG suelto en ~/.local/share/icons (no de un tema): has_icon no lo ve
+        self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
+        Gtk.Window.set_default_icon_name(self.icon)
+
+        for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
+                         ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
+                         ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
+                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
+                         ("update", lambda *_: self.check_package(manual=True)),
+                         ("terminal", self.on_terminal), ("refresh", self.on_refresh),
+                         ("changes", self.on_changes), ("about", self.on_about)]:
+            act = Gio.SimpleAction.new(name, None)
+            act.connect("activate", cb)
+            self.add_action(act)
+
+        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
+        self.win.set_default_size(920, 760)
+
+        header = Gtk.HeaderBar(show_close_button=True)
+        title = Gtk.Box(spacing=8)
+        title.pack_start(icon(self.icon, 24), False, False, 0)
+        self.title_lbl = label("Nexum Dev Stack", "title")
+        title.pack_start(self.title_lbl, False, False, 0)
+        header.set_custom_title(title)
+        menu = Gio.Menu()
+        sec = Gio.Menu()
+        sec.append("Abrir localhost", "app.localhost")
+        sec.append("Abrir phpMyAdmin", "app.phpmyadmin")
+        sec.append("Editar vhosts", "app.vhosts")
+        sec.append("Editar hosts", "app.hosts")
+        menu.append_section(None, sec)
+        sec = Gio.Menu()
+        sec.append("Volver a leer las versiones", "app.refresh")
+        # De momento, el .deb de Descargas; mas adelante, un repositorio
+        sec.append("Buscar actualizaciones", "app.update")
+        sec.append("Abrir el panel en la terminal", "app.terminal")
+        sec.append("Carpeta de registros", "app.logs")
+        menu.append_section(None, sec)
+        sec = Gio.Menu()
+        sec.append("Novedades", "app.changes")
+        sec.append("Acerca de Nexum Dev Stack", "app.about")
+        menu.append_section(None, sec)
+        mb = Gtk.MenuButton(menu_model=menu)
+        mb.add(icon("open-menu-symbolic"))
+        header.pack_end(mb)
+        self.win.set_titlebar(header)
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        self.page_versions, self.ver_box = page()
+        # Instalar va dentro de Versiones, debajo de las instaladas
+        self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        self.page_dbs, self.db_box = page()
+        self.page_tools, self.tools_box = page()
+        self.page_hosts, self.hosts_box = page()
+        self.page_services, self.services_box = page()
+        self.page_docker, self.docker_box = page()
+        self.stack.add_named(self.page_versions, "versiones")
+        self.stack.add_named(self.page_services, "servicios")
+        self.stack.add_named(self.page_hosts, "hosts")
+        self.stack.add_named(self.page_dbs, "bbdd")
+        self.stack.add_named(self.page_tools, "herramientas")
+        self.stack.add_named(self.page_docker, "docker")
+
+        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        # Apartados en una barra a la izquierda, como Configuración de Ubuntu
+        body = Gtk.Box()
+        self.tabs_box = self.build_tabs()
+        body.pack_start(self.tabs_box, False, False, 0)
+        body.pack_start(self.stack, True, True, 0)
+        main.pack_start(body, True, True, 0)
+        main.pack_start(Gtk.Separator(), False, False, 0)
+        self.foot = label("", "dim-label", "firma", xalign=0.5, margin=6)
+        main.pack_start(self.foot, False, False, 0)
+
+        overlay = Gtk.Overlay()
+        overlay.add(main)
+        overlay.add_overlay(self.build_toast())
+        self.win.add(overlay)
+        for box in (self.ver_box, self.db_box, self.inst_box):
+            self.loading(box)
+        # Los datos se leen antes de mostrar la ventana (tarda poco) para abrirla ya con el tamaño
+        # que necesita la pestaña Bases de datos, sin saltos
+        try:
+            res = subprocess.run(script_cmd("gui-datos"), stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 env=script_env(), timeout=10)
+            self.on_data(res.returncode, res.stdout.decode("utf-8", "replace"))
+            self.fit_height()
+        except Exception:  # noqa: BLE001 - si falla, se abre con el tamaño por defecto
+            pass
+        self.win.show_all()
+        self.toast_rev.set_reveal_child(False)
+        self.reload(branches=True)
+        GLib.timeout_add_seconds(20, self.on_tick)
+        # El paquete nuevo de Descargas ya no se busca solo al abrir: se instala como root y
+        # cualquier web puede dejar un fichero en Descargas. Se busca desde Herramientas
+        if os.environ.get("LVM_CAPTURA"):
+            GLib.timeout_add(2500, self.capture_all)
 
 
 # ===================================================================================================
@@ -27982,134 +28032,8 @@ class Hamburger(Gtk.DrawingArea):
         return False
 
 
-class App2(App):
-    def __init__(self):
-        super().__init__()
-
-        self.selected_project = None
-        self.np_dialog = None
-        # Pestaña Docker: vista (cont, img, vol), filtros, proyectos plegados y uso de CPU y memoria
-        # (dk_open: el proyecto desplegado, uno como mucho; al entrar en la pestaña, todos plegados)
-        self.dk_view, self.dk_query, self.dk_only_up, self.dk_open, self.dk_stats = "cont", "", False, set(), None
-        # Pestaña Bases de datos: buscador y «solo la activa» (la activa se ve desplegada al abrir)
-        self.db_query, self.db_only_active = "", False
-        # Tamaño de cada BBDD: (version duena, base) -> (bytes, cuando se midio)
-        self.db_sizes = {}
-        # Correo de pruebas: correos sin leer en Mailpit (None: no se sabe) y si se esta preguntando
-        self.mail_unread, self.mail_polling = None, False
-
-    # ------------------------------------------------------------------ ventana
-    def do_activate(self):
-        if getattr(self, "win", None):
-            self.win.present()
-            return
-        hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
-
-        def pointer_hook(widget, event, *_):
-            if isinstance(widget, (Gtk.Button, Gtk.Switch)) and event.window is not None:
-                event.window.set_cursor(hand if widget.is_sensitive() else None)
-            return True
-        GObject.add_emission_hook(Gtk.Widget, "enter-notify-event", pointer_hook)
-
-        # Los desplegables se abren debajo del boton, como una lista. Sin esto, GTK 3 pone la opcion
-        # elegida encima del boton y, con muchas (los proyectos), deja huecos vacios por arriba o abajo
-        def combo_hook(widget, *_):
-            if isinstance(widget, Gtk.ComboBox) and widget.get_wrap_width() == 0:
-                widget.set_wrap_width(1)
-            return True
-        GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
-        for text in (CSS, NEW_CSS):
-            prov = Gtk.CssProvider()
-            prov.load_from_data(text.encode())
-            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
-                                                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        theme = Gtk.IconTheme.get_default()
-        self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
-        Gtk.Window.set_default_icon_name(self.icon)
-        for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
-                         ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
-                         ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
-                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
-                         ("update", lambda *_: self.check_package(manual=True)),
-                         ("terminal", self.on_terminal), ("refresh", self.on_refresh),
-                         ("changes", self.on_changes), ("about", self.on_about)]:
-            act = Gio.SimpleAction.new(name, None)
-            act.connect("activate", cb)
-            self.add_action(act)
-        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
-        # Sin ninguna ventana del programa, se cierra del todo
-        self.connect("window-removed", lambda app, _w: app.get_windows() or self.nv_exit())
-        # (con el icono junto al reloj, la X la esconde: se vuelve a abrir o se sale desde él)
-        self.win.connect("delete-event", lambda *_: self.nv_tray_hide())
-        self.tray, self.tray_items, self.tray_ticks = None, {}, 0
-        self.nv_tray_setup()
-        self.win.set_default_size(1240, 840)
-        self.win.set_titlebar(self.nv_header())
-        try:
-            with open(THEME_FILE, encoding="utf-8") as f:
-                saved = f.read().strip()
-        except OSError:
-            saved = ""
-        if saved in ("claro", "oscuro"):
-            self.nv_apply_theme(saved == "oscuro")
-        else:
-            self.nv_apply_theme(self.nv_is_dark())
-
-        # Cajas que rellenan los constructores de siempre (algunas no se ven: de ellas se sacan los
-        # avisos, el asistente de proyecto nuevo e Instalar)
-        self.legacy_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.ver_box = self.legacy_box
-        self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        self.services_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=12)
-        self.services_box.set_size_request(520, -1)
-        self.services_pop.add(self.services_box)
-        self.page_dbs, self.db_box = new_page()
-        self.page_tools, self.tools_box = new_page(620)
-        # (los apartados de Configuración, en una columna pegada al menú lateral)
-        self.tools_side = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-subnav-lateral")
-        self.tools_side.set_size_request(220, -1)
-        self.tools_wrap = Gtk.Box()
-        self.tools_wrap.pack_start(self.tools_side, False, False, 0)
-        self.tools_wrap.pack_start(self.page_tools, True, True, 0)
-        self.page_hosts, self.hosts_box = new_page()
-        self.page_docker, self.docker_box = new_page(940)
-        self.page_projects, self.proj_page = new_page(940)
-        self.page_repos, self.repos_page = new_page(940)
-        self.repos, self.repos_all, self.github = None, False, None
-        self.page_node, self.node_page = new_page(940)
-        self.node_rows = None
-        self.page_vers, self.vers_page = new_page(900)
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
-        for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
-                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node),
-                        ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
-            self.stack.add_named(w, name)
-        body = Gtk.Box()
-        body.pack_start(self.nv_sidebar(), False, False, 0)
-        # (el contenido arriba y, abajo, la terminal: se cambia de alto arrastrando el borde)
-        self.term_paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
-        self.term_paned.pack1(self.stack, True, False)
-        self.term_paned.pack2(self.nv_term_panel(), False, False)
-        body.pack_start(self.term_paned, True, True, 0)
-        overlay = Gtk.Overlay()
-        overlay.add(body)
-        overlay.add_overlay(self.build_toast())
-        self.win.add(overlay)
-        self.nv_build_projects_shell()
-        for box in (self.db_box, self.vers_page):
-            self.loading(box)
-        self.win.show_all()
-        self.toast_rev.set_reveal_child(False)
-        self.reload(branches=True)
-        GLib.timeout_add_seconds(20, self.on_tick)
-        # Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
-        # vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
-        self.np_repos_load(cache=True)
-        GLib.timeout_add_seconds(5, lambda: (self.np_repos_load(), False)[1])
-        # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
-        GLib.timeout_add_seconds(6, self.auto_check_package)
-        # (los correos sin leer, tambien al volver a la ventana)
-        self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+class NvBandeja:
+    """El icono junto al reloj."""
 
     # ------------------------------------------------------------------ icono junto al reloj
     def nv_tray_setup(self):
@@ -28398,6 +28322,10 @@ class App2(App):
         self.mail_btn.set_no_show_all(True)
         hb.pack_end(self.mail_btn)
         return hb
+
+
+class NvTerminal:
+    """La terminal de abajo de la ventana."""
 
     # ------------------------------------------------------------------ terminal (abajo de la ventana)
     def nv_term_panel(self):
@@ -28803,6 +28731,10 @@ class App2(App):
             self.nv_mail_poll()
         return res
 
+
+class NvCorreo:
+    """Correo de pruebas (Mailpit)."""
+
     # ------------------------------------------------------------------ correo de pruebas (Mailpit)
     def nv_mail(self):
         return (self.data or {}).get("mail") or {}
@@ -29120,6 +29052,10 @@ class App2(App):
         if name in self.tabs:
             lb, row = self.tabs[name]
             lb.select_row(row)
+
+
+class NvDatosAvisos:
+    """Los datos de la ventana, las versiones y los avisos."""
 
     # ------------------------------------------------------------------ datos
     def on_data(self, rc, out):
@@ -29495,6 +29431,10 @@ class App2(App):
         dlg.connect("destroy", lambda *_: self.inst_box.get_parent() and
                     self.inst_box.get_parent().remove(self.inst_box))
         dlg.show_all()
+
+
+class NvProyectos:
+    """Proyectos: el cargado y la lista de todos."""
 
     # ------------------------------------------------------------------ Proyectos
     def nv_build_projects_shell(self):
@@ -30182,6 +30122,10 @@ class App2(App):
         self.hero_box.pack_start(card, False, False, 0)
         self.hero_box.show_all()
 
+
+class NvActualizarProyecto:
+    """Actualizar un proyecto, sus menús, crearlo, importarlo y borrarlo."""
+
     # --- Actualizar proyecto: la BBDD y el código de producción, arrastrados o elegidos ---
 
     def nv_drop_zone(self, title, formats, symbol_name, choosers, on_path):
@@ -30611,6 +30555,10 @@ class App2(App):
         if not show and self.np_dialog is not None:
             self.np_dialog.hide()
 
+
+class NvConfiguracion:
+    """Títulos de las páginas, Hosts y Configuración por apartados."""
+
     def nv_page_title(self, box, symbol_name, title, sub, trailing=None):
         """Título grande arriba de una página hecha con los constructores de siempre (como el de las
         demás pestañas). trailing: un botón, a su derecha."""
@@ -30957,6 +30905,10 @@ class App2(App):
         n = len(self.warn_box.get_children())
         self.warn_num.set_label(str(n))
         self.warn_btn.set_visible(n > 0)
+
+
+class NvGithub:
+    """Repositorios de GitHub."""
 
     # ------------------------------------------------------------------ repositorios de GitHub
     def nv_github_tools(self):
@@ -31851,6 +31803,10 @@ class App2(App):
                       done_text="Barrera entre webs %s" % ("encendida" if on else "apagada"),
                       on_done=lambda *_: self.build_tools())
 
+
+class NvBasesDatos:
+    """Bases de datos (como Docker)."""
+
     # ------------------------------------------------------------------ Bases de datos (como Docker)
     def update_db_search(self):
         # (el buscador de siempre no esta en la ventana nueva: la tabla tiene el suyo)
@@ -32226,6 +32182,10 @@ class App2(App):
             lb.add(r)
         self.db_table.pack_start(lb, False, False, 0)
         self.db_table.show_all()
+
+
+class NvDocker:
+    """Docker (como Docker Desktop)."""
 
     # ------------------------------------------------------------------ Docker (como Docker Desktop)
     def build_docker(self):
@@ -32890,6 +32850,147 @@ class App2(App):
                         "nv-tenue", margin=14))
             lb.add(r)
         return lb
+
+
+class App2(NvBandeja,
+           NvTerminal,
+           NvCorreo,
+           NvDatosAvisos,
+           NvProyectos,
+           NvActualizarProyecto,
+           NvConfiguracion,
+           NvGithub,
+           NvBasesDatos,
+           NvDocker,
+           App):
+    def __init__(self):
+        super().__init__()
+
+        self.selected_project = None
+        self.np_dialog = None
+        # Pestaña Docker: vista (cont, img, vol), filtros, proyectos plegados y uso de CPU y memoria
+        # (dk_open: el proyecto desplegado, uno como mucho; al entrar en la pestaña, todos plegados)
+        self.dk_view, self.dk_query, self.dk_only_up, self.dk_open, self.dk_stats = "cont", "", False, set(), None
+        # Pestaña Bases de datos: buscador y «solo la activa» (la activa se ve desplegada al abrir)
+        self.db_query, self.db_only_active = "", False
+        # Tamaño de cada BBDD: (version duena, base) -> (bytes, cuando se midio)
+        self.db_sizes = {}
+        # Correo de pruebas: correos sin leer en Mailpit (None: no se sabe) y si se esta preguntando
+        self.mail_unread, self.mail_polling = None, False
+
+    # ------------------------------------------------------------------ ventana
+    def do_activate(self):
+        if getattr(self, "win", None):
+            self.win.present()
+            return
+        hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
+
+        def pointer_hook(widget, event, *_):
+            if isinstance(widget, (Gtk.Button, Gtk.Switch)) and event.window is not None:
+                event.window.set_cursor(hand if widget.is_sensitive() else None)
+            return True
+        GObject.add_emission_hook(Gtk.Widget, "enter-notify-event", pointer_hook)
+
+        # Los desplegables se abren debajo del boton, como una lista. Sin esto, GTK 3 pone la opcion
+        # elegida encima del boton y, con muchas (los proyectos), deja huecos vacios por arriba o abajo
+        def combo_hook(widget, *_):
+            if isinstance(widget, Gtk.ComboBox) and widget.get_wrap_width() == 0:
+                widget.set_wrap_width(1)
+            return True
+        GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
+        for text in (CSS, NEW_CSS):
+            prov = Gtk.CssProvider()
+            prov.load_from_data(text.encode())
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
+                                                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        theme = Gtk.IconTheme.get_default()
+        self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
+        Gtk.Window.set_default_icon_name(self.icon)
+        for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
+                         ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
+                         ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
+                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
+                         ("update", lambda *_: self.check_package(manual=True)),
+                         ("terminal", self.on_terminal), ("refresh", self.on_refresh),
+                         ("changes", self.on_changes), ("about", self.on_about)]:
+            act = Gio.SimpleAction.new(name, None)
+            act.connect("activate", cb)
+            self.add_action(act)
+        self.win = Gtk.ApplicationWindow(application=self, title="Nexum Dev Stack")
+        # Sin ninguna ventana del programa, se cierra del todo
+        self.connect("window-removed", lambda app, _w: app.get_windows() or self.nv_exit())
+        # (con el icono junto al reloj, la X la esconde: se vuelve a abrir o se sale desde él)
+        self.win.connect("delete-event", lambda *_: self.nv_tray_hide())
+        self.tray, self.tray_items, self.tray_ticks = None, {}, 0
+        self.nv_tray_setup()
+        self.win.set_default_size(1240, 840)
+        self.win.set_titlebar(self.nv_header())
+        try:
+            with open(THEME_FILE, encoding="utf-8") as f:
+                saved = f.read().strip()
+        except OSError:
+            saved = ""
+        if saved in ("claro", "oscuro"):
+            self.nv_apply_theme(saved == "oscuro")
+        else:
+            self.nv_apply_theme(self.nv_is_dark())
+
+        # Cajas que rellenan los constructores de siempre (algunas no se ven: de ellas se sacan los
+        # avisos, el asistente de proyecto nuevo e Instalar)
+        self.legacy_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.ver_box = self.legacy_box
+        self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        self.services_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=12)
+        self.services_box.set_size_request(520, -1)
+        self.services_pop.add(self.services_box)
+        self.page_dbs, self.db_box = new_page()
+        self.page_tools, self.tools_box = new_page(620)
+        # (los apartados de Configuración, en una columna pegada al menú lateral)
+        self.tools_side = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-subnav-lateral")
+        self.tools_side.set_size_request(220, -1)
+        self.tools_wrap = Gtk.Box()
+        self.tools_wrap.pack_start(self.tools_side, False, False, 0)
+        self.tools_wrap.pack_start(self.page_tools, True, True, 0)
+        self.page_hosts, self.hosts_box = new_page()
+        self.page_docker, self.docker_box = new_page(940)
+        self.page_projects, self.proj_page = new_page(940)
+        self.page_repos, self.repos_page = new_page(940)
+        self.repos, self.repos_all, self.github = None, False, None
+        self.page_node, self.node_page = new_page(940)
+        self.node_rows = None
+        self.page_vers, self.vers_page = new_page(900)
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
+                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node),
+                        ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
+            self.stack.add_named(w, name)
+        body = Gtk.Box()
+        body.pack_start(self.nv_sidebar(), False, False, 0)
+        # (el contenido arriba y, abajo, la terminal: se cambia de alto arrastrando el borde)
+        self.term_paned = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL)
+        self.term_paned.pack1(self.stack, True, False)
+        self.term_paned.pack2(self.nv_term_panel(), False, False)
+        body.pack_start(self.term_paned, True, True, 0)
+        overlay = Gtk.Overlay()
+        overlay.add(body)
+        overlay.add_overlay(self.build_toast())
+        self.win.add(overlay)
+        self.nv_build_projects_shell()
+        for box in (self.db_box, self.vers_page):
+            self.loading(box)
+        self.win.show_all()
+        self.toast_rev.set_reveal_child(False)
+        self.reload(branches=True)
+        GLib.timeout_add_seconds(20, self.on_tick)
+        # Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
+        # vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
+        self.np_repos_load(cache=True)
+        GLib.timeout_add_seconds(5, lambda: (self.np_repos_load(), False)[1])
+        # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
+        GLib.timeout_add_seconds(6, self.auto_check_package)
+        # (los correos sin leer, tambien al volver a la ventana)
+        self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
+
 
 def load_fonts():
     """Fuente del nombre de la cabecera: se escribe en ~/.lvm-instalador/cache/fuentes y se añade
@@ -33960,6 +34061,7 @@ AaYAAQABAVwAAQAAAAEACAABAAYAAwABAAECfQAGAAAAAQAIAAMAAQAYAAEAOAADACQAHgAkAAEAAAAf
 AQBQAAEAAAABAAgAAQAGAAEAAQABAAQAAAABAAAAAA==
 """,
 }
+
 
 if __name__ == "__main__":
     load_fonts()

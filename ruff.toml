@@ -1,4 +1,4 @@
-# Revisión del Python (src/linux/ventana.py y el proxy del túnel): solo lo que encuentra fallos, no el estilo
+# Revisión del Python (la ventana de Linux, src/linux/ventana/, entera, y el proxy del túnel): solo lo que encuentra fallos, no el estilo
 # (el código usa % para dar formato, a propósito, como el resto del proyecto). La usa GitHub Actions.
 # El túnel también va en el Mac, con el Python del sistema (3.9): nada más moderno que eso.
 target-version = "py39"

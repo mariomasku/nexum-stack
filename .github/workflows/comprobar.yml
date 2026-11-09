@@ -59,9 +59,10 @@ jobs:
         run: ./construir.sh --comprobar
       - name: Sintaxis de cada sección de bash
         run: for f in src/linux/bash/*.sh src/mac/bash/*.sh src/comun/*/*.sh; do bash -n "$f" || exit 1; done
-      - name: Sintaxis del Python (ventana de Linux y túnel)
+      - name: Sintaxis del Python (ventana de Linux, entera y cada fichero suyo, y túnel)
         run: |
-          for f in src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py; do
+          ./construir.sh --ventana ventana.py
+          for f in ventana.py src/linux/ventana/*.py src/linux/tunel.py src/mac/tunel.py; do
             python3 -I -c "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())" "$f" || exit 1
           done
           echo ok
@@ -91,7 +92,27 @@ jobs:
         run: |
           pip install --quiet ruff
           ruff --version
-          ruff check --output-format concise src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py | tee ruff.txt
-          rc=${PIPESTATUS[0]}
+          # (la ventana, entera: cada fichero suyo usa lo de los demás. Cada aviso dice en qué fichero de
+          # src/linux/ventana/ está)
+          ./construir.sh --ventana ventana.py
+          ruff check --output-format concise ventana.py src/linux/tunel.py src/mac/tunel.py > ruff-crudo.txt
+          rc=$?
+          python3 -I - ruff-crudo.txt src/linux/ventana > ruff.txt << 'PY'
+          import os, re, sys
+          folder = sys.argv[2]
+          pieces, start = [], 1
+          for n in sorted(os.listdir(folder)):
+              k = open(os.path.join(folder, n), encoding="utf-8").read().count("\n")
+              pieces.append((start, n))
+              start += k + 2
+          for line in open(sys.argv[1], encoding="utf-8"):
+              m = re.match(r"ventana\.py:(\d+):(.*)", line)
+              if m:
+                  at = int(m.group(1))
+                  first, n = [p for p in pieces if p[0] <= at][-1]
+                  line = "src/linux/ventana/%s:%d:%s\n" % (n, at - first + 1, m.group(2))
+              sys.stdout.write(line)
+          PY
+          cat ruff.txt
           echo "### ruff: $( [ "$rc" -eq 0 ] && echo sin avisos || grep -c ':[0-9]*:[0-9]*: ' ruff.txt) " >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
