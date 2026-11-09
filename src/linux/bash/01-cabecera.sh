@@ -380,6 +380,7 @@ PHP2SHELL_BACKPORTS=(
 )
 # Las pilas que lo llevan lo dicen en este fichero (lo que sale en la ventana: «+ parche de seguridad»)
 PHP2SHELL_MARK=etc/lvm-parche-php2shell
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_7_4_33='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4J/dGTZdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3bFIb0G
 pf0e1wfdsSqDSg0qaXMVy47K2E9fN+TJBFpmPtkeCTNTLPlrLEBL7eSQi6GsC6kScFdp7GAMIsBKuP3oVLwpo0L0O0o72QHqydzo
@@ -469,6 +470,7 @@ Kl5hcwv1wdlOO1OLkPlYG6o8/C5EzL2QNSG2D69+cOo9+a9kI3Pxuj1+Z2kqTH/mRP5vLNH4MgwgrBnE
 +TA5AEWOB+AT/Vq627PTpzgT+wWhL672awLOeloq07SScKdpmTfm3RxDMEsfH6/0HElwRljdde7t4RBJ6eSZPAtYmCTPEoZq6BSW
 un/RRVA4JbHOhL0Kp2R2KzxTCMeLQaTKqUpaxGzZsMt3uwAAAADxUSn3mBBPdwAB0jLevwIAGpf9fbHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_8_0_30='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4Jo0F5RdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3cn8SR2
 VAJ6MHS1N180xCXCcaC3Qmk8D1zSzJxt8Rd80/sqHZoOGhbMXdX4W16k9EHnHasdwW6t4jY5rN2mQV1SGh9ZZHOUu9+kBiIArKD5
@@ -553,6 +555,7 @@ Jug5DE1I/Fg4KbLBsC27q/5G0eUBaJrrbkwlhFPxiGma2KOEBRGvlo6B3ONPZ4wEOzEajBTBI3Zp7SIn
 iyGk1ydP33KsI+ZJRA1G1XIOVRGYVwYseKvvqcPZu4Q7qhtrp99ded9bqAFauDPc3P6DXpFojvYjp3aRhDWGlHi8wgCWGpEcToKR
 VwABsC+1tAIAm/XDQLHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_8_1_34='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4LvGIHJdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3g0FVks
 +gq2lrSaGRU1vNWg2H4ed8RfBlb+15N6mBE2RL71QT4wVIihEsS66fjli+EzaMuNnAcwSq2ndccDg3ow+P8W9UWIwLjK/ahalZce
@@ -774,7 +777,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.5"
+APP_VERSION="1.57.6"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

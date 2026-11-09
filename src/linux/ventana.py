@@ -2418,7 +2418,8 @@ class Task:
 
         self.proc = subprocess.Popen(script_cmd(*self.args), stdin=subprocess.DEVNULL,
                                      stdout=slave, stderr=slave, env=env,
-                                     start_new_session=True, preexec_fn=as_terminal)
+                                     # (preexec_fn con hilos: solo hace un ioctl, sin reservar memoria ni bloqueos)
+                                     start_new_session=True, preexec_fn=as_terminal)  # noqa: PLW1509
         os.close(slave)
         flags = fcntl.fcntl(self.master, fcntl.F_GETFL)
         fcntl.fcntl(self.master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
@@ -7258,7 +7259,7 @@ class App(Gtk.Application):
                  (lambda: self.show_tab("herramientas"), None), (lambda: None, "4-herramientas"),
                  (lambda: self.quit(), None)]
 
-        def step(i=[0]):
+        def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
             fn, shot = steps[i[0]]
             fn()
             if shot:
@@ -11324,7 +11325,7 @@ class App2(App):
         box.pack_start(note, False, False, 0)
         dlg.get_content_area().add(box)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        ok = css(dlg.add_button("Compartir", Gtk.ResponseType.OK), "nv-azul")
+        css(dlg.add_button("Compartir", Gtk.ResponseType.OK), "nv-azul")
         dlg.set_default_response(Gtk.ResponseType.OK)
 
         def update(*_):
@@ -12421,7 +12422,7 @@ class App2(App):
                                      "de verse)" if up else "Arrancar el Apache de Docker y su phpMyAdmin",
                                      lambda up=up: (not up or self.nv_stop_shared_ok(["nexum-web"], "el Apache de Docker")) and self.run_task(
                                          "Parando el Apache de Docker" if up else "Arrancando el Apache de Docker",
-                                         ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])
+                                         ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
                 elif re.fullmatch(r"nexum-lampp-bd-\d+-\d+(-\d+)?", proj or "") and len(items) == 1:
                     # (el puente de los proyectos de Docker que usan en vivo la BBDD de esa version LAMPP)
                     ver = proj[len("nexum-lampp-bd-"):].replace("-", ".")
@@ -12434,7 +12435,7 @@ class App2(App):
                                      lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
                                          ("Parando %s" if up else "Arrancando %s") % t,
                                          ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
-                                         on_done=done), True)])
+                                         on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
                 elif re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or "") and len(items) == 1:
                     acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                                      "Parar %s (los proyectos que van con ella se quedan sin BBDD)" % title if up else
@@ -12442,7 +12443,7 @@ class App2(App):
                                      lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
                                          ("Parando %s" if up else "Arrancando %s") % t,
                                          ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
-                                         on_done=done), True)])
+                                         on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
             row([name, label(""), img_cell, pma, label(cpu_text([c["name"] for c in items]), "nv-mono", "nv-chico", "nv-tenue"), acts],
                 on_click=lambda proj=proj: self.nv_dk_toggle(proj))
             if not opened:

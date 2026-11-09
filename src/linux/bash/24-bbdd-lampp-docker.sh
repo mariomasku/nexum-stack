@@ -250,6 +250,7 @@ function docker_stop_all() {
     run dk stop "${names[@]}" > /dev/null || return 1
     # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
     local f
+    # shellcheck disable=SC2045  # (nombres de versión ya comprobados, sin espacios)
     for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }

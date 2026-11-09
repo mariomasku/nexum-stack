@@ -206,7 +206,7 @@ function cert_audit() {
 # sin limite de dominios que los firmaban dejan de ser de confianza en este Mac. La clave de la CA no
 # se borra (puede que la quieras): se dice donde esta
 function fix_certs() {
-    local audit t dom crt key why copy n=0 cas=0 failed=0 old_files=() keyfile
+    local audit t dom crt key why copy n=0 failed=0 keyfile
     audit=$(cert_audit --clave)
     if ! grep -qE '^(C|A)\|' <<< "$audit"; then
         echo "Los certificados de los vhosts ya estan bien: ninguno es de confianza para todo este Mac."
@@ -274,7 +274,6 @@ PY
     fi
     while IFS='|' read -r t _ _ sha1 where; do
         [ "$t" == A ] || continue
-        cas=1
         case $where in
             llavero:*)
                 # Primero sus ajustes de confianza (los que pone mkcert con add-trusted-cert): borrar

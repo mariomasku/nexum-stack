@@ -120,6 +120,7 @@ function install_plan() {
         sudo -v || return 1
         while true; do sudo -n true; sleep 50; kill -0 "$$" 2> /dev/null || exit; done 2> /dev/null &
         local keepalive=$!
+        # shellcheck disable=SC2064  # (el PID, el de ahora)
         trap "kill $keepalive 2> /dev/null" EXIT
     fi
 

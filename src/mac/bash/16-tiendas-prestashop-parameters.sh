@@ -52,13 +52,13 @@ function ps_table_prefix() {
 # Tienda 1.7 o posterior sin base en app/config/parameters.php: lo crea con la base cargada en local
 # (la copia guardada si es de la misma base). Lo que ya tiene base no se toca.
 function ps_parameters() {
-    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved try out
+    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved out
     local file=$dir/app/config/parameters.php
     [ -f "$dir/app/config/set_parameters.php" ] || [ -d "$dir/src/PrestaShopBundle" ] || return 0
     [ -f "$file" ] && grep -qE "['\"]database_name['\"][[:space:]]*=>[[:space:]]*['\"][^'\"]" "$file" && return 0
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1

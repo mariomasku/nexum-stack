@@ -660,6 +660,7 @@ case "$1" in
             echo "construir-pila solo lo usa install_stack"
             exit 1
         fi
+        # shellcheck disable=SC1090  # (el fichero lo pasa quien llama)
         . "$2"
         cd "$build" || exit 1
         function stack_fail() { stack_child_fail; }

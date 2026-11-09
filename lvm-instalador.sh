@@ -380,6 +380,7 @@ PHP2SHELL_BACKPORTS=(
 )
 # Las pilas que lo llevan lo dicen en este fichero (lo que sale en la ventana: «+ parche de seguridad»)
 PHP2SHELL_MARK=etc/lvm-parche-php2shell
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_7_4_33='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4J/dGTZdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3bFIb0G
 pf0e1wfdsSqDSg0qaXMVy47K2E9fN+TJBFpmPtkeCTNTLPlrLEBL7eSQi6GsC6kScFdp7GAMIsBKuP3oVLwpo0L0O0o72QHqydzo
@@ -469,6 +470,7 @@ Kl5hcwv1wdlOO1OLkPlYG6o8/C5EzL2QNSG2D69+cOo9+a9kI3Pxuj1+Z2kqTH/mRP5vLNH4MgwgrBnE
 +TA5AEWOB+AT/Vq627PTpzgT+wWhL672awLOeloq07SScKdpmTfm3RxDMEsfH6/0HElwRljdde7t4RBJ6eSZPAtYmCTPEoZq6BSW
 un/RRVA4JbHOhL0Kp2R2KzxTCMeLQaTKqUpaxGzZsMt3uwAAAADxUSn3mBBPdwAB0jLevwIAGpf9fbHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_8_0_30='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4Jo0F5RdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3cn8SR2
 VAJ6MHS1N180xCXCcaC3Qmk8D1zSzJxt8Rd80/sqHZoOGhbMXdX4W16k9EHnHasdwW6t4jY5rN2mQV1SGh9ZZHOUu9+kBiIArKD5
@@ -553,6 +555,7 @@ Jug5DE1I/Fg4KbLBsC27q/5G0eUBaJrrbkwlhFPxiGma2KOEBRGvlo6B3ONPZ4wEOzEajBTBI3Zp7SIn
 iyGk1ydP33KsI+ZJRA1G1XIOVRGYVwYseKvvqcPZu4Q7qhtrp99ded9bqAFauDPc3P6DXpFojvYjp3aRhDWGlHi8wgCWGpEcToKR
 VwABsC+1tAIAm/XDQLHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_DIFF_8_1_34='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4LvGIHJdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3g0FVks
 +gq2lrSaGRU1vNWg2H4ed8RfBlb+15N6mBE2RL71QT4wVIihEsS66fjli+EzaMuNnAcwSq2ndccDg3ow+P8W9UWIwLjK/ahalZce
@@ -774,7 +777,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.5"
+APP_VERSION="1.57.6"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -4125,7 +4128,7 @@ function cert_audit() {
 # sin limite de dominios que los firmaban dejan de ser de confianza en este equipo. La clave de la CA no
 # se borra (puede que la quieras): se dice donde esta
 function fix_certs() {
-    local audit t dom crt key why copy n=0 cas=0 failed=0 old_files=() keyfile
+    local audit t dom crt key why copy n=0 failed=0 old_files=() keyfile fresh=0
     audit=$(cert_audit --clave)
     if ! grep -qE '^(C|A|S)\|' <<< "$audit"; then
         echo "Los certificados de los vhosts ya estan bien: ninguno es de confianza para todo este equipo."
@@ -4220,7 +4223,6 @@ PY
     fi
     while IFS='|' read -r t _ _ sha1 where; do
         [ "$t" == A ] || continue
-        cas=1
         case $where in
             file:/usr/local/share/ca-certificates/*)
                 f=${where#file:}
@@ -4506,8 +4508,7 @@ function ps_domain() {
     if [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] && [ -x "$DB_CLIENT" ] \
             && db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}shop_url"; then
         # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-        local try
-        for try in 1 2 3 4 5 6; do
+        for _ in 1 2 3 4 5 6; do
             domain=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" < /dev/null 2>&1) && break
             [[ "$domain" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
             sleep 1
@@ -7134,13 +7135,13 @@ function ps_table_prefix() {
 # Tienda 1.7 o posterior sin base en app/config/parameters.php: lo crea con la base cargada en local
 # (la copia guardada si es de la misma base). Lo que ya tiene base no se toca.
 function ps_parameters() {
-    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved try out
+    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved out
     local file=$dir/app/config/parameters.php
     [ -f "$dir/app/config/set_parameters.php" ] || [ -d "$dir/src/PrestaShopBundle" ] || return 0
     [ -f "$file" ] && grep -qE "['\"]database_name['\"][[:space:]]*=>[[:space:]]*['\"][^'\"]" "$file" && return 0
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1
@@ -7618,7 +7619,7 @@ EOF
 # MariaDB local, lo rehace con la plantilla
 function wp_config() {
     local folder=${1%/} db=$2 dir file sample saved src name user host prefix pass new_prefix prefixes
-    local s_name s_user s_host s_prefix s_pass local_db=0 try out url
+    local s_name s_user s_host s_prefix s_pass local_db=0 out url
     valid_project "$folder" || return 1
     dir=$HTDOCS_DIR/$folder file=$HTDOCS_DIR/$folder/wp-config.php sample=$HTDOCS_DIR/$folder/wp-config-sample.php
     if ! project_path_ok "$dir" "$file" || { [ -e "$sample" ] && ! project_path_ok "$dir" "$sample"; }; then
@@ -7631,7 +7632,7 @@ function wp_config() {
         < <(wp_config_read "$file")
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1
@@ -7688,6 +7689,7 @@ function wp_config() {
 
         return 0
     fi
+    # shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
     { IFS= read -r s_name; IFS= read -r s_user; IFS= read -r s_host; IFS= read -r s_prefix; IFS= read -r s_pass; } \
         < <(wp_config_read "$src")
     # Prefijo: siempre uno que traen las tablas de la base (nunca se cambian las tablas). Con varios
@@ -11466,6 +11468,7 @@ function install_plan() {
         sudo -v || return 1
         while true; do sudo -n true; sleep 50; kill -0 "$$" 2> /dev/null || exit; done 2> /dev/null &
         local keepalive=$!
+        # shellcheck disable=SC2064  # (el PID, el de ahora)
         trap "kill $keepalive 2> /dev/null" EXIT
     fi
 
@@ -12674,6 +12677,13 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.57.6 (9 nov 2026)
+- Mantenimiento: el código va ahora en ficheros por partes y se revisa
+  solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
+  nada cambia por fuera.
+- Arreglar los certificados: usado dos veces seguidas, ya no vuelve a
+  rehacer la lista de certificados del sistema sin hacer falta.
 
 1.57.5 (9 nov 2026)
 - Configuración: arriba, en grande, el nombre del apartado abierto
@@ -16678,6 +16688,7 @@ function docker_web_create() {
         echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con LAMPP delante): pasalo con lvm-instalador docker-pasar $slug"
         return 1
     fi
+    # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
     if [ $live -eq 1 ]; then
         [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version LAMPP (--bd y --desde)"; return 1; }
@@ -17342,6 +17353,7 @@ function docker_stop_all() {
     run dk stop "${names[@]}" > /dev/null || return 1
     # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
     local f
+    # shellcheck disable=SC2045  # (nombres de versión ya comprobados, sin espacios)
     for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }
@@ -17639,7 +17651,7 @@ print("T|%s|%s|%s|%d" % (s["url"], s["target"], s["folder"], s["expires"]))' "$T
 }
 
 TUNNEL_PY=$(cat <<'PYEOF'
-import base64, hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
+import hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
 import socketserver, ssl, subprocess, sys, threading, time, urllib.parse
 
 params_path = sys.argv[2]
@@ -18444,7 +18456,7 @@ function db_temp_start() {
         --socket="$DB_TMP_SOCK" --pid-file="$DB_TMP/mysql.pid" --log-error="$DB_TMP/mysql.log" \
         < /dev/null > /dev/null 2>&1 &
     local server_pid=$!
-    DB_TMP_PID=$server_pid DB_TMP_USER=$user
+    DB_TMP_PID=$server_pid
 
     local i
     for i in $(seq 300); do
@@ -18592,6 +18604,7 @@ function copy_database() {
     if db_names "/opt/lampp-$dst_owner" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
             echo "lampp-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
+            # shellcheck disable=SC2088  # (el ~ es un texto que se enseña)
             echo "~/lvm-copias y se pone la de lampp-$src en su lugar; o copiala con otro nombre: --como)"
             return 1
         fi
@@ -22434,7 +22447,8 @@ class Task:
 
         self.proc = subprocess.Popen(script_cmd(*self.args), stdin=subprocess.DEVNULL,
                                      stdout=slave, stderr=slave, env=env,
-                                     start_new_session=True, preexec_fn=as_terminal)
+                                     # (preexec_fn con hilos: solo hace un ioctl, sin reservar memoria ni bloqueos)
+                                     start_new_session=True, preexec_fn=as_terminal)  # noqa: PLW1509
         os.close(slave)
         flags = fcntl.fcntl(self.master, fcntl.F_GETFL)
         fcntl.fcntl(self.master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
@@ -27274,7 +27288,7 @@ class App(Gtk.Application):
                  (lambda: self.show_tab("herramientas"), None), (lambda: None, "4-herramientas"),
                  (lambda: self.quit(), None)]
 
-        def step(i=[0]):
+        def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
             fn, shot = steps[i[0]]
             fn()
             if shot:
@@ -31340,7 +31354,7 @@ class App2(App):
         box.pack_start(note, False, False, 0)
         dlg.get_content_area().add(box)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
-        ok = css(dlg.add_button("Compartir", Gtk.ResponseType.OK), "nv-azul")
+        css(dlg.add_button("Compartir", Gtk.ResponseType.OK), "nv-azul")
         dlg.set_default_response(Gtk.ResponseType.OK)
 
         def update(*_):
@@ -32437,7 +32451,7 @@ class App2(App):
                                      "de verse)" if up else "Arrancar el Apache de Docker y su phpMyAdmin",
                                      lambda up=up: (not up or self.nv_stop_shared_ok(["nexum-web"], "el Apache de Docker")) and self.run_task(
                                          "Parando el Apache de Docker" if up else "Arrancando el Apache de Docker",
-                                         ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])
+                                         ["docker-web", "parar" if up else "arrancar"], auto_close=True, on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
                 elif re.fullmatch(r"nexum-lampp-bd-\d+-\d+(-\d+)?", proj or "") and len(items) == 1:
                     # (el puente de los proyectos de Docker que usan en vivo la BBDD de esa version LAMPP)
                     ver = proj[len("nexum-lampp-bd-"):].replace("-", ".")
@@ -32450,7 +32464,7 @@ class App2(App):
                                      lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
                                          ("Parando %s" if up else "Arrancando %s") % t,
                                          ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
-                                         on_done=done), True)])
+                                         on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
                 elif re.fullmatch(r"nexum-mariadb-\d+-\d+", proj or "") and len(items) == 1:
                     acts = actions([("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                                      "Parar %s (los proyectos que van con ella se quedan sin BBDD)" % title if up else
@@ -32458,7 +32472,7 @@ class App2(App):
                                      lambda up=up, n=items[0]["name"], t=title: (not up or self.nv_stop_shared_ok([n], t)) and self.run_task(
                                          ("Parando %s" if up else "Arrancando %s") % t,
                                          ["docker-contenedor", "parar" if up else "arrancar", n], auto_close=True,
-                                         on_done=done), True)])
+                                         on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
             row([name, label(""), img_cell, pma, label(cpu_text([c["name"] for c in items]), "nv-mono", "nv-chico", "nv-tenue"), acts],
                 on_click=lambda proj=proj: self.nv_dk_toggle(proj))
             if not opened:
@@ -34618,6 +34632,7 @@ case "$1" in
             echo "construir-pila solo lo usa install_stack"
             exit 1
         fi
+        # shellcheck disable=SC1090  # (el fichero lo pasa quien llama)
         . "$2"
         cd "$build" || exit 1
         function stack_fail() { stack_child_fail; }

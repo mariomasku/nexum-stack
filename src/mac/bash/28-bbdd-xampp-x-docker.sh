@@ -255,6 +255,7 @@ function docker_stop_all() {
     run dk stop "${names[@]}" > /dev/null || return 1
     # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
     local f
+    # shellcheck disable=SC2045  # (nombres de versión ya comprobados, sin espacios)
     for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }
@@ -436,6 +437,11 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.6 (9 nov 2026)
+- Mantenimiento: el código va ahora en ficheros por partes y se revisa
+  solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
+  nada cambia por fuera.
 
 1.57.5 (9 nov 2026)
 - Mismo número de versión que la de Linux, porque las dos llevan lo

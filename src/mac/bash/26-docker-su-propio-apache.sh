@@ -1012,6 +1012,7 @@ function docker_web_create() {
         echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con XAMPP-X delante): pasalo con lvm-instalador docker-pasar $slug"
         return 1
     fi
+    # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
     if [ $live -eq 1 ]; then
         [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version XAMPP-X (--bd y --desde)"; return 1; }

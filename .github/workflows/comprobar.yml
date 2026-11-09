@@ -7,7 +7,7 @@ name: Comprobar
 on:
   push:
     branches: [main]
-    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", "src/**", "construir.sh", ".github/workflows/comprobar.yml"]
+    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", "src/**", "construir.sh", "ruff.toml", ".github/workflows/comprobar.yml"]
   pull_request:
   workflow_dispatch:
 
@@ -66,14 +66,13 @@ jobs:
           done
           echo ok
 
-  # Revisión del código (paso 3 del mantenimiento). De momento solo avisa: cuenta lo que encuentra y lo deja
-  # en el resumen de la ejecución, sin hacer fallar la comprobación. Fuera, lo que en este código es a
-  # propósito o un aviso falso (ver src/LEEME.md).
+  # Revisión del código (paso 3 del mantenimiento): falla si ShellCheck o ruff encuentran algo. Fuera de
+  # ShellCheck, lo que en este código es a propósito o un aviso falso; lo que es a propósito en una sola
+  # línea va marcado allí (# shellcheck disable=…, # noqa: …) con el motivo. Reglas de ruff: ruff.toml.
   revision:
-    name: Revisión (ShellCheck y ruff), solo avisa
+    name: Revisión (ShellCheck y ruff)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: ShellCheck (los dos scripts construidos)
@@ -81,27 +80,25 @@ jobs:
           shellcheck --version | head -2
           # SC2155 local x=$(…), SC2174 mkdir -p -m, SC2016 comillas simples con $ (Python dentro),
           # SC2015 A && B || C, SC2128/SC2178/SC2179 variables del mismo nombre en funciones distintas,
-          # SC2018/SC2019 tr A-Z, SC2034 variables que se leen con ${!nombre}, SC1007 VAR= orden
-          ex=SC2155,SC2174,SC2016,SC2015,SC2128,SC2178,SC2179,SC2018,SC2019,SC2034,SC1007
+          # SC2018/SC2019 tr A-Z, SC1007 VAR= orden, SC2046/SC2206/SC2207 listas que se separan por
+          # espacios a propósito (PIDs, servicios, opciones), SC2191 --proto =https
+          ex=SC2155,SC2174,SC2016,SC2015,SC2128,SC2178,SC2179,SC2018,SC2019,SC1007,SC2046,SC2206,SC2207,SC2191
+          bad=0
           for f in lvm-instalador.sh macos/lvm-instalador.sh; do
-            shellcheck -s bash -S warning -e "$ex" -f gcc "$f" > "sc-$(dirname "$f").txt" || true
-            n=$(wc -l < "sc-$(dirname "$f").txt")
+            out=$(shellcheck -s bash -S warning -e "$ex" -f gcc "$f" || true)
+            n=$(grep -c . <<< "$out" || true)
             echo "### ShellCheck, $f: $n avisos" >> "$GITHUB_STEP_SUMMARY"
-            sed -E 's/.*\[(SC[0-9]+)\]$/\1/' "sc-$(dirname "$f").txt" | sort | uniq -c | sort -rn | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
-            cat "sc-$(dirname "$f").txt"
+            [ -z "$out" ] && continue
+            echo "$out"
+            echo "$out" | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
+            bad=1
           done
+          exit $bad
       - name: ruff (Python de la ventana de Linux y del túnel)
         run: |
           pip install --quiet ruff
           ruff --version
-          ruff check --output-format concise src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py > ruff.txt || true
-          cat ruff.txt
-          echo "### ruff: $(grep -c ':[0-9]*:[0-9]*: ' ruff.txt) avisos" >> "$GITHUB_STEP_SUMMARY"
-          grep -oE ': [A-Z]+[0-9]+ ' ruff.txt | sort | uniq -c | sort -rn | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
-      - name: Guardar lo que ha salido
-        uses: actions/upload-artifact@v4
-        with:
-          name: revision
-          path: |
-            sc-*.txt
-            ruff.txt
+          ruff check --output-format concise src/linux/ventana.py src/linux/tunel.py src/mac/tunel.py | tee ruff.txt
+          rc=${PIPESTATUS[0]}
+          echo "### ruff: $( [ "$rc" -eq 0 ] && echo sin avisos || grep -c ':[0-9]*:[0-9]*: ' ruff.txt) " >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

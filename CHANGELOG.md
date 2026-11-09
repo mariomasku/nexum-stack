@@ -4,6 +4,11 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.6 · 9 nov 2026
+
+- **Mantenimiento:** el código va ahora en ficheros por partes (`src/`, se juntan con `construir.sh`) y se revisa solo con ShellCheck y ruff en cada cambio. Se quita lo que no se usaba; nada cambia por fuera.
+- **Arreglar los certificados:** usado dos veces seguidas, ya no vuelve a rehacer la lista de certificados del sistema sin hacer falta.
+
 ## 1.57.5 · 9 nov 2026
 
 - **Configuración:** arriba, en grande, el nombre del apartado abierto (con su icono y lo que hace), no «Configuración»; el correo de pruebas se enciende con el interruptor de al lado.

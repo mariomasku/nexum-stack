@@ -1118,6 +1118,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.6 (9 nov 2026)
+- Mantenimiento: el código va ahora en ficheros por partes y se revisa
+  solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
+  nada cambia por fuera.
+- Arreglar los certificados: usado dos veces seguidas, ya no vuelve a
+  rehacer la lista de certificados del sistema sin hacer falta.
+
 1.57.5 (9 nov 2026)
 - Configuración: arriba, en grande, el nombre del apartado abierto
   (con su icono y lo que hace), no «Configuración»; el correo de

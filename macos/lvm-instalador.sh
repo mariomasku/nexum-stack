@@ -828,6 +828,7 @@ PHP2SHELL_BACKPORTS=(
     "8.0|8.0.30|82f8f31b16a035c1b67cc253e79f7cc288f4cc20|4cda6e04266d0799c546cd0d79e1161eec82810da62252c164fc19ee00571b54"
     "8.1|8.1.34|1d7dec178a094e6e75b229ce22754045f8c6070a|5bd88c386523dde98fefaa7bac97ec80f754b84cc58d6511c01dfde39ce1fbe2"
 )
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_XZ_74='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4J/dGTZdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3bFIb0G
 pf0e1wfdsSqDSg0qaXMVy47K2E9fN+TJBFpmPtkeCTNTLPlrLEBL7eSQi6GsC6kScFdp7GAMIsBKuP3oVLwpo0L0O0o72QHqydzo
@@ -917,6 +918,7 @@ Kl5hcwv1wdlOO1OLkPlYG6o8/C5EzL2QNSG2D69+cOo9+a9kI3Pxuj1+Z2kqTH/mRP5vLNH4MgwgrBnE
 +TA5AEWOB+AT/Vq627PTpzgT+wWhL672awLOeloq07SScKdpmTfm3RxDMEsfH6/0HElwRljdde7t4RBJ6eSZPAtYmCTPEoZq6BSW
 un/RRVA4JbHOhL0Kp2R2KzxTCMeLQaTKqUpaxGzZsMt3uwAAAADxUSn3mBBPdwAB0jLevwIAGpf9fbHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_XZ_80='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4Jo0F5RdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3cn8SR2
 VAJ6MHS1N180xCXCcaC3Qmk8D1zSzJxt8Rd80/sqHZoOGhbMXdX4W16k9EHnHasdwW6t4jY5rN2mQV1SGh9ZZHOUu9+kBiIArKD5
@@ -1001,6 +1003,7 @@ Jug5DE1I/Fg4KbLBsC27q/5G0eUBaJrrbkwlhFPxiGma2KOEBRGvlo6B3ONPZ4wEOzEajBTBI3Zp7SIn
 iyGk1ydP33KsI+ZJRA1G1XIOVRGYVwYseKvvqcPZu4Q7qhtrp99ded9bqAFauDPc3P6DXpFojvYjp3aRhDWGlHi8wgCWGpEcToKR
 VwABsC+1tAIAm/XDQLHEZ/sCAAAAAARZWg==
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 PHP2SHELL_XZ_81='
 /Td6WFoAAATm1rRGAgAhARwAAAAQz1jM4LvGIHJdADIaSQnC/BF9UN4KT0fUaKJ0WK281ySqtdq4gWAU2CmoZ/JhK+0kB3g0FVks
 +gq2lrSaGRU1vNWg2H4ed8RfBlb+15N6mBE2RL71QT4wVIihEsS66fjli+EzaMuNnAcwSq2ndccDg3ow+P8W9UWIwLjK/ahalZce
@@ -1175,11 +1178,16 @@ function php2shell_state() {
 # supplychain.mariadb.com/MariaDB-Server-GPG-KEY y files.phpmyadmin.net/phpmyadmin.keyring), y solo
 # vale una firma buena de una de estas huellas. Si no, no se instala nada. Perl y ProFTPD no
 # publican firmas (solo su sha256); OpenSSL 1.1.1w e ICU 72.1 llevan su sha256 puesto aqui
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_FPRS_PHP="1198C0117593497A5EC5C199286AF1F9897469DC 39B641343D8C104B2B146DC3F9C39DC0B9698544 5A52880781F755608BF815FC910DEB46F53EA312 E60913E4DF209907D8E30D96659A97C9CF2A795A AFD8691FDAEDF03BDF6E460563F15A9B715376CA C28D937575603EB4ABB725861C0779DC5C0A9DE4 F1F692238FBC1666E5A5CCD4199F9DFEF6FFBAFD 1729F83938DA44E27BA0F4D3DBDB397470D12172 528995BFEDFBA7191D46839EF9BA0ADA31CBD89E 2C16C765DBE54A088130F1BC4B9B5F600B55F3B4 BFDDD28642824F8118EF77909B67A5C12229118F 9D7F99A0CB8F05C8A6958D6256A97AF7600A39A6 0616E93D95AF471243E26761770426E17EBBB3DD D95C03BC702BE9515344AE3374E44BC9067701A5 49D9AF6BC72A80D6691719C8AA23F5BE9C7097D4"
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_FPRS_APACHE="65B2D44FE74BD5E3DE3AC3F082781DE46D5954FA CBA1525BAA7A47BE28FF23DDD3B13FCA2CE60BED 26F51EF9A82F4ACB43F1903ED377C9E7D1944C66 A93D62ECC3C8EA12DB220EC934EA76E6791485A8"
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_FPRS_MARIADB="177F4010FE56CA3336300305F1656F24C74CD1D8"
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_FPRS_PMA="3D06A59ECE730EB71B511C17CE752F178259BD92 63CB1DF1EF12CF2AC0EE5A329C27B31342B7511D 436FF1884B1A0C3FDCBF0D79FEFC65D181AF644A"
 # (las claves, en binario y base64)
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_KEYS_PHP='
 mQINBGBlJjMBEAC2wbO/PIAzVSAp2kk7MXmzoXVRSPyEbnjN6qm77nrzvugh/bePZucG6lbXMxRsCj4GS9xLcGZoSQZhT/2GJdy+
 aUt7zf6sympJUTcgPdEVmf5uTxWnQkBg0Bdm6h8xwvgTZVrdfwy7f7jfAsGSXKzEmJfJ2L6LHmAMI3I+csdPqKBHSzj6hYjZYcwX
@@ -1601,6 +1609,7 @@ EgorBgEEAZdVAQUBAQdAwJiQF3aQcA7YhW6UIorN9vfsSJHKW+GjEC3pldFYRWwDAQgHiHgEGBYKACAW
 I/W+nHCX1AUCaEXt2QIbDAAKCRCqI/W+nHCX1NpnAQDREgz453kWtC2ctdtwIw/6XIZUCsK8YOrL1++bXEQdMgEAkOBGFpN2/wRN
 0x3ZzZxzzbBTQSpNFFLg2vZLYJJb5Ak=
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_KEYS_APACHE='
 mQINBEzSCGYBEADM35SrGvF8jjtPHoVtoU3LKaFqqYInTOKiGeBxkCReGSQrUL+gnvEqs69xSnHffHY8MwjsJY/k0zaegHgivWW3
 fjiA53oFnu6yTl30PeNN+l5QS7kRzWk1mHL+Hl1FV9Rorso1lQrokTYBxkE6g/1F36QNmgn3ckdyXV3t98WI+elj4Uf2uQkc9W/s
@@ -1771,6 +1780,7 @@ aS14FCMrx4f1VX1kroCJiT7y27zfj4ZahpmNSRUVfSUremF5Yk2EsTbdluC9ZL6uCZHTTzmVvRjhdBP/
 hCrWT/TSqyuo6n4v+4ImbZ4b2Lc61hip8I5BHqw8MrvbwULi5qztNfONqjnJf729oYtiHzFVCha8R/OF5wc6GHut7A9Hoxunpem6
 zogSBq7prwOxNxBnij40kynhYUWJqsMy76QfQhDwqaKoPWzIcAS0qp/FFayOKiGvTqRZbIqhSRQ=
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_KEYS_MARIADB='
 mQINBFb8EKsBEADwGmleOSVThrbCyCVUdCreMTKpmD5p5aPz/0jc66050MAb71HvTVcfuMqHYO8O66qXLpEdqZpuk4D+rw1oKyC+
 d8uPD2PSHRqBXnR0Qf+LVTZvtO923R7pYnC2x6V6iVGpKQYFP8cwh2B1qgIa+9y/N8cQIqfD+0ghyiUjjTYek3YFBnqaL/2h2V0M
@@ -1803,6 +1813,7 @@ TkMuPqww+Tzex4dpMQllMEKZ3wEyd9v6ba+nj/P1FHSEy/VN6IXzd82s1lYOonKTdmXAIROcHnb0QUzw
 JaPrAZHDjUGcXrREmjEyXyElRoD4CrWXySe46jCuNhVVlkLGo7osefynXa/+PNjQjURtx8en7M9A1FkQuRAxE8KIZgZzYxkGl5o5
 POSFCA4JUoRPDcrl/sI3fuq2dIOE/BJ2r8dV+LddiR+iukhXRwJXH8RVVEUS
 '
+# shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
 GPG_KEYS_PMA='
 mQINBEo4qPwBEACyTlxl0/LY2tZPBllpzIcbYyz0/Zacf0j8wSDGJvUXMWreeKfqwBY03maJQpPTewJABmF/l/oLiFLHWM5KN2Jd
 4l2fyYdIAHG4E9ErCcaaXfokV0uhA1zH9fqL9lkygZ7vse/Rbp1zfvNRCSTRHQ0PIE00UA1XEzRw4aWxDUfrNG1vKDHN+g8wx9oZ
@@ -2141,7 +2152,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.5"
+APP_VERSION="1.57.6"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -5407,7 +5418,7 @@ function cert_audit() {
 # sin limite de dominios que los firmaban dejan de ser de confianza en este Mac. La clave de la CA no
 # se borra (puede que la quieras): se dice donde esta
 function fix_certs() {
-    local audit t dom crt key why copy n=0 cas=0 failed=0 old_files=() keyfile
+    local audit t dom crt key why copy n=0 failed=0 keyfile
     audit=$(cert_audit --clave)
     if ! grep -qE '^(C|A)\|' <<< "$audit"; then
         echo "Los certificados de los vhosts ya estan bien: ninguno es de confianza para todo este Mac."
@@ -5475,7 +5486,6 @@ PY
     fi
     while IFS='|' read -r t _ _ sha1 where; do
         [ "$t" == A ] || continue
-        cas=1
         case $where in
             llavero:*)
                 # Primero sus ajustes de confianza (los que pone mkcert con add-trusted-cert): borrar
@@ -5748,8 +5758,7 @@ function ps_domain() {
     if [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] && [ -x "$DB_CLIENT" ] \
             && db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}shop_url"; then
         # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-        local try
-        for try in 1 2 3 4 5 6; do
+        for _ in 1 2 3 4 5 6; do
             domain=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" < /dev/null 2>&1) && break
             [[ "$domain" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
             sleep 1
@@ -9495,13 +9504,13 @@ function ps_table_prefix() {
 # Tienda 1.7 o posterior sin base en app/config/parameters.php: lo crea con la base cargada en local
 # (la copia guardada si es de la misma base). Lo que ya tiene base no se toca.
 function ps_parameters() {
-    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved try out
+    local folder=$1 db dir=$HTDOCS_DIR/$1 prefix saved out
     local file=$dir/app/config/parameters.php
     [ -f "$dir/app/config/set_parameters.php" ] || [ -d "$dir/src/PrestaShopBundle" ] || return 0
     [ -f "$file" ] && grep -qE "['\"]database_name['\"][[:space:]]*=>[[:space:]]*['\"][^'\"]" "$file" && return 0
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1
@@ -9979,7 +9988,7 @@ EOF
 # MariaDB local, lo rehace con la plantilla
 function wp_config() {
     local folder=${1%/} db=$2 dir file sample saved src name user host prefix pass new_prefix prefixes
-    local s_name s_user s_host s_prefix s_pass local_db=0 try out url
+    local s_name s_user s_host s_prefix s_pass local_db=0 out url
     valid_project "$folder" || return 1
     dir=$HTDOCS_DIR/$folder file=$HTDOCS_DIR/$folder/wp-config.php sample=$HTDOCS_DIR/$folder/wp-config-sample.php
     if ! project_path_ok "$dir" "$file" || { [ -e "$sample" ] && ! project_path_ok "$dir" "$sample"; }; then
@@ -9992,7 +10001,7 @@ function wp_config() {
         < <(wp_config_read "$file")
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1
@@ -10049,6 +10058,7 @@ function wp_config() {
 
         return 0
     fi
+    # shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
     { IFS= read -r s_name; IFS= read -r s_user; IFS= read -r s_host; IFS= read -r s_prefix; IFS= read -r s_pass; } \
         < <(wp_config_read "$src")
     # Prefijo: siempre uno que traen las tablas de la base (nunca se cambian las tablas). Con varios
@@ -10403,7 +10413,7 @@ function official_dump_all() {
         --socket="$DB_TMP_SOCK" --pid-file="$DB_TMP/mysql.pid" --log-error="$DB_TMP/mysql.log" \
         < /dev/null > /dev/null 2>&1 &
     local server_pid=$! i
-    DB_TMP_PID=$server_pid DB_TMP_USER=$user
+    DB_TMP_PID=$server_pid
     for i in $(seq 300); do
         $SUDO test -S "$DB_TMP_SOCK" && break
         kill -0 $server_pid 2> /dev/null || break
@@ -13032,6 +13042,7 @@ function install_plan() {
             sudo -v || { unlock_install; return 1; }
             while true; do sudo -n true; sleep 50; kill -0 "$$" 2> /dev/null || exit; done 2> /dev/null &
             local keepalive=$!
+            # shellcheck disable=SC2064  # (el PID, el de ahora)
             trap "kill $keepalive 2> /dev/null; unlock_install" EXIT
         else
             trap "unlock_install" EXIT
@@ -13790,7 +13801,7 @@ function db_temp_start() {
         "${grants[@]}" --socket="$DB_TMP_SOCK" --pid-file="$DB_TMP/mysql.pid" --log-error="$DB_TMP/mysql.log" \
         < /dev/null > /dev/null 2>&1 &
     local server_pid=$!
-    DB_TMP_PID=$server_pid DB_TMP_USER=$user
+    DB_TMP_PID=$server_pid
 
     local i
     for i in $(seq 300); do
@@ -13935,6 +13946,7 @@ function copy_database() {
     if db_names "$ddir" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
             echo "XAMPP-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
+            # shellcheck disable=SC2088  # (el ~ es un texto que se enseña)
             echo "~/lvm-copias y se pone la de XAMPP-$src en su lugar; o copiala con otro nombre: --como)"
             return 1
         fi
@@ -30538,7 +30550,7 @@ print("T|%s|%s|%s|%d" % (s["url"], s["target"], s["folder"], s["expires"]))' "$T
 }
 
 TUNNEL_PY=$(cat <<'PYEOF'
-import base64, hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
+import hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
 import socketserver, ssl, subprocess, sys, threading, time, urllib.parse
 
 params_path = sys.argv[2]
@@ -32902,6 +32914,7 @@ function docker_web_create() {
         echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con XAMPP-X delante): pasalo con lvm-instalador docker-pasar $slug"
         return 1
     fi
+    # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
     if [ $live -eq 1 ]; then
         [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version XAMPP-X (--bd y --desde)"; return 1; }
@@ -33575,6 +33588,7 @@ function docker_stop_all() {
     run dk stop "${names[@]}" > /dev/null || return 1
     # (y la MariaDB de LAMPP que hubiera arrancado Docker para alguno)
     local f
+    # shellcheck disable=SC2045  # (nombres de versión ya comprobados, sin espacios)
     for f in $(ls "$LAMPP_BD_MARK_DIR" 2> /dev/null); do valid_version_name "$f" && lampp_bd_release "$f"; done
     echo "Todos parados"
 }
@@ -33756,6 +33770,11 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.6 (9 nov 2026)
+- Mantenimiento: el código va ahora en ficheros por partes y se revisa
+  solo (ShellCheck y ruff) en cada cambio. Se quita lo que no se usaba;
+  nada cambia por fuera.
 
 1.57.5 (9 nov 2026)
 - Mismo número de versión que la de Linux, porque las dos llevan lo

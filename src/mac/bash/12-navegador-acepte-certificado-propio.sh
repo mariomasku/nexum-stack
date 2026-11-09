@@ -229,8 +229,7 @@ function ps_domain() {
     if [ -n "$db" ] && [[ "$db$prefix" =~ ^[A-Za-z0-9_-]+$ ]] && [ -x "$DB_CLIENT" ] \
             && db_base_table root "${MYSQL_PWD:-}" "$db" "${prefix}shop_url"; then
         # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-        local try
-        for try in 1 2 3 4 5 6; do
+        for _ in 1 2 3 4 5 6; do
             domain=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e "SELECT domain FROM \`$db\`.\`${prefix}shop_url\` ORDER BY main DESC, active DESC, id_shop_url LIMIT 1" < /dev/null 2>&1) && break
             [[ "$domain" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
             sleep 1

@@ -1,4 +1,4 @@
-import base64, hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
+import hashlib, hmac, html, http.client, http.server, json, os, re, secrets, signal, socket
 import socketserver, ssl, subprocess, sys, threading, time, urllib.parse
 
 params_path = sys.argv[2]

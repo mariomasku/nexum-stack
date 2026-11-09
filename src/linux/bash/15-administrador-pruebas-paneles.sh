@@ -186,7 +186,7 @@ EOF
 # MariaDB local, lo rehace con la plantilla
 function wp_config() {
     local folder=${1%/} db=$2 dir file sample saved src name user host prefix pass new_prefix prefixes
-    local s_name s_user s_host s_prefix s_pass local_db=0 try out url
+    local s_name s_user s_host s_prefix s_pass local_db=0 out url
     valid_project "$folder" || return 1
     dir=$HTDOCS_DIR/$folder file=$HTDOCS_DIR/$folder/wp-config.php sample=$HTDOCS_DIR/$folder/wp-config-sample.php
     if ! project_path_ok "$dir" "$file" || { [ -e "$sample" ] && ! project_path_ok "$dir" "$sample"; }; then
@@ -199,7 +199,7 @@ function wp_config() {
         < <(wp_config_read "$file")
 
     # Si MariaDB se acaba de arrancar (cambio de version), se le dan unos segundos
-    for try in 1 2 3 4 5 6; do
+    for _ in 1 2 3 4 5 6; do
         out=$("${DB_SAFE[@]}" "$DB_CLIENT" -uroot -N -e 'SELECT 1' < /dev/null 2>&1) && break
         [[ "$out" == *"Can't connect"* ]] && [ "$DRY" -eq 0 ] || break
         sleep 1
@@ -256,6 +256,7 @@ function wp_config() {
 
         return 0
     fi
+    # shellcheck disable=SC2034  # (se lee por su nombre (${!nombre}) o es a propósito)
     { IFS= read -r s_name; IFS= read -r s_user; IFS= read -r s_host; IFS= read -r s_prefix; IFS= read -r s_pass; } \
         < <(wp_config_read "$src")
     # Prefijo: siempre uno que traen las tablas de la base (nunca se cambian las tablas). Con varios

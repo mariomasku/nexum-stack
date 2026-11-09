@@ -466,7 +466,7 @@ function db_temp_start() {
         "${grants[@]}" --socket="$DB_TMP_SOCK" --pid-file="$DB_TMP/mysql.pid" --log-error="$DB_TMP/mysql.log" \
         < /dev/null > /dev/null 2>&1 &
     local server_pid=$!
-    DB_TMP_PID=$server_pid DB_TMP_USER=$user
+    DB_TMP_PID=$server_pid
 
     local i
     for i in $(seq 300); do
@@ -611,6 +611,7 @@ function copy_database() {
     if db_names "$ddir" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
             echo "XAMPP-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
+            # shellcheck disable=SC2088  # (el ~ es un texto que se enseña)
             echo "~/lvm-copias y se pone la de XAMPP-$src en su lugar; o copiala con otro nombre: --como)"
             return 1
         fi
