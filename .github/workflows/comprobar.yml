@@ -48,9 +48,9 @@ jobs:
             main.swift
 
   linux:
-    name: Linux (bash y Python de la ventana)
+    name: Linux (bash y Python de la ventana) y revisión
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - name: Sintaxis de bash
@@ -65,16 +65,9 @@ jobs:
             python3 -I -c "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())" "$f" || exit 1
           done
           echo ok
-
-  # Revisión del código (paso 3 del mantenimiento): falla si ShellCheck o ruff encuentran algo. Fuera de
-  # ShellCheck, lo que en este código es a propósito o un aviso falso; lo que es a propósito en una sola
-  # línea va marcado allí (# shellcheck disable=…, # noqa: …) con el motivo. Reglas de ruff: ruff.toml.
-  revision:
-    name: Revisión (ShellCheck y ruff)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
+      # Revisión del código (paso 3 del mantenimiento): falla si ShellCheck o ruff encuentran algo. Fuera de
+      # ShellCheck, lo que en este código es a propósito o un aviso falso; lo que es a propósito en una sola
+      # línea va marcado allí (# shellcheck disable=…, # noqa: …) con el motivo. Reglas de ruff: ruff.toml.
       - name: ShellCheck (los dos scripts construidos)
         run: |
           shellcheck --version | head -2
