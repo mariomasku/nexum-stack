@@ -18555,6 +18555,7 @@ func fileTypes(_ exts: [String]) -> [UTType] {
     return out
 }
 
+
 // MARK: - Dialogos (NSAlert)
 
 /// Ancho del texto de los dialogos. Va en una vista propia: NSAlert lo pondria en una columna
@@ -19126,6 +19127,7 @@ func projectDb(_ folder: String) -> String {
     return ""
 }
 
+
 // MARK: - Progreso (mismo calculo que progress_screen del script)
 
 struct InstallProgress {
@@ -19293,6 +19295,7 @@ func itemFolder(_ item: String) -> String {
     if parts.count > 2 { parts.removeLast() }
     return parts.joined(separator: ".")
 }
+
 
 // MARK: - Tareas (acciones del script en una pseudoterminal)
 
@@ -19725,6 +19728,7 @@ final class TaskRunner: ObservableObject, Identifiable {
     }
 }
 
+
 // MARK: - Datos
 
 struct Install: Identifiable, Equatable {
@@ -19869,6 +19873,7 @@ struct Branch: Identifiable, Equatable {
     let security: Bool
     var id: String { return branch }
 }
+
 
 final class AppModel: ObservableObject {
     @Published var data: AppData? = nil
@@ -20175,6 +20180,12 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// El visor de la bandeja, siempre el mismo: al cambiar de apartado no se pierde el correo abierto
+    lazy var mailWeb = MailWebHost()
+}
+
+
+extension AppModel {
     // MARK: repositorios de GitHub
 
     func reloadGithub() {
@@ -20480,7 +20491,10 @@ final class AppModel: ObservableObject {
         branches = list
         selected = selected.filter { b in list.contains(where: { $0.branch == b && $0.state == "nueva" }) }
     }
+}
 
+
+extension AppModel {
     // MARK: actualizaciones
 
     /// Busca una versión nueva: en GitHub (firmada; se instala desde aquí y la ventana se vuelve a
@@ -20692,7 +20706,10 @@ final class AppModel: ObservableObject {
         let chosen = group.buttons.firstIndex(where: { $0.state == .on }) ?? pre
         return cands[chosen]
     }
+}
 
+
+extension AppModel {
     // MARK: servicios
 
     func reloadServices() {
@@ -20925,7 +20942,10 @@ final class AppModel: ObservableObject {
                          commands: true)
         }
     }
+}
 
+
+extension AppModel {
     // MARK: acciones
 
     @discardableResult
@@ -21010,7 +21030,10 @@ final class AppModel: ObservableObject {
         runTask(on ? "Poniendo la barrera entre webs" : "Apagando la barrera entre webs", ["barrera-web", on ? "si" : "no"],
                 doneText: on ? "Barrera entre webs puesta" : "Barrera entre webs apagada", autoClose: true)
     }
+}
 
+
+extension AppModel {
     // MARK: correo de pruebas (Mailpit)
 
     /// Cuántos correos hay sin leer (api/v1/info de Mailpit, con curl del sistema y sin proxy), en
@@ -21051,9 +21074,6 @@ final class AppModel: ObservableObject {
             }
         }
     }
-
-    /// El visor de la bandeja, siempre el mismo: al cambiar de apartado no se pierde el correo abierto
-    lazy var mailWeb = MailWebHost()
 
     /// Botón Correo de arriba: la bandeja de Mailpit o, si no está instalado o parado, por qué
     func openMail() {
@@ -21244,7 +21264,10 @@ final class AppModel: ObservableObject {
             }
         }
     }
+}
 
+
+extension AppModel {
     // MARK: bases de datos (siempre en la version activa)
 
     func dbEnv() -> [String: String] {
@@ -21709,7 +21732,10 @@ final class AppModel: ObservableObject {
         npRepoNote = npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo"
             : "\(npRepos.count) repositorios de GitHub"
     }
+}
 
+
+extension AppModel {
     // MARK: Actualizar proyecto
 
     /// Abre el diálogo para actualizar el proyecto cargado con lo de producción
@@ -22392,6 +22418,7 @@ final class AppModel: ObservableObject {
         alert.runStyled()
     }
 }
+
 
 // MARK: - Piezas de interfaz
 
@@ -23262,6 +23289,7 @@ struct IconButton: View {
     }
 }
 
+
 // MARK: - Aspecto de la ventana (desde la 1.39: como la de Linux 1.54)
 
 /// Azul de los botones principales, de lo elegido y del borde de los botones al pasar el ratón
@@ -23783,6 +23811,7 @@ struct PanelBox<Content: View>: View {
     }
 }
 
+
 // MARK: - Docker (datos de gui-docker)
 
 struct DockerProject: Equatable, Identifiable {
@@ -23896,6 +23925,7 @@ func ownContainer(_ name: String) -> Bool {
         || name.range(of: "^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$",
                       options: .regularExpression) != nil
 }
+
 
 // MARK: - Acciones de la ventana nueva
 
@@ -24540,6 +24570,7 @@ extension AppModel {
     }
 }
 
+
 // MARK: - Barra de arriba
 
 /// Siempre a la vista: el nombre, el menú, el visor de la versión montada (PHP, Apache y MariaDB con su
@@ -24956,6 +24987,7 @@ struct WarningsView: View {
     }
 }
 
+
 // MARK: - Barra lateral
 
 /// Apartados: clave, texto e icono (logo:<paquete> o un símbolo)
@@ -25236,6 +25268,7 @@ struct SubNavRow: View {
         .hoverPointer()
     }
 }
+
 
 // MARK: - Proyectos
 
@@ -25810,6 +25843,7 @@ struct ProjectsView: View {
     }
 }
 
+
 // MARK: - Versiones de PHP
 
 struct VersionsView: View {
@@ -26027,6 +26061,7 @@ struct ComponentsPanel: View {
         }
     }
 }
+
 
 // MARK: - Docker
 
@@ -26675,6 +26710,7 @@ struct DockerGroup: Identifiable {
     let visible: [DockerContainer]
 }
 
+
 // MARK: - Apache de Docker, túnel de Cloudflare, botones del visor y consumo (1.40)
 
 /// El Apache de Docker (gui-docker, W): su dirección, sus puertos, su estado (marcha, parado o nuevo) y
@@ -27065,6 +27101,7 @@ struct ButtonsPanel: View {
     }
 }
 
+
 // MARK: repositorios de GitHub
 
 struct GitHubState: Equatable {
@@ -27435,6 +27472,7 @@ struct ReposView: View {
     }
 }
 
+
 // MARK: parches nuevos de los componentes
 
 /// Lo que dice componentes: lo que tiene un parche nuevo (para enseñarlo), lo que no se pone al día solo y
@@ -27557,6 +27595,7 @@ func updateCheckDue() -> Bool {
     try? "\(today) \(due ? 0 : n + 1)\n".write(toFile: path, atomically: true, encoding: .utf8)
     return due
 }
+
 
 // MARK: acciones
 
@@ -27981,6 +28020,7 @@ struct DockerNewPanel: View {
     }
 }
 
+
 // MARK: - Montar nuevo proyecto (asistente de tres pasos dentro de Cargar proyecto)
 
 let GIT_URL_RX = try! NSRegularExpression(pattern: "^(https://[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?/|git@[A-Za-z0-9][A-Za-z0-9.-]*:|ssh://git@[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?/)[A-Za-z0-9_~][A-Za-z0-9._~/-]*$")
@@ -28146,6 +28186,7 @@ struct NewProjectWizard: View {
         }
     }
 }
+
 
 // MARK: - Instalar nuevas versiones (dentro de Versiones)
 
@@ -28325,6 +28366,7 @@ struct InstallSection: View {
         }
     }
 }
+
 
 // MARK: - Pestaña Bases de datos
 
@@ -28655,6 +28697,7 @@ struct DatabasesView: View {
     }
 }
 
+
 // MARK: - Cargar proyecto
 
 struct Project: Equatable {
@@ -28770,6 +28813,7 @@ struct ProjectSheet: View {
         model.loadProject(req, folder: f, version: req.inst.folder, manual: true)
     }
 }
+
 
 // MARK: - Ventana de una tarea
 
@@ -28973,6 +29017,7 @@ struct ReportView: View {
         .frame(width: 760)
     }
 }
+
 
 // MARK: - Pestaña Herramientas
 
@@ -29781,6 +29826,7 @@ struct ToolsView: View {
     }
 }
 
+
 // MARK: - Icono en la barra de menús (junto al reloj)
 
 /// «no» si se ha quitado en Configuración (sin el fichero, puesto)
@@ -29870,6 +29916,7 @@ final class TrayIcon: NSObject, NSMenuDelegate {
         NSApp.terminate(nil)
     }
 }
+
 
 // MARK: - Terminal (abajo de la ventana)
 
@@ -30258,6 +30305,7 @@ struct TermPanel: View {
         .frame(height: model.termHeight)
     }
 }
+
 
 // MARK: - Ventana principal
 

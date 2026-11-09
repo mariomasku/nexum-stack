@@ -1,21 +1,23 @@
 #!/bin/bash
 # Construye los dos scripts que se instalan y se publican a partir de sus fuentes, en src/:
 #
-#   src/linux/bash/NN-*.sh  ->  lvm-instalador.sh          (con src/linux/ventana.py y tunel.py)
-#   src/mac/bash/NN-*.sh    ->  macos/lvm-instalador.sh    (con src/mac/ventana.swift y tunel.py)
+#   src/linux/bash/NN-*.sh  ->  lvm-instalador.sh          (con src/linux/ventana/ y tunel.py)
+#   src/mac/bash/NN-*.sh    ->  macos/lvm-instalador.sh    (con src/mac/ventana/ y tunel.py)
 #
 # El bash va por secciones, en el orden de su número. Una línea «#@incluir <fichero>» se cambia por ese
 # fichero entero: de la carpeta del sistema (dentro de un heredoc: la ventana de Linux en Python, la del
 # Mac en Swift y el proxy del túnel) o, con «comun/…», de src/comun: las funciones que son iguales en
 # Linux y en Mac, una sola vez (cada una tiene que usarse en los dos). «#@incluir <carpeta>/» junta sus
-# ficheros NN-*, en el orden de su número y con dos líneas en blanco entre uno y otro: la ventana de
-# Linux, que va en src/linux/ventana/ (cada apartado, una clase en su fichero). El resultado sigue
-# siendo un solo fichero, como siempre.
+# ficheros NN-*, en el orden de su número y con dos líneas en blanco entre uno y otro: las ventanas,
+# en src/linux/ventana/ (cada apartado, una clase en su fichero) y src/mac/ventana/ (cada apartado en
+# su fichero; AppModel, en una clase con sus propiedades y extensiones). El resultado sigue siendo un
+# solo fichero, como siempre.
 #
 # Uso: ./construir.sh                      rehace los dos scripts
 #      ./construir.sh --comprobar          no escribe nada: falla si los scripts no son los de src/
 #      ./construir.sh --ventana <fichero>  escribe en <fichero> la ventana de Linux entera (para
 #                                          revisarla con ruff o comprobar que es Python válido)
+#      ./construir.sh --ventana-mac <fich>  la del Mac entera (para compilarla con swiftc)
 #
 # Se edita en src/ y se construye. Los dos scripts siguen en el repositorio (los usan el paquete,
 # publicar.sh y las pruebas), pero no se tocan a mano: la comprobación de GitHub lo detecta.
@@ -24,8 +26,8 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 mode=${1:-} out=${2:-}
 case "$mode" in
     ""|--comprobar) ;;
-    --ventana) [ -n "$out" ] || { echo "Uso: $0 --ventana <fichero>" >&2; exit 2; } ;;
-    *) echo "Uso: $0 [--comprobar | --ventana <fichero>]" >&2; exit 2 ;;
+    --ventana|--ventana-mac) [ -n "$out" ] || { echo "Uso: $0 $mode <fichero>" >&2; exit 2; } ;;
+    *) echo "Uso: $0 [--comprobar | --ventana <fichero> | --ventana-mac <fichero>]" >&2; exit 2 ;;
 esac
 
 python3 -I - "$HERE" "$mode" "$out" << 'PY'
@@ -83,8 +85,8 @@ def build(src):
     return "\n".join(out) + "\n"
 
 
-if mode == "--ventana":
-    text = read_folder(os.path.join(root, "src", "linux", "ventana")) + "\n"
+if mode in ("--ventana", "--ventana-mac"):
+    text = read_folder(os.path.join(root, "src", "linux" if mode == "--ventana" else "mac", "ventana")) + "\n"
     with open(out_file, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     sys.exit(0)

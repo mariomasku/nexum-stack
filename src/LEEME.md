@@ -10,11 +10,11 @@ Los dos scripts que se instalan y se publican, `lvm-instalador.sh` (Linux) y `ma
 | `linux/ventana/NN-*.py` | La ventana de Linux (Python con GTK 3), un fichero por apartado (desde la 1.57.6) | heredoc `LVM_GUI_PY` (sección `25-…`) |
 | `linux/tunel.py` | El proxy del túnel de Cloudflare | heredoc `PYEOF` (sección `24-…`) |
 | `mac/bash/NN-*.sh` | El bash del Mac, igual | `macos/lvm-instalador.sh` |
-| `mac/ventana.swift` | La ventana del Mac (SwiftUI) | heredoc `LVM_SWIFT` (sección `23-accesos`) |
+| `mac/ventana/NN-*.swift` | La ventana del Mac (SwiftUI), un fichero por apartado (desde la 1.57.6) | heredoc `LVM_SWIFT` (sección `23-accesos`) |
 | `mac/tunel.py` | El proxy del túnel en el Mac | heredoc `PYEOF` (sección `28-…`) |
 | `comun/<sección>/<función>.sh` | Funciones que son **iguales en Linux y en Mac**, una sola vez (desde la 1.57.6) | los dos scripts, cada una en su sitio |
 
-En el bash, la línea `#@incluir ventana/` (dentro de su heredoc) es donde van los ficheros de esa carpeta, juntos y en el orden de su número, y `#@incluir comun/…` es donde van esas funciones comunes.
+En el bash, la línea `#@incluir ventana/` (dentro de su heredoc) es donde van los ficheros de la carpeta de la ventana, juntos y en el orden de su número, y `#@incluir comun/…` es donde van esas funciones comunes.
 
 ## La ventana de Linux (`linux/ventana/`)
 
@@ -27,6 +27,15 @@ Cada fichero es un apartado, por orden:
 
 **Un método nuevo va en la clase de su apartado.** Si es de la ventana de ahora y cambia uno de la base con el mismo nombre, va en su clase `Nv…`, que manda sobre la base. Para ruff y las pruebas se junta entera con `./construir.sh --ventana <fichero>`. Se repartió (1.57.6) comprobando que los 530 métodos que usa la ventana son, compilados, exactamente los mismos que antes.
 
+## La ventana del Mac (`mac/ventana/`)
+
+También un fichero por apartado, en el orden en que estaban: constantes, diálogos, tareas, datos, las piezas de la interfaz, cada pestaña (Proyectos, Versiones, Docker, Bases de datos, Configuración...), la terminal y la ventana principal.
+
+- **`AppModel`** (lo que la ventana sabe y hace) va en `06-modelo.swift`, con **todas sus propiedades** (Swift no deja ponerlas en una extensión), y sus apartados en `07` a `13`, cada uno como `extension AppModel`.
+- **Un método nuevo de `AppModel`** va en la extensión de su apartado. **Una propiedad nueva** (`@Published var`, `lazy var`...), en `06-modelo.swift`.
+- Al construir se junta en un solo fichero, así que lo `private` se sigue viendo entre ficheros. Para compilarla aparte: `./construir.sh --ventana-mac main.swift`.
+- Se repartió (1.57.6) sin cambiar nada más que eso: comparado con el de antes, lo único distinto son los 7 cierres de la clase con su `extension AppModel {` y la propiedad `mailWeb`, que pasó al principio.
+
 ## Lo común a Linux y Mac (`comun/`)
 
 Cada fichero es un tramo de funciones enteras (con sus comentarios) que está igual, y en el mismo orden, en los dos sistemas. Su nombre es el de su sección y el de su primera función: `comun/repositorios-github/github_command.sh` lleva `github_command` y las que la siguen.
@@ -37,7 +46,7 @@ Cada fichero es un tramo de funciones enteras (con sus comentarios) que está ig
 
 ## Cómo se trabaja
 
-1. Se edita en `src/`: la ventana en `linux/ventana/` o `ventana.swift`, y el bash en su sección.
+1. Se edita en `src/`: la ventana en `linux/ventana/` o `mac/ventana/`, y el bash en su sección.
 2. `./construir.sh` rehace los dos scripts. Sin cambios, no los toca.
 3. Las pruebas (`pruebas/todas.sh`), el paquete y `publicar.sh` usan los scripts construidos, como siempre.
 4. Se hace commit de los dos: `src/` y los scripts construidos.

@@ -2033,7 +2033,7 @@ function open_window() {
 # Codigo de la ventana (SwiftUI). No puede contener una linea con solo LVM_SWIFT.
 function swift_source() {
     cat <<'LVM_SWIFT'
-#@incluir ventana.swift
+#@incluir ventana/
 LVM_SWIFT
 }
 

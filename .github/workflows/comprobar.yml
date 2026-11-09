@@ -29,9 +29,9 @@ jobs:
           "$b" -n macos/lvm-instalador.sh
       - name: El script es el de src/
         run: ./construir.sh --comprobar
-      - name: El Swift, de src/mac/ventana.swift (lo mismo que swift_source)
+      - name: El Swift, de src/mac/ventana/ entera (lo mismo que swift_source)
         run: |
-          cp src/mac/ventana.swift main.swift
+          ./construir.sh --ventana-mac main.swift
           wc -l main.swift
       - name: Compilar (como build_native_app)
         run: |
