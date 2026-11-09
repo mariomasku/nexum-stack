@@ -20,8 +20,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Sintaxis de bash
-        run: bash -n macos/lvm-instalador.sh
+      - name: Sintaxis de bash (con bash 5, como en el Mac; el /bin/bash 3.2 del sistema no lo lee)
+        run: |
+          b=$(brew --prefix)/bin/bash
+          [ -x "$b" ] || brew install bash
+          "$b" --version | head -1
+          "$b" -n macos/lvm-instalador.sh
       - name: Sacar el Swift del script (lo mismo que swift_source)
         run: |
           awk "/cat <<'LVM_SWIFT'\$/{f=1;next} /^LVM_SWIFT\$/{f=0} f" macos/lvm-instalador.sh > main.swift
