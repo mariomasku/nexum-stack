@@ -154,7 +154,7 @@ function upgrade_to() {
     # (--copia: para cuando se vuelve a compilar en su carpeta, como actualizar --copia)
     [ "$3" == "--copia" ] && STACK_DB_COPY=1
     if [ -z "$from" ] || ! [[ "$php" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "Uso: lvm-instalador actualizar-a <version instalada> <version de PHP, como 8.3.36>"
+        echo "Uso: nexum actualizar-a <version instalada> <version de PHP, como 8.3.36>"
         return 1
     fi
     valid_version_name "$from" || { echo "Version no valida"; return 1; }

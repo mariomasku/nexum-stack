@@ -6,7 +6,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: sin apartado Visor de los proyectos (va en Apariencia)" '! grep -qF "(\"visor\", \"Visor de los proyectos\"" "$SRC" && ! grep -qF "func buttonsCard()" "$SRC" && grep -qF "block(\"Visor de los proyectos\"" "$SRC"'
-    check "Mac: Apariencia en tres bloques" 'grep -qF "block(\"Iconos del menú lateral\"" "$SRC" && grep -qF "block(\"Apartados del menú lateral\"" "$SRC"'
+    check "Mac: Apariencia en tres bloques (los apartados del menú lateral, en dos columnas)" 'grep -qF "block(\"Iconos del menú lateral\"" "$SRC" && grep -qF "Text(\"Apartados del menú lateral\")" "$SRC" && grep -qF "navSwitches(Array(items.prefix(half)))" "$SRC" && grep -qF "navSwitches(Array(items.dropFirst(half)))" "$SRC"'
     check "Mac: el título, el del apartado abierto" 'grep -qF "PageTitle(title: sec?.1 ?? \"Configuración\", sub: toolsDesc ?? \"Configuración\"," "$SRC" && grep -qF ".environment(\\.toolsSection, sec?.1)" "$SRC"'
     check "Mac: la tarjeta del apartado no repite el título" 'grep -qF "return t.hasPrefix(s)" "$SRC" && grep -qF ".preference(key: ToolsDescKey.self, value: isSectionCard ? description : nil)" "$SRC"'
     check "Mac: Seguridad entre webs, en cuatro puntos" '[ "$(sed -n "/^let CROSS_SITE_HELP/,/^]/p" "$SRC" | grep -cE "^    \(\"")" -eq 4 ] && grep -qF "TileCard(\"Qué es\", wide: true)" "$SRC"'

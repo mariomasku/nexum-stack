@@ -85,7 +85,7 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
     # Lo que manda otra web (un formulario o un fetch a 127.0.0.1): el navegador pone ese dominio y
     # phpMyAdmin, que entra como root sin contraseña, lo ejecutaria aunque la web no pueda leer la
     # respuesta. Desde otra web solo se puede abrir la portada con un enlace; escribiendo la
-    # direccion, desde lvm-instalador o dentro de phpMyAdmin, todo funciona igual
+    # direccion, desde nexum o dentro de phpMyAdmin, todo funciona igual
     <If "(%{HTTP:Sec-Fetch-Site} =~ /^(cross-site|same-site)$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && -z %{QUERY_STRING} && %{REQUEST_URI} =~ m#^/phpmyadmin/?(index\.php)?$#)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
         Require all denied
         ErrorDocument 403 "Otra web ha intentado usar phpMyAdmin: no se ha hecho nada. Abrelo escribiendo http://127.0.0.1/phpmyadmin/ o desde lvm-instalador."
@@ -134,7 +134,7 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
 # (un formulario o un fetch a https://tienda.local/admin/...). Desde otro sitio (Sec-Fetch-Site:
 # cross-site) solo se puede abrir una pagina con un enlace (GET o HEAD, de navegacion), y un POST,
 # PUT o DELETE solo vale desde la propia web (su Origin). Una pasarela de pago que vuelve a la tienda
-# con un POST no pasa: se apaga en Configuracion (o lvm-instalador barrera-web no) mientras se prueba
+# con un POST no pasa: se apaga en Configuracion (o nexum barrera-web no) mientras se prueba
 # (los navegadores mandan Sec-Fetch-Mode y Sec-Fetch-Dest con Sec-Fetch-Site: si faltan, cuenta como enlace)
 # >>> barrera entre webs
 <If "(%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">

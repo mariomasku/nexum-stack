@@ -302,10 +302,11 @@ extension AppModel {
         guard !installs.isEmpty else { return }
         let pairs = projectPairs(x)
         let alert = NSAlert()
-        alert.messageText = "BBDD de \(x.name) en cada versión"
+        alert.messageText = "Opciones de la BBDD de \(x.name)"
         alert.addButton(withTitle: "Guardar los vínculos")
         alert.addButton(withTitle: "Cancelar")
-        var views: [NSView] = [dialogLabel("Cargar proyecto monta cada versión con la BBDD que elijas. «Ninguna»: la carpeta deja de ir con esa versión (la BBDD no se toca). Cada BBDD es de un solo proyecto por versión.", color: .secondaryLabelColor)]
+        var views: [NSView] = [dialogLabel("En cada versión de PHP le puedes asignar una BBDD al proyecto, o cambiar la que usa por otra: por ejemplo, otra copia de esa misma BBDD con otros datos."),
+                               dialogLabel("Cargar proyecto monta cada versión con la BBDD que elijas. «Ninguna»: la carpeta deja de ir con esa versión (la BBDD no se toca). Cada BBDD es de un solo proyecto por versión.", color: .secondaryLabelColor)]
         var popups: [(Install, NSPopUpButton, [String], [String])] = []
         for i in installs {
             let dbs = (d.dbs[i.folder] ?? []).sorted { $0.lowercased() < $1.lowercased() }

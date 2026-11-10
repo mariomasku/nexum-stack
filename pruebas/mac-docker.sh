@@ -198,7 +198,7 @@ check "imagenes: las del gestor no se descargan" '! docker_image_action descarga
 check "imagenes: accion desconocida, no" '! docker_image_action quitar php:8.2-fpm > /dev/null 2>&1'
 check "volumenes: borrar" 'docker_volume_remove nexum-mi-tienda-8-4_db > /dev/null 2>&1 && grep -qx "volume rm nexum-mi-tienda-8-4_db" "$W/docker.log"'
 check "volumenes: nombre raro, no" '! docker_volume_remove "../x" > /dev/null 2>&1 && ! docker_volume_remove "-f" > /dev/null 2>&1 && ! docker_volume_remove "" > /dev/null 2>&1'
-check "comandos docker-imagenes y docker-volumen-borrar" 'grep -q "^    docker-imagenes) docker_image_action \"\$2\" \"\$3\" ;;" "$SRC" && grep -q "^    docker-volumen-borrar) docker_volume_remove \"\$2\" ;;" "$SRC" && grep -q "^#   lvm-instalador docker-imagenes borrar" "$SRC"'
+check "comandos docker-imagenes y docker-volumen-borrar" 'grep -q "^    docker-imagenes) docker_image_action \"\$2\" \"\$3\" ;;" "$SRC" && grep -q "^    docker-volumen-borrar) docker_volume_remove \"\$2\" ;;" "$SRC" && grep -q "^#   nexum docker-imagenes borrar" "$SRC"'
 check "ventana: borrar imagenes y volumenes con estos comandos" 'grep -qF "[\"docker-imagenes\", \"borrar\", ref]" "$SRC" && grep -qF "[\"docker-imagenes\", \"descargar\", i.name]" "$SRC" && grep -qF "[\"docker-volumen-borrar\", v.name]" "$SRC"'
 # --- 1.39.7: docker con la configuracion del gestor (sin el credsStore de Docker Desktop) ---
 mkdir -p "$DOCKER_CONFIG_DIR/cli-plugins"; touch "$DOCKER_CONFIG_DIR/cli-plugins/docker-malo"

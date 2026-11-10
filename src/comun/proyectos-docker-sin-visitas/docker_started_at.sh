@@ -74,7 +74,7 @@ function docker_idle_command() {
                 echo "Los proyectos de Docker ya no se paran solos"
             fi ;;
         comprobar) docker_idle_check "$2" ;;
-        *) echo "Uso: lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar"; return 1 ;;
+        *) echo "Uso: nexum docker-reposo [estado] | horas <0-24> | comprobar"; return 1 ;;
     esac
 }
 

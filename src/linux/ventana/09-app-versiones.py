@@ -709,7 +709,7 @@ class AppVersiones:
         current = self.projects and os.path.basename(self.projects["current"].rstrip("/")) == name
         if current:
             row.add_title_tag(label("Cargado", "texto-activa", "subtitulo"))
-        lk = Gtk.Button(tooltip_text="Vincular %s con su BBDD"
+        lk = Gtk.Button(tooltip_text="Opciones de la BBDD de %s…"
                         % name, relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy and bool(self.data))
         lk.add(icon("insert-link-symbolic"))
         lk.connect("clicked", lambda *_: self.on_link_project(x))
@@ -727,15 +727,18 @@ class AppVersiones:
             return
         pairs = self.project_pairs(x)
         name = x["name"]
-        dlg = Gtk.Dialog(title="Vincular BBDD", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg = Gtk.Dialog(title="Opciones de la BBDD", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(600, -1)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
         dlg.set_default_response(Gtk.ResponseType.ACCEPT)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=24)
         dlg.get_content_area().add(box)
-        box.pack_start(css(label("BBDD de %s en cada versión" % name, wrap=True, max_width_chars=60),
+        box.pack_start(css(label("BBDD de %s en cada versión de PHP" % name, wrap=True, max_width_chars=60),
                            "title-3"), False, False, 0)
+        box.pack_start(label("En cada versión de PHP le puedes asignar una BBDD al proyecto, o cambiar la "
+                             "que usa por otra: por ejemplo, otra copia de esa misma BBDD con otros datos.",
+                             wrap=True, max_width_chars=60), False, False, 0)
         box.pack_start(label("Cargar proyecto monta la versión con la BBDD que elijas aquí. Con "
                              "«Ninguna», la carpeta deja de ir con esa versión (la BBDD no se toca). "
                              "Cada BBDD es de un solo proyecto en cada versión: si era de otro, "
@@ -1053,13 +1056,13 @@ class AppVersiones:
             row = ActionRow("PHP %s" % act["php"], "/opt/lampp → lampp-%s" % act["folder"])
             row.add_prefix(label("●", "punto-verde" if d["running"] else "punto-gris"))
             row.add_suffix(label("En marcha" if d["running"] else "Parada", "dim-label"))
-            # Parar = lvm disable: para y quita el enlace /opt/lampp, asi que php (enlazado a
+            # Parar = nexum disable: para y quita el enlace /opt/lampp, asi que php (enlazado a
             # /opt/lampp/bin/php) deja de responder. Tambien con la version ya parada
             actions = [("view-refresh-symbolic", "Reiniciar", "reiniciar", "icono-azul")] \
                 if d["running"] else \
                 [("media-playback-start-symbolic", "Arrancar", "arrancar", "icono-verde")]
             actions.append(("media-playback-stop-symbolic",
-                            "Parar y desactivar (como lvm disable): php deja de responder hasta "
+                            "Parar y desactivar (como nexum disable): php deja de responder hasta "
                             "que actives una versión", "parar", "icono-rojo"))
             for ic, tip, cmd, color in actions:
                 # (más grandes que los demás botones de icono: son los que más se usan)

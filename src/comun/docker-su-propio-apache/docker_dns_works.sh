@@ -104,7 +104,7 @@ function docker_dns_command() {
     case $1 in
         activar) docker_dns_activate ;;
         quitar) docker_dns_deactivate ;;
-        *) echo "Uso: lvm-instalador docker-web dns activar|quitar"; return 1 ;;
+        *) echo "Uso: nexum docker-web dns activar|quitar"; return 1 ;;
     esac
 }
 

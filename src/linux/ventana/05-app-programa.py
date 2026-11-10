@@ -52,10 +52,10 @@ class AppPrograma:
         def done(rc, out):
             dlg.destroy()
             if rc == 0:
-                # La version nueva esta en /opt/lvm-instalador: se abre su ventana cuando se
+                # La version nueva esta en /opt/nexum: se abre su ventana cuando se
                 # cierre esta (misma aplicacion: si siguiera abierta, solo se traeria al frente)
                 subprocess.Popen(["sh", "-c", 'sleep 1; exec "$0" ventana',
-                                  "/opt/lvm-instalador/lvm-instalador.sh"], start_new_session=True,
+                                  "/opt/nexum/nexum.sh"], start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL)
                 self.quit()
@@ -69,11 +69,11 @@ class AppPrograma:
 
         def work():
             try:
-                # Con el paquete 1.30.3 o mas nuevo instalado, la contraseña se pide con el
-                # mensaje en español de su accion de polkit (dev.hexer.lvm-instalador.policy)
+                # La contraseña se pide con el mensaje en español de la accion de polkit del
+                # paquete (io.github.mariomasku.nexum.policy)
                 # El ayudante (de root) copia el paquete a su carpeta y comprueba allí la huella que
                 # se ha mostrado, su contenido y sus scripts. Sin él no se instala nada desde aquí
-                helper = "/opt/lvm-instalador/lvm-actualizar"
+                helper = "/opt/nexum/nexum-actualizar"
                 cmd = ["pkexec", helper, path, sha]
                 res = subprocess.run(cmd,
                                      stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -336,7 +336,7 @@ class AppPrograma:
             except OSError:
                 continue
         message(self.win, "No se ha encontrado ninguna terminal",
-                "Abre una terminal y escribe: lvm-instalador")
+                "Abre una terminal y escribe: nexum")
 
     # datos
     def reload(self, branches=False):

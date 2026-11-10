@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# lvm-instalador - Nexum Dev Stack: gestor e instalador de versiones LAMPP y PHP para Linux en un solo archivo.
+# nexum - Nexum Dev Stack: gestor e instalador de versiones LAMPP y PHP para Linux en un solo archivo.
 #
 # Gestiona varias instalaciones de LAMPP en /opt/lampp-<version>, de las que solo una
 # esta activa (/opt/lampp es un enlace a ella). Puede instalar:
@@ -12,7 +12,7 @@
 #     bases de datos (vacias al instalar).
 # No instala PHP ni MariaDB en el sistema: cada version solo funciona cuando esta activa.
 #
-# COMANDOS: lvm-instalador <comando> [opciones]
+# COMANDOS: nexum <comando> [opciones]
 #
 # Cada comando va en su linea, con lo que hace debajo. <...> es un dato obligatorio y [...]
 # uno opcional; a | b son alternativas.
@@ -20,104 +20,104 @@
 #
 # === VENTANA Y PANEL =========================================================================
 #
-#   lvm-instalador
+#   nexum
 #       Sin comando: abre la ventana (desde el menu) o el panel en la terminal
 #
-#   lvm-instalador ventana
+#   nexum ventana
 #       Ventana grafica (la abre el acceso del menu)
 #
-#   lvm-instalador instalador
+#   nexum instalador
 #       Panel de la terminal, directo a la lista para instalar
 #
-#   lvm-instalador --simular <comando>
+#   nexum --simular <comando>
 #       Delante de cualquier comando: muestra lo que haria sin cambiar nada (tambien sin
 #       comando: el panel en simulacion)
 #
 #
 # === VERSIONES DE LAMPP ======================================================================
 #
-#   lvm-instalador list
+#   nexum list
 #       Versiones instaladas (/opt/lampp-<version>)
 #
-#   lvm-instalador estado
+#   nexum estado
 #       Version activa, si esta en marcha y lo que tiene cada una
 #
-#   lvm-instalador use <version>
+#   nexum use <version>
 #       Monta una version: para la actual, cierra lo que quede en memoria y arranca la nueva
 #       (ej.: use 8.4)
 #
-#   lvm-instalador arrancar | parar | reiniciar
+#   nexum arrancar | parar | reiniciar
 #       La version montada. Parar no deja ningun proceso en memoria
 #
-#   lvm-instalador disable
+#   nexum disable
 #       Para la version montada y la desmonta (quita /opt/lampp)
 #
-#   lvm-instalador procesos
+#   nexum procesos
 #       Procesos de LAMPP en memoria y de que version es cada uno
 #
-#   lvm-instalador cerrar-procesos [--todos]
+#   nexum cerrar-procesos [--todos]
 #       Cierra los que no son de la version montada (--todos: todos)
 #
 #
 # === INSTALAR, ACTUALIZAR Y DESINSTALAR ======================================================
 #
-#   lvm-instalador instalar [--xampp 7.4,8.1] [--php 7.4,8.4,8.3.10] [--si]
+#   nexum instalar [--xampp 7.4,8.1] [--php 7.4,8.4,8.3.10] [--si]
 #       Instala sin preguntas. 8.4 = ultimo parche de la rama en lampp-8.4; 8.3.10 = ese
 #       parche en lampp-8.3.10; --si confirma
 #
-#   lvm-instalador add-php <version>
+#   nexum add-php <version>
 #       Instala una version de PHP con su pila propia
 #
-#   lvm-instalador add-xampp <version>
+#   nexum add-xampp <version>
 #       Instala un XAMPP oficial (7.1.33, 7.4 u 8.1). Ninguno tiene el arreglo de PHP2Shell
 #       ni se puede arreglar: solo para lo que no funcione con una pila propia
 #
-#   lvm-instalador actualizar <version> [--copia]
+#   nexum actualizar <version> [--copia]
 #       Vuelve a compilar una version con la ultima pila de su rama (las basadas en XAMPP
 #       pasan a pila propia)
 #       Si su MariaDB cambia de rama, empieza con BBDD vacias: --copia guarda antes las de ahora
 #       en ~/nexum-backups (sin ella, no se podran recuperar)
 #
-#   lvm-instalador github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
-#   lvm-instalador github-conectar [--gh] | github-desconectar
-#   lvm-instalador repos [--todos] [--cache] | repo-traer <dueño/repo> [--actualizar]
+#   nexum github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
+#   nexum github-conectar [--gh] | github-desconectar
+#   nexum repos [--todos] [--cache] | repo-traer <dueño/repo> [--actualizar]
 #       Repositorios de GitHub (pestaña Repositorios): los de una organizacion o cuenta (los de sus
 #       prefijos, o --todos), leidos con un token (por la entrada; se guarda en el llavero) o con la
 #       sesion de gh. repo-traer lo clona por SSH en htdocs o, si ya esta, trae sus cambios (git pull)
 #
-#   lvm-instalador docker-reposo [estado] | horas <0-24> | comprobar
+#   nexum docker-reposo [estado] | horas <0-24> | comprobar
 #       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
 #
-#   lvm-instalador componentes | componentes-actualizar [--copia]
+#   nexum componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
 #       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
 #
-#   lvm-instalador descargas [vaciar]
+#   nexum descargas [vaciar]
 #       La cache de descargas de las pilas propias (/var/cache/nexum-stack): el codigo de cada
 #       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
 #       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
 #
-#   lvm-instalador copias [vaciar]
+#   nexum copias [vaciar]
 #       Las copias de seguridad de ~/nexum-backups (las que pides con --copia o en las casillas
 #       de la ventana): sin nada, cuantos ficheros hay y cuanto ocupan; vaciar, las borra todas
 #       (la carpeta se queda)
 #
-#   lvm-instalador copias-ficheros [si|no]
+#   nexum copias-ficheros [si|no]
 #       Copias de los ficheros que el programa cambia por su cuenta (el de hosts, los vhosts, la
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
-#   lvm-instalador manual [<capitulo>]
+#   nexum manual [<capitulo>]
 #       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
 #       Con un capitulo (proyectos, bbdd, docker, configuracion, limpieza...), en ese. Con --ruta,
 #       solo dice que fichero abrir
 #
-#   lvm-instalador limpieza
+#   nexum limpieza
 #       Lo que se puede limpiar, cada cosa con lo que ocupa y cuantos ficheros tiene
 #
-#   lvm-instalador limpiar <clave>...
+#   nexum limpiar <clave>...
 #       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
 #       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
 #       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
@@ -125,18 +125,18 @@
 #       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
 #       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
 #
-#   lvm-instalador actualizar-a <version> <php>
+#   nexum actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
 #       lampp-<php>, le copia las BBDD con sus vinculos y, si era la activa, la activa. La
 #       de antes no se toca: desinstalala cuando compruebes la nueva. 7.4.33, 8.0.30 y
 #       8.1.34 se compilan con el parche de seguridad de PHP2Shell
 #
-#   lvm-instalador desinstalar <version> [--copia]
+#   nexum desinstalar <version> [--copia]
 #       Borra una version (no la activa ni una cuyas bases usen otras); --copia guarda antes
 #       sus bases en ~/nexum-backups
 #
-#   lvm-instalador add <nombre>
+#   nexum add <nombre>
 #       Registra como version un XAMPP instalado a mano en /opt/lampp (activa los vhosts,
 #       Apache con tu usuario y htdocs tuyo)
 #
@@ -145,37 +145,37 @@
 #
 #   (en la version montada y en marcha; si root tiene contraseña: MYSQL_PWD=...)
 #
-#   lvm-instalador list-db
+#   nexum list-db
 #       Bases de datos de cada version
 #
-#   lvm-instalador crear-bd <base>
+#   nexum crear-bd <base>
 #       Crea una base vacia (utf8mb4_general_ci)
 #
-#   lvm-instalador importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
+#   nexum importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
 #       Carga un .sql, .sql.gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
 #       borran todas sus tablas (con --copia, antes se guarda una copia en ~/nexum-backups si tenia
 #       alguna; sin ella, no se podran recuperar); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
 #       con la plantilla; PrestaShop, su parameters.php pasa a usarla
 #
-#   lvm-instalador exportar-bd <base> <fichero.zip|.sql|.sql.gz> [version]
+#   nexum exportar-bd <base> <fichero.zip|.sql|.sql.gz> [version]
 #       Descarga una copia de una base (sin version, de la montada)
 #
-#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]
+#   nexum copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]
 #       Copia una BBDD a otra version (para probar el proyecto con otro PHP); la de origen no se
 #       toca. --como: nombre de la copia en la de destino (sin el, el mismo). --carpeta: carpeta
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
 #       tiene una con ese nombre, solo con --sustituir (y con --copia, antes guarda una copia suya
 #       en ~/nexum-backups)
 #
-#   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> [--en-vivo] | --volcado <fichero>]
-#   lvm-instalador docker-bd <nombre> lampp <version> | docker
+#   nexum docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> [--en-vivo] | --volcado <fichero>]
+#   nexum docker-bd <nombre> lampp <version> | docker
 #       --en-vivo y docker-bd lampp: un WordPress de Docker con la BBDD de esa version LAMPP en vivo, la
 #       misma que web.local (sin copias; su MariaDB se arranca sola, sin red, si no esta en marcha).
 #       docker-bd docker: vuelve a su copia en la MariaDB comun de Docker
-#   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
-#   lvm-instalador docker-pasar <nombre> [--copia]
-#   lvm-instalador docker-parar-todo
-#   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
+#   nexum docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
+#   nexum docker-pasar <nombre> [--copia]
+#   nexum docker-parar-todo
+#   nexum docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.56): no necesitan LAMPP y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
 #       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
@@ -185,39 +185,39 @@
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y permitir que Docker sin root use los de
 #       menos de 1024. dns activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test
 #       y dejan de ir en /etc/hosts; web.local y lo demas, igual)
-#   lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
-#   lvm-instalador node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
-#   lvm-instalador node-registro <carpeta>     lo ultimo que ha dicho su servidor
-#   lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
-#   lvm-instalador tunel-cerrar | tunel | tunel-instalar
+#   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
+#   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
+#   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
+#   nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
+#   nexum tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
 #       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
 #       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice). La web no se toca: el
 #       dominio local se cambia por el del tunel al pasar
-#   lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
-#   lvm-instalador docker-php <nombre> <version de PHP>
-#   lvm-instalador docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
-#   lvm-instalador docker-imagen <nombre>
-#   lvm-instalador docker-usuario-pruebas <nombre>
+#   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
+#   nexum docker-php <nombre> <version de PHP>
+#   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
+#   nexum docker-imagen <nombre>
+#   nexum docker-usuario-pruebas <nombre>
 #       Proyectos en Docker sin root (pestaña Docker): docker-php cambia su version de PHP;
 #       docker-imagen rehace su imagen de PHP con lo ultimo de Docker Hub (parches de seguridad);
 #       docker-usuario-pruebas pone el administrador de pruebas en la BBDD de su contenedor
-#   lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
-#   lvm-instalador docker-volumen-borrar <volumen>
+#   nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
+#   nexum docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
 #       a descargarla de Docker Hub, o borrar un volumen (sus datos se pierden)
 #
-#   lvm-instalador vincular-bd <base> <version> <carpeta|->
+#   nexum vincular-bd <base> <version> <carpeta|->
 #       La carpeta de /opt/htdocs del proyecto de esa BBDD en esa version (Cargar proyecto la
 #       carga con ella). Con -, la BBDD deja de estar vinculada a ninguna carpeta en esa version
 #
-#   lvm-instalador borrar-bd <base> [--copia]
+#   nexum borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/nexum-backups
 #
 #
 # === PROYECTOS Y DOMINIOS ====================================================================
 #
-#   lvm-instalador cargar-proyecto <carpeta> [version] [base]
+#   nexum cargar-proyecto <carpeta> [version] [base]
 #       Apunta web.local a /opt/htdocs/<carpeta> (y monta antes esa version). Tienda
 #       PrestaShop o proyecto nuevo: crea lo que falte de su vhost y su certificado y falsea
 #       su dominio en /etc/hosts; los demas dominios dejan de estar falseados. Tienda sin base
@@ -226,101 +226,101 @@
 #       configuracion usa otra base (codigo de produccion volcado encima), vuelve a la de la
 #       carpeta
 #
-#   lvm-instalador montar-proyecto <url de git> <carpeta> <version> <base> [volcado]
+#   nexum montar-proyecto <url de git> <carpeta> <version> <base> [volcado]
 #       Proyecto nuevo desde GitHub (u otro repositorio): lo clona en /opt/htdocs/<carpeta>
 #       con tu usuario (solo https o ssh, sin submodulos), lo carga en esa version, crea su
 #       base y, si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga
 #       protegida
 #
-#   lvm-instalador desmontar-proyecto
+#   nexum desmontar-proyecto
 #       web.local deja de apuntar al proyecto cargado y enseña una pagina vacia; los dominios
 #       falseados de una tienda PrestaShop dejan de estarlo
 #
-#   lvm-instalador usuario-pruebas <base> [carpeta]
+#   nexum usuario-pruebas <base> [carpeta]
 #       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop):
 #       local@local.test con contraseña local. Se hace solo al cargar una BBDD
 #
-#   lvm-instalador wp-config <carpeta> [base]
+#   nexum wp-config <carpeta> [base]
 #       WordPress: comprueba que wp-config.php usa la base de la carpeta (la indicada o la
 #       recordada) y entra en el MariaDB local; si no (codigo de produccion pegado encima), lo
 #       rehace con la plantilla de este equipo, con WP_SITEURL y WP_HOME en la direccion
 #       local. Cargar proyecto lo hace solo
 #
-#   lvm-instalador vaciar-cache <carpeta> | --bd <base>
+#   nexum vaciar-cache <carpeta> | --bd <base>
 #       Vacia var/cache de una tienda PrestaShop (por carpeta o base)
 #
-#   lvm-instalador limpiar-proyecto <carpeta> [cache] [registros] [actualizaciones]
+#   nexum limpiar-proyecto <carpeta> [cache] [registros] [actualizaciones]
 #       Vacia las caches, los registros y los restos de las actualizaciones de un WordPress o de una
 #       tienda PrestaShop (sin claves, todo). Nada de wp-content/uploads (salvo los registros de
 #       WooCommerce) ni de img/. Las carpetas se quedan, vacias. No se puede recuperar
 #
-#   lvm-instalador nuevo-dominio <dominio> <carpeta> [base]
+#   nexum nuevo-dominio <dominio> <carpeta> [base]
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version montada (si no existe)
 #
-#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
+#   nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
 #       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
 #       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
 #       y la BBDD de antes, en ~/nexum-backups
-#   lvm-instalador hosts-falsear <dominio> si|no
+#   nexum hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1) o deja de falsear el dominio de un vhost
 #
-#   lvm-instalador media-produccion <dominio .local> <dominio de produccion>|quitar
+#   nexum media-produccion <dominio .local> <dominio de produccion>|quitar
 #       Lo que falte en local de wp-content/uploads o img (no van en git) se pide a la web de
 #       produccion (redireccion 302). Solo en vhosts .local
 #
-#   lvm-instalador media-proyecto <carpeta> <dominio de produccion>|quitar
+#   nexum media-proyecto <carpeta> <dominio de produccion>|quitar
 #       Lo mismo para un WordPress, en el vhost de los proyectos (web.local) mientras este cargado
 #
-#   lvm-instalador ps-imagenes <carpeta>
+#   nexum ps-imagenes <carpeta>
 #       Descarga de la web real las imagenes de una tienda PrestaShop que faltan en img (productos,
 #       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts)
 #
-#   lvm-instalador vhosts
+#   nexum vhosts
 #       Edita una copia de los vhosts y la aplica con sudo: se comprueba antes, se guarda el
 #       anterior en ~/nexum-backups (con copias-ficheros si) y se recarga Apache
 #
-#   lvm-instalador hosts
+#   nexum hosts
 #       Edita /etc/hosts (con sudoedit)
 #
 #
 # === SERVICIOS Y SEGURIDAD ===================================================================
 #
-#   lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar
+#   nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar
 #       Un servicio de la version montada. El FTP no arranca con la version: se activa asi (o
 #       en la pestaña Servicios) y sigue activo hasta que se pare
 #
-#   lvm-instalador asegurar [version]
+#   nexum asegurar [version]
 #       Deja Apache, MariaDB y el FTP solo para este equipo (no se puede entrar desde la red)
 #       y los vhosts del administrador. Se hace solo al montar o arrancar una version
 #
-#   lvm-instalador barrera-web [si|no]
+#   nexum barrera-web [si|no]
 #       Barrera entre webs (encendida si no se apaga): otra web abierta en el navegador no
 #       puede mandar formularios ni peticiones a tus proyectos. Una pasarela de pago que vuelve
 #       a la tienda con un POST no pasa: apagala mientras la pruebas. Sin argumento, como esta
 #
-#   lvm-instalador correo [estado] | si [--instalar] | no
+#   nexum correo [estado] | si [--instalar] | no
 #       Correo de pruebas (encendido si no se apaga): lo que mandan las webs locales (formularios,
 #       pedidos, contraseñas) no llega a nadie, va a Mailpit (http://127.0.0.1:8025/), que arranca
 #       y para con la version activa. mail() de PHP en todas las versiones, PrestaShop por SMTP y
 #       WordPress segun su modo. Apagado, el correo sale como sin el gestor. --instalar: y Mailpit
 #
-#   lvm-instalador correo wordpress mailpit|desactivar|nada
+#   nexum correo wordpress mailpit|desactivar|nada
 #       Plugins de correo de WordPress (WP Mail SMTP, Post SMTP, FluentSMTP, Brevo...) en la copia
 #       local: mailpit (por defecto) los de SMTP siguen, con su correo a Mailpit, y los que mandan
 #       por una API (Brevo) se desactivan; desactivar, todos fuera; nada, no se tocan (avisa: el
 #       correo puede llegar de verdad). Los cambios no van en las copias (exportar-bd, Docker)
 #
-#   lvm-instalador correo instalar | vaciar | bd <base>
+#   nexum correo instalar | vaciar | bd <base>
 #       Instala Mailpit (comprobado con su sha256, de root en /opt/config/mailpit); vacia su
 #       bandeja; o aplica (o deshace) el correo de pruebas en una BBDD (se hace solo al cargarla)
 #
-#   lvm-instalador arreglar-certificados
+#   nexum arreglar-certificados
 #       Los vhosts https con certificados en los que confia todo el equipo (en /etc/ssl/certs,
 #       de CA o de una CA local sin limite de dominios) pasan a uno propio, y esa CA deja de
 #       ser de confianza
 #
-#   lvm-instalador confiar-certificados [dominio|--quitar]
+#   nexum confiar-certificados [dominio|--quitar]
 #       Chrome, Chromium y Firefox aceptan sin aviso el certificado propio de cada proyecto
 #       https (o solo el de ese dominio): solo ese certificado, no una CA. Sin el aviso, las
 #       herramientas que manejan el navegador (Claude in Chrome) pueden abrir los proyectos.
@@ -331,10 +331,10 @@
 #
 # === INFORMACION =============================================================================
 #
-#   lvm-instalador version | acerca | novedades
+#   nexum version | acerca | novedades
 #       Version del programa / que hace / lista de cambios
 #
-#   lvm-instalador --ayuda
+#   nexum --ayuda
 #       Esta ayuda
 #
 # Variables opcionales: PHP_TIMEZONE (por defecto Europe/Madrid), LVM_UI=text (panel sin ventanas)
@@ -826,11 +826,11 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.10"
+APP_VERSION="1.57.11"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
-# lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
-# publica va aqui y en /opt/lvm-instalador/nexum-stack-firma.gpg (la que usa el ayudante, como root)
+# nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
+# publica va aqui y en /opt/nexum/nexum-stack-firma.gpg (la que usa el ayudante, como root)
 UPDATE_REPO="mariomasku/nexum-stack"
 UPDATE_KEY_FPR="3506F1EB091AD4A23F40081FF24FD5CC07557404"
 UPDATE_KEY_B64='

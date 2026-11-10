@@ -138,7 +138,7 @@ check "actualizar-a: solo a un parche de su rama" 'grep -q "solo se pasa a otro 
 out=$(LVM_PRUEBA=$T bash "$SRC" actualizar-a 8.3.10 8.3.9 2>&1)
 check "actualizar-a: no hacia atras" 'grep -q "no se actualiza hacia atras" <<< "$out"'
 out=$(LVM_PRUEBA=$T bash "$SRC" actualizar-a 8.3.10 8.3.36x 2>&1)
-check "actualizar-a: version no valida, uso" 'grep -q "^Uso: lvm-instalador actualizar-a" <<< "$out"'
+check "actualizar-a: version no valida, uso" 'grep -q "^Uso: nexum actualizar-a" <<< "$out"'
 out=$(LVM_PRUEBA=$T bash "$SRC" actualizar-a ../x 8.3.36 2>&1)
 check "actualizar-a: carpeta no valida" 'grep -q "no valida" <<< "$out"'
 

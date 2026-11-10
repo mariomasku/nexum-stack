@@ -22,10 +22,10 @@ class AppHosts:
         if self.hosts is None:
             self.loading(self.hosts_box)
             return
-        # Un .local siempre esta en /etc/hosts (sin su linea se preguntaria a la red) y no hay ninguna
-        # web real a la que devolverlo: no es un dominio falseado, va con los demas (sin apagarse)
-        fake = [h for h in self.hosts if h["fake"] and not h["name"].lower().endswith(".local")]
-        rest = [h for h in self.hosts if h not in fake]
+        # Falseados: los que llevan a este equipo en /etc/hosts. También los .local (siempre están, sin su
+        # línea se preguntaría a la red), aunque no haya ninguna web real a la que devolverlos
+        fake = [h for h in self.hosts if h["fake"]]
+        rest = [h for h in self.hosts if not h["fake"]]
 
         # Primero, si el vhost de los proyectos no lleva a este equipo: el navegador no conecta
         for name, now in getattr(self, "hosts_link_fix", []):
@@ -46,21 +46,24 @@ class AppHosts:
             lb.add(row)
             self.hosts_box.pack_start(box, False, False, 0)
 
-        box, lb = group("Host falseado",
-                        "Al cargar una tienda PrestaShop se crea lo que le falte (su vhost y su "
-                        "certificado) y su dominio se falsea en /etc/hosts: el navegador la abre "
-                        "en este equipo. Al cargar otro proyecto deja de estar falseado y vuelve "
-                        "a llevar a la web real.")
-        if not fake:
-            row = ActionRow("Ningún dominio falseado",
-                            "Los dominios de los vhosts llevan a sus webs reales")
+        # Arriba, en un recuadro como el visor de Proyectos: todos los que llevan a este equipo (también
+        # los .local), en dos columnas, cada uno con su interruptor
+        self.hosts_box.pack_start(self.hosts_visor(fake), False, False, 0)
+
+        # Debajo, en la misma fila: los demás dominios de los vhosts ocupan 1/3 y el proyecto nuevo, 2/3
+        box, lb = group("Dominios de los vhosts",
+                        "Los que llevan a su web real. Encendido, el dominio lleva a este equipo "
+                        "(127.0.0.1) y sube al recuadro de arriba. Se pide la contraseña de sudo "
+                        "para cambiar /etc/hosts.")
+        if not rest:
+            row = ActionRow("No hay más dominios",
+                            "Los vhosts están en /opt/config/httpd-vhosts.conf")
             # (en un tercio de la pestaña no cabe en una línea)
             row.subtitle.set_line_wrap(True)
             row.subtitle.set_ellipsize(0)
             lb.add(row)
-        for h in fake:
+        for h in rest:
             lb.add(self.host_row(h))
-        # En la misma fila: el host falseado ocupa 1/3 y el proyecto nuevo, 2/3 (tres columnas iguales)
         grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
         box.set_valign(Gtk.Align.START)
         grid.attach(box, 0, 0, 1, 1)
@@ -68,17 +71,43 @@ class AppHosts:
         new_domain.set_valign(Gtk.Align.START)
         grid.attach(new_domain, 1, 0, 2, 1)
         self.hosts_box.pack_start(grid, False, False, 0)
-
-        box, lb = group("Dominios de los vhosts",
-                        "Encendido, el dominio lleva a este equipo (127.0.0.1); apagado, a la "
-                        "web real. Se pide la contraseña de sudo para cambiar /etc/hosts.")
-        if not rest:
-            lb.add(ActionRow("No hay más dominios",
-                             "Los vhosts están en /opt/config/httpd-vhosts.conf"))
-        for h in rest:
-            lb.add(self.host_row(h))
-        self.hosts_box.pack_start(box, False, False, 0)
         self.hosts_box.show_all()
+
+    def hosts_visor(self, fake):
+        """El recuadro de arriba de Dominios y hosts, como el visor de Proyectos: su cabecera (el punto verde
+        si hay alguno) y, en una tarjeta, los dominios falseados en dos columnas, cada uno con su interruptor."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        head = Gtk.Box(spacing=8)
+        head.pack_start(nv_dot(bool(fake)), False, False, 0)
+        head.pack_start(label("DOMINIOS Y HOSTS FALSEADOS", "nv-seccion"), False, False, 0)
+        head.pack_start(info_icon(
+            "Llevan a este equipo y no a internet. Los .local, siempre; el dominio de una tienda PrestaShop, "
+            "mientras está cargada (al cargarla se crea lo que le falte, su vhost y su certificado, y al cargar "
+            "otro proyecto vuelve a llevar a la web real), y los que falsees tú. Apagado, el dominio baja a "
+            "«Dominios de los vhosts» y lleva a su web real."), False, False, 0)
+        if fake:
+            head.pack_end(label("%d %s a este equipo" % (len(fake), "lleva" if len(fake) == 1 else "llevan"),
+                                "nv-chico", "nv-tenue"), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-tarjeta")
+        if not fake:
+            card.pack_start(label("Ningún dominio falseado: los dominios de los vhosts llevan a sus webs reales.",
+                                  "nv-tenue", xalign=0, wrap=True), False, False, 0)
+        else:
+            # (de dos en dos, por filas: la primera columna, los de número par)
+            grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
+            cols = [css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "nv-grupo")
+                    for _c in range(2)]
+            for n, h in enumerate(fake):
+                cols[n % 2].add(self.host_row(h))
+            for c, lb in enumerate(cols):
+                if lb.get_children():
+                    grid.attach(lb, c, 0, 1, 1)
+                else:
+                    grid.attach(Gtk.Box(), c, 0, 1, 1)
+            card.pack_start(grid, False, False, 0)
+        box.pack_start(card, False, False, 0)
+        return box
 
     def build_new_domain(self):
         """Proyecto nuevo con el dominio de producción falseado (para construirlo en local y

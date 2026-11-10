@@ -13,7 +13,7 @@ function cli_install() {
         esac
     done
 
-    [ -z "$php" ] && echo "Indica las ramas de PHP (o un parche concreto), por ejemplo: lvm-instalador instalar --php 7.4,8.4,8.3.10" && return 1
+    [ -z "$php" ] && echo "Indica las ramas de PHP (o un parche concreto), por ejemplo: nexum instalar --php 7.4,8.4,8.3.10" && return 1
 
     local releases=$(php_releases) all=""
     for branch in $php; do

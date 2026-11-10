@@ -266,7 +266,7 @@ struct ProjectsView: View {
             Button(action: { model.linkProject(x) }) { Image(systemName: "link") }
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.busy || model.data == nil)
-                .tip("Vincular su BBDD")
+                .tip("Opciones de la BBDD…")
           }
         }
         .padding(.horizontal, 14)
@@ -384,7 +384,7 @@ struct ProjectsView: View {
     /// Opciones del menú ⋮ de un proyecto
     func moreItems(_ x: Project) -> [(String, () -> Void)] {
         let db = model.projectBase(x)
-        var items: [(String, () -> Void)] = [("Vincular la BBDD de cada versión…", { model.linkProject(x) }),
+        var items: [(String, () -> Void)] = [("Opciones de la BBDD…", { model.linkProject(x) }),
                                              ("Abrir la carpeta", { showFolder(HTDOCS + "/" + x.name) })]
         for dp in model.dockerOf(x.name) {
             items.append(("Eliminar de Docker…", { model.dockerDelete(dp) }))
@@ -403,12 +403,15 @@ struct ProjectsView: View {
         return items
     }
 
+    /// ⋮ no lleva mensaje al dejar el ratón encima: solo despliega su menú
+    var moreTip: String { return "" }
+
     /// ⋮ (con un proyecto cargado y los botones cuadrados, del mismo tamaño que los demás)
     @ViewBuilder
     func moreMenu(_ x: Project, square: Bool = false) -> some View {
         let items = moreItems(x)
         if square && model.visorConf.square {
-            VisorButton(conf: model.visorConf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: "Más") {
+            VisorButton(conf: model.visorConf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: moreTip) {
                 popMenu(items)
             }
             .disabled(model.busy)
@@ -419,6 +422,7 @@ struct ProjectsView: View {
                 }
             }
             .disabled(model.busy)
+            .tip(moreTip)
         }
     }
 
@@ -541,7 +545,7 @@ struct ProjectsView: View {
                         Button("Añadir entorno en otra versión de PHP…") { model.replicate(x) }
                         Button("Añadir entorno en Docker…") { model.dockerForLoaded(x) }
                         Button("Importar SQL…") { model.importFor(x) }
-                        Button("Vincular la BBDD de cada versión…") { model.linkProject(x) }
+                        Button("Opciones de la BBDD…") { model.linkProject(x) }
                         Button("Abrir la carpeta") { showFolder(HTDOCS + "/" + x.name) }
                         ForEach(model.dockerOf(x.name)) { dp in
                             Button("Eliminar de Docker…") { model.dockerDelete(dp) }
@@ -558,6 +562,7 @@ struct ProjectsView: View {
                         Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }
                     .disabled(model.busy)
+                    .tip(hover ? moreTip : "")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
                 }

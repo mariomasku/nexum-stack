@@ -492,7 +492,7 @@ EOF
 function hosts_fake_one() {
     local domain=$(tr 'A-Z' 'a-z' <<< "$1") state=$2
     if ! valid_domain "$domain" || [[ "$state" != si && "$state" != no ]]; then
-        echo "Uso: lvm-instalador hosts-falsear <dominio> si|no"
+        echo "Uso: nexum hosts-falsear <dominio> si|no"
 
         return 1
     fi
@@ -549,7 +549,7 @@ MEDIA_EXT="jpe?g|png|gif|webp|avif|svg|ico|bmp|mp4|webm|pdf"
 function media_proxy() {
     local domain=$(tr 'A-Z' 'a-z' <<< "$1") prod=$(tr 'A-Z' 'a-z' <<< "$2") copy rc
     if [ -z "$domain" ] || [ -z "$prod" ]; then
-        echo "Uso: lvm-instalador media-produccion <dominio .local> <dominio de produccion>|quitar"
+        echo "Uso: nexum media-produccion <dominio .local> <dominio de produccion>|quitar"
 
         return 1
     fi
@@ -820,7 +820,7 @@ function new_custom_domain() {
     owner=$(vhosts_info | awk -F'|' -v d="$domain" '$3 == d || index(" " $4 " ", " " d " ") { print $2; exit }')
     if [ -n "$owner" ]; then
         echo "Ya hay un vhost para $domain (carpeta ${owner:-desconocida}). Para falsearlo usa su"
-        echo "interruptor en la pestaña Hosts (o: lvm-instalador hosts-falsear $domain si)."
+        echo "interruptor en la pestaña Hosts (o: nexum hosts-falsear $domain si)."
 
         return 1
     fi

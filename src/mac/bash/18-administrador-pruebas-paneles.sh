@@ -469,7 +469,7 @@ function set_aside_official() {
     echo "  - Copia de sus bases de datos: $backup"
     echo "  - Sus proyectos estan tambien en $COMMON/htdocs."
     echo "Ahora activa una version y, en Configuración de la ventana, carga las bases del XAMPP oficial."
-    echo "Para deshacerlo: lvm-instalador volver-oficial."
+    echo "Para deshacerlo: nexum volver-oficial."
 }
 
 # importar-copias <carpeta>: carga en la version activa las bases .zip de una carpeta (las del XAMPP
@@ -477,7 +477,7 @@ function set_aside_official() {
 function import_backups() {
     local folder=$1 f db rc loaded=0 skipped=() failed=()
     if [ -z "$folder" ] || [ ! -d "$folder" ]; then
-        echo "Uso: lvm-instalador importar-copias <carpeta con copias .zip>"
+        echo "Uso: nexum importar-copias <carpeta con copias .zip>"
 
         return 1
     fi

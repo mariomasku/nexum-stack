@@ -18,8 +18,8 @@ Por defecto prueba:
   - Linux: ../lvm-instalador.sh
     (es decir, el lvm-instalador.sh de la carpeta de arriba)
   - Mac: ../macos/lvm-instalador.sh o, si no está, el lvm-instalador.sh
-    del zip más reciente de ../macos/lvm-instalador-mac-*.zip (se saca a
-    la carpeta temporal)
+    del zip más reciente de ../macos/nexum-mac-*.zip (o del nombre de
+    antes, lvm-instalador-mac-*.zip; se saca a la carpeta temporal)
   - El empaquetador: ../empaquetar-deb.sh
   - El script xampp antiguo del Mac: datos/mac-1.27.1-xampp.sh
 
@@ -133,6 +133,11 @@ LOS FICHEROS
                       con --simular no borra nada, los registros de las
                       versiones quedan a 0 bytes y los temporales recientes
                       o en uso siguen. Sin sudo de verdad.
+  registro-tareas.sh  Configuración, General y el registro de tareas: cada
+                      tarea guarda el suyo en ~/.lvm-instalador/tareas (700
+                      y 600), con la orden de nexum y sin secretos (ni
+                      MYSQL_PWD, ni contraseñas, ni tokens); se quedan las
+                      200 últimas y un enlace no se lee.
   web.sh              Reglas web en un Apache temporal: ficheros que no se
                       sirven (.env, .git, copias, claves...), CSRF contra
                       phpMyAdmin, phpMyAdmin solo en 127.0.0.1, TRACE.
@@ -167,12 +172,18 @@ LOS FICHEROS
                       gui-fechas y (Linux) el nombre propuesto en la ventana.
 
   Solo Linux:
-  ayudante.sh         lvm-actualizar: paquetes buenos y manipulados (con una
+  ayudante.sh         nexum-actualizar: paquetes buenos y manipulados (con una
                       copia del ayudante que no instala nada), su firma
                       (sin firma, otra clave, firma de otro paquete o
                       enlazada, clave cambiada), versiones no más nuevas,
                       la comprobación de la ventana (update_signed) y la
                       lectura de las publicaciones de GitHub (RELEASE_PY).
+  paquete.sh          El paquete nexum (1.57.11): su contenido y lo que hacen
+                      su postinst y su postrm, con las rutas cambiadas por
+                      las de una carpeta falsa (sin root ni tocar el
+                      sistema): la orden nexum, las de antes quitadas, un
+                      lvm de otro programa intacto y el de Nexum quitado,
+                      los iconos de cada usuario y su temporizador.
   arreglar-certs.sh   cert_audit y fix_certs con CAs de prueba.
   procesos.sh         lampp_processes con .pid manipulados.
   entorno.sh          Entorno de las tareas de la ventana (sin funciones

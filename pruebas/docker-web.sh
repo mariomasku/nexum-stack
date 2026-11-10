@@ -275,7 +275,7 @@ if grep -q '^function docker_web_media() {' "$SRC"; then
     check "ps-imagenes: con la BBDD de la tienda en Docker y su dominio de produccion" 'grep -q "Con la BBDD de la tienda en Docker" <<< "$o" && ! grep -q "no esta en" <<< "$o" && ! grep -q "No se sabe el dominio" <<< "$o"'
     docker_conf_set tienda PRODUCCION ""
     o=$(DRY=1 ps_images tienda 2>&1)
-    check "ps-imagenes: sin dominio de produccion, lo pide (como segundo argumento)" 'grep -q "lvm-instalador ps-imagenes tienda <dominio de produccion>" <<< "$o"'
+    check "ps-imagenes: sin dominio de produccion, lo pide (como segundo argumento)" 'grep -q "nexum ps-imagenes tienda <dominio de produccion>" <<< "$o"'
     o=$(DRY=1 ps_images tienda https://tienda.es/ 2>&1)
     check "ps-imagenes: con el dominio dicho, sigue" '! grep -q "No se sabe el dominio" <<< "$o" && grep -q "Con la BBDD de la tienda en Docker" <<< "$o"'
     docker_conf_set tienda PRODUCCION tienda.es

@@ -34,7 +34,7 @@ instalador cuando hace falta.
 LO MÁS FÁCIL: EL PAQUETE .deb
 -----------------------------
 
-PRIMERA INSTALACIÓN: haz doble clic en lvm-instalador_<versión>_all.deb.
+PRIMERA INSTALACIÓN: haz doble clic en nexum_<versión>_all.deb.
 Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04):
 pulsa "Instalar" y escribe tu contraseña.
 
@@ -50,9 +50,9 @@ aplicaciones no sirve para actualizar: ve el programa ya instalado y
 no ofrece el botón.)
 
 También puedes actualizar desde una terminal, con el .deb descargado:
-      sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
+      sudo apt install ~/Descargas/nexum_<versión>_all.deb
 
-- Se instala en /opt/lvm-instalador. El comando lvm-instalador y el
+- Se instala en /opt/nexum. El comando nexum y el
   icono "Nexum Dev Stack" del menú apuntan ahí, también si ya
   tenías una versión anterior descomprimida en otra carpeta.
 - Si el doble clic abre otro programa: botón derecho > "Abrir con" >
@@ -109,7 +109,7 @@ Responde "Si" y escribe tu contraseña (al escribirla no se ve nada en
 pantalla; es normal). Se crean:
 
   - El icono "Nexum Dev Stack" en el menú de aplicaciones.
-  - El comando "lvm-instalador" para abrirlo desde cualquier terminal.
+  - El comando "nexum" para abrirlo desde cualquier terminal.
 
 A partir de ahora puedes abrirlo desde el menú de aplicaciones, sin
 usar la terminal: el icono abre la VENTANA GRÁFICA del gestor.
@@ -162,7 +162,7 @@ Con la ventana gráfica (icono "Nexum Dev Stack" del menú):
    Una barra muestra cómo va cada componente. No cierres la ventana.
 4. Al terminar, pulsa "Activar lampp-8.4".
 
-Con el panel de la terminal (lvm-instalador):
+Con el panel de la terminal (nexum):
 
 Cómo moverse por las ventanas:
   - Flechas arriba/abajo: moverse por la lista.
@@ -215,7 +215,7 @@ un aviso naranja. Cada paso pide la contraseña de administrador.
 
 1. Instala el paquete. Si ya lo tenías, las versiones 1.39.0 y 1.40.0
    se instalan una vez en la terminal:
-      sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
+      sudo apt install ~/Descargas/nexum_<versión>_all.deb
    Las demás se actualizan desde la ventana.
 
 2. Abre la ventana, pestaña Versiones. Arriba salen los avisos que
@@ -253,7 +253,7 @@ un aviso naranja. Cada paso pide la contraseña de administrador.
       .test). Sin esto sale "La conexión no es privada" y las
       herramientas que manejan el navegador, como Claude in Chrome, no
       pueden abrirlos. Después cierra el navegador y vuelve a abrirlo.
-      En la terminal: lvm-instalador confiar-certificados [dominio]
+      En la terminal: nexum confiar-certificados [dominio]
       (desde la 1.47.0) Las tiendas con dominio real, solo mientras están
       falseadas en /etc/hosts: al falsear una, el navegador acepta su
       certificado; al dejar de falsearla, deja de aceptarlo.
@@ -262,7 +262,7 @@ un aviso naranja. Cada paso pide la contraseña de administrador.
       Sale si cambias /etc/hosts a mano: el navegador aún acepta el
       certificado de una tienda que ya no está falseada, y con su clave se
       podría suplantar la web de verdad. Quitar hace que deje de
-      aceptarlo. En la terminal: lvm-instalador confiar-certificados --quitar
+      aceptarlo. En la terminal: nexum confiar-certificados --quitar
 
    Cuando no queda ningún aviso, el equipo está al día.
 
@@ -278,8 +278,8 @@ un aviso naranja. Cada paso pide la contraseña de administrador.
    vuelvas a instalar una CA así.
 
 5. Para ver antes qué haría, en la terminal:
-      lvm-instalador --simular asegurar --todas
-      lvm-instalador --simular arreglar-certificados
+      nexum --simular asegurar --todas
+      nexum --simular arreglar-certificados
 
 No cargues proyectos ni volcados de origen dudoso: MariaDB sigue con
 root sin contraseña y Apache con tu usuario, a propósito.
@@ -290,7 +290,7 @@ DESPUÉS
 
   - Cambiar de versión:  botón "Activar" de la ventana, opción
                          "Cambiar la version activa" del panel,
-                         o  lvm-instalador use 8.4
+                         o  nexum use 8.4
   - Actualizar parches:  opción "Actualizar versiones de PHP".
   - Ver la versión del instalador y sus cambios: opción "Acerca de".
   - Instrucciones completas: archivo README.md de esta carpeta.
@@ -313,14 +313,14 @@ un fallo en una web no pueda usarlo. Usa esa dirección o el botón de
 phpMyAdmin del gestor. Desde la 1.42.2, localhost/phpmyadmin lleva solo
 a la dirección buena (pulsa Protegerlas tras actualizar).
 
-SI AL ACTUALIZAR SALE "El paquete trae otro /opt/lvm-instalador/lvm-actualizar"
+SI AL ACTUALIZAR SALE "El paquete trae otro /opt/nexum/nexum-actualizar"
 ---------------------------------------------------------------------------------
 
 No es un error ni un paquete dañado (el "Tubería rota" de dpkg-deb que
 sale detrás tampoco). Esa versión cambia el programa que instala las
 actualizaciones, y el que tienes no puede dar por buena su propia
 sustitución: se instala una vez en la terminal (Ctrl+Alt+T):
-   sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb
+   sudo apt install ~/Descargas/nexum_<versión>_all.deb
 Luego abre de nuevo el gestor; las siguientes se actualizan desde la
 ventana. Pasa al venir de la 1.43 o anterior (la 1.44.0 cambió ese
 programa). Desde la 1.45.0, la ventana lo explica y da la orden con un
@@ -356,7 +356,7 @@ derecha del buscador). Tres pasos:
   3. El nombre de la BBDD nueva y, si lo tienes, su volcado (.sql,
      .sql.gz o .zip). Sin volcado, la BBDD se crea vacía.
 Se clona en htdocs, se carga en esa versión y se crea la BBDD. En la
-terminal: lvm-instalador montar-proyecto <url> <carpeta> <version> <base>
+terminal: nexum montar-proyecto <url> <carpeta> <version> <base>
 [volcado]
 
 Desde la 1.45.0:
@@ -382,7 +382,7 @@ BBDD ya estaba cargada de antes, se crea al pulsar el botón. Si no entra
 (por ejemplo, un PrestaShop 9 o un plugin de seguridad que pide algo
 más), la misma página tiene el enlace al panel normal: escribe ahí el
 usuario y la contraseña. En la terminal:
-   lvm-instalador usuario-pruebas <base> [carpeta]
+   nexum usuario-pruebas <base> [carpeta]
 Ese usuario se queda en la BBDD de tu equipo, que nunca va a producción.
 
 DESMONTAR EL PROYECTO CARGADO
@@ -390,7 +390,7 @@ DESMONTAR EL PROYECTO CARGADO
 
 El botón de expulsar, junto a "web.local → proyecto": web.local
 deja de apuntar a él y enseña una página vacía. En la terminal:
-lvm-instalador desmontar-proyecto
+nexum desmontar-proyecto
 
 PROBAR UN PROYECTO CON OTRA VERSIÓN DE PHP
 -----------------------------------------
@@ -401,7 +401,7 @@ tiene una BBDD con ese nombre (por ejemplo, la copiaste antes), sale
 marcada "ya la tiene: se sustituye": se pide confirmación, se guarda una
 copia de la que había en ~/lvm-copias y se pone la nueva en su lugar.
 Después, en Versiones, carga el proyecto y elige esa versión. En la
-terminal: lvm-instalador copiar-bd <base> <origen> <destino> [--sustituir]
+terminal: nexum copiar-bd <base> <origen> <destino> [--sustituir]
 
 SI LA WEB DA "Ha habido un error crítico en esta web"
 -----------------------------------------------------

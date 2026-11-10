@@ -9,9 +9,37 @@ final class TermSession {
     private var source: DispatchSourceRead?
     var onExit: (() -> Void)?
     var running: Bool { return pid > 0 }
+    /// Las columnas y filas que caben en la caja de la terminal (las que se le dicen a la pseudoterminal: con
+    /// otras, zsh y ls cortan las líneas donde no es y el prompt sale fuera de su sitio)
+    private var cols: UInt16 = 120
+    private var rows: UInt16 = 20
+    /// «Terminal nueva»: la carpeta en la que abrir la nueva cuando se cierre la de ahora
+    private var restartIn: String? = nil
 
     init() {
         view.send = { [weak self] d in self?.write(d) }
+        view.onSize = { [weak self] c, r in self?.resize(cols: c, rows: r) }
+    }
+
+    /// Cierra la de ahora y, cuando se ha cerrado, abre otra en cwd (sin esperar, la nueva no se abría:
+    /// la de ahora aún estaba en marcha)
+    func restart(cwd: String) -> Bool {
+        guard pid > 0 else { return start(cwd: cwd) }
+        restartIn = cwd
+        stop()
+        return true
+    }
+
+    /// El tamaño de la caja ha cambiado: se le dice a la pseudoterminal (y esta avisa a la shell con SIGWINCH)
+    func resize(cols c: Int, rows r: Int) {
+        let nc = UInt16(Swift.max(20, Swift.min(c, 1000)))
+        let nr = UInt16(Swift.max(4, Swift.min(r, 500)))
+        if nc == cols && nr == rows { return }
+        cols = nc
+        rows = nr
+        guard master >= 0 else { return }
+        var ws = winsize(ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0)
+        _ = ioctl(master, UInt(0x80087467), &ws)
     }
 
     func start(cwd: String) -> Bool {
@@ -20,7 +48,7 @@ final class TermSession {
         guard m >= 0 else { return false }
         guard grantpt(m) == 0, unlockpt(m) == 0, let name = ptsname(m) else { close(m); return false }
         let slave = String(cString: name)
-        var ws = winsize(ws_row: 40, ws_col: 160, ws_xpixel: 0, ws_ypixel: 0)
+        var ws = winsize(ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0)
         // (TIOCSWINSZ: en Swift no llega, es una macro de C; en macOS vale 0x80087467)
         _ = ioctl(m, UInt(0x80087467), &ws)
         var attr: posix_spawnattr_t? = nil
@@ -40,6 +68,8 @@ final class TermSession {
         // (sin colores ni redibujos: se ve como texto)
         env["TERM"] = "dumb"
         env["CLICOLOR"] = "0"
+        // (el «dumb» con clear: `clear` y Ctrl+L borran la terminal; con el del sistema no hacían nada)
+        if let ti = termInfoDir() { env["TERMINFO"] = ti }
         let argv: [UnsafeMutablePointer<CChar>?] = [strdup(shell), strdup("-l"), nil]
         let envp: [UnsafeMutablePointer<CChar>?] = env.map { strdup("\($0.key)=\($0.value)") } + [nil]
         var p: pid_t = 0
@@ -77,7 +107,13 @@ final class TermSession {
     }
 
     func stop() {
-        if pid > 0 { kill(pid, SIGHUP) }
+        guard pid > 0 else { return }
+        let p = pid
+        kill(p, SIGHUP)
+        // (si no se cierra con SIGHUP, a la fuerza)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            if let s = self, s.pid == p { kill(p, SIGKILL) }
+        }
     }
 
     private func exited() {
@@ -86,16 +122,81 @@ final class TermSession {
         if master >= 0 { close(master) }
         master = -1
         pid = 0
+        if let cwd = restartIn {
+            restartIn = nil
+            if start(cwd: cwd) { return }
+        }
         onExit?()
     }
+}
+
+/// Un «dumb» como el del sistema (am, cols#80, bel, cr, cud1, ind) y, además, clear (\e[H\e[2J), compilado
+/// como lo deja tic (el formato clásico de terminfo), en una carpeta temporal: con TERMINFO apuntando a
+/// ella, `clear` y Ctrl+L borran la terminal y TERM sigue siendo «dumb» para todo lo demás
+func termInfoDir() -> String? {
+    let dir = NSTemporaryDirectory() + "nexum-terminfo"
+    var b: [UInt8] = []
+    func short(_ v: Int) {
+        let u = UInt16(bitPattern: Int16(v))
+        b.append(UInt8(u & 0xFF))
+        b.append(UInt8(u >> 8))
+    }
+    let names: [UInt8] = Array("dumb|80-column dumb tty".utf8) + [0]
+    // (su número en la lista de terminfo: bel 1, cr 2, clear 5, cud1 11, ind 129)
+    let strs: [(Int, [UInt8])] = [(1, [7]), (2, [13]), (5, Array("\u{1b}[H\u{1b}[2J".utf8)), (11, [10]), (129, [10])]
+    var table: [UInt8] = []
+    var offs = [Int](repeating: -1, count: 130)
+    for (i, s) in strs {
+        offs[i] = table.count
+        table += s + [0]
+    }
+    short(0o432)
+    short(names.count)
+    short(2)
+    short(1)
+    short(offs.count)
+    short(table.count)
+    b += names
+    b += [0, 1]
+    if b.count % 2 == 1 { b.append(0) }
+    short(80)
+    for o in offs { short(o) }
+    b += table
+    // (en el Mac, la carpeta de cada letra va en hexadecimal: «64»; «d», por si acaso)
+    for sub in ["64", "d"] {
+        let d = dir + "/" + sub
+        do {
+            try FileManager.default.createDirectory(atPath: d, withIntermediateDirectories: true)
+            try Data(b).write(to: URL(fileURLWithPath: d + "/dumb"))
+        } catch {
+            return nil
+        }
+    }
+    return dir
 }
 
 /// El texto de la terminal: enseña lo que sale (sin los códigos de color ni de cursor) y manda lo que
 /// se teclea a la pseudoterminal
 final class TermTextView: NSTextView {
     var send: ((Data) -> Void)?
+    /// Las columnas y filas que caben (al cambiar el tamaño de la caja)
+    var onSize: ((Int, Int) -> Void)?
     private var pending: [UInt8] = []
     private let font0 = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+    private let fg = NSColor(calibratedRed: 0xD7 / 255.0, green: 0xDE / 255.0, blue: 0xE6 / 255.0, alpha: 1)
+    /// El ancho de una letra y el alto de una línea (la letra es de ancho fijo)
+    private lazy var charW: CGFloat = ("M" as NSString).size(withAttributes: [.font: font0]).width
+    private lazy var lineH: CGFloat = NSLayoutManager().defaultLineHeight(for: font0)
+    /// Las columnas de la caja: una línea más larga sigue en la siguiente, como en cualquier terminal
+    private var cols = 120
+    private var rows = 20
+    /// Dónde se ha dibujado el cursor (para borrarlo al moverse)
+    private var lastCaret = NSRect.zero
+
+    // (los códigos que sí se entienden, cambiados antes por un carácter propio: borrar la pantalla y
+    // borrar hasta el final de la línea)
+    private static let CLEAR_MARK: Character = "\u{E000}"
+    private static let EOL_MARK: Character = "\u{E001}"
 
     override var acceptsFirstResponder: Bool { return true }
 
@@ -105,6 +206,101 @@ final class TermTextView: NSTextView {
         col = 0
         lineStart = 0
         textStorage?.setAttributedString(NSAttributedString(string: ""))
+        refreshCaret()
+    }
+
+    /// Las columnas y filas que caben en lo que se ve de la caja (size: el de la parte visible)
+    func fit(_ size: NSSize) {
+        let padX = (textContainer?.lineFragmentPadding ?? 5) * 2 + textContainerInset.width * 2
+        let c = Swift.max(20, Int(floor((size.width - padX) / Swift.max(1, charW))))
+        let r = Swift.max(4, Int(floor((size.height - textContainerInset.height * 2) / Swift.max(1, lineH))))
+        if c == cols && r == rows { return }
+        cols = c
+        rows = r
+        onSize?(c, r)
+        refreshCaret()
+    }
+
+    /// ⌘K (como en Terminal): borra lo de arriba y deja la línea de ahora
+    func clearScrollback() {
+        guard let ts = textStorage, lineStart > 0 else { return }
+        ts.deleteCharacters(in: NSRange(location: 0, length: Swift.min(lineStart, ts.length)))
+        lineStart = 0
+        needsDisplay = true
+        refreshCaret()
+    }
+
+    // MARK: el cursor
+
+    /// Un bloque donde está el cursor de la shell (lleno con el foco, solo el borde sin él). El de
+    /// NSTextView no sirve: va donde se pulsa con el ratón, no donde escribe la shell
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let r = caretRect() else { return }
+        lastCaret = r
+        let focused = window?.firstResponder === self && window?.isKeyWindow == true
+        if focused {
+            fg.withAlphaComponent(0.55).setFill()
+            NSBezierPath(rect: r).fill()
+        } else {
+            fg.withAlphaComponent(0.55).setStroke()
+            NSBezierPath(rect: r.insetBy(dx: 0.5, dy: 0.5)).stroke()
+        }
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        refreshCaret()
+        return ok
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let ok = super.resignFirstResponder()
+        refreshCaret()
+        return ok
+    }
+
+    /// Vuelve a dibujar el cursor: donde estaba y donde está
+    private func refreshCaret() {
+        setNeedsDisplay(lastCaret.insetBy(dx: -2, dy: -2))
+        if let r = caretRect() { setNeedsDisplay(r.insetBy(dx: -2, dy: -2)) }
+    }
+
+    /// Dónde está el cursor: en la última línea, en su columna (pasado el final del texto, los espacios
+    /// que no se guardan cuentan igual)
+    private func caretRect() -> NSRect? {
+        guard let lm = layoutManager, let tc = textContainer, let ts = textStorage else { return nil }
+        let tail = trimmed(line)
+        let shown = Swift.min(col, tail.count)
+        let idx = Swift.min(ts.length, lineStart + (String(tail.prefix(shown)) as NSString).length)
+        let extra = CGFloat(Swift.max(0, Swift.min(col, cols - 1) - shown)) * charW
+        lm.ensureLayout(for: tc)
+        var x: CGFloat = tc.lineFragmentPadding
+        var y: CGFloat = 0
+        var h: CGFloat = lineH
+        if ts.length == 0 {
+            // (vacía: arriba del todo)
+        } else if idx < ts.length {
+            let g = lm.glyphIndexForCharacter(at: idx)
+            let frag = lm.lineFragmentRect(forGlyphAt: g, effectiveRange: nil)
+            x = frag.minX + lm.location(forGlyphAt: g).x
+            y = frag.minY
+            h = frag.height
+        } else if (ts.string as NSString).character(at: ts.length - 1) == 10 {
+            // (la línea de ahora, vacía: la de después del último salto de línea)
+            let frag = lm.extraLineFragmentRect
+            x = frag.minX + tc.lineFragmentPadding
+            y = frag.minY
+            if frag.height > 0 { h = frag.height }
+        } else {
+            let g = lm.glyphIndexForCharacter(at: ts.length - 1)
+            let r = lm.boundingRect(forGlyphRange: NSRange(location: g, length: 1), in: tc)
+            x = r.maxX
+            y = r.minY
+            h = r.height
+        }
+        let o = textContainerOrigin
+        return NSRect(x: o.x + x + extra, y: o.y + y, width: charW, height: h)
     }
 
     private func trimmed(_ l: [Character]) -> String {
@@ -128,6 +324,7 @@ final class TermTextView: NSTextView {
         case "c": copy(nil); return true
         case "v": paste(nil); return true
         case "a": selectAll(nil); return true
+        case "k": clearScrollback(); return true
         default: return super.performKeyEquivalent(with: e)
         }
     }
@@ -193,16 +390,24 @@ final class TermTextView: NSTextView {
         if cut < data.count { pending = Array(data[cut...]); data = Array(data[..<cut]) }
         var text = String(decoding: data, as: UTF8.self)
         text = text.replacingOccurrences(of: "\u{1b}\\][^\u{07}\u{1b}]*(\u{07}|\u{1b}\\\\)", with: "", options: .regularExpression)
+        // Lo que se entiende (lo demás se quita): borrar la pantalla (\e[H\e[2J de `clear` y Ctrl+L, \e[3J,
+        // o ^L) y borrar hasta el final de la línea (\e[K). Antes de quitar los códigos: si no, ^L se
+        // quedaba como una letra más y el cursor de la shell, una columna más allá de donde se veía
+        text = text.replacingOccurrences(of: "\u{1b}\\[[0-9;]*H\u{1b}\\[[0-9]?J|\u{1b}\\[[23]J|\u{0C}",
+                                         with: String(TermTextView.CLEAR_MARK), options: .regularExpression)
+        text = text.replacingOccurrences(of: "\u{1b}\\[0?K", with: String(TermTextView.EOL_MARK), options: .regularExpression)
         text = text.replacingOccurrences(of: "\u{1b}\\[[0-9;?]*[ -/]*[@-~]", with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: "\u{1b}[()][0-9A-Za-z]|\u{1b}[=>78]", with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\u{07}", with: "")
         guard let ts = textStorage else { return }
-        let attrs: [NSAttributedString.Key: Any] = [.font: font0, .foregroundColor: NSColor(calibratedRed: 0xD7 / 255.0, green: 0xDE / 255.0, blue: 0xE6 / 255.0, alpha: 1)]
+        let attrs: [NSAttributedString.Key: Any] = [.font: font0, .foregroundColor: fg]
         // La línea de ahora se lleva aparte, con su cursor: \r vuelve al principio y lo que sigue escribe
         // encima (zsh, antes del prompt, pone «%» y espacios hasta el borde y vuelve con \r: sin esto, el
         // prompt salía a la derecha); \b retrocede. Al acabar, solo se cambia esa última línea
         if lineStart > ts.length { lineStart = ts.length }
         var done = ""
+        // (borrada la pantalla: se cambia todo el texto, no solo la última línea)
+        var wipe = false
         for ch in text {
             if ch == "\n" {
                 done += trimmed(line) + "\n"
@@ -212,7 +417,23 @@ final class TermTextView: NSTextView {
                 col = 0
             } else if ch == "\u{08}" {
                 col = max(0, col - 1)
+            } else if ch == TermTextView.CLEAR_MARK {
+                wipe = true
+                done = ""
+                line = []
+                col = 0
+            } else if ch == TermTextView.EOL_MARK {
+                if col < line.count { line.removeSubrange(col...) }
+            } else if ch == "\t" {
+                // (al siguiente tope, cada 8 columnas, sin escribir nada)
+                col = Swift.min(cols - 1, (col / 8 + 1) * 8)
             } else {
+                // (en la última columna, la letra siguiente va a la línea de abajo)
+                if col >= cols {
+                    done += trimmed(line) + "\n"
+                    line = []
+                    col = 0
+                }
                 if col < line.count {
                     line[col] = ch
                 } else {
@@ -224,7 +445,8 @@ final class TermTextView: NSTextView {
         }
         // (sin los espacios del final: los de zsh hasta el borde harían saltar una línea vacía)
         let tail = trimmed(line)
-        ts.replaceCharacters(in: NSRange(location: lineStart, length: ts.length - lineStart),
+        let from = wipe ? 0 : lineStart
+        ts.replaceCharacters(in: NSRange(location: from, length: ts.length - from),
                              with: NSAttributedString(string: done + tail, attributes: attrs))
         lineStart = ts.length - (tail as NSString).length
         // (como mucho las últimas 200.000 letras)
@@ -233,7 +455,31 @@ final class TermTextView: NSTextView {
             ts.deleteCharacters(in: NSRange(location: 0, length: cut))
             lineStart = max(0, lineStart - cut)
         }
+        if wipe { needsDisplay = true }
         scrollToEndOfDocument(nil)
+        refreshCaret()
+    }
+}
+
+/// La caja de la terminal: al cambiar de tamaño (al arrastrar su borde o la ventana) dice cuántas
+/// columnas y filas caben y, si se veía el final, lo sigue enseñando
+final class TermScrollView: NSScrollView {
+    var onTile: ((NSSize) -> Void)?
+    private var lastSize = NSSize.zero
+
+    override func tile() {
+        let atEnd: Bool = {
+            guard let d = documentView else { return true }
+            return contentView.bounds.maxY >= d.frame.height - 4
+        }()
+        super.tile()
+        let s = contentSize
+        guard s != lastSize, s.width > 0, s.height > 0 else { return }
+        lastSize = s
+        onTile?(s)
+        if atEnd {
+            DispatchQueue.main.async { [weak self] in self?.documentView?.scrollToEndOfDocument(nil) }
+        }
     }
 }
 
@@ -320,7 +566,7 @@ struct TermHost: NSViewRepresentable {
     let session: TermSession
 
     func makeNSView(context: Context) -> NSScrollView {
-        let sv = NSScrollView()
+        let sv = TermScrollView()
         sv.hasVerticalScroller = true
         sv.scrollerStyle = .overlay
         sv.drawsBackground = true
@@ -337,6 +583,7 @@ struct TermHost: NSViewRepresentable {
         tv.autoresizingMask = [.width]
         tv.textContainer?.widthTracksTextView = true
         sv.documentView = tv
+        sv.onTile = { [weak tv] size in tv?.fit(size) }
         DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
         return sv
     }

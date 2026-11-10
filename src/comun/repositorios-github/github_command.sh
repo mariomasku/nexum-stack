@@ -25,7 +25,7 @@ function github_command() {
                 ok+=" $p"
             done
             github_conf_set PREFIJOS "${ok# }" && echo "Prefijos: ${ok# }" ;;
-        *) echo "Uso: lvm-instalador github [estado] | cuenta <nombre> | prefijos \"<p1> <p2>\""; return 1 ;;
+        *) echo "Uso: nexum github [estado] | cuenta <nombre> | prefijos \"<p1> <p2>\""; return 1 ;;
     esac
 }
 
@@ -551,7 +551,7 @@ function project_update() {
         shift
     done
     if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
-        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
+        echo "Uso: nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
         return 1
     fi
     valid_project "$folder" || return 1

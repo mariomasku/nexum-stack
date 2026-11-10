@@ -181,7 +181,7 @@ function install_plan() {
     local summary="Resultado de la instalacion:\n\n"
     for item in "${ok[@]}"; do
         local name=$(item_folder "$item")
-        summary+="  OK     ${item/:/ }  ->  activar con: lvm-instalador use $name\n"
+        summary+="  OK     ${item/:/ }  ->  activar con: nexum use $name\n"
     done
     for item in "${failed[@]}"; do
         summary+="  ERROR  ${item/:/ }  (no se ha instalado nada; revisa el log)\n"

@@ -34,11 +34,11 @@ NEW_CSS = """
 .nv-subnav-caja { background-color: alpha(@theme_fg_color, 0.035); border: 1px solid alpha(@theme_fg_color, 0.08);
                   border-radius: 12px; padding: 6px 0; }
 .nv-subnav row { padding: 9px 12px; margin: 1px 6px; border-radius: 8px; }
-/* Barra de arriba mas alta, y el recuadro de la version montada, hundido (como una pantallita) */
+/* Barra de arriba mas alta, y el recuadro de la version montada, hundido (como una pantallita). Como en el Mac:
+   un velo del color de la letra (en el tema claro, casi el fondo; en el oscuro, algo mas claro) y una sombra suave */
 headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
-.nv-pastilla { background-color: shade(@theme_bg_color, 0.78); border: 1px solid alpha(black, 0.25); border-radius: 12px;
-               padding: 3px 4px; box-shadow: inset 0 2px 4px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.10),
-               0 1px 0 alpha(white, 0.06); }
+.nv-pastilla { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
+               padding: 3px 4px; box-shadow: inset 0 1px 3px alpha(black, 0.16); }
 .nv-pastilla button { border: none; background: transparent; box-shadow: none; }
 .nv-pastilla button.nv-servicios { border-radius: 8px; padding: 2px 8px; }
 .nv-pastilla button.nv-servicios:hover, .nv-pastilla button.nv-servicios:checked { background-color: alpha(@theme_fg_color, 0.10); }
@@ -49,8 +49,8 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 .nv-pastilla button.nv-encender:hover { background-color: alpha(@theme_fg_color, 0.10); }
 .nv-pastilla button.nv-encender:disabled { opacity: 0.45; }
 /* Subir o actualizar una BBDD: un visor un poco hundido, como el de arriba */
-.nv-hundido { background-color: shade(@theme_bg_color, 0.86); border: 1px solid alpha(black, 0.20); border-radius: 12px;
-              box-shadow: inset 0 2px 6px alpha(black, 0.35), inset 0 0 0 1px alpha(black, 0.10); padding: 14px 16px; }
+.nv-hundido { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
+              box-shadow: inset 0 1px 3px alpha(black, 0.16); padding: 14px 16px; }
 .nv-hundido-titulo { font-weight: bold; }
 .nv-terminal { background-color: shade(@theme_bg_color, 0.78); border: 1px solid alpha(black, 0.25); border-radius: 12px;
                box-shadow: inset 0 2px 7px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.15); margin: 12px 14px 12px 14px;
@@ -113,8 +113,8 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
 .nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
 .nv-chip-docker { background-color: alpha(#1d63ed, 0.16); color: #4c8dff; }
-.nv-selectores { background-color: alpha(black, 0.07); border: 1px solid alpha(black, 0.12); border-radius: 12px;
-                 padding: 12px 14px; box-shadow: inset 0 1px 3px alpha(black, 0.22), 0 1px 0 alpha(white, 0.05); }
+.nv-selectores { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
+                 padding: 12px 14px; box-shadow: inset 0 1px 3px alpha(black, 0.16); }
 /* El boton de vincular (cambiar la BBDD de cada version): azul al pasar el raton */
 .nv-selectores button:hover { background-image: none; background-color: %(b)s; border-color: %(b)s; }
 .nv-selectores button:hover image, .nv-selectores button:hover label, .nv-selectores button:hover cellview,

@@ -76,6 +76,8 @@ struct DatabasesView: View {
                       ? plural(all.count - dbTotal.count, "BBDD", "BBDD") + " sin medir"
                       : "Tamaño de las BBDD de todas las versiones")
         }
+        // (la fila, tan alta como la tarjeta más alta, y cada tarjeta, de ese alto: todas iguales)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// Una fila por versión (se pliega al pulsarla) y, debajo, sus BBDD con su proyecto, la fecha

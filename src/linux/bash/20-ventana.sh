@@ -3,7 +3,7 @@
 # ===========================================================================
 
 # La ventana es un programa en Python (GTK 3 y Python 3.8: funciona desde Ubuntu 20.04 sin instalar
-# nada) que va dentro de este archivo, en gui_source. "lvm-instalador ventana" lo escribe en
+# nada) que va dentro de este archivo, en gui_source. "nexum ventana" lo escribe en
 # ~/.lvm-instalador/ventana.py y lo abre. La ventana no repite la logica del instalador: llama a
 # este script con los comandos gui-* (datos en lineas "TIPO|campo|...") y con los de siempre (use,
 # instalar, actualizar, desinstalar...) dentro de una pseudoterminal, para que sudo funcione igual
@@ -16,21 +16,21 @@ function gui_available() {
     python3 -I -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import Gtk' 2> /dev/null
 }
 
-# Para la ventana: N|version|fecha|sha256|ruta del paquete .deb de lvm-instalador mas nuevo que esta
+# Para la ventana: N|version|fecha|sha256|ruta del paquete .deb de nexum mas nuevo que esta
 # version, y avisos (I|texto). Se busca en la ultima publicacion del repositorio de GitHub (su .deb
 # y su firma se descargan a UPDATES_DIR) y en la carpeta de descargas (el Centro de aplicaciones no
 # ofrece actualizar un .deb suelto). Solo cuando se pide (Buscar actualizaciones): se instala como
 # root, y cualquier web puede dejar un fichero en Descargas. Solo vale un paquete tuyo, sin enlaces,
 # firmado con la clave de UPDATE_KEY_FPR (su .sig al lado) y que solo lleve los ficheros de
-# lvm-instalador, de root y con sus permisos (755 o 644).
+# nexum, de root y con sus permisos (755 o 644).
 UPDATES_DIR="$LOG_DIR/actualizaciones"
 PACKAGE_FILES_PY='
 import posixpath, sys, tarfile
-files = {"opt/lvm-instalador/lvm-instalador.sh", "opt/lvm-instalador/lvm-actualizar",
-         "opt/lvm-instalador/nexum-stack-firma.gpg",
-         "usr/share/applications/lampp-version-manager.desktop",
-         "usr/share/icons/hicolor/256x256/apps/lampp-version-manager.png",
-         "usr/share/polkit-1/actions/dev.hexer.lvm-instalador.policy"}
+files = {"opt/nexum/nexum.sh", "opt/nexum/nexum-actualizar",
+         "opt/nexum/nexum-stack-firma.gpg",
+         "usr/share/applications/nexum.desktop",
+         "usr/share/icons/hicolor/256x256/apps/nexum.png",
+         "usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy"}
 dirs = {""}
 for f in files:
     parts = f.split("/")
@@ -45,7 +45,7 @@ try:
                 sys.exit(1)
             if not ((m.isdir() and name in dirs) or (m.isreg() and name in files)):
                 sys.exit(1)
-            exe = name in ("opt/lvm-instalador/lvm-instalador.sh", "opt/lvm-instalador/lvm-actualizar")
+            exe = name in ("opt/nexum/nexum.sh", "opt/nexum/nexum-actualizar")
             if m.uid != 0 or m.gid != 0 or m.uname not in ("root", "") or m.gname not in ("root", "") or (m.mode & 0o7777) != (0o755 if m.isdir() or exe else 0o644):
                 sys.exit(1)
 except tarfile.TarError:
@@ -67,7 +67,7 @@ m = re.fullmatch(r"v([0-9]{1,4}(\.[0-9]{1,4}){1,3})", tag)
 when = r.get("published_at") or ""
 if not m or r.get("draft") or r.get("prerelease") or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", when):
     sys.exit(1)
-deb = "lvm-instalador_%s_all.deb" % m.group(1)
+deb = "nexum_%s_all.deb" % m.group(1)
 base = "https://github.com/%s/releases/download/%s/" % (repo, tag)
 urls = {a.get("name"): a.get("browser_download_url") for a in r["assets"] if isinstance(a, dict)}
 if urls.get(deb) != base + deb or urls.get(deb + ".sig") != base + deb + ".sig":
@@ -111,10 +111,10 @@ function github_update() {
 
     [ -L "$UPDATES_DIR" ] && { echo "I|$UPDATES_DIR es un enlace: no se descarga nada ahí"; return 0; }
     mkdir -p -m 700 "$UPDATES_DIR" && chmod 700 "$UPDATES_DIR" || return 0
-    f=$UPDATES_DIR/lvm-instalador_${v}_all.deb
+    f=$UPDATES_DIR/nexum_${v}_all.deb
     # Ya descargada y bien firmada: no se vuelve a bajar
     update_signed "$f" && return 0
-    rm -f -- "$UPDATES_DIR"/lvm-instalador_*
+    rm -f -- "$UPDATES_DIR"/nexum_* "$UPDATES_DIR"/lvm-instalador_*
     if ! "${get[@]}" --max-filesize 52428800 -o "$f.part" "$deb_url" 2> /dev/null \
             || ! "${get[@]}" --max-filesize 65536 -o "$f.sig" "$sig_url" 2> /dev/null; then
         rm -f -- "$f.part" "$f.sig"
@@ -138,11 +138,11 @@ function gui_package() {
     github_update
     for dir in "$UPDATES_DIR" "$(xdg-user-dir DOWNLOAD 2> /dev/null)" "$HOME/Descargas" "$HOME/Downloads"; do
         [ -d "$dir" ] || continue
-        for f in "$dir"/lvm-instalador_*_all.deb; do
+        for f in "$dir"/nexum_*_all.deb; do
             [ -f "$f" ] && [ ! -L "$f" ] && [ -O "$f" ] || continue
-            [ "$(dpkg-deb -f "$f" Package 2> /dev/null)" == "lvm-instalador" ] || continue
-            # Solo los ficheros de lvm-instalador, normales (sin enlaces ni especiales), y firmado:
-            # lo mismo que comprueba como root lvm-actualizar antes de instalarlo
+            [ "$(dpkg-deb -f "$f" Package 2> /dev/null)" == "nexum" ] || continue
+            # Solo los ficheros de nexum, normales (sin enlaces ni especiales), y firmado:
+            # lo mismo que comprueba como root nexum-actualizar antes de instalarlo
             dpkg-deb --fsys-tarfile "$f" 2> /dev/null | python3 -I -c "$PACKAGE_FILES_PY" || continue
             v=$(dpkg-deb -f "$f" Version 2> /dev/null)
             [ -n "$v" ] && dpkg --compare-versions "$v" gt "$best_v" || continue
@@ -167,13 +167,13 @@ function gui_package() {
 function gui_open() {
     if ! gui_available; then
         echo "La ventana necesita GTK 3 para Python. Instalalo con: sudo apt install python3-gi gir1.2-gtk-3.0"
-        echo "Mientras tanto puedes usar el panel de la terminal: lvm-instalador"
+        echo "Mientras tanto puedes usar el panel de la terminal: nexum"
 
         return 1
     fi
 
     if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
-        echo "No hay sesion grafica. Usa el panel de la terminal: lvm-instalador"
+        echo "No hay sesion grafica. Usa el panel de la terminal: nexum"
 
         return 1
     fi
@@ -188,8 +188,9 @@ function gui_open() {
     # sin contraseña: si no, al desmontar el proximo proyecto)
     [ -w "$HTDOCS_DIR/$EMPTY_PROJECT/index.html" ] && empty_page "$HTDOCS_DIR/$EMPTY_PROJECT" > /dev/null 2>&1
 
-    # Abierta desde el menu no hay terminal donde ver los errores: van a ventana.log
-    [ -t 2 ] || exec 2> "$LOG_DIR/ventana.log"
+    # Abierta desde el menu no hay terminal donde ver los errores: van a ventana.log (vacio al abrirla y en
+    # modo de añadir: si Limpieza lo vacia con la ventana abierta, sigue escribiendo al principio)
+    [ -t 2 ] || { : > "$LOG_DIR/ventana.log"; exec 2>> "$LOG_DIR/ventana.log"; }
     # Con su ruta: el PATH de la sesion puede llevar delante carpetas tuyas (~/.local/bin)
     LVM_SIMULAR=$DRY exec /usr/bin/python3 -I - "$SELF" < <(gui_source)
 }
@@ -198,7 +199,7 @@ function gui_open() {
 #   M|nombre|version|firma
 #   A|activa|en marcha (1/0)|/opt/lampp sin registrar (1/0)|binarios x86_64 (1/0)|acceso del menu (1/0)
 #   V|carpeta|php|apache|mariadb|proftpd|perl|phpmyadmin|tipo|bases de|motivo para no desinstalar
-#   D|carpeta|base de datos|fecha|tipo (i: importada con lvm-instalador, c: ultimo cambio de tablas)
+#   D|carpeta|base de datos|fecha|tipo (i: importada con nexum, c: ultimo cambio de tablas)
 #   Z|procesos de LAMPP que sobran en memoria (de otras versiones)
 #   Y|version montada|bytes del registro de errores: sus tablas del sistema de MariaDB son antiguas
 #   R|carpeta|ok, parche o vulnerable|texto     PHP2Shell en cada version (php2shell_state)
@@ -220,7 +221,7 @@ function gui_data() {
     local active=$(active_dir) dir name owner blocker kind dates=()
 
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
-    echo "A|${active#/opt/lampp-}|$(lampp_running && echo 1 || echo 0)|$([ -e /opt/lampp ] && [ ! -L /opt/lampp ] && echo 1 || echo 0)|$(native_binaries && echo 1 || echo 0)|$([ -f "$LAUNCHER" ] && echo 1 || echo 0)"
+    echo "A|${active#/opt/lampp-}|$(lampp_running && echo 1 || echo 0)|$([ -e /opt/lampp ] && [ ! -L /opt/lampp ] && echo 1 || echo 0)|$(native_binaries && echo 1 || echo 0)|$(launcher_exists && echo 1 || echo 0)"
     echo "H|$ACTIVE_VHOSTS|$HOSTS_FILE"
     # Correo de pruebas: E|Mailpit instalado (1/0)|encendido (1/0)|modo de WordPress|Mailpit en marcha
     # (1/0)|version instalada|direccion de su web|version que instala el gestor. Si la version activa

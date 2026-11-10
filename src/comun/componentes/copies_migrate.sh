@@ -36,7 +36,7 @@ function copies_command() {
     local dir=$COPIES_DIR files kb left
     case "$1" in
         ""|vaciar) ;;
-        *) echo "Uso: lvm-instalador copias [vaciar]"; return 1 ;;
+        *) echo "Uso: nexum copias [vaciar]"; return 1 ;;
     esac
     if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
         echo "$dir no es una carpeta (es un enlace o un fichero): no se toca"
@@ -95,7 +95,7 @@ function copies_files_command() {
             if [ -f "$COPIES_FILES_FLAG" ]; then
                 echo "Copias de los ficheros que cambia el programa: si (en ~/nexum-backups, antes de cambiarlos)"
             else
-                echo "Copias de los ficheros que cambia el programa: no (con lvm-instalador copias-ficheros si, se guardan)"
+                echo "Copias de los ficheros que cambia el programa: no (con nexum copias-ficheros si, se guardan)"
             fi
             ;;
         si)
@@ -117,6 +117,6 @@ function copies_files_command() {
             rm -f "$COPIES_FILES_FLAG" || return 1
             echo "Copias de los ficheros que cambia el programa: no"
             ;;
-        *) echo "Uso: lvm-instalador copias-ficheros [si|no]"; return 1 ;;
+        *) echo "Uso: nexum copias-ficheros [si|no]"; return 1 ;;
     esac
 }

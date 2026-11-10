@@ -1,5 +1,5 @@
 // Ventana nativa de Nexum Dev Stack para macOS (SwiftUI, macOS 12 o posterior).
-// La escribe y la compila "lvm-instalador" dentro de la aplicacion de ~/Applications. No repite la
+// La escribe y la compila "nexum" dentro de la aplicacion de ~/Applications. No repite la
 // logica del instalador: lo ejecuta con los comandos gui-* (datos) y con los de siempre (use,
 // instalar, actualizar, desinstalar, importar-bd...). Las acciones van dentro de una pseudoterminal
 // (/usr/bin/script) para que sudo funcione igual que en Terminal; la contraseña se pide en una
@@ -22,7 +22,7 @@ let RUN_TOKEN = UUID().uuidString.replacingOccurrences(of: "-", with: "")
 let SUDO_MARK = "@@LVM-SUDO-\(RUN_TOKEN)@@"
 let LOG_DIR = NSHomeDirectory() + "/.lvm-instalador"
 /// Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
-/// programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
+/// programa si está el ajuste COPIES_FILES_FLAG (nexum copias-ficheros si|no)
 let COPIES_DIR = NSHomeDirectory() + "/nexum-backups"
 let COPIES_FILES_FLAG = LOG_DIR + "/copias-ficheros"
 /// La casilla de los diálogos que pueden guardar antes una copia (desmarcada de partida: marcada, --copia) y
@@ -135,7 +135,7 @@ func diskSpace(_ path: String) -> (free: Int64, total: Int64)? {
     return (free, Int64(total))
 }
 
-/// Caché de descargas de las pilas propias (lvm-instalador descargas)
+/// Caché de descargas de las pilas propias (nexum descargas)
 let DL_CACHE_DIR = "/Library/Nexum/descargas"
 
 /// Ficheros de la caché de descargas y lo que ocupan (sin sus .sha256)

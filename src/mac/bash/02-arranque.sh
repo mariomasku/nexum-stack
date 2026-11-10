@@ -124,7 +124,7 @@ function boot_without_terminal() {
             boot_open_terminal "$@" && exit 0
             ;;
     esac
-    echo "ERROR|Falta terminar de instalar Nexum Dev Stack en $TRUSTED_DIR (de root). Abre Terminal y escribe: lvm-instalador"
+    echo "ERROR|Falta terminar de instalar Nexum Dev Stack en $TRUSTED_DIR (de root). Abre Terminal y escribe: nexum"
     exit 1
 }
 
@@ -262,7 +262,7 @@ function boot_prereqs() {
     fi
 
     if [ ! -x "$BREW" ]; then
-        boot_can_ask || { echo "ERROR|Hace falta Homebrew: abre Terminal y escribe: lvm-instalador"; exit 1; }
+        boot_can_ask || { echo "ERROR|Hace falta Homebrew: abre Terminal y escribe: nexum"; exit 1; }
         echo "Hace falta Homebrew (https://brew.sh) para instalar las librerias con las que se compila."
         echo "Homebrew no instala PHP: solo se usa para las librerias."
         printf "¿Instalar Homebrew ahora? [s/N]: "
@@ -1792,7 +1792,7 @@ else
     BASE_DIR=/Library/Nexum
     APPS_DIR=/Applications
 fi
-# Donde estaban las versiones hasta la 1.39.2 (lvm-instalador migrar las pasa a BASE_DIR)
+# Donde estaban las versiones hasta la 1.39.2 (nexum migrar las pasa a BASE_DIR)
 LEGACY_DIR=/Applications
 
 # /Applications/XAMPP: enlace a la version activa. XAMPP-compartido: htdocs y vhosts de todas.
@@ -1819,11 +1819,12 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.10"
+APP_VERSION="1.57.11"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
-# de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
-# UPDATE_KEY_FPR (la misma que la de los paquetes de Linux); su parte publica va aqui
+# de Mac llevan nexum-mac-<version>.zip (hasta la 1.57.10, lvm-instalador-mac-<version>.zip; la 1.57.11
+# va con los dos nombres) y su firma (.zip.sig), hecha con la clave de UPDATE_KEY_FPR (la misma que la
+# de los paquetes de Linux); su parte publica va aqui
 UPDATE_REPO="mariomasku/nexum-stack"
 UPDATE_KEY_FPR="3506F1EB091AD4A23F40081FF24FD5CC07557404"
 UPDATE_KEY_B64='

@@ -614,7 +614,7 @@ class NvProyectos:
         sel.attach(self.nv_add_env_menu(x), 0, 1, 1, 1)
         sel.attach(env, 1, 1, 1, 1)
         sel.attach(dbl, 2, 1, 1, 1)
-        lk = nv_button("insert-link-symbolic", None, "Cambiar la BBDD de cada versión (vincular)",
+        lk = nv_button("insert-link-symbolic", None, "Opciones de la BBDD…",
                        lambda *_: self.on_link_project(x), flat=True)
         sel.attach(lk, 3, 1, 1, 1)
         top.pack_end(sel, False, False, 0)

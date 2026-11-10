@@ -3,7 +3,7 @@
 # ===========================================================================
 # Hasta la 1.39.2 las versiones y XAMPP-compartido estaban en /Applications, donde puede escribir el
 # grupo admin (tu usuario): un programa tuyo podia cambiar una carpeta por otra entre la comprobacion
-# y el uso como root. "lvm-instalador migrar" las pasa a /Library/Nexum, de root.
+# y el uso como root. "nexum migrar" las pasa a /Library/Nexum, de root.
 
 # Pasa, como root, las versiones de antes de la 1.39.3 de <antes> (/Applications) a <ahora>
 # (/Library/Nexum): mueve XAMPP-X.Y[.Z] (solo las de root, con pvm-stack) y XAMPP-compartido, deja en
@@ -124,7 +124,7 @@ def load_commands(path):
     return found
 
 # Un programa o una libreria: las rutas de sus librerias (install_name_tool) y la firma local de
-# nuevo. Las cadenas que lleva compiladas no se cambian (lvm-instalador actualizar las rehace)
+# nuevo. Las cadenas que lleva compiladas no se cambian (nexum actualizar las rehace)
 def macho(path, st, subs):
     args, seen = [], set()
     for kind, value in load_commands(path):
@@ -285,7 +285,7 @@ def migrate():
                 say("S", src, "no es una version del gestor")
                 continue
             if os.lstat(src).st_uid != ROOT or os.lstat(os.path.join(src, "xamppfiles")).st_uid != ROOT:
-                say("S", src, "no es de root: no se pasa (vuelve a instalarla con lvm-instalador actualizar)")
+                say("S", src, "no es de root: no se pasa (vuelve a instalarla con nexum actualizar)")
                 continue
         if os.path.lexists(dst):
             say("E", "ya existe %s: no se mueve nada" % dst)
@@ -439,7 +439,7 @@ sys.exit(1 if bad else 0)
 '
 
 # Versiones de antes de la 1.39.3 que siguen en /Applications (carpetas, no enlaces, con pvm-stack) y
-# XAMPP-compartido si sigue alli: lo que pasa a /Library/Nexum con lvm-instalador migrar
+# XAMPP-compartido si sigue alli: lo que pasa a /Library/Nexum con nexum migrar
 function legacy_dirs() {
     local d name
     [ -n "$TEST_DIR" ] && return 0
@@ -500,7 +500,7 @@ function stacks_running() {
     pgrep -f "^($LEGACY_DIR|$BASE_DIR)/XAMPP-[0-9][0-9.]*/xamppfiles/(apache2/bin/httpd|mysql/bin/mariadbd|proftpd/sbin/proftpd)( |$)" > /dev/null
 }
 
-# lvm-instalador migrar: las versiones de antes de la 1.39.3 pasan de /Applications a /Library/Nexum
+# nexum migrar: las versiones de antes de la 1.39.3 pasan de /Applications a /Library/Nexum
 # (MIGRATE_PY). Antes se para todo, con kill (como root no se ejecuta nada de /Applications); despues
 # se comprueba cada una en su sitio nuevo y, si algo falla, se deja todo como estaba. Las BBDD, los
 # proyectos, los vhosts, los certificados y /etc/hosts se conservan. Se puede repetir (si no queda
@@ -526,7 +526,7 @@ function stacks_migrate() {
         close_processes --todos
     fi
     if stacks_running; then
-        echo "Sigue algo de XAMPP en marcha: no se mueve nada. Cierralo (lvm-instalador cerrar-procesos --todos) y vuelve a probar."
+        echo "Sigue algo de XAMPP en marcha: no se mueve nada. Cierralo (nexum cerrar-procesos --todos) y vuelve a probar."
         return 1
     fi
     echo "Moviendolas y cambiando sus rutas (sus programas se vuelven a firmar: puede tardar unos minutos)..."
@@ -569,21 +569,33 @@ function stacks_migrate() {
     return 0
 }
 
-# Comandos lvm-instalador y lvm de /opt/homebrew/bin: a este gestor (se crean si no estan, como hacia
-# el instalador del .dmg; los que llevan a otro programa no se tocan)
+# Comando nexum de /opt/homebrew/bin: a este gestor (se crea si no esta, como hacia el instalador
+# del .dmg; si lleva a otro programa, no se toca). Los de antes de la 1.57.11 se quitan: lvm-instalador
+# si es un enlace a un *-instalador.sh, y lvm solo si es un enlace a un lvm-instalador.sh (cualquier
+# otro lvm es de otro programa)
 function point_commands() {
-    local link
+    local link=$CMD_DIR/nexum
     [ "$DRY" -eq 1 ] && return 0
     [ -d "$CMD_DIR" ] && [ -w "$CMD_DIR" ] || return 0
-    for link in "$CMD_DIR/lvm-instalador" "$CMD_DIR/lvm"; do
-        if [ -L "$link" ]; then
-            [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && [ "$(readlink "$link")" != "$SELF" ] \
-                && ln -sfh "$SELF" "$link"
-        elif [ ! -e "$link" ]; then
-            [ "$link" == "$CMD_DIR/lvm" ] && command -v lvm > /dev/null && continue
-            ln -s "$SELF" "$link"
-        fi
-    done
+    if [ -L "$link" ]; then
+        [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && [ "$(readlink "$link")" != "$SELF" ] \
+            && ln -sfh "$SELF" "$link"
+    elif [ ! -e "$link" ]; then
+        ln -s "$SELF" "$link"
+    fi
+    drop_old_commands
+}
+
+# Quita los comandos de antes de la 1.57.11 (lvm-instalador, y lvm si era de este programa). Nunca un
+# lvm que no sea un enlace a un lvm-instalador.sh
+function drop_old_commands() {
+    local link
+    [ "$DRY" -eq 1 ] && return 0
+    link=$CMD_DIR/lvm-instalador
+    [ -L "$link" ] && [[ "$(readlink "$link")" == */*-instalador.sh ]] && rm -f "$link"
+    link=$CMD_DIR/lvm
+    [ -L "$link" ] && [[ "$(readlink "$link")" == *lvm-instalador.sh ]] && rm -f "$link"
+    return 0
 }
 
 # La copia de antes de la 1.39.3 (~/lvm-instalador/lvm-instalador.sh, o a la que apuntaban los
@@ -591,7 +603,7 @@ function point_commands() {
 # nada de root aunque un programa tuyo la cambie. Nunca una version mas nueva que esta
 function retire_old_copies() {
     local f link plist app list=("$HOME/lvm-instalador/lvm-instalador.sh")
-    for link in "$CMD_DIR/lvm-instalador" "$CMD_DIR/lvm"; do
+    for link in "$CMD_DIR/nexum" "$CMD_DIR/lvm-instalador" "$CMD_DIR/lvm"; do
         [ -L "$link" ] && list+=("$(readlink "$link")")
     done
     for app in "$APP_BUNDLE" "${OLD_APP_BUNDLES[@]}"; do
@@ -606,7 +618,7 @@ function retire_old_copies() {
     done
 }
 
-# lvm-instalador migrar [--ventana] (lo lanza tambien instalar-gestor): lo que queda de antes de la
+# nexum migrar [--ventana] (lo lanza tambien instalar-gestor): lo que queda de antes de la
 # 1.39.3. Las versiones pasan a /Library/Nexum, la copia de antes se queda en un aviso, y los comandos
 # y la aplicacion apuntan a este gestor. Con --ventana, al final abre la ventana. Se puede repetir
 function gestor_migrate() {
@@ -643,17 +655,17 @@ function xampp_ctl() {
         # programas y librerias que el gestor no revisa, y /Applications la puede cambiar el grupo
         # admin (tu usuario). Se arranca desde su panel (manager-osx); para pararlo, official_stop
         echo "El XAMPP oficial de $LINK no se arranca ni se para desde aqui: usa su panel (manager-osx),"
-        echo "o apartalo (lvm-instalador apartar) para usar las versiones del gestor."
+        echo "o apartalo (nexum apartar) para usar las versiones del gestor."
         return 1
     fi
     real=$(readlink "$LINK")
     if ! trusted_version_dir "$real"; then
         if [[ "$real" == "$LEGACY_DIR"/XAMPP-* ]]; then
             echo "No se arranca ni se para $real como administrador: esta en $LEGACY_DIR (lo puede cambiar"
-            echo "el grupo admin). Pasala a $BASE_DIR con: lvm-instalador migrar"
+            echo "el grupo admin). Pasala a $BASE_DIR con: nexum migrar"
         else
             echo "No se arranca ni se para $real como administrador: no es de root, tiene enlaces o el"
-            echo "grupo puede cambiarlo. Dejalo bien con: lvm-instalador asegurar --todas"
+            echo "grupo puede cambiarlo. Dejalo bien con: nexum asegurar --todas"
         fi
         return 1
     fi
@@ -729,7 +741,7 @@ function secure_command() {
     if [ -n "$version" ]; then
         if valid_version_name "$version" && [ ! -d "$BASE_DIR/XAMPP-$version" ] && [ -d "$LEGACY_DIR/XAMPP-$version" ] \
                 && [ ! -L "$LEGACY_DIR/XAMPP-$version" ] && [ -z "$TEST_DIR" ]; then
-            echo "XAMPP-$version sigue en $LEGACY_DIR (de antes de la 1.39.3): pasala a $BASE_DIR con: lvm-instalador migrar"
+            echo "XAMPP-$version sigue en $LEGACY_DIR (de antes de la 1.39.3): pasala a $BASE_DIR con: nexum migrar"
             return 1
         fi
         valid_version_name "$version" && [ -d "$BASE_DIR/XAMPP-$version" ] \
@@ -737,7 +749,7 @@ function secure_command() {
         dir=$BASE_DIR/XAMPP-$version
     else
         dir=$(active_dir)
-        [ -n "$dir" ] || { echo "No hay ninguna version activa (indica cual: lvm-instalador asegurar <version>)"; return 1; }
+        [ -n "$dir" ] || { echo "No hay ninguna version activa (indica cual: nexum asegurar <version>)"; return 1; }
     fi
     secure_version "$dir"
     rc=$?
@@ -753,7 +765,7 @@ function secure_command() {
         local left=$(exposed_summary)
         if [ -n "$left" ]; then
             echo "Sigue abierto a la red: $left"
-            echo "Puede que no sea de XAMPP (otro programa en el mismo puerto): lvm-instalador procesos"
+            echo "Puede que no sea de XAMPP (otro programa en el mismo puerto): nexum procesos"
             return 1
         fi
     fi
@@ -776,13 +788,13 @@ function service_control() {
         apache) c=apache ;;
         mariadb|mysql) c=mysql ;;
         ftp) c=ftp ;;
-        *) echo "Uso: lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
+        *) echo "Uso: nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
     esac
     case "$action" in
         arrancar|start) cmds=("start$c") ;;
         parar|stop) cmds=("stop$c") ;;
         reiniciar|restart) cmds=("stop$c" "start$c") ;;
-        *) echo "Uso: lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
+        *) echo "Uso: nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
     esac
     # Antes de arrancar: solo para este Mac y nada de otras versiones ocupando el puerto
     if [ "${cmds[-1]}" == "start$c" ]; then
@@ -827,12 +839,14 @@ for r in rels:
     base = "https://github.com/%s/releases/download/%s/" % (repo, tag)
     urls = {a.get("name"): a.get("browser_download_url") for a in r["assets"] if isinstance(a, dict)}
     for name in urls:
-        m = re.fullmatch(r"lvm-instalador-mac-([0-9]{1,4}(\.[0-9]{1,4}){1,3})\.zip", name or "")
+        # (nexum-mac desde la 1.57.11; lvm-instalador-mac, el nombre de antes: con los dos en la misma
+        # publicacion, el nuevo)
+        m = re.fullmatch(r"(nexum|lvm-instalador)-mac-([0-9]{1,4}(\.[0-9]{1,4}){1,3})\.zip", name or "")
         if not m or urls.get(name) != base + name or urls.get(name + ".sig") != base + name + ".sig":
             continue
-        v = tuple(int(x) for x in m.group(1).split("."))
+        v = (tuple(int(x) for x in m.group(2).split(".")), m.group(1) == "nexum")
         if best is None or v > best[0]:
-            best = (v, m.group(1), when, base + name, base + name + ".sig")
+            best = (v, m.group(2), when, base + name, base + name + ".sig")
 if not best:
     sys.exit(1)
 print("%s|%s|%s|%s" % best[1:])
@@ -1052,10 +1066,12 @@ function github_update() {
 
     [ -L "$UPDATES_DIR" ] && { echo "I|$UPDATES_DIR es un enlace: no se descarga nada ahí"; return 1; }
     mkdir -p -m 700 "$UPDATES_DIR" && chmod 700 "$UPDATES_DIR" || return 1
-    f=$UPDATES_DIR/lvm-instalador-mac-$v.zip
+    # (con el nombre que trae la publicacion: nexum-mac-<v>.zip, o lvm-instalador-mac-<v>.zip si es de antes)
+    f=$UPDATES_DIR/${zip_url##*/}
+    [[ "$f" == */nexum-mac-$v.zip || "$f" == */lvm-instalador-mac-$v.zip ]] || return 1
     # Ya descargada y bien firmada: no se vuelve a bajar
     if ! { [ -f "$f" ] && [ ! -L "$f" ] && update_signed "$f"; }; then
-        rm -f -- "$UPDATES_DIR"/lvm-instalador-mac-*
+        rm -f -- "$UPDATES_DIR"/nexum-mac-* "$UPDATES_DIR"/lvm-instalador-mac-*
         if ! "${get[@]}" --max-filesize 52428800 -o "$f.part" "$zip_url" 2> /dev/null \
                 || ! "${get[@]}" --max-filesize 65536 -o "$f.sig" "$sig_url" 2> /dev/null; then
             rm -f -- "$f.part" "$f.sig"
@@ -1076,9 +1092,10 @@ function github_update() {
 function gui_package() {
     github_update && return 0
     local f v best="" best_v=$APP_VERSION
-    for f in "$HOME"/Downloads/lvm-instalador-mac-*.dmg; do
+    for f in "$HOME"/Downloads/nexum-mac-*.dmg "$HOME"/Downloads/lvm-instalador-mac-*.dmg; do
         [ -f "$f" ] && [ ! -L "$f" ] && [ -O "$f" ] || continue
-        v=${f##*/lvm-instalador-mac-}
+        v=${f##*/}
+        v=${v#nexum-mac-} v=${v#lvm-instalador-mac-}
         v=${v%.dmg}
         mac_version_gt "$v" "$best_v" && best=$f best_v=$v
     done
@@ -1118,7 +1135,7 @@ with open(dst, "wb") as f:
     f.write(data)
 '
 
-# actualizar-gestor <lvm-instalador-mac-X.zip>: instala la version de un .zip firmado (el que ha
+# actualizar-gestor <nexum-mac-X.zip>: instala la version de un .zip firmado (el que ha
 # descargado Buscar actualizaciones) en el gestor de root (/Library/Nexum/gestor), al que apuntan los
 # comandos y la aplicacion. Root copia el .zip y su firma a una carpeta suya y lo comprueba todo
 # alli (la firma, con UPDATE_VERIFY_PY; que solo traiga un lvm-instalador.sh normal; que sea la
@@ -1127,11 +1144,14 @@ with open(dst, "wb") as f:
 function install_update() {
     local zip=$1 v work new_v dest=$TRUSTED_SCRIPT owner=(-o root -g wheel)
 
-    v=${zip##*/lvm-instalador-mac-}
+    # (nexum-mac-X.Y.Z.zip; lvm-instalador-mac-X.Y.Z.zip, el nombre hasta la 1.57.10, tambien vale)
+    v=${zip##*/}
+    v=${v#nexum-mac-} v=${v#lvm-instalador-mac-}
     v=${v%.zip}
-    if [ ! -f "$zip" ] || [ -L "$zip" ] || [ ! -O "$zip" ] || [[ "$zip" != */lvm-instalador-mac-*.zip ]] \
+    if [ ! -f "$zip" ] || [ -L "$zip" ] || [ ! -O "$zip" ] \
+            || [[ "$zip" != */nexum-mac-*.zip && "$zip" != */lvm-instalador-mac-*.zip ]] \
             || ! [[ "$v" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-        echo "Uso: lvm-instalador actualizar-gestor <ruta de lvm-instalador-mac-X.Y.Z.zip>"
+        echo "Uso: nexum actualizar-gestor <ruta de nexum-mac-X.Y.Z.zip>"
         return 1
     fi
     if ! mac_version_gt "$v" "$APP_VERSION"; then

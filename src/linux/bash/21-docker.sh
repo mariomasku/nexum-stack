@@ -185,7 +185,7 @@ function docker_container_action() {
         # (se quita el contenedor; los datos de la BBDD siguen en su volumen y, al arrancar el
         # proyecto, se vuelve a crear. Para quitarlo todo: docker-borrar <proyecto>)
         borrar) run dk rm -f "$name" ;;
-        *) echo "Uso: lvm-instalador docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
+        *) echo "Uso: nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
     esac
 }
 
@@ -204,7 +204,7 @@ function docker_image_action() {
             # (las nexum-php:X son del gestor y no estan en Docker Hub: se rehacen con docker-imagen)
             [[ "$ref" == nexum-* ]] && { echo "$ref es del gestor: se rehace con «Actualizar imagen» de su proyecto"; return 1; }
             run dk pull "$ref" ;;
-        *) echo "Uso: lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>"; return 1 ;;
+        *) echo "Uso: nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>"; return 1 ;;
     esac
 }
 
@@ -632,7 +632,7 @@ function docker_create() {
         esac
     done
     if [ -z "$folder" ] || [ -z "$php" ] || [ -z "$maria" ]; then
-        echo "Uso: lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <dominio>] [--nombre <nombre>]"
+        echo "Uso: nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <dominio>] [--nombre <nombre>]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -820,7 +820,7 @@ function docker_action() {
     if docker_web_project "$slug"; then
         case $action in
             arrancar|parar|registros|borrar) docker_web_action "$action" "$slug" ;;
-            *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
+            *) echo "Uso: nexum docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
         esac
         return
     fi
@@ -851,7 +851,7 @@ function docker_action() {
             [ "$DRY" -eq 1 ] || rm -rf "$dir" "$(docker_run_dir "$slug")"
             echo "Proyecto en Docker $slug borrado"
             ;;
-        *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
+        *) echo "Uso: nexum docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
     esac
 }
 

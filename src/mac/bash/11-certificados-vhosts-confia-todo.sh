@@ -311,7 +311,7 @@ for p in re.findall(r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]+?-----END CERT
     echo
     echo "Certificados arreglados. Para que el navegador no avise en cada proyecto https, pulsa Confiar"
     echo "en el aviso «El navegador avisa al abrir estos proyectos» de la ventana"
-    echo "(o: lvm-instalador confiar-certificados)."
+    echo "(o: nexum confiar-certificados)."
     return 0
 }
 

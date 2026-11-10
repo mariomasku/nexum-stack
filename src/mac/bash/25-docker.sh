@@ -231,7 +231,7 @@ function docker_container_action() {
         # (se quita el contenedor; los datos de la BBDD siguen en su volumen y, al arrancar el
         # proyecto, se vuelve a crear. Para quitarlo todo: docker-borrar <proyecto>)
         borrar) run dk rm -f "$name" ;;
-        *) echo "Uso: lvm-instalador docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
+        *) echo "Uso: nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
     esac
 }
 
@@ -250,7 +250,7 @@ function docker_image_action() {
             # (las nexum-php:X son del gestor y no estan en Docker Hub: se rehacen con docker-imagen)
             [[ "$ref" == nexum-* ]] && { echo "$ref es del gestor: se rehace con «Actualizar imagen» de su proyecto"; return 1; }
             run dk pull "$ref" ;;
-        *) echo "Uso: lvm-instalador docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>"; return 1 ;;
+        *) echo "Uso: nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>"; return 1 ;;
     esac
 }
 
@@ -574,7 +574,7 @@ function docker_create() {
         esac
     done
     if [ -z "$folder" ] || [ -z "$php" ] || [ -z "$maria" ]; then
-        echo "Uso: lvm-instalador docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <dominio>] [--nombre <nombre>]"
+        echo "Uso: nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <dominio>] [--nombre <nombre>]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -693,7 +693,7 @@ function docker_create() {
     fi
     browser_trust "$domain" || true
     echo "Proyecto en Docker listo: https://$domain (PHP $php). phpMyAdmin: http://127.0.0.1:$pma_port/"
-    echo "(phpMyAdmin pide usuario y contraseña: root y la que enseña la ventana, Docker, o lvm-instalador docker-clave $slug)"
+    echo "(phpMyAdmin pide usuario y contraseña: root y la que enseña la ventana, Docker, o nexum docker-clave $slug)"
 }
 
 # Proyectos en Docker de antes de la 1.39.2: PHP-FPM publicado en 127.0.0.1:<PUERTO_FPM>, sin clave
@@ -920,7 +920,7 @@ function docker_action() {
             [ "$DRY" -eq 1 ] || rm -rf "$dir"
             echo "Proyecto en Docker $slug borrado"
             ;;
-        *) echo "Uso: lvm-instalador docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
+        *) echo "Uso: nexum docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>"; return 1 ;;
     esac
 }
 

@@ -265,9 +265,10 @@ struct VisorButton: View {
 
     var body: some View {
         if conf.square {
+            // (⋮ «Más», sin mensaje: solo despliega su menú)
             Button(action: action) { VisorSquareLabel(conf: conf, name: name, icon: icon) }
                 .buttonStyle(SquareButton(side: conf.side, kind: kind))
-                .tip(conf.style == "icono" ? (tip.isEmpty ? name : tip.hasPrefix(name) ? tip : name + ": " + tip) : tip)
+                .tip(name == "Más" ? "" : conf.style == "icono" ? (tip.isEmpty ? name : tip.hasPrefix(name) ? tip : name + ": " + tip) : tip)
         } else {
             Button(action: action) {
                 HStack(spacing: 6) {

@@ -265,7 +265,9 @@ struct StatCard: View {
             Text(sub).font(.caption).foregroundColor(.secondary).lineLimit(1).truncationMode(.middle)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // (todo el alto que le den: en una fila con .fixedSize(horizontal: false, vertical: true), todas tan
+        // altas como la más alta)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.035)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
     }
@@ -386,7 +388,15 @@ struct SearchPicker: View {
             }
         }
         .padding(8)
-        .frame(width: Swift.max(width, 260))
+        .frame(width: listWidth())
+    }
+
+    /// Como poco, tan ancha como el desplegable; si los nombres son más largos, lo que haga falta para verlos
+    /// enteros, hasta 640 (solo los larguísimos se cortan con «…»)
+    func listWidth() -> CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let longest = items.map { ($0.1 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return Swift.min(Swift.max(width, 260, longest + 48), 640)
     }
 }
 
@@ -556,6 +566,12 @@ struct SplitPage<Head: View, Content: View>: View {
         self.head = head()
         self.content = content()
     }
+    /// Lo que ocupa la barra de desplazamiento de la lista (0 si flota encima): lo de arriba deja ese mismo
+    /// hueco a la derecha, para que el visor y la tabla tengan el mismo ancho y los mismos márgenes
+    @State private var gutter: CGFloat = 0
+    @State private var outerW: CGFloat = 0
+    @State private var innerW: CGFloat = 0
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) { head }
@@ -564,6 +580,7 @@ struct SplitPage<Head: View, Content: View>: View {
                 .padding(.top, 24)
                 .padding(.bottom, 14)
                 .frame(maxWidth: .infinity)
+                .padding(.trailing, gutter)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) { content }
@@ -571,14 +588,39 @@ struct SplitPage<Head: View, Content: View>: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
                         .frame(maxWidth: .infinity)
+                        .background(GeometryReader { g in
+                            Color.clear.preference(key: SplitInnerWidthKey.self, value: g.size.width)
+                        })
                         .id("arriba")
                 }
                 .onChange(of: top) { _ in
                     withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("arriba", anchor: .top) }
                 }
             }
+            .background(GeometryReader { g in
+                Color.clear.preference(key: SplitOuterWidthKey.self, value: g.size.width)
+            })
         }
+        .onPreferenceChange(SplitInnerWidthKey.self) { w in innerW = w; fitGutter() }
+        .onPreferenceChange(SplitOuterWidthKey.self) { w in outerW = w; fitGutter() }
     }
+
+    private func fitGutter() {
+        guard outerW > 0, innerW > 0 else { return }
+        // (como mucho lo de una barra; medio punto arriba o abajo no se cuenta, para que no tiemble)
+        let g = Swift.min(24, Swift.max(0, (outerW - innerW).rounded()))
+        if abs(g - gutter) >= 1 { gutter = g }
+    }
+}
+
+private struct SplitInnerWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = Swift.max(value, nextValue()) }
+}
+
+private struct SplitOuterWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = Swift.max(value, nextValue()) }
 }
 
 /// Título grande de una página, con su explicación debajo. Delante, un símbolo (Dominios y hosts,
@@ -588,8 +630,13 @@ struct PageTitle: View {
     let sub: String
     var symbol: String? = nil
     var logo: String? = nil
+    /// (Docker y Node: de título, su logotipo entero, con el icono y sus letras, en lugar del texto)
+    var brandTitle: String? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if let b = brandTitle {
+                BrandImage(key: b, height: 34)
+            } else {
             HStack(spacing: 10) {
                 if let l = logo {
                     LogoShape(d: LOGO_PATHS[l] ?? "").fill(brand(l)).frame(width: 30, height: 30)
@@ -597,6 +644,7 @@ struct PageTitle: View {
                     Image(systemName: sym).font(.system(size: 22, weight: .medium)).frame(width: 30, height: 30)
                 }
                 Text(title).font(.system(size: 22, weight: .bold))
+            }
             }
             if !sub.isEmpty {
                 Text(sub).font(.caption).foregroundColor(.secondary)

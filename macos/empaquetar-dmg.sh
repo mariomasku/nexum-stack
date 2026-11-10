@@ -1,5 +1,5 @@
 #!/bin/bash
-# Crea el .dmg de Nexum Dev Stack para Mac a partir de lvm-instalador.sh (la version sale de
+# Crea el .dmg de Nexum Dev Stack para Mac (nexum-mac-<version>.dmg) a partir de lvm-instalador.sh (la version sale de
 # su APP_VERSION y el icono de su ICON_PNG_B64). Se ejecuta en un Mac: usa hdiutil, sips e iconutil,
 # que vienen con macOS (desde Linux no se puede crear un .dmg que macOS monte sin herramientas de fuera).
 #
@@ -13,7 +13,7 @@
 #     - lo instala en /Library/Nexum/gestor, de root (pide la contraseña de administrador), con su
 #       bash compilado del codigo de GNU; si ya hay una version mas nueva, no la cambia
 #     - pasa las versiones de antes de la 1.39.3 de /Applications a /Library/Nexum, deja la copia de
-#       ~/lvm-instalador en un aviso, crea o apunta los comandos y la aplicacion y abre la ventana
+#       ~/lvm-instalador en un aviso, crea o apunta el comando nexum y la aplicacion y abre la ventana
 #   LEEME.txt
 #
 # Imagen UDIF comprimida (UDZO) con HFS+. Sin firma de Apple (solo la local, como la aplicacion que
@@ -50,7 +50,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <dict>
     <key>CFBundleName</key><string>$INSTALLER</string>
     <key>CFBundleDisplayName</key><string>$INSTALLER</string>
-    <key>CFBundleIdentifier</key><string>dev.hexer.lvm-instalador.instalar</string>
+    <key>CFBundleIdentifier</key><string>io.github.mariomasku.nexum.instalar</string>
     <key>CFBundleExecutable</key><string>instalar</string>
     <key>CFBundleIconFile</key><string>icono</string>
     <key>CFBundlePackageType</key><string>APPL</string>
@@ -67,7 +67,7 @@ EOF
 cat > "$APP/Contents/MacOS/instalar" <<'EOF'
 #!/bin/bash
 RES=$(cd "$(dirname "$0")/../Resources" && pwd)
-CMD=$(mktemp -d /tmp/lvm-instalar-XXXX)/instalar.command
+CMD=$(mktemp -d /tmp/nexum-instalar-XXXX)/instalar.command
 printf '#!/bin/bash\nexec /bin/bash %q\n' "$RES/instalar.sh" > "$CMD"
 chmod 755 "$CMD"
 xattr -c "$CMD" 2> /dev/null
@@ -105,7 +105,7 @@ if ! /bin/bash "$NEW" instalar-gestor; then
     finish "No se ha terminado de instalar. Si se estaba instalando algo (las herramientas de Xcode), cuando acabe vuelve a abrir «Instalar $NAME»." 1
 fi
 
-finish "Listo: el gestor esta en /Library/Nexum/gestor (de root), «$NAME» en Launchpad y en ~/Applications, y en la terminal tienes los comandos lvm-instalador y lvm."
+finish "Listo: el gestor esta en /Library/Nexum/gestor (de root), «$NAME» en Launchpad y en ~/Applications, y en la terminal tienes la orden nexum."
 EOF
 chmod 755 "$APP/Contents/Resources/instalar.sh"
 
@@ -134,7 +134,7 @@ Haz doble clic en «$INSTALLER». Se abre Terminal y:
 - si tus versiones de PHP son de antes de la 1.39.3, las pasa de
   /Applications a /Library/Nexum, con sus bases de datos, proyectos,
   vhosts y certificados (en /Applications queda un enlace a cada una);
-- crea los comandos lvm-instalador y lvm y abre la ventana. La
+- crea la orden nexum (en la terminal) y abre la ventana. La
   aplicacion «$NAME» queda en Launchpad y en ~/Applications.
 
 Tus proyectos y tus bases de datos no se tocan.
@@ -156,7 +156,7 @@ xattr -cr "$ROOT"
 codesign --force --deep -s - "$APP" > /dev/null 2>&1 || true
 
 mkdir -p "$OUT"
-DMG=$OUT/lvm-instalador-mac-$VERSION.dmg
+DMG=$OUT/nexum-mac-$VERSION.dmg
 hdiutil create -quiet -ov -volname "$NAME $VERSION" -srcfolder "$ROOT" -fs HFS+ -format UDZO "$DMG"
 # Comprobacion: se monta y lleva el instalador con su ejecutable
 MNT=$(mktemp -d)

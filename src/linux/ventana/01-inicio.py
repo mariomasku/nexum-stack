@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Ventana de Nexum Dev Stack (GTK 3 y Python 3.8: funciona desde Ubuntu 20.04).
-# La escribe y la abre "lvm-instalador ventana". No repite la logica del instalador: lo ejecuta con
+# La escribe y la abre "nexum ventana". No repite la logica del instalador: lo ejecuta con
 # los comandos gui-* (datos) y con los de siempre (use, instalar, actualizar, desinstalar...)
 # dentro de una pseudoterminal, para que sudo funcione igual que en la terminal; la contraseña
 # se pide en una ventana y se escribe en esa terminal.
@@ -47,10 +47,10 @@ for _k in [k for k in os.environ if k.startswith(("LD_", "PYTHON", "BASH_FUNC_")
 APP_ID = "dev.hexer.LamppVersionManager"
 # Parches de PHP sin soporte que se compilan con el arreglo de PHP2Shell (PHP2SHELL_BACKPORTS del script)
 PHP2SHELL_BACKPORTS = ("7.4.33", "8.0.30", "8.1.34")
-ICON = "lampp-version-manager"
+ICON = "nexum"
 LOG_DIR = os.path.expanduser("~/.lvm-instalador")
 # Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
-# programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
+# programa si está el ajuste COPIES_FILES_FLAG (nexum copias-ficheros si|no)
 COPIES_DIR = os.path.expanduser("~/nexum-backups")
 COPIES_FILES_FLAG = os.path.join(LOG_DIR, "copias-ficheros")
 # La ultima version que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor

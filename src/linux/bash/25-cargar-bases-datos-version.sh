@@ -317,7 +317,7 @@ function copy_database() {
         esac
     done
     if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ] || [ $usage -eq 1 ]; then
-        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
+        echo "Uso: nexum copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
         return 1
     fi
     new=${new:-$db}
@@ -453,7 +453,7 @@ function export_database() {
     local db=$1 dest=$2 folder=$3 rc
 
     if [ -z "$db" ] || [ -z "$dest" ]; then
-        echo "Uso: lvm-instalador exportar-bd <base de datos> <fichero.zip|.sql|.sql.gz> [version]"
+        echo "Uso: nexum exportar-bd <base de datos> <fichero.zip|.sql|.sql.gz> [version]"
 
         return 1
     fi
@@ -1113,7 +1113,7 @@ function import_database() {
     done
 
     if [ -z "$file" ] || [ -z "$db" ]; then
-        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
+        echo "Uso: nexum importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
 
         return 1
     fi

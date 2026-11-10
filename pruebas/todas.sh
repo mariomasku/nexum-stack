@@ -1,9 +1,9 @@
 #!/bin/bash
-# Batería de pruebas de seguridad de lvm-instalador. Se pasa entera en cada versión (sus grupos, en paralelo).
+# Batería de pruebas de seguridad de Nexum Dev Stack (lvm-instalador.sh y macos/lvm-instalador.sh). Se pasa entera en cada versión (sus grupos, en paralelo).
 # Uso: todas.sh [linux.sh] [mac.sh] [empaquetar-deb.sh] [mac-1.27.1.sh de referencia]
 # Sin argumentos: LVM_SCRIPT (por defecto ../lvm-instalador.sh), LVM_SCRIPT_MAC (por defecto
 # ../macos/lvm-instalador.sh o, si no esta, el lvm-instalador.sh del zip mas reciente de
-# ../macos/lvm-instalador-mac-*.zip, sacado a la carpeta temporal), LVM_EMPAQUETAR (../empaquetar-deb.sh) y LVM_MAC_ANTIGUO (datos/mac-1.27.1-xampp.sh).
+# ../macos/nexum-mac-*.zip o ../macos/lvm-instalador-mac-*.zip, sacado a la carpeta temporal), LVM_EMPAQUETAR (../empaquetar-deb.sh) y LVM_MAC_ANTIGUO (datos/mac-1.27.1-xampp.sh).
 # Sin sudo. Todo lo temporal va en una carpeta nueva de ${TMPDIR:-/tmp} que se borra al acabar.
 HERE=$(cd "$(dirname "$0")" && pwd)
 RAIZ=$(cd "$HERE/.." && pwd)
@@ -14,8 +14,9 @@ L=${1:-${LVM_SCRIPT:-$RAIZ/lvm-instalador.sh}}
 M=${2:-$LVM_SCRIPT_MAC}
 [ -z "$M" ] && [ -f "$RAIZ/macos/lvm-instalador.sh" ] && M=$RAIZ/macos/lvm-instalador.sh
 if [ -z "$M" ]; then
-    zip=$(ls "$RAIZ"/macos/lvm-instalador-mac-*.zip 2> /dev/null | sort -V | tail -1)
-    [ -n "$zip" ] || { echo "No hay ningun $RAIZ/macos/lvm-instalador-mac-*.zip: pon LVM_SCRIPT_MAC"; exit 1; }
+    zip=$(ls "$RAIZ"/macos/nexum-mac-*.zip "$RAIZ"/macos/lvm-instalador-mac-*.zip 2> /dev/null \
+        | awk -F/ '{ v = $NF; sub(/^(nexum|lvm-instalador)-mac-/, "", v); print v "\t" $0 }' | sort -V | tail -1 | cut -f2)
+    [ -n "$zip" ] || { echo "No hay ningun $RAIZ/macos/nexum-mac-*.zip: pon LVM_SCRIPT_MAC"; exit 1; }
     mkdir "$LVM_TMP/mac" && unzip -q -o "$zip" lvm-instalador.sh -d "$LVM_TMP/mac" \
         || { echo "No se ha podido sacar lvm-instalador.sh de $zip"; exit 1; }
     M=$LVM_TMP/mac/lvm-instalador.sh
@@ -67,6 +68,7 @@ for s in "$L" "$M" "$E" "$OLD"; do [ -f "$s" ] || { echo "No esta $s"; exit 1; }
 for s in "$L" "$M"; do bash -n "$s" || { echo "sintaxis: $s"; exit 1; }; done
 note "Linux ($L, $(grep -m1 '^APP_VERSION=' "$L" | cut -d'"' -f2))"
 suite "ayudante de actualizacion" "$HERE/ayudante.sh" "$E" "$L"
+suite "paquete nexum: postinst y postrm (1.57.11)" "$HERE/paquete.sh" "$E" "$L"
 suite "volcados (MariaDB temporal)" "$HERE/volcados.sh" "$L"
 suite "certificados y dominios" "$HERE/certs.sh" "$L"
 suite "arreglar-certificados" "$HERE/arreglar-certs.sh" "$L"
@@ -125,6 +127,7 @@ suite "limpieza (1.57.9)" "$HERE/limpieza.sh" "$L"
 suite "el manual dentro del programa (1.57.10)" "$HERE/manual.sh" "$L"
 suite "diálogos con los cambios numerados (1.57.4)" "$HERE/dialogos.sh" "$L"
 suite "Configuración: título del apartado, Apariencia y seguridad entre webs (1.57.5)" "$HERE/apartados.sh" "$L"
+suite "Configuración, General y el registro de tareas" "$HERE/registro-tareas.sh" "$L"
 suite "dependencias con apt, con repositorios rotos (1.56.15)" "$HERE/apt.sh" "$L"
 suite "rendimiento de la ventana (1.56.16)" "$HERE/rendimiento.sh" "$L"
 suite "icono junto al reloj (1.56.18)" "$HERE/bandeja.sh" "$L" "$E"
@@ -189,6 +192,7 @@ suite "limpieza (1.57.9)" "$HERE/limpieza.sh" "$M"
 suite "el manual dentro del programa (1.57.10)" "$HERE/manual.sh" "$M"
 suite "diálogos con los cambios numerados (1.41.3)" "$HERE/dialogos.sh" "$M"
 suite "Configuración: título del apartado, Apariencia y seguridad entre webs (1.57.5)" "$HERE/apartados.sh" "$M"
+suite "Configuración, General y el registro de tareas" "$HERE/registro-tareas.sh" "$M"
 suite "otro parche concreto de PHP (1.57.5)" "$HERE/parches-mac.sh" "$M"
 suite "fuentes en src/ y construir.sh (1.57.5)" "$HERE/fuentes.sh"
 suite "BBDD de XAMPP-X en Docker, en vivo (1.40.1)" "$HERE/bd-vivo-mac.sh" "$M"

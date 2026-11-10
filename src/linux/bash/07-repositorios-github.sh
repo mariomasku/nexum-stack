@@ -63,7 +63,7 @@ function github_disconnect() {
 function mount_project() {
     local url=$1 folder=$2 version=$3 db=$4 file=$5 dest dir owner
     if [ -z "$url" ] || [ -z "$folder" ] || [ -z "$version" ] || [ -z "$db" ]; then
-        echo "Uso: lvm-instalador montar-proyecto <url de git> <carpeta> <version> <base de datos> [volcado]"
+        echo "Uso: nexum montar-proyecto <url de git> <carpeta> <version> <base de datos> [volcado]"
 
         return 1
     fi

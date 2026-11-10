@@ -247,7 +247,7 @@ function stack_cache_store() {
     return 0
 }
 
-# lvm-instalador descargas [vaciar]: lo que hay en la cache de descargas y cuanto ocupa, o vaciarla
+# nexum descargas [vaciar]: lo que hay en la cache de descargas y cuanto ocupa, o vaciarla
 function downloads_command() {
     local f total=0 n=0 size
     case "${1:-}" in
@@ -278,7 +278,7 @@ function downloads_command() {
             echo "Cache de descargas vacia: la proxima instalacion lo descarga todo otra vez"
             ;;
         *)
-            echo "Uso: lvm-instalador descargas [vaciar]"
+            echo "Uso: nexum descargas [vaciar]"
             return 1
             ;;
     esac

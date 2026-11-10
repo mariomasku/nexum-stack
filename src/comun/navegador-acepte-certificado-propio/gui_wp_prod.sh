@@ -37,7 +37,7 @@ PS_IMAGES_DOH="https://cloudflare-dns.com/dns-query"
 function ps_images() {
     local folder=${1%/} domain=$2 config db prefix t list total web="" maria="" p
     if [ -z "$folder" ]; then
-        echo "Uso: lvm-instalador ps-imagenes <carpeta> [dominio de produccion]"
+        echo "Uso: nexum ps-imagenes <carpeta> [dominio de produccion]"
 
         return 1
     fi
@@ -73,7 +73,7 @@ function ps_images() {
     domain=${domain#https://} domain=${domain#http://} domain=${domain%/}
     if ! valid_domain "$domain" || [[ "$domain" == *.local || "$domain" == *.test || "$domain" == localhost || "$domain" == *.localhost ]]; then
         echo "No se sabe el dominio de produccion de $folder: ${domain:-ninguno}. Dilo tu:"
-        echo "lvm-instalador ps-imagenes $folder <dominio de produccion>"
+        echo "nexum ps-imagenes $folder <dominio de produccion>"
 
         return 1
     fi

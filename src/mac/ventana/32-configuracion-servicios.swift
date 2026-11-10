@@ -225,31 +225,24 @@ struct HostsView: View {
                         })
                     }
                 }
-                // En la misma fila: el host falseado ocupa 1/3 y el proyecto nuevo, 2/3
+                // Arriba, en un recuadro como el visor de Proyectos: todos los que llevan a este Mac (también
+                // los .local), en dos columnas, cada uno con su interruptor
+                hostsVisor(fakes(hosts))
+                // Debajo, en la misma fila: los demás dominios de los vhosts ocupan 1/3 y el proyecto nuevo, 2/3
                 OneThirdTwoThirds(first: {
-                    Card("Host falseado",
-                         "Al cargar una tienda PrestaShop se crea lo que le falte (su vhost y su certificado) y su dominio se falsea en /etc/hosts: el navegador la abre en este Mac. Al cargar otro proyecto deja de estar falseado y vuelve a llevar a la web real.") {
-                        if fakes(hosts).isEmpty {
-                            Row("Ningún dominio falseado", "Los dominios de los vhosts llevan a sus webs reales")
+                    Card("Dominios de los vhosts",
+                         "Los que llevan a su web real. Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1) y sube al recuadro de arriba. Se pide la contraseña de administrador para cambiar /etc/hosts.") {
+                        if rest(hosts).isEmpty {
+                            Row("No hay más dominios", "Los vhosts están en XAMPP-compartido/httpd-vhosts.conf")
                         }
-                        ForEach(fakes(hosts), id: \.name) { h in
-                            if h.name != fakes(hosts).first?.name { Divider() }
+                        ForEach(rest(hosts), id: \.name) { h in
+                            if h.name != rest(hosts).first?.name { Divider() }
                             hostRow(h)
                         }
                     }
                 }, second: {
                     newDomainCard(hosts)
                 })
-                Card("Dominios de los vhosts",
-                     "Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1); apagado, a la web real. Se pide la contraseña de administrador para cambiar /etc/hosts.") {
-                    if rest(hosts).isEmpty {
-                        Row("No hay más dominios", "Los vhosts están en XAMPP-compartido/httpd-vhosts.conf")
-                    }
-                    ForEach(rest(hosts), id: \.name) { h in
-                        if h.name != rest(hosts).first?.name { Divider() }
-                        hostRow(h)
-                    }
-                }
             } else {
                 Loading()
             }
@@ -308,13 +301,67 @@ struct HostsView: View {
         }
     }
 
-    // Un .local siempre está en /etc/hosts (sin su línea se preguntaría a la red) y no hay ninguna
-    // web real a la que devolverlo: no es un dominio falseado, va con los demás
+    // Falseados: los que llevan a este Mac en /etc/hosts. También los .local (siempre están, sin su línea
+    // se preguntaría a la red), aunque no haya ninguna web real a la que devolverlos
     func fakes(_ hosts: [HostEntry]) -> [HostEntry] {
-        return hosts.filter { $0.fake && !$0.name.lowercased().hasSuffix(".local") }
+        return hosts.filter { $0.fake }
     }
     func rest(_ hosts: [HostEntry]) -> [HostEntry] {
-        return hosts.filter { !$0.fake || $0.name.lowercased().hasSuffix(".local") }
+        return hosts.filter { !$0.fake }
+    }
+
+    /// El recuadro de arriba, como el visor de Proyectos: su cabecera (el punto verde si hay alguno) y, en una
+    /// tarjeta, los dominios falseados en dos columnas (de dos en dos, por filas), cada uno con su interruptor
+    func hostsVisor(_ fake: [HostEntry]) -> some View {
+        let left: [HostEntry] = fake.enumerated().filter { $0.offset % 2 == 0 }.map { $0.element }
+        let right: [HostEntry] = fake.enumerated().filter { $0.offset % 2 == 1 }.map { $0.element }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                StatusDot(on: !fake.isEmpty, blink: false)
+                Text("DOMINIOS Y HOSTS FALSEADOS")
+                    .font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
+                Image(systemName: "info.circle").foregroundColor(.secondary)
+                    .tip("Llevan a este Mac y no a internet. Los .local, siempre; el dominio de una tienda PrestaShop, mientras está cargada (al cargarla se crea lo que le falte, su vhost y su certificado, y al cargar otro proyecto vuelve a llevar a la web real), y los que falsees tú. Apagado, el dominio baja a «Dominios de los vhosts» y lleva a su web real.")
+                Spacer()
+                if !fake.isEmpty {
+                    Text("\(fake.count) \(fake.count == 1 ? "lleva" : "llevan") a este Mac")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                if fake.isEmpty {
+                    Text("Ningún dominio falseado: los dominios de los vhosts llevan a sus webs reales.")
+                        .foregroundColor(.secondary)
+                } else {
+                    HStack(alignment: .top, spacing: 18) {
+                        hostColumn(left)
+                        hostColumn(right)
+                    }
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+        }
+    }
+
+    /// Una columna del recuadro de arriba: sus dominios en una lista con bordes redondeados (vacía, su hueco)
+    @ViewBuilder
+    func hostColumn(_ hs: [HostEntry]) -> some View {
+        if hs.isEmpty {
+            Color.clear.frame(height: 1).frame(maxWidth: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(hs, id: \.name) { h in
+                    if h.name != hs.first?.name { Divider() }
+                    hostRow(h)
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+            .frame(maxWidth: .infinity)
+        }
     }
 
     func info(_ h: HostEntry) -> String {
@@ -371,7 +418,7 @@ struct ToolsView: View {
 
     /// Apartados de Configuración (como en Linux): su clave, su nombre en la columna de la izquierda y su icono
     static let sections: [(String, String, String)] = [
-        ("parches", "Parches nuevos", "arrow.down.circle"),
+        ("general", "General", "slider.horizontal.3"),
         ("hosts", "Vhosts y hosts", "network"),
         ("seguridad", "Seguridad entre webs", "lock.shield"),
         ("correo", "Correo de pruebas", "envelope"),
@@ -379,12 +426,12 @@ struct ToolsView: View {
         ("tunel", "Túnel de Cloudflare", "cloud"),
         ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
-        ("errores", "Registro de errores", "exclamationmark.triangle"),
         ("limpieza", "Limpieza", "sparkles"),
         ("carpetas", "Carpetas", "folder"),
         ("oficial", "XAMPP oficial", "externaldrive"),
-        ("programa", "Programa", "menubar.rectangle"),
         ("info", "Información", "info.circle")]
+    /// La explicación de General (cada uno de sus bloques lleva la suya)
+    static let generalDesc = "Los registros de errores de la web cargada y de Apache, el de las tareas que lanza la ventana, los parches nuevos de lo que usa Nexum y el propio programa"
 
     var body: some View {
         // Los apartados, en una columna pegada al menú lateral; a la derecha, lo que se puede cambiar del elegido
@@ -473,19 +520,11 @@ struct ToolsView: View {
             AppearanceCard()
         case "github":
             GitHubCard()
-        case "errores":
-            TileCard("Registro de errores", "Si la web cargada da un error (el «error crítico» de WordPress), el motivo está en el registro de su vhost: ahí van los errores de PHP. Los de Apache (que no arranca, un vhost mal escrito…), en el general. Lo más reciente está al final.") {
-                if let path = projectErrorLog(d) {
-                    errorLogRow(d, path: path, title: "error_log de \(model.projects?.link ?? "")"
-                                + ((model.projects?.current ?? "").isEmpty ? "" : "  (\(((model.projects?.current ?? "") as NSString).lastPathComponent))"))
-                }
-                errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
-            }
         case "limpieza":
             CleanCard()
         case "carpetas":
             TileCard("Carpetas") {
-                // Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
+                // Copias de seguridad: abrirlas y borrarlas (nexum copias vaciar)
                 let bk = model.backups ?? [0, 0]
                 Tile("Copias de seguridad", "~/nexum-backups: las copias que pides al borrar, sustituir o actualizar, y las del XAMPP oficial · "
                      + (bk[1] > 0 ? "\(fmtSize(bk[0])), \(bk[1]) \(bk[1] == 1 ? "fichero" : "ficheros")" : "vacía")) {
@@ -497,7 +536,7 @@ struct ToolsView: View {
                     Button("Borrar…") { model.clearCopies(Int(bk[1]), bk[0]) }.disabled(model.busy || bk[1] == 0)
                 }
                 .onAppear { model.refreshBackups() }
-                // Copias de los ficheros que cambia el programa por su cuenta (lvm-instalador copias-ficheros si|no)
+                // Copias de los ficheros que cambia el programa por su cuenta (nexum copias-ficheros si|no)
                 Tile("Copias de los ficheros que cambia el programa",
                      "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos") {
                     Toggle("", isOn: Binding(get: { model.copiesFiles }, set: { model.setCopiesFiles($0) }))
@@ -516,17 +555,9 @@ struct ToolsView: View {
             }
         case "oficial":
             officialCard(d)
-        case "programa":
-            TileCard("Programa", wide: true) {
-                Tile("Dejar en la barra de menús al cerrar",
-                     "Icono junto al reloj: al cerrar la ventana, la aplicación sigue en él. Desde ahí se abre otra vez, se arranca o para la versión, se abre web.local o se sale.") {
-                    Toggle("", isOn: Binding(get: { model.trayOn }, set: { model.setTray($0) }))
-                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                }
-            }
         case "info":
             TileCard("Información") {
-                Tile("Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace cada uno") {
+                Tile("Comandos de nexum", "Todos los comandos para la terminal y qué hace cada uno") {
                     Button("Ver") { model.showCommands() }
                 }
                 Tile("Novedades", "Qué ha cambiado en cada versión") {
@@ -537,7 +568,49 @@ struct ToolsView: View {
                 }
             }
         default:
-            componentsCard()
+            generalSection(d)
+        }
+    }
+
+    /// General: el registro de errores, el de tareas, los parches nuevos y el programa, cada uno en su bloque con
+    /// su título y su explicación a la vista
+    func generalSection(_ d: AppData) -> some View {
+        VStack(alignment: .leading, spacing: 30) {
+            generalBlock("Registro de errores", "Si la web cargada da un error (el «error crítico» de WordPress), el motivo está en el registro de su vhost: ahí van los errores de PHP. Los de Apache (que no arranca, un vhost mal escrito…), en el general. Lo más reciente está al final.") {
+                TileCard {
+                    if let path = projectErrorLog(d) {
+                        errorLogRow(d, path: path, title: "error_log de \(model.projects?.link ?? "")"
+                                    + ((model.projects?.current ?? "").isEmpty ? "" : "  (\(((model.projects?.current ?? "") as NSString).lastPathComponent))"))
+                    }
+                    errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
+                }
+            }
+            generalBlock("Registro de tareas", "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.lvm-instalador/tareas, solo para ti; las contraseñas y los tokens no se escriben.") {
+                TaskLogsCard()
+            }
+            generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.") {
+                componentsCard()
+            }
+            generalBlock("Programa", "El propio Nexum Dev Stack: lo que hace al cerrar la ventana.") {
+                TileCard(wide: true) {
+                    Tile("Dejar en la barra de menús al cerrar",
+                         "Icono junto al reloj: al cerrar la ventana, la aplicación sigue en él. Desde ahí se abre otra vez, se arranca o para la versión, se abre web.local o se sale.") {
+                        Toggle("", isOn: Binding(get: { model.trayOn }, set: { model.setTray($0) }))
+                            .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                    }
+                }
+            }
+        }
+        // (debajo del título grande de Configuración)
+        .preference(key: ToolsDescKey.self, value: ToolsView.generalDesc)
+    }
+
+    /// Un bloque de General: su título, su explicación y lo suyo debajo
+    func generalBlock<C: View>(_ title: String, _ sub: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.headline)
+            Text(sub).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            content().padding(.top, 6)
         }
     }
 
@@ -641,7 +714,7 @@ struct ToolsView: View {
         .onAppear { model.reloadTunnelInfo() }
     }
 
-    /// Parches nuevos: lo que tiene un parche publicado y «Actualizar todo»
+    /// Parches nuevos (en General, con su título y su explicación): lo que tiene un parche publicado y «Actualizar todo»
     func componentsCard() -> some View {
         let c = model.components
         var text = "Buscando parches nuevos…"
@@ -652,7 +725,7 @@ struct ToolsView: View {
             if !c.notes.isEmpty { text += "\n" + c.notes.map { "• " + $0 }.joined(separator: "\n") }
             if !c.items.isEmpty && !c.errors.isEmpty { text += "\n(No se ha podido consultar: " + c.errors.joined(separator: ", ") + ")" }
         }
-        return TileCard("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.", wide: true) {
+        return TileCard(wide: true) {
             Tile("Componentes", text) {
                 Button("Buscar de nuevo") { model.components = nil; model.reloadComponents() }.disabled(model.busy || c == nil)
                 if let c = c, !c.items.isEmpty {
@@ -809,7 +882,53 @@ struct ToolsView: View {
     }
 }
 
-/// Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...), como en Linux: cada cosa, con su título, lo que
+/// Configuración, General, Registro de tareas (como en Linux): las tareas que ha lanzado la ventana (las
+/// TASKS_KEEP últimas de TASKS_DIR), cada una con su fecha y cómo acabó; con «Ver», entera
+struct TaskLogsCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var logs: [TaskLogEntry] = []
+    /// Cuántas se ven (las 15 más nuevas; «Ver más», de 50 en 50)
+    @State private var shown = 15
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TileCard(wide: true) {
+                if logs.isEmpty {
+                    Tile("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
+                }
+                ForEach(Array(logs.prefix(shown))) { e in
+                    Tile(e.title, e.when + "  ·  " + e.result, leading: { mark(e.state) }) {
+                        Button("Ver") { showTaskLog(e.path) }
+                            .tip(e.command)
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                if logs.count > shown {
+                    Button("Ver más (\(logs.count - shown))") { shown += 50 }
+                }
+                Button("Abrir la carpeta") {
+                    _ = taskLogDir()
+                    NSWorkspace.shared.open(URL(fileURLWithPath: TASKS_DIR))
+                }
+            }
+        }
+        .onAppear { logs = taskLogs() }
+        .onChange(of: model.taskLogsChanged) { _ in logs = taskLogs() }
+    }
+
+    /// Cómo acabó: bien (verde), mal (rojo), cancelada o en marcha
+    func mark(_ state: String) -> some View {
+        let m: (String, Color, String) = state == "ok" ? ("checkmark.circle.fill", GREEN, "Terminada bien")
+            : state == "error" ? ("xmark.octagon.fill", RED, "Ha fallado")
+            : state == "cancel" ? ("stop.circle", Color.secondary, "Cancelada")
+            : ("play.circle", Color.secondary, "En marcha")
+        return Image(systemName: m.0).font(.system(size: 16)).foregroundColor(m.1).frame(width: 22).tip(m.2)
+    }
+}
+
+/// Limpieza (nexum gui-limpieza y limpiar <clave>...), como en Linux: cada cosa, con su título, lo que
 /// es y qué pasa si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
 struct CleanItem {
     let key: String
@@ -821,29 +940,29 @@ struct CleanItem {
 
 let CLEAN_ITEMS: [CleanItem] = [
     CleanItem(key: "descargas", title: "Caché de descargas",
-              desc: "El código ya descargado y comprobado de PHP, Apache, MariaDB… (\(DL_CACHE_DIR)). Si se limpia, la próxima instalación lo descarga otra vez.",
-              step: "se vacía \(DL_CACHE_DIR)", on: true),
+              desc: "Los paquetes de código de PHP, Apache, MariaDB, phpMyAdmin… que el programa descargó para instalar o actualizar tus versiones de PHP. Están en \(DL_CACHE_DIR). Solo sirven para no descargarlos otra vez si repites una instalación (o si la web de donde salen no responde). Las versiones ya instaladas no los usan: si se limpia, todo sigue igual y la próxima instalación los vuelve a descargar. No toca ningún proyecto.",
+              step: "se vacía \(DL_CACHE_DIR): la próxima instalación lo vuelve a descargar", on: true),
     CleanItem(key: "copias", title: "Copias de seguridad",
-              desc: "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden volver a cargar.",
-              step: "se borra todo lo de ~/nexum-backups (la carpeta se queda)", on: false),
+              desc: "Las copias que guardó el programa cuando se lo pediste («Guardar antes una copia» al borrar, sustituir o actualizar una BBDD o una versión), las de las BBDD del XAMPP oficial al apartarlo y, si lo tienes encendido, las de los ficheros que cambia por su cuenta (hosts, vhosts…). Están en ~/nexum-backups. Sirven para volver atrás si algo salió mal. Tus proyectos y sus BBDD de ahora no las usan y siguen igual, pero lo que había antes ya no se podrá recuperar (las del XAMPP oficial que no hayas cargado siguen en el XAMPP apartado): por eso va sin marcar.",
+              step: "se borra todo lo de ~/nexum-backups (la carpeta se queda): ya no se podrá volver atrás con ellas", on: false),
     CleanItem(key: "correo", title: "Correo de pruebas",
-              desc: "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía (Mailpit tiene que estar en marcha).",
+              desc: "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Configuración, Correo de pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la versión activa).",
               step: "se vacía la bandeja de Mailpit", on: false),
     CleanItem(key: "registros", title: "Registros del programa",
-              desc: "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
-              step: "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", on: true),
+              desc: "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones (y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node parados y el de la compilación de la ventana. Están en ~/.lvm-instalador. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un servidor en marcha: el programa y tus proyectos siguen igual.",
+              step: "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que esté usando una tarea o un servidor de Node en marcha)", on: true),
     CleanItem(key: "registros-versiones", title: "Registros de las versiones",
-              desc: "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: se pierde lo que decían hasta ahora.",
-              step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", on: true),
+              desc: "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, los errores de PHP y MariaDB. Están en xamppfiles/logs de cada /Library/Nexum/XAMPP-<versión> (el de MariaDB, con sus datos). Sirven para buscar por qué falla una web (Configuración, General, Registro de errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
+              step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión (siguen en marcha)", on: true),
     CleanItem(key: "caches-proyectos", title: "Cachés de los proyectos",
-              desc: "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace sola: la primera visita va algo más lenta.",
-              step: "se vacían las cachés de los proyectos de \(HTDOCS)", on: true),
+              desc: "Las páginas y plantillas que WordPress (wp-content/cache, la de sus plugins de caché) y PrestaShop (var/cache y las de Smarty) guardan ya preparadas para ir más deprisa, en cada proyecto de \(HTDOCS). Son solo una copia que se rehace sola: si se limpia, la primera visita a cada página va algo más lenta mientras se vuelve a crear. Nada más del proyecto se toca: ni sus ficheros, ni sus imágenes, ni su BBDD.",
+              step: "se vacían las cachés de los proyectos de \(HTDOCS) (se rehacen solas)", on: true),
     CleanItem(key: "temporales", title: "Temporales",
-              desc: "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un día sin cambiar y nada está usando.",
+              desc: "Ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una descarga, el volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en /tmp y en ~/.lvm-instalador. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y no está usando ningún programa (un MariaDB temporal en marcha, por ejemplo, se deja). No afecta a ningún proyecto ni a ninguna versión.",
               step: "se borran los temporales del programa de más de un día que nada usa", on: true),
     CleanItem(key: "sesiones", title: "Sesiones de PHP",
-              desc: "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones abiertas en las webs locales (hay que volver a entrar en su administración).",
-              step: "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", on: false),
+              desc: "Los ficheros con los que PHP recuerda quién ha entrado en una web local: tu sesión en phpMyAdmin y la de las webs o plugins que usan las sesiones de PHP (WordPress y PrestaShop guardan la suya en una cookie: esa no se cierra). Están en xamppfiles/temp de cada versión y en /tmp. Si se limpian, esas sesiones se cierran y hay que volver a entrar; las webs, sus ficheros y sus BBDD no cambian. Va sin marcar para no cerrarte nada sin querer.",
+              step: "se borran las sesiones de PHP: hay que volver a entrar en phpMyAdmin y en lo que las use", on: false),
 ]
 
 /// Limpiar proyecto (gui-limpiar-proyecto y limpiar-proyecto): cada clave, con su título y lo que se hace
@@ -886,7 +1005,7 @@ struct CleanCard: View {
         let summary = sizes == nil ? (failed.isEmpty ? "Midiendo…" : failed)
             : (all > 0 ? "Total: \(fmtSize(all)) · marcado: \(fmtSize(sel))" : "Total: nada que limpiar")
         return VStack(alignment: .leading, spacing: 12) {
-            TileCard("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar espacio. Lo que se limpia no se puede recuperar: no se hacen copias.") {
+            TileCard("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar espacio. Ningún proyecto ni ninguna versión de PHP lo necesita para funcionar: cada cosa dice qué es y qué pasa si se limpia. Lo que se limpia no se puede recuperar: no se hacen copias.") {
                 Tile("Lo que se puede limpiar", summary)
                 ForEach(CLEAN_ITEMS, id: \.key) { it in
                     let v = s[it.key] ?? CleanSize(bytes: 0, files: 0)

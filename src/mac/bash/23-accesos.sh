@@ -2003,9 +2003,12 @@ function update_app() {
     create_app
 }
 
-# lvm-instalador ventana: abre la aplicacion (la crea si no existe)
+# nexum ventana: abre la aplicacion (la crea si no existe)
 function open_window() {
     migrate_old_app
+    # Tras actualizar (actualizar-gestor) la ventana se abre con el gestor nuevo: el comando nexum, y
+    # fuera los de antes (lvm-instalador, y lvm si era de este programa)
+    [ "$DRY" -eq 0 ] && [ "$SELF" == "$TRUSTED_SCRIPT" ] && point_commands
     # La pagina de web.local sin proyecto, al dia tras una actualizacion (solo si se puede escribir
     # sin contraseña: si no, al desmontar el proximo proyecto)
     [ -w "$HTDOCS_DIR/$EMPTY_PROJECT/index.html" ] && empty_page "$HTDOCS_DIR/$EMPTY_PROJECT" > /dev/null 2>&1
@@ -2017,7 +2020,7 @@ function open_window() {
         else
             echo "La ventana no esta disponible: faltan las herramientas de Xcode (xcode-select --install)."
         fi
-        echo "Mientras tanto puedes usar el panel: lvm-instalador"
+        echo "Mientras tanto puedes usar el panel: nexum"
 
         return 1
     fi
@@ -2040,8 +2043,8 @@ LVM_SWIFT
 function offer_command_install() {
     [ "$DRY" -eq 1 ] && return 0
 
-    # Descargado con el navegador o copiado de un USB puede llegar sin permiso de ejecucion, y los
-    # comandos lvm-instalador y lvm son enlaces a este archivo
+    # Descargado con el navegador o copiado de un USB puede llegar sin permiso de ejecucion, y el
+    # comando nexum es un enlace a este archivo
     [ -x "$SELF" ] || chmod +x "$SELF" 2> /dev/null
     migrate_old_app
 
@@ -2065,23 +2068,26 @@ function offer_command_install() {
         fi
     fi
 
-    # Comandos pvm-instalador y pvm de las versiones hasta la 1.0.0: se quitan (ahora son
-    # lvm-instalador y lvm). No hace falta sudo en /opt/homebrew/bin
+    # Comandos pvm-instalador y pvm de las versiones hasta la 1.0.0: se quitan, y lvm-instalador (y
+    # lvm, solo si es un enlace a un lvm-instalador.sh), los de hasta la 1.57.10: ahora es nexum. No
+    # hace falta sudo en /opt/homebrew/bin
     local link
     for link in "$CMD_DIR/pvm-instalador" "$CMD_DIR/pvm"; do
         [ -L "$link" ] && [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && rm -f "$link"
     done
-    # lvm-instalador y lvm que apuntan a otro archivo del instalador se reapuntan a este
-    for link in "$CMD_DIR/lvm-instalador" "$CMD_DIR/lvm"; do
-        [ -L "$link" ] && [ "$(readlink "$link")" != "$SELF" ] \
-            && [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && ! script_is_newer "$(readlink "$link")" \
-            && ln -sf "$SELF" "$link"
-    done
+    # (un lvm-instalador que lleva a una version mas nueva que esta, no: es de esa)
+    link=$CMD_DIR/lvm-instalador
+    ! { [ -L "$link" ] && script_is_newer "$(readlink "$link")"; } && drop_old_commands
+    # nexum que apunta a otro archivo del instalador se reapunta a este
+    link=$CMD_DIR/nexum
+    [ -L "$link" ] && [ "$(readlink "$link")" != "$SELF" ] \
+        && [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && ! script_is_newer "$(readlink "$link")" \
+        && ln -sf "$SELF" "$link"
 
     local marker="$LOG_DIR/.accesos-ofrecidos"
     local need_cmd=0 need_app=0
 
-    command -v lvm-instalador > /dev/null || need_cmd=1
+    command -v nexum > /dev/null || need_cmd=1
     # Si venia de los comandos con pvm, se vuelven a ofrecer aunque ya se ofrecieran
     [ -f "$marker" ] && [ $need_cmd -eq 0 ] && return 0
     [ -d "$APP_BUNDLE" ] || need_app=1
@@ -2092,7 +2098,7 @@ function offer_command_install() {
 
     local text="¿Quieres crear accesos directos para abrir este gestor facilmente?\n\n"
     [ $need_app -eq 1 ] && text+="  - Aplicacion '$APP_NAME' en ~/Applications (Launchpad y Spotlight)\n"
-    [ $need_cmd -eq 1 ] && text+="  - Comandos 'lvm-instalador' y 'lvm' en la terminal ('lvm use 8.4'...)\n"
+    [ $need_cmd -eq 1 ] && text+="  - Comando 'nexum' en la terminal ('nexum use 8.4'...)\n"
     text+="\nApuntaran a: $SELF\n(no muevas ni borres este archivo despues)"
 
     ui_yesno "$text" || return 0
@@ -2104,10 +2110,9 @@ function offer_command_install() {
 
     # En los Mac con Apple Silicon /opt/homebrew/bin ya esta en el PATH y no necesita sudo
     if [ $need_cmd -eq 1 ]; then
-        ln -sf "$SELF" "$CMD_DIR/lvm-instalador"
-        command -v lvm > /dev/null || ln -s "$SELF" "$CMD_DIR/lvm"
+        ln -sf "$SELF" "$CMD_DIR/nexum"
     fi
 
-    ui_msg "Accesos creados. A partir de ahora puedes abrir el gestor desde Launchpad o Spotlight ('$APP_NAME') o escribiendo 'lvm-instalador' en la terminal."
+    ui_msg "Accesos creados. A partir de ahora puedes abrir el gestor desde Launchpad o Spotlight ('$APP_NAME') o escribiendo 'nexum' en la terminal."
 }
 

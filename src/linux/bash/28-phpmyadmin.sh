@@ -54,7 +54,7 @@ function update_pma() {
     # Linux, /opt tambien), no un enlace que lleve a otro sitio
     vhosts_root > /dev/null
     if [ -L "$root" ] || [ -L "$dir" ] || [ "$(stat -c %u /opt)" != 0 ] || [ "$(stat -c %u "$root")" != 0 ]; then
-        echo "No se cambia phpMyAdmin: /opt o $root no son del administrador (lvm-instalador asegurar --todas)"
+        echo "No se cambia phpMyAdmin: /opt o $root no son del administrador (nexum asegurar --todas)"
         return 1
     fi
     task_step

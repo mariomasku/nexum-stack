@@ -30,7 +30,7 @@ extension AppModel {
     func control(_ cmd: String, _ what: String) {
         let folder = data?.active ?? ""
         if cmd == "parar" {
-            // Parar = lvm disable: para y quita el enlace /Applications/XAMPP (php deja de responder)
+            // Parar = nexum disable: para y quita el enlace /Applications/XAMPP (php deja de responder)
             runTask("Parando y desactivando XAMPP-\(folder)", ["disable"],
                     doneText: "XAMPP-\(folder) parada y desactivada", autoClose: true)
             return

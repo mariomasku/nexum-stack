@@ -12,7 +12,7 @@ extract "$SRC" docker_idle_hours docker_idle_timer_on docker_idle_timer docker_s
     docker_idle_ensure docker_idle_command || exit 1
 MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1
-DRY=0 DOCKER_DIR=$W/docker LOG_DIR=$W/log SELF=/usr/bin/lvm-instalador TRUSTED_SCRIPT=/Library/Nexum/gestor/lvm-instalador.sh
+DRY=0 DOCKER_DIR=$W/docker LOG_DIR=$W/log SELF=/opt/nexum/nexum.sh TRUSTED_SCRIPT=/Library/Nexum/gestor/lvm-instalador.sh
 DOCKER_IDLE_FILE=$DOCKER_DIR/reposo DOCKER_IDLE_LOG=$LOG_DIR/docker-reposo.log
 DOCKER_IDLE_UNIT_DIR=$W/units DOCKER_IDLE_AGENT=dev.hexer.nexum-reposo DOCKER_IDLE_PLIST=$W/agents/dev.hexer.nexum-reposo.plist
 mkdir -p "$LOG_DIR"
@@ -54,6 +54,14 @@ if [ $MAC -eq 1 ]; then
     check "temporizador (Mac): un LaunchAgent tuyo, cada 15 minutos, con docker-reposo comprobar" 'grep -q "<integer>900</integer>" "$DOCKER_IDLE_PLIST" && grep -q "<string>$TRUSTED_SCRIPT</string><string>docker-reposo</string><string>comprobar</string>" "$DOCKER_IDLE_PLIST" && grep -q "launchctl bootstrap gui/" "$W/timer.log" && python3 -c "import plistlib, sys; plistlib.load(open(sys.argv[1], \"rb\"))" "$DOCKER_IDLE_PLIST"'
 else
     check "temporizador: de systemctl --user, cada 15 minutos, con docker-reposo comprobar" 'grep -qx "OnUnitActiveSec=15min" "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.timer" && grep -q "^ExecStart=.* docker-reposo comprobar$" "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service" && grep -q "enable --now nexum-reposo.timer" "$W/timer.log"'
+fi
+if [ $MAC -eq 0 ] && grep -qF 'lvm-instalador\.sh\) docker-reposo ' "$SRC"; then
+    # (1.57.11) Uno puesto con la orden de antes (lvm-instalador, que ya no existe): al mirarlo se rehace
+    sed -i "s#^ExecStart=.*#ExecStart=/usr/local/bin/lvm-instalador docker-reposo comprobar#" "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service"
+    touch "$W/timer-on"
+    ( SELF=/opt/nexum/nexum.sh; command() { [ "$*" == "-v nexum" ] && echo /usr/local/bin/nexum; }; docker_idle_timer_on )
+    check "temporizador con la orden de antes (lvm-instalador): se rehace con nexum" 'grep -qx "ExecStart=/usr/local/bin/nexum docker-reposo comprobar" "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service"'
+    rm -f "$W/timer-on"
 fi
 docker_idle_command horas 0 > "$W/o"
 check "nunca: no se para nada y se quita el temporizador" '[ "$(docker_idle_hours)" == 0 ] && : > "$W/parados.log" && docker_idle_check > /dev/null && [ ! -s "$W/parados.log" ] && [ ! -e "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.timer" ] && [ ! -e "$DOCKER_IDLE_PLIST" ]'

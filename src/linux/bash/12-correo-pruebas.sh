@@ -250,7 +250,7 @@ function mail_apply() {
     secure_all
     rc=$?
     if [ $rc -eq 2 ]; then
-        echo "No se ha podido cambiar en todas las versiones: prueba con lvm-instalador asegurar --todas"
+        echo "No se ha podido cambiar en todas las versiones: prueba con nexum asegurar --todas"
         return 1
     fi
     if [ $rc -eq 0 ] && lampp_running; then
@@ -275,7 +275,7 @@ function mail_command() {
             if mailpit_installed; then
                 echo "  Mailpit $(mailpit_installed_version) en $MAILPIT_BIN$([ -n "$(mailpit_pid)" ] && echo ", en marcha: $MAIL_UI_URL" || echo ", parado (va con la version activa)")"
             else
-                echo "  Mailpit no esta instalado (lvm-instalador correo instalar): sin el, mail() falla y no sale nada"
+                echo "  Mailpit no esta instalado (nexum correo instalar): sin el, mail() falla y no sale nada"
             fi
             return 0 ;;
         si|on|no|off)
@@ -288,7 +288,7 @@ function mail_command() {
                     mailpit_install || return 1
                 fi
                 [ "$DRY" -eq 0 ] && rm -f "$MAIL_OFF_FILE"
-                mailpit_installed || echo "Aviso: Mailpit no esta instalado (lvm-instalador correo instalar): hasta entonces mail() falla"
+                mailpit_installed || echo "Aviso: Mailpit no esta instalado (nexum correo instalar): hasta entonces mail() falla"
             else
                 mail_on || { echo "El correo de pruebas ya estaba apagado"; return 0; }
                 sudo_first || return 1
@@ -312,7 +312,7 @@ function mail_command() {
             mode=$2
             case $mode in
                 mailpit|desactivar|nada) ;;
-                *) echo "Uso: lvm-instalador correo wordpress mailpit|desactivar|nada"; return 1 ;;
+                *) echo "Uso: nexum correo wordpress mailpit|desactivar|nada"; return 1 ;;
             esac
             if [ "$DRY" -eq 1 ]; then
                 echo "  [simulacion] WordPress: $(mail_wp_text "$mode")"
@@ -335,7 +335,7 @@ function mail_command() {
             if mail_on; then
                 mail_apply
             else
-                echo "El correo de pruebas esta apagado: enciendelo con lvm-instalador correo si"
+                echo "El correo de pruebas esta apagado: enciendelo con nexum correo si"
             fi
             return 0 ;;
         vaciar)
@@ -347,7 +347,7 @@ function mail_command() {
         bd)
             mail_db "$2" ;;
         *)
-            echo "Uso: lvm-instalador correo [estado] | si [--instalar] | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>"
+            echo "Uso: nexum correo [estado] | si [--instalar] | no | wordpress mailpit|desactivar|nada | instalar | vaciar | bd <base>"
             return 1 ;;
     esac
 }
@@ -461,7 +461,7 @@ if own(path):
         nl = "\r\n" if "\r\n" in text else "\n"
         new = text + ("" if text.endswith("\n") else nl) + "# lvm-instalador" + nl + "Include " + UNKNOWN_HOST_CONF + nl
         save(path, new, "Apache, rechaza los dominios sin vhost")
-    # El fichero es de lvm-instalador: si es de una version anterior (o le falta el 443), se rehace
+    # El fichero es de nexum: si es de una version anterior (o le falta el 443), se rehace
     conf = os.path.join(base, UNKNOWN_HOST_CONF)
     want = UNKNOWN_HOST_VHOST
     # Otros puertos http (un Listen 8080 puesto a mano): tambien los recibe, si no evil.com:8080
@@ -804,7 +804,7 @@ for c in sorted(changes, key=lambda c: not c[0].endswith("/")):
 function secure_failed() {
     [ "$1" -eq 2 ] && [ "$DRY" -eq 0 ] || return 1
     echo "No se arranca $(basename "$2"): no se ha podido dejar solo para este equipo."
-    echo "Prueba con: lvm-instalador asegurar --todas"
+    echo "Prueba con: nexum asegurar --todas"
     return 0
 }
 
@@ -1060,14 +1060,14 @@ function cross_site_command() {
     case $1 in
         "")
             if cross_site_on; then
-                echo "La barrera entre webs esta encendida (lvm-instalador barrera-web no para apagarla)"
+                echo "La barrera entre webs esta encendida (nexum barrera-web no para apagarla)"
             else
-                echo "La barrera entre webs esta apagada (lvm-instalador barrera-web si para encenderla)"
+                echo "La barrera entre webs esta apagada (nexum barrera-web si para encenderla)"
             fi
             return 0 ;;
         si|on) cross_site_on && { echo "La barrera entre webs ya estaba encendida"; return 0; } ;;
         no|off) cross_site_on || { echo "La barrera entre webs ya estaba apagada"; return 0; } ;;
-        *) echo "Uso: lvm-instalador barrera-web [si|no]"; return 1 ;;
+        *) echo "Uso: nexum barrera-web [si|no]"; return 1 ;;
     esac
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] barrera entre webs $([ "$1" == si ] || [ "$1" == on ] && echo encendida || echo apagada) en todas las versiones"
@@ -1125,7 +1125,7 @@ function secure_command() {
         dir=/opt/lampp-$version
     else
         dir=$(active_dir)
-        [ -n "$dir" ] || { echo "No hay ninguna version activa (indica cual: lvm-instalador asegurar <version>)"; return 1; }
+        [ -n "$dir" ] || { echo "No hay ninguna version activa (indica cual: nexum asegurar <version>)"; return 1; }
     fi
     secure_lampp "$dir"
     rc=$?
@@ -1140,7 +1140,7 @@ function secure_command() {
         local left=$(exposed_summary)
         if [ -n "$left" ]; then
             echo "Sigue abierto a la red: $left"
-            echo "Puede que no sea de LAMPP (otro programa en el mismo puerto): lvm-instalador procesos"
+            echo "Puede que no sea de LAMPP (otro programa en el mismo puerto): nexum procesos"
             return 1
         fi
     fi
@@ -1163,13 +1163,13 @@ function service_control() {
         apache) c=apache ;;
         mariadb|mysql) c=mysql ;;
         ftp) c=ftp ;;
-        *) echo "Uso: lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
+        *) echo "Uso: nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
     esac
     case "$action" in
         arrancar|start) cmds=("start$c") ;;
         parar|stop) cmds=("stop$c") ;;
         reiniciar|restart) cmds=("stop$c" "start$c") ;;
-        *) echo "Uso: lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
+        *) echo "Uso: nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar"; return 1 ;;
     esac
     # Antes de arrancar: solo para este equipo y nada de otras versiones ocupando el puerto
     if [ "${cmds[-1]}" == "start$c" ]; then

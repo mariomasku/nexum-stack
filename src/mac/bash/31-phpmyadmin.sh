@@ -53,7 +53,7 @@ function update_pma() {
     # Antes de cambiar nada como root: la carpeta de la version tiene que ser de root (y en
     # Linux, /opt tambien), no un enlace que lleve a otro sitio
     if [ -n "$SUDO" ] && { [ -L "$dir" ] || ! trusted_version_dir "$BASE_DIR/XAMPP-$version"; }; then
-        echo "No se cambia phpMyAdmin: XAMPP-$version no es de root (lvm-instalador asegurar --todas)"
+        echo "No se cambia phpMyAdmin: XAMPP-$version no es de root (nexum asegurar --todas)"
         return 1
     fi
     task_step
@@ -122,7 +122,7 @@ PY
 if [ -z "$TEST_DIR" ] && [ "$DRY" -eq 0 ] && [[ "$1" != gui-* ]] && [ "$1" != migrar ] && [ "$1" != instalar-gestor ] \
         && [ "$1" != construir-pila ] && [ -t 1 ] && [ -n "$(legacy_dirs)" ]; then
     echo "Aviso: hay versiones en $LEGACY_DIR de antes de la 1.39.3, que el gestor ya no arranca como administrador." >&2
-    echo "Pasalas a $BASE_DIR (de root) con: lvm-instalador migrar" >&2
+    echo "Pasalas a $BASE_DIR (de root) con: nexum migrar" >&2
     if [ -z "$1" ] && ui_yesno "Las versiones de antes de la 1.39.3 estan en $LEGACY_DIR, donde puede escribir el grupo admin (tu usuario), y ya no se arrancan como administrador.\n\nSe pasan a $BASE_DIR (de root) con sus BBDD, proyectos, vhosts y certificados; en $LEGACY_DIR queda un enlace a cada una. Pide tu contraseña de administrador.\n\n¿Pasarlas ahora?"; then
         gestor_migrate
     fi

@@ -14,13 +14,13 @@ class AppAcerca:
         about.destroy()
 
     def on_commands(self, *_):
-        """Ayuda: los comandos de lvm-instalador (lo mismo que lvm-instalador --ayuda)."""
+        """Ayuda: los comandos de nexum (lo mismo que nexum --ayuda)."""
         def show(_rc, out):
-            dlg = Gtk.Dialog(title="Comandos de lvm-instalador", transient_for=self.win,
+            dlg = Gtk.Dialog(title="Comandos de nexum", transient_for=self.win,
                              modal=True, use_header_bar=True)
             dlg.set_default_size(860, 700)
             hb = dlg.get_header_bar()
-            hb.set_subtitle("En la terminal: lvm-instalador --ayuda")
+            hb.set_subtitle("En la terminal: nexum --ayuda")
             copy = Gtk.Button(label="Copiar todo")
             copy.connect("clicked", lambda *_: (
                 Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(out, -1),
@@ -38,7 +38,7 @@ class AppAcerca:
             buf.create_tag("orden", weight=700, pixels_above_lines=4)
             for n, line in enumerate(out.split("\n")):
                 tag = "seccion" if line.startswith("=== ") else \
-                    "orden" if line.startswith("  lvm-instalador") else None
+                    "orden" if line.startswith("  nexum") else None
                 if tag:
                     start = buf.get_iter_at_line(n)
                     end = start.copy()
@@ -56,12 +56,11 @@ class AppAcerca:
     # El capítulo del manual de cada pestaña y de cada apartado de Configuración (los id de ayuda/index.html)
     HELP_TABS = {"proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
                  "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"}
-    HELP_SECTIONS = {"Parches nuevos": "parches", "Configuración": "vhosts", "Seguridad entre webs": "seguridad-webs",
+    HELP_SECTIONS = {"General": "general", "Configuración": "vhosts", "Seguridad entre webs": "seguridad-webs",
                      "Correo de pruebas (Mailpit)": "correo", "Docker": "docker-config",
                      "Túnel de Cloudflare": "tunel-config", "GitHub (Repositorios)": "github-config",
-                     "Registro de errores": "errores", "Apariencia": "apariencia", "Limpieza": "limpieza",
-                     "Carpetas": "carpetas", "XAMPP sin registrar": "xampp-registrar", "Programa": "programa",
-                     "Información": "informacion"}
+                     "Apariencia": "apariencia", "Limpieza": "limpieza", "Carpetas": "carpetas",
+                     "XAMPP sin registrar": "xampp-registrar", "Información": "informacion"}
 
     def on_help(self, *_):
         """Ayuda (menú ☰): el manual, que va dentro del script, en el navegador; en el capítulo de la pestaña

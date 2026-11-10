@@ -1,5 +1,112 @@
 # ---------------------------------------------------------------- tareas con sudo
 
+# Registro de tareas: cada tarea de la ventana deja el suyo en TASKS_DIR (la carpeta y sus ficheros, solo
+# tuyos), con su fecha, su título, la orden de nexum, toda su salida y cómo acabó. Se guardan las
+# TASKS_KEEP últimas (en la demostración, las de su carpeta de ejemplo)
+TASKS_DIR = os.path.join(DEMO, "tareas") if DEMO else os.path.join(LOG_DIR, "tareas")
+TASKS_KEEP = 200
+TASK_LOG_RX = re.compile(r"\d{8}-\d{6}-\d+\.txt")
+# (el registro de una tarea muy larga, como mucho esto: se guarda el final)
+TASK_LOG_MAX = 8 * 1024 * 1024
+TASK_LOG_SEP = "=" * 72
+# Nada de secretos en el registro: el valor de las variables de la tarea que lo parecen (MYSQL_PWD…), lo
+# que va detrás de «contraseña:», «token=»…, los tokens de GitHub y la contraseña de una dirección
+SECRET_NAME_RX = re.compile(r"(?i)pass|pwd|token|secret|clave|key|auth")
+SECRET_RX = re.compile(r"(?i)((?:contraseña|password|passwd|pwd|token|secret|clave)[\w ]{0,16}?[ \t]*[:=][ \t]*)"
+                       r"(?!••••••)[^\s'\"]+")
+SECRET_TOKEN_RX = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})")
+SECRET_URL_RX = re.compile(r"(://[^/\s:@]+:)[^@\s/]+@")
+HIDDEN = "••••••"
+
+
+def task_log_redact(text, env=None):
+    for k, v in (env or {}).items():
+        if v and len(str(v)) >= 3 and SECRET_NAME_RX.search(k):
+            text = text.replace(str(v), HIDDEN)
+    text = SECRET_RX.sub(lambda m: m.group(1) + HIDDEN, text)
+    text = SECRET_TOKEN_RX.sub(HIDDEN, text)
+    return SECRET_URL_RX.sub(lambda m: m.group(1) + HIDDEN + "@", text)
+
+
+def task_log_command(args):
+    """La orden de la tarea como se escribiría en la terminal."""
+    return " ".join(["nexum"] + (["--simular"] if SIMULATE else []) + [shlex.quote(str(a)) for a in args])
+
+
+def task_log_dir():
+    """La carpeta del registro de tareas, creada y solo tuya (None si no se puede o es un enlace)."""
+    try:
+        if os.path.islink(TASKS_DIR):
+            return None
+        os.makedirs(TASKS_DIR, mode=0o700, exist_ok=True)
+        os.chmod(TASKS_DIR, 0o700)
+        return TASKS_DIR
+    except OSError:
+        return None
+
+
+def task_log_write(path, text):
+    """Escribe el registro de una tarea (solo tuyo, 600; sin seguir enlaces)."""
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", errors="replace") as f:
+            f.write(text)
+    except OSError:
+        pass
+
+
+def task_log_prune():
+    """Se quedan las TASKS_KEEP últimas: las más viejas se borran."""
+    try:
+        names = sorted(n for n in os.listdir(TASKS_DIR) if TASK_LOG_RX.fullmatch(n))
+    except OSError:
+        return
+    for n in names[:-TASKS_KEEP]:
+        try:
+            os.unlink(os.path.join(TASKS_DIR, n))
+        except OSError:
+            pass
+
+
+def task_log_read(path, limit=None):
+    """Un registro de tareas: (cabecera {clave: valor}, texto entero). Solo un fichero normal, sin enlaces."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as f:
+            if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                return None
+            text = f.read(limit if limit else TASK_LOG_MAX + 65536).decode("utf-8", "replace")
+    except OSError:
+        return None
+    head = {}
+    for line in text.split("\n" + TASK_LOG_SEP, 1)[0].splitlines():
+        k, sep, v = line.partition(": ")
+        if sep:
+            head[k.strip()] = v.strip()
+    return head, text
+
+
+def task_logs():
+    """Los registros de tareas, el más nuevo primero: [{path, title, when, result, state}]."""
+    try:
+        names = sorted((n for n in os.listdir(TASKS_DIR) if TASK_LOG_RX.fullmatch(n)), reverse=True)
+    except OSError:
+        return []
+    out = []
+    for n in names[:TASKS_KEEP]:
+        got = task_log_read(os.path.join(TASKS_DIR, n), 4096)
+        if got is None:
+            continue
+        head = got[0]
+        res = head.get("Resultado", "")
+        state = "ok" if res.startswith("Terminada") else "cancel" if res.startswith("Cancelada") \
+            else "run" if res.startswith("En marcha") else "error"
+        out.append({"path": os.path.join(TASKS_DIR, n), "title": head.get("Tarea", n), "when": head.get("Fecha", ""),
+                    "result": res, "state": state, "command": head.get("Orden", "")})
+    return out
+
+
 class Task:
     """Ejecuta un comando del script en una pseudoterminal y muestra su avance en una ventana.
 
@@ -19,6 +126,8 @@ class Task:
         self.pending = ""
         self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
         self.pfile = None
+        self.title = title
+        self.log_path = None
         self.build(title)
         self.start()
 
@@ -145,6 +254,33 @@ class Task:
         self.started = time.time()
         self.timer = GLib.timeout_add(1000 if self.progress else 120, self.on_timer)
         self.on_timer()
+        # (su registro, desde que empieza: si la ventana se cierra a medias, queda al menos qué se lanzó)
+        if task_log_dir():
+            self.log_path = os.path.join(TASKS_DIR, "%s-%d%03d.txt" % (time.strftime("%Y%m%d-%H%M%S", time.localtime(
+                self.started)), os.getpid(), int(self.started * 1000) % 1000))
+            self.save_log("En marcha (o la ventana se cerró antes de que acabara)")
+            task_log_prune()
+            if hasattr(self.app, "nv_tasks_fill"):
+                self.app.nv_tasks_fill()
+
+    def save_log(self, result, text=""):
+        """El registro de la tarea en TASKS_DIR: la cabecera (título, orden, fecha, cómo acabó) y su salida,
+        la misma de su ventana, sin secretos."""
+        if not self.log_path:
+            return
+        head = ["Tarea: %s" % self.title.replace("\n", " "),
+                "Orden: %s" % task_log_command(self.args),
+                "Fecha: %s" % time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(self.started)),
+                "Resultado: %s" % result]
+        if text:
+            head.append("Duración: %s" % fmt_clock(time.time() - self.started))
+        if self.env:
+            head.append("Variables: %s" % " ".join(
+                "%s=%s" % (k, HIDDEN if SECRET_NAME_RX.search(k) else v) for k, v in sorted(self.env.items())))
+        if len(text) > TASK_LOG_MAX:
+            text = "(…se ha cortado el principio: solo se guarda el final)\n" + text[-TASK_LOG_MAX:]
+        body = "\n".join(head) + "\n" + TASK_LOG_SEP + "\n" + text.rstrip() + "\n"
+        task_log_write(self.log_path, task_log_redact(body, self.env))
 
     def read_all(self):
         chunks = []
@@ -384,6 +520,11 @@ class Task:
             except OSError:
                 pass
         ok = rc == 0 and not self.cancelled
+        self.save_log("Cancelada" if self.cancelled else "Terminada bien" if ok else "Ha fallado (código %d)" % rc,
+                      self.log_text() or "(sin salida)")
+        # (Configuración, General: el registro de tareas, con esta ya acabada)
+        if hasattr(self.app, "nv_tasks_fill"):
+            self.app.nv_tasks_fill()
         self.info.set_label("Tiempo total: %s" % fmt_clock(time.time() - self.started))
         self.bar.set_fraction(1 if ok else self.bar.get_fraction())
         self.close_btn.set_label("Cerrar")

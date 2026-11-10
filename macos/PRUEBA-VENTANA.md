@@ -10,15 +10,15 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
 
    ```bash
    ls -la /Applications | grep XAMPP; readlink /Applications/XAMPP
-   lvm-instalador estado; lvm-instalador list-db
-   readlink /opt/homebrew/bin/lvm-instalador
+   nexum estado; nexum list-db
+   readlink /opt/homebrew/bin/nexum
    ```
 
-2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `lvm-instalador exportar-bd <base> ~/copia.zip`.
+2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `nexum exportar-bd <base> ~/copia.zip`.
 3. **Instala la 1.57.6** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/lvm-instalador-mac-1.57.6/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/nexum-mac-1.57.6/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -33,10 +33,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ls -ld /Library/Nexum /Library/Nexum/gestor; ls -l /Library/Nexum/gestor   # root wheel, rwxr-xr-x
    /Library/Nexum/gestor/bash --version | head -1                                # 5.3.20
    otool -L /Library/Nexum/gestor/bash                                            # solo /usr/lib
-   readlink /opt/homebrew/bin/lvm-instalador /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
+   readlink /opt/homebrew/bin/nexum /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   lvm-instalador version                                                         # Nexum Dev Stack 1.57.6
+   nexum version                                                         # Nexum Dev Stack 1.57.6
    ```
 
 5. **Comprueba las versiones:**
@@ -46,7 +46,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ls -la /Library/Nexum                 # las carpetas de verdad, de root; sin .migracion
    grep -rn '/Applications/XAMPP-' /Library/Nexum/XAMPP-*/xamppfiles/etc /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf
                                          # nada (DocumentRoot "/Applications/XAMPP/xamppfiles/htdocs/…" sí puede salir con otra búsqueda: es el enlace de la activa y está bien)
-   lvm-instalador estado; lvm-instalador list-db; lvm-instalador procesos
+   nexum estado; nexum list-db; nexum procesos
    ```
 
    - Los proyectos abren igual (`http://web.local`, los https sin aviso del navegador, las tiendas con dominio falseado) y phpMyAdmin (`http://127.0.0.1/phpmyadmin/`) enseña las mismas BBDD. `/etc/hosts` no cambia.
@@ -60,19 +60,19 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
      done
      ```
 
-   - Cambia de versión (`lvm-instalador use 7.4` y vuelve a la tuya) y, en la ventana, **Encendidos** / **Parados** con la contraseña.
-   - **Root ya no pasa por /Applications:** `mv /Applications/XAMPP-compartido /Applications/XAMPP-compartido.prueba` (es solo el enlace) y `lvm-instalador reiniciar`: tiene que arrancar y servir los proyectos igual. Después, `mv /Applications/XAMPP-compartido.prueba /Applications/XAMPP-compartido`.
+   - Cambia de versión (`nexum use 7.4` y vuelve a la tuya) y, en la ventana, **Encendidos** / **Parados** con la contraseña.
+   - **Root ya no pasa por /Applications:** `mv /Applications/XAMPP-compartido /Applications/XAMPP-compartido.prueba` (es solo el enlace) y `nexum reiniciar`: tiene que arrancar y servir los proyectos igual. Después, `mv /Applications/XAMPP-compartido.prueba /Applications/XAMPP-compartido`.
    - **Una copia no ejecuta nada como root:** `cp /Library/Nexum/gestor/lvm-instalador.sh /tmp/x.sh && bash /tmp/x.sh version` dice la versión del gestor de root (abre el instalado, no la copia).
-   - `lvm-instalador migrar` otra vez: no hace nada (ya no queda nada en `/Applications`).
+   - `nexum migrar` otra vez: no hace nada (ya no queda nada en `/Applications`).
 6. **Docker:** en Docker Desktop, **Settings › Resources › File sharing**, añade `/Library/Nexum/XAMPP-compartido/htdocs` y pulsa Apply. Arranca tus proyectos en Docker (apartado Docker, Arrancar): `grep htdocs ~/.lvm-instalador/docker/*/compose.yaml` tiene que enseñar la ruta nueva, y cada proyecto abre por `https://<carpeta>.docker.local` con sus datos. `sudo ls -l /Library/Nexum/XAMPP-compartido/docker-claves` → ficheros de root con `-rw-------`.
-7. **Si algo falla:** pásame toda la salida de Terminal y la de `ls -la /Applications /Library/Nexum` y `sudo ls -la /Library/Nexum/.migracion` (si existe: es el diario para deshacer). Si se quedara a medias, `lvm-instalador migrar` primero deshace lo que quedó en el diario y vuelve a empezar. Después de pasar las versiones, la 1.39.2 ya no las ve (busca carpetas en `/Applications`): no vuelvas a ella sin avisarme.
+7. **Si algo falla:** pásame toda la salida de Terminal y la de `ls -la /Applications /Library/Nexum` y `sudo ls -la /Library/Nexum/.migracion` (si existe: es el diario para deshacer). Si se quedara a medias, `nexum migrar` primero deshace lo que quedó en el diario y vuelve a empezar. Después de pasar las versiones, la 1.39.2 ya no las ve (busca carpetas en `/Applications`): no vuelvas a ella sin avisarme.
 
 ## Paso 1: compilar la ventana
 
 Con el paso 0 ya está compilada. Si no se abrió, ejecuta:
 
 ```bash
-lvm-instalador ventana
+nexum ventana
 ```
 
 - Si compila, se abre la ventana nueva y la aplicación de `~/Applications` pasa a llamarse «Nexum Dev Stack» (la «Nexum Stack» de antes desaparece).
@@ -83,7 +83,7 @@ lvm-instalador ventana
 Cierra la ventana y ábrela en modo simulación:
 
 ```bash
-lvm-instalador --simular ventana
+nexum --simular ventana
 ```
 
 Comprueba (el pie de la barra lateral dice «SIMULACIÓN»):
@@ -135,7 +135,7 @@ Si algo falla, pasa la salida de la tarea («Ver registro») y la de `docker ps 
 ## Paso 6: sin gnupg, Homebrew y cerrar la ventana (1.39.5)
 
 1. **Rehacer una versión** (por ejemplo XAMPP-8.5.12, menú ⋯ → actualizar o rehacer): en la consola de la tarea, tras «Instalando las librerias de Homebrew para compilar», o «Ya estan todas instaladas» (y no se llama a Homebrew), o «Se instalan con Homebrew: …» solo con las que falten, y el aviso de que en las versiones de macOS sin paquetes hechos se compilan y puede tardar. Ya no sale `gnupg` ni se compilan python, meson o gnutls por él, ni los avisos repetidos de «A newer Command Line Tools release is available». Después: «Firma de httpd.tar.bz2 comprobada (clave …)», lo mismo para apr, apr-util, php.tar.xz, pma.tar.xz y mariadb.tar.gz.
-2. `lvm-instalador preparar-firma` → «Ya no hace falta gnupg…» (no instala nada). Si ya tenías gnupg de Homebrew, puedes quitarlo con `brew uninstall gnupg` (el gestor no lo usa).
+2. `nexum preparar-firma` → «Ya no hace falta gnupg…» (no instala nada). Si ya tenías gnupg de Homebrew, puedes quitarlo con `brew uninstall gnupg` (el gestor no lo usa).
 3. **Cerrar la ventana:** desde la 1.40.2 cambia; se prueba en el paso 12. Minimízala (botón amarillo) y pulsa el icono del Dock: vuelve, con sus datos.
 4. (Cerrar la ventana con una tarea en marcha: paso 12.)
 5. **Barra de arriba:** sin el botón de phpMyAdmin (está en Bases de datos y en el menú Gestor → Abrir phpMyAdmin). El nombre: «Nexum» en negrita y «Dev Stack» normal y en azul; cambia el tema (menú ☰) y comprueba que se lee bien en los dos.
@@ -151,7 +151,7 @@ Lo que mandan las webs (formularios, pedidos, contraseñas) tiene que llegar a M
    ls -ld /Library/Nexum/mailpit; ls -l /Library/Nexum/mailpit     # root wheel; mailpit rwxr-xr-x, LICENSE y version
    xattr /Library/Nexum/mailpit/mailpit                             # nada (sin cuarentena)
    codesign -v /Library/Nexum/mailpit/mailpit && echo firma-ok
-   lvm-instalador correo                                            # encendido, WordPress a Mailpit, Mailpit 1.32.0 en marcha
+   nexum correo                                            # encendido, WordPress a Mailpit, Mailpit 1.32.0 en marcha
    ```
 
 2. **Con la versión activa en marcha**, Mailpit también (la tarea de instalar termina sola, sin quedarse en el 98 %):
@@ -169,12 +169,12 @@ Lo que mandan las webs (formularios, pedidos, contraseñas) tiene que llegar a M
 5. **Las tres opciones de WordPress** (Configuración): «Desactivarlos en la copia local» (en wp-admin, WP Mail SMTP sale desactivado; el formulario sigue llegando a Mailpit), «No tocarlos» (sale el aviso en naranja «⚠ No se tocan…»; al volver a cargar el proyecto, los plugins vuelven a estar como en producción: el registro dice «Correo de pruebas deshecho…») y «Llevarlos a Mailpit» otra vez. Cada cambio pide la contraseña (rehace el PHP de todas las versiones).
 6. **PrestaShop:** carga una tienda; en el registro, «PrestaShop (ps_configuration): correo por SMTP a Mailpit (127.0.0.1:1025)». En su back office (Parámetros avanzados → Correo electrónico) sale SMTP con 127.0.0.1 y el puerto 1025. Haz un **pedido de prueba** en la tienda: el correo de confirmación al cliente y el aviso a la tienda están en Mailpit.
 7. **Al lado de «PROYECTO CARGADO»** sale «su correo va a Mailpit» con el logotipo, en gris; al pasar el ratón, la explicación.
-8. **Las copias llevan el correo de producción:** en Bases de datos, descarga la BBDD de esa tienda o ese WordPress (o `lvm-instalador exportar-bd <base> ~/copia.sql`). El registro dice «Los cambios del correo de pruebas no van en la copia…». En el `.sql`: no hay ``CREATE TABLE `lvm_correo_original` ``, y al final, tras «-- lvm-instalador: el correo de pruebas cambio esto…», los `UPDATE` con lo de antes. Cárgala en otra BBDD vacía de prueba con phpMyAdmin: `PS_MAIL_SERVER` (o los plugins activos de WordPress) son los de producción. La BBDD de trabajo sigue con el correo a Mailpit.
+8. **Las copias llevan el correo de producción:** en Bases de datos, descarga la BBDD de esa tienda o ese WordPress (o `nexum exportar-bd <base> ~/copia.sql`). El registro dice «Los cambios del correo de pruebas no van en la copia…». En el `.sql`: no hay ``CREATE TABLE `lvm_correo_original` ``, y al final, tras «-- lvm-instalador: el correo de pruebas cambio esto…», los `UPDATE` con lo de antes. Cárgala en otra BBDD vacía de prueba con phpMyAdmin: `PS_MAIL_SERVER` (o los plugins activos de WordPress) son los de producción. La BBDD de trabajo sigue con el correo a Mailpit.
 9. **Vaciar** (fila «Bandeja de entrada», pide confirmación): la bandeja queda vacía y el número de **Correo** desaparece.
 10. **Apagar** el interruptor «Correo de pruebas» (pide confirmación, en rojo, y la contraseña): el botón **Correo** de arriba desaparece, Mailpit se para y `99-lvm-correo.ini` se queda sin directivas; al cargar el proyecto, su BBDD vuelve a ser la de antes (sin `lvm_correo_original`). Vuelve a encenderlo.
 11. **Docker:** sus proyectos aún no mandan a Mailpit (queda para más adelante); su BBDD copiada lleva el correo de producción.
 
-Si algo falla, pasa la salida de la tarea, `lvm-instalador correo`, `cat ~/.lvm-instalador/mailpit/mailpit.log ~/.lvm-instalador/mailpit/salida.log` y `ps -axo user,pid,command | grep mailpit`.
+Si algo falla, pasa la salida de la tarea, `nexum correo`, `cat ~/.lvm-instalador/mailpit/mailpit.log ~/.lvm-instalador/mailpit/salida.log` y `ps -axo user,pid,command | grep mailpit`.
 
 ## Paso 8: imágenes de producción, borrar un proyecto y Docker (1.39.25)
 
@@ -404,7 +404,7 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 1. En **Versiones de PHP → Instalar**, debajo de la lista de ramas está **Otro parche concreto**. Elige una rama: salen todos sus parches de php.net, con su fecha y si son de seguridad.
 2. El último de la rama dice «márcalo en la lista de arriba»; los ya instalados salen atenuados. Marca uno antiguo (por ejemplo, el penúltimo): arriba sale en «Marcados» (la ✕ lo quita) y el botón dice «Instalar 1 versión».
 3. Instálalo (20-40 min): va a /Library/Nexum/XAMPP-X.Y.Z. Al acabar, «Activar XAMPP-X.Y.Z» activa esa carpeta.
-4. En la terminal: `lvm-instalador instalar --php 8.3.10` instala ese parche; uno que no exista en php.net dice que se omite.
+4. En la terminal: `nexum instalar --php 8.3.10` instala ese parche; uno que no exista en php.net dice que se omite.
 
 ## Qué apuntar
 

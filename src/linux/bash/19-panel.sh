@@ -162,7 +162,7 @@ function panel_install() {
     check_space "$needed" || return 0
 
     if other_lvm_running; then
-        ui_msg "Hay otra ejecucion de lvm en marcha. Espera a que termine."
+        ui_msg "Hay otra ejecucion de Nexum en marcha. Espera a que termine."
 
         return 0
     fi
@@ -351,7 +351,7 @@ function panel_rebuild() {
     check_space "$SPACE_STACK_GB" || return 0
 
     if other_lvm_running; then
-        ui_msg "Hay otra ejecucion de lvm en marcha. Espera a que termine."
+        ui_msg "Hay otra ejecucion de Nexum en marcha. Espera a que termine."
 
         return 0
     fi
@@ -470,9 +470,9 @@ function panel_remove() {
 
 # Icono del acceso del menu (PNG 256x256 incrustado, para que el instalador siga siendo un solo archivo).
 # Lleva el nombre de la aplicacion para que GNOME no siga mostrando el icono antiguo de su cache
-ICON_FILE="$HOME/.local/share/icons/lampp-version-manager.png"
-OLD_ICON_FILES=("$HOME/.local/share/icons/lvm-instalador.png" "$HOME/.local/share/icons/php-version-loader.png"
-    "$HOME/.local/share/icons/php-version-manager.png")
+ICON_FILE="$HOME/.local/share/icons/nexum.png"
+OLD_ICON_FILES=("$HOME/.local/share/icons/lampp-version-manager.png" "$HOME/.local/share/icons/lvm-instalador.png"
+    "$HOME/.local/share/icons/php-version-loader.png" "$HOME/.local/share/icons/php-version-manager.png")
 ICON_PNG_B64='
 iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAABHNCSVQICAgIfAhkiAAAIABJREFUeJzsvXecJUd57/19qrr7hMlp
 Z3NQWFAAIQQSksASwWQwItrXluEaAcZgwsXGgC8Xrs177QsGbMBgjDGYZEww2NiAA+Y6ALZJMiAESEhotUEbZ3YnnHO6q+p5/6g+
@@ -977,7 +977,15 @@ function replace_favorite() {
 }
 
 LAUNCHER_DIR="$HOME/.local/share/applications"
-LAUNCHER="$LAUNCHER_DIR/lampp-version-manager.desktop"
+LAUNCHER="$LAUNCHER_DIR/nexum.desktop"
+# El del paquete (.deb), para todos los usuarios: con el, no hace falta el tuyo
+SYSTEM_LAUNCHER=/usr/share/applications/nexum.desktop
+OLD_LAUNCHERS=(lampp-version-manager.desktop lvm-instalador.desktop php-version-loader.desktop php-version-manager.desktop)
+
+# ¿Hay acceso del menu (el tuyo o el del paquete)?
+function launcher_exists() {
+    [ -f "$LAUNCHER" ] || [ -f "$SYSTEM_LAUNCHER" ]
+}
 
 # Pone al dia los accesos creados por versiones anteriores (nombre, icono y lo que abren)
 function update_launchers() {
@@ -986,7 +994,7 @@ function update_launchers() {
     # El acceso antiguo se renombra: GNOME no siempre relee un .desktop que cambia de contenido,
     # pero con otro nombre de archivo lo trata como una aplicacion nueva (nombre e icono incluidos)
     local old changed=0
-    for old in "$apps/lvm-instalador.desktop" "$apps/php-version-loader.desktop" "$apps/php-version-manager.desktop"; do
+    for old in "${OLD_LAUNCHERS[@]/#/$apps/}"; do
         [ -f "$old" ] || continue
         replace_favorite "$(basename "$old")" "$(basename "$launcher")"
         if [ -f "$launcher" ]; then
@@ -1006,10 +1014,10 @@ function update_launchers() {
             changed=1
         fi
         local exec_lines=$(launcher_exec)
-        # El acceso del paquete (.deb) abre el script de /opt/lvm-instalador, que es de root: una copia
+        # El acceso del paquete (.deb) abre el script de /opt/nexum, que es de root: una copia
         # que se ejecute desde otra carpeta (Descargas, que es tuya y la puede cambiar otro programa)
         # no se lo lleva a ella, porque en esa ventana se escribe la contraseña
-        if grep -q '^Exec=.*/opt/lvm-instalador/' "$launcher" && [[ "$SELF" != /opt/lvm-instalador/* ]]; then
+        if grep -q '^Exec=.*/opt/\(nexum\|lvm-instalador\)/' "$launcher" && [[ "$SELF" != /opt/nexum/* ]]; then
             exec_lines=$(grep -E '^(Exec|Terminal|StartupWMClass)=' "$launcher")
         fi
         if [ "$(grep -E '^(Exec|Terminal|StartupWMClass)=' "$launcher")" != "$exec_lines" ]; then
@@ -1020,8 +1028,8 @@ function update_launchers() {
         fi
     fi
     [ $changed -eq 1 ] && refresh_launchers "$apps"
-    if [ -f "$launcher" ]; then
-        for old in lvm-instalador.desktop php-version-loader.desktop php-version-manager.desktop; do
+    if launcher_exists; then
+        for old in "${OLD_LAUNCHERS[@]}"; do
             replace_favorite "$old" "$(basename "$launcher")"
         done
     fi
@@ -1047,30 +1055,31 @@ EOF
 function offer_command_install() {
     [ "$DRY" -eq 1 ] && return 0
 
-    local marker="$LOG_DIR/.accesos-ofrecidos-pvm"
-    local launcher=$LAUNCHER
-    local need_cmd=0 need_lvm=0 need_launcher=0
+    local marker="$LOG_DIR/.accesos-ofrecidos-nexum"
+    local need_cmd=0 need_launcher=0
 
     update_launchers
 
-    # Comandos creados por versiones anteriores que apuntan a otro archivo del instalador (por
-    # ejemplo al pvm-instalador.sh de las versiones 1.5 a 1.7): lvm-instalador y lvm se reapuntan
-    # y pvm-instalador, el nombre de esas versiones, se quita. Se ofrece aunque ya se ofreciera antes
+    # Comandos de versiones anteriores: nexum que apunta a otro archivo del instalador se reapunta, y
+    # lvm-instalador y pvm-instalador (los nombres de antes) se quitan. lvm, solo si es un enlace a un
+    # lvm-instalador.sh (el de este programa): cualquier otro lvm es de otro programa y no se toca.
+    # Se ofrece aunque ya se ofreciera antes
     local link old_links=() drop_links=()
-    # (los que llevan al de /opt/lvm-instalador, el del paquete, no se tocan: es de root)
-    for link in /usr/local/bin/lvm-instalador /usr/local/bin/lvm; do
-        [ -L "$link" ] && [ "$(readlink "$link")" != "$SELF" ] \
-            && [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] \
-            && [[ "$(readlink "$link")" != /opt/lvm-instalador/* ]] && old_links+=("$link")
+    # (los que llevan al de /opt/nexum, el del paquete, no se tocan: es de root y los pone el paquete)
+    link=/usr/local/bin/nexum
+    [ -L "$link" ] && [ "$(readlink "$link")" != "$SELF" ] \
+        && [[ "$(readlink "$link")" == */nexum.sh || "$(readlink "$link")" == */[lp]vm-instalador.sh ]] \
+        && [[ "$(readlink "$link")" != /opt/nexum/* ]] && old_links+=("$link")
+    for link in /usr/local/bin/lvm-instalador /usr/local/bin/pvm-instalador; do
+        [ -L "$link" ] && [[ "$(readlink "$link")" == */*-instalador.sh ]] && drop_links+=("$link")
     done
-    link=/usr/local/bin/pvm-instalador
-    [ -L "$link" ] && [[ "$(readlink "$link")" == */[lp]vm-instalador.sh ]] && drop_links+=("$link")
+    link=/usr/local/bin/lvm
+    [ -L "$link" ] && [[ "$(readlink "$link")" == *lvm-instalador.sh ]] && drop_links+=("$link")
 
     [ -f "$marker" ] && [ ${#old_links[@]} -eq 0 ] && [ ${#drop_links[@]} -eq 0 ] && return 0
-    command -v lvm-instalador > /dev/null || need_cmd=1
-    command -v lvm > /dev/null || need_lvm=1
+    command -v nexum > /dev/null || need_cmd=1
     [ ${#old_links[@]} -gt 0 ] || [ ${#drop_links[@]} -gt 0 ] && need_cmd=1
-    [ -f "$launcher" ] || need_launcher=1
+    launcher_exists || need_launcher=1
     [ $need_cmd -eq 0 ] && [ $need_launcher -eq 0 ] && return 0
 
     mkdir -p -m 700 "$LOG_DIR"
@@ -1078,14 +1087,13 @@ function offer_command_install() {
 
     local text="¿Quieres crear accesos directos para abrir este instalador facilmente?\n\n"
     [ $need_launcher -eq 1 ] && text+="  - Icono '$APP_NAME' en el menu de aplicaciones\n"
-    command -v lvm-instalador > /dev/null || text+="  - Comando 'lvm-instalador' en la terminal\n"
+    command -v nexum > /dev/null || text+="  - Comando 'nexum' en la terminal ('nexum use 8.4', 'nexum ventana'...)\n"
     for link in "${old_links[@]}"; do
         text+="  - Comando '$(basename "$link")' (ya existe): que abra este archivo\n"
     done
     for link in "${drop_links[@]}"; do
-        text+="  - Quitar el comando antiguo '$(basename "$link")' (ahora es 'lvm-instalador')\n"
+        text+="  - Quitar el comando antiguo '$(basename "$link")' (ahora es 'nexum')\n"
     done
-    [ $need_cmd -eq 1 ] && [ $need_lvm -eq 1 ] && text+="  - Comando 'lvm' en la terminal ('lvm use 8.4', 'lvm instalador'...)\n"
     text+="\nApuntaran a: $SELF\n(no muevas ni borres este archivo despues)"
 
     ui_yesno "$text" || return 0
@@ -1095,13 +1103,12 @@ function offer_command_install() {
     if [ $need_cmd -eq 1 ]; then
         [ "$UI" == "whiptail" ] && clear
         echo "Para crear el comando se necesita la contraseña de administrador (sudo):"
-        command -v lvm-instalador > /dev/null || sudo ln -sf "$SELF" /usr/local/bin/lvm-instalador
-        [ $need_lvm -eq 1 ] && sudo ln -s "$SELF" /usr/local/bin/lvm
+        command -v nexum > /dev/null || sudo ln -sf "$SELF" /usr/local/bin/nexum
         for link in "${old_links[@]}"; do sudo ln -sfn "$SELF" "$link"; done
         for link in "${drop_links[@]}"; do sudo rm -f "$link"; done
     fi
 
-    ui_msg "Accesos creados. A partir de ahora puedes abrir el instalador desde el menu de aplicaciones o escribiendo 'lvm-instalador' en la terminal."
+    ui_msg "Accesos creados. A partir de ahora puedes abrir el instalador desde el menu de aplicaciones o escribiendo 'nexum' en la terminal."
 }
 
 # Acerca de: que hace el instalador y la lista de versiones con sus cambios (la ultima, arriba)
@@ -1123,6 +1130,39 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.57.11 (10 nov 2026)
+- La orden de la terminal es nexum: nexum ventana, nexum use 8.4,
+  nexum --ayuda... lvm-instalador ya no existe (ni como otro nombre).
+  La orden lvm no se toca: si es de otro programa, sigue igual.
+- El paquete se llama nexum (nexum_1.57.11_all.deb) y se instala en
+  /opt/nexum. Al instalarlo se quita el de antes, y con él
+  lvm-instalador. Esta versión se instala una vez a mano, en la
+  terminal: sudo apt install ./nexum_1.57.11_all.deb. Las siguientes
+  se vuelven a actualizar desde la ventana.
+- Al instalarlo, los iconos del menú de antes y el temporizador de los
+  proyectos de Docker sin visitas pasan a usar nexum.
+- Configuración, General (el primero): el registro de errores, el
+  registro de tareas, los parches nuevos y lo del programa, juntos.
+- Registro de tareas: cada tarea de la ventana (instalar, cargar, un
+  interruptor, un botón...) guarda en ~/.lvm-instalador/tareas la orden
+  que ha ejecutado (nexum ...) y todo lo que ha escrito, sin
+  contraseñas ni tokens. En General se ven las últimas y cada una
+  entera, para copiarla o repetirla en la terminal. Se guardan 200.
+- Limpieza: cada cosa explica qué es, dónde está y qué pasa al
+  limpiarla. Nada de lo que se limpia hace falta a ningún proyecto.
+- Los desplegables con buscador se abren como poco tan anchos como el
+  desplegable y crecen hasta ver los nombres enteros.
+- Dominios y hosts: todos los falseados (también los .local) arriba, en
+  un recuadro como el visor de Proyectos y en dos columnas, cada uno con
+  su interruptor.
+- «Opciones de la BBDD…» (antes, vincular): en cada versión de PHP, la
+  BBDD del proyecto o cambiarla por otra copia.
+- Menú lateral: Docker y Node con su icono y su logotipo de letras.
+  Apariencia: los apartados del menú lateral, en dos columnas.
+- El ⋮ «Más» del visor no saca mensaje al dejar el ratón encima.
+- El visor de arriba y los recuadros hundidos, más claros con el tema
+  claro (como en el Mac).
 
 1.57.10 (10 nov 2026)
 - El manual, dentro del programa: «Ayuda», en el menú ☰, lo abre en el
@@ -2876,7 +2916,7 @@ import re, sys
 
 VERSION = re.compile(r"^(\d+\.\d+\.\d+) \((.+)\)$")
 # Rutas (/opt/..., ~/...) y nombres de fichero: en letra de codigo (no lo de detras de https://)
-CODE = re.compile(r"(?<![\w`:/])((?:~/|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
+CODE = re.compile(r"(?<![\w`:/])((?:~/|\./|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
                   r"\.(?:php|conf|cnf|deb|dmg|sql|zip|gz|desktop|policy|md|py|sh|log|pid|run|sha256)\b)")
 
 

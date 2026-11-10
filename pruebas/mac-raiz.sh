@@ -300,6 +300,8 @@ check "install_stack: root mira las librerias de lo que copia antes de instalarl
 
 # --- Lo de alrededor del paso: legacy_dirs, la copia vieja, los comandos, Docker ---
 extract "$SRC" legacy_dirs retire_old_copies point_commands docker_refresh_compose script_is_newer || exit 1
+# (desde la 1.57.11 la orden es nexum: los comandos de antes se quitan con drop_old_commands)
+grep -q '^function drop_old_commands() {' "$SRC" && { extract "$SRC" drop_old_commands || exit 1; }
 realpath_f() { readlink -f "$1"; }
 # (ln -h del Mac: en Linux, -n)
 ln() { if [ "$1" = -sfh ]; then shift; command ln -sfn "$@"; else command ln "$@"; fi; }
@@ -316,11 +318,15 @@ ln -s "$H/otra/lvm-instalador.sh" "$W/bin/lvm"; ln -s "$W/fuera.sh" "$W/bin/lvm-
 check "copia vieja: la de ~/lvm-instalador se queda en un aviso que abre el gestor de root" '! grep -q "^APP_VERSION=" "$H/lvm-instalador/lvm-instalador.sh" && grep -qx "exec /bin/bash $TRUSTED_SCRIPT \"\$@\"" "$H/lvm-instalador/lvm-instalador.sh" && bash -n "$H/lvm-instalador/lvm-instalador.sh" && [ -x "$H/lvm-instalador/lvm-instalador.sh" ]'
 check "copia vieja: una mas nueva o fuera de tu carpeta no se toca" 'grep -q "echo nueva" "$H/otra/lvm-instalador.sh" && grep -q "^APP_VERSION=\"1.39.0\"" "$W/fuera.sh"'
 mkdir -p "$W/bin2"; ln -s "$H/lvm-instalador/lvm-instalador.sh" "$W/bin2/lvm-instalador"; ln -s /usr/bin/true "$W/bin2/lvm"
-# (en Linux hay un lvm del sistema: el PATH, solo con ln y readlink)
-mkdir -p "$W/pb"; for c in ln readlink; do command ln -s "$(type -P $c)" "$W/pb/$c"; done
+# (en Linux hay un lvm del sistema: el PATH, solo con ln, readlink y rm)
+mkdir -p "$W/pb"; for c in ln readlink rm; do command ln -s "$(type -P $c)" "$W/pb/$c"; done
 ( DRY=0 CMD_DIR=$W/bin2 SELF=$TRUSTED_SCRIPT; point_commands ); mkdir -p "$W/bin3"; ( DRY=0 CMD_DIR=$W/bin3 SELF=$TRUSTED_SCRIPT; PATH=$W/pb; point_commands )
-check "comandos: el de la copia vieja pasa al gestor de root; uno de otro programa no se toca" '[ "$(readlink "$W/bin2/lvm-instalador")" = "$TRUSTED_SCRIPT" ] && [ "$(readlink "$W/bin2/lvm")" = /usr/bin/true ]'
-check "comandos: si no estan, se crean (como hacia el .dmg)" '[ "$(readlink "$W/bin3/lvm-instalador")" = "$TRUSTED_SCRIPT" ] && [ "$(readlink "$W/bin3/lvm")" = "$TRUSTED_SCRIPT" ]'
+check "comandos: nexum, al gestor de root; lvm-instalador de antes (a una copia vieja), quitado; un lvm de otro programa no se toca" '[ "$(readlink "$W/bin2/nexum")" = "$TRUSTED_SCRIPT" ] && [ ! -L "$W/bin2/lvm-instalador" ] && [ "$(readlink "$W/bin2/lvm")" = /usr/bin/true ]'
+check "comandos: si no estan, se crea nexum (como hacia el .dmg), y nada llamado lvm" '[ "$(readlink "$W/bin3/nexum")" = "$TRUSTED_SCRIPT" ] && [ ! -e "$W/bin3/lvm" ] && [ ! -L "$W/bin3/lvm" ] && [ ! -L "$W/bin3/lvm-instalador" ]'
+# (1.57.11) El lvm que ponia Nexum (un enlace al gestor, lvm-instalador.sh) se quita; un nexum de otro programa, no se toca
+mkdir -p "$W/bin4"; ln -s "$TRUSTED_SCRIPT" "$W/bin4/lvm"; ln -s "$TRUSTED_SCRIPT" "$W/bin4/lvm-instalador"; ln -s /usr/bin/true "$W/bin4/nexum"
+( DRY=0 CMD_DIR=$W/bin4 SELF=$TRUSTED_SCRIPT; PATH=$W/pb; point_commands )
+check "comandos: el lvm y el lvm-instalador de Nexum se quitan; un nexum de otro programa no se toca" '[ ! -L "$W/bin4/lvm" ] && [ ! -L "$W/bin4/lvm-instalador" ] && [ "$(readlink "$W/bin4/nexum")" = /usr/bin/true ]'
 D=$W/docker/tienda; mkdir -p "$D"; printf 'services:\n  php:\n    volumes:\n      - "%s/XAMPP-compartido/htdocs/tienda:/Applications/XAMPP/xamppfiles/htdocs/tienda"\n' "$L" > "$D/compose.yaml"; chmod 600 "$D/compose.yaml"
 ( DOCKER_DIR=$W/docker LEGACY_DIR=$L COMMON=$N/XAMPP-compartido HTDOCS_DIR=$N/XAMPP-compartido/htdocs; docker_refresh_compose ) > /dev/null
 check "Docker: compose.yaml con la carpeta de /Library/Nexum (la de dentro del contenedor, igual)" 'grep -qF "\"$N/XAMPP-compartido/htdocs/tienda:/Applications/XAMPP/xamppfiles/htdocs/tienda\"" "$D/compose.yaml" && [ "$(stat -c %a "$D/compose.yaml")" = 600 ]'
@@ -328,8 +334,8 @@ check "Docker: compose.yaml con la carpeta de /Library/Nexum (la de dentro del c
 # --- Las ordenes de root de alrededor ---
 # (hasta la funcion siguiente: dentro de los heredocs puede haber lineas con solo })
 body() { awk -v f="^function $1\\(\\) \\{" '$0 ~ f {p = 1; print; next} p && /^function / {exit} p' "$SRC"; }
-check "xampp_ctl: una de /Applications dice que se pase con migrar" 'body xampp_ctl | grep -q "lvm-instalador migrar"'
-check "use y asegurar: una de /Applications de antes, que se pase con migrar" 'body use_version | grep -q "lvm-instalador migrar" && body secure_command | grep -q "lvm-instalador migrar"'
+check "xampp_ctl: una de /Applications dice que se pase con migrar" 'body xampp_ctl | grep -q "nexum migrar"'
+check "use y asegurar: una de /Applications de antes, que se pase con migrar" 'body use_version | grep -q "nexum migrar" && body secure_command | grep -q "nexum migrar"'
 check "asegurar --todas (Protegerlas): primero las pasa a /Library/Nexum" 'body secure_command | grep -q "stacks_migrate || moved=1"'
 check "avisos (U|): las de /Applications salen como sin proteger" 'body unsecured_versions | grep -q "legacy_dirs"'
 check "migrar: para con kill (nada de /Applications como root), comprueba y deshace si falla" 'body stacks_migrate | grep -q "close_processes --todos" && body stacks_migrate | grep -q "MIGRATE_PY\" deshacer" && body stacks_migrate | grep -q "stack_check" && ! body stacks_migrate | grep -q "xampp_ctl"'
@@ -360,7 +366,7 @@ if [ -f "$DMG" ]; then
     INST=$(sed -n "/^cat > \"\$APP\/Contents\/Resources\/instalar.sh\" <<'EOF'$/,/^EOF$/p" "$DMG" | sed '1d;$d')
     check ".dmg: el instalador usa instalar-gestor (de root), sin copiar el script a tu carpeta" 'grep -q "/bin/bash \"\$NEW\" instalar-gestor" <<< "$INST" && ! grep -q "lvm-instalador/lvm-instalador.sh\|ln -s" <<< "$INST" && bash -n <<< "$INST"'
 fi
-check "ayuda: instalar-gestor y migrar" 'sed -n "3,/^$/p" "$SRC" | grep -q "lvm-instalador instalar-gestor" && sed -n "3,/^$/p" "$SRC" | grep -q "lvm-instalador migrar" && grep -q "^    migrar) gestor_migrate \"\$2\" ;;$" "$SRC" && grep -q "^    instalar-gestor) gestor_migrate --ventana ;;$" "$SRC"'
+check "ayuda: instalar-gestor y migrar" 'sed -n "3,/^$/p" "$SRC" | grep -q "nexum instalar-gestor" && sed -n "3,/^$/p" "$SRC" | grep -q "nexum migrar" && grep -q "^    migrar) gestor_migrate \"\$2\" ;;$" "$SRC" && grep -q "^    instalar-gestor) gestor_migrate --ventana ;;$" "$SRC"'
 # (la 1.39.3 o una posterior, con las novedades de la 1.39.3 y las de la suya)
 check "version 1.39.3 o posterior con sus novedades" 'v=$(sed -n "s/^APP_VERSION=\"\(.*\)\"$/\1/p" "$SRC"); [ "$(printf "1.39.3\n%s\n" "$v" | sort -V | head -1)" == "1.39.3" ] && grep -q "^1.39.3 (24 oct 2026)$" "$SRC" && grep -q "^${v//./\\.} (" "$SRC"'
 # --- 1.39.7: la tarea no se queda en el 98 % (servicios sin la terminal de la tarea) ---

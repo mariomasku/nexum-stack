@@ -7,11 +7,11 @@ struct Install: Identifiable, Equatable {
 
 struct DbDate: Equatable {
     let when: Int
-    /// true: importada con lvm-instalador (fecha exacta); false: último cambio de sus tablas
+    /// true: importada con nexum (fecha exacta); false: último cambio de sus tablas
     let imported: Bool
 }
 
-/// Tipo c de la fecha de una base: no se ha importado con lvm-instalador
+/// Tipo c de la fecha de una base: no se ha importado con nexum
 let DB_DATE_HELP = "Fecha en la que cambiaron por última vez las tablas de la BBDD (al importarla desde phpMyAdmin, por ejemplo). Las que se suben desde esta versión guardan la fecha exacta de la importación."
 
 /// Antigüedad aproximada: hace 5 min, hace 3 horas, hace 12 días, hace 4 meses, hace 2 años
@@ -62,7 +62,7 @@ struct AppData: Equatable {
     var dbsysVersion = ""
     var dbsysLog: Int64 = 0
     /// Certificados de proyectos en los que confía todo el Mac (dominio, motivo) y las CAs locales
-    /// sin límite de dominios que los firman (lvm-instalador arreglar-certificados)
+    /// sin límite de dominios que los firman (nexum arreglar-certificados)
     var certs: [CertIssue] = []
     var cas: [String] = []
     /// Proyectos https cuyo certificado propio aún no acepta el navegador (G|dominio)

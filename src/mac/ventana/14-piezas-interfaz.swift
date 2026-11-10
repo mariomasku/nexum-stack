@@ -69,10 +69,32 @@ final class TipWindow {
     static let shared = TipWindow()
     private var panel: NSPanel? = nil
     private var work: DispatchWorkItem? = nil
+    /// Con un menú abierto (⋮, un desplegable) no sale ninguno: taparía el menú
+    private var menuOpen = false
+    private var observers: [Any] = []
+
+    init() {
+        let nc = NotificationCenter.default
+        observers.append(nc.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.menuOpen = true
+            self?.cancel()
+        })
+        observers.append(nc.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.menuOpen = false
+        })
+        // (al pulsar, fuera: el mensaje es para antes de pulsar)
+        if let m = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown, .scrollWheel],
+                                                    handler: { [weak self] (e: NSEvent) -> NSEvent? in
+                                                        self?.cancel()
+                                                        return e
+                                                    }) {
+            observers.append(m)
+        }
+    }
 
     func schedule(_ text: String) {
         cancel()
-        if text.isEmpty { return }
+        if text.isEmpty || menuOpen { return }
         let w = DispatchWorkItem { [weak self] in self?.show(text) }
         work = w
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: w)
@@ -85,7 +107,15 @@ final class TipWindow {
     }
 
     private func show(_ text: String) {
-        let host = NSHostingView(rootView: TipBubble(text: text))
+        if menuOpen { return }
+        // El ancho del texto, medido aquí (hasta 360 y, si no cabe, en varias líneas): así el globo tiene
+        // siempre su ancho justo y no hay que apartarlo del ratón para que quepa en la pantalla
+        let font = NSFont.preferredFont(forTextStyle: .callout)
+        let measured = (text as NSString).boundingRect(with: NSSize(width: TipBubble.maxText, height: 10_000),
+                                                       options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                                       attributes: [.font: font])
+        let textW = Swift.min(TipBubble.maxText, ceil(measured.width) + 4)
+        let host = NSHostingView(rootView: TipBubble(text: text, width: textW))
         let size = host.fittingSize
         let p: NSPanel
         if let old = panel {
@@ -102,11 +132,14 @@ final class TipWindow {
         }
         p.contentView = host
         let mouse = NSEvent.mouseLocation
-        // (justo debajo de la punta de la flecha y a su derecha, no 20 puntos más abajo)
-        var origin = NSPoint(x: mouse.x + 10, y: mouse.y - size.height - 6)
-        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) {
+        // Siempre en el mismo sitio respecto al ratón: su esquina de arriba a la izquierda, justo debajo y a la
+        // derecha de la punta de la flecha. Solo si no cabe en la pantalla pasa al otro lado del ratón
+        // (a su izquierda o encima), a la misma distancia
+        var origin = NSPoint(x: mouse.x + 10, y: mouse.y - size.height - 8)
+        if let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main {
             let vf = screen.visibleFrame
-            origin.x = min(max(origin.x, vf.minX + 4), vf.maxX - size.width - 4)
+            if origin.x + size.width > vf.maxX - 4 { origin.x = mouse.x - size.width - 4 }
+            origin.x = Swift.max(origin.x, vf.minX + 4)
             if origin.y < vf.minY + 4 { origin.y = mouse.y + 8 }
         }
         p.setFrame(NSRect(origin: origin, size: size), display: true)
@@ -115,13 +148,17 @@ final class TipWindow {
 }
 
 struct TipBubble: View {
+    /// El ancho máximo del texto (los largos, en varias líneas)
+    static let maxText: CGFloat = 360
     let text: String
+    /// El del texto, medido en TipWindow
+    let width: CGFloat
     var body: some View {
         Text(text)
             .font(.callout)
             .foregroundColor(Color(white: 0.93))
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 360, alignment: .leading)
+            .frame(width: width, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color(red: 0.24, green: 0.24, blue: 0.26)))
@@ -449,7 +486,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
     ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),
-    ("Comandos de lvm-instalador", "terminal.fill", .black),
+    ("Comandos de nexum", "terminal.fill", .black),
     // Los pasos de una instalación o actualización (la lista de la ventana de la tarea)
     ("Descargas", "arrow.down.circle.fill", .blue),
     ("Descarga de XAMPP", "logo:xampp", brand("xampp")),

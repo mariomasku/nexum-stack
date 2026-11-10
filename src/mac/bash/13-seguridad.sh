@@ -52,7 +52,7 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
     # Lo que manda otra web (un formulario o un fetch a 127.0.0.1): el navegador pone ese dominio y
     # phpMyAdmin, que entra como root sin contraseña, lo ejecutaria aunque la web no pueda leer la
     # respuesta. Desde otra web solo se puede abrir la portada con un enlace; escribiendo la
-    # direccion, desde lvm-instalador o dentro de phpMyAdmin, todo funciona igual
+    # direccion, desde nexum o dentro de phpMyAdmin, todo funciona igual
     <If "(%{HTTP:Sec-Fetch-Site} =~ /^(cross-site|same-site)$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && -z %{QUERY_STRING} && %{REQUEST_URI} =~ m#^/phpmyadmin/?(index\.php)?$#)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
         Require all denied
         ErrorDocument 403 "Otra web ha intentado usar phpMyAdmin: no se ha hecho nada. Abrelo escribiendo http://127.0.0.1/phpmyadmin/ o desde lvm-instalador."
@@ -100,7 +100,7 @@ TraceEnable Off
 # Un vhost puede subirlo con su propio LimitRequestBody
 LimitRequestBody 67108864
 # lvm-barrera-web: lo que manda otra web a cualquier proyecto (se apaga en Configuración o con
-# lvm-instalador barrera-web no). Desde otra web solo se puede abrir una pagina (un enlace: GET o
+# nexum barrera-web no). Desde otra web solo se puede abrir una pagina (un enlace: GET o
 # HEAD de la pagina entera); un formulario, un fetch, un iframe o una imagen de otra web no llega.
 # Y un POST (o PUT, DELETE...) con el Origin de otra web, tampoco. Ojo: la vuelta de una pasarela de
 # pago que hace un POST desde su web se corta mientras este puesta
@@ -165,7 +165,7 @@ function web_barrier_command() {
             web_barrier_on && echo "Barrera entre webs: puesta" || echo "Barrera entre webs: apagada"
             return 0 ;;
         si|no) ;;
-        *) echo "Uso: lvm-instalador barrera-web [si|no]"; return 1 ;;
+        *) echo "Uso: nexum barrera-web [si|no]"; return 1 ;;
     esac
     if [ "$1" == si ]; then
         web_barrier_on && { echo "La barrera entre webs ya esta puesta"; return 0; }
@@ -177,7 +177,7 @@ function web_barrier_command() {
         echo "formularios a tus proyectos, como la vuelta de una pasarela de pago)"
         if [ "$DRY" -eq 0 ]; then
             [ -d "$COMMON" ] || { echo "No existe $COMMON (se crea al instalar la primera version)"; return 1; }
-            echo "Apagada con lvm-instalador barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null || return 1
+            echo "Apagada con nexum barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null || return 1
             [ -z "$SUDO" ] || $SUDO chmod 644 "$WEB_BARRIER_OFF" || return 1
         fi
     fi
@@ -186,7 +186,7 @@ function web_barrier_command() {
     if [ $? -eq 2 ]; then
         # (no se ha podido aplicar: el interruptor vuelve a como estaba)
         if [ "$1" == si ]; then
-            echo "Apagada con lvm-instalador barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null
+            echo "Apagada con nexum barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null
             [ -z "$SUDO" ] || $SUDO chmod 644 "$WEB_BARRIER_OFF"
         else
             $SUDO rm -f "$WEB_BARRIER_OFF"

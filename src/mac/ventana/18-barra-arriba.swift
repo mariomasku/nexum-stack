@@ -351,7 +351,7 @@ struct WarningsView: View {
         VStack(alignment: .leading, spacing: 18) {
             if let c = model.updatesPending {
                 Card("Hay parches nuevos (\(c.items.count))",
-                     "Lo de ahora sigue funcionando mientras se actualiza (se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta que salga otro parche; siguen en Configuración, Parches nuevos.") {
+                     "Lo de ahora sigue funcionando mientras se actualiza (se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta que salga otro parche; siguen en Configuración, General, Parches nuevos.") {
                     Row("Conviene ponerlos: son parches de seguridad",
                         (c.items.prefix(6).map { "• " + $0 } + (c.items.count > 6 ? ["…y \(c.items.count - 6) más"] : [])).joined(separator: "\n"),
                         trailing: {

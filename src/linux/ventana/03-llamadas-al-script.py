@@ -296,7 +296,7 @@ class UsageMeter:
             q, depth = pr["ppid"], 0
             while pr["group"] is None and q in procs and depth < 6:
                 g = procs[q]["group"]
-                if g and (g != "ventana" or any("lvm-instalador" in a for a in pr["argv"])):
+                if g and (g != "ventana" or any("nexum.sh" in a or "lvm-instalador" in a for a in pr["argv"])):
                     pr["group"] = g
                 q, depth = procs[q]["ppid"], depth + 1
         now = time.monotonic()
@@ -524,7 +524,7 @@ def item_folder(item):
     return name.rsplit(".", 1)[0] if kind in ("php", "rehacer") else name
 
 
-# Caché de descargas de las pilas propias (lvm-instalador descargas)
+# Caché de descargas de las pilas propias (nexum descargas)
 DL_CACHE_DIR = "/var/cache/nexum-stack"
 
 
@@ -752,7 +752,7 @@ def fmt_age(secs):
     return "hace %s" % plural(secs // (365 * 86400), "año", "años")
 
 
-# Tipo c de la fecha de una base: no se ha importado con lvm-instalador
+# Tipo c de la fecha de una base: no se ha importado con nexum
 DB_DATE_HELP = ("Fecha en la que cambiaron por última vez las tablas de la BBDD (al importarla "
                 "desde phpMyAdmin, por ejemplo). Las que se suben desde esta versión guardan la "
                 "fecha exacta de la importación.")

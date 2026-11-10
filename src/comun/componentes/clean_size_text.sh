@@ -96,8 +96,9 @@ function clean_rules() {
         registros)
             # Solo estos (ninguno es un ajuste): los de las instalaciones y lo que dejan las que fallan
             # (pila-<version>-<fecha>), el de install-db, el de los proyectos sin visitas, los de los
-            # proyectos de Node y el de la compilacion de la ventana del Mac. Lo que tenga abierto una tarea
-            # en marcha se deja; ventana.log, que la ventana tiene abierto mientras esta abierta, se vacia
+            # proyectos de Node, el de la compilacion de la ventana del Mac y el registro de tareas de la
+            # ventana (tareas/). Lo que tenga abierto una tarea o un servidor en marcha se deja; ventana.log,
+            # que la ventana tiene abierto mientras esta abierta (en modo de añadir), se vacia
             [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] || return 0
             echo "registros|$LOG_DIR|ficheros|.|instalacion-*.log|uso"
             echo "registros|$LOG_DIR|ficheros|.|install-db.log|uso"
@@ -105,6 +106,7 @@ function clean_rules() {
             echo "registros|$LOG_DIR|entradas|.|pila-[A-Za-z0-9._]+-[0-9]{8}-[0-9]{6}|solo=dir,uso"
             echo "registros|$LOG_DIR|ficheros|node/proyectos|*.log|uso"
             echo "registros|$LOG_DIR|ficheros|app|compilar.log|uso"
+            echo "registros|$LOG_DIR|ficheros|tareas|*.txt|uso"
             echo "registros|$LOG_DIR|truncar|.|ventana.log|"
             ;;
         registros-versiones)
@@ -129,9 +131,10 @@ function clean_rules() {
             # carpeta temporal y, en ~/.lvm-instalador, temporal/ (actualizar proyecto), las listas y carpetas
             # de ps-imagenes, los ficheros de mktemp de los vhosts, hosts, correo y BBDD de Docker, y las
             # descargas a medias de Mailpit, cloudflared y Node. No las copias de pasar a Docker
-            # (pasar-*): si el paso falla a medias, son la unica copia de su BBDD
+            # (pasar-*): si el paso falla a medias, son la unica copia de su BBDD. Ni lvm-copia.* (Mac): si
+            # no se pudo mover a htdocs un proyecto del XAMPP oficial, se queda ahi y se dice
             for t in "${CLEAN_TMP_DIRS[@]}"; do
-                echo "temporales|$t|entradas|.|lvm-(seguridad|mysql|conocidos|hosts|progreso|vhosts|vhosts-cert|cert|ca|pma|actualizar|mailpit|xampp|pila|icono|copia|cliente|bash|instalar|gpg|dns|github|gh|direccion)[.-].+|edad=$CLEAN_AGE,uso"
+                echo "temporales|$t|entradas|.|lvm-(seguridad|mysql|conocidos|hosts|progreso|vhosts|vhosts-cert|cert|ca|pma|actualizar|mailpit|xampp|pila|icono|cliente|bash|instalar|gpg|dns|github|gh|direccion)[.-].+|edad=$CLEAN_AGE,uso"
             done
             if [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ]; then
                 echo "temporales|$LOG_DIR|vaciar|temporal||edad=$CLEAN_AGE,uso"
@@ -204,7 +207,7 @@ function clean_valid_key() {
 # limpieza: cada cosa que se puede limpiar, con lo que ocupa y cuantos ficheros
 function clean_list() {
     local k b f total=0 line
-    echo "Lo que se puede limpiar (lvm-instalador limpiar <clave>...):"
+    echo "Lo que se puede limpiar (nexum limpiar <clave>...):"
     while IFS='|' read -r _ k b f _; do
         total=$((total + b))
         if [ "$f" -gt 0 ]; then
@@ -280,7 +283,7 @@ function clean_mail() {
 function clean_command() {
     local k b f r keys=() rc=0 line
     if [ $# -eq 0 ]; then
-        echo "Uso: lvm-instalador limpiar <clave>... (claves: ${CLEAN_KEYS[*]}; lvm-instalador limpieza dice lo que ocupa cada una)"
+        echo "Uso: nexum limpiar <clave>... (claves: ${CLEAN_KEYS[*]}; nexum limpieza dice lo que ocupa cada una)"
         return 1
     fi
     for k in "$@"; do

@@ -1594,7 +1594,7 @@ GPG_FPR_PMA="3D06A59ECE730EB71B511C17CE752F178259BD92 436FF1884B1A0C3FDCBF0D79FE
 63CB1DF1EF12CF2AC0EE5A329C27B31342B7511D 5BAD38CFB98050B94BD7FB5BDA68AB39218AB947"
 
 # Release managers de cada rama de PHP (php.net/gpg-keys.php). Una rama que no esta aqui no se
-# puede comprobar: hay que actualizar lvm-instalador
+# puede comprobar: hay que actualizar nexum
 function php_gpg_fprs() {
     case $1 in
         7.4) echo "5A52880781F755608BF815FC910DEB46F53EA312 42670A7FE4D0441C8E4632349E4FDC074A4EF02D" ;;
@@ -2187,7 +2187,7 @@ EOF
 EOF
     mkdir -p "$S/phpmyadmin/tmp"
 
-    # --- Script de arranque y parada (lo usa "lvm-instalador use") ---
+    # --- Script de arranque y parada (lo usa "nexum use") ---
     sed -e "s|@ROOT@|$target|g" -e "s|@NAME@|$lampp_name|g" -e "s|@NEED_ROOT@|$(( 1 - test_mode ))|g" > "$S/lampp" <<'EOF'
 #!/bin/bash
 # Arranque y parada de lampp-@NAME@ (pila propia creada por lvm-instalador):
@@ -2534,7 +2534,7 @@ function stack_build_phase() {
     download_apache "apr/apr-$apr.tar.bz2" apr.tar.bz2 || stack_fail
     download_apache "apr/apr-util-$aprutil.tar.bz2" apr-util.tar.bz2 || stack_fail
     local php_fprs
-    php_fprs=$(php_gpg_fprs "$short") || { echo "  No se conocen las claves de quienes publican PHP $short: actualiza lvm-instalador"; stack_fail; }
+    php_fprs=$(php_gpg_fprs "$short") || { echo "  No se conocen las claves de quienes publican PHP $short: actualiza nexum"; stack_fail; }
     download_signed "https://www.php.net/distributions/php-$version.tar.xz" php.tar.xz "$php_sha" "$php_fprs" || stack_fail
     if needs_openssl11 "$short"; then
         download "https://www.openssl.org/source/openssl-$OPENSSL11_VERSION.tar.gz" openssl11.tar.gz "$OPENSSL11_SHA" || stack_fail
@@ -2996,7 +2996,7 @@ function install_stack() {
     echo "lampp-$lampp_name instalada en $target"
     [ "$replace" -eq 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias$([ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "; la copia de las anteriores esta en ~/nexum-backups")"
     [ "$replace" -eq 1 ] && [ $keep_data -eq 1 ] && echo "Conserva sus bases de datos"
-    [ $was_running -eq 0 ] && echo "Para usarla: lvm-instalador use $lampp_name"
+    [ $was_running -eq 0 ] && echo "Para usarla: nexum use $lampp_name"
 
     return 0
 }

@@ -224,7 +224,7 @@ APPLIED=$W/aplicado
 mail_apply() { echo "aplicado" >> "$APPLIED"; return 0; }
 mail_db() { echo "bd $1"; }
 run() { if [ "$DRY" -eq 1 ]; then echo "  [simulacion] $*"; else "$@"; fi; }
-cli() {  # cli [--simular] <argumentos de correo>: como lvm-instalador correo, en las pruebas (LVM_PRUEBA)
+cli() {  # cli [--simular] <argumentos de correo>: como nexum correo, en las pruebas (LVM_PRUEBA)
     local dry=0
     [ "$1" == --simular ] && dry=1 && shift
     ( TEST_DIR=$W/prueba BASE_DIR=$W/prueba SUDO="" DRY=$dry LOG_DIR=$W/home2/.lvm-instalador
@@ -258,10 +258,10 @@ check "correo wordpress desactivar: se guarda" '[ "$(cat "$W/home2/.lvm-instalad
 o=$(cli wordpress todo)
 check "correo wordpress con un modo raro: uso, sin cambiar nada" '[ "$(cat "$W/home2/.lvm-instalador/correo-wordpress")" = desactivar ] && grep -q "^Uso" <<< "$o"'
 o=$(cli raro)
-check "correo con una orden rara: uso" 'grep -q "^Uso: lvm-instalador correo" <<< "$o"'
+check "correo con una orden rara: uso" 'grep -q "^Uso: nexum correo" <<< "$o"'
 o=$(cli vaciar)
 check "correo vaciar sin Mailpit en marcha: lo dice" 'grep -q "no esta en marcha" <<< "$o"'
-check "la ayuda y el comando correo" 'grep -q "^#   lvm-instalador correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command \"\$2\" \"\$3\" ;;" "$SRC" && grep -q "de root en /Library/Nexum/mailpit" "$SRC"'
+check "la ayuda y el comando correo" 'grep -q "^#   nexum correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command \"\$2\" \"\$3\" ;;" "$SRC" && grep -q "de root en /Library/Nexum/mailpit" "$SRC"'
 check "mail_apply: asegura todas, recarga Apache y PHP-FPM con xampp_ctl y pone al dia el proyecto cargado" 'sed -n "/^function mail_apply() {/,/^}/p" "$SRC" | grep -q "run xampp_ctl reloadapache" && sed -n "/^function mail_apply() {/,/^}/p" "$SRC" | grep -q "^    mail_loaded_project$"'
 check "gui-datos: E| con lo de Mailpit (y lo arranca si se ha cerrado)" 'grep -q "echo \"E|\$(mailpit_installed && echo 1 || echo 0)|\$(mail_on && echo 1 || echo 0)|\$(mail_wp_mode)|" "$SRC" && sed -n "/^function gui_data() {/,/^}/p" "$SRC" | grep -q "mailpit_sync --suave"'
 

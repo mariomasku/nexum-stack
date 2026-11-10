@@ -746,10 +746,10 @@ extension AppModel {
     func showHelp() {
         let tabs = ["proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
                     "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"]
-        let sections = ["parches": "parches", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo",
+        let sections = ["general": "general", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo",
                         "docker": "docker-config", "tunel": "tunel-config", "apariencia": "apariencia",
-                        "github": "github-config", "errores": "errores", "limpieza": "limpieza", "carpetas": "carpetas",
-                        "programa": "programa", "info": "informacion"]
+                        "github": "github-config", "limpieza": "limpieza", "carpetas": "carpetas",
+                        "oficial": "configuracion-xampp-oficial", "info": "informacion"]
         var chapter = tabs[tab] ?? "ventana"
         if tab == "config" { chapter = sections[toolsSection] ?? chapter }
         runQuick(["manual", "--ruta", chapter]) { code, out in

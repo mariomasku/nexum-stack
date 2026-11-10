@@ -187,7 +187,7 @@ function docker_db_mode() {
             docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
                 && docker_conf_set "$slug" LAMPP_BD "" || return 1
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
-        *) echo "Uso: lvm-instalador docker-bd <nombre> lampp <version> | docker"; return 1 ;;
+        *) echo "Uso: nexum docker-bd <nombre> lampp <version> | docker"; return 1 ;;
     esac
     # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
     was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
@@ -393,6 +393,41 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.11 (10 nov 2026)
+- La orden de la terminal es nexum: nexum ventana, nexum use 8.4,
+  nexum --ayuda... lvm-instalador ya no existe (ni como otro nombre).
+  La orden lvm no se toca si es de otro programa; la que ponía Nexum
+  (un enlace al gestor) se quita.
+- Se actualiza desde la ventana como siempre. Al abrirse con la versión
+  nueva se crea nexum en /opt/homebrew/bin y se quita lvm-instalador.
+- El .dmg se llama ahora nexum-mac-1.57.11.dmg.
+- Configuración, General (el primero): el registro de errores, el
+  registro de tareas, los parches nuevos y lo del programa, juntos.
+- Registro de tareas: cada tarea de la ventana (instalar, cargar, un
+  interruptor, un botón...) guarda en ~/.lvm-instalador/tareas la orden
+  que ha ejecutado (nexum ...) y todo lo que ha escrito, sin
+  contraseñas ni tokens. En General se ven las últimas y cada una
+  entera, para copiarla o repetirla en la terminal. Se guardan 200.
+- Limpieza: cada cosa explica qué es, dónde está y qué pasa al
+  limpiarla. Nada de lo que se limpia hace falta a ningún proyecto.
+- Los desplegables con buscador se abren como poco tan anchos como el
+  desplegable y crecen hasta ver los nombres enteros.
+- Dominios y hosts: todos los falseados (también los .local) arriba, en
+  un recuadro como el visor de Proyectos y en dos columnas, cada uno con
+  su interruptor.
+- «Opciones de la BBDD…» (antes, vincular): en cada versión de PHP, la
+  BBDD del proyecto o cambiarla por otra copia.
+- Menú lateral: Docker y Node con su icono y su logotipo de letras.
+  Apariencia: los apartados del menú lateral, en dos columnas.
+- El ⋮ «Más» del visor no saca mensaje al dejar el ratón encima.
+- Bases de datos: las tarjetas, todas igual de altas.
+- Terminal: el tamaño de verdad (la shell sabe cuántas filas y columnas
+  caben), clear y Ctrl+L dejan la pantalla en blanco, el cursor se ve
+  donde se escribe y ⟳ abre una terminal nueva.
+- Proyectos: la tabla, alineada con el visor del proyecto cargado.
+- Los mensajes al dejar el ratón encima salen junto a la flecha.
+- Apariencia, logotipos encendidos: el de Node se ve en el menú lateral.
 
 1.57.10 (10 nov 2026)
 - El manual, dentro del programa: «Ayuda», en el menú ☰, lo abre en el
@@ -2071,7 +2106,7 @@ import re, sys
 
 VERSION = re.compile(r"^(\d+\.\d+\.\d+) \((.+)\)$")
 # Rutas (/opt/..., ~/...) y nombres de fichero: en letra de codigo (no lo de detras de https://)
-CODE = re.compile(r"(?<![\w`:/])((?:~/|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
+CODE = re.compile(r"(?<![\w`:/])((?:~/|\./|/)[\w.*<>@+-]+(?:/[\w.*<>@+-]*)*|[\w*<>-]+(?:\.[\w*<>-]+)*"
                   r"\.(?:php|conf|cnf|deb|dmg|sql|zip|gz|desktop|policy|md|py|sh|log|pid|run|sha256)\b)")
 
 

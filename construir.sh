@@ -14,7 +14,7 @@
 # solo fichero, como siempre. «#@manual linux|mac», la última línea, pone detrás un exit y el manual
 # (ayuda/: la página, su estilo, su código, la tipografía y las capturas de ese sistema; en el Mac, las de
 # Linux que aún no tengan la suya) en un tar en base64, siempre igual para lo mismo (sin fechas ni dueños):
-# lo saca «lvm-instalador manual».
+# lo saca «nexum manual».
 #
 # Uso: ./construir.sh                      rehace los dos scripts
 #      ./construir.sh --comprobar          no escribe nada: falla si los scripts no son los de src/
@@ -89,7 +89,7 @@ def manual(so):
             tar.addfile(info, io.BytesIO(data))
     b64 = base64.b64encode(buf.getvalue()).decode()
     body = "\n".join(b64[i:i + 76] for i in range(0, len(b64), 76))
-    return ("# (el script acaba aquí: lo de abajo es el manual, que saca «lvm-instalador manual»)\nexit\n"
+    return ("# (el script acaba aquí: lo de abajo es el manual, que saca «nexum manual»)\nexit\n"
             ": <<'NEXUM_MANUAL'\n" + body + "\nNEXUM_MANUAL")
 
 

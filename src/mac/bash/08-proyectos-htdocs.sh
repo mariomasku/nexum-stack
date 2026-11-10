@@ -118,7 +118,7 @@ function create_project_vhost() {
 
     local admin=$(server_admin)
     local block="
-# $name: apunta al proyecto cargado (enlace $HTDOCS_DIR/$name), creado por lvm-instalador
+# $name: apunta al proyecto cargado (enlace $HTDOCS_DIR/$name), creado por nexum
 <VirtualHost *:$PORT_HTTP>
     ServerAdmin $admin
     DocumentRoot \"$LINK/xamppfiles/htdocs/$name\"
@@ -336,7 +336,7 @@ function delete_project() {
         esac
     done
     if [ -z "$folder" ]; then
-        echo "Uso: lvm-instalador borrar-proyecto <carpeta> [--bd <base> [--copia]]"
+        echo "Uso: nexum borrar-proyecto <carpeta> [--bd <base> [--copia]]"
 
         return 1
     fi

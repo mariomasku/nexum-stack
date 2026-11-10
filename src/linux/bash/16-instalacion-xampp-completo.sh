@@ -125,6 +125,6 @@ function install_xampp() {
 
     echo ""
     echo "XAMPP $release instalado en $target"
-    echo "Para usarlo: lvm-instalador use $folder"
+    echo "Para usarlo: nexum use $folder"
 }
 

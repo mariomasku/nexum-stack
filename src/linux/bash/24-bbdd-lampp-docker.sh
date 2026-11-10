@@ -182,7 +182,7 @@ function docker_db_mode() {
             docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
                 && docker_conf_set "$slug" LAMPP_BD "" || return 1
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
-        *) echo "Uso: lvm-instalador docker-bd <nombre> lampp <version> | docker"; return 1 ;;
+        *) echo "Uso: nexum docker-bd <nombre> lampp <version> | docker"; return 1 ;;
     esac
     # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
     was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
@@ -405,7 +405,7 @@ function tunnel_open() {
         esac
     done
     if [ -z "$url" ]; then
-        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
+        echo "Uso: nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
 
         return 1
     fi
@@ -434,7 +434,7 @@ function tunnel_open() {
         fi
     fi
     if ! tunnel_installed; then
-        echo "Falta cloudflared: lvm-instalador tunel-instalar (o en Configuracion, Tunel de Cloudflare)"
+        echo "Falta cloudflared: nexum tunel-instalar (o en Configuracion, Tunel de Cloudflare)"
 
         return 1
     fi

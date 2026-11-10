@@ -1,5 +1,166 @@
 // MARK: - Tareas (acciones del script en una pseudoterminal)
 
+// Registro de tareas (como en Linux): cada tarea de la ventana deja el suyo en TASKS_DIR (la carpeta y sus
+// ficheros, solo tuyos), con su fecha, su título, la orden de nexum, toda su salida y cómo acabó. Se guardan
+// las TASKS_KEEP últimas
+let TASKS_DIR = LOG_DIR + "/tareas"
+let TASKS_KEEP = 200
+let TASK_LOG_RX = try! NSRegularExpression(pattern: "^\\d{8}-\\d{6}-\\d+\\.txt$")
+/// El registro de una tarea muy larga, como mucho esto (en caracteres): se guarda el final
+let TASK_LOG_MAX = 8 * 1024 * 1024
+let TASK_LOG_SEP = String(repeating: "=", count: 72)
+let HIDDEN = "••••••"
+// Nada de secretos en el registro: el valor de las variables de la tarea que lo parecen (MYSQL_PWD…), lo que
+// va detrás de «contraseña:», «token=»…, los tokens de GitHub y la contraseña de una dirección
+let SECRET_NAME_RX = try! NSRegularExpression(pattern: "pass|pwd|token|secret|clave|key|auth", options: [.caseInsensitive])
+let SECRET_RX = try! NSRegularExpression(
+    pattern: "((?:contraseña|password|passwd|pwd|token|secret|clave)[\\w ]{0,16}?[ \\t]*[:=][ \\t]*)(?!••••••)[^\\s'\"]+",
+    options: [.caseInsensitive])
+let SECRET_TOKEN_RX = try! NSRegularExpression(pattern: "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})")
+let SECRET_URL_RX = try! NSRegularExpression(pattern: "(://[^/\\s:@]+:)[^@\\s/]+@")
+
+func isSecretName(_ name: String) -> Bool {
+    return SECRET_NAME_RX.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil
+}
+
+func taskLogRedact(_ text: String, env: [String: String]) -> String {
+    var t = text
+    for (k, v) in env where v.count >= 3 && isSecretName(k) {
+        t = t.replacingOccurrences(of: v, with: HIDDEN)
+    }
+    t = SECRET_RX.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1" + HIDDEN)
+    t = SECRET_TOKEN_RX.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: HIDDEN)
+    return SECRET_URL_RX.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "$1" + HIDDEN + "@")
+}
+
+/// Un argumento como se escribiría en la terminal (entre comillas si hace falta)
+func shellQuote(_ s: String) -> String {
+    if !s.isEmpty && s.range(of: "^[A-Za-z0-9_@%+=:,./-]+$", options: .regularExpression) != nil { return s }
+    return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+/// La orden de una tarea como se escribiría en la terminal
+func taskLogCommand(_ args: [String]) -> String {
+    return (["nexum"] + (SIMULATE ? ["--simular"] : []) + args.map { shellQuote($0) }).joined(separator: " ")
+}
+
+/// La carpeta del registro de tareas, creada y solo tuya (false si no se puede o es un enlace)
+func taskLogDir() -> Bool {
+    let fm = FileManager.default
+    if let attrs = try? fm.attributesOfItem(atPath: TASKS_DIR),
+       (attrs[.type] as? FileAttributeType) == .typeSymbolicLink { return false }
+    do {
+        try fm.createDirectory(atPath: TASKS_DIR, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: TASKS_DIR)
+    } catch {
+        return false
+    }
+    return true
+}
+
+/// Escribe el registro de una tarea (solo tuyo, 600; sin seguir enlaces)
+func taskLogWrite(_ path: String, _ text: String) {
+    let fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, mode_t(0o600))
+    guard fd >= 0 else { return }
+    _ = fchmod(fd, mode_t(0o600))
+    let h = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    h.write(Data(text.utf8))
+}
+
+/// Se quedan las TASKS_KEEP últimas: las más viejas se borran
+func taskLogNames() -> [String] {
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: TASKS_DIR)) ?? []
+    return names.filter { TASK_LOG_RX.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }.sorted()
+}
+
+func taskLogPrune() {
+    let names = taskLogNames()
+    guard names.count > TASKS_KEEP else { return }
+    for n in names.prefix(names.count - TASKS_KEEP) {
+        try? FileManager.default.removeItem(atPath: TASKS_DIR + "/" + n)
+    }
+}
+
+/// Una tarea del registro: su cabecera (título, orden, fecha, cómo acabó) y su texto entero
+struct TaskLogEntry: Identifiable {
+    let path: String
+    let title: String
+    let when: String
+    let result: String
+    let command: String
+    var id: String { return path }
+    /// ok, error, cancel o run (en marcha)
+    var state: String {
+        if result.hasPrefix("Terminada") { return "ok" }
+        if result.hasPrefix("Cancelada") { return "cancel" }
+        if result.hasPrefix("En marcha") { return "run" }
+        return "error"
+    }
+}
+
+/// Lee un registro de tareas (solo un fichero normal, sin enlaces): su cabecera y su texto
+func taskLogRead(_ path: String, limit: Int = TASK_LOG_MAX + 65536) -> ([String: String], String)? {
+    let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+    guard fd >= 0 else { return nil }
+    let h = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    var st = stat()
+    guard fstat(fd, &st) == 0, (Int(st.st_mode) & Int(S_IFMT)) == Int(S_IFREG) else { return nil }
+    let text = String(decoding: h.readData(ofLength: limit), as: UTF8.self)
+    var head: [String: String] = [:]
+    let top = text.components(separatedBy: "\n" + TASK_LOG_SEP).first ?? ""
+    for line in top.components(separatedBy: "\n") {
+        if let r = line.range(of: ": ") {
+            head[String(line[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)] =
+                String(line[r.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
+    }
+    return (head, text)
+}
+
+/// Los registros de tareas, el más nuevo primero
+func taskLogs() -> [TaskLogEntry] {
+    var out: [TaskLogEntry] = []
+    for n in taskLogNames().reversed().prefix(TASKS_KEEP) {
+        let path = TASKS_DIR + "/" + n
+        guard let got = taskLogRead(path, limit: 4096) else { continue }
+        let h = got.0
+        out.append(TaskLogEntry(path: path, title: h["Tarea"] ?? n, when: h["Fecha"] ?? "",
+                                result: h["Resultado"] ?? "", command: h["Orden"] ?? ""))
+    }
+    return out
+}
+
+/// Una tarea del registro, entera (su orden y toda su salida), con «Copiar» y «Abrir la carpeta»
+func showTaskLog(_ path: String) {
+    guard let got = taskLogRead(path) else {
+        showLongText("No se ha podido leer el registro de la tarea", path)
+        return
+    }
+    let alert = NSAlert()
+    alert.messageText = got.0["Tarea"] ?? "Tarea"
+    alert.informativeText = (got.0["Fecha"] ?? "") + "  ·  " + (got.0["Resultado"] ?? "")
+    alert.addButton(withTitle: "Cerrar")
+    alert.addButton(withTitle: "Copiar")
+    alert.addButton(withTitle: "Abrir la carpeta")
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 760, height: 560))
+    scroll.hasVerticalScroller = true
+    let tv = NSTextView(frame: scroll.bounds)
+    tv.isEditable = false
+    tv.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+    tv.textContainerInset = NSSize(width: 10, height: 10)
+    tv.string = got.1
+    tv.autoresizingMask = [.width]
+    scroll.documentView = tv
+    alert.accessoryView = scroll
+    let r = alert.runStyled()
+    if r == .alertSecondButtonReturn {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(got.1, forType: .string)
+    } else if r == .alertThirdButtonReturn {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+}
+
 final class TaskRunner: ObservableObject, Identifiable {
     let id = UUID()
     /// El título con que se lanzó (head cambia al acabar)
@@ -48,6 +209,8 @@ final class TaskRunner: ObservableObject, Identifiable {
     private let console = Console()
     // Porcentaje que se lee en la salida (tareas sin progreso propio): primero, último y cuándo empezó
     private var seenPct: (Int, Int, Date)? = nil
+    /// Su fichero del registro de tareas (TASKS_DIR)
+    private var logPath: String? = nil
 
     init(title: String, args: [String], withProgress: Bool, doneText: String, autoClose: Bool,
          env: [String: String], cancelText: (String, String, String)?) {
@@ -120,6 +283,41 @@ final class TaskRunner: ObservableObject, Identifiable {
             self?.tick()
         }
         tick()
+        // (su registro, desde que empieza: si la ventana se cierra a medias, queda al menos qué se lanzó)
+        if taskLogDir() {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyyMMdd-HHmmss"
+            let ms = Int(started.timeIntervalSince1970 * 1000) % 1000
+            logPath = TASKS_DIR + "/" + fmt.string(from: started) + "-" + String(ProcessInfo.processInfo.processIdentifier)
+                + String(format: "%03d", ms) + ".txt"
+            saveLog("En marcha (o la ventana se cerró antes de que acabara)")
+            taskLogPrune()
+            model?.taskLogsChanged += 1
+        }
+    }
+
+    /// El registro de la tarea en TASKS_DIR: la cabecera (título, orden, fecha, cómo acabó) y su salida, la
+    /// misma de su ventana, sin secretos
+    private func saveLog(_ result: String, _ text: String = "") {
+        guard let path = logPath else { return }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        var head = ["Tarea: " + title.replacingOccurrences(of: "\n", with: " "),
+                    "Orden: " + taskLogCommand(args),
+                    "Fecha: " + fmt.string(from: started),
+                    "Resultado: " + result]
+        if !text.isEmpty { head.append("Duración: " + fmtClock(Int(Date().timeIntervalSince(started)))) }
+        if !env.isEmpty {
+            head.append("Variables: " + env.keys.sorted().map { k in k + "=" + (isSecretName(k) ? HIDDEN : (env[k] ?? "")) }
+                .joined(separator: " "))
+        }
+        var body = text
+        if body.count > TASK_LOG_MAX {
+            body = "(…se ha cortado el principio: solo se guarda el final)\n" + String(body.suffix(TASK_LOG_MAX))
+        }
+        let all = head.joined(separator: "\n") + "\n" + TASK_LOG_SEP + "\n"
+            + body.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+        taskLogWrite(path, taskLogRedact(all, env: env))
     }
 
     private func feed(_ text: String) {
@@ -316,6 +514,9 @@ final class TaskRunner: ObservableObject, Identifiable {
         let p = pfile.flatMap { readProgress($0) }
         if let path = pfile { try? FileManager.default.removeItem(atPath: path) }
         let ok = rc == 0 && !cancelled
+        saveLog(cancelled ? "Cancelada" : (ok ? "Terminada bien" : "Ha fallado (código \(rc))"), log.isEmpty ? "(sin salida)" : log)
+        // (Configuración, General: el registro de tareas, con esta ya acabada)
+        model?.taskLogsChanged += 1
         info = "Tiempo total: \(fmtClock(Int(Date().timeIntervalSince(started))))"
         if cancelled {
             head = "Cancelado"

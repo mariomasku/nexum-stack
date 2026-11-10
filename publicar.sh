@@ -4,11 +4,12 @@
 #   1. comprueba que el repositorio esta limpio, en main y al dia con GitHub, y que la version es
 #      mas nueva que la ultima publicada
 #   2. pasa la bateria de pruebas (pruebas/todas.sh): con algun fallo no se publica
-#   3. crea el paquete en dist/ (empaquetar-deb.sh) y lo firma con la clave de UPDATE_KEY_FPR (pide
-#      su frase de contraseña)
+#   3. crea el paquete en dist/ (empaquetar-deb.sh, nexum_<version>_all.deb) y lo firma con la clave
+#      de UPDATE_KEY_FPR (pide su frase de contraseña)
 #   4. si hay version de Mac (macos/lvm-instalador.sh) y esa version aun no esta en ninguna
-#      publicacion, crea lvm-instalador-mac-<version>.zip y lo firma con la misma clave; y si esta
-#      macos/lvm-instalador-mac-<version>.dmg (compilado en un Mac), tambien lo firma y lo sube
+#      publicacion, crea nexum-mac-<version>.zip y lo firma con la misma clave (la 1.57.11 va tambien
+#      como lvm-instalador-mac-<version>.zip, el nombre que buscan los Mac de antes); y si esta
+#      macos/nexum-mac-<version>.dmg (compilado en un Mac), tambien lo firma y lo sube
 #   5. tras confirmarlo: pone al dia CHANGELOG.md y la version de README.md (commit), crea la
 #      etiqueta vX.Y.Z, lo sube todo y crea la publicacion (Release) con el .deb, su firma, el .zip
 #      de Mac y su firma (si va) y las novedades de esa version
@@ -26,7 +27,7 @@ FPR=$(grep -m1 '^UPDATE_KEY_FPR=' "$SRC" | cut -d'"' -f2)
 REPO=$(grep -m1 '^UPDATE_REPO=' "$SRC" | cut -d'"' -f2)
 TAG=v$VERSION
 DIST=$HERE/dist
-DEB=$DIST/lvm-instalador_${VERSION}_all.deb
+DEB=$DIST/nexum_${VERSION}_all.deb
 SOLO_LINUX=0
 [ "$1" == --solo-linux ] && SOLO_LINUX=1
 
@@ -59,7 +60,7 @@ fi
 echo "   Ultima publicada: ${LATEST:-ninguna}"
 # Version de Mac: solo si aun no esta en ninguna publicacion (el Mac busca la mas nueva en todas)
 MAC_SRC=$HERE/macos/lvm-instalador.sh
-MAC_ZIP="" MAC_DMG=""
+MAC_ZIP="" MAC_ZIP_OLD="" MAC_DMG=""
 if [ $SOLO_LINUX -eq 1 ]; then
     echo "   Mac: no se sube (--solo-linux)"
 elif [ -f "$MAC_SRC" ]; then
@@ -71,17 +72,21 @@ elif [ -f "$MAC_SRC" ]; then
         || fail "$MAC_SRC no lleva la misma UPDATE_KEY_FPR que $SRC"
     MAC_ASSETS=$(gh api --paginate "repos/$REPO/releases?per_page=100" -q '.[].assets[].name') \
         || fail "no se ha podido consultar las publicaciones de $REPO"
-    if grep -qxF "lvm-instalador-mac-$MAC_VERSION.zip" <<< "$MAC_ASSETS"; then
+    if grep -qxE "(nexum|lvm-instalador)-mac-${MAC_VERSION//./\\.}\.zip" <<< "$MAC_ASSETS"; then
         echo "   Mac $MAC_VERSION: ya publicada, no se sube otra vez"
     else
-        MAC_ZIP=$DIST/lvm-instalador-mac-$MAC_VERSION.zip
-        echo "   Mac $MAC_VERSION: se sube con esta publicacion"
+        MAC_ZIP=$DIST/nexum-mac-$MAC_VERSION.zip
+        # La 1.57.11 (la orden pasa a ser nexum) va tambien con el nombre de antes: los Mac con la
+        # 1.57.10 o anterior buscan lvm-instalador-mac-*.zip, y asi actualizan desde la ventana. Desde
+        # ella, el gestor busca nexum-mac-*.zip
+        [ "$MAC_VERSION" == 1.57.11 ] && MAC_ZIP_OLD=$DIST/lvm-instalador-mac-$MAC_VERSION.zip
+        echo "   Mac $MAC_VERSION: se sube con esta publicacion${MAC_ZIP_OLD:+ (tambien como lvm-instalador-mac-$MAC_VERSION.zip)}"
         # El .dmg lo compila un Mac (empaquetar-dmg.sh) y se deja en macos/: va con el .zip si esta
-        if [ -f "$HERE/macos/lvm-instalador-mac-$MAC_VERSION.dmg" ]; then
-            MAC_DMG=$DIST/lvm-instalador-mac-$MAC_VERSION.dmg
+        if [ -f "$HERE/macos/nexum-mac-$MAC_VERSION.dmg" ]; then
+            MAC_DMG=$DIST/nexum-mac-$MAC_VERSION.dmg
             echo "   Mac $MAC_VERSION: con su .dmg"
         else
-            echo "   Mac $MAC_VERSION: sin .dmg (no esta macos/lvm-instalador-mac-$MAC_VERSION.dmg)"
+            echo "   Mac $MAC_VERSION: sin .dmg (no esta macos/nexum-mac-$MAC_VERSION.dmg)"
         fi
     fi
 fi
@@ -114,7 +119,8 @@ echo "   SHA-256: $(sha256sum "$DEB" | cut -d' ' -f1)"
 if [ -n "$MAC_ZIP" ]; then
     bash -n "$MAC_SRC" || fail "error de sintaxis en $MAC_SRC"
     rm -f "$MAC_ZIP" "$MAC_ZIP.sig"
-    # Sin carpetas dentro: el Mac solo saca de el lvm-instalador.sh (actualizar-gestor)
+    # Sin carpetas dentro: el Mac solo saca de el lvm-instalador.sh (actualizar-gestor; el fichero se
+    # sigue llamando asi dentro del .zip y en /Library/Nexum/gestor)
     python3 -I - "$MAC_ZIP" "$HERE/macos" lvm-instalador.sh README.md empaquetar-dmg.sh PRUEBA-VENTANA.md << 'EOF'
 import os, sys, zipfile
 dst, src = sys.argv[1:3]
@@ -134,10 +140,20 @@ EOF
     grep -q "^\[GNUPG:\] VALIDSIG $FPR " "$CHECK/estado-mac" || fail "la firma del .zip de Mac no se comprueba"
     echo "   $MAC_ZIP"
     echo "   SHA-256: $(sha256sum "$MAC_ZIP" | cut -d' ' -f1)"
+    if [ -n "$MAC_ZIP_OLD" ]; then
+        # El mismo .zip con el nombre de antes, con su firma
+        rm -f "$MAC_ZIP_OLD" "$MAC_ZIP_OLD.sig"
+        cp "$MAC_ZIP" "$MAC_ZIP_OLD"
+        gpg --local-user "$FPR" --detach-sign --output "$MAC_ZIP_OLD.sig" "$MAC_ZIP_OLD"
+        GNUPGHOME=$CHECK gpgv --status-fd 1 --keyring "$CHECK/firma.gpg" "$MAC_ZIP_OLD.sig" "$MAC_ZIP_OLD" 2> /dev/null \
+            > "$CHECK/estado-mac-antes" || true
+        grep -q "^\[GNUPG:\] VALIDSIG $FPR " "$CHECK/estado-mac-antes" || fail "la firma del .zip de Mac (nombre de antes) no se comprueba"
+        echo "   $MAC_ZIP_OLD (el mismo)"
+    fi
 fi
 if [ -n "$MAC_DMG" ]; then
     rm -f "$MAC_DMG" "$MAC_DMG.sig"
-    cp "$HERE/macos/lvm-instalador-mac-$MAC_VERSION.dmg" "$MAC_DMG"
+    cp "$HERE/macos/nexum-mac-$MAC_VERSION.dmg" "$MAC_DMG"
     gpg --local-user "$FPR" --detach-sign --output "$MAC_DMG.sig" "$MAC_DMG"
     GNUPGHOME=$CHECK gpgv --status-fd 1 --keyring "$CHECK/firma.gpg" "$MAC_DMG.sig" "$MAC_DMG" 2> /dev/null \
         > "$CHECK/estado-dmg" || true
@@ -156,7 +172,7 @@ bash "$SRC" novedades | awk -v head="## $VERSION " -v stop="## ${LATEST#v} " \
 [ -s "$NOTES" ] || fail "no hay novedades de la $VERSION"
 # Las de Mac, desde su última versión publicada (las saca del texto de VERSIONES de su script)
 if [ -n "$MAC_ZIP" ]; then
-    MAC_LAST=$(grep -oE '^lvm-instalador-mac-[0-9.]+\.zip$' <<< "$MAC_ASSETS" | sed -E 's/^lvm-instalador-mac-//; s/\.zip$//' | sort -V | tail -1)
+    MAC_LAST=$(grep -oE '^(nexum|lvm-instalador)-mac-[0-9.]+\.zip$' <<< "$MAC_ASSETS" | sed -E 's/^(nexum|lvm-instalador)-mac-//; s/\.zip$//' | sort -V | tail -1)
     python3 -I - "$MAC_SRC" "$MAC_VERSION" "$MAC_LAST" >> "$NOTES" << 'EOF_MAC' || fail "no se han podido leer las novedades de Mac"
 import re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
@@ -191,13 +207,13 @@ cat >> "$NOTES" << EOF
 ---
 
 **Actualizar:** en Nexum Dev Stack, menú ☰ → *Buscar actualizaciones* (comprueba la firma antes de instalarla).
-**Instalar en la terminal:** descarga \`lvm-instalador_${VERSION}_all.deb\` y ejecuta \`sudo apt install ./lvm-instalador_${VERSION}_all.deb\`.
+**Instalar en la terminal:** descarga \`nexum_${VERSION}_all.deb\` y ejecuta \`sudo apt install ./nexum_${VERSION}_all.deb\`.
 EOF
 [ -n "$MAC_ZIP" ] && cat >> "$NOTES" << EOF
-**Mac:** incluye Nexum Dev Stack para Mac $MAC_VERSION (\`lvm-instalador-mac-$MAC_VERSION.zip\`). En la ventana, menú Gestor → *Buscar actualizaciones* (comprueba la firma antes de instalarla).
+**Mac:** incluye Nexum Dev Stack para Mac $MAC_VERSION (\`nexum-mac-$MAC_VERSION.zip\`). En la ventana, menú Gestor → *Buscar actualizaciones* (comprueba la firma antes de instalarla).
 EOF
 [ -n "$MAC_DMG" ] && cat >> "$NOTES" << EOF
-**Mac, instalación nueva:** \`lvm-instalador-mac-$MAC_VERSION.dmg\` (ábrelo y abre «Instalar Nexum Dev Stack»).
+**Mac, instalación nueva:** \`nexum-mac-$MAC_VERSION.dmg\` (ábrelo y abre «Instalar Nexum Dev Stack»).
 EOF
 
 # --- 5. Publicar ------------------------------------------------------------------------------
@@ -217,9 +233,10 @@ git diff --cached --quiet || git commit -q -m "Versión $VERSION"
 git tag -a "$TAG" -m "Nexum Dev Stack $VERSION"
 git push -q origin main "$TAG"
 if ! gh release create "$TAG" -R "$REPO" --verify-tag --title "Nexum Dev Stack $VERSION" \
-        --notes-file "$NOTES" "$DEB" "$DEB.sig" ${MAC_ZIP:+"$MAC_ZIP" "$MAC_ZIP.sig"} ${MAC_DMG:+"$MAC_DMG" "$MAC_DMG.sig"}; then
+        --notes-file "$NOTES" "$DEB" "$DEB.sig" ${MAC_ZIP:+"$MAC_ZIP" "$MAC_ZIP.sig"} \
+        ${MAC_ZIP_OLD:+"$MAC_ZIP_OLD" "$MAC_ZIP_OLD.sig"} ${MAC_DMG:+"$MAC_DMG" "$MAC_DMG.sig"}; then
     echo "La etiqueta $TAG ya esta en GitHub, pero no se ha creado la publicacion. Para reintentarlo:" >&2
-    echo "  gh release create $TAG -R $REPO --verify-tag --title \"Nexum Dev Stack $VERSION\" --notes-file $NOTES $DEB $DEB.sig${MAC_ZIP:+ $MAC_ZIP $MAC_ZIP.sig}${MAC_DMG:+ $MAC_DMG $MAC_DMG.sig}" >&2
+    echo "  gh release create $TAG -R $REPO --verify-tag --title \"Nexum Dev Stack $VERSION\" --notes-file $NOTES $DEB $DEB.sig${MAC_ZIP:+ $MAC_ZIP $MAC_ZIP.sig}${MAC_ZIP_OLD:+ $MAC_ZIP_OLD $MAC_ZIP_OLD.sig}${MAC_DMG:+ $MAC_DMG $MAC_DMG.sig}" >&2
     exit 1
 fi
 echo "Publicada: https://github.com/$REPO/releases/tag/$TAG"

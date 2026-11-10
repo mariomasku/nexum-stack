@@ -25,7 +25,7 @@ function make_selfsigned() {
     if [ $ok_crt -eq 0 ] || [ $ok_key -eq 0 ] || ! [[ "$(basename "$crt")" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(crt|pem)$ ]] \
             || ! [[ "$(basename "$key")" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.(key|pem)$ ]] || ! valid_domain "$cn"; then
         echo "El certificado de $cn ($crt) no esta en la carpeta de certificados del gestor ($OWN_SSL_DIR): no se crea."
-        echo "Pulsa Arreglarlos en el aviso de certificados (Versiones) o: lvm-instalador arreglar-certificados"
+        echo "Pulsa Arreglarlos en el aviso de certificados (Versiones) o: nexum arreglar-certificados"
         return 1
     fi
     { [ -d "$(dirname "$crt")" ] && [ -w "$(dirname "$crt")" ] && [ -w "$(dirname "$key")" ]; } || s=sudo

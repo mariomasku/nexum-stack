@@ -95,6 +95,17 @@ rel 1.37.9 "borrador, se salta" "rels[1]['draft'] = True"
 rel 1.37.9 "nombre con ordenes, se salta" "rels[1]['assets'][2]['name'] = 'lvm-instalador-mac-1.38.0;x.zip'"
 rel 1.37.9 "fecha rara, se salta" "rels[1]['published_at'] = '2026-10-23 10:00|x'"
 rel no "ninguna con la de Mac" "rels = [r('v1.52.0')]"
+if grep -q '(nexum|lvm-instalador)-mac-' "$SRC"; then
+    # (1.57.11) nexum-mac-<v>.zip, el nombre nuevo; con los dos en la misma publicacion, el nuevo
+    rel 1.57.11 "nexum-mac (nombre nuevo)" "u = 'https://github.com/o/r/releases/download/v1.57.11/'; rels.insert(0, {'tag_name': 'v1.57.11', 'published_at': '2026-11-10T10:00:00Z', 'draft': False, 'prerelease': False, 'assets': [{'name': n, 'browser_download_url': u + n} for n in ('nexum-mac-1.57.11.zip', 'nexum-mac-1.57.11.zip.sig')]})"
+    out=$(python3 -I -c "$MAC_RELEASE_PY" o/r <<< '[{"tag_name": "v1.57.11", "published_at": "2026-11-10T10:00:00Z", "assets": [
+        {"name": "lvm-instalador-mac-1.57.11.zip", "browser_download_url": "https://github.com/o/r/releases/download/v1.57.11/lvm-instalador-mac-1.57.11.zip"},
+        {"name": "lvm-instalador-mac-1.57.11.zip.sig", "browser_download_url": "https://github.com/o/r/releases/download/v1.57.11/lvm-instalador-mac-1.57.11.zip.sig"},
+        {"name": "nexum-mac-1.57.11.zip", "browser_download_url": "https://github.com/o/r/releases/download/v1.57.11/nexum-mac-1.57.11.zip"},
+        {"name": "nexum-mac-1.57.11.zip.sig", "browser_download_url": "https://github.com/o/r/releases/download/v1.57.11/nexum-mac-1.57.11.zip.sig"}]}]')
+    check "GitHub: con los dos nombres en la misma publicacion, nexum-mac" '[ "$out" = "1.57.11|2026-11-10T10:00:00Z|https://github.com/o/r/releases/download/v1.57.11/nexum-mac-1.57.11.zip|https://github.com/o/r/releases/download/v1.57.11/nexum-mac-1.57.11.zip.sig" ]'
+    rel 1.37.9 "nexum-mac con ordenes, se salta" "rels[1]['assets'][2]['name'] = 'nexum-mac-1.38.0;x.zip'"
+fi
 rel no "no es una lista" "rels = rels[0]"
 check "GitHub: devuelve fecha y descargas de su publicacion" '[ "$(python3 -I -c "$MAC_RELEASE_PY" o/r <<< "[{\"tag_name\": \"v1.51.0\", \"published_at\": \"2026-10-23T10:00:00Z\", \"assets\": [{\"name\": \"lvm-instalador-mac-1.38.0.zip\", \"browser_download_url\": \"https://github.com/o/r/releases/download/v1.51.0/lvm-instalador-mac-1.38.0.zip\"}, {\"name\": \"lvm-instalador-mac-1.38.0.zip.sig\", \"browser_download_url\": \"https://github.com/o/r/releases/download/v1.51.0/lvm-instalador-mac-1.38.0.zip.sig\"}]}]")" = "1.38.0|2026-10-23T10:00:00Z|https://github.com/o/r/releases/download/v1.51.0/lvm-instalador-mac-1.38.0.zip|https://github.com/o/r/releases/download/v1.51.0/lvm-instalador-mac-1.38.0.zip.sig" ]'
 
@@ -206,6 +217,13 @@ try si "firmado y mas nuevo" "$W/z/lvm-instalador-mac-1.38.0.zip"
 check "actualizar-gestor: el nuevo con permiso de ejecucion" '[ "$(command stat -c %a "$SELF")" = 755 ] && [ ! -e "$SELF.nuevo" ]'
 reset_self; out=$(DRY=1 install_update "$W/z/lvm-instalador-mac-1.38.0.zip" 2>&1); rc=$?
 check "actualizar-gestor: en simulacion no se cambia" '[ $rc -eq 0 ] && grep -q "\[simulacion\]" <<< "$out" && grep -q "echo vieja" "$SELF"'
+if grep -q '"$zip" != \*/nexum-mac-\*.zip' "$SRC"; then
+    # (1.57.11) con el nombre nuevo, nexum-mac-<v>.zip, igual
+    mkdir -p "$W/zn"; cp "$W/z/lvm-instalador-mac-1.38.0.zip" "$W/zn/nexum-mac-1.38.0.zip"; cp "$W/z/lvm-instalador-mac-1.38.0.zip.sig" "$W/zn/nexum-mac-1.38.0.zip.sig"
+    try si "nexum-mac (nombre nuevo), firmado y mas nuevo" "$W/zn/nexum-mac-1.38.0.zip"
+    cp "$W/zn/nexum-mac-1.38.0.zip" "$W/zn/otro-mac-1.38.0.zip"; cp "$W/zn/nexum-mac-1.38.0.zip.sig" "$W/zn/otro-mac-1.38.0.zip.sig"
+    try no "otro nombre de .zip" "$W/zn/otro-mac-1.38.0.zip"
+fi
 try no "la misma version" "$W/z/lvm-instalador-mac-1.38.0.zip" "APP_VERSION=1.38.0"
 try no "una mas vieja" "$W/z/lvm-instalador-mac-1.38.0.zip" "APP_VERSION=1.40.0"
 if [ $NEW_VERIFY -eq 1 ]; then

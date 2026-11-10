@@ -8,14 +8,14 @@ function media_saved() {
 function media_project() {
     local folder=${1%/} prod=$(tr 'A-Z' 'a-z' <<< "$2") rest
     if [ -z "$folder" ] || [ -z "$prod" ]; then
-        echo "Uso: lvm-instalador media-proyecto <carpeta> <dominio de produccion>|quitar"
+        echo "Uso: nexum media-proyecto <carpeta> <dominio de produccion>|quitar"
 
         return 1
     fi
     valid_project "$folder" || return 1
     if is_prestashop "$folder"; then
         echo "$folder es una tienda PrestaShop: se ve con su dominio real falseado y una redireccion volveria"
-        echo "a este equipo. Descarga las imagenes que faltan: lvm-instalador ps-imagenes $folder"
+        echo "a este equipo. Descarga las imagenes que faltan: nexum ps-imagenes $folder"
 
         return 1
     fi

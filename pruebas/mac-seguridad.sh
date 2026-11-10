@@ -69,7 +69,7 @@ check "barrera puesta: el bloque tal cual" '[ "$(unknown_host_vhost)" == "${VH%$
 touch "$WEB_BARRIER_OFF"
 check "barrera apagada: sin su bloque, con lo demas" '! unknown_host_vhost | grep -q "Sec-Fetch-Site: cross\|lvm-barrera-web" && unknown_host_vhost | grep -qx "LimitRequestBody 67108864" && unknown_host_vhost | grep -q "phpmyadmin"'
 rm -f "$WEB_BARRIER_OFF"
-check "barrera-web: en gui-datos (T|) y en la ayuda" 'grep -q "echo \"T|\$(web_barrier_on" "$SRC" && grep -q "lvm-instalador barrera-web \[si|no\]" "$SRC"'
+check "barrera-web: en gui-datos (T|) y en la ayuda" 'grep -q "echo \"T|\$(web_barrier_on" "$SRC" && grep -q "nexum barrera-web \[si|no\]" "$SRC"'
 
 if [ -x /opt/lampp-8.2.4/bin/httpd ] && [ -f /opt/lampp-8.2.4/etc/httpd.conf ]; then
     A=$W/apache; mkdir -p "$A"

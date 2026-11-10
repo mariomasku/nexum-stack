@@ -13,7 +13,7 @@ function ps_clear_cache_db() {
     fi
     if [ -z "$folder" ] || [ "$(grep -c . <<< "$folder")" != 1 ]; then
         echo "No se sabe cual es la carpeta de la tienda de $db. Cargala una vez con Cargar proyecto"
-        echo "(se recuerda) o usa: lvm-instalador vaciar-cache <carpeta>"
+        echo "(se recuerda) o usa: nexum vaciar-cache <carpeta>"
 
         return 1
     fi

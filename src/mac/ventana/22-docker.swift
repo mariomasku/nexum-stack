@@ -21,10 +21,8 @@ struct DockerView: View {
     func header(_ k: DockerData) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 10) {
-                    LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 30, height: 30)
-                    Text("Contenedores Docker").font(.system(size: 22, weight: .bold))
-                }
+                // (de título, el logotipo de Docker: la ballena y sus letras, en su color)
+                BrandImage(key: "docker", height: 34)
                 Text(k.ready ? "Docker Desktop \(k.version) · los contenedores van en su máquina virtual, apartados del Mac"
                      : "Docker Desktop · proyectos con cualquier versión de PHP, a la vez que XAMPP-X")
                     .font(.caption).foregroundColor(.secondary)
@@ -187,6 +185,8 @@ struct DockerView: View {
                      sub: plural(k.projects.count, "proyecto", "proyectos"),
                      progress: k.containers.isEmpty ? 0 : Double(up) / Double(k.containers.count))
         }
+        // (todas las tarjetas, tan altas como la más alta)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     func tools() -> some View {

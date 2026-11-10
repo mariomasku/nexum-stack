@@ -1,4 +1,4 @@
-# Nexum Dev Stack (lvm-instalador)
+# Nexum Dev Stack (nexum)
 
 **Gestor de entornos locales de desarrollo para Linux y Mac**
 Versión actual: **Linux 1.56.13** · **Mac 1.40.1** · Autor: M. Mascuñano
@@ -122,7 +122,7 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 - **Editar** los virtual hosts y el fichero `/etc/hosts`. Se edita una copia; al aplicarla se comprueba, se guarda la anterior en `~/lvm-copias` y se recarga Apache. Si Apache no la acepta, todo queda como estaba.
 - **Registro de errores:** primero el del proyecto cargado (donde van los errores de PHP, como el "error crítico" de WordPress) y debajo el general de Apache. Cada uno con **"Ver el final"** (las últimas líneas, sin abrir ficheros enormes; hay logs de más de 100 MB) y **"Abrir"**. Es lo primero que hay que mirar cuando el servidor local da un error.
 - **Carpetas:** proyectos, copias de seguridad y registros de instalaciones.
-- **Comandos de lvm-instalador:** ayuda con todos los comandos de la terminal y qué hace cada uno.
+- **Comandos de nexum:** ayuda con todos los comandos de la terminal y qué hace cada uno.
 - **Buscar una versión nueva** de la aplicación (también en el menú ☰ → Buscar actualizaciones), **Novedades** y **Acerca de**.
 - **Solo Linux:** registrar un XAMPP instalado a mano y volver a crear el icono del menú.
 - **Solo Mac:** apartar un **XAMPP oficial** que ya tuviera el compañero (copiando antes sus bases, proyectos y vhosts, sin borrar nada), cargar esas copias en el gestor y volver al XAMPP oficial si hiciera falta.
@@ -184,15 +184,15 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 
 ### Linux (Ubuntu / Debian, 64 bits; desde Ubuntu 20.04)
 
-- **Instalar:** doble clic en `lvm-instalador_<versión>_all.deb` → "Instalar".
+- **Instalar:** doble clic en `nexum_<versión>_all.deb` → "Instalar".
 - **Instalar:** el `.deb` de cada versión está en las [publicaciones del repositorio](https://github.com/mariomasku/nexum-stack/releases).
 - **Actualizar:** en la aplicación, pulsar **Buscar actualizaciones** (menú ☰ o Herramientas). Busca la última versión publicada en GitHub, comprueba su firma, muestra su fecha y su huella y la instala tras pedir la contraseña. Sin conexión, busca un `.deb` firmado en **Descargas**.
-- Algunas versiones cambian el programa que instala las actualizaciones y hay que instalarlas una vez en la terminal (`sudo apt install ./lvm-instalador_<versión>_all.deb`); la aplicación lo detecta y da la orden lista para copiar. La 1.50.0 es una de ellas.
+- Algunas versiones cambian el programa que instala las actualizaciones y hay que instalarlas una vez en la terminal (`sudo apt install ./nexum_<versión>_all.deb`); la aplicación lo detecta y da la orden lista para copiar. La 1.50.0 es una de ellas.
 - Se abre desde el menú de aplicaciones: **Nexum Dev Stack**.
 
 ### Mac (Apple Silicon: M1 o posterior)
 
-- Descomprimir `lvm-instalador-mac-<versión>.zip` y ejecutar en la terminal `bash empaquetar-dmg.sh`, que compila la aplicación en el propio Mac y genera el `.dmg`.
+- Descomprimir `nexum-mac-<versión>.zip` y ejecutar en la terminal `bash empaquetar-dmg.sh`, que compila la aplicación en el propio Mac y genera el `.dmg`.
 - Instalar desde el `.dmg`. Usa Homebrew solo para librerías de compilación.
 - **Actualizar:** dejar el `.dmg` nuevo en **Descargas** y pulsar **Buscar actualizaciones**.
 
@@ -210,24 +210,24 @@ La aplicación se usa normalmente desde la ventana, pero todo está disponible t
 
 | Comando | Qué hace |
 |---|---|
-| `lvm-instalador` | Abre la ventana (o el panel en la terminal). |
-| `lvm-instalador use 8.4` | Monta la versión 8.4. |
-| `lvm-instalador arrancar` / `parar` / `reiniciar` | Controla la versión montada. |
-| `lvm-instalador servicio apache\|mariadb\|ftp arrancar\|parar\|reiniciar` | Controla un servicio suelto de la versión montada. |
-| `lvm-instalador instalar --php 8.4,8.5 --si` | Instala versiones sin preguntas. |
-| `lvm-instalador procesos` | Procesos en memoria y de qué versión es cada uno. |
-| `lvm-instalador importar-bd copia.zip mi_base --crear` | Carga una copia de base de datos (si la base ya existe, la vacía antes y guarda copia). |
-| `lvm-instalador exportar-bd mi_base copia.zip` | Descarga una base en `.zip`. |
-| `lvm-instalador copiar-bd mi_base 8.2.4 8.4` | Copia una base a otra versión de PHP. |
-| `lvm-instalador cargar-proyecto <carpeta> [versión]` | Carga un proyecto (y su dominio si es PrestaShop o proyecto nuevo). |
-| `lvm-instalador montar-proyecto <url de git> <carpeta> <versión> <base> [volcado]` | Clona un proyecto de GitHub, crea su base y lo deja cargado. |
-| `lvm-instalador nuevo-dominio <dominio> <carpeta> [base]` | Proyecto nuevo con su dominio de producción falseado. |
-| `lvm-instalador repos` / `repo-traer <dueño/repo> [--actualizar]` | Lista los repositorios de GitHub de la organización; clona uno por SSH o trae sus cambios. |
-| `lvm-instalador componentes` / `componentes-actualizar` | Parches nuevos de todos los componentes, y ponerlos al día. |
-| `lvm-instalador hosts-falsear <dominio> si/no` | Falsea o deja de falsear un dominio. |
-| `lvm-instalador asegurar` | Deja las versiones accesibles solo desde este equipo. |
-| `lvm-instalador --simular <comando>` | Muestra lo que haría sin cambiar nada. |
-| `lvm-instalador --ayuda` | Lista completa de comandos. |
+| `nexum` | Abre la ventana (o el panel en la terminal). |
+| `nexum use 8.4` | Monta la versión 8.4. |
+| `nexum arrancar` / `parar` / `reiniciar` | Controla la versión montada. |
+| `nexum servicio apache\|mariadb\|ftp arrancar\|parar\|reiniciar` | Controla un servicio suelto de la versión montada. |
+| `nexum instalar --php 8.4,8.5 --si` | Instala versiones sin preguntas. |
+| `nexum procesos` | Procesos en memoria y de qué versión es cada uno. |
+| `nexum importar-bd copia.zip mi_base --crear` | Carga una copia de base de datos (si la base ya existe, la vacía antes y guarda copia). |
+| `nexum exportar-bd mi_base copia.zip` | Descarga una base en `.zip`. |
+| `nexum copiar-bd mi_base 8.2.4 8.4` | Copia una base a otra versión de PHP. |
+| `nexum cargar-proyecto <carpeta> [versión]` | Carga un proyecto (y su dominio si es PrestaShop o proyecto nuevo). |
+| `nexum montar-proyecto <url de git> <carpeta> <versión> <base> [volcado]` | Clona un proyecto de GitHub, crea su base y lo deja cargado. |
+| `nexum nuevo-dominio <dominio> <carpeta> [base]` | Proyecto nuevo con su dominio de producción falseado. |
+| `nexum repos` / `repo-traer <dueño/repo> [--actualizar]` | Lista los repositorios de GitHub de la organización; clona uno por SSH o trae sus cambios. |
+| `nexum componentes` / `componentes-actualizar` | Parches nuevos de todos los componentes, y ponerlos al día. |
+| `nexum hosts-falsear <dominio> si/no` | Falsea o deja de falsear un dominio. |
+| `nexum asegurar` | Deja las versiones accesibles solo desde este equipo. |
+| `nexum --simular <comando>` | Muestra lo que haría sin cambiar nada. |
+| `nexum --ayuda` | Lista completa de comandos. |
 
 ---
 

@@ -204,13 +204,13 @@ check "hosts-falsear: un .local no se apaga" '[ $rc -ne 0 ] && grep -q "no se de
 fi
 
 # --- La ayuda: cada comando que enseña existe
-cmds=$(sed -n '3,/^$/p' "$SRC" | grep -oE '^#   lvm-instalador [a-z][a-z-]*' | awk '{print $3}' | sort -u)
+cmds=$(sed -n '3,/^$/p' "$SRC" | grep -oE '^#   nexum [a-z][a-z-]*' | awk '{print $3}' | sort -u)
 missing=""
 for c in $cmds; do
     grep -qE "^    ([a-z|-]*\|)?$c(\|[a-z|-]*)?\)" "$SRC" || missing+=" $c"
 done
 check "ayuda: todos sus comandos existen${missing:+ (faltan:$missing)}" '[ -z "$missing" ]'
-check "ayuda: incluye montar-proyecto y desmontar-proyecto" 'grep -q "^#   lvm-instalador montar-proyecto" "$SRC" && grep -q "^#   lvm-instalador desmontar-proyecto" "$SRC"'
+check "ayuda: incluye montar-proyecto y desmontar-proyecto" 'grep -q "^#   nexum montar-proyecto" "$SRC" && grep -q "^#   nexum desmontar-proyecto" "$SRC"'
 
 # --- Simulaciones de los comandos nuevos (solo Linux: el del Mac no arranca fuera de macOS)
 if [ $MAC -eq 0 ]; then

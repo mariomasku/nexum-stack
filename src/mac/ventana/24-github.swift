@@ -162,7 +162,7 @@ struct NodeView: View {
         WidePage {
             PageTitle(title: "Node",
                       sub: "Proyectos de \(HTDOCS) hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en este Mac, con tu usuario y con la versión de Node que pide.",
-                      symbol: "chevron.left.forwardslash.chevron.right")
+                      symbol: "chevron.left.forwardslash.chevron.right", brandTitle: "node")
             let items = model.nodeItems ?? []
             Card {
                 if items.isEmpty {

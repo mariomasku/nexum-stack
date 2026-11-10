@@ -98,7 +98,9 @@ final class AppModel: ObservableObject {
     // Ventana: apartado de la barra lateral, proyecto elegido en Proyectos (se ve arriba) y su filtro
     @Published var tab = "proyectos"
     /// Apartado elegido en Configuración (su clave de ToolsView.sections)
-    @Published var toolsSection = "parches"
+    @Published var toolsSection = "general"
+    /// Sube cada vez que una tarea empieza o acaba: Configuración, General, vuelve a leer el registro de tareas
+    @Published var taskLogsChanged = 0
     @Published var selProject: String? = nil
     @Published var projKind = "all"
     // Bases de datos: «solo la versión activa» (la activa se ve desplegada al abrir) y lo que ocupan
@@ -191,10 +193,15 @@ final class AppModel: ObservableObject {
     }
 
     func termStart(restart: Bool = false) {
-        if restart { term.stop() }
-        guard !term.running else { return }
         let cwd = termProject
         term.onExit = { [weak self] in self?.termOpen = false }
+        // (Terminal nueva: se cierra la de ahora y, cuando se ha cerrado, se abre la nueva aquí mismo)
+        if restart && term.running {
+            _ = term.restart(cwd: cwd)
+            termCwd = cwd
+            return
+        }
+        guard !term.running else { return }
         if term.start(cwd: cwd) {
             termCwd = cwd
         } else {

@@ -347,7 +347,7 @@ function db_temp_start() {
     # Root ejecuta su mariadbd: solo de una version de root (como xampp_ctl)
     if [ -z "$TEST_DIR" ] && ! trusted_version_dir "$1"; then
         echo "No se arranca el MariaDB de $1 como administrador: no es de root, tiene enlaces o el grupo"
-        echo "puede cambiarlo (lvm-instalador asegurar --todas)"
+        echo "puede cambiarlo (nexum asegurar --todas)"
 
         return 1
     fi
@@ -438,7 +438,7 @@ function copy_database() {
         esac
     done
     if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ] || [ $usage -eq 1 ]; then
-        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
+        echo "Uso: nexum copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
         return 1
     fi
     new=${new:-$db}
@@ -560,7 +560,7 @@ function copy_database() {
 function move_to_version() {
     local src=$1 dst=$2 sdir ddir db folder rc=0 was_active=0 n=0
     valid_version_name "$src" && valid_version_name "$dst" && [ -n "$src" ] && [ -n "$dst" ] && [ "$src" != "$dst" ] \
-        || { echo "Uso: lvm-instalador pasar-version <origen> <destino>"; return 1; }
+        || { echo "Uso: nexum pasar-version <origen> <destino>"; return 1; }
     sdir=$BASE_DIR/XAMPP-$src ddir=$BASE_DIR/XAMPP-$dst
     [ -f "$sdir/xamppfiles/etc/pvm-stack" ] && [ ! -L "$sdir" ] || { echo "No existe la version XAMPP-$src"; return 1; }
     [ -f "$ddir/xamppfiles/etc/pvm-stack" ] && [ ! -L "$ddir" ] || { echo "No existe la version XAMPP-$dst"; return 1; }
@@ -1011,7 +1011,7 @@ function test_admin_filter() {
 function export_database() {
     local db=$1 dest=$2 folder=$3
     if [ -z "$db" ] || [ -z "$dest" ]; then
-        echo "Uso: lvm-instalador exportar-bd <base de datos> <fichero.zip|.sql|.sql.gz> [version]"
+        echo "Uso: nexum exportar-bd <base de datos> <fichero.zip|.sql|.sql.gz> [version]"
 
         return 1
     fi
@@ -1142,7 +1142,7 @@ function import_database() {
     done
 
     if [ -z "$file" ] || [ -z "$db" ]; then
-        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
+        echo "Uso: nexum importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
 
         return 1
     fi

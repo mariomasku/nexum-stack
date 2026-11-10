@@ -140,6 +140,9 @@ def gui_hosts():
         if dom:
             out.append(("F", dom, "www." + dom, folder, 0, 1, 1, 1 if kind == "ps" else 0, 0, ""))
     out.append(("F", "panaderialuna.test", "", "panaderia-luna", 0, 1, 1, 0, 1, ""))
+    # (dos .local, que siempre llevan a este equipo: salen en el recuadro de arriba de Dominios y hosts)
+    out.append(("F", "clinica-del-sol.local", "", "clinica-del-sol", 1, 1, 1, 0, 0, ""))
+    out.append(("F", "academia-flor.local", "", "academia-flor", 1, 1, 1, 0, 0, ""))
     return lines(out)
 
 
@@ -251,6 +254,25 @@ def htdocs(root):
     os.symlink(LOADED, os.path.join(root, "web.local"))
 
 
+def tasks(root):
+    """El registro de tareas de la ventana (Configuración, General): unas tareas inventadas, como las escribe."""
+    os.makedirs(root)
+    rows = [("20261110-091204-1001", "Activando lampp-8.4", "nexum use 8.4", "10/11/2026 09:12:04", "Terminada bien", "0:06",
+             "Activando lampp-8.4...\nApache y MariaDB de lampp-8.4 en marcha\n"),
+            ("20261110-093517-1001", "Copiando wp_panaderia_luna a lampp-8.2", "nexum copiar-bd wp_panaderia_luna 8.4 8.2",
+             "10/11/2026 09:35:17", "Terminada bien", "0:41", "Copiando wp_panaderia_luna de lampp-8.4 a lampp-8.2...\nHecho\n"),
+            ("20261110-101950-1001", "Arrancando FTP (ProFTPD)", "nexum servicio ftp arrancar", "10/11/2026 10:19:50",
+             "Ha fallado (código 1)", "0:03", "El puerto 21 está ocupado por otro programa\n"),
+            ("20261110-112233-1001", "Actualizando academia-flor", "nexum actualizar-proyecto academia-flor",
+             "10/11/2026 11:22:33", "Cancelada", "1:12", "Descargando la BBDD de producción...\n"),
+            ("20261110-120514-1001", "Limpiando", "nexum limpiar descargas registros temporales", "10/11/2026 12:05:14",
+             "Terminada bien", "0:09", "Limpiando (no se puede recuperar: no se hacen copias)...\nLimpieza terminada\n")]
+    for name, title, cmd, when, res, took, out in rows:
+        with open(os.path.join(root, name + ".txt"), "w", encoding="utf-8") as f:
+            f.write("Tarea: %s\nOrden: %s\nFecha: %s\nResultado: %s\nDuración: %s\n%s\n%s"
+                    % (title, cmd, when, res, took, "=" * 72, out))
+
+
 def main():
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
@@ -266,7 +288,8 @@ def main():
         "github": lines([("G", 1, GITHUB[0], "gh", GITHUB[1], "")]),
         "repos": repos(), "tunel": "I|1|2026.10.0|2026.10.0\n",
         "correo": "Correo de pruebas encendido: lo que mandan las webs va a Mailpit\n",
-        "httpd-vhosts.conf": vhosts(), "hosts": "127.0.0.1\tlocalhost\n127.0.0.1\tweb.local\n",
+        "httpd-vhosts.conf": vhosts(), "hosts": "127.0.0.1\tlocalhost\n127.0.0.1\tweb.local\n"
+                 "127.0.0.1\tclinica-del-sol.local\n127.0.0.1\tacademia-flor.local\n",
         "gui-limpieza": gui_limpieza(),
     }
     files.update(gui_limpiar_proyecto())
@@ -276,6 +299,7 @@ def main():
         with open(os.path.join(OUT, name if "." in name or name == "hosts" else name + ".txt"), "w", encoding="utf-8") as f:
             f.write(text)
     htdocs(os.path.join(OUT, "htdocs"))
+    tasks(os.path.join(OUT, "tareas"))
     print("Datos de la demostración en %s (%d respuestas)" % (OUT, len(files)))
 
 

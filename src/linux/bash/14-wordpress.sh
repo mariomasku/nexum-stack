@@ -30,7 +30,7 @@ function active_name() {
 function link_database() {
     local db=$1 ver=$2 folder=$3
     if [ -z "$db" ] || [ -z "$ver" ] || [ -z "$folder" ]; then
-        echo "Uso: lvm-instalador vincular-bd <base de datos> <version> <carpeta de /opt/htdocs|->"
+        echo "Uso: nexum vincular-bd <base de datos> <version> <carpeta de /opt/htdocs|->"
         return 1
     fi
     db_valid_name "$db" || return 1

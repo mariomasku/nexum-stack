@@ -271,8 +271,8 @@ check "correo wordpress desactivar: se guarda" '[ "$(cat "$W/home2/.lvm-instalad
 o=$(lvm correo wordpress todo)
 check "correo wordpress con un modo raro: uso, sin cambiar nada" '[ "$(cat "$W/home2/.lvm-instalador/correo-wordpress")" = desactivar ] && grep -q "^Uso" <<< "$o"'
 o=$(lvm correo raro)
-check "correo con una orden rara: uso" 'grep -q "^Uso: lvm-instalador correo" <<< "$o"'
-check "la ayuda y la ventana conocen la orden correo" 'grep -q "^#   lvm-instalador correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command" "$SRC" && grep -q "\[\"correo\", \"wordpress\", mode\]" "$SRC"'
+check "correo con una orden rara: uso" 'grep -q "^Uso: nexum correo" <<< "$o"'
+check "la ayuda y la ventana conocen la orden correo" 'grep -q "^#   nexum correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command" "$SRC" && grep -q "\[\"correo\", \"wordpress\", mode\]" "$SRC"'
 
 # --- BBDD: WordPress y PrestaShop contra un MariaDB temporal
 if [ ! -x /opt/lampp-8.2.4/sbin/mysqld ]; then

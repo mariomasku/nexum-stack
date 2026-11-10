@@ -252,7 +252,7 @@ class NvActualizarProyecto:
         return self.nv_menu_button(None, "view-more-symbolic", self.nv_more_items(x))
 
     def nv_more_items(self, x):
-        items = [("Vincular la BBDD de cada versión…", lambda: self.on_link_project(x)),
+        items = [("Opciones de la BBDD…", lambda: self.on_link_project(x)),
                  ("Abrir la carpeta", lambda: self.open_uri("file://%s/%s" % (HTDOCS, x["name"])))]
         for dp in self.nv_docker_of(x["name"]):
             items.append(("Eliminar de Docker…", lambda dp=dp: self.on_docker_delete(dp)))

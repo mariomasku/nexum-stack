@@ -31,7 +31,7 @@ func certsNames(_ d: AppData) -> String {
     return names.prefix(6).joined(separator: ", ") + (names.count > 6 ? " y \(names.count - 6) más" : "")
 }
 
-/// Cierra la aplicación y la vuelve a abrir con el script nuevo («lvm-instalador ventana» la rehace
+/// Cierra la aplicación y la vuelve a abrir con el script nuevo («nexum ventana» la rehace
 /// y la abre cuando esta ya se ha cerrado)
 func relaunchApp() {
     let p = Process()

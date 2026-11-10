@@ -249,7 +249,7 @@ function docker_web_up() {
     fi
     if ! docker_web_ports_ok; then
         echo "Docker sin root aun no puede usar los puertos $(docker_web_get HTTP) y $(docker_web_get HTTPS)."
-        echo "Pulsa «Permitir» en Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otros puertos."
+        echo "Pulsa «Permitir» en Configuracion, Docker (o: nexum docker-web permitir), o elige otros puertos."
         return 1
     fi
     docker_web_cert && docker_web_write && docker_net || return 1
@@ -278,7 +278,7 @@ function docker_web_command() {
             [ "$DRY" -eq 1 ] && { echo "  [simulacion] Apache de Docker y phpMyAdmin parados"; return 0; }
             run dk compose --project-directory "$DOCKER_WEB_DIR" -f "$DOCKER_WEB_DIR/compose.yaml" stop ;;
         confiar) docker_web_trust ;;
-        *) echo "Uso: lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar"; return 1 ;;
+        *) echo "Uso: nexum docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar"; return 1 ;;
     esac
 }
 
@@ -308,7 +308,7 @@ function docker_web_set() {
     fi
     mkdir -p -m 700 "$DOCKER_DIR" || return 1
     docker_web_conf_write "$ip" "$http" "$https" "$(docker_web_tld)" "$(docker_web_get DNS)" || return 1
-    docker_web_ports_ok || echo "Aviso: Docker sin root aun no puede usar esos puertos: pulsa «Permitir» (lvm-instalador docker-web permitir)"
+    docker_web_ports_ok || echo "Aviso: Docker sin root aun no puede usar esos puertos: pulsa «Permitir» (nexum docker-web permitir)"
     [ -d "$DOCKER_WEB_DIR" ] || return 0
     sudo_first || return 1
     # (con el DNS comodin, este responde con la direccion nueva)
@@ -561,7 +561,7 @@ function docker_web_create() {
         esac
     done
     if [ -z "$folder" ] || [ -z "$php" ] || [ -z "$maria" ]; then
-        echo "Uso: lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]"
+        echo "Uso: nexum docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -586,13 +586,13 @@ function docker_web_create() {
     case $slug in web|bin|imagenes|mariadb-*) slug=$(cut -c1-31 <<< "$slug" | sed 's/-*$//')-proyecto ;; esac
     for p in $(docker_web_projects); do
         if [ "$(docker_conf "$p" CARPETA)" == "$folder" ]; then
-            echo "$folder ya esta en Docker ($p): para otra version de PHP, lvm-instalador docker-php-añadir $p $php"
+            echo "$folder ya esta en Docker ($p): para otra version de PHP, nexum docker-php-añadir $p $php"
             return 1
         fi
     done
     dir=$DOCKER_DIR/$slug
     if [ -e "$dir" ]; then
-        echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con LAMPP delante): pasalo con lvm-instalador docker-pasar $slug"
+        echo "Ya hay un proyecto en Docker con el nombre $slug (de antes, con LAMPP delante): pasalo con nexum docker-pasar $slug"
         return 1
     fi
     # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
@@ -611,7 +611,7 @@ function docker_web_create() {
     docker_ready || { echo "Docker sin root no esta en marcha: instalalo o arrancalo en la pestaña Docker."; return 1; }
     if ! docker_web_ports_ok; then
         echo "Docker sin root aun no puede usar los puertos $(docker_web_get HTTP) y $(docker_web_get HTTPS): pulsa «Permitir» en"
-        echo "Configuracion, Docker (o: lvm-instalador docker-web permitir), o elige otros puertos."
+        echo "Configuracion, Docker (o: nexum docker-web permitir), o elige otros puertos."
         return 1
     fi
     # La contraseña antes de cambiar nada (hosts): cancelarla deja todo como estaba. Con el DNS comodin no

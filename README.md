@@ -1,4 +1,4 @@
-# lvm-instalador · Nexum Dev Stack
+# nexum · Nexum Dev Stack
 
 Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP y Perl) para Linux. Todo va en un solo archivo: `lvm-instalador.sh`.
 
@@ -42,11 +42,11 @@ El resto de dependencias (`net-tools`, librerías de compilación) las instala e
 
 ## Instalar o actualizar con el paquete .deb
 
-Cada versión se publica en las [Releases del repositorio](https://github.com/mariomasku/nexum-stack/releases) con su paquete `lvm-instalador_<versión>_all.deb` y su firma (`.sig`). **Primera instalación:** descarga el `.deb` de la última Release y haz doble clic. Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04): **Instalar** y la contraseña. En una terminal: `sudo apt install ./lvm-instalador_<versión>_all.deb`. **Actualizar:** desde la propia ventana, con **Buscar actualizaciones** (ver [Uso diario](#uso-diario)).
+Cada versión se publica en las [Releases del repositorio](https://github.com/mariomasku/nexum-stack/releases) con su paquete `nexum_<versión>_all.deb` y su firma (`.sig`). **Primera instalación:** descarga el `.deb` de la última Release y haz doble clic. Se abre el Centro de aplicaciones (Ubuntu Software en 20.04 y 22.04): **Instalar** y la contraseña. En una terminal: `sudo apt install ./nexum_<versión>_all.deb`. **Actualizar:** desde la propia ventana, con **Buscar actualizaciones** (ver [Uso diario](#uso-diario)).
 
-- Instala el script en `/opt/lvm-instalador/lvm-instalador.sh`, el icono del menú en `/usr/share/applications/lampp-version-manager.desktop` y el del icono en `/usr/share/icons/hicolor/256x256/apps/`.
-- Al instalarse, `/usr/local/bin/lvm-instalador` (y `lvm`, si ya era un enlace a `lvm-instalador.sh`) apunta al script de `/opt`, y los iconos del menú de cada usuario (`~/.local/share/applications/lampp-version-manager.desktop`) se reapuntan también. Así deja de abrirse la versión vieja de la carpeta donde se descomprimió.
-- Al desinstalar el paquete (`sudo apt remove lvm-instalador`) se quitan esos enlaces y accesos. Las versiones de PHP de `/opt/lampp-*`, los proyectos y las bases de datos no se tocan.
+- Instala el script en `/opt/nexum/nexum.sh`, el icono del menú en `/usr/share/applications/nexum.desktop` y el del icono en `/usr/share/icons/hicolor/256x256/apps/`.
+- Al instalarse, la orden `/usr/local/bin/nexum` apunta al script de `/opt` (si ya hay un `nexum` de otro programa, no se toca y se avisa). Los iconos del menú que tuviera cada usuario en `~/.local/share/applications` para una copia del programa se quitan (está el del paquete), y el temporizador de los proyectos de Docker sin visitas de cada usuario usa la orden `nexum`. Una orden `lvm` de otro programa no se toca nunca.
+- Al desinstalar el paquete (`sudo apt remove nexum`) se quitan esos enlaces y accesos. Las versiones de PHP de `/opt/lampp-*`, los proyectos y las bases de datos no se tocan.
 - El paquete se genera con `./empaquetar-deb.sh [carpeta]`, que toma la versión de `APP_VERSION` y el icono que lleva el script.
 
 ## Primera instalación
@@ -57,8 +57,8 @@ Con git:
 
 ```bash
 cd ~
-git clone <URL-del-repositorio> lvm-instalador
-cd lvm-instalador
+git clone <URL-del-repositorio> nexum
+cd nexum
 ```
 
 O descarga el ZIP del repositorio, descomprímelo en tu carpeta personal (por ejemplo en `~/lvm-instalador/`) y abre una terminal en esa carpeta (clic derecho → **Abrir en una terminal**).
@@ -77,20 +77,19 @@ chmod +x lvm-instalador.sh
 La primera vez pregunta si quieres crear los **accesos directos**. Responde **Sí** y escribe tu contraseña de `sudo` (no se ve al escribirla; es normal). Se crean:
 
 - El icono **«Nexum Dev Stack»** en el menú de aplicaciones, que abre la [ventana gráfica](#la-ventana).
-- El comando **`lvm-instalador`**, para abrirlo desde cualquier terminal.
-- El comando corto **`lvm`** (`lvm use 8.4`…), solo si el equipo no tiene ya otro comando con ese nombre.
+- El comando **`nexum`**, para abrirlo desde cualquier terminal.
 
 Si prefieres crear el comando a mano, desde la carpeta del repositorio:
 
 ```bash
-sudo ln -sf "$PWD/lvm-instalador.sh" /usr/local/bin/lvm-instalador
+sudo ln -sf "$PWD/lvm-instalador.sh" /usr/local/bin/nexum
 ```
 
-Si vienes de una versión anterior con el comando `pvm-instalador`, el instalador ofrece quitarlo y dejar `lvm-instalador` apuntando a este archivo.
+Si vienes de una versión anterior con el comando `pvm-instalador`, el instalador ofrece quitarlo y dejar `nexum` apuntando a este archivo.
 
 ### 4. Instalar la primera versión de PHP
 
-1. Abre **«Nexum Dev Stack»** desde el menú de aplicaciones y ve a la pestaña **Instalar** (en la terminal: `lvm-instalador instalador`).
+1. Abre **«Nexum Dev Stack»** desde el menú de aplicaciones y ve a la pestaña **Instalar** (en la terminal: `nexum instalador`).
 2. Marca la versión de PHP que necesites, por ejemplo **PHP 8.4.x**. Si también tienes proyectos antiguos, marca además **XAMPP 8.2.4-0** (dentro de «XAMPP oficiales»). Las versiones de PHP no necesitan ningún XAMPP.
 3. Pulsa **Instalar** y escribe la contraseña de `sudo` cuando la pida. A partir de ahí todo es automático: cada versión de PHP tarda entre 7 y 20 minutos en compilarse, según el equipo.
 4. Al terminar, pulsa **Activar lampp-8.4** (en la terminal, el panel pregunta si quieres activarla).
@@ -106,7 +105,7 @@ En la carpeta `manual/` hay un manual interactivo (ábrelo con doble clic en `ma
 
 Haz esto una vez al instalar el gestor en un equipo, y cada vez que la ventana muestre un aviso naranja. Así queda como el equipo de referencia. Cada paso pide la contraseña de administrador.
 
-1. **Instala el paquete.** Equipo nuevo: doble clic en el `.deb` (o `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`). Si ya lo tenías, las versiones que cambian el ayudante de actualización (la 1.39.0, la 1.40.0, la 1.44.0, la 1.49.0 y la 1.50.0) se instalan una vez en la terminal con ese mismo `sudo apt install`; las demás, desde la ventana.
+1. **Instala el paquete.** Equipo nuevo: doble clic en el `.deb` (o `sudo apt install ~/Descargas/nexum_<versión>_all.deb`). Si ya lo tenías, las versiones que cambian el ayudante de actualización (la 1.39.0, la 1.40.0, la 1.44.0, la 1.49.0 y la 1.50.0) se instalan una vez en la terminal con ese mismo `sudo apt install`; las demás, desde la ventana.
 2. **Abre la ventana y mira la pestaña Versiones.** Arriba aparecen los avisos pendientes, cada uno con su botón. Púlsalos de arriba abajo:
 
    | Aviso | Qué pasa si no lo arreglas | Botón |
@@ -118,9 +117,9 @@ Haz esto una vez al instalar el gestor en un equipo, y cada vez que la ventana m
    | **El navegador avisa al abrir estos proyectos** (desde la 1.46.0) | Chrome y Firefox no aceptan todavía el certificado propio de los proyectos con dominio de pruebas (como `web.local`): sale «La conexión no es privada» y las herramientas que manejan el navegador, como **Claude in Chrome**, no pueden abrirlos. | **Confiar** (después cierra el navegador del todo y vuelve a abrirlo) |
 
    Cuando no queda ningún aviso, el equipo está al día.
-3. **Después de Arreglarlos**, el navegador acepta sin aviso los proyectos con dominio de pruebas (`web.local`, `.local`, `.test`): desde la 1.46.0, Arreglarlos hace también lo de **Confiar**. Desde la 1.47.0, las tiendas con dominio real también, pero **solo mientras están falseadas** en `/etc/hosts`: al falsear una (pestaña Hosts o al cargarla), el navegador acepta su certificado; al dejar de falsearla, deja de aceptarlo. Es a propósito: Apache corre con tu usuario y tiene su clave en memoria, donde la puede leer el PHP de cualquier web, y con ella se podría suplantar la web de verdad; mientras está falseada, el navegador no va a la web de verdad. Si cambias `/etc/hosts` a mano, sale el aviso «El navegador acepta webs reales que ya no están falseadas»: pulsa **Quitar** (o `lvm-instalador confiar-certificados --quitar`).
+3. **Después de Arreglarlos**, el navegador acepta sin aviso los proyectos con dominio de pruebas (`web.local`, `.local`, `.test`): desde la 1.46.0, Arreglarlos hace también lo de **Confiar**. Desde la 1.47.0, las tiendas con dominio real también, pero **solo mientras están falseadas** en `/etc/hosts`: al falsear una (pestaña Hosts o al cargarla), el navegador acepta su certificado; al dejar de falsearla, deja de aceptarlo. Es a propósito: Apache corre con tu usuario y tiene su clave en memoria, donde la puede leer el PHP de cualquier web, y con ella se podría suplantar la web de verdad; mientras está falseada, el navegador no va a la web de verdad. Si cambias `/etc/hosts` a mano, sale el aviso «El navegador acepta webs reales que ya no están falseadas»: pulsa **Quitar** (o `nexum confiar-certificados --quitar`).
 4. **Si tenías una CA propia** (la de `mkcert` o una creada con scripts como `generar-certificados.sh`), Arreglarlos la quita de la confianza del sistema y de Chrome y Firefox, y te dice dónde está su clave privada. Bórrala, o guárdala cifrada fuera de tu carpeta personal si la usas en otro sitio. No vuelvas a instalar una CA así en el equipo.
-5. **Para ver antes qué haría**, en la terminal: `lvm-instalador --simular asegurar --todas` y `lvm-instalador --simular arreglar-certificados`. Sin `--simular`, lo hacen (igual que los botones).
+5. **Para ver antes qué haría**, en la terminal: `nexum --simular asegurar --todas` y `nexum --simular arreglar-certificados`. Sin `--simular`, lo hacen (igual que los botones).
 
 Lo que no cambia, a propósito: MariaDB con root sin contraseña y Apache con tu usuario. Por eso, no cargues proyectos ni volcados de origen dudoso: un plugin malicioso puede leer las demás bases y tus ficheros.
 
@@ -129,22 +128,22 @@ Lo que no cambia, a propósito: MariaDB con root sin contraseña y Apache con tu
 Abre la ventana desde el menú de aplicaciones (**«Nexum Dev Stack»**) o usa la terminal:
 
 ```bash
-lvm-instalador ventana         # ventana gráfica (la que abre el icono del menú)
-lvm-instalador                 # panel en la terminal: activar, instalar, actualizar, desinstalar...
-lvm-instalador use 8.4         # cambiar la versión activa
-lvm-instalador list            # ver las versiones instaladas y cuál está activa
+nexum ventana         # ventana gráfica (la que abre el icono del menú)
+nexum                 # panel en la terminal: activar, instalar, actualizar, desinstalar...
+nexum use 8.4         # cambiar la versión activa
+nexum list            # ver las versiones instaladas y cuál está activa
 ```
 
 Arranque y parada de la versión activa:
 
 ```bash
-lvm-instalador arrancar | parar | reiniciar
+nexum arrancar | parar | reiniciar
 sudo /opt/lampp/lampp start | stop | restart | status     # lo mismo, como en XAMPP
 ```
 
 La lista completa de comandos está en [Comandos sin panel](#comandos-sin-panel).
 
-Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). Desde la 1.50.0 busca la última Release del repositorio de GitHub (y, sin conexión, un `.deb` con su `.sig` en Descargas): si es más nueva que la versión instalada, la descarga a `~/.lvm-instalador/actualizaciones`, comprueba su firma, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Un paquete sin la firma de quien publica el programa no se instala desde la ventana. Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `lvm-instalador novedades`.
+Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). Desde la 1.50.0 busca la última Release del repositorio de GitHub (y, sin conexión, un `.deb` con su `.sig` en Descargas): si es más nueva que la versión instalada, la descarga a `~/.lvm-instalador/actualizaciones`, comprueba su firma, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Un paquete sin la firma de quien publica el programa no se instala desde la ventana. Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/nexum_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `nexum novedades`.
 
 ---
 
@@ -152,15 +151,15 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
 
 ![Ventana de Nexum Dev Stack](capturas/ventana.png)
 
-`lvm-instalador ventana` (o el icono del menú) abre una ventana con cuatro pestañas. Las explicaciones de cada bloque están en el símbolo de información (ⓘ) junto a su título: se ven al pasar el ratón por encima.
+`nexum ventana` (o el icono del menú) abre una ventana con cuatro pestañas. Las explicaciones de cada bloque están en el símbolo de información (ⓘ) junto a su título: se ven al pasar el ratón por encima.
 
 | Pestaña | Qué hay |
 |---|---|
-| **Versiones** | La versión activa, con su estado (en marcha o parada) y los botones Arrancar (verde), Reiniciar (azul), Parar (rojo) y Abrir localhost. **Parar** hace lo mismo que `lvm disable`: para la versión y quita el enlace `/opt/lampp`, así que `php` deja de responder en la terminal hasta que actives una versión. Debajo, todas las versiones instaladas: la etiqueta **XAMPP** o **Pila propia** (en gris) y el botón **Activar**, o **Activa** en verde. Al pulsar una versión se despliegan sus componentes y los botones **Actualizar** (solo pilas propias) y **Desinstalar…**. Si quedan en memoria procesos de otras versiones, arriba sale **Hay procesos de otras versiones en memoria** con el botón **Cerrarlos** |
+| **Versiones** | La versión activa, con su estado (en marcha o parada) y los botones Arrancar (verde), Reiniciar (azul), Parar (rojo) y Abrir localhost. **Parar** hace lo mismo que `nexum disable`: para la versión y quita el enlace `/opt/lampp`, así que `php` deja de responder en la terminal hasta que actives una versión. Debajo, todas las versiones instaladas: la etiqueta **XAMPP** o **Pila propia** (en gris) y el botón **Activar**, o **Activa** en verde. Al pulsar una versión se despliegan sus componentes y los botones **Actualizar** (solo pilas propias) y **Desinstalar…**. Si quedan en memoria procesos de otras versiones, arriba sale **Hay procesos de otras versiones en memoria** con el botón **Cerrarlos** |
 | **Bases de datos** | Un **buscador**, las bases de cada versión (sin las del sistema) con el botón **Abrir phpMyAdmin** en la versión activa y la descarga de cada base. Debajo, **Subir o actualizar una base de datos** |
-| **Hosts** | Los dominios de los vhosts de `/opt/config/httpd-vhosts.conf` y si están falseados en `/etc/hosts` (llevan a este equipo). Arriba, **Host falseado**: el dominio de la tienda PrestaShop cargada, con el interruptor encendido y el botón **Abrir**. Debajo, el resto de dominios con su interruptor para falsearlos o dejar de falsearlos a mano (pide la contraseña de sudo). En medio, **Nuevo proyecto con dominio falseado**: dominio de producción, carpeta elegida de la lista de `/opt/htdocs` (por ejemplo, la de un `git clone`) o nueva con **+**, y base de datos de la versión activa, nueva con **+** o ninguna (si la carpeta trae `wp-config.php`, PrestaShop o `.env`, se propone su base); crea la carpeta en `/opt/htdocs`, su vhost http y https con certificado, la base vacía en la versión activa y falsea el dominio, para construir el proyecto en local y subirlo a producción tal cual (`lvm-instalador nuevo-dominio <dominio> <carpeta> [base]`). «Cargar proyecto» vuelve a falsear su dominio |
+| **Hosts** | Los dominios de los vhosts de `/opt/config/httpd-vhosts.conf` y si están falseados en `/etc/hosts` (llevan a este equipo). Arriba, **Host falseado**: el dominio de la tienda PrestaShop cargada, con el interruptor encendido y el botón **Abrir**. Debajo, el resto de dominios con su interruptor para falsearlos o dejar de falsearlos a mano (pide la contraseña de sudo). En medio, **Nuevo proyecto con dominio falseado**: dominio de producción, carpeta elegida de la lista de `/opt/htdocs` (por ejemplo, la de un `git clone`) o nueva con **+**, y base de datos de la versión activa, nueva con **+** o ninguna (si la carpeta trae `wp-config.php`, PrestaShop o `.env`, se propone su base); crea la carpeta en `/opt/htdocs`, su vhost http y https con certificado, la base vacía en la versión activa y falsea el dominio, para construir el proyecto en local y subirlo a producción tal cual (`nexum nuevo-dominio <dominio> <carpeta> [base]`). «Cargar proyecto» vuelve a falsear su dominio |
 | **Versiones → Instalar nuevas versiones de PHP** (debajo de Instaladas) | Las ramas de PHP con su último parche, los componentes que llevaría y la carpeta donde se instala. Cada rama lleva su estado según php.net, como texto de color: **Estable** (verde, recibe correcciones de errores y de seguridad: la mejor opción para proyectos nuevos), **Solo seguridad** (ámbar, solo parches de seguridad hasta la fecha que se indica) o **Sin soporte** (rojo, solo para proyectos antiguos). También «Otro parche concreto…», que muestra el estado de la rama y marca su último parche, y los XAMPP oficiales |
-| **Herramientas** | Lo que se usa de vez en cuando: **Editar** los vhosts y los hosts, registrar un XAMPP de `/opt/lampp`, abrir las carpetas de proyectos, copias y **Registros de instalaciones**, el **Registro de errores** (`/opt/lampp/logs/error_log` de la versión montada, con **Ver el final** para leer las últimas líneas sin abrir ficheros enormes, y **Abrir**), **Buscar una versión nueva** (la última Release de GitHub, firmada), volver a crear el icono del menú, **Comandos de lvm-instalador** (la ayuda con todos los comandos), **Novedades** y **Acerca de** |
+| **Herramientas** | Lo que se usa de vez en cuando: **Editar** los vhosts y los hosts, registrar un XAMPP de `/opt/lampp`, abrir las carpetas de proyectos, copias y **Registros de instalaciones**, el **Registro de errores** (`/opt/lampp/logs/error_log` de la versión montada, con **Ver el final** para leer las últimas líneas sin abrir ficheros enormes, y **Abrir**), **Buscar una versión nueva** (la última Release de GitHub, firmada), volver a crear el icono del menú, **Comandos de nexum** (la ayuda con todos los comandos), **Novedades** y **Acerca de** |
 
 - **Contraseña:** las acciones que necesitan `sudo` piden la contraseña en una ventana, una sola vez por acción.
 - **Progreso:** al instalar o actualizar se ve una barra con el porcentaje, los componentes (hechos, en curso y pendientes), el tiempo y una estimación del que queda. «Ver registro» muestra la salida completa. Al terminar, el botón **Activar** activa la versión recién instalada. Si la instalación falla, el botón **Ver el log del error** abre un informe con el sistema, el compilador, el paso que ha fallado, sus primeros errores, el final de su log y, si falló la configuración, lo último de su `config.log`. **Copiar todo** lo copia para buscar la solución. El informe también se guarda como `informe-error.txt` junto a los logs de la compilación.
@@ -173,7 +172,7 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
   - Si la base está en más de una versión, sale un resultado por versión: se carga en la del resultado que pulses.
   - Si no cambia de versión, recarga Apache (recarga suave, y PHP-FPM en las pilas propias). Sin ella, cada proceso de PHP recuerda durante 120 s (`realpath_cache_ttl`) adónde apuntaba el enlace y sigue sirviendo el proyecto anterior. Si cambia de versión no hace falta, porque la activación ya reinicia todo.
   - Para que el navegador tampoco muestre el proyecto anterior desde su caché, conviene poner `Header always set Cache-Control "no-store"` (dentro de `<IfModule headers_module>`) en los vhosts de `web.local`.
-  - En la terminal: `lvm-instalador cargar-proyecto <carpeta> [versión]`.
+  - En la terminal: `nexum cargar-proyecto <carpeta> [versión]`.
   - Encima del buscador se ve a dónde apunta `web.local` («web.local → proyecto»; si el nombre no cabe, se ve entero al dejar el ratón encima). Junto a él está el botón para **desmontarlo**, y a la derecha los de abrirlo (de derecha a izquierda: Visual Studio Code, su BBDD en phpMyAdmin, wp-admin y `web.local`). **Montar nuevo proyecto**, a la derecha del buscador, clona uno de GitHub (ver más abajo).
   - **Tiendas PrestaShop** (las que tienen `app/config/parameters.php` o `config/settings.inc.php`): PrestaShop redirige siempre al dominio guardado en su base, así que no basta con `web.local`. Al cargarla se hace lo del manual de XAMPP del equipo, solo lo que falte:
     - **Dominio:** el de la tienda principal en la tabla `<prefijo>shop_url` de su base. Si la base no se puede leer, el `ServerName` del vhost que ya apunte a la carpeta.
@@ -182,25 +181,25 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
     - **Hosts:** se falsea el dominio en `/etc/hosts` (`127.0.0.1 <dominio> www.<dominio>`): se le quita el `#` a su línea o se añade si no la hay.
   - **Cualquier otro proyecto:** los dominios de los vhosts que estuvieran falseados se comentan con `#` y vuelven a llevar a la web real. `localhost`, `web.local` y el nombre del equipo no se tocan nunca. Cada cambio de `/etc/hosts` guarda el anterior en `~/lvm-copias`.
   - **Apache con tu usuario:** si la versión no tiene `User`/`Group` con tu usuario (como pide el manual, para que la caché y los ficheros que crean las webs sean tuyos), se añaden al final de su `httpd.conf`. Lo mismo al registrar un XAMPP, que además activa los vhosts y hace tuya `/opt/htdocs` si no lo era.
-  - En la terminal, a mano: `lvm-instalador hosts-falsear <dominio> si|no`.
-- **Solo la versión montada en memoria:** todos los LAMPP se arrancan por el enlace `/opt/lampp`, así que sus procesos se llaman igual (`/opt/lampp/bin/httpd`…) sea cual sea la versión, y el `lampp stop` de XAMPP solo cierra lo que encuentra en sus `.pid`. Al montar otra versión, al pulsar **Parar** y al parar desde la terminal, el gestor comprueba que no quede ningún proceso de LAMPP (Apache, MariaDB, ProFTPD, PHP-FPM) y cierra los que sigan vivos: primero de forma normal (a MariaDB le da hasta 90 s para guardar) y después a la fuerza. Antes de arrancar cierra los de otras versiones. La versión de cada proceso se sabe por su ruta real, por los `.pid` de cada versión, por su proceso padre y, si solo pone `/opt/lampp/`, por si arrancó antes o después de montar la versión actual. En la terminal: `lvm-instalador procesos` y `lvm-instalador cerrar-procesos [--todos]`.
+  - En la terminal, a mano: `nexum hosts-falsear <dominio> si|no`.
+- **Solo la versión montada en memoria:** todos los LAMPP se arrancan por el enlace `/opt/lampp`, así que sus procesos se llaman igual (`/opt/lampp/bin/httpd`…) sea cual sea la versión, y el `lampp stop` de XAMPP solo cierra lo que encuentra en sus `.pid`. Al montar otra versión, al pulsar **Parar** y al parar desde la terminal, el gestor comprueba que no quede ningún proceso de LAMPP (Apache, MariaDB, ProFTPD, PHP-FPM) y cierra los que sigan vivos: primero de forma normal (a MariaDB le da hasta 90 s para guardar) y después a la fuerza. Antes de arrancar cierra los de otras versiones. La versión de cada proceso se sabe por su ruta real, por los `.pid` de cada versión, por su proceso padre y, si solo pone `/opt/lampp/`, por si arrancó antes o después de montar la versión actual. En la terminal: `nexum procesos` y `nexum cerrar-procesos [--todos]`.
   - Que Apache tenga varios procesos es normal: uno principal (root) y varios de trabajo que atienden las peticiones (con XAMPP, de 5 a 10 esperando). Todos son de la misma versión.
 - **Editar vhosts** (menú, debajo de Abrir phpMyAdmin): los vhosts (`/opt/config/httpd-vhosts.conf`, compartidos por todas las versiones) son del administrador, porque Apache los lee como root al arrancar. Se abre una copia en `~/.lvm-instalador/httpd-vhosts.conf` con el editor de textos. Al pulsar **Aplicar**:
   - se comprueba que solo lleva directivas de vhosts (nada de `LoadModule`, `Include`, `Listen`, `PidFile` ni registros con `|orden` o fuera de `logs/`);
   - se guarda la anterior en `~/lvm-copias` y se escribe la nueva con sudo;
   - Apache la prueba (`httpd -t`): si no la acepta, se deja como estaba; si la acepta, se recarga Apache.
 
-  Lo que no se admite se puede poner a mano con `sudoedit /opt/config/httpd-vhosts.conf`. En la terminal: `lvm-instalador vhosts`.
-- **Editar hosts** (menú): abre una copia de `/etc/hosts` en el editor de textos. Al pulsar **Aplicar**, guarda el `/etc/hosts` actual en `~/lvm-copias` y escribe el nuevo con sudo. No deja guardar uno sin la línea de `localhost`, ni añadir dominios que lleven a otro equipo (solo a `127.x` o `::1`). Para eso, en la terminal: `lvm-instalador hosts` (con `sudoedit`).
+  Lo que no se admite se puede poner a mano con `sudoedit /opt/config/httpd-vhosts.conf`. En la terminal: `nexum vhosts`.
+- **Editar hosts** (menú): abre una copia de `/etc/hosts` en el editor de textos. Al pulsar **Aplicar**, guarda el `/etc/hosts` actual en `~/lvm-copias` y escribe el nuevo con sudo. No deja guardar uno sin la línea de `localhost`, ni añadir dominios que lleven a otro equipo (solo a `127.x` o `::1`). Para eso, en la terminal: `nexum hosts` (con `sudoedit`).
 - **Cargar proyecto** (el primer bloque de la pestaña Versiones): buscador de las carpetas de `/opt/htdocs`, con el proyecto cargado ahora y, a su derecha, cuatro botones de icono (al dejar el ratón encima se ve qué abre cada uno): la **bola del mundo** abre el proyecto en el navegador (`web.local`); **phpMyAdmin**, su BBDD; **WordPress** o **PrestaShop**, su panel de administración (`wp-admin` o el back office de la tienda, se llame como se llame su carpeta); y **Visual Studio Code**, su carpeta (si ya está abierta, trae su ventana delante; solo sale si VS Code está instalado). **Cargar** apunta el vhost (`web.local`) a la carpeta y monta la versión de PHP donde está su base de datos. Si la base está en varias versiones, o en ninguna, pregunta cuál montar (propone la activa o la de su `.php-version`).
-- **Pestaña Servicios** (como el panel de XAMPP): Apache, MariaDB y el FTP de la versión montada. Cada uno con su estado, sus puertos y si se puede entrar desde la red, y botones para arrancar, parar o reiniciar. **El FTP no arranca con la versión:** se arranca aquí cuando haga falta y sigue arrancando con ella hasta que se pare. En la terminal: `lvm-instalador servicio apache|mariadb|ftp arrancar|parar|reiniciar`.
+- **Pestaña Servicios** (como el panel de XAMPP): Apache, MariaDB y el FTP de la versión montada. Cada uno con su estado, sus puertos y si se puede entrar desde la red, y botones para arrancar, parar o reiniciar. **El FTP no arranca con la versión:** se arranca aquí cuando haga falta y sigue arrancando con ella hasta que se pare. En la terminal: `nexum servicio apache|mariadb|ftp arrancar|parar|reiniciar`.
 - **Base que ya existe en otra versión:** al cargar una copia en una base que también está en otra versión, la ventana avisa («ya existe en lampp-7.4 (PHP 7.4.33)») y pregunta si cargarla también en la activa. Cada versión tiene su propio MariaDB, así que la otra no se toca. Al crear una base, también avisa si ese nombre ya existe en otra versión.
 - **Descargar una base de datos:** el botón de descarga de cada base (en la lista de su versión o en el buscador) guarda una copia `.zip` con un `.sql` dentro (o `.sql.gz` o `.sql` si el nombre acaba así), con estructura, datos, disparadores y rutinas. Se puede volver a cargar con «Subir o actualizar». Funciona con cualquier versión: si no está en marcha, se arranca un MariaDB temporal sin red y sin tocar la versión activa, solo para la copia, y por eso pide la contraseña de sudo.
 - **Crear y borrar bases de datos** (solo en la versión activa, que tiene que estar en marcha): «Crear base de datos…» en su lista o el botón **+** junto al destino de la carga. La base se crea vacía en utf8mb4_general_ci. La papelera de cada base, o la que está junto al destino, la borra tras una confirmación. Si la base tiene tablas, avisa de que se elimina todo su contenido y es irreversible, y propone guardar antes una copia `.sql.gz` en `~/lvm-copias`, que se puede volver a cargar. Sin copia, hay que escribir el nombre de la base para confirmar. Si la copia falla, no se borra nada.
 - **Desinstalar:** propone guardar antes una copia de las bases de datos en `~/lvm-copias`. Si se quita la copia, hay que escribir el nombre de la versión para confirmar.
 - **Menú (☰):** abrir localhost o phpMyAdmin, volver a leer las versiones, abrir el panel en la terminal, la carpeta de registros, «Novedades» y «Acerca de».
 - La ventana no repite la lógica del instalador: ejecuta los mismos comandos que la terminal. El código de la ventana (Python, GTK 3) va dentro de `lvm-instalador.sh` y se escribe en `~/.lvm-instalador/ventana.py` al abrirla.
-- `lvm-instalador --simular ventana` abre la ventana en modo simulación.
+- `nexum --simular ventana` abre la ventana en modo simulación.
 
 ## Apariencia
 
@@ -231,13 +230,13 @@ Desde la 1.57.0, los proyectos de `/opt/htdocs` hechos con **Astro, Next, Nuxt, 
 - **Astro con el adaptador de Vercel, Netlify o Cloudflare:** se compila con `@astrojs/node` sin tocar la configuración ni el `package.json` del proyecto, porque esos adaptadores no se pueden servir en local. Las tareas programadas de esos alojamientos no se ejecutan.
 - **Parar** cierra el servidor con todos sus procesos y, si se estaba compartiendo, también su túnel. Cerrar la ventana no lo para.
 
-En la terminal: `lvm-instalador node-arrancar <carpeta> [desarrollo|compilado]`, `node-parar <carpeta>` y `node-registro <carpeta>`.
+En la terminal: `nexum node-arrancar <carpeta> [desarrollo|compilado]`, `node-parar <carpeta>` y `node-registro <carpeta>`.
 
 ## Uso del panel
 
 ```bash
-lvm-instalador              # panel
-lvm-instalador --simular    # panel en modo prueba: muestra lo que haría sin cambiar nada
+nexum              # panel
+nexum --simular    # panel en modo prueba: muestra lo que haría sin cambiar nada
 ```
 
 En las ventanas: **flechas** para moverte, **Espacio** para marcar, **Intro** para aceptar y **Tab** para llegar a los botones.
@@ -312,7 +311,7 @@ En la lista de instalación cada fila muestra la versión exacta de cada compone
 
 ## Desinstalar
 
-Opción **Desinstalar versiones** del panel (o `lvm-instalador desinstalar <version>`):
+Opción **Desinstalar versiones** del panel (o `nexum desinstalar <version>`):
 
 - No deja desinstalar **la versión activa**: cambia antes a otra.
 - No deja desinstalar un XAMPP cuyas **bases de datos usan otras versiones** (aparece como `en uso`; solo pasa con versiones instaladas por el script antiguo).
@@ -325,11 +324,11 @@ Desde la línea de comandos no se hace copia: úsalo solo para versiones sin bas
 
 ## Actualizar versiones de PHP
 
-Opción **Actualizar versiones de PHP** del panel (o `lvm-instalador actualizar <version>`). Vuelve a compilar una versión de PHP con la última pila de su rama. Las versiones con un parche concreto (`/opt/lampp-8.3.10`) no se actualizan: se quedan en su parche.
+Opción **Actualizar versiones de PHP** del panel (o `nexum actualizar <version>`). Vuelve a compilar una versión de PHP con la última pila de su rama. Las versiones con un parche concreto (`/opt/lampp-8.3.10`) no se actualizan: se quedan en su parche.
 
 - **`actualizable`**: hay parches nuevos de algún componente (por ejemplo, PHP 8.4.26 → 8.4.27). **Conserva sus bases de datos**, porque la rama de MariaDB es la misma.
 - **`sobre XAMPP`**: versión instalada por el script antiguo, que copiaba Apache, MariaDB, ProFTPD y Perl de un XAMPP. Pasa a tener su pila propia. Como su MariaDB cambia de rama (por ejemplo, de 10.4 a 11.8), empieza con bases de datos vacías y antes guarda una copia de las anteriores en `~/lvm-copias/`.
-- **`al dia`**: ya tiene todos los paquetes en su última versión, así que no se puede actualizar. Al elegirla aparece en verde «El paquete lampp-X.Y se encuentra actualizado.» y se vuelve a la lista. `lvm-instalador actualizar <version>` muestra el mismo aviso y no compila nada.
+- **`al dia`**: ya tiene todos los paquetes en su última versión, así que no se puede actualizar. Al elegirla aparece en verde «El paquete lampp-X.Y se encuentra actualizado.» y se vuelve a la lista. `nexum actualizar <version>` muestra el mismo aviso y no compila nada.
 
 Mientras se compila, la versión actual sigue funcionando. Solo al final se sustituye: si es la activa, se para unos segundos y arranca la nueva. Si algo falla, la versión anterior queda como estaba.
 
@@ -338,35 +337,35 @@ Mientras se compila, la versión actual sigue funcionando. Solo al final se sust
 ## Comandos sin panel
 
 ```bash
-lvm-instalador ventana            # ventana gráfica
-lvm-instalador instalador         # abrir directamente la lista de versiones para instalar
-lvm-instalador use 8.4             # activar una versión
-lvm-instalador list                # listar versiones instaladas
-lvm-instalador estado              # estado detallado
-lvm-instalador list-db             # bases de datos de cada versión
-lvm-instalador disable             # parar y desactivar la versión activa
-lvm-instalador desinstalar 8.3     # eliminar una versión (no la activa ni una base en uso)
-lvm-instalador desinstalar 8.3 --copia   # lo mismo, guardando antes sus bases en ~/lvm-copias
-lvm-instalador arrancar            # arrancar la versión activa (también parar y reiniciar)
-lvm-instalador importar-bd copia.sql mi_web   # cargar una copia en la versión activa (también .sql.gz y .zip)
-lvm-instalador importar-bd copia.sql nueva --crear   # creando la base; si ya existe, se vacía antes (con copia)
-lvm-instalador crear-bd mi_web     # crear una base vacía en la versión activa
-lvm-instalador borrar-bd mi_web --copia   # borrarla guardando antes una copia en ~/lvm-copias
-lvm-instalador exportar-bd mi_web ~/Descargas/mi_web.zip [7.4]       # descargar una copia (sin versión, de la activa)
-lvm-instalador cargar-proyecto wordpress-mi_web [7.4]           # web.local -> esa carpeta (y activa la 7.4)
-lvm-instalador montar-proyecto https://github.com/yo/mi_web.git mi_web 8.4 wp_mi_web [copia.sql]   # clonar, cargar y crear su BBDD
-lvm-instalador desmontar-proyecto                                  # web.local enseña una página vacía
-lvm-instalador vhosts             # editar httpd-vhosts.conf de la versión activa (después, reiniciar)
-lvm-instalador hosts              # editar /etc/hosts (sudoedit)
-lvm-instalador add 8.2.12          # registrar un XAMPP instalado a mano en /opt/lampp
-lvm-instalador actualizar 8.4      # actualizar una versión de PHP
-lvm-instalador version            # versión del instalador
-lvm-instalador acerca             # qué hace y lista de cambios
+nexum ventana            # ventana gráfica
+nexum instalador         # abrir directamente la lista de versiones para instalar
+nexum use 8.4             # activar una versión
+nexum list                # listar versiones instaladas
+nexum estado              # estado detallado
+nexum list-db             # bases de datos de cada versión
+nexum disable             # parar y desactivar la versión activa
+nexum desinstalar 8.3     # eliminar una versión (no la activa ni una base en uso)
+nexum desinstalar 8.3 --copia   # lo mismo, guardando antes sus bases en ~/lvm-copias
+nexum arrancar            # arrancar la versión activa (también parar y reiniciar)
+nexum importar-bd copia.sql mi_web   # cargar una copia en la versión activa (también .sql.gz y .zip)
+nexum importar-bd copia.sql nueva --crear   # creando la base; si ya existe, se vacía antes (con copia)
+nexum crear-bd mi_web     # crear una base vacía en la versión activa
+nexum borrar-bd mi_web --copia   # borrarla guardando antes una copia en ~/lvm-copias
+nexum exportar-bd mi_web ~/Descargas/mi_web.zip [7.4]       # descargar una copia (sin versión, de la activa)
+nexum cargar-proyecto wordpress-mi_web [7.4]           # web.local -> esa carpeta (y activa la 7.4)
+nexum montar-proyecto https://github.com/yo/mi_web.git mi_web 8.4 wp_mi_web [copia.sql]   # clonar, cargar y crear su BBDD
+nexum desmontar-proyecto                                  # web.local enseña una página vacía
+nexum vhosts             # editar httpd-vhosts.conf de la versión activa (después, reiniciar)
+nexum hosts              # editar /etc/hosts (sudoedit)
+nexum add 8.2.12          # registrar un XAMPP instalado a mano en /opt/lampp
+nexum actualizar 8.4      # actualizar una versión de PHP
+nexum version            # versión del instalador
+nexum acerca             # qué hace y lista de cambios
 
 # Instalación desatendida
-lvm-instalador instalar --xampp 8.2.4 --php 8.4,8.5 --si
-lvm-instalador instalar --php 7.4,8.3.10 --si   # 7.4 = último parche; 8.3.10 = ese parche en /opt/lampp-8.3.10
-lvm-instalador use 8.3.10                       # activar una versión con parche concreto
+nexum instalar --xampp 8.2.4 --php 8.4,8.5 --si
+nexum instalar --php 7.4,8.3.10 --si   # 7.4 = último parche; 8.3.10 = ese parche en /opt/lampp-8.3.10
+nexum use 8.3.10                       # activar una versión con parche concreto
 ```
 
 Arranque y parada de la versión activa (como siempre en XAMPP):
@@ -404,7 +403,7 @@ En las versiones con pila propia también: `startapache`, `stopapache`, `reloada
 - Apache, PHP-FPM y el FTP se ejecutan con el usuario que instala, así que los permisos de los archivos de los proyectos no cambian. MariaDB se ejecuta con el usuario `mysql`, como en XAMPP.
 - HTTPS en el puerto 443 con un certificado autofirmado para `localhost`; los virtual hosts usan sus propios certificados, como hasta ahora.
 - **Solo desde este equipo:** Apache escucha en `127.0.0.1` y `::1`, MariaDB en `127.0.0.1` (`bind-address`) y el FTP en `127.0.0.1` (`DefaultAddress`). Los demás equipos de la red no llegan a nada.
-- **FTP**: entra con tu usuario y contraseña del equipo y llega directamente a `/opt/htdocs`. No arranca con la versión: se arranca en la pestaña Servicios (o con `lvm-instalador servicio ftp arrancar`).
+- **FTP**: entra con tu usuario y contraseña del equipo y llega directamente a `/opt/htdocs`. No arranca con la versión: se arranca en la pestaña Servicios (o con `nexum servicio ftp arrancar`).
 - **Perl**: scripts `.pl` y `.cgi` en `/opt/htdocs` o en `cgi-bin/` con `#!/opt/lampp/bin/perl`. No incluye mod_perl.
 - Al instalar un XAMPP, Apache queda configurado para ejecutarse con el usuario que lo instala y con los virtual hosts activados.
 
@@ -414,18 +413,18 @@ En las versiones con pila propia también: `startapache`, `stopapache`, `reloada
 
 Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equipo de lo que traigan los proyectos y las bases de los clientes:
 
-- **Solo desde este equipo.** XAMPP deja Apache, MariaDB y ProFTPD escuchando en todas las interfaces, y el FTP entra con `daemon` / `xampp`, la contraseña de fábrica de todos los XAMPP. Al montar, arrancar o registrar una versión se cambia solo lo que falta: `Listen 127.0.0.1:80` y `[::1]:80` (lo mismo con el 443), `bind-address = 127.0.0.1` y `DefaultAddress 127.0.0.1`. Los ficheros anteriores quedan en `~/lvm-copias`. Si algo sigue abierto, la pestaña Versiones avisa y ofrece **Cerrar a la red**. En la terminal: `lvm-instalador asegurar`.
+- **Solo desde este equipo.** XAMPP deja Apache, MariaDB y ProFTPD escuchando en todas las interfaces, y el FTP entra con `daemon` / `xampp`, la contraseña de fábrica de todos los XAMPP. Al montar, arrancar o registrar una versión se cambia solo lo que falta: `Listen 127.0.0.1:80` y `[::1]:80` (lo mismo con el 443), `bind-address = 127.0.0.1` y `DefaultAddress 127.0.0.1`. Los ficheros anteriores quedan en `~/lvm-copias`. Si algo sigue abierto, la pestaña Versiones avisa y ofrece **Cerrar a la red**. En la terminal: `nexum asegurar`.
 - **Dominios sin vhost (desde la 1.33.0).** Una web que visites puede hacer que su dominio apunte a `127.0.0.1` (*DNS rebinding*): su JavaScript leería phpMyAdmin (root sin contraseña) y los proyectos desde tu navegador. El primer vhost del puerto 80 (`etc/extra/lvm-dominio-desconocido.conf`, incluido antes de `httpd-vhosts.conf`) recibe los dominios que no tienen vhost y les devuelve un 403; solo pasan `localhost`, `127.0.0.1` y `[::1]`. `web.local` y los dominios falseados no cambian. `http://localhost/` muestra la carpeta `htdocs` y phpMyAdmin sigue en `http://127.0.0.1/phpmyadmin/`. HTTPS no lo necesita: el certificado no vale para el dominio de fuera y el navegador corta la conexión.
 - **Desde la 1.37.0:**
-  - `/opt` es del administrador (sus carpetas siguen siendo de quien eran): el PHP de una web, que se ejecuta con tu usuario, no puede cambiar `/opt/lampp` ni `/opt/lvm-instalador`.
+  - `/opt` es del administrador (sus carpetas siguen siendo de quien eran): el PHP de una web, que se ejecuta con tu usuario, no puede cambiar `/opt/lampp` ni `/opt/nexum`.
   - Aplicar vhosts y `/etc/hosts` lee la copia una sola vez a una carpeta de root y escribe exactamente lo que se ha comprobado. En los vhosts no se admiten `Define` ni `${VAR}`, y los registros solo van a un fichero de `logs`.
-  - `lvm-actualizar` copia el `.deb` y su firma a una carpeta de root y comprueba allí la huella SHA-256 que se te ha mostrado, la firma (con la clave instalada en `/opt/lvm-instalador/nexum-stack-firma.gpg` y su huella), que es más nueva que la instalada, que solo lleva ficheros de lvm-instalador y que su `postinst`/`postrm`, el propio ayudante y la clave son los del paquete instalado (si cambian, se instala a mano con `sudo apt install`).
-  - Todas las versiones se dejan solo para este equipo (`lvm-instalador asegurar --todas`, o «Protegerlas» en Versiones). Si una no se puede, no se arranca.
+  - `nexum-actualizar` copia el `.deb` y su firma a una carpeta de root y comprueba allí la huella SHA-256 que se te ha mostrado, la firma (con la clave instalada en `/opt/nexum/nexum-stack-firma.gpg` y su huella), que es más nueva que la instalada, que solo lleva ficheros de nexum y que su `postinst`/`postrm`, el propio ayudante y la clave son los del paquete instalado (si cambian, se instala a mano con `sudo apt install`).
+  - Todas las versiones se dejan solo para este equipo (`nexum asegurar --todas`, o «Protegerlas» en Versiones). Si una no se puede, no se arranca.
   - phpMyAdmin solo en `http://127.0.0.1/phpmyadmin/` (desde la 1.38.0/1.26.0 tiene su propio origen: en `127.0.0.1` no hay nada más, y en `localhost`, `web.local` o un dominio falseado da 403; un XSS en un proyecto no lo alcanza), sin `setup/`. No se sirven `.env`, `.git`, `.svn` ni `.hg`. El vhost de dominios desconocidos también está en el 443.
   - Los volcados se cargan con un usuario temporal (`lvm_imp_*`) con permisos solo sobre su base y sin `DEFINER`: no pueden tocar otras bases, crear usuarios ni usar ficheros del servidor. Un volcado de varias bases (`--all-databases`) ya no se carga.
   - MariaDB de XAMPP sin el usuario anónimo ni los permisos de las bases `test`; ProFTPD de XAMPP sin `daemon`/`xampp`.
   - El dominio de `shop_url` solo se falsea si se parece a la carpeta o ya tiene su vhost.
-- **Desde la 1.39.0:** la contraseña de administrador va por una terminal exclusiva (`TIOCEXCL`): ningún otro programa de tu usuario puede abrirla. Las comprobaciones de vhosts y hosts leen por bytes (un `\0` no se cuela). Cada base tiene su usuario `lvm_bd_<base>` (permiso solo para ella, con el `_` escapado), bloqueado tras cargar; sus vistas y funciones `INVOKER` pasan a `DEFINER`, y el gestor solo lee como root tablas de verdad. Reglas web sin distinguir mayúsculas; no se sirven `.sql`, `debug.log`, `.vscode` ni `config.inc.php`; las webs de fuera no leen la API de WordPress (CORS). Los `wp-config.php` del gestor llevan `DISALLOW_FILE_EDIT`. `lvm-actualizar` revisa el paquete con `tarfile` (sin enlaces), exige la huella y que el ayudante, la acción de polkit, los scripts y las dependencias sean los instalados; si cambian, `sudo apt install`.
+- **Desde la 1.39.0:** la contraseña de administrador va por una terminal exclusiva (`TIOCEXCL`): ningún otro programa de tu usuario puede abrirla. Las comprobaciones de vhosts y hosts leen por bytes (un `\0` no se cuela). Cada base tiene su usuario `lvm_bd_<base>` (permiso solo para ella, con el `_` escapado), bloqueado tras cargar; sus vistas y funciones `INVOKER` pasan a `DEFINER`, y el gestor solo lee como root tablas de verdad. Reglas web sin distinguir mayúsculas; no se sirven `.sql`, `debug.log`, `.vscode` ni `config.inc.php`; las webs de fuera no leen la API de WordPress (CORS). Los `wp-config.php` del gestor llevan `DISALLOW_FILE_EDIT`. `nexum-actualizar` revisa el paquete con `tarfile` (sin enlaces), exige la huella y que el ayudante, la acción de polkit, los scripts y las dependencias sean los instalados; si cambian, `sudo apt install`.
 - **Desde la 1.40.0:** el ayudante de actualización exige que cada fichero del paquete sea de root y con sus permisos (sin setuid) y lee los scripts de instalación sin seguir enlaces. Una vista rota en un volcado ya no deja vistas `INVOKER` sin pasar a `DEFINER`. Los certificados de los proyectos van en `/opt/config/ssl` (no en `/etc/ssl/certs`, donde el sistema los toma como de confianza), se crean con tu usuario y solo en esa carpeta, y **Arreglarlos** (`arreglar-certificados`) pasa los antiguos y quita las CAs locales sin límite de dominios. **Protegerlas** corrige también lo que ya estaba abierto (`Listen` con la IP de la red, `bind-address = 0.0.0.0`, `DefaultAddress`, puertos de más) y cambia la clave SSL de fábrica de XAMPP. No se sirven `.dump`, `.old`, `.orig`, copias `~`, `error_log`, `auth.json` ni `.npmrc`. Lo compilado se copia a `/opt` sin conservar el dueño ni el setuid; root no sigue enlaces al escribir en los proyectos ni al vaciar la caché; la ventana usa los programas del sistema (no los de `~/.local/bin`) y pasa a las tareas solo las variables necesarias. Lo que se compila corre sin la terminal de la tarea (no puede usar el permiso de `sudo` ya dado). Un `.pid` manipulado ya no hace que se cierre otro programa. Una CA local solo se avisa y se quita si su clave está en tu carpeta personal.
 - **Desde la 1.41.0** (se aplica con **Protegerlas**):
   - **phpMyAdmin y otras webs.** Una web abierta en el navegador podía mandar un formulario o un `fetch` a `http://127.0.0.1/phpmyadmin/`, y phpMyAdmin (root sin contraseña) lo ejecutaba aunque la web no pudiera leer la respuesta. Ahora Apache rechaza (403) lo que llega de otra web (cabeceras `Sec-Fetch-Site` y `Origin`); desde otra web solo se abre la portada. Escribiendo la dirección, con el botón del gestor o dentro de phpMyAdmin funciona igual.
@@ -443,13 +442,13 @@ Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equi
   - **Más ficheros que no se sirven:** claves (`.pem`, `.key`, `.p12`), `.ini`, `.conf` y las exportaciones de clientes de PrestaShop (`customers_export_*.csv`).
   - Un dominio guardado para un proyecto solo se falsea si ya tiene su vhost o se parece al nombre de la carpeta.
   - **Registrar un XAMPP** de `/opt/lampp` ya no borra su htdocs si tiene proyectos: se aparta en `/opt/htdocs-de-lampp-<versión>-<fecha>` y sus vhosts se copian a `~/lvm-copias`.
-  - El acceso del menú y el comando `lvm-instalador` del paquete siguen apuntando al script de `/opt` aunque se ejecute una copia desde Descargas.
+  - El acceso del menú y el comando `nexum` del paquete siguen apuntando al script de `/opt` aunque se ejecute una copia desde Descargas.
 - **phpMyAdmin por `localhost` (desde la 1.42.2):** `http://localhost/phpmyadmin` (un marcador antiguo o la costumbre de XAMPP) lleva directamente a `http://127.0.0.1/phpmyadmin/`, a su portada y sin lo que llevara detrás. Por `web.local`, el dominio de un proyecto o uno sin vhost sigue dando el aviso «phpMyAdmin está en http://127.0.0.1/phpmyadmin/». Se aplica con **Protegerlas**.
 - **`web.local` que no lleva a este equipo (desde la 1.42.2):** si en `/etc/hosts` `web.local` apunta a otra dirección (por ejemplo `127.0.1.1`, la que Ubuntu usa para el nombre del equipo) o no está, el navegador da «No se puede acceder a este sitio web» (`ERR_CONNECTION_REFUSED`), porque Apache solo escucha en `127.0.0.1`. La pestaña **Hosts** lo avisa y **Arreglarlo** lo cambia una sola vez (con copia del `/etc/hosts` anterior en `~/lvm-copias`).
-- **Probar un proyecto con otra versión de PHP:** en la pestaña **BBDD**, el botón de copiar (dos hojas) junto a cada BBDD la copia a otra versión, eligiendo en una ventana. La de origen no se toca. Si esa versión ya tiene una BBDD con ese nombre, sale marcada «ya la tiene: se sustituye»: se pide confirmación, se guarda antes una copia de la suya en `~/lvm-copias` y se pone la nueva en su lugar (desde la 1.45.1 / Mac 1.33.1; en la terminal, con `--sustituir`). Si la de destino no es la activa, se arranca su MariaDB solo para la copia (sin red; pide la contraseña), y la copia se carga igual de protegida que al subir un volcado (usuario de la BBDD, sin `DEFINER`, lo `INVOKER` y los eventos neutralizados). Después, **Cargar proyecto** pregunta en qué versión cargarlo. En la terminal: `lvm-instalador copiar-bd <base> <origen> <destino>`.
-- **Montar un proyecto nuevo de GitHub (desde la 1.44.0 / Mac 1.32.0):** en **Cargar proyecto**, el botón **Montar nuevo proyecto**, a la derecha del buscador, despliega un asistente de tres pasos: 1) la dirección del repositorio (`https://github.com/usuario/repositorio.git`, o `git@github.com:usuario/repositorio.git` si es privado, con tu clave SSH) y el nombre de la carpeta; 2) la versión de PHP; 3) el nombre de la BBDD nueva y, si lo hay, su volcado (`.sql`, `.sql.gz` o `.zip`). Se clona en htdocs con tu usuario (sin sudo, sin submódulos, sin ganchos y solo por https o ssh), se carga en esa versión, se crea la BBDD y se sube el volcado con la carga protegida. En la terminal: `lvm-instalador montar-proyecto <url> <carpeta> <versión> <base> [volcado]`.
-- **Administrador de pruebas en los paneles (desde la 1.45.0 / Mac 1.33.0):** al cargar una BBDD de WordPress o PrestaShop (subir un volcado, copiarla a otra versión o montar un proyecto nuevo) se le añade un administrador **`local@local.test`** con contraseña **`local`**, el mismo en todos los equipos. En **Cargar proyecto**, el botón del panel (WordPress o PrestaShop) abre una página con los dos ya escritos: solo hay que pulsar **Entrar**. Si la BBDD ya estaba cargada de antes, se crea al pulsar el botón. En WordPress es un usuario con rol de administrador; en PrestaShop, una copia del primer SuperAdmin (su idioma y su tema) en todas las tiendas. Los usuarios de verdad no se tocan. En PrestaShop 1.6 hace falta la carpeta del proyecto (por su `_COOKIE_KEY_`): se carga desde Cargar proyecto. En la terminal: `lvm-instalador usuario-pruebas <base> [carpeta]`. Es un riesgo aceptado a propósito: esas BBDD solo viven en tu equipo y nunca se suben a producción (si alguna vez exportas una para otro sitio, borra antes ese usuario).
-- **Desmontar el proyecto cargado:** el botón de expulsar, junto a «web.local → proyecto», hace que `web.local` deje de apuntar a él y enseñe una página vacía («No hay ningún proyecto cargado»). El enlace sigue existiendo y apunta a la carpeta oculta `htdocs/.lvm-sin-proyecto`. Si era una tienda PrestaShop, su dominio deja de estar falseado. En la terminal: `lvm-instalador desmontar-proyecto`.
+- **Probar un proyecto con otra versión de PHP:** en la pestaña **BBDD**, el botón de copiar (dos hojas) junto a cada BBDD la copia a otra versión, eligiendo en una ventana. La de origen no se toca. Si esa versión ya tiene una BBDD con ese nombre, sale marcada «ya la tiene: se sustituye»: se pide confirmación, se guarda antes una copia de la suya en `~/lvm-copias` y se pone la nueva en su lugar (desde la 1.45.1 / Mac 1.33.1; en la terminal, con `--sustituir`). Si la de destino no es la activa, se arranca su MariaDB solo para la copia (sin red; pide la contraseña), y la copia se carga igual de protegida que al subir un volcado (usuario de la BBDD, sin `DEFINER`, lo `INVOKER` y los eventos neutralizados). Después, **Cargar proyecto** pregunta en qué versión cargarlo. En la terminal: `nexum copiar-bd <base> <origen> <destino>`.
+- **Montar un proyecto nuevo de GitHub (desde la 1.44.0 / Mac 1.32.0):** en **Cargar proyecto**, el botón **Montar nuevo proyecto**, a la derecha del buscador, despliega un asistente de tres pasos: 1) la dirección del repositorio (`https://github.com/usuario/repositorio.git`, o `git@github.com:usuario/repositorio.git` si es privado, con tu clave SSH) y el nombre de la carpeta; 2) la versión de PHP; 3) el nombre de la BBDD nueva y, si lo hay, su volcado (`.sql`, `.sql.gz` o `.zip`). Se clona en htdocs con tu usuario (sin sudo, sin submódulos, sin ganchos y solo por https o ssh), se carga en esa versión, se crea la BBDD y se sube el volcado con la carga protegida. En la terminal: `nexum montar-proyecto <url> <carpeta> <versión> <base> [volcado]`.
+- **Administrador de pruebas en los paneles (desde la 1.45.0 / Mac 1.33.0):** al cargar una BBDD de WordPress o PrestaShop (subir un volcado, copiarla a otra versión o montar un proyecto nuevo) se le añade un administrador **`local@local.test`** con contraseña **`local`**, el mismo en todos los equipos. En **Cargar proyecto**, el botón del panel (WordPress o PrestaShop) abre una página con los dos ya escritos: solo hay que pulsar **Entrar**. Si la BBDD ya estaba cargada de antes, se crea al pulsar el botón. En WordPress es un usuario con rol de administrador; en PrestaShop, una copia del primer SuperAdmin (su idioma y su tema) en todas las tiendas. Los usuarios de verdad no se tocan. En PrestaShop 1.6 hace falta la carpeta del proyecto (por su `_COOKIE_KEY_`): se carga desde Cargar proyecto. En la terminal: `nexum usuario-pruebas <base> [carpeta]`. Es un riesgo aceptado a propósito: esas BBDD solo viven en tu equipo y nunca se suben a producción (si alguna vez exportas una para otro sitio, borra antes ese usuario).
+- **Desmontar el proyecto cargado:** el botón de expulsar, junto a «web.local → proyecto», hace que `web.local` deje de apuntar a él y enseñe una página vacía («No hay ningún proyecto cargado»). El enlace sigue existiendo y apunta a la carpeta oculta `htdocs/.lvm-sin-proyecto`. Si era una tienda PrestaShop, su dominio deja de estar falseado. En la terminal: `nexum desmontar-proyecto`.
 - **Aviso en rojo en Cargar proyecto:** si la versión de PHP montada no tiene la BBDD del proyecto cargado (por ejemplo, al activar otra versión a mano), sale «El proyecto vinculado a web.local no está disponible para esa versión», con las versiones que sí la tienen.
 - **Fecha y parches de seguridad:** en **Instalar nuevas versiones de PHP**, cada versión dice cuándo se publicó y si php.net la marca como **Parche de seguridad** (corrige vulnerabilidades) o **Corrección de errores**.
 - **Octavo repaso de seguridad (1.44.0 / Mac 1.32.0):** Cerrar procesos ya no se puede engañar con un proceso de nombre trucado; copiar una BBDD a otra versión ya no deja un programa tuyo en la terminal que tiene el permiso de administrador; los volcados se cargan con sus vistas y funciones `INVOKER` cambiadas a `DEFINER` desde el principio, y al terminar el usuario de la BBDD se vuelve a crear solo con su BBDD; el MariaDB temporal nunca corre como administrador; y si una versión no se puede dejar solo para este equipo, no se arranca. No hay que hacer nada: se aplica al actualizar.
@@ -485,7 +484,7 @@ Lo que sigue igual a propósito: MariaDB con root sin contraseña y Apache con t
 - **MariaDB de cada versión es distinta.** Una base de datos exportada desde una MariaDB antigua se importa sin problemas en una más nueva. Al revés también funciona normalmente, gracias al cotejamiento `utf8mb4_general_ci`.
 - Las versiones de PHP instaladas con el script antiguo (que copiaban un XAMPP) siguen funcionando y aparecen como `sobre X`. Se pasan a pila propia con **Actualizar versiones de PHP**.
 - **`.htaccess` con `php_value` o `php_flag`** da error 500 en las versiones de PHP nuevas (PHP-FPM). Esos valores van en un archivo `.user.ini` en la carpeta del proyecto.
-- La zona horaria de PHP es `Europe/Madrid`. Para otra: `PHP_TIMEZONE=Europe/London lvm-instalador`.
+- La zona horaria de PHP es `Europe/Madrid`. Para otra: `PHP_TIMEZONE=Europe/London nexum`.
 - Extensiones de PHP incluidas en las versiones nuevas: mysqli, pdo_mysql, gd (jpeg, webp, freetype), intl, mbstring, zip, curl, soap, bcmath, exif, sodium, opcache, sqlite. **No incluye imagick.**
 
 ---
@@ -498,10 +497,10 @@ Lo que sigue igual a propósito: MariaDB con root sin contraseña y Apache con t
 | MariaDB no arranca | `sudo tail /opt/lampp/var/mysql/mysqld.err` |
 | Errores de PHP | `/opt/lampp/logs/error_log` |
 | Una instalación de PHP falla | No queda nada instalado. Los logs de la compilación se guardan en `~/.lvm-instalador/pila-<versión>-<fecha>/` |
-| Una instalación de XAMPP falla a medias | Revisa el log indicado al final y borra la versión con `lvm-instalador desinstalar <version>` |
+| Una instalación de XAMPP falla a medias | Revisa el log indicado al final y borra la versión con `nexum desinstalar <version>` |
 | Logs de cada instalación | `~/.lvm-instalador/` |
-| Volver a la versión anterior | `lvm-instalador use <version>` |
-| Al actualizar: «El paquete trae otro /opt/lvm-instalador/lvm-actualizar» y «Tubería rota» | No es un error: esa versión cambia el ayudante de actualización (la 1.44.0, viniendo de la 1.43 o anterior). Se instala una vez en la terminal: `sudo apt install ~/Descargas/lvm-instalador_<versión>_all.deb`. Desde la 1.45.0 la ventana lo explica y copia la orden |
+| Volver a la versión anterior | `nexum use <version>` |
+| Al actualizar: «El paquete trae otro /opt/nexum/nexum-actualizar» y «Tubería rota» | No es un error: esa versión cambia el ayudante de actualización (la 1.44.0, viniendo de la 1.43 o anterior). Se instala una vez en la terminal: `sudo apt install ~/Descargas/nexum_<versión>_all.deb`. Desde la 1.45.0 la ventana lo explica y copia la orden |
 
 ---
 
@@ -517,7 +516,7 @@ A partir de ese momento, **Buscar actualizaciones** la encuentra en todos los eq
 
 ## Versión para macOS
 
-En [`macos/`](macos/README.md) está la versión para Mac con Apple Silicon (M1 o posterior): `macos/lvm-instalador.sh`, con los comandos `lvm-instalador` y `lvm`. Instala las versiones de PHP en `/Applications/XAMPP-X.Y`, al estilo de XAMPP para Mac, y usa Homebrew solo para las librerías. Desde la 1.2.0 tiene ventana nativa (SwiftUI) con las mismas pestañas que la de Linux, y la misma gestión de bases de datos: cargar copias, crear y borrar. Las instrucciones están en su propio README.
+En [`macos/`](macos/README.md) está la versión para Mac con Apple Silicon (M1 o posterior): `macos/lvm-instalador.sh`, con la orden `nexum`. Instala las versiones de PHP en `/Applications/XAMPP-X.Y`, al estilo de XAMPP para Mac, y usa Homebrew solo para las librerías. Desde la 1.2.0 tiene ventana nativa (SwiftUI) con las mismas pestañas que la de Linux, y la misma gestión de bases de datos: cargar copias, crear y borrar. Las instrucciones están en su propio README.
 
 ---
 

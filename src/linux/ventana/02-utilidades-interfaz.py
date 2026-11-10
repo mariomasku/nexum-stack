@@ -572,7 +572,7 @@ ROW_ICONS = [
     ("error_log de ", ("logo", "apache")),
     ("Buscar una versión nueva", ("icono", "software-update-available-symbolic", "")),
     ("Icono en el menú de aplicaciones", ("icono", "view-app-grid-symbolic", "")),
-    ("Comandos de lvm-instalador", ("icono", "utilities-terminal-symbolic", "")),
+    ("Comandos de nexum", ("icono", "utilities-terminal-symbolic", "")),
     # Los pasos de una instalación o actualización (la lista de la ventana de la tarea)
     ("Descargas", ("icono", "folder-download-symbolic", "")),
     ("Descarga de XAMPP", ("logo", "xampp")),
@@ -1011,7 +1011,7 @@ def message(parent, title, text="", kind=Gtk.MessageType.INFO):
 
 
 def markdown_to_buffer(buf, text):
-    """Pinta el Markdown de «lvm-instalador novedades»: «## versión · fecha», viñetas «- » (con dos
+    """Pinta el Markdown de «nexum novedades»: «## versión · fecha», viñetas «- » (con dos
     espacios delante, dentro de la anterior), **negrita** y `código`."""
     # (con aire: espacio entre versiones, entre puntos y entre las líneas de un mismo punto)
     buf.create_tag("h2", weight=700, scale=1.3, pixels_above_lines=30, pixels_below_lines=12)
@@ -1147,16 +1147,20 @@ def combo_search(combo):
     for i, name in enumerate(names):
         row = Gtk.ListBoxRow()
         row.index, row.key = i, name.lower()
+        # (el nombre entero: solo los larguísimos, de más de 80 letras, se cortan con «…»)
         row.add(label(name, xalign=0, margin_start=8, margin_end=8, margin_top=5, margin_bottom=5,
-                      ellipsize=3, max_width_chars=60))
+                      ellipsize=3, width_chars=min(len(name), 80), max_width_chars=80))
         lb.add(row)
     query = [""]
     lb.set_filter_func(lambda r: query[0] in r.key)
     empty = css(label("Sin resultados", xalign=0.5, margin=10), "dim-label")
     empty.set_no_show_all(True)
     lb.set_placeholder(empty)
+    # (como poco, tan ancha como el desplegable; si los nombres son más largos, lo que haga falta para
+    # verlos enteros, hasta 640)
     sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
-                            max_content_height=360, min_content_width=max(combo.get_allocated_width(), 240))
+                            propagate_natural_width=True, max_content_height=360, max_content_width=640,
+                            min_content_width=max(combo.get_allocated_width(), 240))
     sw.add(lb)
     box.pack_start(entry, False, False, 0)
     box.pack_start(sw, True, True, 0)

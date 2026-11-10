@@ -161,7 +161,8 @@ class App2(NvBandeja,
         steps = [(lambda: self.show_tab("versiones"), None)]
         steps += [(lambda n=n: self.show_tab(n), "pagina-" + n)
                   for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
-        for title, _name, _ic in self.TOOLS_SECTIONS:
+        # (y cada bloque de General, con él arriba)
+        for title in [t for t, _name, _ic in self.TOOLS_SECTIONS] + self.GENERAL_PARTS:
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")
             steps.append((lambda t=title: self.nv_tools_show(t), "config-" + slug))
         # (con el Mailpit de la demostración: uno de sus correos, abierto en la bandeja)

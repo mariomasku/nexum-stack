@@ -447,7 +447,7 @@ func confirmCopy(_ title: String, _ text: String, _ okLabel: String, destructive
     return (r.ok, r.ok && r.checked)
 }
 
-/// Markdown de «lvm-instalador novedades»: «## versión · fecha», viñetas «- » (con dos espacios
+/// Markdown de «nexum novedades»: «## versión · fecha», viñetas «- » (con dos espacios
 /// delante, dentro de la anterior), **negrita** y `código`
 func markdownAttributed(_ text: String) -> NSAttributedString {
     let out = NSMutableAttributedString()
@@ -530,7 +530,7 @@ func commandsAttributed(_ text: String) -> NSAttributedString {
             color = green
             p.paragraphSpacingBefore = 10
             p.paragraphSpacing = 4
-        } else if line.hasPrefix("  lvm-instalador") {
+        } else if line.hasPrefix("  nexum") {
             font = monoBold
             p.paragraphSpacingBefore = 4
         }

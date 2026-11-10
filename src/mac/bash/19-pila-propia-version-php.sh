@@ -1282,7 +1282,7 @@ EOF
 EOF
     mkdir -p "$S/phpmyadmin/tmp"
 
-    # --- Script de arranque y parada, como el de XAMPP para Mac (lo usa "lvm-instalador use") ---
+    # --- Script de arranque y parada, como el de XAMPP para Mac (lo usa "nexum use") ---
     sed -e "s|@ROOT@|$target|g" -e "s|@NAME@|$vname|g" -e "s|@NEED_ROOT@|$(( 1 - test_mode ))|g" \
         -e "s|@WEB_USER@|$web_user|g" > "$S/xampp" <<'EOF'
 #!/bin/bash
@@ -2060,7 +2060,7 @@ function install_stack() {
         $SUDO "$target/proftpd/sbin/proftpd" -t -c "$target/etc/proftpd.conf" 2>&1 | grep -iv '^checking' | sed 's/^/  ProFTPD: /'
     else
         echo "No se comprueba la configuracion como administrador: la version o los vhosts compartidos no"
-        echo "son de root o el grupo puede cambiarlos. Dejalo bien con: lvm-instalador asegurar --todas"
+        echo "son de root o el grupo puede cambiarlos. Dejalo bien con: nexum asegurar --todas"
     fi
 
     [ -n "$aside" ] && $SUDO rm -R "$aside"
@@ -2073,7 +2073,7 @@ function install_stack() {
         if [ $trusted -eq 1 ]; then
             $SUDO "$target/xampp" start
         else
-            echo "No se arranca: primero lvm-instalador asegurar --todas"
+            echo "No se arranca: primero nexum asegurar --todas"
         fi
     fi
 
@@ -2081,7 +2081,7 @@ function install_stack() {
     echo "XAMPP-$vname instalada en $root"
     [ "$replace" -ge 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias$([ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "; la copia de las anteriores esta en ~/nexum-backups")"
     [ "$replace" -ge 1 ] && [ $keep_data -eq 1 ] && echo "Conserva sus bases de datos"
-    [ $was_running -eq 0 ] && echo "Para usarla: lvm-instalador use $vname"
+    [ $was_running -eq 0 ] && echo "Para usarla: nexum use $vname"
 
     return 0
 }

@@ -3,7 +3,7 @@
 CONTEXTO.md
 
 # --- Paquetes generados -------------------------------------------------------------------
-# empaquetar-deb.sh crea lvm-instalador_<versión>_all.deb (por defecto en ~/Descargas)
+# empaquetar-deb.sh crea nexum_<versión>_all.deb (por defecto en ~/Descargas)
 *.deb
 # Versión de macOS: los .dmg y .zip se publican aparte, no van en el repositorio
 macos/*.dmg

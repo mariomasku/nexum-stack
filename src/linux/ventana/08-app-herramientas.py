@@ -34,7 +34,7 @@ class AppHerramientas:
         box, lb = tile_group("Carpetas")
         add_row(lb, "Proyectos", "/opt/htdocs, compartida por todas las versiones", "Abrir",
                 lambda: self.open_uri(GLib.filename_to_uri("/opt/htdocs")))
-        # Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
+        # Copias de seguridad: abrirlas y borrarlas (nexum copias vaciar)
         n, size = copies_size()
         row = ActionRow("Copias de seguridad",
                         "~/nexum-backups: las copias que pides al borrar, sustituir o actualizar · %s"
@@ -47,7 +47,7 @@ class AppHerramientas:
         b.connect("clicked", lambda *_: self.on_clear_copies(n, size))
         row.add_suffix(b)
         lb.add(row)
-        # Copias de los ficheros que cambia el programa por su cuenta (lvm-instalador copias-ficheros si|no)
+        # Copias de los ficheros que cambia el programa por su cuenta (nexum copias-ficheros si|no)
         row = ActionRow("Copias de los ficheros que cambia el programa",
                         "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos")
         sw = Gtk.Switch(active=os.path.exists(COPIES_FILES_FLAG), valign=Gtk.Align.CENTER, sensitive=not self.busy)
@@ -71,7 +71,8 @@ class AppHerramientas:
 
         self.build_error_logs(add_row)
 
-        box, lb = tile_group("Programa")
+        box, lb = tile_group("Programa", "El propio Nexum Dev Stack: sus versiones nuevas, su icono en el menú de "
+                             "aplicaciones y lo que hace al cerrar la ventana.")
         add_row(lb, "Buscar una versión nueva", "Busca en GitHub (y en Descargas) una versión más "
                 "nueva, firmada, y la instala", "Buscar", lambda: self.check_package(manual=True))
         add_row(lb, "Icono en el menú de aplicaciones", "Vuelve a crear el acceso «Nexum Dev Stack» "
@@ -81,7 +82,7 @@ class AppHerramientas:
         self.tools_box.pack_start(box, False, False, 0)
 
         box, lb = tile_group("Información")
-        add_row(lb, "Comandos de lvm-instalador", "Todos los comandos para la terminal y qué hace "
+        add_row(lb, "Comandos de nexum", "Todos los comandos para la terminal y qué hace "
                 "cada uno", "Ver", self.on_commands)
         add_row(lb, "Novedades", "Qué ha cambiado en cada versión", "Ver", self.on_changes)
         add_row(lb, "Acerca de", "%s %s" % (d["name"], d["version"]), "Ver", self.on_about)

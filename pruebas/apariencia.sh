@@ -1,5 +1,6 @@
 #!/bin/bash
-# Apariencia (Linux 1.57.1, Mac 1.41.0): iconos del menu lateral en color, Docker, Node y PHP con su logotipo,
+# Apariencia (Linux 1.57.1, Mac 1.41.0): iconos del menu lateral en color, Docker, Node y PHP con su logotipo
+# (desde la 1.57.11, Docker y Node con su icono y al lado su logotipo de letras),
 # que apartados salen (Proyectos y Configuracion, siempre) y el icono de discos de Bases de datos.
 # Uso: apariencia.sh <script>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -25,10 +26,13 @@ t = open(sys.argv[1], encoding="utf-8").read()
 block = t[t.index("let BRAND_PDF: [String: String] = ["):]
 block = block[:block.index("\n]\n")]
 got = dict(re.findall(r'^    "([a-z-]+)": "([A-Za-z0-9+/=]+)",?$', block, re.M))
-for k in ("docker", "node-claro", "node-oscuro", "php"):
+for k in ("docker", "docker-letras", "node-claro", "node-oscuro", "php"):
     print("%d|%s" % (k in got and base64.b64decode(got[k])[:5] == b"%PDF-", k))
+# (los de Node, sin máscara: con ella macOS no los dibujaba)
+print("%d|node sin máscara" % all(k in got and b"Mask" not in base64.b64decode(got[k]) for k in ("node-claro", "node-oscuro")))
 PY
     while IFS='|' read -r good k; do check "Mac: logotipo $k en PDF" '[ "$good" = 1 ]'; done < "$W/pdf"
+    check "Mac: Docker y Node, su icono y al lado su logotipo de letras (1.57.11)" 'sed -n "/^struct NavRow: View {/,/^}/p" "$SRC" | grep -A3 -F "if look.marcas && (key == \"docker\" || key == \"node\") {" | grep -qF "navIcon(on, color: look.color)" && grep -qF "BrandImage(key: key == \"docker\" ? \"docker-letras\" : key" "$SRC"'
     check "Mac: Bases de datos y Node con su icono" 'grep -qF "(\"bbdd\", \"Bases de datos\", \"logo:bbdd\")" "$SRC" && grep -qF "(\"node\", \"Node\", \"logo:node\")" "$SRC"'
     check "Mac: se guarda al cambiar y, si se oculta el apartado abierto, a Proyectos" 'grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "saveLook(look)" && grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "if look.ocultos.contains(tab) { openTab(\"proyectos\") }"'
     check "Mac: en la simulacion no se guarda" 'sed -n "/^func saveLook/,/^}/p" "$SRC" | grep -qF "if SIMULATE { return }"'
@@ -74,6 +78,20 @@ PY
     check "Linux: el menu se rehace solo (no la ventana entera)" 'sed -n "/^    def nv_look_set/,/^    def nv_look_tools/p" "$SRC" | grep -qF "self.nv_sidebar_fill()"'
     check "Linux: apartado Apariencia" 'grep -qF "(\"Apariencia\", \"Apariencia\", \"preferences-desktop-appearance-symbolic\")" "$SRC" && grep -qF "self.nv_look_tools()" "$SRC"'
     check "Linux: los logotipos se dibujan una vez por tamaño" 'grep -A3 "^def brand_pixbuf" "$SRC" | grep -qF "if k not in _brand_cache:"'
+    check "Linux: Docker y Node, su icono y al lado su logotipo de letras (1.57.11)" 'grep -A3 -F "if look[\"marcas\"] and name in (\"docker\", \"node\"):" "$SRC" | grep -qF "inner.pack_start(MonoLogo(ic[5:], 20, colored=look[\"color\"]), False, False, 0)" && grep -qF "BrandLogo(\"docker-letras\" if name == \"docker\" else \"node\"" "$SRC"'
+    DL=$(python3 -I - "$SRC" << 'PY'
+import base64, re, sys, zlib
+t = open(sys.argv[1], encoding="utf-8").read()
+bs = t[t.index("BRAND_SVG = {"):]
+got = dict(re.findall(r'^    "([a-z-]+)": "([A-Za-z0-9+/=]+)",?$', bs[:bs.index("\n}\n")], re.M))
+g = {"base64": base64, "zlib": zlib, "BRAND_SVG": got, "BRAND_RATIO": {}}
+start = t.index("# El logotipo de letras de Docker, sin la ballena")
+exec(t[start:t.index("\nclass NvTerminal:", start)], g)
+svg = zlib.decompress(base64.b64decode(got["docker-letras"]))
+print(int(b'viewBox="385 30 865 210"' in svg and abs(g["BRAND_RATIO"]["docker-letras"] - 865 / 210) < 1e-9))
+PY
+)
+    check "Linux: el logotipo de letras de Docker, el mismo SVG solo sobre las letras" '[ "$DL" = 1 ]'
     check "Linux: en la fila elegida se leen (se repinta al cambiar)" 'grep -qF "self.side_box.queue_draw()" "$SRC" && grep -q "^def row_selected(widget):" "$SRC"'
 fi
 exit $fail

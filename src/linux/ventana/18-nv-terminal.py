@@ -1,3 +1,10 @@
+# El logotipo de letras de Docker, sin la ballena (en el menú lateral va al lado de su icono): el mismo SVG,
+# con el recuadro (viewBox) solo sobre las letras
+BRAND_SVG["docker-letras"] = base64.b64encode(zlib.compress(zlib.decompress(base64.b64decode(BRAND_SVG["docker"])).replace(
+    b'viewBox="0 0 1250 268"', b'viewBox="385 30 865 210"'))).decode()
+BRAND_RATIO["docker-letras"] = 865 / 210
+
+
 class NvTerminal:
     """La terminal de abajo de la ventana."""
 
@@ -282,8 +289,10 @@ class NvTerminal:
                 row = Gtk.ListBoxRow()
                 inner = Gtk.Box(spacing=12)
                 if look["marcas"] and name in ("docker", "node"):
-                    # (el logotipo con su nombre, en su tipografía: ya dice qué es)
-                    inner.pack_start(BrandLogo(name, 22 if name == "docker" else 20, mono=not look["color"]), False, False, 0)
+                    # (su icono, como los demás, y al lado su logotipo de letras en lugar del nombre)
+                    inner.pack_start(MonoLogo(ic[5:], 20, colored=look["color"]), False, False, 0)
+                    inner.pack_start(BrandLogo("docker-letras" if name == "docker" else "node", 15 if name == "docker" else 20,
+                                               mono=not look["color"]), False, False, 0)
                 else:
                     if look["marcas"] and look["color"] and name == "versiones":
                         w = BrandLogo("php", 20)
@@ -350,10 +359,19 @@ class NvTerminal:
                "marcas", look["marcas"])
         lb = block("Apartados del menú lateral",
                    "Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)")
-        for _g, items in SIDEBAR:
-            for name, text, _ic in items:
-                if name not in SIDEBAR_FIXED:
-                    switch(lb, text, None, "@" + name, name not in look["ocultos"])
+        # (en dos columnas: la primera mitad a la izquierda y el resto a la derecha)
+        b = lb.get_parent()
+        b.remove(lb)
+        cols = Gtk.Box(spacing=12, homogeneous=True, margin_top=8)
+        b.pack_start(cols, False, False, 0)
+        names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED]
+        half = (len(names) + 1) // 2
+        for chunk in (names[:half], names[half:]):
+            col = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
+            col.connect("row-activated", on_row_activated)
+            cols.pack_start(col, True, True, 0)
+            for name, text in chunk:
+                switch(col, text, None, "@" + name, name not in look["ocultos"])
         lb = block("Visor de los proyectos", "Los botones de cada proyecto: cuáles se ven, en qué orden y cómo")
         conf = buttons_conf()
         shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]

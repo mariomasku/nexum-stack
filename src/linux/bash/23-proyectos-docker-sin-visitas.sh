@@ -20,13 +20,20 @@ function docker_idle_hours() {
 # docker-reposo comprobar, aunque la ventana este cerrada
 DOCKER_IDLE_UNIT_DIR=${LVM_REPOSO_UNITS:-$HOME/.config/systemd/user}
 function docker_idle_timer_on() {
-    systemctl --user is-active --quiet nexum-reposo.timer 2> /dev/null
+    systemctl --user is-active --quiet nexum-reposo.timer 2> /dev/null || return 1
+    # Uno puesto cuando la orden era lvm-instalador (ExecStart=/usr/local/bin/lvm-instalador o el script
+    # de /opt/lvm-instalador, que ya no existen): se rehace con nexum, y asi sigue funcionando
+    if grep -q '^ExecStart=\(.*/lvm-instalador\|/opt/lvm-instalador/lvm-instalador\.sh\) docker-reposo ' \
+            "$DOCKER_IDLE_UNIT_DIR/nexum-reposo.service" 2> /dev/null; then
+        docker_idle_timer poner > /dev/null 2>&1
+    fi
+    return 0
 }
 function docker_idle_timer() {
     local bin
     if [ "$1" == poner ]; then
-        # (el instalado; si no, este mismo)
-        bin=$(command -v lvm-instalador 2> /dev/null)
+        # (la orden nexum instalada; si no, este mismo)
+        bin=$(command -v nexum 2> /dev/null)
         [ -n "$bin" ] || bin=$SELF
         mkdir -p "$DOCKER_IDLE_UNIT_DIR" || return 1
         printf '[Unit]\nDescription=Nexum Dev Stack: parar los proyectos de Docker sin visitas\n\n[Service]\nType=oneshot\nExecStart=%s docker-reposo comprobar\n' \

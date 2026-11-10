@@ -204,7 +204,7 @@ function apache_configtest() {
 }
 
 # /opt tiene que ser del administrador: si es tuyo, cualquier programa con tu usuario (el PHP de
-# una web) puede cambiar el enlace /opt/lampp, una version o /opt/lvm-instalador, y lo siguiente que
+# una web) puede cambiar el enlace /opt/lampp, una version o /opt/nexum, y lo siguiente que
 # se arranque con sudo seria suyo. Solo se cambia /opt; sus carpetas (htdocs, programas) siguen
 # siendo de quien eran. Devuelve 0 si ha cambiado algo.
 function opt_root() {
@@ -286,7 +286,7 @@ function edit_hosts() {
     fi
     # La copia se puede cambiar con tu usuario: solo se aceptan lineas nuevas que lleven a este
     # equipo (lo que usa la aplicacion). Una que lleve un dominio a otra direccion (por ejemplo,
-    # github.com a un servidor falso) se pone a mano con: lvm-instalador hosts
+    # github.com a un servidor falso) se pone a mano con: nexum hosts
     local other
     other=$(python3 -I - "$HOSTS_FILE" "$check" <<'EOF'
 import sys
@@ -314,7 +314,7 @@ sys.exit(1 if any(c < 32 and c not in (9, 10) or c == 127 for c in d) else 0)' "
     if [ -n "$other" ]; then
         echo "La copia editada lleva dominios a otros equipos:"
         echo "$other"
-        echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: lvm-instalador hosts"
+        echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: nexum hosts"
         return 1
     fi
     if [ -f "$COPIES_FILES_FLAG" ]; then
@@ -346,7 +346,7 @@ function use_lampp() {
     fi
 
     if [ -d "/opt/lampp" ] && [ ! -L "/opt/lampp" ]; then
-        echo "La carpeta /opt/lampp es una instalacion completa y no un enlace. Registrala primero con: lvm-instalador add <nombre>"
+        echo "La carpeta /opt/lampp es una instalacion completa y no un enlace. Registrala primero con: nexum add <nombre>"
 
         return 1
     fi
@@ -356,7 +356,7 @@ function use_lampp() {
     p2s=$(php2shell_state "/opt/lampp-$version" "$(stack_fields "/opt/lampp-$version" | cut -d'|' -f1)")
     if [[ "$p2s" == vulnerable\|* ]]; then
         echo "Aviso: lampp-$version es vulnerable a PHP2Shell (${p2s#*|})."
-        echo "  Usala solo con proyectos tuyos y pasa a una version con el arreglo (lvm-instalador actualizar-a)."
+        echo "  Usala solo con proyectos tuyos y pasa a una version con el arreglo (nexum actualizar-a)."
     fi
 
     local before
@@ -373,7 +373,7 @@ function use_lampp() {
     secure_all
     if [ $? -eq 2 ] && [ "$DRY" -eq 0 ]; then
         echo "No se arranca lampp-$version: no se ha podido dejar solo para este equipo."
-        echo "Prueba con: lvm-instalador asegurar --todas"
+        echo "Prueba con: nexum asegurar --todas"
         return 1
     fi
     vhosts_root

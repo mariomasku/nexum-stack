@@ -6,7 +6,7 @@
 #   M|nombre|version|firma
 #   A|activa|en marcha (1/0)|XAMPP oficial en /Applications/XAMPP (1/0)
 #   V|version|php|apache|mariadb|proftpd|perl|phpmyadmin|motivo para no desinstalar
-#   D|version|base de datos|fecha|tipo (i: importada con lvm-instalador, c: ultimo cambio de tablas)
+#   D|version|base de datos|fecha|tipo (i: importada con nexum, c: ultimo cambio de tablas)
 # gui-vuelta: lo que la ventana pregunta cada 20 s (gui-datos, gui-hosts, gui-servicios y gui-proyectos) en
 # una sola orden: el script se lee una vez y no cuatro. Cada parte, en su subshell (un exit no corta las
 # demas), va detras de una linea «@@<orden>|<codigo de salida>»
@@ -300,7 +300,7 @@ function tunnel_open() {
         esac
     done
     if [ -z "$url" ]; then
-        echo "Uso: lvm-instalador tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
+        echo "Uso: nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
 
         return 1
     fi
@@ -330,7 +330,7 @@ print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])' "$host" 2
         fi
     fi
     if ! tunnel_installed; then
-        echo "Falta cloudflared: lvm-instalador tunel-instalar (o en Configuracion, Tunel de Cloudflare)"
+        echo "Falta cloudflared: nexum tunel-instalar (o en Configuracion, Tunel de Cloudflare)"
 
         return 1
     fi

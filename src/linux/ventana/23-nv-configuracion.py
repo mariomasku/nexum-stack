@@ -53,7 +53,7 @@ class NvConfiguracion:
         if web is not None and web.get_parent() is not None:
             web.get_parent().remove(web)
         super().build_tools()
-        # Barrera entre webs (lvm-instalador barrera-web): encendida si no existe el fichero
+        # Barrera entre webs (nexum barrera-web): encendida si no existe el fichero
         box, lb = tile_group("Seguridad entre webs",
                              "Impide que otra web abierta en tu navegador use tus proyectos locales sin que lo sepas.")
         on = not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))
@@ -78,6 +78,7 @@ class NvConfiguracion:
         self.tools_box.reorder_child(box, 1)
         box.show_all()
         self.nv_components_tools()
+        self.nv_tasks_tools()
         self.nv_docker_tools()
         self.nv_tunnel_tools()
         self.nv_mail_tools()
@@ -91,25 +92,28 @@ class NvConfiguracion:
 
     # Apartados de Configuración: su nombre en la columna de la izquierda, su icono y el orden (los que no
     # estén aquí, al final)
-    TOOLS_SECTIONS = [("Parches nuevos", "Parches nuevos", "software-update-available-symbolic"),
+    TOOLS_SECTIONS = [("General", "General", "preferences-system-symbolic"),
                       ("Configuración", "Vhosts y hosts", "network-workgroup-symbolic"),
                       ("Seguridad entre webs", "Seguridad entre webs", "security-high-symbolic"),
                       ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
                       ("Docker", "Docker", "logo:docker"),
                       ("Túnel de Cloudflare", "Túnel de Cloudflare", "network-transmit-receive-symbolic"),
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
-                      ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
                       ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
                       ("Limpieza", "Limpieza", "edit-clear-all-symbolic"),
                       ("Carpetas", "Carpetas", "folder-symbolic"),
                       ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
-                      ("Programa", "Programa", "system-software-install-symbolic"),
                       ("Información", "Información", "help-about-symbolic")]
+    # Lo que va junto en General, cada uno en su bloque con su título, en este orden
+    GENERAL_PARTS = ["Registro de errores", "Registro de tareas", "Parches nuevos", "Programa"]
+    GENERAL_DESC = ("Los registros de errores de la web cargada y de Apache, el de las tareas que lanza la ventana, "
+                    "los parches nuevos de lo que usa Nexum y el propio programa")
 
     def nv_tools_sections(self):
         """Configuración en dos columnas: a la izquierda, los encabezados de sus apartados; a la derecha, lo que
         se puede cambiar del elegido. Los apartados son los de siempre (cada constructor añade el suyo a
-        tools_box): aqui se pasan a una hoja cada uno. El elegido se recuerda al rehacer la pestaña."""
+        tools_box): aqui se pasan a una hoja cada uno. Los de GENERAL_PARTS van juntos en la de General, cada
+        uno con su título y su explicación. El elegido se recuerda al rehacer la pestaña."""
         groups = list(self.tools_box.get_children())
         for g in groups:
             self.tools_box.remove(g)
@@ -121,20 +125,49 @@ class NvConfiguracion:
                 if isinstance(w, Gtk.Label) and w.get_style_context().has_class("grupo-titulo"):
                     return w.get_label()
             return ""
-        found = sorted(((title_of(g) or "Otros", n, g) for n, g in enumerate(groups)),
-                       key=lambda x: (order.get(x[0], len(order)), x[1]))
+        found = []
+        parts = {}
+        for n, g in enumerate(groups):
+            t = title_of(g) or "Otros"
+            if t in self.GENERAL_PARTS and t not in parts:
+                parts[t] = g
+            else:
+                found.append((t, n, g))
+        self.tools_parts = parts
+        if parts:
+            gen = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=30)
+            for t in self.GENERAL_PARTS:
+                g = parts.get(t)
+                if g is None:
+                    continue
+                # (su explicación, a la vista debajo de su título, en lugar del símbolo de información)
+                tlbl = next((w for w in self.nv_walk(g) if isinstance(w, Gtk.Label)
+                             and w.get_style_context().has_class("grupo-titulo")), None)
+                head = tlbl.get_parent() if tlbl is not None else None
+                for c in head.get_children() if head is not None else []:
+                    if isinstance(c, Gtk.EventBox) and c.get_tooltip_text():
+                        desc = label(c.get_tooltip_text(), "dim-label", "subtitulo", xalign=0, wrap=True)
+                        c.set_no_show_all(True)
+                        c.hide()
+                        g.pack_start(desc, False, False, 0)
+                        g.reorder_child(desc, 1)
+                        break
+                gen.pack_start(g, False, False, 0)
+            found.append(("General", -1, gen))
+        found.sort(key=lambda x: (order.get(x[0], len(order)), x[1]))
         stack = Gtk.Stack(vhomogeneous=False, hhomogeneous=False, hexpand=True,
                           transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=120)
         nav = css(Gtk.ListBox(valign=Gtk.Align.START), "nv-nav", "nv-subnav")
         rows = {}
-        self.tools_desc = {}
+        self.tools_desc = {"General": self.GENERAL_DESC}
         self.tools_extra = {}
         for title, _n, g in found:
             if title in rows:
                 continue
-            # (su nombre va en el título grande de arriba: aquí, sin repetirlo; su explicación, debajo de él)
-            tlbl = next((w for w in self.nv_walk(g) if isinstance(w, Gtk.Label)
-                         and w.get_style_context().has_class("grupo-titulo")), None)
+            # (su nombre va en el título grande de arriba: aquí, sin repetirlo; su explicación, debajo de él.
+            # General no: cada uno de sus bloques lleva el suyo)
+            tlbl = None if title == "General" else next((w for w in self.nv_walk(g) if isinstance(w, Gtk.Label)
+                                                         and w.get_style_context().has_class("grupo-titulo")), None)
             if tlbl is not None:
                 head = tlbl.get_parent()
                 kids = head.get_children()
@@ -214,48 +247,76 @@ class NvConfiguracion:
             tl.pack_start(c, False, False, 0)
             c.show_all()
 
-    # Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...): cada cosa, con su título, lo que es y qué pasa
-    # si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
+    # Limpieza (nexum gui-limpieza y limpiar <clave>...): cada cosa, con su título, qué es, dónde está, para qué
+    # servía y qué pasa si se limpia, lo que se hace (en la confirmación) y si va marcada de partida. Nada de
+    # esto lo necesita un proyecto para funcionar
     CLEAN_ITEMS = [
         ("descargas", "Caché de descargas",
-         "El código ya descargado y comprobado de PHP, Apache, MariaDB… (%s). Si se limpia, la próxima "
-         "instalación lo descarga otra vez." % DL_CACHE_DIR,
-         "se vacía %s" % DL_CACHE_DIR, True),
+         "Los paquetes de código de PHP, Apache, MariaDB, phpMyAdmin… que el programa descargó para instalar o "
+         "actualizar tus versiones de PHP. Están en %s. Solo sirven para no descargarlos otra vez si repites una "
+         "instalación (o si la web de donde salen no responde). Las versiones ya instaladas no los usan: si se "
+         "limpia, todo sigue igual y la próxima instalación los vuelve a descargar. No toca ningún proyecto."
+         % DL_CACHE_DIR,
+         "se vacía %s: la próxima instalación lo vuelve a descargar" % DL_CACHE_DIR, True),
         ("copias", "Copias de seguridad",
-         "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden "
-         "volver a cargar.",
-         "se borra todo lo de ~/nexum-backups (la carpeta se queda)", False),
+         "Las copias que guardó el programa cuando se lo pediste («Guardar antes una copia» al borrar, sustituir "
+         "o actualizar una BBDD o una versión) y, si lo tienes encendido, las de los ficheros que cambia por su "
+         "cuenta (hosts, vhosts…). Están en ~/nexum-backups. Sirven para volver atrás si algo salió mal. Tus "
+         "proyectos y sus BBDD de ahora no las usan y siguen igual, pero lo que había antes ya no se podrá "
+         "recuperar: por eso va sin marcar.",
+         "se borra todo lo de ~/nexum-backups (la carpeta se queda): ya no se podrá volver atrás con ellas", False),
         ("correo", "Correo de pruebas",
-         "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía "
-         "(Mailpit tiene que estar en marcha).",
+         "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que "
+         "Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Configuración, Correo de "
+         "pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit "
+         "sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la "
+         "versión activa).",
          "se vacía la bandeja de Mailpit", False),
         ("registros", "Registros del programa",
-         "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes "
-         "no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
-         "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", True),
+         "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones "
+         "(y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node "
+         "parados y el de la ventana. Están en ~/.lvm-instalador. Solo sirven para ver qué pasó en una tarea "
+         "anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un "
+         "servidor en marcha: el programa y tus proyectos siguen igual.",
+         "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que esté usando una tarea o un "
+         "servidor de Node en marcha)", True),
         ("registros-versiones", "Registros de las versiones",
-         "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: "
-         "se pierde lo que decían hasta ahora.",
-         "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", True),
+         "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, "
+         "los errores de PHP y MariaDB. Están en la carpeta logs de cada /opt/lampp-<versión> (el de MariaDB, "
+         "con sus datos). Sirven para buscar por qué falla una web (Configuración, General, Registro de "
+         "errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo "
+         "se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
+         "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión (siguen en marcha)", True),
         ("caches-proyectos", "Cachés de los proyectos",
-         "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace "
-         "sola: la primera visita va algo más lenta.",
-         "se vacían las cachés de los proyectos de %s" % HTDOCS, True),
+         "Las páginas y plantillas que WordPress (wp-content/cache, la de sus plugins de caché) y PrestaShop "
+         "(var/cache y las de Smarty) guardan ya preparadas para ir más deprisa, en cada proyecto de %s. Son "
+         "solo una copia que se rehace sola: si se limpia, la primera visita a cada página va algo más lenta "
+         "mientras se vuelve a crear. Nada más del proyecto se toca: ni sus ficheros, ni sus imágenes, ni su "
+         "BBDD." % ("/opt/htdocs" if DEMO else HTDOCS),
+         "se vacían las cachés de los proyectos de %s (se rehacen solas)" % ("/opt/htdocs" if DEMO else HTDOCS), True),
         ("temporales", "Temporales",
-         "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un "
-         "día sin cambiar y nada está usando.",
+         "Ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una "
+         "descarga, el volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en /tmp y "
+         "en ~/.lvm-instalador. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y "
+         "no está usando ningún programa (un MariaDB temporal en marcha, por ejemplo, se deja). No afecta a "
+         "ningún proyecto ni a ninguna versión.",
          "se borran los temporales del programa de más de un día que nada usa", True),
         ("sesiones", "Sesiones de PHP",
-         "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones "
-         "abiertas en las webs locales (hay que volver a entrar en su administración).",
-         "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", False)]
+         "Los ficheros con los que PHP recuerda quién ha entrado en una web local: tu sesión en phpMyAdmin y la "
+         "de las webs o plugins que usan las sesiones de PHP (WordPress y PrestaShop guardan la suya en una "
+         "cookie: esa no se cierra). Están en la carpeta temp de cada versión y en /tmp. Si se limpian, esas "
+         "sesiones se cierran y hay que volver a entrar; las webs, sus ficheros y sus BBDD no cambian. Va sin "
+         "marcar para no cerrarte nada sin querer.",
+         "se borran las sesiones de PHP: hay que volver a entrar en phpMyAdmin y en lo que las use", False)]
 
     def nv_clean_tools(self):
         """Configuración, Limpieza: lo que Nexum va dejando con el uso, cada cosa con lo que ocupa y su casilla;
         arriba, el total, y debajo «Limpiar lo marcado…». Se mide por detrás (gui-limpieza): hasta entonces,
         «Midiendo…». Las casillas se recuerdan mientras la ventana está abierta."""
         box, lb = tile_group("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar "
-                             "espacio. Lo que se limpia no se puede recuperar: no se hacen copias.")
+                             "espacio. Ningún proyecto ni ninguna versión de PHP lo necesita para funcionar: cada "
+                             "cosa dice qué es y qué pasa si se limpia. Lo que se limpia no se puede recuperar: no se "
+                             "hacen copias.")
         total = ActionRow("Lo que se puede limpiar", "Midiendo…")
         total.add_prefix(icon("edit-clear-all-symbolic", 18))
         lb.add(total)
@@ -334,12 +395,120 @@ class NvConfiguracion:
                       on_done=lambda *_: self.build_tools())
 
     def nv_tools_show(self, section):
-        """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS)."""
+        """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS). Uno de los bloques de General
+        (GENERAL_PARTS): General, con ese bloque arriba."""
+        part = section if section in self.GENERAL_PARTS else None
+        if part:
+            section = "General"
         self.tools_section = section
         self.show_tab("config")
         row = getattr(self, "tools_nav", {}).get(section)
         if row is not None and row.get_parent() is not None:
             row.get_parent().select_row(row)
+        if part:
+            GLib.timeout_add(120, self.nv_tools_scroll, part)
+
+    def nv_tools_scroll(self, part):
+        """Desplaza Configuración hasta ese bloque de General."""
+        g = getattr(self, "tools_parts", {}).get(part)
+        adj = self.page_tools.get_vadjustment() if hasattr(self.page_tools, "get_vadjustment") else None
+        if g is None or adj is None or g.get_toplevel() is not self.win:
+            return False
+        pos = g.translate_coordinates(self.tools_box, 0, 0)
+        if pos is not None:
+            adj.set_value(max(0, min(pos[1] - 12, adj.get_upper() - adj.get_page_size())))
+        return False
+
+    def nv_tasks_tools(self):
+        """Configuración, General, Registro de tareas: las tareas que ha lanzado la ventana (las TASKS_KEEP
+        últimas de TASKS_DIR), cada una con su fecha y cómo acabó; al pulsarla, entera."""
+        # (en la demostración, la de siempre: la de verdad es la de su carpeta de ejemplo)
+        home = os.path.expanduser("~")
+        where = "~/.lvm-instalador/tareas" if DEMO else "~" + TASKS_DIR[len(home):] \
+            if TASKS_DIR.startswith(home + os.sep) else TASKS_DIR
+        box, lb = tile_group("Registro de tareas",
+                             "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) "
+                             "guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha "
+                             "dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las %d últimas en %s, solo "
+                             "para ti; las contraseñas y los tokens no se escriben." % (TASKS_KEEP, where))
+        self.tasks_lb = lb
+        self.tasks_line = Gtk.Box(spacing=8, halign=Gtk.Align.END, margin_top=6)
+        box.pack_start(self.tasks_line, False, False, 0)
+        self.tools_box.pack_start(box, False, False, 0)
+        self.nv_tasks_fill()
+        box.show_all()
+
+    def nv_tasks_fill(self):
+        """Las filas del registro de tareas (las 15 más nuevas; «Ver más», de 50 en 50). Se rehacen al acabar
+        cada tarea."""
+        lb, line = getattr(self, "tasks_lb", None), getattr(self, "tasks_line", None)
+        if lb is None or line is None:
+            return
+        clear(lb)
+        clear(line)
+        logs = task_logs()
+        shown = getattr(self, "tasks_shown", 15)
+        marks = {"ok": ("object-select-symbolic", "punto-verde", "Terminada bien"),
+                 "error": ("dialog-error-symbolic", "error", "Ha fallado"),
+                 "cancel": ("process-stop-symbolic", "dim-label", "Cancelada"),
+                 "run": ("media-playback-start-symbolic", "dim-label", "En marcha")}
+        if not logs:
+            row = ActionRow("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
+            row.add_prefix(icon("document-open-recent-symbolic", 18))
+            lb.add(row)
+        for e in logs[:shown]:
+            ic, cls, tip = marks[e["state"]]
+            row = ActionRow(e["title"], "%s  ·  %s" % (e["when"], e["result"]), activatable=True)
+            mark = css(icon(ic, 18), cls)
+            mark.set_tooltip_text(tip)
+            row.add_prefix(mark)
+            row.set_tooltip_text(e["command"])
+            row.on_activate = lambda p=e["path"]: self.nv_task_log_show(p)
+            b = Gtk.Button(label="Ver", valign=Gtk.Align.CENTER)
+            b.connect("clicked", lambda _b, p=e["path"]: self.nv_task_log_show(p))
+            row.add_suffix(b)
+            lb.add(row)
+        if len(logs) > shown:
+            more = Gtk.Button(label="Ver más (%d)" % (len(logs) - shown))
+            more.connect("clicked", lambda *_: (setattr(self, "tasks_shown", shown + 50), self.nv_tasks_fill()))
+            line.pack_start(more, False, False, 0)
+        folder = Gtk.Button(label="Abrir la carpeta")
+        folder.connect("clicked", lambda *_: (task_log_dir(), self.open_uri(GLib.filename_to_uri(TASKS_DIR))))
+        line.pack_start(folder, False, False, 0)
+        lb.show_all()
+        line.show_all()
+
+    def nv_task_log_show(self, path):
+        """Una tarea del registro, entera: su orden y toda su salida, con «Copiar» y «Abrir la carpeta»."""
+        got = task_log_read(path)
+        if got is None:
+            message(self.win, "No se ha podido leer el registro de la tarea", path, Gtk.MessageType.ERROR)
+            return
+        head, text = got
+        dlg = Gtk.Dialog(title=head.get("Tarea", "Tarea"), transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(980, 640)
+        hb = dlg.get_header_bar()
+        hb.set_subtitle("%s  ·  %s" % (head.get("Fecha", ""), head.get("Resultado", "")))
+        copy = Gtk.Button(label="Copiar")
+
+        def on_copy(*_):
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1)
+            copy.set_label("Copiado")
+            GLib.timeout_add(2000, lambda: copy.set_label("Copiar") and False)
+        copy.connect("clicked", on_copy)
+        hb.pack_end(copy)
+        folder = Gtk.Button(label="Abrir la carpeta")
+        folder.connect("clicked", lambda *_: self.open_uri(GLib.filename_to_uri(os.path.dirname(path))))
+        hb.pack_end(folder)
+        view = css(Gtk.TextView(editable=False, monospace=True, cursor_visible=False, wrap_mode=Gtk.WrapMode.WORD_CHAR,
+                                left_margin=14, right_margin=14, top_margin=10, bottom_margin=10), "log", "nv-consola")
+        view.get_buffer().set_text(text)
+        sw = css(Gtk.ScrolledWindow(vexpand=True), "nv-consola-marco")
+        sw.add(view)
+        dlg.get_content_area().add(sw)
+        dlg.show_all()
+        run_dialog(dlg)
+        dlg.destroy()
 
     def nv_components_tools(self):
         """Configuración, Parches nuevos: lo que tiene un parche publicado (cada versión de PHP con su
@@ -450,7 +619,7 @@ class NvConfiguracion:
             row = ActionRow("Conviene ponerlos: son parches de seguridad",
                             "\n".join("• " + i for i in shown) + "\nLo de ahora sigue funcionando mientras se actualiza "
                             "(se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta "
-                            "que salga otro parche; siguen en Configuración, Parches nuevos.")
+                            "que salga otro parche; siguen en Configuración, General, Parches nuevos.")
             row.add_prefix(icon("software-update-available-symbolic", 18))
             # (entero, sin cortar: en el aviso hay sitio)
             for lbl in (row.title, row.subtitle):

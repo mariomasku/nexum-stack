@@ -388,7 +388,7 @@ function edit_hosts() {
     fi
     # La copia se puede cambiar con tu usuario: solo se aceptan lineas nuevas que lleven a este
     # equipo (lo que usa la aplicacion). Una que lleve un dominio a otra direccion (por ejemplo,
-    # github.com a un servidor falso) se pone a mano con: lvm-instalador hosts
+    # github.com a un servidor falso) se pone a mano con: nexum hosts
     local other
     other=$(python3 -I - "$HOSTS_FILE" "$check" <<'EOF'
 import sys
@@ -416,7 +416,7 @@ sys.exit(1 if any(c < 32 and c not in (9, 10) or c == 127 for c in d) else 0)' "
     if [ -n "$other" ]; then
         echo "La copia editada lleva dominios a otros equipos:"
         echo "$other"
-        echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: lvm-instalador hosts"
+        echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: nexum hosts"
         return 1
     fi
     if [ -f "$COPIES_FILES_FLAG" ]; then
@@ -446,7 +446,7 @@ function use_version() {
     if ! valid_version_name "$version" || [ ! -d "$dir" ] || [ -L "$dir" ] || [ ! -f "$dir/xamppfiles/etc/pvm-stack" ]; then
         if valid_version_name "$version" && [ -z "$TEST_DIR" ] && [ -d "$LEGACY_DIR/XAMPP-$version" ] && [ ! -L "$LEGACY_DIR/XAMPP-$version" ]; then
             echo "XAMPP-$version sigue en $LEGACY_DIR (de antes de la 1.39.3), donde la puede cambiar el grupo admin:"
-            echo "pasala a $BASE_DIR con: lvm-instalador migrar"
+            echo "pasala a $BASE_DIR con: nexum migrar"
 
             return 1
         fi
@@ -464,7 +464,7 @@ function use_version() {
     # PHP2Shell: se avisa (la ventana ya lo ha preguntado antes)
     case "$(php2shell_state "$(php_version "$dir")" "$dir")" in
         actualizable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell (CVE-2026-109618/109619): instala el ultimo parche de su rama." ;;
-        parcheable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell: lvm-instalador actualizar $version le pone el parche de seguridad." ;;
+        parcheable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell: nexum actualizar $version le pone el parche de seguridad." ;;
         sin-arreglo) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell y no tiene arreglo: usala solo con proyectos de confianza." ;;
     esac
 
@@ -482,7 +482,7 @@ function use_version() {
     secure_all
     if [ $? -eq 2 ] && [ "$DRY" -eq 0 ]; then
         echo "No se arranca XAMPP-$version: no se ha podido dejar solo para este Mac."
-        echo "Prueba con: lvm-instalador asegurar --todas"
+        echo "Prueba con: nexum asegurar --todas"
         return 1
     fi
     vhosts_root

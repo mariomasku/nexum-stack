@@ -207,7 +207,7 @@ function install_plan() {
     local summary="Resultado de la instalacion:\n\n"
     for item in "${ok[@]}"; do
         local name=${item#*:}
-        summary+="  OK     PHP ${name}  ->  activar con: lvm-instalador use ${name%.*}\n"
+        summary+="  OK     PHP ${name}  ->  activar con: nexum use ${name%.*}\n"
     done
     for item in "${failed[@]}"; do
         local name=${item#*:}

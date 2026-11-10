@@ -133,7 +133,10 @@ class NvGithub:
         box = self.node_page
         clear(box)
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        head.pack_start(label("Node", "nv-titulo-grande"), False, False, 0)
+        # (de título, el logotipo de Node: su hexágono y sus letras, en su color)
+        title = BrandLogo("node", 34)
+        title.set_halign(Gtk.Align.START)
+        head.pack_start(title, False, False, 0)
         head.pack_start(label("Proyectos de %s hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en "
                               "este equipo, con tu usuario y con la versión de Node que pide." % ("/opt/htdocs" if DEMO else HTDOCS),
                               "nv-chico", "nv-tenue", wrap=True, xalign=0), False, False, 0)
@@ -572,7 +575,9 @@ class NvGithub:
         css(b, "nv-proyecto-btn", "nv-boton-cuadrado")
         if conf["style"] == "icono":
             b.add(button_icon(spec, max(16, side // 2)))
-            b.set_tooltip_text("%s: %s" % (name, tip) if tip and not tip.startswith(name) else tip or name)
+            # (⋮ «Más», sin mensaje: solo despliega su menú)
+            b.set_tooltip_text(None if name == "Más" else
+                               "%s: %s" % (name, tip) if tip and not tip.startswith(name) else tip or name)
         else:
             side = max(side, BUTTON_SIZE_NAMED)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)

@@ -11,7 +11,7 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: su menu (abrir, estado, arrancar o parar, web.local y salir), rehecho al abrirlo" 'grep -q "func menuNeedsUpdate(_ menu: NSMenu) {" "$SRC" && grep -q "add(\"Abrir Nexum Dev Stack\", #selector(openWindow))" "$SRC" && grep -q "#selector(power), d != nil" "$SRC" && grep -q "#selector(openWeb), !link.isEmpty && running" "$SRC" && grep -q "add(\"Salir\", #selector(quit))" "$SRC"'
     check "Mac: con el icono, cerrar la ventana (o acabar una tarea sin ella) no cierra la aplicacion" 'grep -q "return !(AppModel.current?.busy ?? false) && !TrayIcon.shared.on" "$SRC" && grep -q "if task == nil && oldValue != nil && !TrayIcon.shared.on" "$SRC"'
     check "Mac: sin ventana, el menu se pone al dia cada minuto (solo gui-datos)" 'grep -q "if self.trayTicks == 0 { runQuick(\[\"gui-datos\"\])" "$SRC"'
-    check "Mac: se quita o se pone en Configuracion → Programa" 'grep -q "(\"programa\", \"Programa\", \"menubar.rectangle\")" "$SRC" && grep -q "Toggle(\"\", isOn: Binding(get: { model.trayOn }, set: { model.setTray(\$0) }))" "$SRC"'
+    check "Mac: se quita o se pone en Configuracion → General → Programa" 'grep -q "generalBlock(\"Programa\"," "$SRC" && grep -q "Toggle(\"\", isOn: Binding(get: { model.trayOn }, set: { model.setTray(\$0) }))" "$SRC"'
 else
     check "Linux: AppIndicator (Ayatana o el de antes); sin el, como antes" 'grep -q "for name in (\"AyatanaAppIndicator3\", \"AppIndicator3\"):" "$SRC" && grep -q "if lib is None:" "$SRC"'
     check "Linux: la X esconde la ventana solo con el icono puesto" 'grep -q "self.win.connect(\"delete-event\", lambda \*_: self.nv_tray_hide())" "$SRC" && grep -A4 "    def nv_tray_hide(self):" "$SRC" | grep -q "return False"'

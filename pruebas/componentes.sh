@@ -84,7 +84,7 @@ check "nada que actualizar: lo dice (y lo que no se ha podido consultar)" '[ $rc
 
 # La ventana
 if [ $MAC -eq 1 ]; then
-    check "ventana (Mac): Parches nuevos en Configuración y, al abrir, en los avisos (1.41.1); Mailpit en tarjetas" 'grep -q "^            componentsCard()$" "$SRC" && grep -q "self.autoCheckComponents()" "$SRC" && grep -qF "solo se ve desde este Mac.\", tiles: true," "$SRC"'
+    check "ventana (Mac): Parches nuevos en Configuración (en General) y, al abrir, en los avisos (1.41.1); Mailpit en tarjetas" 'grep -q "^                componentsCard()$" "$SRC" && grep -q "self.autoCheckComponents()" "$SRC" && grep -qF "solo se ve desde este Mac.\", tiles: true," "$SRC"'
 else
     check "ventana: Parches nuevos en Configuración y, al abrir, en los avisos (1.57.2); Mailpit en tarjetas" 'grep -q "^        self.nv_components_tools()$" "$SRC" && grep -q "GLib.timeout_add_seconds(25, self.nv_components_auto)" "$SRC" && grep -q "tile_group(\"Correo de pruebas (Mailpit)\", tiles=True," "$SRC"'
 fi

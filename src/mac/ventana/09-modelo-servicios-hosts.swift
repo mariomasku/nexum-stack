@@ -13,7 +13,7 @@ extension AppModel {
         if services != rows { services = rows }
     }
 
-    /// Arranca, para o reinicia un servicio de la versión montada (lvm-instalador servicio ...)
+    /// Arranca, para o reinicia un servicio de la versión montada (nexum servicio ...)
     func service(_ name: String, _ cmd: String, _ title: String) {
         let verbs = ["arrancar": ("Arrancando", "arrancado"), "parar": ("Parando", "parado"),
                      "reiniciar": ("Reiniciando", "reiniciado")]
@@ -21,7 +21,7 @@ extension AppModel {
         runTask("\(v.0) \(title)", ["servicio", name, cmd], doneText: "\(title) \(v.1)", autoClose: true)
     }
 
-    /// Deja la versión montada solo para este Mac y la reinicia (lvm-instalador asegurar)
+    /// Deja la versión montada solo para este Mac y la reinicia (nexum asegurar)
     func secure() {
         runTask("Cerrando a la red", ["asegurar"], doneText: "Solo se puede entrar desde este Mac", autoClose: true)
     }
@@ -32,12 +32,12 @@ extension AppModel {
                 doneText: "phpMyAdmin actualizado", autoClose: true)
     }
 
-    /// Certificados propios para los proyectos https y sin la CA local (lvm-instalador arreglar-certificados)
+    /// Certificados propios para los proyectos https y sin la CA local (nexum arreglar-certificados)
     func fixCerts() {
         runTask("Arreglando los certificados", ["arreglar-certificados"], doneText: "Certificados arreglados")
     }
 
-    /// Que el navegador acepte el certificado propio de cada proyecto https (lvm-instalador confiar-certificados)
+    /// Que el navegador acepte el certificado propio de cada proyecto https (nexum confiar-certificados)
     func trustCerts() {
         runTask("Confiando en los certificados de los proyectos", ["confiar-certificados"],
                 doneText: "El navegador acepta los certificados de los proyectos")
@@ -49,7 +49,7 @@ extension AppModel {
                 doneText: "El navegador ya no acepta esos certificados")
     }
 
-    /// Todas las versiones solo para este Mac (lvm-instalador asegurar --todas)
+    /// Todas las versiones solo para este Mac (nexum asegurar --todas)
     func secureAll() {
         runTask("Protegiendo las versiones", ["asegurar", "--todas"],
                 doneText: "Todas las versiones son solo para este Mac", autoClose: true)
@@ -234,7 +234,7 @@ extension AppModel {
 
     func showCommands() {
         runQuick(["--ayuda"]) { _, out in
-            showLongText("Comandos de lvm-instalador", out, subtitle: "En la terminal: lvm-instalador --ayuda",
+            showLongText("Comandos de nexum", out, subtitle: "En la terminal: nexum --ayuda",
                          commands: true)
         }
     }
