@@ -37737,7 +37737,7 @@ function clean_command() {
     done
     echo "Limpiando (no se puede recuperar: no se hacen copias)..."
     # (lo medido, antes: dentro del bucle, sudo y lo demas no tienen que leer de una tuberia)
-    local measured=() projects=()
+    local measured=() projects=() p
     mapfile -t measured < <(clean_measure "${keys[@]}")
     for line in "${measured[@]}"; do
         IFS='|' read -r _ k b f r <<< "$line"
@@ -37751,8 +37751,8 @@ function clean_command() {
             correo) clean_mail || rc=1 ;;
             caches-proyectos)
                 mapfile -t projects < <(clean_projects)
-                for line in "${projects[@]}"; do
-                    clean_project_key "$line" cache quiet || rc=1
+                for p in "${projects[@]}"; do
+                    clean_project_key "$p" cache quiet || rc=1
                 done
                 ;;
             *)
