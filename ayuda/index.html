@@ -24,8 +24,8 @@
   <ul class="indice">
     <li class="grupo">Empezar</li>
     <li><a href="#inicio">Qué es Nexum Dev Stack</a></li>
-    <li class="pronto"><a href="#inicio">Instalar y actualizar</a></li>
-    <li class="pronto"><a href="#inicio">La ventana de un vistazo</a></li>
+    <li><a href="#instalar">Instalar y actualizar</a></li>
+    <li><a href="#ventana">La ventana de un vistazo</a></li>
     <li class="grupo">Entorno</li>
     <li><a href="#proyectos">Proyectos</a></li>
     <li><a href="#repositorios">Repositorios de GitHub</a></li>
@@ -35,14 +35,14 @@
     <li><a href="#node">Node.js</a></li>
     <li class="grupo">Sistema</li>
     <li><a href="#dominios">Dominios y hosts</a></li>
-    <li class="pronto"><a href="#inicio">Configuración</a></li>
-    <li class="pronto"><a href="#inicio">Correo de pruebas</a></li>
-    <li class="pronto"><a href="#inicio">Compartir una web</a></li>
+    <li><a href="#configuracion">Configuración</a></li>
+    <li><a href="#correo">Correo de pruebas</a></li>
+    <li><a href="#compartir">Compartir una web</a></li>
     <li class="grupo">Más</li>
-    <li class="pronto"><a href="#inicio">Seguridad</a></li>
-    <li class="pronto"><a href="#inicio">Comandos de la terminal</a></li>
-    <li class="pronto"><a href="#inicio">Si algo falla</a></li>
-    <li class="pronto"><a href="#inicio">Glosario</a></li>
+    <li><a href="#seguridad">Seguridad</a></li>
+    <li><a href="#comandos">Comandos de la terminal</a></li>
+    <li><a href="#problemas">Si algo falla</a></li>
+    <li><a href="#glosario">Glosario</a></li>
   </ul>
   <div class="pie-lateral">
     <button class="boton" id="tema" type="button">Claro / oscuro</button>
@@ -84,6 +84,108 @@
   </ul>
   <div class="nota"><b>Las capturas son de ejemplo</b>Los proyectos, bases de datos y dominios que ves («Panadería Luna», «Ferretería
     Norte»…) son inventados. En tu equipo verás los tuyos.</div>
+</section>
+
+<!-- =========================================================================================== INSTALAR -->
+<section class="capitulo" id="instalar">
+  <div class="antetitulo">Empezar</div>
+  <h2>Instalar y actualizar</h2>
+  <p class="entrada">Se instala una vez y después se actualiza solo desde la ventana, comprobando siempre la firma de cada versión nueva.</p>
+
+  <div data-so="linux">
+    <h3>Instalar en Linux</h3>
+    <p><b>Necesitas</b> Ubuntu o Debian de 64 bits (probado en Ubuntu 24.04), un usuario con permiso de administrador y conexión a
+      internet. Funciona en procesadores x86_64 y ARM (en ARM, MariaDB se compila y tarda más, y no hay XAMPP oficiales). Cada versión de
+      PHP necesita unos 5 GB libres en <code>/opt</code> mientras se compila (unos 1,5 GB después).</p>
+    <ol class="pasos-tarea">
+      <li><b>Descarga el paquete</b> <code>lvm-instalador_X.Y.Z_all.deb</code> de la última versión publicada en GitHub.</li>
+      <li><b>Haz doble clic en él.</b> Se abre el Centro de aplicaciones: pulsa «Instalar» y escribe tu contraseña. En una terminal también
+        vale <code>sudo apt install ./lvm-instalador_X.Y.Z_all.deb</code>.</li>
+      <li><b>Ábrelo</b> desde el menú de aplicaciones: «Nexum Dev Stack». También se instala el comando <code>lvm-instalador</code>.</li>
+      <li><b>Instala tu primera versión de PHP</b> en <a href="#versiones">Versiones de PHP</a> → «Instalar versión…».</li>
+    </ol>
+    <p>El programa queda en <code>/opt/lvm-instalador</code>. <b>No instala PHP, Apache ni MariaDB en el sistema</b>: cada versión vive en
+      su carpeta, <code>/opt/lampp-X.Y</code>.</p>
+  </div>
+
+  <div data-so="mac">
+    <h3>Instalar en el Mac</h3>
+    <p><b>Necesitas</b> un Mac con Apple Silicon y macOS 12 o posterior. Cada versión de PHP tarda unos 20-40 minutos en compilarse y
+      necesita unos 8 GB libres mientras tanto.</p>
+    <ol class="pasos-tarea">
+      <li><b>Descarga</b> <code>lvm-instalador-mac-X.Y.Z.dmg</code> de la última versión publicada en GitHub y ábrelo.</li>
+      <li><b>Abre «Instalar Nexum Dev Stack».</b> Como no está firmado por Apple, la primera vez macOS lo para: en macOS 14 o anterior,
+        botón derecho → Abrir → Abrir; en macOS 15 o posterior, Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente».</li>
+      <li><b>Deja que prepare lo que falte.</b> Se abre Terminal: si faltan las herramientas de Xcode, abre su instalador (después vuelve a
+        abrir «Instalar»); si falta Homebrew, pregunta si instalarlo (solo se usa para las librerías con las que se compila).</li>
+      <li><b>Escribe tu contraseña.</b> El programa se instala en <code>/Library/Nexum/gestor</code>, crea los comandos
+        <code>lvm-instalador</code> y <code>lvm</code>, deja la aplicación en tu carpeta Aplicaciones y abre la ventana.</li>
+    </ol>
+  </div>
+
+  <h3>Actualizar el programa</h3>
+  <ol class="pasos-tarea">
+    <li><b>Menú ☰ → «Buscar actualizaciones»</b><span data-so="mac"> (o el menú «Gestor» de la barra de menús)</span>. También lo mira
+      solo al abrir la ventana, de vez en cuando.</li>
+    <li><b>Si hay una versión nueva</b>, te dice cuál es y su huella, y la descarga de GitHub con su firma.</li>
+    <li><b>Acepta.</b> Antes de instalarla se comprueba que la firma es la del autor; si no lo es, no se instala. Tus versiones de PHP, tus
+      proyectos y tus bases de datos no se tocan.</li>
+  </ol>
+
+  <h3 data-so="linux">Desinstalar</h3>
+  <p data-so="linux"><code>sudo apt remove lvm-instalador</code> quita el programa, su comando y sus accesos. Tus versiones de PHP
+    (<code>/opt/lampp-*</code>), tus proyectos y tus bases de datos se quedan donde están; cada versión se desinstala aparte, en
+    <a href="#versiones">Versiones de PHP</a>.</p>
+</section>
+
+<!-- =========================================================================================== LA VENTANA -->
+<section class="capitulo" id="ventana">
+  <div class="antetitulo">Empezar</div>
+  <h2>La ventana de un vistazo</h2>
+  <p class="entrada">Arriba, siempre a la vista, lo que está funcionando ahora; a la izquierda, las páginas del programa; en el centro,
+    la página elegida.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-proyectos.png" data-linux="img/linux/pagina-proyectos.png" data-mac="img/mac/pagina-proyectos.png"
+           alt="La ventana de Nexum Dev Stack, con la cabecera, el menú lateral y la página Proyectos" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="9.5" data-y="4.1"><b>El programa y su versión</b><span>La versión del programa que tienes instalada. «Acerca de», en el menú ☰,
+        da más detalles.</span></li>
+      <li data-x="30.3" data-y="4.1"><b>Lo que está funcionando</b><span>La versión de PHP activa, si Apache y MariaDB están en marcha (punto verde)
+        y lo que gastan. Púlsalo para arrancar, parar o reiniciar cada servicio.</span></li>
+      <li data-x="70.4" data-y="4.1"><b>El menú ☰</b><span>Tema claro u oscuro, editar los vhosts y el fichero de hosts, volver a leer los
+        datos, buscar una versión nueva del programa, el panel de la terminal, la carpeta de registros, las novedades, «Acerca de» y la
+        ayuda (este manual).</span></li>
+      <li data-x="80.2" data-y="4.1"><b>Correo</b><span>La bandeja del correo de pruebas, con los que tienes sin leer.</span></li>
+      <li data-x="87.2" data-y="4.1"><b>Terminal</b><span>Abre una terminal en la parte de abajo de la ventana. Su borde se arrastra para hacerla
+        más alta o más baja.</span></li>
+      <li data-x="3.5" data-y="11"><b>Entorno</b><span>Lo de tu trabajo diario: <a href="#proyectos">Proyectos</a>,
+        <a href="#repositorios">Repositorios</a>, <a href="#versiones">Versiones de PHP</a>, <a href="#bbdd">Bases de datos</a>,
+        <a href="#docker">Docker</a> y <a href="#node">Node</a>. En Configuración → Apariencia puedes ocultar las que no uses.</span></li>
+      <li data-x="3.5" data-y="48"><b>Sistema</b><span>Lo que se toca de vez en cuando: <a href="#dominios">Dominios y hosts</a> y
+        <a href="#configuracion">Configuración</a>.</span></li>
+      <li data-x="58" data-y="70"><b>La página</b><span>Lo de la página elegida. Muchas cosas enseñan más al pasar el ratón por encima, y casi
+        todo lo que cambia algo te dice antes qué va a hacer, con los pasos numerados.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Lo que conviene saber</h3>
+  <ul>
+    <li><b>La contraseña de administrador</b> se pide en una ventana, solo cuando hace falta, y no se vuelve a pedir durante unos minutos.</li>
+    <li><b>Las tareas largas</b> (instalar una versión, cargar una base de datos…) se abren en su propia ventana, con una barra de avance.
+      Con «Seguir en segundo plano» puedes usar el resto mientras tanto. Solo va una tarea a la vez.</li>
+    <li><b>Los avisos</b> salen arriba, en una barra, cuando hay algo que conviene hacer: un parche nuevo, una versión vulnerable…</li>
+    <li data-so="linux"><b>Junto al reloj</b> puede quedarse un icono al cerrar la ventana (Configuración → Programa), con lo básico:
+      abrirla, arrancar o parar, <code>web.local</code> y salir.</li>
+    <li data-so="mac"><b>En la barra de menús</b>, junto al reloj, hay un icono con lo básico de la ventana, para usarlo sin abrirla.</li>
+  </ul>
 </section>
 
 <!-- =========================================================================================== PROYECTOS -->
@@ -588,6 +690,299 @@
     <p>Con el interruptor, no: solo cambia ese. Con «Crear y falsear» o al cargar un proyecto, sí: queda falseado solo el suyo.</p></details>
   <details><summary>¿Puedo recuperar el fichero de hosts de antes?</summary>
     <p>Sí: antes de cada cambio se guarda en <code>~/lvm-copias</code>, con la fecha en el nombre.</p></details>
+</section>
+
+
+<!-- =========================================================================================== CONFIGURACIÓN -->
+<section class="capitulo" id="configuracion">
+  <div class="antetitulo">Sistema</div>
+  <h2>Configuración</h2>
+  <p class="entrada">Lo que se ajusta una vez y se deja: en la columna de la izquierda, sus apartados; a la derecha, lo del elegido.</p>
+
+  <figure class="pantalla">
+    <div class="lienzo">
+      <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png"
+           alt="Configuración, con la columna de sus apartados y el apartado Parches nuevos" width="1442" height="919">
+    </div>
+  </figure>
+
+  <h3>Parches nuevos</h3>
+  <p>Los parches de seguridad de todo lo que usa el programa: cada versión de PHP (con su Apache, MariaDB, FTP, Perl y phpMyAdmin), las
+    imágenes de Docker, Mailpit y cloudflared. Se buscan solos al abrir la ventana de vez en cuando, y con «Buscar de nuevo» cuando
+    quieras. Si hay alguno, «Actualizar todo» los pone de una vez: las versiones de PHP se vuelven a compilar (la de ahora sigue
+    funcionando mientras tanto) y los contenedores de Docker se rehacen sin cambiar sus bases de datos. Arriba de la ventana también
+    sale un aviso; con «Ahora no» no vuelve a avisar hasta que salga otro parche.</p>
+
+  <h3>Vhosts y hosts</h3>
+  <p>Editar a mano los vhosts compartidos y el fichero de hosts del sistema. Se abre una copia en tu editor; al pulsar «Aplicar» se
+    comprueba antes de escribirla (con la contraseña): los vhosts solo admiten lo que es de un vhost, y si Apache no los acepta se deja
+    lo de antes. De los dos se guarda una copia en <code>~/lvm-copias</code>.</p>
+
+  <h3>Seguridad entre webs</h3>
+  <p>La <b>barrera entre webs</b>, encendida de partida: otra web abierta en tu navegador no puede mandar formularios ni peticiones a tus
+    proyectos. Apágala solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a la tienda con un formulario
+    desde su web, y vuelve a encenderla al acabar. Lo explica en cuatro puntos el propio apartado. Ver también <a href="#seguridad">Seguridad</a>.</p>
+
+  <h3>Correo de pruebas</h3>
+  <p>El interruptor del correo de pruebas, qué hacer con los plugins de correo de WordPress y la bandeja. Está explicado en
+    <a href="#correo">Correo de pruebas</a>.</p>
+
+  <h3>Docker</h3>
+  <ul>
+    <li><b>Dirección y puertos</b> del Apache de Docker: <code>127.0.0.2</code>, 80 y 443 de partida. Siempre una dirección de tu equipo
+      (<code>127.x.x.x</code>), nunca abierta a la red.</li>
+    <li><b>DNS de *.docker.test:</b> al activarlo, los dominios de Docker ya no van en el fichero de hosts y no se pide la contraseña
+      al añadir proyectos o versiones.</li>
+    <li><b>Certificado:</b> «Confiar» hace que el navegador acepte los <code>https://</code> de Docker.</li>
+    <li><b>Parar los proyectos sin visitas:</b> nunca, a la hora o a las horas que elijas (3, de partida). Se mira cada 15 minutos,
+      también con la ventana cerrada; las visitas por el túnel cuentan.</li>
+  </ul>
+
+  <h3>Túnel de Cloudflare</h3>
+  <p>El programa que abre los túneles (cloudflared): su versión, o «Instalar» si aún no está (se descarga solo la primera vez que
+    compartes). Si hay un túnel abierto, aquí puedes verlo y cerrarlo, y en «Registro del túnel» ver quién ha entrado. Ver
+    <a href="#compartir">Compartir una web</a>.</p>
+
+  <h3>GitHub</h3>
+  <p>La conexión, la organización o cuenta y los prefijos de la página <a href="#repositorios">Repositorios</a>.</p>
+
+  <h3>Registro de errores</h3>
+  <p>Los dos registros que hay que mirar cuando una web falla: el del <b>vhost del proyecto cargado</b> (ahí van los errores de PHP, como
+    el «error crítico» de WordPress) y el <b>general de Apache</b> (que no arranca, un vhost mal escrito…). «Ver el final» enseña las
+    últimas líneas, con «Copiar todo»; «Abrir», el fichero entero en tu editor.</p>
+
+  <h3>Apariencia</h3>
+  <p>Iconos en color y logotipos en el menú lateral, qué páginas se ven en él (Proyectos y Configuración siempre) y los botones del
+    visor de los proyectos: cuáles, en qué orden, con su nombre o solo el icono, y de qué tamaño, con una vista previa. Se guarda al
+    momento.</p>
+
+  <h3>Carpetas</h3>
+  <p>Accesos a las carpetas importantes: la de los proyectos, las copias de seguridad (<code>~/lvm-copias</code>), los registros de las
+    instalaciones y la <b>caché de descargas</b>, con lo que ocupa y un botón para vaciarla.</p>
+
+  <h3>Programa</h3>
+  <p>Buscar una versión nueva del programa, volver a crear su icono en el menú de aplicaciones y, en Linux, si al cerrar la ventana se
+    queda un icono junto al reloj.</p>
+
+  <h3>Información</h3>
+  <p>Los comandos de la terminal, las novedades de cada versión y «Acerca de».</p>
+</section>
+
+<!-- =========================================================================================== CORREO -->
+<section class="capitulo" id="correo">
+  <div class="antetitulo">Sistema</div>
+  <h2>Correo de pruebas</h2>
+  <p class="entrada">Lo que mandan tus webs (un pedido, un formulario, una contraseña nueva) llega a una bandeja de tu equipo y
+    <b>nunca a un cliente real</b>, aunque la base de datos sea una copia de producción.</p>
+  <p>Lo recoge <b>Mailpit</b>, que se instala comprobado y arranca y se para con la versión activa. Está encendido de partida.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-correo-de-pruebas-mailpit.png" data-linux="img/linux/config-correo-de-pruebas-mailpit.png"
+           data-mac="img/mac/config-correo-de-pruebas-mailpit.png" alt="Configuración, Correo de pruebas" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="53" data-y="13"><b>Encendido o apagado</b><span>Apagado, lo que manden las webs <b>puede llegar de verdad</b> a los clientes
+        de las bases copiadas. Por eso, al apagarlo te pregunta antes.</span></li>
+      <li data-x="46" data-y="25"><b>WordPress con plugins de correo</b><span>Qué hacer con los plugins de SMTP o de envío por API (Brevo, SendGrid,
+        Mailgun…): <b>llevarlos a Mailpit</b> (de partida; los de API se desactivan en la copia local), <b>desactivarlos</b> en la copia
+        local o <b>no tocarlos</b>, que sale en rojo porque sus correos pueden llegar de verdad.</span></li>
+      <li data-x="76" data-y="25"><b>La bandeja</b><span>La versión de Mailpit y su dirección (<code>http://127.0.0.1:8025/</code>, solo desde tu
+        equipo).</span></li>
+      <li data-x="94" data-y="33"><b>Vaciar</b><span>Borra todos los correos de la bandeja, después de preguntarte.</span></li>
+      <li data-x="65" data-y="69"><b>Los correos</b><span>Aquí se ve la bandeja, dentro de la ventana: cada correo con su asunto, su remitente y su contenido. También con el botón «Correo» de arriba,
+        que dice cuántos tienes sin leer.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Cómo lo consigue</h3>
+  <ul>
+    <li><b>PHP:</b> el <code>mail()</code> de todas tus versiones va a Mailpit.</li>
+    <li><b>WordPress:</b> lo que se manda por SMTP también va a Mailpit, y los envíos por API conocidos se cortan.</li>
+    <li><b>PrestaShop:</b> en la copia local, su configuración de correo pasa a la de Mailpit.</li>
+    <li><b>Nada se queda en tus copias:</b> lo que se cambia en una base de datos se apunta y se deshace al apagar el correo, y no va en
+      las copias que descargas o exportas.</li>
+  </ul>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Le puede llegar a un cliente el pedido que hago de prueba?</summary>
+    <p>Con el correo de pruebas encendido, no. Sí podría con el correo apagado o con los plugins de WordPress en «No tocarlos».</p></details>
+  <details><summary>No veo el botón «Correo» arriba</summary>
+    <p>Sale solo con el correo de pruebas encendido. Si está encendido pero no se abre, arranca la versión activa: Mailpit funciona con ella.</p></details>
+</section>
+
+<!-- =========================================================================================== COMPARTIR -->
+<section class="capitulo" id="compartir">
+  <div class="antetitulo">Sistema</div>
+  <h2>Compartir una web</h2>
+  <p class="entrada">Enséñale a un cliente o a un compañero una web de tu equipo, tal y como está, con una dirección temporal de internet
+    y una contraseña.</p>
+  <p>Usa un <b>túnel de Cloudflare</b>: no hace falta cuenta ni abrir puertos en el router. La dirección
+    (<code>https://….trycloudflare.com</code>) cambia cada vez y lleva una <b>contraseña nueva al azar</b>. Lo que cambies en tu equipo se
+    ve al momento.</p>
+
+  <figure class="pantalla">
+    <div class="lienzo" style="max-width: 560px">
+      <img src="img/linux/dialogo-tunel.png" alt="El diálogo de un túnel abierto, con su dirección y su contraseña" width="692" height="504">
+    </div>
+  </figure>
+
+  <h3>Compartir un proyecto</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa «Compartir»</b> en el visor del proyecto (en Proyectos, en Docker o en Node).</li>
+    <li><b>Elige cuánto dura</b> (de 1 a 12 horas; 2 de partida) y deja encendido <b>«Bloquear el panel de administración»</b>: así nadie
+      puede intentar entrar en el escritorio de WordPress o en el de PrestaShop por el túnel. La primera vez se descarga cloudflared
+      (unos 40 MB).</li>
+    <li><b>Pulsa «Compartir».</b> Sale la dirección y la contraseña. <b>«Copiar para enviar»</b> copia un texto con las dos y la hora de
+      cierre, listo para pegar en un correo o un mensaje.</li>
+    <li><b>Cuando acabe</b>, se cierra solo a su hora, aunque cierres la ventana. Para cerrarlo antes: «Cerrar el túnel».</li>
+  </ol>
+  <p>Mientras está abierto, el botón del visor dice <b>«Compartiendo»</b>, en verde, y vuelve a enseñarte la dirección y la contraseña.</p>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Puede entrar en phpMyAdmin quien tenga la dirección?</summary>
+    <p>No, nunca: phpMyAdmin no pasa por el túnel. El panel de WordPress o de PrestaShop, tampoco, salvo que apagues el bloqueo.</p></details>
+  <details><summary>¿Quién ha entrado?</summary>
+    <p>En Configuración → Túnel de Cloudflare → «Registro del túnel»: quién entra, las contraseñas equivocadas y lo que se ha bloqueado.
+      Con 8 contraseñas equivocadas en 10 minutos desde el mismo sitio, deja de intentarlo un rato.</p></details>
+  <details><summary>¿Se puede tener más de un túnel?</summary>
+    <p>No: uno a la vez. Al abrir otro, se cierra el que había.</p></details>
+</section>
+<!-- =========================================================================================== SEGURIDAD -->
+<section class="capitulo" id="seguridad">
+  <div class="antetitulo">Más</div>
+  <h2>Seguridad</h2>
+  <p class="entrada">Un entorno de desarrollo suele tener copias de webs de clientes con datos reales. El programa está pensado para que
+    nada de eso quede al alcance de otros.</p>
+  <div class="tarjetas">
+    <div class="tarjeta"><b>Solo desde tu equipo</b><p>Apache, MariaDB y el FTP de cada versión solo escuchan en tu equipo. Si una versión no
+      se puede cerrar a la red, no arranca.</p></div>
+    <div class="tarjeta"><b>Barrera entre webs</b><p>Otra web abierta en tu navegador no puede mandar nada a tus proyectos a escondidas.</p></div>
+    <div class="tarjeta"><b>Descargas comprobadas</b><p>Todo lo que se descarga se comprueba con su suma sha256 y, si su autor la publica, con
+      su firma. Si no coincide, se cancela.</p></div>
+    <div class="tarjeta"><b>Actualizaciones firmadas</b><p>Una versión nueva del programa solo se instala si lleva la firma de su autor.</p></div>
+    <div class="tarjeta"><b>Nada en el sistema</b><p>PHP y MariaDB no se instalan en el sistema: cada versión vive en su carpeta y solo funciona
+      cuando está activa.</p></div>
+    <div class="tarjeta" data-so="linux"><b>Compilación aparte</b><p>Las versiones se compilan con un usuario del sistema sin contraseña ni sesión,
+      para que ningún programa tuyo pueda cambiar lo que se instala.</p></div>
+    <div class="tarjeta"><b>Tu contraseña, a salvo</b><p>La contraseña de administrador solo se envía cuando la pide el sistema de verdad, y el token
+      de GitHub se guarda en el llavero de tu sesión, nunca en un fichero.</p></div>
+    <div class="tarjeta"><b>Copia antes de cambiar</b><p>Antes de borrar o sustituir una base de datos, el fichero de hosts o los vhosts, se guarda
+      una copia en <code>~/lvm-copias</code>.</p></div>
+    <div class="tarjeta"><b>Certificados con límite</b><p>El navegador acepta el certificado propio de cada proyecto, y el de un dominio real solo
+      mientras está falseado.</p></div>
+  </div>
+  <div class="nota cuidado"><b>Lo que conviene saber</b>Las bases de datos locales usan <code>root</code> sin contraseña y Apache funciona con tu
+    usuario, para que todo sea cómodo en local. Por eso, no cargues proyectos ni copias de bases de datos de origen dudoso.</div>
+</section>
+
+<!-- =========================================================================================== COMANDOS -->
+<section class="capitulo" id="comandos">
+  <div class="antetitulo">Más</div>
+  <h2>Comandos de la terminal</h2>
+  <p class="entrada">Todo lo de la ventana se puede hacer también con <code>lvm-instalador</code> en una terminal. La lista completa, con
+    lo que hace cada uno, sale con <code>lvm-instalador --ayuda</code> (o en Configuración → Información).</p>
+  <div class="nota"><b>Probar sin cambiar nada</b>Pon <code>--simular</code> delante de cualquier comando y verás lo que haría, sin hacerlo:
+    <code>lvm-instalador --simular desinstalar 8.2</code>.</div>
+  <h3>Los más usados</h3>
+  <dl class="glosario">
+    <dt><code>lvm-instalador ventana</code></dt><dd>Abre la ventana. Sin nada, <code>lvm-instalador</code> abre <span data-so="linux">la ventana o
+      </span>el panel de la terminal.</dd>
+    <dt><code>list</code> · <code>estado</code></dt><dd>Las versiones instaladas; la activa, si está en marcha y lo que lleva cada una.</dd>
+    <dt><code>use 8.4</code></dt><dd>Cambia la versión activa.</dd>
+    <dt><code>arrancar</code> · <code>parar</code> · <code>reiniciar</code></dt><dd>La versión activa.</dd>
+    <dt><code>instalar --php 8.4</code></dt><dd>Instala una versión de PHP (con <code>--si</code>, sin preguntas).</dd>
+    <dt><code>actualizar 8.4</code></dt><dd>La vuelve a compilar con el último parche de su rama.</dd>
+    <dt><code>desinstalar 8.2 --copia</code></dt><dd>La desinstala, guardando antes sus bases de datos.</dd>
+    <dt><code>list-db</code></dt><dd>Las bases de datos de cada versión.</dd>
+    <dt><code>importar-bd</code> · <code>exportar-bd</code></dt><dd>Carga o descarga una copia de una base de datos.</dd>
+    <dt><code>copiar-bd</code> · <code>borrar-bd</code></dt><dd>Copia una base a otra versión, o la borra (con <code>--copia</code>, guardándola antes).</dd>
+    <dt><code>cargar-proyecto</code> · <code>desmontar-proyecto</code></dt><dd>Lo que hacen «Cargar» y «Desmontar» en Proyectos.</dd>
+    <dt><code>hosts-falsear mitienda.com si</code></dt><dd>Falsea un dominio (o <code>no</code>, para dejar de falsearlo).</dd>
+    <dt><code>correo si</code> · <code>correo no</code></dt><dd>Enciende o apaga el correo de pruebas.</dd>
+    <dt><code>barrera-web si</code> · <code>barrera-web no</code></dt><dd>Enciende o apaga la barrera entre webs.</dd>
+    <dt><code>asegurar</code></dt><dd>Cierra a la red la versión activa (con <code>--todas</code>, todas).</dd>
+    <dt><code>componentes</code> · <code>componentes-actualizar</code></dt><dd>Los parches nuevos de todo, y ponerlo todo al día.</dd>
+    <dt><code>descargas</code> · <code>descargas vaciar</code></dt><dd>La caché de descargas: lo que hay, o vaciarla.</dd>
+    <dt><code>novedades</code> · <code>version</code></dt><dd>Qué ha cambiado en cada versión, y la versión del programa.</dd>
+  </dl>
+</section>
+
+<!-- =========================================================================================== SI ALGO FALLA -->
+<section class="capitulo" id="problemas">
+  <div class="antetitulo">Más</div>
+  <h2>Si algo falla</h2>
+  <p class="entrada">Dónde mirar primero y lo que suele pasar, con su solución.</p>
+
+  <h3>Dónde mirar</h3>
+  <ul>
+    <li><b>Una web da un error o sale en blanco:</b> Configuración → <b>Registro de errores</b>. El del proyecto cargado tiene los errores de
+      PHP; el general de Apache, lo que impide arrancar.</li>
+    <li><b>Una instalación ha fallado:</b> no se queda nada a medias. La ventana de la tarea tiene «Ver el log del error», con un
+      <b>informe</b> que se puede copiar entero: el sistema, el paso que falló, sus errores y el final de su registro.</li>
+    <li><b>Los registros de todo:</b> menú ☰ → «Carpeta de registros» (<code>~/.lvm-instalador</code>).</li>
+  </ul>
+
+  <h3>Problemas habituales</h3>
+  <details><summary>«Espacio insuficiente» al instalar</summary>
+    <p>Cada versión de PHP necesita sitio mientras se compila (unos 5 GB en Linux y 8 GB en el Mac, más 2 de margen). Libera espacio y vuelve
+      a probar; lo ya descargado está en la caché y no se vuelve a descargar.</p></details>
+  <details><summary>Una instalación falla porque «su web no responde»</summary>
+    <p>La web de un componente (PHP, Apache, MariaDB…) no contesta. Si ya lo habías descargado otra vez, se usa el de la caché; si no, prueba
+      en un rato.</p></details>
+  <details><summary>Error 500 después de cargar un proyecto</summary>
+    <p>Mira su registro de errores. Si su <code>.htaccess</code> lleva <code>php_value</code> o <code>php_flag</code>, quítalos: con PHP-FPM
+      esos valores van en un fichero <code>.user.ini</code>.</p></details>
+  <details><summary>El navegador dice que la conexión no es privada</summary>
+    <p>Pulsa «Confiar» donde te lo proponga el programa y cierra y vuelve a abrir el navegador. El de un dominio real solo se acepta
+      mientras está falseado.</p></details>
+  <details><summary>Aviso «Tablas del sistema de MariaDB antiguas»</summary>
+    <p>Vienen de una versión anterior de MariaDB y llenan su registro de errores. «Repararlas» las pone al día, sin tocar las bases de tus
+      proyectos y guardando antes una copia.</p></details>
+  <details><summary>No encuentra la versión nueva del programa</summary>
+    <p>Sin conexión no puede consultar GitHub. Prueba más tarde<span data-so="linux">, o deja el paquete <code>.deb</code> en tu carpeta
+      Descargas: también lo busca ahí</span>.</p></details>
+</section>
+
+<!-- =========================================================================================== GLOSARIO -->
+<section class="capitulo" id="glosario">
+  <div class="antetitulo">Más</div>
+  <h2>Glosario</h2>
+  <p class="entrada">Las palabras que salen en el programa y en este manual, en pocas líneas.</p>
+  <dl class="glosario">
+    <dt>Apache</dt><dd>El servidor web: el programa que recibe lo que pide el navegador y le devuelve las páginas de tus proyectos.</dd>
+    <dt>Apache de Docker</dt><dd>Un Apache propio de Docker que sirve tus proyectos de Docker en <code>https://…docker.test</code>, sin necesidad de LAMPP.</dd>
+    <dt>Base de datos (BBDD)</dt><dd>Donde un WordPress o una tienda guarda sus páginas, productos, pedidos y usuarios. Cada versión de PHP tiene las suyas.</dd>
+    <dt>Contenedor</dt><dd>Un pequeño sistema aislado de Docker donde funciona una parte de un proyecto: su PHP, su base de datos…</dd>
+    <dt>Copias en ~/lvm-copias</dt><dd>La carpeta donde el programa guarda lo que va a cambiar o borrar (bases de datos, el fichero de hosts…), para poder volver atrás.</dd>
+    <dt>Dominio falseado</dt><dd>Un dominio de verdad (<code>mitienda.com</code>) que, por una línea en el fichero de hosts, lleva a tu equipo en vez de a internet.</dd>
+    <dt>Fichero de hosts</dt><dd><code>/etc/hosts</code>: la lista del sistema que dice a qué dirección lleva cada nombre antes de preguntar a internet.</dd>
+    <dt>Firma y sha256</dt><dd>Comprobaciones de que lo descargado es exactamente lo que publicó su autor, sin cambios por el camino.</dd>
+    <dt>Imagen (Docker)</dt><dd>La plantilla de la que se crean los contenedores: por ejemplo, la de PHP 8.4.</dd>
+    <dt>LAMPP</dt><dd>Linux, Apache, MariaDB (o MySQL), PHP y Perl: lo necesario para una web en PHP. Cada versión de PHP del programa es un LAMPP completo.</dd>
+    <dt>Mailpit</dt><dd>La bandeja de pruebas donde llega el correo que mandan tus webs, sin salir de tu equipo.</dd>
+    <dt>MariaDB</dt><dd>El programa de bases de datos (compatible con MySQL) que lleva cada versión.</dd>
+    <dt>Parche</dt><dd>Una versión pequeña de PHP dentro de su rama (8.4.27, 8.4.28…) que corrige fallos. Conviene tener el último.</dd>
+    <dt>phpMyAdmin</dt><dd>La página web para ver y cambiar las bases de datos.</dd>
+    <dt>PHP2Shell</dt><dd>Un fallo grave de seguridad de PHP. Las versiones que lo tienen salen en rojo, como «Vulnerable».</dd>
+    <dt>Pila propia</dt><dd>Una versión que compila el propio programa desde el código oficial, con componentes al día (frente a un XAMPP oficial).</dd>
+    <dt>Prefijo</dt><dd>Cómo empiezan los nombres de los repositorios que quieres ver en Repositorios (por ejemplo, <code>wordpress-</code>).</dd>
+    <dt>Rama</dt><dd>Una serie de PHP: 8.4, 8.5… Cada rama recibe parches hasta que se queda sin soporte.</dd>
+    <dt>Simulación</dt><dd><code>--simular</code>: el programa enseña lo que haría sin cambiar nada.</dd>
+    <dt>SSH y clave SSH</dt><dd>La forma segura de hablar con GitHub para clonar y traer cambios, con una clave que solo tienes tú.</dd>
+    <dt>Token de GitHub</dt><dd>Una contraseña especial, con permisos limitados, para que el programa pueda leer tu lista de repositorios.</dd>
+    <dt>Túnel</dt><dd>Una dirección temporal de internet que lleva a una web de tu equipo, para enseñársela a alguien.</dd>
+    <dt>Versión activa</dt><dd>La versión de PHP que está sirviendo tus proyectos ahora. Solo hay una a la vez.</dd>
+    <dt>Vhost</dt><dd>La configuración de Apache que dice qué carpeta se abre con cada dominio.</dd>
+    <dt>Volumen</dt><dd>Donde Docker guarda los datos que no se pierden al borrar un contenedor, como los de una base de datos.</dd>
+    <dt>web.local</dt><dd>La dirección del proyecto cargado: siempre la misma, cargues el que cargues.</dd>
+    <dt>XAMPP</dt><dd>Un LAMPP ya preparado que se distribuía para descargar. Sus últimas versiones son antiguas y no se pueden arreglar.</dd>
+  </dl>
 </section>
 
 </main>

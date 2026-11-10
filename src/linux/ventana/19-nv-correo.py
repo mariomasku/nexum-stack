@@ -181,6 +181,9 @@ class NvCorreo:
                 inner.pack_start(b, False, False, 0)
             box.pack_start(inner, True, True, 0)
             return box
+        # (en la demostración, como la de alguien que acaba de instalarlo: vacía)
+        if DEMO:
+            return note("La bandeja está vacía: aquí aparecerá lo que manden las webs de este equipo.")
         if SIMULATE:
             return note("En la simulación no se abre la bandeja: desde ella se pueden borrar correos.")
         if not m["running"]:

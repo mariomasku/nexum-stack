@@ -18,8 +18,10 @@ class AppHerramientas:
         box, lb = tile_group("Configuración",
                         "Los vhosts y los hosts del sistema son del administrador: se edita una "
                         "copia y se aplica con Aplicar (pide la contraseña).")
-        add_row(lb, "Virtual hosts", d["vhosts"], "Editar…", self.on_vhosts)
-        add_row(lb, "Hosts del sistema", d["hosts"], "Editar…", self.on_hosts)
+        # (en la demostración, las rutas de siempre: las de verdad son las de su carpeta de ejemplo)
+        add_row(lb, "Virtual hosts", "/opt/lampp/etc/extra/httpd-vhosts.conf" if DEMO else d["vhosts"], "Editar…",
+                self.on_vhosts)
+        add_row(lb, "Hosts del sistema", "/etc/hosts" if DEMO else d["hosts"], "Editar…", self.on_hosts)
         self.tools_box.pack_start(box, False, False, 0)
 
         if d["unregistered"]:

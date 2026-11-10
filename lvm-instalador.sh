@@ -24264,8 +24264,10 @@ class AppHerramientas:
         box, lb = tile_group("Configuración",
                         "Los vhosts y los hosts del sistema son del administrador: se edita una "
                         "copia y se aplica con Aplicar (pide la contraseña).")
-        add_row(lb, "Virtual hosts", d["vhosts"], "Editar…", self.on_vhosts)
-        add_row(lb, "Hosts del sistema", d["hosts"], "Editar…", self.on_hosts)
+        # (en la demostración, las rutas de siempre: las de verdad son las de su carpeta de ejemplo)
+        add_row(lb, "Virtual hosts", "/opt/lampp/etc/extra/httpd-vhosts.conf" if DEMO else d["vhosts"], "Editar…",
+                self.on_vhosts)
+        add_row(lb, "Hosts del sistema", "/etc/hosts" if DEMO else d["hosts"], "Editar…", self.on_hosts)
         self.tools_box.pack_start(box, False, False, 0)
 
         if d["unregistered"]:
@@ -28971,6 +28973,9 @@ class NvCorreo:
                 inner.pack_start(b, False, False, 0)
             box.pack_start(inner, True, True, 0)
             return box
+        # (en la demostración, como la de alguien que acaba de instalarlo: vacía)
+        if DEMO:
+            return note("La bandeja está vacía: aquí aparecerá lo que manden las webs de este equipo.")
         if SIMULATE:
             return note("En la simulación no se abre la bandeja: desde ella se pueden borrar correos.")
         if not m["running"]:
