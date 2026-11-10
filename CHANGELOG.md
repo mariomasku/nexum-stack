@@ -4,6 +4,29 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.10 · 10 nov 2026
+
+- **El manual, dentro del programa:** «Ayuda», en el menú ☰, lo abre en el navegador en el capítulo de la página en la que estás (en la terminal: lvm-instalador manual). No necesita conexión y se actualiza con el programa.
+- El manual enseña un capítulo cada vez, con «← Anterior» y «Siguiente →» al final; el buscador sigue buscando en todo.
+
+## 1.57.9 · 10 nov 2026
+
+- **Desplegables con buscador:** los de 8 opciones o más (proyectos, BBDD, carpetas, versiones...) se abren con «Buscar…». Se escribe y la lista se queda con lo que lleva ese texto; las flechas eligen, Intro la escoge y Esc cierra.
+- ▶ / ■ en el visor de arriba, a la derecha de Apache y MariaDB: ■ para y desactiva la versión, ▶ la arranca. Sin ninguna activa, ▶ despliega las versiones instaladas (la última que se usó, la primera) para arrancar una.
+- **Limpieza, en Configuración:** la caché de descargas, las copias de seguridad, el correo de Mailpit, los registros del programa y de cada versión (se vacían), la caché de todos los proyectos, los temporales que deja el programa y las sesiones de PHP, cada cosa con lo que ocupa. Se marca lo que se quiere limpiar (en la terminal: limpieza y limpiar).
+- **Limpiar proyecto, en el ⋮ de cada proyecto:** su caché, sus registros y, en WordPress, los restos de las actualizaciones. Nunca las imágenes (uploads ni img). En la terminal: limpiar-proyecto.
+
+## 1.57.8 · 10 nov 2026
+
+- Copiar una BBDD a una versión parada (recrear un proyecto en otra versión de PHP, copiar o descargar una BBDD): su MariaDB temporal se daba por caído nada más arrancarlo y la copia fallaba con «No ha arrancado», aunque estuviera arrancando bien. Ahora se espera a que esté listo.
+
+## 1.57.7 · 10 nov 2026
+
+- **Copias de seguridad, solo si se piden:** al cargar un .sql sobre una BBDD con tablas, sustituir una BBDD al copiarla o replicarla, reparar las tablas del sistema, pasar un proyecto al Apache de Docker, actualizar un proyecto o actualizar una versión que empieza con BBDD vacías, la copia de lo de antes se guarda solo si se marca «Guardar antes una copia» (en la terminal, --copia). Sin ella, se avisa de que no se podrá recuperar. Borrar una BBDD, una versión o un proyecto, igual que antes, pero con la casilla desmarcada de partida.
+- La carpeta de las copias se llama ahora `~/nexum-backups`: la de antes (`~/lvm-copias`) se renombra sola la primera vez, si no hay ya otra.
+- Las copias de los ficheros que el programa cambia por su cuenta (el de hosts, los vhosts, la configuración de los proyectos al cargarlos, lo que cambia asegurar) ya no se guardan siempre: se encienden en Configuración, Carpetas (o lvm-instalador copias-ficheros si). La caché vieja de una tienda, sin ellas, se borra (se rehace sola).
+- **Configuración, Carpetas:** «Borrar…» las copias de seguridad, con cuántos ficheros hay y cuánto ocupan (o lvm-instalador copias vaciar).
+
 ## 1.57.6 · 10 nov 2026
 
 - **Caché de descargas:** el código de cada componente que se instala (PHP, Apache, MariaDB, phpMyAdmin...) se guarda ya comprobado en `/var/cache/nexum-stack`. Al reintentar una instalación que falló no se descarga otra vez, y si la web de un componente no responde se usa el de la caché en vez de cancelar. Se ve y se vacía en Configuración, Carpetas (o lvm-instalador descargas).
