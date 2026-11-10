@@ -1414,7 +1414,7 @@ VERSIONES
   terminal: docker-reposo.
 - Pestaña Repositorios (como DevHub): los repositorios de la
   organización o cuenta de GitHub que se elija en Configuración, solo
-  los de sus prefijos (los que se elijan, como wordpress-; se
+  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
   pueden añadir otros, como los de Shopify) o todos, con un buscador.
   «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
   Si ya está clonado en un proyecto, se pregunta si aplastarlo: se

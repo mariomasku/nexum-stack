@@ -129,7 +129,7 @@ La ventana tiene una barra lateral con cinco apartados: **Versiones**, **BBDD**,
 
 ### 3.5.1 Repositorios (apartado **Repositorios**)
 
-- La lista de los repositorios de la organización de GitHub (por ejemplo, mi-empresa), como en DevHub: solo los que empiezan por los **prefijos** de Configuración (los que se elijan, como `wordpress-`; se añaden otros, como los de Shopify, cuando los haya), o todos con **«Mostrar todos»**, y un buscador.
+- La lista de los repositorios de la organización de GitHub (por ejemplo, mi-empresa), como en DevHub: solo los que empiezan por los **prefijos** de Configuración (de partida `dob-wordpress-` y `dob-prestashop-`; se añaden otros, como los de Shopify, cuando los haya), o todos con **«Mostrar todos»**, y un buscador.
 - **Clonar** lo clona por SSH, con la clave de cada uno, en la carpeta de proyectos; luego se carga como cualquier proyecto.
 - Si ya está clonado, se pregunta si **aplastarlo**: se traen sus cambios con `git pull`. Si chocan con lo que se tiene sin subir, no se toca nada y se avisa.
 - La lista se lee con un **token de GitHub** que se guarda en el llavero del sistema (no en un fichero), o con la sesión de `gh` si ya está iniciada. Se configura en Configuración, GitHub.

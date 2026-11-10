@@ -141,7 +141,7 @@ Desde la 1.39.0, como en Linux (1.53 y 1.54): proyectos con **cualquier versión
 
 ## Repositorios (GitHub)
 
-- **La pestaña Repositorios** (como DevHub): la lista de los repositorios de la organización o cuenta de GitHub que se elija en Configuración, solo los que empiezan por los **prefijos** (los que se elijan, como `wordpress-`; se añaden otros cuando haga falta) o todos con **Mostrar todos**, y un buscador. La lista de la última vez sale al momento y se lee de nuevo de GitHub por detrás.
+- **La pestaña Repositorios** (como DevHub): la lista de los repositorios de la organización o cuenta de GitHub que se elija en Configuración, solo los que empiezan por los **prefijos** (de partida `dob-wordpress-` y `dob-prestashop-`; se añaden otros cuando haga falta) o todos con **Mostrar todos**, y un buscador. La lista de la última vez sale al momento y se lee de nuevo de GitHub por detrás.
 - **Clonar** lo clona por SSH, con tu clave, en la carpeta de proyectos. Si ya está clonado en un proyecto, **Traer cambios** pregunta si aplastarlo y hace `git pull`; si choca con lo que tienes sin subir, no se toca nada y se dice. El logotipo de GitHub de cada fila abre el repositorio en GitHub.
 - **La conexión** (Configuración, GitHub): un token de GitHub, que se guarda en el **Llavero** (no en un fichero), o la sesión de `gh`. La organización se puede escribir también como su dirección (`https://github.com/mi-empresa`). En Terminal: `lvm-instalador github`, `github-conectar`, `repos` y `repo-traer`.
 

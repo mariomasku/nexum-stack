@@ -139,9 +139,9 @@ for mail in 'a@b\' 'a"b@c.com' 'x@y z'; do
     r=$(USER=yo SUDO_USER="" server_admin)
     check "ServerAdmin con correo raro ($mail) -> yo@localhost" '[ "$r" = yo@localhost ]'
 done
-sudo_user_git_email() { echo 'ana.p+web@hexer.dev'; }; git() { echo 'ana.p+web@hexer.dev'; }
+sudo_user_git_email() { echo 'ana.p+web@ejemplo.com'; }; git() { echo 'ana.p+web@ejemplo.com'; }
 r=$(USER=yo SUDO_USER="" server_admin)
-check "ServerAdmin con un correo normal" '[ "$r" = ana.p+web@hexer.dev ]'
+check "ServerAdmin con un correo normal" '[ "$r" = ana.p+web@ejemplo.com ]'
 unset -f git dscl sudo_user_git_email
 
 # --- importar-bd --proyecto: carpeta valida (sin .., . ni saltos de linea)

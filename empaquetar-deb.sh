@@ -274,7 +274,7 @@ Architecture: all
 Depends: bash, curl, python3, sudo, openssl, binutils, gpgv
 Recommends: python3-gi, gir1.2-gtk-3.0, whiptail, gir1.2-ayatanaappindicator3-0.1, gir1.2-webkit2-4.1
 Installed-Size: $(du -ks "$ROOT" | cut -f1)
-Maintainer: M.Mascuñano - HEXER <soporte@hexer.dev>
+Maintainer: Nexum Dev Stack <https://github.com/mariomasku/nexum-stack>
 Description: Nexum Dev Stack: varias versiones de PHP con su LAMPP
  Gestor e instalador de versiones LAMPP y PHP para Linux. Monta un LAMPP
  (Apache, PHP-FPM, MariaDB, ProFTPD, Perl y phpMyAdmin) por cada version de

@@ -4043,14 +4043,14 @@ EOF
 # ===========================================================================
 # Los repositorios de una organizacion o cuenta de GitHub, para clonarlos por SSH en htdocs (o, si ya
 # estan, traer sus cambios con git pull). Como DevHub: un token de GitHub (o la sesion de gh) solo para
-# leer la lista, y los prefijos de los nombres que se ven (wordpress-, tienda-...; sin ninguno, todos). El token
+# leer la lista, y los prefijos de los nombres que se ven (dob-wordpress-, dob-prestashop-...). El token
 # va en el Llavero, no en un fichero; GITHUB_CONF_FILE (solo tuyo) lleva:
 #   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
 #   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
 #   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
 GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
 GITHUB_KEYRING_SERVICE=nexum-dev-stack
-GITHUB_DEFAULT_PREFIXES=""
+GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
 
 function github_conf() {
     local v="" p ok=""
@@ -34490,7 +34490,7 @@ VERSIONES
   terminal: docker-reposo.
 - Pestaña Repositorios (como DevHub): los repositorios de la
   organización o cuenta de GitHub que se elija en Configuración, solo
-  los de sus prefijos (los que se elijan, como wordpress-; se
+  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
   pueden añadir otros, como los de Shopify) o todos, con un buscador.
   «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
   Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
