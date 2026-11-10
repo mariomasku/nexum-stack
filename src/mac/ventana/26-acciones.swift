@@ -141,13 +141,13 @@ extension AppModel {
             let mine = stamp
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { if stamp == mine { copied.stringValue = "" } }
         }
-        let message = "Te paso la web en pruebas:\n\(t.url)\nContraseña: \(t.password)\n(Funciona hasta las \(hour).)"
+        // (la dirección y la contraseña se copian cada una por su lado: se mandan por separado)
         let copyURL = DialogValidator()
         copyURL.update = { copy(t.url, "Dirección copiada") }
         let copyPass = DialogValidator()
         copyPass.update = { copy(t.password, "Contraseña copiada") }
-        let copyAll = DialogValidator()
-        copyAll.update = { copy(message, "Dirección y contraseña copiadas, listas para enviar") }
+        let openURL = DialogValidator()
+        openURL.update = { if let u = URL(string: t.url) { NSWorkspace.shared.open(u) } }
         func field(_ title: String, _ value: String, _ v: DialogValidator) -> NSView {
             let l = NSTextField(labelWithString: title)
             l.textColor = .secondaryLabelColor
@@ -180,21 +180,21 @@ extension AppModel {
             box.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
             return box
         }
-        let send = NSButton(title: "Copiar para enviar", target: copyAll, action: #selector(DialogValidator.changed(_:)))
-        send.bezelColor = .controlAccentColor
-        let sendRow = NSStackView(views: [send, NSView()])
-        sendRow.orientation = .horizontal
-        sendRow.translatesAutoresizingMaskIntoConstraints = false
-        sendRow.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+        let open = NSButton(title: "Abrir", target: openURL, action: #selector(DialogValidator.changed(_:)))
+        open.toolTip = "Abrirla tú en el navegador"
+        let openRow = NSStackView(views: [open, NSView()])
+        openRow.orientation = .horizontal
+        openRow.translatesAutoresizingMaskIntoConstraints = false
+        openRow.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
         alert.accessoryView = dialogStack([
-            field("Dirección", t.url, copyURL), field("Contraseña", t.password, copyPass), sendRow, copied,
+            field("Dirección", t.url, copyURL), field("Contraseña", t.password, copyPass), copied, openRow,
             dialogLabel("Se cierra solo a las \(hour). "
                         + (t.block ? "El panel de administración va bloqueado." : "⚠ El panel de administración no va bloqueado.")
                         + " Quién entra y lo que se bloquea queda en el registro del túnel (Configuración, Túnel de Cloudflare).",
                         color: .secondaryLabelColor, align: .left),
         ], spacing: 10)
         let r = alert.runStyled()
-        withExtendedLifetime([copyURL, copyPass, copyAll]) {}
+        withExtendedLifetime([copyURL, copyPass, openURL]) {}
         if r == .alertSecondButtonReturn {
             tunnelClose()
         }

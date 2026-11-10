@@ -858,11 +858,8 @@ class NvGithub:
                                  until, "El panel de administración va bloqueado." if blocked
                                  else "⚠ El panel de administración no va bloqueado."),
                              "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
+        # (la dirección y la contraseña se copian cada una por su lado: se mandan por separado)
         acts = Gtk.Box(spacing=8)
-        msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], password, until))
-        acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "Copiar dirección y contraseña",
-                                  lambda *_: copy(msg, "Dirección y contraseña copiadas, listas para enviar"), "nv-azul"),
-                        False, False, 0)
         acts.pack_start(nv_button("web-browser-symbolic", "Abrir", "Abrirla tú en el navegador",
                                   lambda *_: self.open_uri(st["url"])), False, False, 0)
         box.pack_start(acts, False, False, 0)

@@ -401,6 +401,9 @@ VERSIONES
   «Quitarlos». Solo cambia el fichero de vhosts: las carpetas, las BBDD
   y /etc/hosts no se tocan. En la terminal: nexum vhosts-sin-carpeta
   [quitar].
+- Compartir (túnel): la dirección y la contraseña, cada una en su
+  recuadro con su «Copiar», para mandarlas por separado (sin «Copiar
+  para enviar», que las juntaba).
 - Ya no piden la contraseña de administrador lo que no la necesita:
   compartir (el túnel), Clonar y Traer cambios, borrar una BBDD y
   «Confiar» en el certificado de Docker. Cargar un .sql la pide solo si
