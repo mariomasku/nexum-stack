@@ -4,6 +4,21 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.11 · 10 nov 2026
+
+- **La orden de la terminal es nexum:** nexum ventana, nexum use 8.4, nexum --ayuda... lvm-instalador ya no existe (ni como otro nombre). La orden lvm no se toca: si es de otro programa, sigue igual.
+- El paquete se llama nexum (`nexum_1.57.11_all.deb`) y se instala en `/opt/nexum`. Al instalarlo se quita el de antes, y con él lvm-instalador. Esta versión se instala una vez a mano, en la terminal: sudo apt install `./nexum_1.57.11_all.deb`. Las siguientes se vuelven a actualizar desde la ventana.
+- Al instalarlo, los iconos del menú de antes y el temporizador de los proyectos de Docker sin visitas pasan a usar nexum.
+- **Configuración, General (el primero):** el registro de errores, el registro de tareas, los parches nuevos y lo del programa, juntos.
+- **Registro de tareas:** cada tarea de la ventana (instalar, cargar, un interruptor, un botón...) guarda en `~/.lvm-instalador/tareas` la orden que ha ejecutado (nexum ...) y todo lo que ha escrito, sin contraseñas ni tokens. En General se ven las últimas y cada una entera, para copiarla o repetirla en la terminal. Se guardan 200.
+- **Limpieza:** cada cosa explica qué es, dónde está y qué pasa al limpiarla. Nada de lo que se limpia hace falta a ningún proyecto.
+- Los desplegables con buscador se abren como poco tan anchos como el desplegable y crecen hasta ver los nombres enteros.
+- **Dominios y hosts:** todos los falseados (también los .local) arriba, en un recuadro como el visor de Proyectos y en dos columnas, cada uno con su interruptor.
+- «Opciones de la BBDD…» (antes, vincular): en cada versión de PHP, la BBDD del proyecto o cambiarla por otra copia.
+- **Menú lateral:** Docker y Node con su icono y su logotipo de letras. Apariencia: los apartados del menú lateral, en dos columnas.
+- El ⋮ «Más» del visor no saca mensaje al dejar el ratón encima.
+- El visor de arriba y los recuadros hundidos, más claros con el tema claro (como en el Mac).
+
 ## 1.57.10 · 10 nov 2026
 
 - **El manual, dentro del programa:** «Ayuda», en el menú ☰, lo abre en el navegador en el capítulo de la página en la que estás (en la terminal: lvm-instalador manual). No necesita conexión y se actualiza con el programa.
