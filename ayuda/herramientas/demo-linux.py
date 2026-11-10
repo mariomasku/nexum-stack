@@ -100,7 +100,7 @@ def lines(rows):
 def gui_datos():
     out = [("M", "Nexum Dev Stack", "1.57.6", "By M.Mascuñano"), ("A", ACTIVE, 1, 0, 1, 1),
            ("H", "@DEMO@/httpd-vhosts.conf", "@DEMO@/hosts"),
-           ("E", 1, 1, "mailpit", 1, "1.32.0", "http://127.0.0.1:8025/", "1.32.0")]
+           ("E", 1, 1, "mailpit", 1, "1.32.0", "http://127.0.0.1:18025/", "1.32.0")]
     for v in VERSIONS:
         blocker = "lampp-%s es la version activa. Cambia antes a otra version (o desactivala) y vuelve a intentarlo." \
             % v[0] if v[0] == ACTIVE else ""

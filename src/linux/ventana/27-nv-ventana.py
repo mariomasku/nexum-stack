@@ -149,6 +149,15 @@ class App2(NvBandeja,
         for title, _name, _ic in self.TOOLS_SECTIONS:
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")
             steps.append((lambda t=title: self.nv_tools_show(t), "config-" + slug))
+        # (con el Mailpit de la demostración: uno de sus correos, abierto en la bandeja)
+        mail_id = os.environ.get("LVM_DEMO_CORREO_ID", "")
+        if DEMO and re.fullmatch(r"[A-Za-z0-9]{6,40}", mail_id):
+            def open_mail():
+                self.nv_tools_show("Correo de pruebas (Mailpit)")
+                web, m = getattr(self, "mail_web", None), self.nv_mail()
+                if web is not None and m:
+                    web.load_uri(m["url"] + "view/" + mail_id)
+            steps.append((open_mail, "config-correo-abierto"))
 
         def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
             if i[0] >= len(steps):

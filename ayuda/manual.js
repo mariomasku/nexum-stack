@@ -60,44 +60,89 @@
     a.addEventListener("click", function () { document.body.classList.remove("indice-abierto"); });
   });
 
-  // --- Búsqueda: solo los capítulos que lo tienen, con lo buscado resaltado
+  // --- Búsqueda: la lista de los sitios donde sale lo buscado (capítulo › apartado y un trozo del texto); al
+  // pulsar uno, se va ahí y se ilumina. Dentro de una pregunta, se despliega; en un punto de una captura, se abre
   var buscar = document.getElementById("buscar");
-  var capitulos = Array.prototype.slice.call(document.querySelectorAll("section.capitulo"));
-  var aviso = document.getElementById("sin-resultados");
-  function quitarMarcas() {
-    document.querySelectorAll("main mark").forEach(function (m) {
-      m.replaceWith(document.createTextNode(m.textContent));
-    });
-    document.querySelectorAll("main").forEach(function (m) { m.normalize(); });
-  }
+  var caja = document.getElementById("resultados");
   function normal(t) { return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
-  function marcar(nodo, q) {
-    var paseo = document.createTreeWalker(nodo, NodeFilter.SHOW_TEXT, null), textos = [], t;
-    while ((t = paseo.nextNode())) {
-      if (t.parentNode.closest("script, style, .punto, .globo")) continue;
-      textos.push(t);
-    }
-    textos.forEach(function (tx) {
-      var i = normal(tx.data).indexOf(q);
-      if (i < 0) return;
-      var r = document.createRange();
-      r.setStart(tx, i);
-      r.setEnd(tx, i + q.length);
-      var m = document.createElement("mark");
-      r.surroundContents(m);
+  function textoDe(el) { return el.textContent.replace(/\s+/g, " ").trim(); }
+  // Los trozos que se buscan, en orden, cada uno con dónde está
+  var trozos = [];
+  document.querySelectorAll("section.capitulo").forEach(function (cap) {
+    // (el nombre del capítulo, el del índice: la portada se titula con el logotipo)
+    var enIndice = document.querySelector('.indice a[href="#' + cap.id + '"]');
+    var capitulo = enIndice ? textoDe(enIndice) : textoDe(cap.querySelector("h1, h2"));
+    var apartado = "";
+    cap.querySelectorAll("h3, p, li, dt, dd, summary, .tarjeta").forEach(function (el) {
+      if (el.tagName === "H3") { apartado = textoDe(el); return; }
+      // (lo de dentro de otro trozo ya va en el suyo)
+      if (el.parentNode.closest("li, dd, .tarjeta") && !el.matches(".puntos li")) return;
+      if (el.closest(".tarjeta") && el !== el.closest(".tarjeta")) return;
+      var donde = apartado;
+      var det = el.closest("details");
+      var punto = el.closest(".puntos li");
+      if (punto) donde = "En la captura: " + textoDe(punto.querySelector("b"));
+      else if (det) donde = textoDe(det.querySelector("summary"));
+      else if (el.closest(".entrada") || (!apartado && el.tagName === "P")) donde = donde || "Introducción";
+      var t = textoDe(el);
+      if (t) trozos.push({ el: el, capitulo: capitulo, donde: donde, texto: t, norm: normal(t) });
+    });
+  });
+  function trozoCon(t, q) {
+    var i = normal(t).indexOf(q);
+    var ini = Math.max(0, i - 50), fin = Math.min(t.length, i + q.length + 70);
+    var esc = function (x) { return x.replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+    return (ini > 0 ? "…" : "") + esc(t.slice(ini, i)) + "<mark>" + esc(t.slice(i, i + q.length)) + "</mark>" +
+      esc(t.slice(i + q.length, fin)) + (fin < t.length ? "…" : "");
+  }
+  var elegido = -1, hallados = [];
+  function ir(n) {
+    var r = hallados[n];
+    if (!r) return;
+    var det = r.el.closest("details");
+    if (det) det.open = true;
+    document.body.classList.remove("indice-abierto");
+    var punto = r.el.closest(".puntos li");
+    var destino = punto ? punto.closest(".pantalla").querySelector(".lienzo") : r.el;
+    destino.scrollIntoView({ block: "center", behavior: "smooth" });
+    r.el.classList.remove("destello");
+    void r.el.offsetWidth;
+    r.el.classList.add("destello");
+    if (punto) setTimeout(function () { punto.click(); }, 450);
+  }
+  function marcarElegido() {
+    caja.querySelectorAll(".resultado").forEach(function (b, n) {
+      b.classList.toggle("elegido", n === elegido);
+      if (n === elegido) b.scrollIntoView({ block: "nearest" });
     });
   }
   buscar.addEventListener("input", function () {
-    quitarMarcas();
     var q = normal(buscar.value.trim());
-    var hay = 0;
-    capitulos.forEach(function (c) {
-      var si = !q || normal(c.textContent).indexOf(q) >= 0;
-      c.classList.toggle("oculto", !si);
-      if (si) hay++;
-      if (si && q.length >= 3) marcar(c, q);
+    elegido = -1;
+    if (q.length < 2) { caja.hidden = true; caja.innerHTML = ""; return; }
+    hallados = trozos.filter(function (t) { return t.norm.indexOf(q) >= 0; });
+    caja.hidden = false;
+    if (!hallados.length) {
+      caja.innerHTML = '<div class="sin-resultados">No sale en el manual. Prueba con otra palabra (o con parte de ella).</div>';
+      return;
+    }
+    caja.innerHTML = '<div class="cuantos">' + hallados.length + (hallados.length === 1 ? " sitio" : " sitios") + "</div>";
+    hallados.forEach(function (r, n) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "resultado";
+      b.setAttribute("role", "option");
+      b.innerHTML = "<b>" + r.capitulo + (r.donde ? " › " + r.donde : "") + "</b><span>" + trozoCon(r.texto, q) + "</span>";
+      b.addEventListener("click", function () { ir(n); });
+      caja.appendChild(b);
     });
-    aviso.hidden = hay > 0;
+  });
+  buscar.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { buscar.value = ""; buscar.dispatchEvent(new Event("input")); return; }
+    if (!hallados.length || caja.hidden) return;
+    if (ev.key === "ArrowDown") { ev.preventDefault(); elegido = Math.min(hallados.length - 1, elegido + 1); marcarElegido(); }
+    if (ev.key === "ArrowUp") { ev.preventDefault(); elegido = Math.max(0, elegido - 1); marcarElegido(); }
+    if (ev.key === "Enter") { ev.preventDefault(); ir(elegido < 0 ? 0 : elegido); }
   });
 
   // --- Pantallas con puntos: el número sobre la captura y su texto en un globo, uno a uno o de corrido

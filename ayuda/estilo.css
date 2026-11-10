@@ -152,6 +152,15 @@ dl.glosario dt { font-weight: 600; }
 dl.glosario dd { margin: 0; color: var(--tenue); }
 @media (max-width: 700px) { dl.glosario { grid-template-columns: 1fr; gap: 2px; } dl.glosario dd { margin-bottom: 10px; } }
 
+/* --- Configuración: saltos a cada apartado y qué se configura en él */
+ul.saltos { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 10px 0 8px; max-width: none; }
+ul.saltos a { display: inline-block; padding: 4px 12px; border: 1px solid var(--borde); border-radius: 20px; text-decoration: none; font-size: 14px; background: var(--papel); }
+ul.saltos a:hover { border-color: var(--azul); }
+.se-configura { background: var(--papel); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px 18px 4px; margin: 14px 0 8px; max-width: 900px; }
+.se-configura > b { color: var(--azul); }
+.se-configura ul { margin: 6px 0 8px; padding-left: 20px; }
+.se-configura li { margin: 4px 0; max-width: none; }
+
 /* --- Desplegables (preguntas) */
 details { background: var(--papel); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 16px; margin: 8px 0; max-width: 820px; }
 details summary { cursor: pointer; font-weight: 600; }
@@ -162,10 +171,20 @@ details[open] summary { margin-bottom: 6px; }
 body[data-sistema="linux"] [data-so="mac"], body[data-sistema="mac"] [data-so="linux"] { display: none !important; }
 .etiqueta-so { display: inline-block; font-size: 12px; padding: 0 8px; border-radius: 20px; background: var(--codigo); color: var(--tenue); vertical-align: 2px; }
 
-/* --- Búsqueda */
-mark { background: #ffd60a; color: #000; border-radius: 3px; }
-.sin-resultados { color: var(--tenue); }
-section.oculto { display: none; }
+/* --- Búsqueda: la lista de sitios, debajo de la casilla */
+mark { background: #ffd60a; color: #000; border-radius: 3px; padding: 0 1px; }
+.buscador { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.resultados { max-height: 46vh; overflow: auto; background: var(--papel); border: 1px solid var(--borde); border-radius: 10px; padding: 4px; }
+.resultados .cuantos { font-size: 12px; color: var(--tenue); padding: 4px 8px 6px; }
+.resultados .sin-resultados { font-size: 13.5px; color: var(--tenue); padding: 8px; }
+.resultado { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--texto); font: inherit;
+  padding: 7px 9px; border-radius: 8px; cursor: pointer; }
+.resultado:hover, .resultado.elegido { background: var(--azul-suave); }
+.resultado b { display: block; font-size: 12.5px; color: var(--azul); font-weight: 600; }
+.resultado span { display: block; font-size: 13px; line-height: 1.45; color: var(--tenue); }
+.destello { animation: destello 2.2s ease-out; border-radius: 6px; }
+@keyframes destello { 0%, 30% { background: rgba(255, 214, 10, .55); box-shadow: 0 0 0 6px rgba(255, 214, 10, .55); }
+  100% { background: transparent; box-shadow: 0 0 0 6px transparent; } }
 
 .boton-indice { display: none; }
 @media (max-width: 900px) {

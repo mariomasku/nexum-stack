@@ -14,8 +14,19 @@ trap 'rm -rf "${W:?}"' EXIT
 
 python3 -I "$HERE/demo-linux.py" "$W/demo" > /dev/null
 mkdir -p "$W/home" "$W/capturas"
+
+# Correo de pruebas: un Mailpit solo para la demostración (otros puertos y su base en la carpeta temporal: el
+# tuyo, en el 8025, no se toca), con unos correos inventados. Sin Mailpit instalado, la bandeja sale vacía
+MAILPIT=/opt/config/mailpit/mailpit CORREO_ID=""
+if [ -x "$MAILPIT" ]; then
+    "$MAILPIT" --listen 127.0.0.1:18025 --smtp 127.0.0.1:11025 --database "$W/correo.db" --disable-version-check \
+        > "$W/mailpit.log" 2>&1 &
+    MAILPIT_PID=$!
+    trap 'kill "$MAILPIT_PID" 2> /dev/null; rm -rf "${W:?}"' EXIT
+    CORREO_ID=$(python3 -I "$HERE/correos-demo.py" 2> "$W/correos.log") || CORREO_ID=""
+fi
 echo "Abriendo la ventana en demostración (tarda un minuto: no la toques ni pases el ratón por encima)..."
-env HOME="$W/home" LVM_DEMO="$W/demo" LVM_HTDOCS="$W/demo/htdocs" LVM_CAPTURA="$W/capturas" \
+env HOME="$W/home" LVM_DEMO="$W/demo" LVM_HTDOCS="$W/demo/htdocs" LVM_CAPTURA="$W/capturas" LVM_DEMO_CORREO_ID="$CORREO_ID" \
     timeout 300 dbus-run-session -- "$ROOT/lvm-instalador.sh" --simular ventana > "$W/ventana.log" 2>&1 || true
 n=$(find "$W/capturas" -name '*.png' | wc -l)
 if [ "$n" -eq 0 ]; then

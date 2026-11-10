@@ -16,7 +16,11 @@
     <img src="img/nexum.png" width="36" height="36" alt="">
     <span><b><span class="nexum">NEXUM</span> <span class="dev">Dev Stack</span></b><small>Manual · versión 1.57.6</small></span>
   </a>
-  <input class="buscar" id="buscar" type="search" placeholder="Buscar en el manual…" aria-label="Buscar en el manual">
+  <div class="buscador">
+    <input class="buscar" id="buscar" type="search" placeholder="Busca una palabra del programa…" aria-label="Buscar en el manual"
+           autocomplete="off" aria-controls="resultados">
+    <div class="resultados" id="resultados" role="listbox" hidden></div>
+  </div>
   <div class="sistema" role="group" aria-label="Tu sistema">
     <button type="button" data-valor="linux" aria-pressed="true">Linux</button>
     <button type="button" data-valor="mac" aria-pressed="false">Mac</button>
@@ -42,7 +46,6 @@
     <li><a href="#seguridad">Seguridad</a></li>
     <li><a href="#comandos">Comandos de la terminal</a></li>
     <li><a href="#problemas">Si algo falla</a></li>
-    <li><a href="#glosario">Glosario</a></li>
   </ul>
   <div class="pie-lateral">
     <button class="boton" id="tema" type="button">Claro / oscuro</button>
@@ -51,7 +54,6 @@
 </nav>
 
 <main>
-<p id="sin-resultados" class="sin-resultados" hidden>No hay nada en el manual con eso. Prueba con otra palabra.</p>
 
 <!-- =========================================================================================== INICIO -->
 <section class="capitulo" id="inicio">
@@ -697,75 +699,300 @@
 <section class="capitulo" id="configuracion">
   <div class="antetitulo">Sistema</div>
   <h2>Configuración</h2>
-  <p class="entrada">Lo que se ajusta una vez y se deja: en la columna de la izquierda, sus apartados; a la derecha, lo del elegido.</p>
-
-  <figure class="pantalla">
-    <div class="lienzo">
-      <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png"
-           alt="Configuración, con la columna de sus apartados y el apartado Parches nuevos" width="1442" height="919">
-    </div>
-  </figure>
-
-  <h3>Parches nuevos</h3>
-  <p>Los parches de seguridad de todo lo que usa el programa: cada versión de PHP (con su Apache, MariaDB, FTP, Perl y phpMyAdmin), las
-    imágenes de Docker, Mailpit y cloudflared. Se buscan solos al abrir la ventana de vez en cuando, y con «Buscar de nuevo» cuando
-    quieras. Si hay alguno, «Actualizar todo» los pone de una vez: las versiones de PHP se vuelven a compilar (la de ahora sigue
-    funcionando mientras tanto) y los contenedores de Docker se rehacen sin cambiar sus bases de datos. Arriba de la ventana también
-    sale un aviso; con «Ahora no» no vuelve a avisar hasta que salga otro parche.</p>
-
-  <h3>Vhosts y hosts</h3>
-  <p>Editar a mano los vhosts compartidos y el fichero de hosts del sistema. Se abre una copia en tu editor; al pulsar «Aplicar» se
-    comprueba antes de escribirla (con la contraseña): los vhosts solo admiten lo que es de un vhost, y si Apache no los acepta se deja
-    lo de antes. De los dos se guarda una copia en <code>~/lvm-copias</code>.</p>
-
-  <h3>Seguridad entre webs</h3>
-  <p>La <b>barrera entre webs</b>, encendida de partida: otra web abierta en tu navegador no puede mandar formularios ni peticiones a tus
-    proyectos. Apágala solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a la tienda con un formulario
-    desde su web, y vuelve a encenderla al acabar. Lo explica en cuatro puntos el propio apartado. Ver también <a href="#seguridad">Seguridad</a>.</p>
-
-  <h3>Correo de pruebas</h3>
-  <p>El interruptor del correo de pruebas, qué hacer con los plugins de correo de WordPress y la bandeja. Está explicado en
-    <a href="#correo">Correo de pruebas</a>.</p>
-
-  <h3>Docker</h3>
-  <ul>
-    <li><b>Dirección y puertos</b> del Apache de Docker: <code>127.0.0.2</code>, 80 y 443 de partida. Siempre una dirección de tu equipo
-      (<code>127.x.x.x</code>), nunca abierta a la red.</li>
-    <li><b>DNS de *.docker.test:</b> al activarlo, los dominios de Docker ya no van en el fichero de hosts y no se pide la contraseña
-      al añadir proyectos o versiones.</li>
-    <li><b>Certificado:</b> «Confiar» hace que el navegador acepte los <code>https://</code> de Docker.</li>
-    <li><b>Parar los proyectos sin visitas:</b> nunca, a la hora o a las horas que elijas (3, de partida). Se mira cada 15 minutos,
-      también con la ventana cerrada; las visitas por el túnel cuentan.</li>
+  <p class="entrada">Lo que se ajusta una vez y se deja. A la izquierda, sus apartados; a la derecha, lo del elegido. Aquí tienes cada
+    apartado con lo que se puede configurar en él y cómo viene de partida.</p>
+  <ul class="saltos">
+    <li><a href="#parches">Parches nuevos</a></li>
+    <li><a href="#vhosts">Vhosts y hosts</a></li>
+    <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
+    <li><a href="#correo">Correo de pruebas</a></li>
+    <li><a href="#docker-config">Docker</a></li>
+    <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
+    <li><a href="#github-config">GitHub</a></li>
+    <li><a href="#errores">Registro de errores</a></li>
+    <li><a href="#apariencia">Apariencia</a></li>
+    <li><a href="#carpetas">Carpetas</a></li>
+    <li><a href="#programa">Programa</a></li>
+    <li><a href="#informacion">Información</a></li>
   </ul>
 
-  <h3>Túnel de Cloudflare</h3>
-  <p>El programa que abre los túneles (cloudflared): su versión, o «Instalar» si aún no está (se descarga solo la primera vez que
-    compartes). Si hay un túnel abierto, aquí puedes verlo y cerrarlo, y en «Registro del túnel» ver quién ha entrado. Ver
-    <a href="#compartir">Compartir una web</a>.</p>
+  <h3 id="parches">Parches nuevos</h3>
+  <p>Los parches de seguridad de todo lo que usa el programa, en un solo sitio, y ponerlo todo al día de una vez.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png" alt="Configuración, Parches nuevos" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="22" data-y="11"><b>Los apartados</b><span>La columna de Configuración. El elegido se recuerda al volver.</span></li>
+      <li data-x="39" data-y="27"><b>Componentes</b><span>Lo que se ha encontrado: «Todo al día», o la lista de lo que tiene un parche nuevo (cada versión de PHP con su Apache, MariaDB, FTP, Perl y phpMyAdmin, las imágenes de Docker, Mailpit y cloudflared).</span></li>
+      <li data-x="92" data-y="27"><b>Buscar de nuevo</b><span>Vuelve a consultar ahora. Si hay algo, sale al lado «Actualizar todo», que lo pone al día de una vez.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Cuándo se buscan:</b> solos, al abrir la ventana el primer día y después cada pocos arranques; y cuando pulses «Buscar de nuevo».</li>
+      <li><b>Actualizar todo:</b> las versiones de PHP se vuelven a compilar (la de ahora sigue funcionando mientras tanto, varios minutos); los contenedores de Docker se rehacen en segundos, sin cambiar sus bases de datos ni su configuración; Mailpit y cloudflared se reinstalan.</li>
+      <li><b>El aviso de arriba:</b> «Hay parches nuevos». Con «Ahora no» no vuelve a avisar hasta que salga otro parche.</li>
+    </ul>
+  </div>
 
-  <h3>GitHub</h3>
-  <p>La conexión, la organización o cuenta y los prefijos de la página <a href="#repositorios">Repositorios</a>.</p>
+  <h3 id="vhosts">Vhosts y hosts</h3>
+  <p>Los dos ficheros del sistema que deciden qué web se abre con cada dirección, para cambiarlos a mano con red de seguridad.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-configuracion.png" data-linux="img/linux/config-configuracion.png" data-mac="img/mac/config-configuracion.png" alt="Configuración, Vhosts y hosts" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="40" data-y="21"><b>Virtual hosts</b><span>El fichero de vhosts que comparten todas las versiones: qué carpeta se abre con cada dominio.</span></li>
+      <li data-x="94" data-y="22"><b>Editar…</b><span>Abre una copia en tu editor de textos. Guarda tus cambios y pulsa «Aplicar» en el diálogo.</span></li>
+      <li data-x="40" data-y="27"><b>Hosts del sistema</b><span><code>/etc/hosts</code>: a qué dirección lleva cada nombre. Es el que usa el falseo de dominios.</span></li>
+      <li data-x="94" data-y="28"><b>Editar…</b><span>Igual que el de los vhosts: una copia, tu editor y «Aplicar».</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Antes de aplicar se comprueba:</b> los vhosts solo admiten lo que es propio de un vhost (no <code>Listen</code>, <code>Include</code> ni módulos), y Apache los revisa: si no los acepta, se deja lo de antes. El fichero de hosts tiene que seguir llevando <code>localhost</code> a tu equipo y no puede mandar dominios a otros equipos.</li>
+      <li><b>Copia:</b> de los dos se guarda la versión anterior en <code>~/lvm-copias</code>, con la fecha.</li>
+      <li><b>Contraseña:</b> se pide al aplicar, porque los dos ficheros son del administrador.</li>
+      <li><b>Si no has guardado</b> en el editor, el programa te lo dice en vez de aplicar nada.</li>
+    </ul>
+  </div>
 
-  <h3>Registro de errores</h3>
-  <p>Los dos registros que hay que mirar cuando una web falla: el del <b>vhost del proyecto cargado</b> (ahí van los errores de PHP, como
-    el «error crítico» de WordPress) y el <b>general de Apache</b> (que no arranca, un vhost mal escrito…). «Ver el final» enseña las
-    últimas líneas, con «Copiar todo»; «Abrir», el fichero entero en tu editor.</p>
+  <h3 id="seguridad-webs">Seguridad entre webs</h3>
+  <p>La barrera que impide que otra web abierta en tu navegador use tus proyectos sin que lo sepas.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-seguridad-entre-webs.png" data-linux="img/linux/config-seguridad-entre-webs.png" data-mac="img/mac/config-seguridad-entre-webs.png" alt="Configuración, Seguridad entre webs" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="40" data-y="21"><b>Barrera entre webs</b><span>Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos. Apagada: lo dice, para que la vuelvas a encender.</span></li>
+      <li data-x="95" data-y="22"><b>El interruptor</b><span>Al cambiarlo se aplica a todas tus versiones de PHP y se recarga Apache. Pide la contraseña.</span></li>
+      <li data-x="35" data-y="29"><b>Qué es</b><span>La explicación en cuatro puntos: el problema, lo que hace la barrera, cuándo apagarla y dónde se aplica.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> encendida.</li>
+      <li><b>Qué bloquea:</b> desde otra web solo se puede abrir una página de tus proyectos con un enlace normal; un formulario o una petición que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»).</li>
+      <li><b>Cuándo apagarla:</b> solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a tu tienda mandando un formulario desde su web. Enciéndela al acabar.</li>
+      <li><b>Dónde vale:</b> en todas tus versiones: localhost, web.local, los dominios falseados y los vhosts de los proyectos.</li>
+    </ul>
+  </div>
 
-  <h3>Apariencia</h3>
-  <p>Iconos en color y logotipos en el menú lateral, qué páginas se ven en él (Proyectos y Configuración siempre) y los botones del
-    visor de los proyectos: cuáles, en qué orden, con su nombre o solo el icono, y de qué tamaño, con una vista previa. Se guarda al
-    momento.</p>
+  <h3>Correo de pruebas</h3>
+  <p>Encenderlo o apagarlo, qué hacer con los plugins de correo de WordPress y la bandeja: en <a href="#correo">Correo de pruebas</a>.</p>
 
-  <h3>Carpetas</h3>
-  <p>Accesos a las carpetas importantes: la de los proyectos, las copias de seguridad (<code>~/lvm-copias</code>), los registros de las
-    instalaciones y la <b>caché de descargas</b>, con lo que ocupa y un botón para vaciarla.</p>
+  <h3 id="docker-config">Docker</h3>
+  <p>Cómo se sirven tus proyectos de Docker: en qué dirección, con qué dominios y cuándo se paran solos.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="40" data-y="26"><b>Dirección y puertos</b><span>Dónde escucha el Apache de Docker: 127.0.0.2, con 80 y 443, de partida. Cambia los campos y pulsa «Guardar».</span></li>
+      <li data-x="40" data-y="38"><b>DNS de *.docker.test</b><span>Con «Activar», los dominios de Docker dejan de ir en el fichero de hosts y ya no se pide la contraseña al añadir proyectos o versiones de PHP.</span></li>
+      <li data-x="77" data-y="38"><b>Certificado de Docker</b><span>«Confiar» hace que tu navegador acepte los <code>https://</code> de Docker sin aviso. No pide contraseña.</span></li>
+      <li data-x="42" data-y="55"><b>Parar los proyectos sin visitas</b><span>Cuántas horas sin visitas tiene que estar un proyecto para pararse solo, con lo común que ya no use nadie.</span></li>
+      <li data-x="91" data-y="58"><b>Cuándo</b><span>Nunca, a la hora, o a las 2, 3, 4, 6, 8, 12 o 24 horas sin visitas.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>La dirección</b> tiene que ser de tu equipo (<code>127.x.x.x</code>), nunca abierta a la red, y los dos puertos distintos. En <code>127.0.0.1</code> no se pueden usar el 80 ni el 443: son de LAMPP.</li>
+      <li><b>Al guardar</b> se mueven los dominios y se rehace el Apache de Docker (pide la contraseña si ya existe).</li>
+      <li><b>«Permitir»</b> sale solo si tu sistema no deja a Docker sin root usar los puertos 80 y 443; lo cambia, con la contraseña.</li>
+      <li><b>Sin visitas:</b> 3 horas de partida. Se mira cada 15 minutos, también con la ventana cerrada, y las visitas por el túnel cuentan.</li>
+    </ul>
+  </div>
 
-  <h3>Programa</h3>
-  <p>Buscar una versión nueva del programa, volver a crear su icono en el menú de aplicaciones y, en Linux, si al cerrar la ventana se
-    queda un icono junto al reloj.</p>
+  <h3 id="tunel-config">Túnel de Cloudflare</h3>
+  <p>El programa que abre los túneles para compartir tus webs, y el túnel que haya abierto.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-tunel-de-cloudflare.png" data-linux="img/linux/config-tunel-de-cloudflare.png" data-mac="img/mac/config-tunel-de-cloudflare.png" alt="Configuración, Túnel de Cloudflare" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="39" data-y="25"><b>cloudflared</b><span>Su versión y dónde está. Si aún no está, «Instalar» (se descarga de GitHub, unos 40 MB, comprobado); si hay una nueva, «Actualizar a la X».</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Sin contraseña:</b> cloudflared se guarda en tu carpeta personal, con tu usuario.</li>
+      <li><b>Con un túnel abierto</b> sale su fila: la dirección, a qué web lleva y hasta qué hora, con «Ver» (su dirección y su contraseña) y «Cerrar».</li>
+      <li><b>Registro del túnel:</b> quién ha entrado, las contraseñas equivocadas y lo bloqueado en el último túnel, con «Ver».</li>
+      <li>Cómo se comparte una web: en <a href='#compartir'>Compartir una web</a>.</li>
+    </ul>
+  </div>
 
-  <h3>Información</h3>
-  <p>Los comandos de la terminal, las novedades de cada versión y «Acerca de».</p>
+  <h3 id="github-config">GitHub</h3>
+  <p>La cuenta de GitHub de la página Repositorios.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-github-repositorios.png" data-linux="img/linux/config-github-repositorios.png" data-mac="img/mac/config-github-repositorios.png" alt="Configuración, GitHub" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="40" data-y="25"><b>Conexión</b><span>Con quién estás conectado y cómo (un token o tu sesión de gh). «Conectar con un token…» y «Desconectar».</span></li>
+      <li data-x="40" data-y="31"><b>Organización o cuenta</b><span>De quién son los repositorios que ves. Escribe su nombre (o su dirección de GitHub) y «Guardar».</span></li>
+      <li data-x="41" data-y="37"><b>Prefijos</b><span>Con qué empiezan los nombres de los repositorios que quieres ver, separados por espacios. Vacío: todos.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>El token</b> se guarda en el llavero de tu sesión, nunca en un fichero, y solo se usa para leer la lista: los repositorios se clonan por SSH, con tu clave.</li>
+      <li>Cómo se conecta, paso a paso: en <a href='#repositorios'>Repositorios de GitHub</a>.</li>
+    </ul>
+  </div>
+
+  <h3 id="errores">Registro de errores</h3>
+  <p>Los dos ficheros que hay que mirar cuando una web da un error.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-registro-de-errores.png" data-linux="img/linux/config-registro-de-errores.png" data-mac="img/mac/config-registro-de-errores.png" alt="Configuración, Registro de errores" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="46" data-y="23"><b>El del proyecto cargado</b><span>El registro de su vhost: ahí van los errores de PHP de esa web, como el «error crítico» de WordPress.</span></li>
+      <li data-x="45" data-y="29"><b>El general de Apache</b><span>Lo que impide arrancar a Apache, un vhost mal escrito…</span></li>
+      <li data-x="88" data-y="24"><b>Ver el final</b><span>Las últimas líneas, en una ventana con «Copiar todo» y «Actualizar».</span></li>
+      <li data-x="95" data-y="24"><b>Abrir</b><span>El fichero entero en tu editor (si no es enorme: entonces, mejor «Ver el final»).</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li>Debajo de cada uno: su ruta, lo que ocupa y cuándo cambió. Si aún no existe, lo dice: se crea con el primer error.</li>
+      <li>Aquí no se configura nada: es para consultar.</li>
+    </ul>
+  </div>
+
+  <h3 id="apariencia">Apariencia</h3>
+  <p>Cómo se ve la ventana. Se guarda al momento.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-apariencia.png" data-linux="img/linux/config-apariencia.png" data-mac="img/mac/config-apariencia.png" alt="Configuración, Apariencia" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="38" data-y="26"><b>Iconos en color</b><span>Los iconos del menú lateral, en color en vez de grises.</span></li>
+      <li data-x="42" data-y="32"><b>Logotipos</b><span>Los logotipos de Docker, Node y PHP en el menú lateral.</span></li>
+      <li data-x="40" data-y="40"><b>Apartados del menú lateral</b><span>Qué páginas se ven a la izquierda (Proyectos y Configuración, siempre). Apaga las que no uses.</span></li>
+      <li data-x="92" data-y="88"><b>Personalizar…</b><span>Los botones del visor de los proyectos.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> iconos sin color, sin logotipos y todas las páginas a la vista.</li>
+      <li><b>Botones del visor (Personalizar…):</b> cuáles se ven (Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar, Importar), en qué orden (flechas «Antes» y «Después»), su estilo (con su nombre, solo el icono o icono y nombre) y su tamaño, con una vista previa. «Como al principio» lo deja como venía. Desmontar y ⋮ salen siempre.</li>
+    </ul>
+  </div>
+
+  <h3 id="carpetas">Carpetas</h3>
+  <p>Las carpetas importantes del programa, a un clic.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-carpetas.png" data-linux="img/linux/config-carpetas.png" data-mac="img/mac/config-carpetas.png" alt="Configuración, Carpetas" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="39" data-y="21"><b>Proyectos</b><span>La carpeta de tus proyectos, la que comparten todas las versiones.</span></li>
+      <li data-x="40" data-y="27"><b>Copias de seguridad</b><span><code>~/lvm-copias</code>: lo que el programa guarda antes de borrar o cambiar algo (bases de datos, el fichero de hosts…).</span></li>
+      <li data-x="40" data-y="34"><b>Registros de instalaciones</b><span><code>~/.lvm-instalador</code>: los registros de las instalaciones y de la ventana.</span></li>
+      <li data-x="40" data-y="40"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo. Dice lo que ocupa.</span></li>
+      <li data-x="95" data-y="41"><b>Vaciar…</b><span>Vacía la caché (pide la contraseña). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li>Aquí no se configura nada: «Abrir» abre cada carpeta en tu explorador de archivos.</li>
+    </ul>
+  </div>
+
+  <h3 id="programa">Programa</h3>
+  <p>El propio programa: sus actualizaciones y su icono.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-programa.png" data-linux="img/linux/config-programa.png" data-mac="img/mac/config-programa.png" alt="Configuración, Programa" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="42" data-y="21"><b>Buscar una versión nueva</b><span>Busca en GitHub una versión más nueva y firmada; si la hay, enseña su huella y la instala (pide la contraseña). Tus versiones, proyectos y bases de datos no se tocan.</span></li>
+      <li data-x="42" data-y="27"><b>Icono en el menú</b><span>«Crear de nuevo» vuelve a poner «Nexum Dev Stack» en el menú de aplicaciones, si no aparece o no abre esta ventana.</span></li>
+      <li data-x="42" data-y="34"><b>Dejar en la bandeja al cerrar</b><span>Encendido, cerrar la ventana la esconde en un icono junto al reloj, con lo básico: abrirla, arrancar o parar, web.local y salir.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> con el icono junto al reloj. Si falta su componente, la fila dice cómo instalarlo.</li>
+    </ul>
+  </div>
+
+  <h3 id="informacion">Información</h3>
+  <p>Lo que hay que saber del programa.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-informacion.png" data-linux="img/linux/config-informacion.png" data-mac="img/mac/config-informacion.png" alt="Configuración, Información" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="42" data-y="21"><b>Comandos de lvm-instalador</b><span>Todos los comandos de la terminal y qué hace cada uno, con «Copiar todo».</span></li>
+      <li data-x="38" data-y="27"><b>Novedades</b><span>Qué ha cambiado en cada versión.</span></li>
+      <li data-x="38" data-y="34"><b>Acerca de</b><span>El nombre y la versión del programa.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li>Aquí no se configura nada.</li>
+    </ul>
+  </div>
 </section>
 
 <!-- =========================================================================================== CORREO -->
@@ -795,8 +1022,36 @@
       <li data-x="76" data-y="25"><b>La bandeja</b><span>La versión de Mailpit y su dirección (<code>http://127.0.0.1:8025/</code>, solo desde tu
         equipo).</span></li>
       <li data-x="94" data-y="33"><b>Vaciar</b><span>Borra todos los correos de la bandeja, después de preguntarte.</span></li>
-      <li data-x="65" data-y="69"><b>Los correos</b><span>Aquí se ve la bandeja, dentro de la ventana: cada correo con su asunto, su remitente y su contenido. También con el botón «Correo» de arriba,
-        que dice cuántos tienes sin leer.</span></li>
+      <li data-x="41.3" data-y="47.1"><b>La bandeja</b><span>Cuántos correos hay. «Mark all read» los marca como leídos y «Delete all» los
+        borra todos.</span></li>
+      <li data-x="73.9" data-y="50"><b>Los correos</b><span>Cada uno con quién lo manda, a quién iba, su asunto y el principio del texto,
+        el más nuevo arriba. Púlsalo para abrirlo. La bandeja está en inglés: es la de Mailpit.</span></li>
+      <li data-x="81.3" data-y="4.1"><b>El botón Correo</b><span>Desde cualquier página: te trae aquí, y su número dice cuántos tienes sin leer.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Un correo abierto</h3>
+  <p>Así se ve el que ha mandado una tienda al confirmar un pedido de prueba: el correo tal y como le llegaría al cliente, pero sin salir de tu equipo.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-correo-abierto.png" data-linux="img/linux/config-correo-abierto.png" data-mac="img/mac/config-correo-abierto.png"
+           alt="Un correo de pedido abierto en la bandeja de Mailpit" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="35.3" data-y="41"><b>Volver</b><span>A la lista de correos.</span></li>
+      <li data-x="42.7" data-y="41"><b>Marcar como no leído y borrar</b><span>«Mark unread» lo deja como si no lo hubieras abierto; «Delete», lo borra.</span></li>
+      <li data-x="86" data-y="41"><b>Descargar</b><span>El correo entero o sus adjuntos. Los descarga el navegador.</span></li>
+      <li data-x="94.3" data-y="41"><b>Anterior y siguiente</b><span>Pasa al correo de al lado sin volver a la lista.</span></li>
+      <li data-x="37.4" data-y="49.5"><b>De quién y para quién</b><span>Remitente, destinatario, asunto y cuándo llegó. Es la dirección a la que habría
+        llegado de verdad: así compruebas que la web manda cada correo a quien toca.</span></li>
+      <li data-x="48.5" data-y="62.9"><b>Cómo verlo</b><span><b>HTML</b>, como lo vería el cliente; <b>Text</b>, la versión sin formato; <b>Headers</b> y
+        <b>Raw</b>, sus cabeceras y el correo tal cual; <b>Checks</b>, comprobaciones del propio Mailpit sobre el correo.</span></li>
+      <li data-x="46.5" data-y="76"><b>El contenido</b><span>El correo tal y como lo ha mandado la web. Los enlaces se abren en tu navegador, solo si los pulsas.</span></li>
     </ol>
   </figure>
 
@@ -949,41 +1204,6 @@
       Descargas: también lo busca ahí</span>.</p></details>
 </section>
 
-<!-- =========================================================================================== GLOSARIO -->
-<section class="capitulo" id="glosario">
-  <div class="antetitulo">Más</div>
-  <h2>Glosario</h2>
-  <p class="entrada">Las palabras que salen en el programa y en este manual, en pocas líneas.</p>
-  <dl class="glosario">
-    <dt>Apache</dt><dd>El servidor web: el programa que recibe lo que pide el navegador y le devuelve las páginas de tus proyectos.</dd>
-    <dt>Apache de Docker</dt><dd>Un Apache propio de Docker que sirve tus proyectos de Docker en <code>https://…docker.test</code>, sin necesidad de LAMPP.</dd>
-    <dt>Base de datos (BBDD)</dt><dd>Donde un WordPress o una tienda guarda sus páginas, productos, pedidos y usuarios. Cada versión de PHP tiene las suyas.</dd>
-    <dt>Contenedor</dt><dd>Un pequeño sistema aislado de Docker donde funciona una parte de un proyecto: su PHP, su base de datos…</dd>
-    <dt>Copias en ~/lvm-copias</dt><dd>La carpeta donde el programa guarda lo que va a cambiar o borrar (bases de datos, el fichero de hosts…), para poder volver atrás.</dd>
-    <dt>Dominio falseado</dt><dd>Un dominio de verdad (<code>mitienda.com</code>) que, por una línea en el fichero de hosts, lleva a tu equipo en vez de a internet.</dd>
-    <dt>Fichero de hosts</dt><dd><code>/etc/hosts</code>: la lista del sistema que dice a qué dirección lleva cada nombre antes de preguntar a internet.</dd>
-    <dt>Firma y sha256</dt><dd>Comprobaciones de que lo descargado es exactamente lo que publicó su autor, sin cambios por el camino.</dd>
-    <dt>Imagen (Docker)</dt><dd>La plantilla de la que se crean los contenedores: por ejemplo, la de PHP 8.4.</dd>
-    <dt>LAMPP</dt><dd>Linux, Apache, MariaDB (o MySQL), PHP y Perl: lo necesario para una web en PHP. Cada versión de PHP del programa es un LAMPP completo.</dd>
-    <dt>Mailpit</dt><dd>La bandeja de pruebas donde llega el correo que mandan tus webs, sin salir de tu equipo.</dd>
-    <dt>MariaDB</dt><dd>El programa de bases de datos (compatible con MySQL) que lleva cada versión.</dd>
-    <dt>Parche</dt><dd>Una versión pequeña de PHP dentro de su rama (8.4.27, 8.4.28…) que corrige fallos. Conviene tener el último.</dd>
-    <dt>phpMyAdmin</dt><dd>La página web para ver y cambiar las bases de datos.</dd>
-    <dt>PHP2Shell</dt><dd>Un fallo grave de seguridad de PHP. Las versiones que lo tienen salen en rojo, como «Vulnerable».</dd>
-    <dt>Pila propia</dt><dd>Una versión que compila el propio programa desde el código oficial, con componentes al día (frente a un XAMPP oficial).</dd>
-    <dt>Prefijo</dt><dd>Cómo empiezan los nombres de los repositorios que quieres ver en Repositorios (por ejemplo, <code>wordpress-</code>).</dd>
-    <dt>Rama</dt><dd>Una serie de PHP: 8.4, 8.5… Cada rama recibe parches hasta que se queda sin soporte.</dd>
-    <dt>Simulación</dt><dd><code>--simular</code>: el programa enseña lo que haría sin cambiar nada.</dd>
-    <dt>SSH y clave SSH</dt><dd>La forma segura de hablar con GitHub para clonar y traer cambios, con una clave que solo tienes tú.</dd>
-    <dt>Token de GitHub</dt><dd>Una contraseña especial, con permisos limitados, para que el programa pueda leer tu lista de repositorios.</dd>
-    <dt>Túnel</dt><dd>Una dirección temporal de internet que lleva a una web de tu equipo, para enseñársela a alguien.</dd>
-    <dt>Versión activa</dt><dd>La versión de PHP que está sirviendo tus proyectos ahora. Solo hay una a la vez.</dd>
-    <dt>Vhost</dt><dd>La configuración de Apache que dice qué carpeta se abre con cada dominio.</dd>
-    <dt>Volumen</dt><dd>Donde Docker guarda los datos que no se pierden al borrar un contenedor, como los de una base de datos.</dd>
-    <dt>web.local</dt><dd>La dirección del proyecto cargado: siempre la misma, cargues el que cargues.</dd>
-    <dt>XAMPP</dt><dd>Un LAMPP ya preparado que se distribuía para descargar. Sus últimas versiones son antiguas y no se pueden arreglar.</dd>
-  </dl>
-</section>
 
 </main>
 </div>

@@ -28,6 +28,9 @@ class NvCorreo:
         m = self.nv_mail()
         if not (m.get("on") and m.get("running")) or self.mail_polling:
             return
+        # (en la demostración, nunca el Mailpit de verdad: sus correos sin leer saldrían en la captura)
+        if DEMO and ":8025" in m["url"]:
+            return
         self.mail_polling = True
         url = m["url"] + "api/v1/info"
 
@@ -181,10 +184,11 @@ class NvCorreo:
                 inner.pack_start(b, False, False, 0)
             box.pack_start(inner, True, True, 0)
             return box
-        # (en la demostración, como la de alguien que acaba de instalarlo: vacía)
-        if DEMO:
+        # (en la demostración, solo el Mailpit de la demostración, con sus correos inventados: nunca el de verdad,
+        # que es el del puerto 8025)
+        if DEMO and ":8025" in m["url"]:
             return note("La bandeja está vacía: aquí aparecerá lo que manden las webs de este equipo.")
-        if SIMULATE:
+        if SIMULATE and not DEMO:
             return note("En la simulación no se abre la bandeja: desde ella se pueden borrar correos.")
         if not m["running"]:
             if old is not None:
@@ -241,7 +245,7 @@ class NvCorreo:
         row.add_suffix(combo)
         lb.add(row)
         if m["installed"]:
-            sub = "Mailpit %s · %s" % (m["version"] or "?", ("en marcha: %s" % m["url"]) if m["running"]
+            sub = "Mailpit %s · %s" % (m["version"] or "?", ("en marcha: %s" % (m["url"].replace(":18025/", ":8025/") if DEMO else m["url"])) if m["running"]
                                        else "parado: arranca con la versión activa")
             row = ActionRow("Bandeja de entrada", sub)
             row.add_prefix(icon("mail-unread-symbolic", 16))
