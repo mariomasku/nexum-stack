@@ -121,6 +121,8 @@ final class DialogValidator: NSObject, NSTextFieldDelegate {
 /// Ventana modal con casilla y campo de texto opcionales.
 /// validate(casilla marcada, texto) -> (se puede aceptar, texto de la nota, la nota es un error).
 /// Si hay casilla y campo, el campo solo se puede usar con la casilla desmarcada (confirmar sin copia).
+/// copyWarning: con casilla, el aviso en rojo que sale debajo de ella mientras está desmarcada (marcada, dónde
+/// queda la copia).
 @discardableResult
 /// okLabel dice lo que hace («Borrar la BBDD»), no «Aceptar»; cancelLabel, lo que hace el otro
 /// botón (Cancelar, o «Seguir» si lo que se confirma es cancelar una tarea)
@@ -128,7 +130,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
                value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
-               steps: [String] = [],
+               steps: [String] = [], copyWarning: String? = nil,
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -174,6 +176,16 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
         stack.addArrangedSubview(b)
         box = b
     }
+    var copyNote: NSTextField? = nil
+    if let w = copyWarning, box != nil {
+        let n = NSTextField(wrappingLabelWithString: w)
+        n.preferredMaxLayoutWidth = width
+        n.alignment = .center
+        n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        n.textColor = .systemRed
+        stack.addArrangedSubview(n)
+        copyNote = n
+    }
     if hasField {
         if let l = fieldLabel {
             let n = NSTextField(wrappingLabelWithString: l)
@@ -205,6 +217,11 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
 
     validator.update = {
         let isChecked = box?.state == .on
+        if let n = copyNote, let w = copyWarning {
+            // (el mismo sitio con otro texto: el diálogo no cambia de alto al marcarla)
+            n.stringValue = isChecked ? "La copia queda en ~/nexum-backups: se puede volver a cargar." : w
+            n.textColor = isChecked ? .secondaryLabelColor : .systemRed
+        }
         if let f = input, box != nil { f.isEnabled = !isChecked }
         if let v = validate {
             let (enabled, message, isError) = v(isChecked, input?.stringValue ?? "")
@@ -389,6 +406,36 @@ func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bo
              steps: [String] = []) -> Bool {
     return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
                      destructive: destructive, steps: steps).ok
+}
+
+/// La casilla de guardar antes una copia en ~/nexum-backups (desmarcada) con el aviso en rojo debajo, para un
+/// NSAlert hecho a mano. El validador hay que retenerlo mientras se ve el diálogo (el botón no lo retiene)
+func copyCheckViews(warning: String = COPY_WARNING) -> (box: NSButton, note: NSTextField, validator: DialogValidator) {
+    let validator = DialogValidator()
+    let b = NSButton(checkboxWithTitle: COPY_CHECKBOX, target: validator, action: #selector(DialogValidator.changed(_:)))
+    b.state = .off
+    let n = NSTextField(wrappingLabelWithString: warning)
+    n.preferredMaxLayoutWidth = DIALOG_WIDTH
+    n.alignment = .center
+    n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+    n.textColor = .systemRed
+    validator.update = { [weak b, weak n] in
+        guard let b = b, let n = n else { return }
+        let on = b.state == .on
+        n.stringValue = on ? "La copia queda en ~/nexum-backups: se puede volver a cargar." : warning
+        n.textColor = on ? .secondaryLabelColor : .systemRed
+    }
+    return (b, n, validator)
+}
+
+/// Como confirm, con la casilla de guardar antes una copia en ~/nexum-backups (desmarcada) y, mientras lo
+/// esté, el aviso en rojo (warning). copy: si se ha marcado (se pasa --copia)
+func confirmCopy(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
+                 steps: [String] = [], warning: String = COPY_WARNING) -> (ok: Bool, copy: Bool) {
+    let r = runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+                      destructive: destructive, checkbox: COPY_CHECKBOX, checked: false, steps: steps,
+                      copyWarning: warning)
+    return (r.ok, r.ok && r.checked)
 }
 
 /// Markdown de «lvm-instalador novedades»: «## versión · fecha», viñetas «- » (con dos espacios

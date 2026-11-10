@@ -49,6 +49,12 @@ APP_ID = "dev.hexer.LamppVersionManager"
 PHP2SHELL_BACKPORTS = ("7.4.33", "8.0.30", "8.1.34")
 ICON = "lampp-version-manager"
 LOG_DIR = os.path.expanduser("~/.lvm-instalador")
+# Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
+# programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
+COPIES_DIR = os.path.expanduser("~/nexum-backups")
+COPIES_FILES_FLAG = os.path.join(LOG_DIR, "copias-ficheros")
+# El aviso de la casilla de copia al actualizar una versión en su carpeta (solo hace falta si MariaDB cambia de rama)
+UPDATE_COPY_WARN = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")
 # Apartados de la ventana que se han plegado (uno por línea): siguen plegados al volver a abrirla
 FOLDED_FILE = os.path.join(LOG_DIR, "ventana-plegados")

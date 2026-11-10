@@ -286,14 +286,17 @@ class NvConfiguracion:
         row.suffix.show_all()
 
     def nv_components_update(self, res, ask=True):
+        extra = copy_check(UPDATE_COPY_WARN) if ask else None
         if ask and not confirm(self.win, "¿Actualizar todo?",
                                "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de "
                                "ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se "
                                "rehacen en unos segundos: sus BBDD y su configuración no cambian.", "Actualizar todo",
-                               steps=res["items"]):
+                               steps=res["items"], extra=extra):
             return
         self.components = None
-        self.run_task("Actualizando los componentes", ["componentes-actualizar"], progress=True,
+        self.run_task("Actualizando los componentes",
+                      ["componentes-actualizar"] + (["--copia"] if extra is not None and extra.wanted else []),
+                      progress=True,
                       reload_branches=True, done_text="Componentes al día",
                       on_done=lambda *_: self.build_tools())
 

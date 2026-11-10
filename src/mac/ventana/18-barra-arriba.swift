@@ -320,7 +320,7 @@ struct WarningsView: View {
                 Group {
                     if !d.dbsysVersion.isEmpty {
                         Card("Tablas del sistema de MariaDB antiguas",
-                             "Las tablas del sistema (mysql.*) son de una MariaDB anterior y el servidor escribe un error cada vez que las usa: su registro de errores no para de crecer. Repararlas las pone al día con el mariadb-upgrade de la versión, sin tocar las BBDD de los proyectos, después de guardar una copia en ~/lvm-copias, y vacía el registro si es grande.") {
+                             "Las tablas del sistema (mysql.*) son de una MariaDB anterior y el servidor escribe un error cada vez que las usa: su registro de errores no para de crecer. Repararlas las pone al día con el mariadb-upgrade de la versión, sin tocar las BBDD de los proyectos (si quieres, después de guardar una copia en ~/nexum-backups), y vacía el registro si es grande.") {
                             Row("MariaDB de XAMPP-\(d.dbsysVersion)", "Registro de errores: \(fmtSize(d.dbsysLog))", trailing: {
                                 Button("Repararlas") { model.repairDbSystem() }
                                     .buttonStyle(OutlineButton(kind: "primary"))

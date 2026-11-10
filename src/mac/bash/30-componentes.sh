@@ -75,9 +75,11 @@ function components_check() {
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
-# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
+# version que se rehace (como actualizar --copia)
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    [ "$1" == "--copia" ] && STACK_DB_COPY=1
     echo "Buscando parches nuevos..."
     out=$(components_check)
     while IFS= read -r line; do
@@ -150,14 +152,22 @@ function components_update() {
     return $fail
 }
 
+#@incluir comun/componentes/copies_migrate.sh
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
 fi
 
+# (no en --simular, ni en las pruebas, LVM_PRUEBA, ni al pedir solo la version o las novedades, como
+# hace el empaquetador: tu carpeta se queda como esta)
+case "${1:-}" in
+    version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;
+    *) [ "$DRY" -eq 0 ] && [ -z "$TEST_DIR" ] && copies_migrate ;;
+esac
+
 # Copias de bases, configuraciones de proyectos y registros: solo para tu usuario (en el Mac la
 # carpeta personal suele ser 755: cualquier otro usuario del Mac podria leerlas)
-for dir in "$HOME/lvm-copias" "$LOG_DIR"; do
+for dir in "$COPIES_DIR" "$LOG_DIR"; do
     if [ -d "$dir" ] && [ -O "$dir" ] && [ ! -L "$dir" ]; then
         chmod 700 "$dir" 2> /dev/null
         find "$dir" -maxdepth 2 -type f -user "$(id -u)" -perm +077 -exec chmod go-rwx {} + 2> /dev/null

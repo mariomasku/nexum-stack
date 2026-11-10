@@ -239,7 +239,7 @@ struct DatabasesView: View {
     func importCard(_ d: AppData) -> some View {
         let act = d.installs.first(where: { $0.folder == d.active })
         let desc = "Carga una copia .sql, .sql.gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa. "
-            + "Antes se borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para que no quede nada de lo anterior."
+            + "Antes se borran todas las tablas de la BBDD de destino (si quieres, con una copia en ~/nexum-backups), para que no quede nada de lo anterior."
         let dbs = d.dbs[d.active] ?? []
         let hint = model.importHint()
         return VStack(alignment: .leading, spacing: 10) {

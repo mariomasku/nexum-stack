@@ -126,7 +126,7 @@ check "install_stack comprueba las firmas de PHP, Apache, MariaDB y phpMyAdmin" 
 check "se compila con sudo -u nexum-build y env -i" 'grep -q "sudo -u \"\$BUILD_USER\" env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin" "$SRC" && [ "$BUILD_USER" == nexum-build ]'
 check "la carpeta de la compilacion la crea root (la de nexum-build, dentro)" 'grep -q "build_top=\$(sudo mktemp -d /tmp/lvm-pila-" "$SRC" && grep -q "sudo install -d -o \"\$BUILD_USER\" -g \"\$BUILD_USER\" -m 755 \"\$build_top/w\"" "$SRC"'
 check "las variables y el script, en ficheros de root" 'grep -q "sudo install -m 644 -o 0 -g 0 \"\$SELF\" \"\$build_top/lvm-instalador.sh\"" "$SRC"'
-out=$(bash "$SRC" construir-pila "$W/vars" 2>&1); rc=$?
+out=$(HOME=$W bash "$SRC" construir-pila "$W/vars" 2>&1); rc=$?
 check "construir-pila con otro usuario: no hace nada" '[ $rc -ne 0 ] && grep -q "solo lo usa install_stack" <<< "$out"'
 check "las descargas y las firmas, dentro de la compilacion (stack_build_phase)" 'awk "/^function stack_build_phase\\(\\) \\{/{p=1} p && /download_signed/{f=1} p && /^}/{exit} END{exit !f}" "$SRC"'
 

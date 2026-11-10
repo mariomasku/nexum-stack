@@ -361,10 +361,14 @@ extension AppModel {
 
     /// Un proyecto de antes (con XAMPP-X delante) pasa al Apache de Docker (docker-pasar)
     func dockerPass(_ p: DockerProject) {
-        guard confirm("¿Pasar \(p.folder) al Apache de Docker?",
-                      "Ya no necesitará XAMPP-X y podrás añadirle más versiones de PHP. Antes se guarda una copia de su BBDD (\(p.db)) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus contenedores de ahora, su vhost de XAMPP-X, su clave y su línea de /etc/hosts. Pide la contraseña de administrador.",
-                      "Pasarlo") else { return }
-        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug], progress: true,
+        let c = confirmCopy("¿Pasar \(p.folder) al Apache de Docker?",
+                            "Ya no necesitará XAMPP-X y podrás añadirle más versiones de PHP. Pide la contraseña de administrador.",
+                            "Pasarlo",
+                            steps: ["Su BBDD (\(p.db)) se carga en la MariaDB común de Docker.",
+                                    "Se quitan sus contenedores de ahora, su vhost de XAMPP-X, su clave y su línea de /etc/hosts."],
+                            warning: "Sin copia, su BBDD de ahora no se podrá recuperar.")
+        if !c.ok { return }
+        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug] + (c.copy ? ["--copia"] : []), progress: true,
                 doneText: "\(p.folder) ya va con el Apache de Docker") { _, _, _ in self.reloadDocker() }
     }
 }

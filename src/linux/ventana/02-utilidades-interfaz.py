@@ -559,6 +559,7 @@ ROW_ICONS = [
     ("Virtual hosts", ("logo", "apache")),
     ("Hosts del sistema", ("icono", "network-server-symbolic", "")),
     ("Copias de seguridad", ("icono", "drive-harddisk-symbolic", "")),
+    ("Copias de los ficheros", ("icono", "document-save-symbolic", "")),
     ("Registros de instalaciones", ("icono", "document-open-recent-symbolic", "")),
     ("Caché de descargas", ("icono", "folder-download-symbolic", "")),
     ("error_log de ", ("logo", "apache")),
@@ -1074,6 +1075,25 @@ def steps_box(steps, note=""):
         n = css(Gtk.Label(label=note, xalign=0, wrap=True, selectable=True, max_width_chars=64,
                           width_chars=width, margin_top=6), "dim-label")
         box.pack_start(n, False, False, 0)
+    return box
+
+
+def copy_check(warn="Sin copia, lo que se sustituya no se podrá recuperar."):
+    """La casilla «Guardar antes una copia en ~/nexum-backups», desmarcada de partida (marcada, se pasa
+    --copia) y, debajo y mientras esté desmarcada, el aviso en rojo de que no se podrá recuperar. Para el
+    extra de confirm(): box.wanted dice si se ha marcado."""
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=10)
+    check = Gtk.CheckButton(label="Guardar antes una copia en ~/nexum-backups", active=False)
+    box.pack_start(check, False, False, 0)
+    note = label(warn, "error", wrap=True, max_width_chars=50)
+    box.pack_start(note, False, False, 0)
+    box.wanted = False
+
+    def toggled(c):
+        box.wanted = c.get_active()
+        note.set_visible(not box.wanted)
+    check.connect("toggled", toggled)
+    box.check = check
     return box
 
 

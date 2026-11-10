@@ -93,12 +93,23 @@ S|ftp|0|21|0|0|usuario
 """
 
 
+def app_version():
+    """La versión del programa, la del script construido (la de la cabecera de la ventana)."""
+    import re
+    try:
+        with open(os.path.join(HERE, "..", "..", "lvm-instalador.sh"), encoding="utf-8") as f:
+            m = re.search(r'^APP_VERSION="([0-9.]+)"', f.read(), re.M)
+        return m.group(1) if m else "?"
+    except OSError:
+        return "?"
+
+
 def lines(rows):
     return "".join("|".join(str(x) for x in r) + "\n" for r in rows)
 
 
 def gui_datos():
-    out = [("M", "Nexum Dev Stack", "1.57.6", "By M.Mascuñano"), ("A", ACTIVE, 1, 0, 1, 1),
+    out = [("M", "Nexum Dev Stack", app_version(), "By M.Mascuñano"), ("A", ACTIVE, 1, 0, 1, 1),
            ("H", "@DEMO@/httpd-vhosts.conf", "@DEMO@/hosts"),
            ("E", 1, 1, "mailpit", 1, "1.32.0", "http://127.0.0.1:18025/", "1.32.0")]
     for v in VERSIONS:

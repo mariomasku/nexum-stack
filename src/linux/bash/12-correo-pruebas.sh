@@ -903,9 +903,10 @@ function secure_lampp() {
             fi
             continue
         fi
-        # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia)
-        [ -f "$dir/$rel" ] && mkdir -p -m 700 "$HOME/lvm-copias" \
-            && cp "$dir/$rel" "$HOME/lvm-copias/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
+        # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia; los demas, solo con
+        # el ajuste copias-ficheros)
+        [ -f "$dir/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
+            && cp "$dir/$rel" "$COPIES_DIR/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
         sudo sh -c 'cat "$1" > "$2"' sh "$src" "$dir/$rel" || { sudo rm -rf "$tmp"; return 2; }
         [[ "$rel" == *.key ]] && sudo chmod 600 "$dir/$rel"
     done <<< "$list"

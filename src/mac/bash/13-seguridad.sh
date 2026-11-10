@@ -6,7 +6,8 @@
 # MariaDB (root sin contraseña) y entraria por FTP en htdocs con la contraseña del Mac, que viaja
 # sin cifrar. Se dejan solo para este Mac (127.0.0.1 y ::1), el FTP deja de arrancar con la version
 # (se activa en la pestaña Servicios cuando haga falta) y los vhosts vuelven a ser de root. Solo
-# se cambia lo que falta; lo anterior queda en ~/lvm-copias.
+# se cambia lo que falta; lo anterior queda en ~/nexum-backups
+# si esta el ajuste copias-ficheros.
 SECURE_MARK=xamppfiles/etc/lvm-seguridad
 
 # Primer vhost del puerto 80: Apache le pasa las peticiones cuyo dominio no tiene ningun vhost. Una web

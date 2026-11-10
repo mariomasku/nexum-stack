@@ -66,9 +66,11 @@ function components_check() {
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
-# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
+# version que se rehace (como actualizar --copia)
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    [ "$1" == "--copia" ] && STACK_DB_COPY=1
     echo "Buscando parches nuevos..."
     out=$(components_check)
     while IFS= read -r line; do
@@ -149,6 +151,8 @@ function components_update() {
 # parche de seguridad (7.4.33, 8.0.30, 8.1.34), se vuelve a compilar en su carpeta con el
 function upgrade_to() {
     local from=$1 php=$2 to=$2 src dst old db link failed=() n=0 owner have
+    # (--copia: para cuando se vuelve a compilar en su carpeta, como actualizar --copia)
+    [ "$3" == "--copia" ] && STACK_DB_COPY=1
     if [ -z "$from" ] || ! [[ "$php" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "Uso: lvm-instalador actualizar-a <version instalada> <version de PHP, como 8.3.36>"
         return 1
@@ -171,7 +175,7 @@ function upgrade_to() {
             return 0
         fi
         echo "lampp-$from se vuelve a compilar con el parche de seguridad de PHP2Shell (conserva sus BBDD"
-        echo "si su MariaDB sigue en la misma rama; si no, guarda antes una copia en ~/lvm-copias)"
+        echo "si su MariaDB sigue en la misma rama; si no, empieza con BBDD vacias$([ "${STACK_DB_COPY:-0}" -eq 1 ] && echo ", con una copia antes en ~/nexum-backups"))"
         UI=text
         install_plan "reparar:$php"
         return
@@ -220,17 +224,25 @@ function upgrade_to() {
     [ ${#failed[@]} -eq 0 ]
 }
 
+#@incluir comun/componentes/copies_migrate.sh
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
 fi
+
+# (no en --simular, ni en las pruebas, LVM_PRUEBA, ni al pedir solo la version o las novedades, como
+# hace el empaquetador: tu carpeta se queda como esta)
+case "${1:-}" in
+    version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;
+    *) [ "$DRY" -eq 0 ] && [ -z "$TEST_DIR" ] && copies_migrate ;;
+esac
 
 for cmd in curl python3; do
     command -v $cmd > /dev/null || { echo "Falta el comando $cmd. Instalalo con: sudo apt install $cmd"; exit 1; }
 done
 
 # Copias de bases, configuraciones de proyectos y registros: solo para tu usuario
-for dir in "$HOME/lvm-copias" "$LOG_DIR"; do
+for dir in "$COPIES_DIR" "$LOG_DIR"; do
     if [ -d "$dir" ] && [ -O "$dir" ] && [ ! -L "$dir" ]; then
         chmod 700 "$dir" 2> /dev/null
         find "$dir" -maxdepth 2 -type f -user "$(id -u)" -perm /077 -exec chmod go-rwx {} + 2> /dev/null

@@ -542,6 +542,21 @@ def downloads_cache_size():
     return n, size
 
 
+def copies_size():
+    """Ficheros de las copias de seguridad (~/nexum-backups, con sus subcarpetas) y lo que ocupan. Las de
+    root que no se pueden leer no cuentan."""
+    n = size = 0
+    for root, _dirs, files in os.walk(COPIES_DIR):
+        for name in files:
+            try:
+                st = os.lstat(os.path.join(root, name))
+            except OSError:
+                continue
+            n += 1
+            size += st.st_size
+    return n, size
+
+
 def fmt_size(n):
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024 or unit == "GB":

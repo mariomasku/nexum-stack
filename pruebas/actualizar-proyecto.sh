@@ -39,6 +39,11 @@ check "sobrescribir (.tar.gz): quita lo que no trae, a las copias" '[ $rc -eq 0 
 check "sobrescribir: .git no se toca" '[ "$(cat "$P/.git/config")" == repo ] && [ ! -e "$W/copias/.git" ]'
 check "sobrescribir: lo que trae se queda" '[ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/igual.txt")" == igual ] && [ -x "$P/run.sh" ]'
 
+# Sin carpeta de copias (sin --copia): lo sustituido o quitado se borra, y se dice
+fresh; out=$(python3 -I -c "$CODE" "$P" "$W/normal.tgz" sobrescribir "" "$W/tmp" 0 2>&1); rc=$?
+check "sin --copia: sustituye y quita sin guardar nada, y lo dice" '[ $rc -eq 0 ] && [ "$(cat "$P/index.php")" == nuevo ] && [ ! -e "$P/antiguo" ] && [ ! -e "$W/copias" ] && [ -z "$(find "$W" -name solo-aqui.php)" ] && grep -q "Sin copia" <<< "$out" && ! grep -q "Lo que se ha sustituido" <<< "$out"'
+check "sin --copia: .git no se toca" '[ "$(cat "$P/.git/config")" == repo ]'
+
 # Simulacion: no cambia nada
 fresh; out=$(go "$W/normal.zip" sobrescribir 1); rc=$?
 check "simulacion: dice lo que haria y no cambia nada" '[ $rc -eq 0 ] && grep -q "^\[simulacion\] " <<< "$out" && [ "$(cat "$P/index.php")" == viejo ] && [ -f "$P/antiguo/solo-aqui.php" ] && [ ! -e "$W/copias" ]'
@@ -121,7 +126,7 @@ fi
 # El orden de los pasos, y que un fallo pare los siguientes
 extract "$SRC" project_update gui_project_git project_config_db project_config_local || exit 1
 PROJECT_CODE_PY=$CODE
-HTDOCS_DIR=$W/htdocs HOME=$W/casa DRY=0 SUDO="" GIT_KNOWN_HOSTS=x
+HTDOCS_DIR=$W/htdocs HOME=$W/casa COPIES_DIR=$W/casa/nexum-backups DRY=0 SUDO="" GIT_KNOWN_HOSTS=x
 mkdir -p "$HOME"
 valid_project() { [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]; }
 db_valid_name() { [[ "$1" =~ ^[a-z_]+$ ]]; }
@@ -140,8 +145,10 @@ wp_config_has_url() { grep -q "WP_HOME', '$2'" "$1"; }
 wp_local_url() { echo https://web.local; }
 echo "SELECT 1;" > "$W/d.sql"
 fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --pull --bd "$W/d.sql" --base wp_x); rc=$?
-check "pasos: pull, codigo, BBDD (protegida, de este proyecto) y volver a cargar" '[ $rc -eq 0 ] && [ "$(grep -v connect "$W/orden" | cut -d" " -f1 | tr "\n" " ")" == "pull cierra bd carga " ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto" "$W/orden" && grep -q "carga proyecto  wp_x" "$W/orden" && [ "$(cat "$P/index.php")" == nuevo ] && [ -d "$HOME/lvm-copias" ]'
+check "pasos: pull, codigo, BBDD (protegida, de este proyecto) y volver a cargar" '[ $rc -eq 0 ] && [ "$(grep -v connect "$W/orden" | cut -d" " -f1 | tr "\n" " ")" == "pull cierra bd carga " ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto" "$W/orden" && grep -q "carga proyecto  wp_x" "$W/orden" && [ "$(cat "$P/index.php")" == nuevo ] && [ ! -e "$COPIES_DIR" ] && grep -q "Sin copia" <<< "$out"'
 check "pull por SSH de su repositorio" 'grep -q "pull git@github.com:empresa/proyecto.git" "$W/orden"'
+fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --bd "$W/d.sql" --base wp_x --copia); rc=$?
+check "con --copia: lo sustituido en ~/nexum-backups y la BBDD se carga con --copia" '[ $rc -eq 0 ] && [ "$(cat "$COPIES_DIR"/proyecto-antes-de-actualizar-*/index.php)" == viejo ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto --copia" "$W/orden"'
 fresh; : > "$W/orden"; out=$(PULL_RC=1 project_update proyecto --codigo "$W/normal.zip" --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "si el pull falla, no se copia ni se carga nada" '[ $rc -ne 0 ] && [ "$(cat "$P/index.php")" == viejo ] && ! grep -qE "^(bd|carga)" "$W/orden" && grep -q "No se ha copiado" <<< "$out"'
 fresh; : > "$W/orden"; out=$(BD_RC=1 project_update proyecto --bd "$W/d.sql" --base wp_x); rc=$?

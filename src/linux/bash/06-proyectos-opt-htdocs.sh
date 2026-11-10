@@ -305,7 +305,7 @@ function unload_project_steps() {
 # borrar-proyecto <carpeta> [--bd <base> [--copia]]: borra un proyecto entero. Por orden, y si un paso
 # falla no se sigue (la carpeta, lo ultimo): lo desmonta si es el cargado, lo borra de Docker (sus
 # contenedores y su copia de la BBDD), borra su BBDD de la version activa si se pide (con --copia,
-# antes un volcado en ~/lvm-copias; si la copia falla no se borra nada), quita sus vhosts y las lineas
+# antes un volcado en ~/nexum-backups; si la copia falla no se borra nada), quita sus vhosts y las lineas
 # de sus dominios de /etc/hosts (un dominio real no se queda falseado), lo que el gestor recordaba de
 # el y su carpeta de htdocs. Las BBDD de las otras versiones no se tocan
 function delete_project() {

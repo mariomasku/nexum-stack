@@ -50,8 +50,11 @@ function cli_install() {
     install_plan "$selected"
 }
 
+# rehacer|actualizar <version> [--copia]: con --copia, si su MariaDB cambia de rama (empieza con BBDD
+# vacias), antes se guardan las de ahora en ~/nexum-backups
 function cli_rebuild() {
     local version=$1
+    [ "$2" == "--copia" ] && STACK_DB_COPY=1
     local dir=$BASE_DIR/XAMPP-$version
 
     if [ -z "$version" ] || [ ! -f "$dir/xamppfiles/etc/pvm-stack" ]; then

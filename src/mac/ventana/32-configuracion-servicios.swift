@@ -217,7 +217,7 @@ struct HostsView: View {
                 // Primero, si el vhost de los proyectos no lleva a este Mac: el navegador no conecta
                 ForEach(model.hostsLinkFix, id: \.self) { f in
                     Card("\(f[0]) no lleva a este Mac",
-                         "Apache solo escucha en 127.0.0.1 y ::1, y en /etc/hosts \(f[1].isEmpty ? "no está" : "apunta a \(f[1])"). El navegador da «No se puede acceder a este sitio web». Arreglarlo hace que \(f[0]) lleve a 127.0.0.1 y ::1 (una sola vez; la copia del /etc/hosts anterior queda en ~/lvm-copias). Pide la contraseña de administrador.") {
+                         "Apache solo escucha en 127.0.0.1 y ::1, y en /etc/hosts \(f[1].isEmpty ? "no está" : "apunta a \(f[1])"). El navegador da «No se puede acceder a este sitio web». Arreglarlo hace que \(f[0]) lleve a 127.0.0.1 y ::1 (una sola vez\(FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? "; la copia del /etc/hosts anterior queda en ~/nexum-backups" : "")). Pide la contraseña de administrador.") {
                         Row("\(f[0]) → \(f[1].isEmpty ? "sin línea en /etc/hosts" : f[1])", "Tiene que ir a 127.0.0.1, donde escucha Apache", trailing: {
                             Button("Arreglarlo") { model.fixHostsLink() }
                                 .buttonStyle(OutlineButton(kind: "primary"))
@@ -493,8 +493,24 @@ struct ToolsView: View {
             }
         case "carpetas":
             TileCard("Carpetas") {
-                Tile("Copias de seguridad", "~/lvm-copias: BBDD borradas o desinstaladas, y las del XAMPP oficial") {
-                    Button("Abrir") { openFolder(NSHomeDirectory() + "/lvm-copias") }
+                // Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
+                let bk = model.backups ?? [0, 0]
+                Tile("Copias de seguridad", "~/nexum-backups: las copias que pides al borrar, sustituir o actualizar, y las del XAMPP oficial · "
+                     + (bk[1] > 0 ? "\(fmtSize(bk[0])), \(bk[1]) \(bk[1] == 1 ? "fichero" : "ficheros")" : "vacía")) {
+                    Button("Abrir") {
+                        try? FileManager.default.createDirectory(atPath: COPIES_DIR, withIntermediateDirectories: true,
+                                                                 attributes: [.posixPermissions: 0o700])
+                        openFolder(COPIES_DIR)
+                    }
+                    Button("Borrar…") { model.clearCopies(Int(bk[1]), bk[0]) }.disabled(model.busy || bk[1] == 0)
+                }
+                .onAppear { model.refreshBackups() }
+                // Copias de los ficheros que cambia el programa por su cuenta (lvm-instalador copias-ficheros si|no)
+                Tile("Copias de los ficheros que cambia el programa",
+                     "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos") {
+                    Toggle("", isOn: Binding(get: { model.copiesFiles }, set: { model.setCopiesFiles($0) }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                        .disabled(model.busy)
                 }
                 Tile("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
@@ -789,7 +805,7 @@ struct ToolsView: View {
             }
             ForEach(d.copies.keys.sorted(), id: \.self) { folder in
                 Tile("BBDD de \((folder as NSString).lastPathComponent)",
-                    "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/lvm-copias. Las que ya existan en la versión activa no se tocan.") {
+                    "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/nexum-backups. Las que ya existan en la versión activa no se tocan.") {
                     Button("Carpeta") { showFolder(folder) }
                     Button(d.active.isEmpty ? "Cargar" : "Cargar en XAMPP-\(d.active)") { model.importBackups(folder) }
                         .disabled(model.busy || d.active.isEmpty || !d.running)

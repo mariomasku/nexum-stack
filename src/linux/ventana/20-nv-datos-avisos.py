@@ -275,8 +275,8 @@ class NvDatosAvisos:
                        folder))
         elif same:
             text = ("Se vuelve a compilar PHP %s%s en su carpeta, con la última pila de su rama. Conserva "
-                    "sus BBDD si su MariaDB sigue en la misma rama (si no, guarda antes una copia en "
-                    "~/lvm-copias). Tarda varios minutos." % (target, fix))
+                    "sus BBDD si su MariaDB sigue en la misma rama (si no, empieza con ellas vacías). Tarda "
+                    "varios minutos." % (target, fix))
         else:
             text = ("Se instala PHP %s%s en lampp-%s, al lado de lampp-%s, que no se toca. Después se le copian "
                     "%s con sus vínculos a las carpetas de los proyectos%s. Cuando compruebes que todo va bien "
@@ -284,9 +284,13 @@ class NvDatosAvisos:
                     % (target, fix, target, folder, plural(dbs, "BBDD", "BBDD") if dbs else "sus BBDD (ahora no tiene ninguna)",
                        " y, como es la activa, se activa la nueva" if folder == self.data["active"] else "",
                        target, folder))
-        if not confirm(self.win, "¿Actualizar lampp-%s a PHP %s?" % (folder, target), text, "Actualizar"):
+        # (en su carpeta, si MariaDB cambia de rama empieza con las BBDD vacías: copia si se pide)
+        extra = copy_check(UPDATE_COPY_WARN) if same else None
+        if not confirm(self.win, "¿Actualizar lampp-%s a PHP %s?" % (folder, target), text, "Actualizar",
+                       extra=extra):
             return
-        self.run_task("lampp-%s → PHP %s" % (folder, target), ["actualizar-a", folder, target],
+        self.run_task("lampp-%s → PHP %s" % (folder, target),
+                      ["actualizar-a", folder, target] + (["--copia"] if extra is not None and extra.wanted else []),
                       progress=True, reload_branches=True,
                       done_text="PHP %s instalada%s" % (target, "" if same else " con las BBDD de lampp-%s" % folder))
 
@@ -301,10 +305,13 @@ class NvDatosAvisos:
                         "Tiene el último parche de su rama (%s)." % (res[1] if len(res) > 1 else ""),
                         Gtk.MessageType.INFO)
             elif res[0] == "no" and len(res) > 1:
+                extra = copy_check(UPDATE_COPY_WARN)
                 if confirm(self.win, "¿Actualizar lampp-%s?" % folder,
                            "PHP %s con los últimos parches de su rama. La actual sigue funcionando "
-                           "mientras se compila (varios minutos)." % res[1], "Actualizar a PHP %s" % res[1]):
-                    self.run_task("Actualizando lampp-%s" % folder, ["actualizar", folder],
+                           "mientras se compila (varios minutos)." % res[1], "Actualizar a PHP %s" % res[1],
+                           extra=extra):
+                    self.run_task("Actualizando lampp-%s" % folder,
+                                  ["actualizar", folder] + (["--copia"] if extra.wanted else []),
                                   progress=True, reload_branches=True,
                                   done_text="lampp-%s actualizada a PHP %s" % (folder, res[1]))
             elif res[0] == "parche":

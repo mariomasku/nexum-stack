@@ -190,7 +190,7 @@ check "git: clon sin submodulos, sin ganchos, sin preguntas y solo https/ssh" 'g
 check "montar-proyecto: una tienda recupera su dominio tras subir el volcado" 'grep -A6 "aun no existia" "$SRC" | grep -q "load_project_domain \"\$folder\" \"\$db\""'
 
 # --- Bajos arreglados en la 1.44.2 / Mac 1.32.3
-check "lvm-copias: al arrancar se deja solo para ti (700)" 'grep -q "chmod 700 \"\$HOME/lvm-copias\"" "$SRC" && ! grep -qE "mkdir -p \"\\\$HOME/lvm-copias\"" "$SRC"'
+check "nexum-backups: al arrancar se deja solo para ti (700)" 'grep -q "chmod 700 \"\$COPIES_DIR\"" "$SRC" && ! grep -qE "mkdir -p \"\\\$COPIES_DIR\"" "$SRC" && ! grep -q "HOME/lvm-copias/" "$SRC"'
 imp=$(awk '/^function import_database\(\)/,/^}/' "$SRC")
 e=$(grep -n "information_schema.ENGINES" <<< "$imp" | head -1 | cut -d: -f1)
 d=$(grep -n "DROP DATABASE" <<< "$imp" | head -1 | cut -d: -f1)

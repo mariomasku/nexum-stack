@@ -131,13 +131,13 @@ extension AppModel {
         toast("Elige el fichero en «Subir o actualizar una BBDD»: proyecto \(x.name)")
     }
 
-    /// Lo que ocupan las copias de seguridad (~/lvm-copias) y cuántos ficheros hay
+    /// Lo que ocupan las copias de seguridad (~/nexum-backups) y cuántos ficheros hay
     func refreshBackups() {
         DispatchQueue.global(qos: .utility).async {
             var size: Int64 = 0
             var n = 0
             let keys: [URLResourceKey] = [.fileSizeKey, .isRegularFileKey]
-            if let en = FileManager.default.enumerator(at: URL(fileURLWithPath: NSHomeDirectory() + "/lvm-copias"),
+            if let en = FileManager.default.enumerator(at: URL(fileURLWithPath: COPIES_DIR),
                                                        includingPropertiesForKeys: keys) {
                 for case let u as URL in en {
                     if let v = try? u.resourceValues(forKeys: Set(keys)), v.isRegularFile == true {

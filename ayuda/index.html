@@ -235,8 +235,8 @@
     avisos. Púlsalo para ver la lista. Si no hay ninguno, el botón no está. Cada aviso explica qué pasa y tiene su botón:</p>
   <ul>
     <li><b>«Hay parches nuevos»</b> (siempre el primero): la lista de lo que tiene un parche de seguridad publicado (versiones de PHP y sus
-      componentes, imágenes de Docker, Mailpit, cloudflared). <b>«Actualizar todo»</b> te enseña los pasos y, si aceptas, lo actualiza todo
-      en una tarea; lo de ahora sigue funcionando mientras tanto. <b>«Ahora no»</b> lo quita hasta que salga otro parche distinto; los sigues
+      componentes, imágenes de Docker, Mailpit, cloudflared). <b>«Actualizar todo»</b> te enseña los pasos (con la casilla «Guardar antes una
+      copia en ~/nexum-backups», como en <a href="#parches">Parches nuevos</a>) y, si aceptas, lo actualiza todo en una tarea; lo de ahora sigue funcionando mientras tanto. <b>«Ahora no»</b> lo quita hasta que salga otro parche distinto; los sigues
       teniendo en Configuración → <a href="#parches">Parches nuevos</a>. Se busca al abrir la ventana, el primer arranque de cada día y cada
       cuatro arranques; si hay, te lo dice un mensaje abajo: «Hay parches nuevos: míralos en los avisos de arriba».</li>
     <li><b>«Hay un XAMPP sin registrar»</b>: <code>/opt/lampp</code> es un XAMPP completo y no un enlace a una versión. <b>«Registrar…»</b>
@@ -245,7 +245,8 @@
     <li><b>«Hay procesos de otras versiones en memoria»</b>: solo debería estar en memoria la versión activa; los demás gastan memoria y
       pueden ocupar los puertos 80, 443 y 3306. <b>«Cerrarlos»</b> los cierra.</li>
     <li><b>«Tablas del sistema de MariaDB antiguas»</b>: son de una MariaDB anterior y el registro de errores no para de crecer (te dice
-      cuánto ocupa). <b>«Repararlas»</b> guarda antes una copia de esas tablas en <code>~/lvm-copias</code>, las pone al día sin tocar las
+      cuánto ocupa). <b>«Repararlas»</b> te pregunta antes, con la casilla «Guardar antes una copia en ~/nexum-backups» (desmarcada; sin
+      ella avisa en rojo: «Sin copia, las tablas del sistema de ahora no se podrán recuperar.»). Después las pone al día sin tocar las
       bases de datos de tus proyectos y vacía el registro si es grande. La versión activa tiene que estar en marcha.</li>
     <li><b>«phpMyAdmin antiguo»</b>: algunas versiones traen un phpMyAdmin con fallos de seguridad ya corregidos. <b>«Actualizarlos»</b>
       pone en todas el más nuevo que admite su PHP, con la misma configuración. El anterior queda en la carpeta
@@ -255,7 +256,8 @@
       pide la contraseña.</li>
     <li><b>«Certificados en los que confía todo el equipo»</b>: los certificados https de algunos proyectos sirven para más que su dominio
       (o faltan, y Apache no arrancaría). <b>«Arreglarlos»</b> pone a cada uno un certificado propio que solo vale para su dominio y pide la
-      contraseña. Los vhosts anteriores se copian en <code>~/lvm-copias</code> y los certificados viejos se guardan en una carpeta
+      contraseña. Los vhosts anteriores se copian en <code>~/nexum-backups</code> si tienes encendidas las
+      <a href="#carpetas">copias de los ficheros que cambia el programa</a>, y los certificados viejos se guardan en una carpeta
       <code>/etc/ssl/lvm-anteriores-…</code> que solo ve el administrador. Después, el navegador avisará una vez en cada proyecto: acepta el
       aviso.</li>
     <li><b>«El navegador avisa al abrir estos proyectos»</b>: Chrome y Firefox no aceptan todavía su certificado y sale «La conexión no es
@@ -291,7 +293,8 @@
     <li><b>Haz los cambios en el editor y guárdalos.</b></li>
     <li><b>Pulsa «Aplicar»</b> en el diálogo («Cancelar» no cambia nada). Si no has guardado ningún cambio, te lo dice: «No has cambiado
       nada… (¿guardaste los cambios?)».</li>
-    <li><b>Escribe la contraseña.</b> Antes de escribir el fichero nuevo se guarda una copia del actual en <code>~/lvm-copias</code>.</li>
+    <li><b>Escribe la contraseña.</b> Si tienes encendidas las <a href="#carpetas">copias de los ficheros que cambia el
+      programa</a>, antes de escribir el fichero nuevo se guarda una copia del actual en <code>~/nexum-backups</code>.</li>
   </ol>
   <ul>
     <li><b>Los vhosts</b> se comprueban antes de escribirlos. Si llevan líneas que cambiarían todo Apache, no se aplican. Después se recarga
@@ -449,8 +452,8 @@
       <li data-x="67.6" data-y="30.8"><b>Log</b><span>El final del registro de errores de Apache: lo primero que hay que mirar cuando una
         página sale en blanco o con un error 500.</span></li>
       <li data-x="72.9" data-y="30.8"><b>Actualizar</b><span>Lo pone al día con lo de producción: su base de datos (un <code>.sql</code>) y su
-        código (un <code>.zip</code>, un <code>.tar.gz</code> o una carpeta), con <code>git pull</code> antes si quieres. Guarda una copia de
-        lo que sustituye. Ver <a href="#actualizar-proyecto">Actualizar un proyecto</a>.</span></li>
+        código (un <code>.zip</code>, un <code>.tar.gz</code> o una carpeta), con <code>git pull</code> antes si quieres. Si marcas su casilla,
+        guarda una copia de lo que sustituye. Ver <a href="#actualizar-proyecto">Actualizar un proyecto</a>.</span></li>
       <li data-x="81.1" data-y="30.8"><b>Desmontar</b><span>Lo descarga: <code>web.local</code> deja de abrirlo y enseña una página vacía. No
         pregunta antes, pero no se borra nada, ni la carpeta ni la base de datos.</span></li>
       <li data-x="91" data-y="30.8"><b>Falsear Host</b><span>Si el proyecto tiene un dominio en los vhosts (debajo sale cuál), este
@@ -525,9 +528,11 @@
       estaba (el proyecto de antes y la versión de antes).</li>
     <li>Apunta <code>web.local</code> a su carpeta y activa, arranca o recarga la versión de PHP que toca.</li>
     <li>Ajusta su configuración a la base de datos local: el <code>wp-config.php</code> de un WordPress o la de una tienda PrestaShop. La
-      base con la que lo cargas queda recordada para esa carpeta.</li>
+      base con la que lo cargas queda recordada para esa carpeta. Con las <a href="#carpetas">copias de los ficheros que cambia el
+      programa</a> encendidas, la configuración de antes se guarda en <code>~/nexum-backups</code>.</li>
     <li>Tienda PrestaShop: le crea el vhost y el certificado de su dominio y lo falsea. Si su caché era de otra base de datos (de Docker o de
-      producción), la aparta a <code>~/lvm-copias</code>; se rehace sola.</li>
+      producción), la borra (o la aparta a <code>~/nexum-backups</code>, con las copias de los ficheros encendidas); se
+      rehace sola.</li>
     <li>Los dominios falseados de los demás proyectos vuelven a llevar a su web real.</li>
     <li>Pone al día el correo de pruebas y las <a href="#imagenes-produccion">imágenes de producción</a> de ese proyecto.</li>
   </ul>
@@ -578,8 +583,9 @@
   <p>Al pulsar <b>«Replicar»</b> te enseña los pasos y pregunta «¿Replicar en lampp-8.2?». La versión de origen no se toca.</p>
   <ul>
     <li>Si la de destino no es la versión activa, se arranca su MariaDB solo para la copia y se pide la contraseña de administrador.</li>
-    <li>Si ya había una base con ese nombre, el botón pasa a ser «Sustituir en lampp-8.2», en rojo, y antes se guarda una copia suya en
-      <code>~/lvm-copias</code>.</li>
+    <li>Si ya había una base con ese nombre, el botón pasa a ser «Sustituir en lampp-8.2», en rojo, y la confirmación trae la casilla «Guardar antes una
+      copia en ~/nexum-backups», desmarcada. Sin ella, avisa en rojo: «Sin copia, lo que se sustituya no se podrá recuperar.» Márcala si
+      la base que hay en el destino tiene algo que quieras conservar.</li>
   </ul>
   <ol class="pasos-tarea">
     <li><b>Pulsa el + de «Entorno»</b> y elige «En otra versión de PHP (copiar su BBDD)…».</li>
@@ -619,7 +625,8 @@
   <ul>
     <li><b>Encendido</b>: ese dominio lleva a tu equipo. El navegador abre tu copia local con la dirección de verdad.</li>
     <li><b>Apagado</b>: el dominio vuelve a llevar a la web real, en internet.</li>
-    <li>No pregunta antes. Pide la contraseña de administrador y guarda una copia del fichero de hosts en <code>~/lvm-copias</code>.</li>
+    <li>No pregunta antes. Pide la contraseña de administrador y, con las <a href="#carpetas">copias de los ficheros que cambia el
+      programa</a> encendidas, guarda una copia del fichero de hosts en <code>~/nexum-backups</code>.</li>
     <li>Al cargar otro proyecto, los dominios falseados de este vuelven a la web real. Lo mismo se hace en <a href="#dominios">Dominios y
       hosts</a>.</li>
   </ul>
@@ -630,20 +637,25 @@
     <b>«Actualizar»</b>.</p>
   <ul>
     <li><b>«Base de datos de producción»</b>: arrastra aquí el volcado o pulsa «Elegir fichero…». Vale un <code>.sql</code>, un
-      <code>.sql.gz</code> o un <code>.zip</code>. Debajo te dice en qué base se carga («Se carga en la BBDD wp_panaderia_luna (antes se
-      guarda una copia de la actual)»). Si el proyecto aún no tiene base, escribes su nombre. Sin fichero, «Se sigue usando la BBDD …».</li>
+      <code>.sql.gz</code> o un <code>.zip</code>. Debajo te dice en qué base se carga («Se carga en la BBDD wp_panaderia_luna (al confirmar,
+      puedes guardar antes una copia de la actual)»). Si el proyecto aún no tiene base, escribes su nombre. Sin fichero, «Se sigue usando la BBDD …».</li>
     <li><b>«Código de producción»</b>: arrastra aquí un <code>.zip</code>, un <code>.tar.gz</code> (o <code>.tar</code>, <code>.tgz</code>,
       <code>.tar.bz2</code>, <code>.tar.xz</code>) o una carpeta, o pulsa «Elegir fichero…» o «Elegir carpeta…». La ✕ lo quita.</li>
     <li><b>«Fusionar: copia lo que trae y deja lo demás de la carpeta»</b> (la de partida) o <b>«Sobrescribir: además borra lo que no
-      traiga»</b>. Solo se pueden elegir si has puesto código.</li>
+      traiga»</b>. Solo se pueden elegir si has puesto código. Debajo, en rojo, te recuerda que su <code>.git</code>
+      no se toca y que lo sustituido o borrado solo se puede recuperar si al confirmar guardas antes una copia en
+      <code>~/nexum-backups</code>.</li>
   </ul>
   <p>Al pulsar <b>«Actualizar…»</b> te dice antes lo que va a hacer, paso a paso:</p>
   <ul>
     <li>Si has puesto código y la carpeta es un repositorio de git, pregunta <b>«¿Hacer git pull antes de copiar?»</b>. Te enseña la rama
-      y si tienes cambios sin commit o commits sin subir (revísalos antes: lo sustituido queda en <code>~/lvm-copias</code>, pero no en
-      git). Botones «Cancelar», «Copiar sin pull» y «Hacer pull y copiar» (este, solo si tiene origin y está en una rama). Si el pull
+      y si tienes cambios sin commit o commits sin subir (revísalos antes: lo sustituido no queda en git, solo en la copia, si la
+      guardas). Botones «Cancelar», «Copiar sin pull» y «Hacer pull y copiar» (este, solo si tiene origin y está en una rama). Si el pull
       choca con tus cambios, se para sin tocar nada.</li>
     <li>Si no, pregunta «¿Actualizar panaderia-luna?».</li>
+    <li>Las dos preguntas traen la casilla <b>«Guardar antes una copia en ~/nexum-backups»</b>, desmarcada. Sin ella, avisa en rojo: «Sin
+      copia, lo que se sustituya no se podrá recuperar.» Márcala si en la carpeta o en la base hay algo que no esté en producción ni en
+      git.</li>
     <li>Con un fichero de base de datos, si el usuario root de MariaDB tiene contraseña, te la pide.</li>
   </ul>
   <p><b>Lo que hace</b>, en este orden (si un paso falla, no sigue). Antes de nada pide la contraseña de administrador:</p>
@@ -654,9 +666,10 @@
     <li>Vacía la base y carga el volcado, con la carga protegida.</li>
     <li>Vuelve a cargar el proyecto, para que su configuración apunte otra vez a la base y al dominio locales, y lo comprueba.</li>
   </ol>
-  <div class="nota"><b>Copias que guarda</b>Lo que el código sustituye o borra va a <code>~/lvm-copias/panaderia-luna-antes-de-actualizar-…</code>,
-    y la base de antes (si tenía tablas) a <code>~/lvm-copias</code>, como <code>.sql.gz</code>. Si cancelas a medias, el proyecto queda
-    con lo hecho hasta ese momento, y lo sustituido sigue en <code>~/lvm-copias</code>.</div>
+  <div class="nota"><b>Copias que guarda</b>Con la casilla marcada, lo que el código sustituye o borra va a
+    <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,
+    como <code>.sql.gz</code>. Sin ella, lo que el código sustituye o quita se borra. Si cancelas a medias, el proyecto queda con lo hecho
+    hasta ese momento, y lo sustituido sigue en <code>~/nexum-backups</code> si guardaste la copia.</div>
   <div class="nota cuidado"><b>El git pull no va solo</b>Solo se ofrece cuando también copias un paquete de código. Para traer cambios de
     GitHub sin más, usa la <a href="#repositorios">página Repositorios</a> o la terminal.</div>
 
@@ -674,7 +687,8 @@
       de <code>wp-content/uploads</code> que no esté en tu carpeta se pide a la web real con una redirección. Lo que ya tienes en local se
       sigue sirviendo desde aquí.</li>
     <li>No cambia tu carpeta ni tu base de datos. Sí cambia el vhost de <code>web.local</code>: pide la contraseña de administrador, guarda
-      antes una copia de los vhosts en <code>~/lvm-copias</code> y recarga Apache.</li>
+      antes una copia de los vhosts en <code>~/nexum-backups</code> (si tienes encendidas las <a href="#carpetas">copias de los ficheros
+      que cambia el programa</a>) y recarga Apache.</li>
     <li>Va con el proyecto: al cargar otro o desmontarlo, se quita sola, y vuelve al cargarlo otra vez.</li>
     <li><b>Para quitarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (solo sale si hay un dominio guardado).</li>
   </ul>
@@ -752,14 +766,16 @@
   <ul>
     <li>Te dice qué se borra: su carpeta, sus vhosts y las líneas de sus dominios en el fichero de hosts y, si está en Docker, sus
       contenedores. <b>La carpeta no se puede recuperar.</b></li>
-    <li><b>«Borrar también su BBDD … (lampp-8.4, la de phpMyAdmin)»</b>: solo la de la versión activa, y solo si lo marcas. Con
-      <b>«Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)»</b>, marcado de partida, antes se guarda un volcado.</li>
+    <li><b>«Borrar también su BBDD … (lampp-8.4, la de phpMyAdmin)»</b>: solo la de la versión activa, y solo si lo marcas. Si
+      marcas también <b>«Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)»</b>, que viene desmarcado, antes se guarda
+      un volcado. Sin ella, avisa en rojo: «Sin copia, la BBDD no se podrá recuperar.» Márcala si la base no está en producción ni en otra
+      versión.</li>
     <li>Escribe el nombre de la carpeta para confirmar: el botón «Borrar el proyecto» no se enciende hasta entonces.</li>
     <li>Pide la contraseña de administrador (y la de MariaDB, si borras la base y root la tiene).</li>
   </ul>
   <p>Va en orden y, si un paso falla, no sigue; la carpeta es lo último. Si es el cargado, primero lo desmonta. Si está en Docker y Docker
-    no está en marcha, se para ahí. Si la copia de la base falla, no se borra nada. De los vhosts y del fichero de hosts guarda copia en
-    <code>~/lvm-copias</code>. <b>Las bases de las otras versiones no se tocan.</b></p>
+    no está en marcha, se para ahí. Si has pedido la copia de la base y falla, no se borra nada. De los vhosts y del fichero de hosts guarda
+    copia en <code>~/nexum-backups</code> si tienes encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>. <b>Las bases de las otras versiones no se tocan.</b></p>
 
   <!-- ------------------------------------------------------------------ personalizar -->
   <h3 id="personalizar-botones">Personalizar los botones</h3>
@@ -837,11 +853,13 @@
     <p>En WordPress, no: solo se piden a la web real las que faltan, mientras el proyecto está cargado. En PrestaShop se descargan a su
       carpeta <code>img</code> y se quedan allí. En ninguno de los dos casos se toca la base de datos.</p></details>
   <details><summary>¿Dónde están las copias que guarda?</summary>
-    <p>En <code>~/lvm-copias</code>, con la fecha en el nombre: las bases antes de cargar otra encima, lo que sustituye «Actualizar», los
-      vhosts y el fichero de hosts antes de cambiarlos, y la base de un proyecto borrado si marcas la copia.</p></details>
+    <p>En <code>~/nexum-backups</code>, con la fecha en el nombre. Solo se guardan las que pides: al cargar una base encima de otra, al
+      sustituirla, al actualizar o al borrar, marcando «Guardar antes una copia en ~/nexum-backups» (viene desmarcada). Los vhosts, el
+      fichero de hosts y la configuración de los proyectos se copian antes de cambiarlos si enciendes las copias de los ficheros que
+      cambia el programa, en <a href="#carpetas">Configuración → Carpetas</a>. Allí ves cuánto ocupan y las borras con «Borrar…».</p></details>
   <details><summary>¿Qué se borra al borrar un proyecto?</summary>
     <p>Su carpeta, sus vhosts y las líneas de sus dominios en el fichero de hosts, y sus contenedores de Docker si los tiene. Su base de
-      datos de la versión activa solo si lo marcas, con copia en <code>~/lvm-copias</code> si la dejas marcada. <b>La carpeta no se puede
+      datos de la versión activa solo si lo marcas, con copia en <code>~/nexum-backups</code> si marcas también su casilla. <b>La carpeta no se puede
       recuperar</b>: si está en GitHub, vuelve a clonarla con «Nuevo proyecto…». Ver <a href="#borrar-proyecto">Borrar un proyecto</a>.</p></details>
 </section>
 
@@ -1035,7 +1053,8 @@
   <ul>
     <li><b>En su carpeta</b> (las que se llaman como su rama, como <code>lampp-8.4</code>). Primero comprueba en php.net si hay un parche más
       nuevo. Si ya lo tiene, te dice «lampp-8.4 ya está actualizada». Si hay uno, te pregunta «¿Actualizar lampp-8.4?» con el botón
-      «Actualizar a PHP x.y.z». La versión se rehace con el parche nuevo; la de ahora sigue funcionando mientras se compila (varios minutos).
+      «Actualizar a PHP x.y.z» y la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada (sin ella, avisa en rojo: «Sin copia,
+      si su MariaDB cambia de rama, sus BBDD no se podrán recuperar.»). La versión se rehace con el parche nuevo; la de ahora sigue funcionando mientras se compila (varios minutos).
       Si no puede consultar php.net, te lo dice («No se ha podido comprobar la versión»).</li>
     <li><b>Al lado</b> (un XAMPP o un parche concreto, como <code>lampp-8.3.10</code>). Te pregunta «¿Actualizar lampp-8.3.10 a PHP x.y.z?»
       y te explica lo que va a hacer: instala la nueva en otra carpeta, al lado, y le copia todas sus bases de datos, con sus vínculos a las
@@ -1043,10 +1062,10 @@
       activa, se activa la nueva. La de antes no se toca: cuando compruebes que todo va bien, desinstálala.</li>
   </ul>
   <p>Una versión propia con el mismo parche pero sin el arreglo de PHP2Shell (7.4.33, 8.0.30 u 8.1.34) se vuelve a compilar en su propia
-    carpeta, con el arreglo.</p>
+    carpeta, con el arreglo<span data-so="linux">, y su pregunta trae la misma casilla</span>.</p>
   <div class="nota cuidado"><b>Si cambia la rama de MariaDB</b>Al rehacer una versión en su carpeta, tus bases de datos se conservan si su
-    MariaDB sigue en la misma rama. Si cambia, se guarda antes una copia en <code>~/lvm-copias</code> y la versión empieza con las bases de
-    datos <b>vacías</b>: tendrás que volver a cargarlas desde esa copia.</div>
+    MariaDB sigue en la misma rama. Si cambia, la versión empieza con las bases de datos <b>vacías</b>. Marca «Guardar antes una copia en
+    ~/nexum-backups» para tenerlas guardadas y volver a cargarlas desde esa copia; sin ella, no se podrán recuperar.</div>
   <p>Todo esto pide la contraseña de administrador y se hace en una ventana de tarea, con su barra de avance.</p>
 
   <h3>El resto del menú ⋮</h3>
@@ -1064,15 +1083,16 @@
       usan sus bases de datos o tiene una carpeta <code>htdocs</code> propia que podría tener proyectos.</li>
     <li><b>Lee lo que va a borrar.</b> «¿Desinstalar lampp-8.2?»: la carpeta de la versión y sus bases de datos propias. Tus proyectos y los
       vhosts no se tocan.</li>
-    <li><b>Deja marcado «Guardar antes una copia de sus BBDD en ~/lvm-copias».</b> Viene marcado. Si lo desmarcas, tienes que escribir el
-      nombre de la versión para confirmar, porque sin copia las bases de datos no se podrán recuperar.</li>
-    <li><b>Pulsa «Desinstalar»</b> y escribe la contraseña. Si la copia no cabe en tu carpeta personal, no se desinstala nada.</li>
+    <li><b>Decide si guardas sus bases.</b> «Guardar antes una copia de sus BBDD en ~/nexum-backups» viene desmarcado. Márcalo si alguna
+      base no está en otra versión ni en producción. Sin copia, sale en rojo «Sin copia, las BBDD no se podrán recuperar.» y tienes que
+      escribir el nombre de la versión para confirmar.</li>
+    <li><b>Pulsa «Desinstalar»</b> y escribe la contraseña. Si has pedido la copia y no cabe en tu carpeta personal, no se desinstala nada.</li>
   </ol>
 
   <h3>Preguntas</h3>
   <details><summary>¿Por qué no puedo desinstalar la versión activa?</summary>
-    <p>Porque es la que está sirviendo tus proyectos. Activa antes otra y luego desinstala esa. Al desinstalar se guarda una copia de sus
-      bases de datos en <code>~/lvm-copias</code> (viene marcado); tus proyectos y los vhosts no se tocan.</p></details>
+    <p>Porque es la que está sirviendo tus proyectos. Activa antes otra y luego desinstala esa. Al desinstalar puedes guardar antes una copia
+      de sus bases de datos en <code>~/nexum-backups</code> (marcando su casilla); tus proyectos y los vhosts no se tocan.</p></details>
   <details><summary>Un XAMPP sale «Vulnerable». ¿Qué hago?</summary>
     <p>Los XAMPP oficiales no se pueden arreglar. En su menú ⋮, «Actualizar a PHP x.y.z + parche de seguridad» instala al lado una versión
       propia de esa rama con el arreglo, le copia tus bases de datos y, si era la activa, la activa. Cuando compruebes que todo va bien,
@@ -1113,8 +1133,8 @@
       <li data-x="88.4" data-y="23.5"><b>Ocupan las BBDD</b><span>Lo que ocupan las bases de todas las versiones y, en la barra, el espacio libre
         del disco. Cada versión se mide cuando está activa y en marcha. Si falta alguna por medir, pasa el ratón por encima y te dice cuántas.</span></li>
       <li data-x="27.3" data-y="34.8"><b>Subir o actualizar una BBDD</b><span>Carga una copia <code>.sql</code>, <code>.sql.gz</code> o
-        <code>.zip</code> en la versión activa. Antes borra todas las tablas de la base de destino, <b>guardando una copia</b> en
-        <code>~/lvm-copias</code>. Al lado dice en qué versión se carga.</span></li>
+        <code>.zip</code> en la versión activa. Antes borra todas las tablas de la base de destino (si quieres, <b>guardando una
+        copia</b> en <code>~/nexum-backups</code>). Al lado dice en qué versión se carga.</span></li>
       <li data-x="21.9" data-y="40.9"><b>Elegir…</b><span>Elige el fichero. Si se llama como una base de datos de la versión activa
         (<code>wp_panaderia_luna.sql</code> → <code>wp_panaderia_luna</code>), te la propone como destino.</span></li>
       <li data-x="22.9" data-y="44.1"><b>Lo que falta</b><span>Debajo del fichero te dice qué falta para poder cargar: el fichero, la base de
@@ -1123,7 +1143,7 @@
       <li data-x="63.9" data-y="41"><b>+</b><span>Crea una base de datos nueva («Crear una BBDD nueva»). Al crearla, queda elegida como
         destino.</span></li>
       <li data-x="66.6" data-y="41"><b>Papelera</b><span>Borra la base de datos elegida como destino («Borrar la BBDD elegida»). Antes te
-        pregunta, y por defecto guarda una copia.</span></li>
+        pregunta, y guarda una copia si la pides.</span></li>
       <li data-x="79.4" data-y="41"><b>Proyecto (opcional)</b><span>Si es la base de datos nueva de un proyecto, elige su carpeta: se ajusta su
         configuración para usarla. Debajo te dice qué se va a cambiar.</span></li>
       <li data-x="93.9" data-y="44.6"><b>Cargar</b><span>Se puede pulsar cuando está todo elegido. Antes de hacer nada te enseña lo que va a
@@ -1200,24 +1220,25 @@
     <li><b>Si quieres, elige su proyecto.</b> En un WordPress, su <code>wp-config.php</code> se rehace con la plantilla de este equipo para usar
       esa base. En PrestaShop, su <code>parameters.php</code> (o <code>settings.inc.php</code>) pasa a usarla y se vacía su caché. En otros
       proyectos, la base queda asociada a la carpeta (Cargar proyecto la usa).</li>
-    <li><b>Pulsa «Cargar».</b> El aviso «¿Cargar … en …?» te recuerda que se BORRAN todas sus tablas y que antes se guarda una copia.
-      Confirma con <b>«Vaciar y cargar»</b>. Si root de MariaDB tiene contraseña, te la pide; después, la de administrador.</li>
+    <li><b>Pulsa «Cargar».</b> El aviso «¿Cargar … en …?» te recuerda que se BORRAN todas sus tablas y trae la casilla
+      «Guardar antes una copia en ~/nexum-backups», desmarcada. Sin ella, avisa en rojo: «Sin copia, lo que se sustituya no se podrá
+      recuperar.» Márcala si la base tiene algo que no esté en el fichero que cargas, como cambios hechos en local. Confirma con <b>«Vaciar y cargar»</b>. Si root de MariaDB tiene contraseña, te la pide; después, la de administrador.</li>
     <li><b>Espera.</b> Una barra enseña el avance. Al acabar dice «BBDD «…» cargada».</li>
   </ol>
   <p>Si esa base de datos ya existe en otra versión, el aviso es distinto: ««…» ya existe en lampp-…». Te pregunta si quieres meterla también
     en la versión activa; la de la otra versión no se toca. El botón es <b>«Cargar también en lampp-…»</b>.</p>
   <p>Al cargar, además:</p>
   <ul>
-    <li><b>La copia de antes</b>: si la base tenía tablas, se guarda en
-      <code>~/lvm-copias/lampp-&lt;versión&gt;-&lt;base&gt;-antes-de-cargar-&lt;fecha&gt;.sql.gz</code>. Si no se puede guardar, no se cambia
-      nada.</li>
+    <li><b>La copia de antes</b>: si la has pedido y la base tenía tablas, se guarda en
+      <code>~/nexum-backups/lampp-&lt;versión&gt;-&lt;base&gt;-antes-de-cargar-&lt;fecha&gt;.sql.gz</code>. Si no se puede guardar, no se
+      cambia nada.</li>
     <li><b>El fichero se comprueba antes</b> de vaciar la base: si no es un <code>.zip</code> o <code>.gz</code> válido, no se toca nada.</li>
     <li><b>El administrador de pruebas</b>: en un WordPress o una tienda PrestaShop se crea o se deja al día el usuario
       <code>local@local.test</code> con la contraseña <code>local</code>, para el botón «Panel».</li>
     <li><b>El correo</b>: lo que mande la web va al correo de pruebas (Mailpit), no a gente de verdad.</li>
   </ul>
   <div class="nota cuidado"><b>Si cancelas la carga</b>Te pregunta «¿Cancelar la carga?»: la base se queda a medias, con lo que se haya cargado
-    hasta ese momento. Lo que tenía antes está en la copia de <code>~/lvm-copias</code>.</div>
+    hasta ese momento. Lo que tenía antes está en la copia de <code>~/nexum-backups</code>, si la guardaste.</div>
   <div class="nota"><b>Por seguridad</b>La copia se carga con un usuario que solo puede tocar esa base. Una copia de varias bases a la vez (o
     que intente crear usuarios) falla con «Access denied»: usa una copia de una sola base, como las de phpMyAdmin.</div>
 
@@ -1227,14 +1248,15 @@
     <li><b>Elige la versión de destino</b> en «Copiar BBDD» («¿A qué versión de PHP copias …?»). Se copia con el mismo nombre. Si una ya la
       tiene, lo dice: «ya la tiene: se sustituye». Pulsa <b>«Copiar»</b>.</li>
     <li><b>Confirma.</b> «¿Copiar … a lampp-…?» (botón «Copiar a lampp-…») o, si ya la tiene, «¿Sustituir … en lampp-…?» (botón
-      «Sustituir en lampp-…»). Pide la contraseña de administrador.</li>
+      «Sustituir en lampp-…», con la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada). Pide la contraseña de
+      administrador.</li>
     <li><b>Listo.</b> Dice «… copiada a lampp-…». La de origen no se toca.</li>
   </ol>
   <ul>
     <li><b>Si el destino no es la versión activa</b>, se arranca su MariaDB solo para la copia, sin red, y se para al acabar.</li>
-    <li><b>Si el destino ya la tenía</b>, antes se guarda una copia suya en
-      <code>~/lvm-copias/lampp-&lt;destino&gt;-&lt;base&gt;-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>. Lo que tuviera se pierde, salvo en esa
-      copia.</li>
+    <li><b>Si el destino ya la tenía</b>, lo que tuviera se pierde. Si marcas la casilla, antes se guarda una copia suya en
+      <code>~/nexum-backups/lampp-&lt;destino&gt;-&lt;base&gt;-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>; sin ella, avisa en rojo: «Sin
+      copia, lo que se sustituya no se podrá recuperar.»</li>
     <li><b>Con otro nombre o con otra carpeta de proyecto</b>: usa, en Proyectos, el <b>+</b> de «Entorno» → «En otra versión de PHP (copiar
       su BBDD)…».</li>
   </ul>
@@ -1275,12 +1297,14 @@
   <ol class="pasos-tarea">
     <li><b>Pulsa la papelera</b> de la base (solo en la versión activa) o la de «BBDD de destino».</li>
     <li><b>Lee el aviso.</b> «¿Borrar la BBDD «…»?» dice cuántas tablas tiene y cuánto ocupa. No se puede deshacer.</li>
-    <li><b>Deja marcada la copia.</b> «Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)» viene marcada. Si la desmarcas,
-      tienes que escribir el nombre de la base para confirmar.</li>
-    <li><b>Pulsa «Borrar la BBDD».</b> Pide la contraseña de administrador. Al acabar dice «BBDD «…» borrada (copia en ~/lvm-copias)».</li>
+    <li><b>Decide si guardas una copia.</b> «Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)» viene desmarcada.
+      Márcala si la base no está en producción ni en otra versión. Sin copia, sale en rojo «Sin copia, el contenido no se podrá
+      recuperar.» y tienes que escribir el nombre de la base para confirmar.</li>
+    <li><b>Pulsa «Borrar la BBDD».</b> Pide la contraseña de administrador. Al acabar dice «BBDD «…» borrada» (con «(copia en
+      ~/nexum-backups)» si la has guardado).</li>
   </ol>
-  <p>La copia se llama <code>~/lvm-copias/lampp-&lt;versión&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>. Si no se puede guardar, no se borra
-    nada. Una base vacía (sin tablas) se borra sin copia.</p>
+  <p>La copia se llama <code>~/nexum-backups/lampp-&lt;versión&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>. Si la has pedido y no se puede
+    guardar, no se borra nada. Una base vacía (sin tablas) se borra sin copia.</p>
 
   <h3>Preguntas</h3>
   <details><summary>¿Por qué sale «—» en el tamaño?</summary>
@@ -1289,8 +1313,9 @@
     <p>No: crear, cargar y borrar se hacen siempre en la activa. En las demás puedes copiar, descargar, cargar su proyecto y vaciar la
       caché de una tienda.</p></details>
   <details><summary>He cargado una copia encima de la buena. ¿Puedo volver atrás?</summary>
-    <p>Sí. Antes de cargar se guardó la base tal como estaba en <code>~/lvm-copias</code>, con la fecha en el nombre. Cárgala igual que
-      cualquier otra copia.</p></details>
+    <p>Sí, si marcaste «Guardar antes una copia en ~/nexum-backups» al cargarla: la base tal como estaba está en
+      <code>~/nexum-backups</code>, con la fecha en el nombre. Cárgala igual que cualquier otra copia. Sin esa casilla, solo queda volver a
+      cargar el volcado de producción.</p></details>
   <details><summary>¿Por qué una versión dice «usa las de lampp-…»?</summary>
     <p>Porque comparte las bases de datos de otra versión. Sus bases salen en la fila de esa otra versión.</p></details>
   <details><summary>¿Qué usuario y contraseña pongo en el panel de mi WordPress o mi tienda?</summary>
@@ -1498,8 +1523,11 @@
       datos, su phpMyAdmin y su configuración se quedan como están. Elige la versión y pulsa <b>«Cambiar»</b>. Si no arranca, vuelve a la de
       antes.</li>
     <li><b>La flecha hacia arriba</b> («Pasarlo al Apache de Docker») y el botón «Pasar al Apache de Docker» del visor lo pasan al sistema
-      nuevo. Te pregunta «¿Pasar … al Apache de Docker?». Antes guarda una copia de su base en
-      <code>~/lvm-copias/docker-&lt;proyecto&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code> y la carga en la MariaDB común. Después quita sus
+      nuevo. Te pregunta «¿Pasar … al Apache de Docker?», con la casilla «Guardar antes una copia en
+      ~/nexum-backups», desmarcada (sin ella, avisa en rojo: «Sin copia, su BBDD de ahora no se podrá recuperar.»). Su base se carga en la
+      MariaDB común: con la casilla, a través de una copia que se queda en
+      <code>~/nexum-backups/docker-&lt;proyecto&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>; sin ella, de un fichero temporal que se borra
+      al acabar. Después quita sus
       contenedores de antes, su vhost de LAMPP y su línea de <code>/etc/hosts</code>. Pulsa <b>«Pasarlo»</b>; pide la contraseña de
       administrador. Ya no necesitará LAMPP y podrás añadirle más versiones de PHP.</li>
   </ul>
@@ -1627,7 +1655,8 @@
     copia local, con HTTPS de confianza.</p>
   <p>Eso es <b>falsear un dominio</b>: una línea en el fichero de hosts del sistema (<code>/etc/hosts</code>) hace que ese dominio lleve a
     tu equipo en vez de a internet. Al dejar de falsearlo, vuelve a llevar a la web real. Cada cambio pide la contraseña de administrador
-    y antes guarda una copia del fichero en <code>~/lvm-copias</code>.</p>
+    y, con las <a href="#carpetas">copias de los ficheros que cambia el programa</a> encendidas, antes guarda una copia del fichero en
+    <code>~/nexum-backups</code>.</p>
 
   <figure class="pantalla">
     <div class="barra">
@@ -1712,7 +1741,8 @@
       No puede ser un <code>.local</code>.</li>
     <li><b>Pulsa «Guardar».</b> Desde entonces, las imágenes, vídeos y PDF que no estén en la carpeta se piden a la web real con una
       redirección; lo que ya tienes en local se sigue sirviendo desde aquí. Se cambian los vhosts: se guarda antes una copia en
-      <code>~/lvm-copias</code>, Apache los comprueba y se recarga. Pide la contraseña de administrador.</li>
+      <code>~/nexum-backups</code> (con las <a href="#carpetas">copias de los ficheros que cambia el programa</a> encendidas), Apache los comprueba y se
+      recarga. Pide la contraseña de administrador.</li>
     <li><b>Para dejarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (en rojo; solo sale si ya tiene uno).</li>
   </ol>
 
@@ -1723,7 +1753,8 @@
   <ol class="pasos-tarea">
     <li><b>Pulsa «Arreglarlo».</b></li>
     <li><b>Escribe la contraseña de administrador.</b> Se quita <code>web.local</code> de las líneas que lo llevaban a otra dirección y se añade
-      la suya a <code>127.0.0.1</code>. Antes se guarda una copia del fichero en <code>~/lvm-copias</code>.</li>
+      la suya a <code>127.0.0.1</code>. Con las <a href="#carpetas">copias de los ficheros que cambia el programa</a> encendidas, antes se guarda una
+      copia del fichero en <code>~/nexum-backups</code>.</li>
   </ol>
 
   <h3>Preguntas</h3>
@@ -1733,7 +1764,9 @@
   <details><summary>¿Falsear uno deja de falsear los demás?</summary>
     <p>Con el interruptor, no: solo cambia ese. Con «Crear y falsear» o al cargar un proyecto, sí: queda falseado solo el suyo.</p></details>
   <details><summary>¿Puedo recuperar el fichero de hosts de antes?</summary>
-    <p>Sí: antes de cada cambio se guarda en <code>~/lvm-copias</code>, con la fecha en el nombre.</p></details>
+    <p>Sí, si tienes encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>: entonces, antes de cada
+      cambio se guarda en <code>~/nexum-backups</code>, con la fecha en el nombre. Vienen apagadas; enciéndelas en Configuración →
+      Carpetas antes de hacer cambios que quieras poder deshacer.</p></details>
   <details><summary>Ha salido «No se ha cambiado /etc/hosts»</summary>
     <p>No se ha podido hacer el cambio (por ejemplo, porque has cancelado la contraseña). El interruptor vuelve a como estaba.</p></details>
 </section>
@@ -1783,7 +1816,7 @@
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
       <li><b>Cuándo se buscan:</b> solos, al abrir la ventana el primer día y después cada pocos arranques; y cuando pulses «Buscar de nuevo». Si al abrir hay alguno, abajo sale «Hay parches nuevos: míralos en los avisos de arriba».</li>
-      <li><b>Actualizar todo (N):</b> te pregunta «¿Actualizar todo?» con la lista de lo que se va a poner al día. Las versiones de PHP se vuelven a compilar con lo último de su rama (la de ahora sigue funcionando mientras tanto, varios minutos); los contenedores de Docker en marcha se rehacen en segundos, sin cambiar sus bases de datos ni su configuración; Mailpit y cloudflared se reinstalan. Pulsa «Actualizar todo» y escribe la contraseña de administrador. La tarea «Actualizando los componentes» acaba con «Componentes al día».</li>
+      <li><b>Actualizar todo (N):</b> te pregunta «¿Actualizar todo?» con la lista de lo que se va a poner al día. Las versiones de PHP se vuelven a compilar con lo último de su rama (la de ahora sigue funcionando mientras tanto, varios minutos); los contenedores de Docker en marcha se rehacen en segundos, sin cambiar sus bases de datos ni su configuración; Mailpit y cloudflared se reinstalan. Trae la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada: márcala si alguna versión puede cambiar de rama de MariaDB, porque entonces empieza con las bases de datos vacías. Sin ella, avisa en rojo: «Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar.» Pulsa «Actualizar todo» y escribe la contraseña de administrador. La tarea «Actualizando los componentes» acaba con «Componentes al día».</li>
       <li><b>El aviso de arriba:</b> «Hay parches nuevos (N)», con «Conviene ponerlos: son parches de seguridad» y la lista (las 6 primeras y «…y N más»). «Actualizar todo» hace lo mismo que aquí. Con «Ahora no» no vuelve a avisar hasta que salga otro parche; siguen en este apartado.</li>
     </ul>
   </div>
@@ -1817,7 +1850,7 @@
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
       <li><b>Antes de aplicar se comprueba:</b> los vhosts solo admiten lo que es propio de un vhost (no <code>Listen</code>, <code>Include</code> ni módulos), y Apache los revisa: si no los acepta, se deja lo de antes. Si está en marcha, Apache se recarga. El fichero de hosts tiene que seguir llevando <code>localhost</code> a tu equipo, no puede llevar caracteres raros y no puede mandar dominios nuevos a otros equipos (solo a <code>127.x</code>).</li>
-      <li><b>Copia:</b> de los dos se guarda la versión anterior en <code>~/lvm-copias</code>, con la fecha.</li>
+      <li><b>Copia:</b> con las <a href="#carpetas">copias de los ficheros que cambia el programa</a> encendidas, de los dos se guarda la versión anterior en <code>~/nexum-backups</code>, con la fecha.</li>
       <li><b>Contraseña:</b> se pide al aplicar, porque los dos ficheros son del administrador.</li>
       <li><b>Si no has guardado</b> en el editor, el programa te lo dice («No has cambiado nada… (¿guardaste los cambios?)») en vez de aplicar nada.</li>
       <li><b>También</b> desde el menú ☰ de arriba: «Editar vhosts» y «Editar /etc/hosts».</li>
@@ -2021,16 +2054,23 @@
       <img src="img/linux/config-carpetas.png" data-linux="img/linux/config-carpetas.png" data-mac="img/mac/config-carpetas.png" alt="Configuración, Carpetas" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
-      <li data-x="39" data-y="21"><b>Proyectos</b><span>La carpeta de tus proyectos, la que comparten todas las versiones.</span></li>
-      <li data-x="40" data-y="27"><b>Copias de seguridad</b><span><code>~/lvm-copias</code>: lo que el programa guarda antes de borrar o cambiar algo (bases de datos, el fichero de hosts, los vhosts…). Si aún no existe, «Abrir» la crea.</span></li>
-      <li data-x="40" data-y="34"><b>Registros de instalaciones</b><span><code>~/.lvm-instalador</code>: los registros de las instalaciones y de la ventana.</span></li>
-      <li data-x="40" data-y="40"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
-      <li data-x="95" data-y="41"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
+      <li data-x="39" data-y="22"><b>Proyectos</b><span>La carpeta de tus proyectos, la que comparten todas las versiones.</span></li>
+      <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
+      <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
+      <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
+      <li data-x="40" data-y="40.7"><b>Registros de instalaciones</b><span><code>~/.lvm-instalador</code>: los registros de las instalaciones y de la ventana.</span></li>
+      <li data-x="40" data-y="46.9"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
+      <li data-x="94" data-y="46.9"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
-      <li>Aquí no se configura nada: «Abrir» abre cada carpeta en tu explorador de archivos.</li>
+      <li><b>Copias de los ficheros que cambia el programa</b>: apagado de partida. Encendido, se guarda en <code>~/nexum-backups</code>
+        el fichero de hosts, los vhosts o la configuración de un proyecto (su <code>wp-config.php</code> o su <code>parameters.php</code>) antes
+        de que el programa los cambie, y la caché vieja de una tienda se aparta allí en lugar de borrarse. En la terminal:
+        <code>lvm-instalador copias-ficheros si</code> (o <code>no</code>).</li>
+      <li>Las copias de bases de datos y de código no dependen de este ajuste: se guardan cuando marcas su casilla en cada diálogo.</li>
+      <li>Lo demás no se configura: «Abrir» abre cada carpeta en tu explorador de archivos, y «Borrar…» y «Vaciar…» las vacían.</li>
     </ul>
   </div>
 
@@ -2321,8 +2361,9 @@
       para que ningún programa tuyo pueda cambiar lo que se instala.</p></div>
     <div class="tarjeta"><b>Tu contraseña, a salvo</b><p>La contraseña de administrador solo se envía cuando la pide el sistema de verdad, y el token
       de GitHub se guarda en el llavero de tu sesión, nunca en un fichero.</p></div>
-    <div class="tarjeta"><b>Copia antes de cambiar</b><p>Antes de borrar o sustituir una base de datos, el fichero de hosts o los vhosts, se guarda
-      una copia en <code>~/lvm-copias</code>.</p></div>
+    <div class="tarjeta"><b>Copia antes de cambiar</b><p>Antes de borrar o sustituir una base de datos, cada diálogo te ofrece guardar una copia
+      en <code>~/nexum-backups</code>, y te avisa en rojo si no la guardas. Las del fichero de hosts y los vhosts, si las enciendes en
+      Configuración → Carpetas. La carpeta es solo tuya.</p></div>
     <div class="tarjeta"><b>Certificados con límite</b><p>El navegador acepta el certificado propio de cada proyecto, y el de un dominio real solo
       mientras está falseado.</p></div>
   </div>
@@ -2346,18 +2387,31 @@
     <dt><code>use 8.4</code></dt><dd>Cambia la versión activa.</dd>
     <dt><code>arrancar</code> · <code>parar</code> · <code>reiniciar</code></dt><dd>La versión activa.</dd>
     <dt><code>instalar --php 8.4</code></dt><dd>Instala una versión de PHP (con <code>--si</code>, sin preguntas).</dd>
-    <dt><code>actualizar 8.4</code></dt><dd>La vuelve a compilar con el último parche de su rama.</dd>
+    <dt><code>actualizar 8.4</code></dt><dd>La vuelve a compilar con el último parche de su rama (con <code>--copia</code>, guardando antes
+      sus bases de datos, por si su MariaDB cambia de rama).</dd>
     <dt><code>desinstalar 8.2 --copia</code></dt><dd>La desinstala, guardando antes sus bases de datos.</dd>
     <dt><code>list-db</code></dt><dd>Las bases de datos de cada versión.</dd>
-    <dt><code>importar-bd</code> · <code>exportar-bd</code></dt><dd>Carga o descarga una copia de una base de datos.</dd>
-    <dt><code>copiar-bd</code> · <code>borrar-bd</code></dt><dd>Copia una base a otra versión, o la borra (con <code>--copia</code>, guardándola antes).</dd>
+    <dt><code>importar-bd</code> · <code>exportar-bd</code></dt><dd>Carga o descarga una copia de una base de datos (al cargar, con
+      <code>--copia</code>, guarda antes la que había).</dd>
+    <dt><code>copiar-bd</code> · <code>borrar-bd</code></dt><dd>Copia una base a otra versión (con <code>--sustituir</code>, encima de la que
+      ya tenga), o la borra. Con <code>--copia</code>, guarda antes la que se sustituye o se borra.</dd>
+    <dt><code>actualizar-proyecto</code> · <code>borrar-proyecto</code></dt><dd>Lo que hacen «Actualizar» y «Borrar el proyecto…» en
+      Proyectos. Con <code>--copia</code>, guardan antes lo que se sustituye o se borra.</dd>
+    <dt><code>docker-pasar</code> · <code>reparar-bd-sistema</code></dt><dd>Pasar un proyecto al Apache de Docker y reparar las tablas del
+      sistema de MariaDB. Con <code>--copia</code>, guardan antes su base o esas tablas.</dd>
     <dt><code>cargar-proyecto</code> · <code>desmontar-proyecto</code></dt><dd>Lo que hacen «Cargar» y «Desmontar» en Proyectos.</dd>
     <dt><code>hosts-falsear mitienda.com si</code></dt><dd>Falsea un dominio (o <code>no</code>, para dejar de falsearlo).</dd>
     <dt><code>correo si</code> · <code>correo no</code></dt><dd>Enciende o apaga el correo de pruebas.</dd>
     <dt><code>barrera-web si</code> · <code>barrera-web no</code></dt><dd>Enciende o apaga la barrera entre webs.</dd>
     <dt><code>asegurar</code></dt><dd>Cierra a la red la versión activa (con <code>--todas</code>, todas).</dd>
-    <dt><code>componentes</code> · <code>componentes-actualizar</code></dt><dd>Los parches nuevos de todo, y ponerlo todo al día.</dd>
+    <dt><code>componentes</code> · <code>componentes-actualizar</code></dt><dd>Los parches nuevos de todo, y ponerlo todo al día (con
+      <code>--copia</code>, como <code>actualizar</code>). <code>actualizar-a</code> también admite <code>--copia</code>.</dd>
     <dt><code>descargas</code> · <code>descargas vaciar</code></dt><dd>La caché de descargas: lo que hay, o vaciarla.</dd>
+    <dt><code>copias</code> · <code>copias vaciar</code></dt><dd>Las copias de seguridad de <code>~/nexum-backups</code>: lo que hay y cuánto
+      ocupa, o borrarlas todas (la carpeta se queda). Sin <code>--copia</code>, los comandos que sustituyen o borran no guardan nada y lo
+      dicen al empezar («Sin copia: …»).</dd>
+    <dt><code>copias-ficheros si</code> · <code>copias-ficheros no</code></dt><dd>Enciende o apaga las copias del fichero de hosts, los
+      vhosts y la configuración de los proyectos antes de cambiarlos (sin nada, dice cómo está).</dd>
     <dt><code>novedades</code> · <code>version</code></dt><dd>Qué ha cambiado en cada versión, y la versión del programa.</dd>
   </dl>
 </section>
@@ -2392,7 +2446,7 @@
       mientras está falseado.</p></details>
   <details><summary>Aviso «Tablas del sistema de MariaDB antiguas»</summary>
     <p>Vienen de una versión anterior de MariaDB y llenan su registro de errores. «Repararlas» las pone al día, sin tocar las bases de tus
-      proyectos y guardando antes una copia.</p></details>
+      proyectos y, si marcas su casilla, guardando antes una copia en <code>~/nexum-backups</code>.</p></details>
   <details><summary>No encuentra la versión nueva del programa</summary>
     <p>Sin conexión no puede consultar GitHub. Prueba más tarde<span data-so="linux">, o deja el paquete <code>.deb</code> en tu carpeta
       Descargas: también lo busca ahí</span>.</p></details>

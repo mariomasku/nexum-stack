@@ -317,7 +317,7 @@ function panel_rebuild() {
     local old_mariadb=$(stack_fields "$dir" | cut -d'|' -f3) new_mariadb=$(cut -d'|' -f3 <<< "$new")
     IFS='|' read -r -a f <<< "$new"
 
-    local header=$(stack_header "")
+    local header=$(stack_header "") ask_copy=0
     local summary="lampp-$version se volvera a compilar con la ultima pila de PHP ${full%.*}:\n\n"
     summary+="$header\n$(printf '%*s' ${#header} "" | tr ' ' '-')\n"
     summary+="$(stack_row "$dir" "" "Ahora")\n"
@@ -331,9 +331,10 @@ function panel_rebuild() {
     else
         local count=$(db_names "$dir" | grep -c .)
         summary+="MariaDB $new_mariadb no usa directamente los datos de MariaDB $old_mariadb, asi que\n"
-        summary+="la nueva version empezara con bases de datos vacias. Antes se guarda una\n"
-        summary+="copia de las actuales ($count) en ~/lvm-copias/. Para llevarte alguna, exportala\n"
-        summary+="antes desde phpMyAdmin e importala despues.\n"
+        summary+="la nueva version empezara con bases de datos vacias (ahora tiene $count). Despues\n"
+        summary+="se pregunta si guardar antes una copia en ~/nexum-backups/. Para llevarte alguna,\n"
+        summary+="exportala antes desde phpMyAdmin e importala despues.\n"
+        ask_copy=1
     fi
 
     summary+="\nLa compilacion tarda 10-20 minutos y mientras tanto la version actual sigue\n"
@@ -356,6 +357,10 @@ function panel_rebuild() {
     fi
 
     ui_yesno "$summary" || return 0
+    # (sin copia, las bases de ahora no se podran recuperar: la casilla, desmarcada de partida)
+    if [ $ask_copy -eq 1 ] && ui_yesno "¿Guardar antes una copia de las bases de datos de lampp-$version en ~/nexum-backups?\n\nSin copia, no se podran recuperar."; then
+        STACK_DB_COPY=1
+    fi
 
     [ "$UI" == "whiptail" ] && clear
     install_plan "rehacer:$full"
@@ -434,7 +439,7 @@ function panel_remove() {
 
     local backup=0
     if [ "$own_dbs" -gt 0 ]; then
-        ui_yesno "¿Guardar antes una copia comprimida de las bases de datos de lampp-$version?\n\nSe guardara en ~/lvm-copias/ (se necesita espacio libre en tu carpeta personal)." && backup=1
+        ui_yesno "¿Guardar antes una copia comprimida de las bases de datos de lampp-$version?\n\nSe guardara en ~/nexum-backups/ (se necesita espacio libre en tu carpeta personal)." && backup=1
 
         # Sin copia, se pide escribir el nombre de la version para confirmar
         if [ $backup -eq 0 ]; then
@@ -1111,12 +1116,32 @@ QUE HACE
 - Solo hay una versión activa (/opt/lampp). Se cambia sin tocar los
   proyectos de /opt/htdocs ni los virtual hosts.
 - Actualiza cada versión a los últimos parches de su rama, muestra sus
-  bases de datos y desinstala versiones guardando copia en ~/lvm-copias.
+  bases de datos y desinstala versiones (con copia en ~/nexum-backups,
+  si se pide).
 - No instala PHP ni MariaDB en el sistema.
 - Correo de pruebas: lo que mandan las webs locales va a Mailpit y no
   llega a nadie.
 
 VERSIONES
+
+1.57.7 (10 nov 2026)
+- Copias de seguridad, solo si se piden: al cargar un .sql sobre una
+  BBDD con tablas, sustituir una BBDD al copiarla o replicarla, reparar
+  las tablas del sistema, pasar un proyecto al Apache de Docker,
+  actualizar un proyecto o actualizar una versión que empieza con BBDD
+  vacías, la copia de lo de antes se guarda solo si se marca «Guardar
+  antes una copia» (en la terminal, --copia). Sin ella, se avisa de que
+  no se podrá recuperar. Borrar una BBDD, una versión o un proyecto,
+  igual que antes, pero con la casilla desmarcada de partida.
+- La carpeta de las copias se llama ahora ~/nexum-backups: la de antes
+  (~/lvm-copias) se renombra sola la primera vez, si no hay ya otra.
+- Las copias de los ficheros que el programa cambia por su cuenta (el
+  de hosts, los vhosts, la configuración de los proyectos al cargarlos,
+  lo que cambia asegurar) ya no se guardan siempre: se encienden en
+  Configuración, Carpetas (o lvm-instalador copias-ficheros si). La
+  caché vieja de una tienda, sin ellas, se borra (se rehace sola).
+- Configuración, Carpetas: «Borrar…» las copias de seguridad, con
+  cuántos ficheros hay y cuánto ocupan (o lvm-instalador copias vaciar).
 
 1.57.6 (10 nov 2026)
 - Caché de descargas: el código de cada componente que se instala

@@ -32,9 +32,10 @@ class AppHosts:
             box, lb = group("%s no lleva a este equipo" % name,
                             "Apache solo escucha en 127.0.0.1 y en /etc/hosts %s. El navegador da "
                             "«No se puede acceder a este sitio web» (ERR_CONNECTION_REFUSED). "
-                            "Arreglarlo hace que %s lleve a 127.0.0.1 (una sola vez; la copia del "
-                            "/etc/hosts anterior queda en ~/lvm-copias). Pide la contraseña de sudo."
-                            % (("apunta a %s" % now) if now else "no está", name))
+                            "Arreglarlo hace que %s lleve a 127.0.0.1 (una sola vez%s). Pide la contraseña de sudo."
+                            % (("apunta a %s" % now) if now else "no está", name,
+                               "; la copia del /etc/hosts anterior queda en ~/nexum-backups"
+                               if os.path.exists(COPIES_FILES_FLAG) else ""))
             row = ActionRow("%s → %s" % (name, now or "sin línea en /etc/hosts"),
                             "Tiene que ir a 127.0.0.1, donde escucha Apache")
             b = css(Gtk.Button(label="Arreglarlo"), "verde")

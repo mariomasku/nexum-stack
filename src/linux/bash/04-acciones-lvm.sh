@@ -114,7 +114,8 @@ sys.exit(1 if bad else 0)
 
 # Abre una copia de los vhosts en el editor ($VISUAL, $EDITOR o nano) y la aplica. Con --aplicar
 # <copia>, la ventana ya la ha editado: se comprueba (vhosts_check y httpd -t), se guarda el
-# anterior en ~/lvm-copias, se escribe con sudo y se recarga Apache si esta en marcha. Si Apache
+# anterior en ~/nexum-backups (si esta el ajuste copias-ficheros), se escribe con sudo y se recarga
+# Apache si esta en marcha. Si Apache
 # no acepta la configuracion nueva, se vuelve a la anterior.
 function edit_vhosts() {
     local mode=$1 copy=${2:-$VHOSTS_COPY} real backup answer
@@ -151,7 +152,7 @@ function edit_vhosts() {
     # La copia editada es tuya y cualquier programa con tu usuario puede cambiarla mientras se
     # escribe la contraseña: se lee una sola vez (con tu usuario) a una carpeta de root, y lo que se
     # comprueba es exactamente lo que se escribe. La version anterior queda tambien en esa carpeta
-    # (la de ~/lvm-copias es solo para ti: no se vuelve a escribir desde ahi)
+    # (la de ~/nexum-backups es solo para ti: no se vuelve a escribir desde ahi)
     local snap
     sudo -v || return 1
     snap=$(sudo mktemp -d /tmp/lvm-vhosts.XXXXXX) || return 1
@@ -167,9 +168,11 @@ function edit_vhosts() {
         echo "Si de verdad las necesitas, ponlas a mano: sudoedit $real"
         return 1
     fi
-    backup="$HOME/lvm-copias/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p -m 700 "$HOME/lvm-copias" && cp "$real" "$backup" \
-        && echo "Copia de los vhosts anteriores: $backup"
+    if [ -f "$COPIES_FILES_FLAG" ]; then
+        backup="$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p -m 700 "$COPIES_DIR" && cp "$real" "$backup" \
+            && echo "Copia de los vhosts anteriores: $backup"
+    fi
     if ! sudo install -o root -g root -m 644 "$snap/nuevo" "$real"; then
         sudo rm -rf "$snap"
         return 1
@@ -234,7 +237,8 @@ function vhosts_root() {
 
 # Edita /etc/hosts. Sin argumentos, con sudoedit (sudo -e). Con --aplicar <copia>, la ventana ya
 # ha editado una copia: comprueba que sigue teniendo localhost, guarda el /etc/hosts actual en
-# ~/lvm-copias y escribe la copia encima (con sudo si hace falta; se conservan dueño y permisos)
+# ~/nexum-backups (si esta el ajuste copias-ficheros) y escribe la copia encima (con sudo si hace
+# falta; se conservan dueño y permisos)
 function edit_hosts() {
     local s=""
     [ -w "$HOSTS_FILE" ] || s=sudo
@@ -250,7 +254,7 @@ function edit_hosts() {
         browser_trust --hosts || true
         return $rc
     fi
-    local copy=$2 backup="$HOME/lvm-copias/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
+    local copy=$2 backup="$COPIES_DIR/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
     # (aparte: en la misma linea, $copy aun seria el de fuera)
     check=$copy
     if [ ! -s "$copy" ]; then
@@ -313,9 +317,11 @@ sys.exit(1 if any(c < 32 and c not in (9, 10) or c == 127 for c in d) else 0)' "
         echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: lvm-instalador hosts"
         return 1
     fi
-    run mkdir -p -m 700 "$HOME/lvm-copias"
-    run cp "$HOSTS_FILE" "$backup" || return 1
-    echo "Copia del $HOSTS_FILE anterior: $backup"
+    if [ -f "$COPIES_FILES_FLAG" ]; then
+        run mkdir -p -m 700 "$COPIES_DIR"
+        run cp "$HOSTS_FILE" "$backup" || return 1
+        echo "Copia del $HOSTS_FILE anterior: $backup"
+    fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] $s tee $HOSTS_FILE < $copy"
     else

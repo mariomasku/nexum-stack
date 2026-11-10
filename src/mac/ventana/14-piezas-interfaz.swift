@@ -438,6 +438,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Virtual hosts", "logo:apache", brand("apache")),
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
+    ("Copias de los ficheros", "doc.on.doc.fill", .gray),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
     ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),

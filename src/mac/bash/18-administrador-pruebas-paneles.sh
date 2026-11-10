@@ -420,7 +420,7 @@ function official_copy_vhosts() {
 
 # Aparta un XAMPP oficial de /Applications/XAMPP para poder usar el enlace, sin borrar nada:
 #   1. lo para y comprueba que no queda nada en marcha (si no, no se mueve nada)
-#   2. copia todas sus bases (.zip) en ~/lvm-copias/XAMPP-oficial-<fecha>
+#   2. copia todas sus bases (.zip) en ~/nexum-backups/XAMPP-oficial-<fecha>
 #   3. copia sus proyectos a XAMPP-compartido/htdocs y sus vhosts al fichero compartido
 #   4. mueve la carpeta a /Applications/XAMPP-oficial-<fecha> (volver-oficial la devuelve)
 function set_aside_official() {
@@ -428,7 +428,7 @@ function set_aside_official() {
     local stamp=$(date +%Y%m%d-%H%M%S)
     local aside="$APPS_DIR/XAMPP-oficial-$stamp" user=${SUDO_USER:-$USER} home=$HOME
     [ -n "$SUDO_USER" ] && home=$(dscl . -read "/Users/$SUDO_USER" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')
-    local backup="$home/lvm-copias/XAMPP-oficial-$stamp"
+    local backup="$home/${COPIES_DIR##*/}/XAMPP-oficial-$stamp"
 
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] parar el XAMPP oficial y comprobar que no queda nada en marcha"
@@ -442,17 +442,17 @@ function set_aside_official() {
     trap db_cleanup EXIT
     trap 'exit 130' INT TERM HUP
     official_stop || return 1
-    mkdir -p -m 700 "$home/lvm-copias" && mkdir -p "$backup" || return 1
+    mkdir -p -m 700 "$home/${COPIES_DIR##*/}" && mkdir -p "$backup" || return 1
     # Si algo falla, la carpeta de copias queda como incompleta-… (la ventana no la ofrece para cargar)
     local failed="No se ha apartado nada: el XAMPP oficial sigue en $LINK."
-    official_dump_all "$backup" || { mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
+    official_dump_all "$backup" || { mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
     if official_running; then
-        mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"
+        mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"
         echo "El XAMPP oficial se ha vuelto a arrancar: no se mueve nada."
 
         return 1
     fi
-    official_copy_projects || { mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
+    official_copy_projects || { mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
     official_copy_vhosts "$backup"
     printf 'carpeta=%s\nfecha=%s\n' "$aside" "$stamp" > "$backup/xampp-oficial.txt"
     # Solo si esto corre como root (con tu usuario, todo lo de la carpeta ya es tuyo), y solo lo que
@@ -557,7 +557,7 @@ function remove_blocker() {
 function backup_databases() {
     local version=$1 dir=${2:-$BASE_DIR/XAMPP-$1}
     local user=${SUDO_USER:-$USER}
-    local dest_dir=$(dscl . -read "/Users/$user" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')/lvm-copias
+    local dest_dir=$(dscl . -read "/Users/$user" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')/${COPIES_DIR##*/}
     local dest="$dest_dir/XAMPP-$version-bases-$(date +%Y%m%d-%H%M%S).tar.gz"
 
     echo "Guardando copia de las bases de datos en $dest..."

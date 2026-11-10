@@ -89,7 +89,7 @@ class AppBasesDatos:
 
     def copy_targets(self, db, inst):
         """Versiones a las que se puede copiar la base: las que no comparten las bases con la de
-        origen. Las que ya la tienen también (se sustituye, con copia antes)."""
+        origen. Las que ya la tienen también (se sustituye, con copia antes si se pide)."""
         return [i for i in self.installs() if i["owner"] != inst["owner"]]
 
     def has_db(self, folder, db):
@@ -158,15 +158,17 @@ class AppBasesDatos:
                          "pide la contraseña de administrador." % dst)
         replace = self.has_db(dst, db)
         if replace:
-            notes.append("lampp-%s ya tiene una BBDD %s: se guarda antes una copia suya en "
-                         "~/lvm-copias y después se pone en su lugar la de lampp-%s. Lo que tuviera "
-                         "se pierde (salvo en esa copia)." % (dst, db, inst["folder"]))
+            notes.append("lampp-%s ya tiene una BBDD %s: se pone en su lugar la de lampp-%s. Lo que tuviera "
+                         "se pierde, salvo que guardes antes una copia." % (dst, db, inst["folder"]))
             args.append("--sustituir")
+        extra = copy_check() if replace else None
         if not confirm(self.win, "¿Sustituir %s en lampp-%s?" % (db, dst) if replace else
                        "¿Copiar %s a lampp-%s?" % (db, dst), "",
                        ("Sustituir en lampp-%s" if replace else "Copiar a lampp-%s") % dst, destructive=replace,
-                       steps=notes):
+                       steps=notes, extra=extra):
             return
+        if extra is not None and extra.wanted:
+            args.append("--copia")
         self.run_task("Copiando %s a lampp-%s" % (db, dst), args,
                       done_text="%s copiada a lampp-%s" % (db, dst), auto_close=True)
 
@@ -246,7 +248,7 @@ class AppBasesDatos:
                 hint.set_label("Letras sin acentos, números, _ y - (sin - delante).")
             elif t and self.has_db(t["folder"], name):
                 hint.set_markup('<span foreground="#e01b24">lampp-%s ya tiene una BBDD %s: se '
-                                'sustituye (antes se guarda una copia suya en ~/lvm-copias).</span>'
+                                'sustituye (al confirmar puedes guardar antes una copia suya).</span>'
                                 % (t["folder"], GLib.markup_escape_text(name)))
             else:
                 hint.set_label("Se crea %s en lampp-%s." % (name, t["folder"]) if t else "")
@@ -312,14 +314,16 @@ class AppBasesDatos:
                          "pide la contraseña de administrador." % dst)
         replace = self.has_db(dst, name)
         if replace:
-            notes.append("lampp-%s ya tiene una BBDD %s: se guarda antes una copia suya en "
-                         "~/lvm-copias y se pone en su lugar. Lo que tuviera se pierde (salvo en esa "
-                         "copia)." % (dst, name))
+            notes.append("lampp-%s ya tiene una BBDD %s: se pone en su lugar. Lo que tuviera se pierde, salvo "
+                         "que guardes antes una copia." % (dst, name))
             args.append("--sustituir")
+        extra = copy_check() if replace else None
         if not confirm(self.win, "¿Replicar en lampp-%s?" % dst, "",
                        ("Sustituir en lampp-%s" if replace else "Replicar en lampp-%s") % dst, destructive=replace,
-                       steps=notes):
+                       steps=notes, extra=extra):
             return
+        if extra is not None and extra.wanted:
+            args.append("--copia")
         self.run_task("Replicando en lampp-%s" % dst, args,
                       done_text="%s replicada en lampp-%s como %s" % (db, dst, name), auto_close=True)
 

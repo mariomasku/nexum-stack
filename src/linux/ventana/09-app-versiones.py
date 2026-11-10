@@ -917,13 +917,11 @@ class AppVersiones:
                             "Las tablas del sistema (mysql.*) son de una MariaDB anterior y el servidor "
                             "escribe un error cada vez que las usa: su registro de errores no para de "
                             "crecer. Repararlas las pone al día con el mysql_upgrade de la versión, sin "
-                            "tocar las BBDD de los proyectos, después de guardar una copia en "
-                            "~/lvm-copias, y vacía el registro si es grande.")
+                            "tocar las BBDD de los proyectos (si quieres, después de guardar una copia en "
+                            "~/nexum-backups), y vacía el registro si es grande.")
             row = ActionRow("MariaDB de lampp-%s" % ver, "Registro de errores: %s" % fmt_size(size))
             b = css(Gtk.Button(label="Repararlas"), "verde")
-            b.connect("clicked", lambda *_: self.run_task(
-                "Reparando las tablas del sistema de MariaDB", ["reparar-bd-sistema"],
-                done_text="Tablas del sistema de MariaDB al día", auto_close=True))
+            b.connect("clicked", lambda *_, v=ver: self.on_repair_dbsys(v))
             row.add_suffix(b)
             lb.add(row)
             self.ver_box.pack_start(box, False, False, 0)
@@ -1215,7 +1213,7 @@ class AppVersiones:
     def on_vhosts(self, *_):
         """Los vhosts son del administrador (Apache los lee como root al arrancar): se edita una
         copia en ~/.lvm-instalador y, al pulsar Aplicar, el script la comprueba, la escribe con sudo
-        (guardando antes la anterior en ~/lvm-copias) y recarga Apache."""
+        (guardando antes la anterior en ~/nexum-backups, si está el ajuste) y recarga Apache."""
         if not self.data:
             return
         path = self.data["vhosts"]
@@ -1238,9 +1236,10 @@ class AppVersiones:
         dlg.format_secondary_text(
             "Los vhosts (%s) son del administrador: Apache los lee como root al arrancar. Se abre "
             "una copia (%s) en el editor de textos.\n\nHaz los cambios, guárdalos y pulsa Aplicar: "
-            "se comprueban, se guarda una copia de los actuales en ~/lvm-copias, se escriben los "
+            "se comprueban, %sse escriben los "
             "nuevos (pide la contraseña de sudo) y se recarga Apache. Si Apache no los acepta, se "
-            "dejan como estaban." % (real, copy))
+            "dejan como estaban." % (real, copy, "se guarda una copia de los actuales en ~/nexum-backups, "
+                                     if os.path.exists(COPIES_FILES_FLAG) else ""))
         widen(dlg)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         css(dlg.add_button("Aplicar", Gtk.ResponseType.ACCEPT), "verde")
@@ -1261,7 +1260,8 @@ class AppVersiones:
 
     def on_hosts(self, *_):
         """/etc/hosts es de root: se edita una copia en ~/.lvm-instalador y, al pulsar Aplicar,
-        el script la escribe encima con sudo (guardando antes el anterior en ~/lvm-copias)."""
+        el script la escribe encima con sudo (guardando antes el anterior en ~/nexum-backups, si está el
+        ajuste)."""
         src = self.data["hosts"] if self.data else "/etc/hosts"
         copy = os.path.join(LOG_DIR, "hosts")
         try:
@@ -1276,8 +1276,9 @@ class AppVersiones:
                                 buttons=Gtk.ButtonsType.NONE, text="Editar hosts")
         dlg.format_secondary_text(
             "%s es del administrador, así que se abre una copia (%s) en el editor de textos.\n\n"
-            "Haz los cambios, guárdalos y pulsa Aplicar: se guarda una copia del %s actual en "
-            "~/lvm-copias y se escribe el nuevo (pide la contraseña de sudo)." % (src, copy, src))
+            "Haz los cambios, guárdalos y pulsa Aplicar: %sse escribe el nuevo (pide la contraseña "
+            "de sudo)." % (src, copy, "se guarda una copia del %s actual en ~/nexum-backups y " % src
+                           if os.path.exists(COPIES_FILES_FLAG) else ""))
         widen(dlg)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
         css(dlg.add_button("Aplicar", Gtk.ResponseType.ACCEPT), "verde")
@@ -1317,11 +1318,13 @@ class AppVersiones:
             if res[0] == "si":
                 self.toast("El paquete lampp-%s se encuentra actualizado" % folder)
             elif res[0] == "no" and len(res) > 1:
+                extra = copy_check(UPDATE_COPY_WARN)
                 if confirm(self.win, "¿Actualizar lampp-%s?" % folder,
                            "PHP %s con los últimos parches de su rama. La actual sigue funcionando "
                            "mientras se compila (varios minutos)." % res[1],
-                           "Actualizar a PHP %s" % res[1]):
-                    self.run_task("Actualizando lampp-%s" % folder, ["actualizar", folder],
+                           "Actualizar a PHP %s" % res[1], extra=extra):
+                    self.run_task("Actualizando lampp-%s" % folder,
+                                  ["actualizar", folder] + (["--copia"] if extra.wanted else []),
                                   progress=True, reload_branches=True,
                                   done_text="lampp-%s actualizada a PHP %s" % (folder, res[1]))
             else:
@@ -1344,11 +1347,11 @@ class AppVersiones:
         text += "Los proyectos de /opt/htdocs y los vhosts no se tocan."
 
         extra = None
-        state = {"copy": bool(dbs)}
+        state = {"copy": False}
         if dbs:
             extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             copy = Gtk.CheckButton(label="Guardar antes una copia de sus BBDD en "
-                                         "~/lvm-copias", active=True)
+                                         "~/nexum-backups", active=False)
             extra.pack_start(copy, False, False, 0)
             warn = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             warn.pack_start(label("Sin copia, las BBDD no se podrán recuperar. "
@@ -1378,6 +1381,7 @@ class AppVersiones:
                 ok.set_sensitive(state["copy"] or entry.get_text().strip() == folder)
             copy.connect("toggled", update)
             entry.connect("changed", update)
+            update()
         dlg.show_all()
         resp = run_dialog(dlg)
         dlg.destroy()
@@ -1387,7 +1391,7 @@ class AppVersiones:
         self.expanded.discard(folder)
         self.run_task("Desinstalando lampp-%s" % folder, args, reload_branches=True,
                       done_text="lampp-%s desinstalada" % folder
-                      + (" (copia en ~/lvm-copias)" if state["copy"] else ""))
+                      + (" (copia en ~/nexum-backups)" if state["copy"] else ""))
 
     def on_register(self, *_):
         entry = Gtk.Entry(placeholder_text="por ejemplo 8.2.12")
@@ -1414,6 +1418,48 @@ class AppVersiones:
             return
         self.run_task("Vaciando la caché de descargas", ["descargas", "vaciar"],
                       done_text="Caché de descargas vacía", auto_close=True)
+
+    def on_repair_dbsys(self, ver):
+        """Repara las tablas del sistema de MariaDB (reparar-bd-sistema), con copia antes si se marca."""
+        extra = copy_check("Sin copia, las tablas del sistema de ahora no se podrán recuperar.")
+        if not confirm(self.win, "¿Reparar las tablas del sistema?",
+                       "Las BBDD de los proyectos no se tocan.", "Repararlas",
+                       steps=["Se ponen al día las tablas del sistema (mysql.*) del MariaDB de lampp-%s con el "
+                              "mysql_upgrade de la versión." % ver,
+                              "Si el registro de errores es grande, se vacía."], extra=extra):
+            return
+        self.run_task("Reparando las tablas del sistema de MariaDB",
+                      ["reparar-bd-sistema"] + (["--copia"] if extra.wanted else []),
+                      done_text="Tablas del sistema de MariaDB al día", auto_close=True)
+
+    def on_clear_copies(self, n, size):
+        """Configuración, Carpetas: borra las copias de seguridad (lo de dentro de ~/nexum-backups, no la
+        carpeta). Alguna copia de root puede pedir la contraseña."""
+        if not confirm(self.win, "¿Borrar las copias de seguridad?",
+                       "Las copias borradas no se pueden recuperar.",
+                       "Borrar las copias", destructive=True,
+                       steps=["Se borra todo lo que hay en ~/nexum-backups: %s (%s). La carpeta se queda, vacía."
+                              % (plural(n, "fichero", "ficheros"), fmt_size(size)),
+                              "Si alguna copia es del administrador, se pide su contraseña para borrarla."]):
+            return
+        self.run_task("Borrando las copias de seguridad", ["copias", "vaciar"],
+                      done_text="Copias de seguridad borradas", auto_close=True,
+                      on_done=lambda *_: self.build_tools())
+
+    def on_copies_files(self, sw, _p):
+        """Configuración, Carpetas: guardar o no una copia de los ficheros que cambia el programa por su cuenta
+        (hosts, vhosts, configuración de los proyectos)."""
+        on = sw.get_active()
+        if on == os.path.exists(COPIES_FILES_FLAG):
+            return
+        task = self.run_task("Encendiendo las copias de los ficheros" if on else "Apagando las copias de los ficheros",
+                             ["copias-ficheros", "si" if on else "no"], auto_close=True,
+                             done_text="Copias de los ficheros que cambia el programa %s"
+                             % ("encendidas" if on else "apagadas"),
+                             on_done=lambda *_: self.build_tools())
+        if task is None:
+            # (otra tarea en marcha: el interruptor vuelve a como está)
+            sw.set_active(not on)
 
     def on_create_launcher(self, *_):
         def done(rc, out):

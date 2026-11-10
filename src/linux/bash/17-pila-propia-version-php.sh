@@ -2712,7 +2712,8 @@ function stack_build_phase() {
 # dentro de /opt/lampp-X.Y. Se instala primero en una carpeta temporal (DESTDIR) y solo al final
 # se copia a /opt, asi que si algo falla no queda nada a medias.
 # Con reemplazar=1 sustituye la version que ya existe en /opt/lampp-X.Y. Si su MariaDB es de la
-# misma rama, conserva sus bases de datos; si no, guarda una copia y empieza con unas vacias.
+# misma rama, conserva sus bases de datos; si no, empieza con unas vacias (con STACK_DB_COPY=1, el
+# --copia de actualizar, antes guarda una copia en ~/nexum-backups).
 function install_stack() {
     local version=$1 replace=${2:-0}
     local FETCH_FRESH=1
@@ -2817,7 +2818,8 @@ function install_stack() {
         if [ "$replace" -eq 1 ] && [ $keep_data -eq 1 ]; then
             echo "  [simulacion] se sustituiria $target conservando sus bases de datos (MariaDB ${mariadb%.*})"
         elif [ "$replace" -eq 1 ]; then
-            echo "  [simulacion] copia de las bases de datos de $target en ~/lvm-copias y bases nuevas y vacias"
+            [ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "  [simulacion] copia de las bases de datos de $target en ~/nexum-backups y bases nuevas y vacias"
+            [ "${STACK_DB_COPY:-0}" -eq 1 ] || echo "  [simulacion] sin copia: bases nuevas y vacias en $target (las anteriores no se podran recuperar)"
         else
             echo "  [simulacion] bases de datos propias y vacias en $target/var/mysql (root sin contraseña)"
         fi
@@ -2913,8 +2915,12 @@ function install_stack() {
         fi
 
         if [ $keep_data -eq 0 ] && [ -d "$target/var/mysql" ] && [ ! -L "$target/var/mysql" ]; then
-            progress 7 97 98 "copia de las bases de datos"
-            backup_databases "$lampp_name" "$target" || { echo "No se pudo guardar la copia de las bases de datos."; stack_fail; }
+            if [ "${STACK_DB_COPY:-0}" -eq 1 ]; then
+                progress 7 97 98 "copia de las bases de datos"
+                backup_databases "$lampp_name" "$target" || { echo "No se pudo guardar la copia de las bases de datos."; stack_fail; }
+            else
+                echo "Sin copia: las bases de datos de ahora no se podran recuperar (con --copia se guardan antes)"
+            fi
         fi
 
         aside=$target.anterior-$(date +%Y%m%d%H%M%S)
@@ -2988,7 +2994,7 @@ function install_stack() {
 
     echo ""
     echo "lampp-$lampp_name instalada en $target"
-    [ "$replace" -eq 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias; la copia de las anteriores esta en ~/lvm-copias"
+    [ "$replace" -eq 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias$([ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "; la copia de las anteriores esta en ~/nexum-backups")"
     [ "$replace" -eq 1 ] && [ $keep_data -eq 1 ] && echo "Conserva sus bases de datos"
     [ $was_running -eq 0 ] && echo "Para usarla: lvm-instalador use $lampp_name"
 

@@ -64,9 +64,11 @@
 #   lvm-instalador instalar --php 7.4,8.4[,8.3.10] [--si]   (una rama: su ultimo parche; X.Y.Z: ese parche)
 #       Instala sin preguntas (--si confirma)
 #
-#   lvm-instalador actualizar <version>
+#   lvm-instalador actualizar <version> [--copia]
 #       Vuelve a compilar una version con la ultima pila de su rama (y, en la 7.4, 8.0 y 8.1, con
 #       el parche de seguridad contra PHP2Shell; tambien XAMPP-7.4.33, XAMPP-8.0.30 y XAMPP-8.1.34)
+#       Si su MariaDB cambia de rama, empieza con BBDD vacias: --copia guarda antes las de ahora
+#       en ~/nexum-backups (sin ella, no se podran recuperar)
 #
 #   lvm-instalador github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
 #   lvm-instalador github-conectar [--gh] | github-desconectar
@@ -84,22 +86,32 @@
 #       copias; su MariaDB se arranca sola en otro puerto si no esta en marcha). docker: vuelve a su
 #       copia en la MariaDB comun de Docker. Al crearlo: docker-nuevo ... --bd <base> --desde <v> --en-vivo
 #
-#   lvm-instalador componentes | componentes-actualizar
+#   lvm-instalador componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
-#       ponerlo todo al dia
+#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
 #
 #   lvm-instalador descargas [vaciar]
 #       La cache de descargas de las pilas propias (/Library/Nexum/descargas): el codigo de cada
 #       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
 #       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
 #
+#   lvm-instalador copias [vaciar]
+#       Las copias de seguridad de ~/nexum-backups (las que pides con --copia o en las casillas
+#       de la ventana): sin nada, cuantos ficheros hay y cuanto ocupan; vaciar, las borra todas
+#       (la carpeta se queda)
+#
+#   lvm-instalador copias-ficheros [si|no]
+#       Copias de los ficheros que el programa cambia por su cuenta (el de hosts, los vhosts, la
+#       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
+#       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
+#
 #   lvm-instalador pasar-version <origen> <destino>
 #       Tras instalar el parche nuevo a su lado: copia a la nueva las BBDD de la anterior, con sus
 #       vinculos, y la activa si la anterior era la activa (la anterior no se toca)
 #
 #   lvm-instalador desinstalar <version> [--copia]
-#       Borra una version (no la activa); --copia guarda antes sus bases en ~/lvm-copias
+#       Borra una version (no la activa); --copia guarda antes sus bases en ~/nexum-backups
 #
 #
 # === XAMPP OFICIAL ===========================================================================
@@ -125,27 +137,28 @@
 #   lvm-instalador crear-bd <base>
 #       Crea una base vacia (utf8mb4_general_ci)
 #
-#   lvm-instalador importar-bd <fichero> <base> [--crear] [--sin-copia] [--proyecto <carpeta>]
+#   lvm-instalador importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
 #       Carga un .sql, .sql.gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
-#       borran todas sus tablas (con una copia en ~/lvm-copias si tenia alguna; --sin-copia, sin
-#       ella); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
+#       borran todas sus tablas (con --copia, antes se guarda una copia en ~/nexum-backups si tenia
+#       alguna; sin ella, no se podran recuperar); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
 #       con la plantilla; PrestaShop, su parameters.php pasa a usarla
 #
 #   lvm-instalador exportar-bd <base> <fichero.zip|.sql|.sql.gz> [version]
 #       Descarga una copia de una base (sin version, de la activa)
 #
-#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]
+#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]
 #       Copia una BBDD a otra version (para probar el proyecto con otro PHP); la de origen no se
 #       toca. --como: nombre de la copia en la de destino (sin el, el mismo). --carpeta: carpeta
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
-#       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
+#       tiene una con ese nombre, solo con --sustituir (y con --copia, antes guarda una copia suya
+#       en ~/nexum-backups)
 #
 #   lvm-instalador vincular-bd <base> <version> <carpeta|->
 #       La carpeta de htdocs del proyecto de esa BBDD en esa version (Cargar proyecto la carga
 #       con ella). Con -, la BBDD deja de estar vinculada a ninguna carpeta en esa version
 #
 #   lvm-instalador borrar-bd <base> [--copia]
-#       Borra una base; --copia guarda antes una copia en ~/lvm-copias
+#       Borra una base; --copia guarda antes una copia en ~/nexum-backups
 #
 #
 # === PROYECTOS Y DOMINIOS ====================================================================
@@ -185,9 +198,10 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version activa (si no existe)
 #
-#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]
-#       El proyecto con lo de produccion: git pull (si se pide), su codigo (lo sustituido, en ~/lvm-copias),
-#       su BBDD (con la carga protegida de importar-bd) y lo vuelve a cargar
+#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
+#       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
+#       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
+#       y la BBDD de antes, en ~/nexum-backups
 #   lvm-instalador hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1 y ::1) o deja de falsear el dominio de un vhost. Un .local se mantiene
 #       siempre en /etc/hosts salvo que se apague aqui (no): se recuerda en
@@ -206,7 +220,8 @@
 #
 #   lvm-instalador vhosts
 #       Edita una copia de XAMPP-compartido/httpd-vhosts.conf y la aplica con sudo: se
-#       comprueba antes, se guarda el anterior en ~/lvm-copias y se recarga Apache
+#       comprueba antes, se guarda el anterior en ~/nexum-backups (con copias-ficheros si) y
+#       se recarga Apache
 #
 #   lvm-instalador hosts
 #       Edita /etc/hosts (con sudo -e)
@@ -269,14 +284,15 @@
 #
 #   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]
 #   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
-#   lvm-instalador docker-pasar <nombre>
+#   lvm-instalador docker-pasar <nombre> [--copia]
 #   lvm-instalador docker-parar-todo
 #   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.40): no necesitan XAMPP-X y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
 #       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
 #       Su BBDD va en una MariaDB comun por version y phpMyAdmin en https://pma.docker.local.
-#       docker-pasar lleva al Apache de Docker un proyecto de antes (con XAMPP-X delante). docker-web:
+#       docker-pasar lleva al Apache de Docker un proyecto de antes (con XAMPP-X delante; --copia: y
+#       guarda su BBDD en ~/nexum-backups). docker-web:
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y dar de alta esa direccion en este Mac. dns
 #       activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test y dejan de ir en
 #       /etc/hosts; web.local y lo demas, igual)

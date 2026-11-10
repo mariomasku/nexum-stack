@@ -253,7 +253,8 @@ function sudo_user_git_email() {
 
 # Comprueba que el dominio tiene vhost http y https apuntando a la carpeta y certificado. Lo que
 # falte se crea como en el manual: certificado <dominio>-selfsigned en /etc/ssl y bloques al final
-# de VHOSTS_FILE (se guarda copia en ~/lvm-copias). Deja PS_RELOAD=1 si ha cambiado algo.
+# de VHOSTS_FILE (con copia en ~/nexum-backups si esta el ajuste copias-ficheros). Deja PS_RELOAD=1
+# si ha cambiado algo.
 function ps_vhost() {
     local folder=$1 domain=$2 alias info http https crt key other s="" block=""
     # El dominio va en el vhost, en /etc/hosts y en el nombre del certificado: solo uno valido
@@ -313,9 +314,9 @@ $block"
     echo "Añadiendo el vhost de $domain ($([ -z "$http" ] && echo -n "http ")$([ -z "$https" ] && echo -n "https")) a $VHOSTS_FILE..."
     s=""
     [ -w "$VHOSTS_FILE" ] || s=sudo
-    if [ -f "$VHOSTS_FILE" ]; then
-        run mkdir -p -m 700 "$HOME/lvm-copias"
-        run cp "$VHOSTS_FILE" "$HOME/lvm-copias/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
+    if [ -f "$VHOSTS_FILE" ] && [ -f "$COPIES_FILES_FLAG" ]; then
+        run mkdir -p -m 700 "$COPIES_DIR"
+        run cp "$VHOSTS_FILE" "$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
     fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] añadir a $VHOSTS_FILE:$block"
@@ -330,7 +331,8 @@ $block"
 # falsear el resto de dominios de los vhosts. Modo si/no: solo falsea o deja de falsear uno.
 # Solo toca lineas 127.0.0.1 cuyos nombres sean todos dominios de vhosts de proyectos (nunca
 # localhost, web.local ni el nombre del equipo): las comenta o les quita el # (y añade la linea
-# si no existia). Se escribe con edit_hosts --aplicar (copia del anterior en ~/lvm-copias).
+# si no existia). Se escribe con edit_hosts --aplicar (copia del anterior en ~/nexum-backups si esta
+# el ajuste copias-ficheros).
 function hosts_fake() {
     local mode=$1 copy rc
     shift
@@ -441,7 +443,7 @@ EOF
 
 # hosts-enlace: el vhost de los proyectos (web.local) pasa a 127.0.0.1 en hosts, que es donde escucha
 # Apache. Se quita de las lineas que lo llevaban a otra direccion (la del nombre del equipo se queda
-# con sus otros nombres) y se añade su linea. Con copia del anterior en ~/lvm-copias (edit_hosts)
+# con sus otros nombres) y se añade su linea. Con copia del anterior en ~/nexum-backups (edit_hosts, si esta el ajuste)
 function hosts_fix_link() {
     local link copy
     link=$(project_link)

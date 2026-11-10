@@ -105,7 +105,7 @@ class NvActualizarProyecto:
         known_db = self.loaded_project_db() or ""
         db_entry = Gtk.Entry(text=known_db, width_chars=28, max_length=64)
         line.pack_start(label(known_db, "nv-bbdd", selectable=True) if known_db else db_entry, False, False, 0)
-        db_copy = label("(antes se guarda una copia de la actual)", "dim-label")
+        db_copy = label("(al confirmar, puedes guardar antes una copia de la actual)", "dim-label")
         line.pack_start(db_copy, False, False, 0)
         box.pack_start(line, False, False, 0)
         zone, _put = self.nv_drop_zone("Código de producción", ".zip, .tar.gz o carpeta", "folder-symbolic",
@@ -117,8 +117,9 @@ class NvActualizarProyecto:
         modes = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         modes.pack_start(merge, False, False, 0)
         modes.pack_start(over, False, False, 0)
-        modes.pack_start(label("Se escribe sobre %s/%s. Su .git no se toca y lo sustituido o borrado queda en "
-                               "~/lvm-copias." % (HTDOCS, folder), "aviso-rojo", wrap=True), False, False, 0)
+        modes.pack_start(label("Se escribe sobre %s/%s. Su .git no se toca; lo sustituido o borrado solo se puede "
+                               "recuperar si al confirmar guardas antes una copia en ~/nexum-backups." % (HTDOCS, folder),
+                               "aviso-rojo", wrap=True), False, False, 0)
         box.pack_start(modes, False, False, 0)
         dlg.get_content_area().add(box)
         dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
@@ -146,8 +147,8 @@ class NvActualizarProyecto:
 
     def nv_update_project_ask(self, folder, sql, db, code, mode):
         """Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido."""
-        def start(pull):
-            args = ["actualizar-proyecto", folder]
+        def start(pull, backup):
+            args = ["actualizar-proyecto", folder] + (["--copia"] if backup else [])
             if code:
                 args += ["--codigo", code, "--modo", mode] + (["--pull"] if pull else [])
             if sql:
@@ -160,8 +161,9 @@ class NvActualizarProyecto:
                 self.run_task("Actualizando %s" % folder, args, progress=True, env=self.db_env(),
                               done_text="%s actualizado" % folder,
                               cancel_text=("¿Cancelar la actualización?",
-                                           "El proyecto se queda a medias, con lo hecho hasta ahora. Lo sustituido "
-                                           "sigue en ~/lvm-copias.", "Cancelar la actualización"))
+                                           "El proyecto se queda a medias, con lo hecho hasta ahora."
+                                           + (" Lo sustituido sigue en ~/nexum-backups." if backup else ""),
+                                           "Cancelar la actualización"))
             if sql:
                 self.check_db_access(run)
             else:
@@ -173,14 +175,15 @@ class NvActualizarProyecto:
                          "Se sobrescribe la carpeta con «%s» en %s/%s: se borra lo que no traiga.")
                         % (os.path.basename(code), HTDOCS, folder))
         if sql:
-            what.append("La BBDD %s se vacía y se carga «%s» (antes se guarda una copia)." % (db, os.path.basename(sql)))
+            what.append("La BBDD %s se vacía y se carga «%s»." % (db, os.path.basename(sql)))
 
         def got(_rc, out):
             f = next((x for x in parse_lines(out) if x[0] == "G" and len(x) >= 6), None)
             is_git = bool(code) and f is not None and f[1] == "1"
+            extra = copy_check()
             if not is_git:
-                if confirm(self.win, "¿Actualizar %s?" % folder, "", "Actualizar", steps=what):
-                    start(False)
+                if confirm(self.win, "¿Actualizar %s?" % folder, "", "Actualizar", steps=what, extra=extra):
+                    start(False, extra.wanted)
                 return False
             dirty, ahead = int(f[3] or 0), int(f[4] or 0)
             state = ["Rama %s" % (f[2] or "sin rama (HEAD suelto)")]
@@ -190,13 +193,15 @@ class NvActualizarProyecto:
                 state.append("%s sin subir" % plural(ahead, "commit", "commits"))
             text = ["  ·  ".join(state)]
             if dirty or ahead:
-                text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.")
+                text.append("Revisa antes lo que estás trabajando: lo sustituido no queda en git (solo en la copia, "
+                            "si la guardas).")
             has_pull = f[5] == "1" and bool(f[2])
             text.append("Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para "
                         "sin tocar nada." if has_pull else "No se puede hacer pull: no tiene origin o no está en una rama.")
             dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
                                     buttons=Gtk.ButtonsType.NONE, text="¿Hacer git pull antes de copiar?")
             dlg.get_message_area().pack_start(steps_box(what, "\n\n".join(text)), False, False, 0)
+            dlg.get_message_area().pack_start(extra, False, False, 0)
             dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
             dlg.add_button("Copiar sin pull", Gtk.ResponseType.NO)
             if has_pull:
@@ -205,7 +210,7 @@ class NvActualizarProyecto:
             resp = run_dialog(dlg)
             dlg.destroy()
             if resp in (Gtk.ResponseType.YES, Gtk.ResponseType.NO):
-                start(resp == Gtk.ResponseType.YES)
+                start(resp == Gtk.ResponseType.YES, extra.wanted)
             return False
         run_quick(["gui-proyecto-git", folder], got)
 
@@ -342,7 +347,7 @@ class NvActualizarProyecto:
 
     def nv_delete_project(self, x):
         """Borra el proyecto entero (borrar-proyecto): su carpeta, sus vhosts y dominios, lo de Docker y,
-        si se marca, su BBDD de la versión activa (la de phpMyAdmin), con copia por defecto. Hay que
+        si se marca, su BBDD de la versión activa (la de phpMyAdmin), con copia si se marca. Hay que
         escribir el nombre de la carpeta para confirmar: la carpeta no se puede recuperar."""
         name = x["name"]
         active = self.data["active"] if self.data else None
@@ -362,10 +367,14 @@ class NvActualizarProyecto:
         drop = copy = None
         if db:
             drop = Gtk.CheckButton(label="Borrar también su BBDD «%s» (lampp-%s, la de phpMyAdmin)" % (db, active))
-            copy = Gtk.CheckButton(label="Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)",
-                                   active=True, margin_start=24)
+            copy = Gtk.CheckButton(label="Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)",
+                                   active=False, margin_start=24)
+            no_copy = label("Sin copia, la BBDD no se podrá recuperar.", "error", wrap=True, max_width_chars=50,
+                            margin_start=24)
+            no_copy.set_no_show_all(True)
             extra.pack_start(drop, False, False, 0)
             extra.pack_start(copy, False, False, 0)
+            extra.pack_start(no_copy, False, False, 0)
         extra.pack_start(label("Escribe %s para confirmar:" % name, "error", wrap=True, max_width_chars=50),
                          False, False, 0)
         entry = Gtk.Entry(activates_default=False)
@@ -375,10 +384,12 @@ class NvActualizarProyecto:
         def update(*_):
             if copy is not None:
                 copy.set_sensitive(drop.get_active())
+                no_copy.set_visible(drop.get_active() and not copy.get_active())
             ok.set_sensitive(entry.get_text().strip() == name)
         entry.connect("changed", update)
         if drop is not None:
             drop.connect("toggled", update)
+            copy.connect("toggled", update)
         dlg.show_all()
         update()
         resp = run_dialog(dlg)
@@ -391,7 +402,7 @@ class NvActualizarProyecto:
         if with_db:
             args += ["--bd", db] + (["--copia"] if with_copy else [])
         done = "Proyecto «%s» borrado" % name + (" con su BBDD" if with_db else "") \
-            + (" (copia en ~/lvm-copias)" if with_db and with_copy else "")
+            + (" (copia en ~/nexum-backups)" if with_db and with_copy else "")
 
         def go(*_):
             self.run_task("Borrando el proyecto %s" % name, args, env=self.db_env() if with_db else None,

@@ -55,8 +55,15 @@ extension AppModel {
                 doneText: "Todas las versiones son solo para este Mac", autoClose: true)
     }
 
+    /// Repara las tablas del sistema de MariaDB (reparar-bd-sistema), con copia antes si se marca
     func repairDbSystem() {
-        runTask("Reparando las tablas del sistema de MariaDB", ["reparar-bd-sistema"],
+        let ver = data?.dbsysVersion ?? ""
+        let c = confirmCopy("¿Reparar las tablas del sistema?", "Las BBDD de los proyectos no se tocan.", "Repararlas",
+                            steps: ["Se ponen al día las tablas del sistema (mysql.*) del MariaDB de XAMPP-\(ver) con el mariadb-upgrade de la versión.",
+                                    "Si el registro de errores es grande, se vacía."],
+                            warning: "Sin copia, las tablas del sistema de ahora no se podrán recuperar.")
+        if !c.ok { return }
+        runTask("Reparando las tablas del sistema de MariaDB", ["reparar-bd-sistema"] + (c.copy ? ["--copia"] : []),
                 doneText: "Tablas del sistema de MariaDB al día", autoClose: true)
     }
 

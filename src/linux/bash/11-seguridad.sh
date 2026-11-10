@@ -6,7 +6,8 @@
 # trae el usuario daemon con la contraseña xampp). Se dejan solo para este equipo (127.0.0.1 y
 # ::1), el FTP deja de arrancar con la version (se activa en la pestaña Servicios cuando haga
 # falta, por ejemplo para que WordPress instale plugins) y los vhosts vuelven a ser de root. Como
-# con User/Group, solo se cambia lo que falta; lo anterior queda en ~/lvm-copias.
+# con User/Group, solo se cambia lo que falta; lo anterior queda en ~/nexum-backups
+# si esta el ajuste copias-ficheros.
 SECURE_MARK=etc/lvm-seguridad
 
 # Mitigaciones de PHP2Shell (CVE-2026-109618 y CVE-2026-109619) en el PHP de todas las pilas, tambien

@@ -21,6 +21,16 @@ let SIMULATE = ProcessInfo.processInfo.environment["LVM_SIMULAR"] == "1"
 let RUN_TOKEN = UUID().uuidString.replacingOccurrences(of: "-", with: "")
 let SUDO_MARK = "@@LVM-SUDO-\(RUN_TOKEN)@@"
 let LOG_DIR = NSHomeDirectory() + "/.lvm-instalador"
+/// Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
+/// programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
+let COPIES_DIR = NSHomeDirectory() + "/nexum-backups"
+let COPIES_FILES_FLAG = LOG_DIR + "/copias-ficheros"
+/// La casilla de los diálogos que pueden guardar antes una copia (desmarcada de partida: marcada, --copia) y
+/// el aviso en rojo que sale debajo mientras está desmarcada
+let COPY_CHECKBOX = "Guardar antes una copia en ~/nexum-backups"
+let COPY_WARNING = "Sin copia, lo que se sustituya no se podrá recuperar."
+/// (al actualizar una versión en su carpeta: solo hace falta si MariaDB cambia de rama)
+let UPDATE_COPY_WARNING = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 /// Apartados de la ventana que se han plegado (uno por línea): siguen plegados al volver a abrirla
 let FOLDED_FILE = LOG_DIR + "/ventana-plegados"
 let GREEN = Color(red: 0x45 / 255.0, green: 0xA5 / 255.0, blue: 0x7C / 255.0)

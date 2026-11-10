@@ -71,15 +71,33 @@ class AppAcerca:
         run_quick(["novedades"], show)
 
     # ----------------------------------------- capturas (solo para revisar la ventana)
-    def capture(self, widget, name):
+    def capture(self, widget, name, last=True):
         import cairo
+        # (como en primer plano aunque haya otra ventana delante: en segundo plano, GTK pinta la selección casi
+        # invisible y una sombra más suave, y el recorte por el borde falla)
+        def front(w):
+            w.unset_state_flags(Gtk.StateFlags.BACKDROP)
+            if isinstance(w, Gtk.Container):
+                for c in w.get_children():
+                    front(c)
+        front(widget)
         widget.check_resize()
         w, h = widget.get_allocated_width(), widget.get_allocated_height()
         surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
         cr = cairo.Context(surf)
         Gtk.render_background(widget.get_style_context(), cr, 0, 0, w, h)
         widget.draw(cr)
+        surf.flush()
+        # (de un solo color: aún no se ha dibujado; mejor otro intento, salvo que sea el último)
+        data = bytes(surf.get_data())
+        if not last and len(set(data[i:i + 4] for i in range(0, len(data), 4 * 997))) <= 2:
+            return False
+        # (y la misma que la anterior: si aún cambia, la página se estaba rehaciendo)
+        prev, self._capture_prev = getattr(self, "_capture_prev", None), (name, data)
+        if not last and prev != (name, data):
+            return False
         surf.write_to_png(os.path.join(os.environ["LVM_CAPTURA"], name + ".png"))
+        return True
 
     def capture_all(self):
         steps = [(lambda: None, "1-versiones"), (lambda: self.show_tab("bbdd"), "3-bbdd"),

@@ -99,7 +99,7 @@ class NvBasesDatos:
         head.pack_start(symbol("document-send-symbolic", 16), False, False, 0)
         head.pack_start(label("Subir o actualizar una BBDD", "nv-hundido-titulo"), False, False, 0)
         head.pack_start(info_icon("Carga una copia .sql, .sql.gz o .zip en el MariaDB de la versión activa. Antes se "
-                                  "borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para "
+                                  "borran todas las tablas de la BBDD de destino (si quieres, con una copia en ~/nexum-backups), para "
                                   "que no quede nada de lo anterior. Los .zip se descomprimen solos."), False, False, 0)
         if act:
             head.pack_start(label("en lampp-%s · MariaDB %s" % (act["folder"], act["mariadb"]), "nv-chico", "nv-tenue",

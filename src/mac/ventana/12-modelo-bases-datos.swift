@@ -83,7 +83,7 @@ extension AppModel {
             let r = runDialog(title: "¿Borrar la BBDD «\(db)»?",
                               text: "Está en XAMPP-\(folder) y tiene \(plural(tables, "tabla", "tablas")) (\(fmtSize(size))). Se borra todo su contenido y no se puede deshacer.",
                               okLabel: "Borrar la BBDD", style: .critical, destructive: true,
-                              checkbox: "Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)", checked: true,
+                              checkbox: "Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)", checked: false,
                               hasField: true,
                               fieldLabel: "Sin copia, el contenido no se podrá recuperar. Escribe \(db) para confirmar:",
                               validate: { checked, typed in (checked || typed.trimmingCharacters(in: .whitespaces) == db, nil, false) })
@@ -95,7 +95,7 @@ extension AppModel {
                         "Borrar la BBDD", destructive: true) { return }
         }
         runTask("Borrando la BBDD \(db)", ["borrar-bd", db] + (copy ? ["--copia"] : []),
-                doneText: "BBDD «\(db)» borrada" + (copy ? " (copia en ~/lvm-copias)" : ""),
+                doneText: "BBDD «\(db)» borrada" + (copy ? " (copia en ~/nexum-backups)" : ""),
                 autoClose: true, env: dbEnv()) { ok, _, _ in
             if ok && self.impDb == db {
                 self.impDb = nil
@@ -212,16 +212,17 @@ extension AppModel {
             return
         }
         let name = (path as NSString).lastPathComponent
-        var text = "Se carga en XAMPP-\(d.active). Antes se BORRAN todas las tablas de «\(db)» (si tiene alguna, con una copia en ~/lvm-copias)."
+        var text = "Se carga en XAMPP-\(d.active). Antes se BORRAN todas las tablas de «\(db)», para que no quede nada de lo anterior."
         let project = impProject
         if let p = project {
             text += "\n\nDespués, «\(db)» pasa a ser la BBDD de \(p)" + (projectConfigText(p).map { ": \($0)" } ?? "") + "."
         }
-        if !confirm("¿Cargar \(name) (\(fmtSize(size.int64Value))) en \(db)?", text,
-                    "Vaciar y cargar", destructive: true) { return }
+        let c = confirmCopy("¿Cargar \(name) (\(fmtSize(size.int64Value))) en \(db)?", text,
+                            "Vaciar y cargar", destructive: true)
+        if !c.ok { return }
         checkDbAccess {
             self.runTask("Cargando \(name) en \(db)",
-                         ["importar-bd", path, db] + (project.map { ["--proyecto", $0] } ?? []),
+                         ["importar-bd", path, db] + (project.map { ["--proyecto", $0] } ?? []) + (c.copy ? ["--copia"] : []),
                          progress: true, doneText: "BBDD «\(db)» cargada" + (project.map { " en \($0)" } ?? ""),
                          env: self.dbEnv(),
                          cancelText: ("¿Cancelar la carga?",

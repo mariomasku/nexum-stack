@@ -55,8 +55,8 @@ class AppSubirBajarBD:
             self.imp.update(db=None, folder=act["folder"])
         box, lb = group("Subir o actualizar una BBDD",
                         "Carga una copia .sql, .sql.gz o .zip en el MariaDB de la versión activa%s. "
-                        "Antes se borran todas las tablas de la BBDD de destino (con una copia en "
-                        "~/lvm-copias), para que no quede nada de lo anterior. Los .zip se "
+                        "Antes se borran todas las tablas de la BBDD de destino (si quieres, con una copia "
+                        "en ~/nexum-backups), para que no quede nada de lo anterior. Los .zip se "
                         "descomprimen solos."
                         % (", lampp-%s (MariaDB %s)" % (act["folder"], act["mariadb"])
                            if act else ""))
@@ -231,15 +231,16 @@ class AppSubirBajarBD:
                     + "Fichero: %s (%s).\n\n" % (os.path.basename(path), size))
             ok_label = "Cargar también en lampp-%s" % folder
         text += ("Antes se BORRAN todas las tablas de «%s», para que no quede nada de lo "
-                 "anterior. Si tiene alguna, primero se guarda una copia en ~/lvm-copias." % db)
+                 "anterior." % db)
         project = self.imp.get("project")
         if project:
             what = PROJECT_CONFIG_TEXT.get(project_kind(project))
             text += "\n\nDespués, «%s» pasa a ser la BBDD de %s%s." % (
                 db, project, ": " + what if what else "")
-        if not confirm(self.win, title, text, ok_label, destructive=True):
+        extra = copy_check()
+        if not confirm(self.win, title, text, ok_label, destructive=True, extra=extra):
             return
-        self.check_db_access(lambda pwd: self.start_import(path, db, pwd, project))
+        self.check_db_access(lambda pwd: self.start_import(path, db, pwd, project, extra.wanted))
 
     # crear y borrar bases de datos (siempre en la version activa)
     def db_env(self):
@@ -330,7 +331,7 @@ class AppSubirBajarBD:
                                 message_type=Gtk.MessageType.WARNING,
                                 buttons=Gtk.ButtonsType.NONE,
                                 text="¿Borrar la BBDD «%s»?" % db)
-        state = {"copy": tables > 0}
+        state = {"copy": False}
         if tables:
             dlg.format_secondary_markup(
                 "En lampp-%s, con <b>%s</b> (%s). <b>No se puede deshacer.</b>"
@@ -342,8 +343,8 @@ class AppSubirBajarBD:
         dlg.set_default_response(Gtk.ResponseType.CANCEL)
         if tables:
             extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            copy = Gtk.CheckButton(label="Guardar antes una copia en ~/lvm-copias "
-                                         "(se puede volver a cargar)", active=True)
+            copy = Gtk.CheckButton(label="Guardar antes una copia en ~/nexum-backups "
+                                         "(se puede volver a cargar)", active=False)
             extra.pack_start(copy, False, False, 0)
             warn = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             warn.pack_start(label("Sin copia, el contenido no se podrá recuperar. "
@@ -376,7 +377,7 @@ class AppSubirBajarBD:
                       ["borrar-bd", db] + (["--copia"] if state["copy"] else []),
                       env=self.db_env(), on_done=done, auto_close=True,
                       done_text="BBDD «%s» borrada" % db
-                      + (" (copia en ~/lvm-copias)" if state["copy"] else ""))
+                      + (" (copia en ~/nexum-backups)" if state["copy"] else ""))
 
     def check_db_access(self, then, retry=False):
         """Comprueba que se puede entrar en el MariaDB activo; si root tiene contraseña la pide."""
@@ -424,8 +425,9 @@ class AppSubirBajarBD:
         dlg.destroy()
         return pwd if resp == Gtk.ResponseType.OK else None
 
-    def start_import(self, path, db, pwd, project=None):
-        args = ["importar-bd", path, db] + (["--proyecto", project] if project else [])
+    def start_import(self, path, db, pwd, project=None, backup=False):
+        args = ["importar-bd", path, db] + (["--proyecto", project] if project else []) + \
+            (["--copia"] if backup else [])
 
         def done(ok, _task, _p):
             if ok:

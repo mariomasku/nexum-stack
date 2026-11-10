@@ -130,7 +130,7 @@ function panel_set_aside() {
     local text="Hay un XAMPP oficial en $LINK.\n\n"
     text+="Este gestor necesita que $LINK sea un enlace a la version activa. Sin borrar nada:\n"
     text+="  1. Se para (si algo sigue en marcha, no se mueve nada).\n"
-    text+="  2. Se copian todas sus bases de datos (.zip) en ~/lvm-copias/XAMPP-oficial-<fecha>.\n"
+    text+="  2. Se copian todas sus bases de datos (.zip) en ~/nexum-backups/XAMPP-oficial-<fecha>.\n"
     text+="  3. Se copian sus proyectos a $COMMON/htdocs y sus vhosts al fichero compartido.\n"
     text+="  4. Se mueve a $APPS_DIR/XAMPP-oficial-<fecha>.\n\n"
     text+="Despues, activa una version y carga sus bases (en la ventana, en Configuración).\n"

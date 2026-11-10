@@ -217,7 +217,9 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|copias-ficheros) ;;
+        # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
+        copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -269,7 +271,7 @@ case "$1" in
     docker-php-añadir) docker_web_add "$2" "$3" ;;
     docker-php-quitar) docker_web_remove "$2" "$3" ;;
     docker-php-elegir) docker_web_switch "$2" "$3" ;;
-    docker-pasar) docker_pass "$2" ;;
+    docker-pasar) docker_pass "$2" "$3" ;;
     docker-parar-todo) docker_stop_all ;;
     docker-web) shift; docker_web_command "$@" ;;
     tunel) tunnel_status ;;
@@ -331,7 +333,7 @@ case "$1" in
         ;;
     barrera-web|barrera-webs) cross_site_command "$2" ;;
     correo) mail_command "$2" "$3" ;;
-    reparar-bd-sistema) repair_db_system ;;
+    reparar-bd-sistema) repair_db_system "$2" ;;
     arreglar-certificados) fix_certs ;;
     confiar-certificados) browser_trust "$2" ;;
     actualizar-phpmyadmin) update_pma "$2" ;;
@@ -348,7 +350,7 @@ case "$1" in
     hosts|editar-hosts) edit_hosts "$2" "$3" ;;
     add) register_lampp "$2" ;;
     add-php) UI=text; install_plan "php:$2" ;;
-    rehacer|actualizar) cli_rebuild "$2" ;;
+    rehacer|actualizar) cli_rebuild "$2" "$3" ;;
     github) shift; github_command "$@" ;;
     github-conectar) github_connect "$2" ;;
     github-desconectar) github_disconnect ;;
@@ -357,13 +359,15 @@ case "$1" in
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     docker-reposo) shift; docker_idle_command "$@" ;;
     componentes) components_check "$2" ;;
-    componentes-actualizar) components_update ;;
-    actualizar-a) upgrade_to "$2" "$3" ;;
+    componentes-actualizar) components_update "$2" ;;
+    actualizar-a) upgrade_to "$2" "$3" "$4" ;;
     descargas) downloads_command "$2" ;;
     add-xampp) ( install_xampp "$2" ) ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;
     novedades) changes_text ;;
+    copias) copies_command "$2" ;;
+    copias-ficheros) copies_files_command "$2" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

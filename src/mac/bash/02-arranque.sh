@@ -431,10 +431,15 @@ LOG_DIR="$HOME/.lvm-instalador"
 [ -d "$HOME/.pvm-instalador" ] && [ ! -e "$LOG_DIR" ] && mv "$HOME/.pvm-instalador" "$LOG_DIR"
 # Solo tuya: lleva registros, copias de los vhosts y configuraciones con contraseñas
 [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] && chmod 700 "$LOG_DIR" 2> /dev/null
-# Las copias (BBDD de clientes, vhosts, /etc/hosts anteriores), igual: solo tuyas, aunque la carpeta
-# ya existiera con otros permisos
-[ -d "$HOME/lvm-copias" ] && [ ! -L "$HOME/lvm-copias" ] && [ -O "$HOME/lvm-copias" ] \
-    && chmod 700 "$HOME/lvm-copias" 2> /dev/null
+# Las copias de seguridad (BBDD de clientes, vhosts, /etc/hosts anteriores): solo las que se piden
+# (--copia) y, las de los ficheros que cambia el programa, si esta el ajuste COPIES_FILES_FLAG
+COPIES_DIR="$HOME/nexum-backups"
+COPIES_FILES_FLAG="$LOG_DIR/copias-ficheros"
+# (actualizar, rehacer y componentes-actualizar con --copia: las BBDD de una version que empieza vacia)
+STACK_DB_COPY=0
+# (hasta la 1.57.6 era ~/lvm-copias: copies_migrate la renombra al arrancar, salvo con --simular)
+# Igual que la de los registros: solo tuya, aunque la carpeta ya existiera con otros permisos
+[ -d "$COPIES_DIR" ] && [ ! -L "$COPIES_DIR" ] && [ -O "$COPIES_DIR" ] && chmod 700 "$COPIES_DIR" 2> /dev/null
 LOG="$LOG_DIR/instalacion-$(date +%Y%m%d-%H%M%S).log"
 PHP_TIMEZONE=${PHP_TIMEZONE:-Europe/Madrid}
 # Va al php.ini de cada pila (y lo lee el maestro de PHP-FPM, que es root): solo un nombre de zona
@@ -1814,7 +1819,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.6"
+APP_VERSION="1.57.7"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de

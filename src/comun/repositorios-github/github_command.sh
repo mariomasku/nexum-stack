@@ -255,7 +255,7 @@ target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
 simulate = simulate == "1"
 SKIP = {".git", "__MACOSX", ".DS_Store"}
 sys.stdout.reconfigure(errors="replace", line_buffering=True)
-counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0}
+counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0, "old": 0}
 errors, seen = [], set()
 
 
@@ -338,8 +338,16 @@ def inner_root(root):
 
 
 def save_old(path, rel):
-    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama)."""
+    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama).
+    Sin carpeta de copias (no se ha pedido --copia), se borra."""
+    counts["old"] += 1
     if simulate:
+        return
+    if not backup:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+        else:
+            os.unlink(path)
         return
     dest = os.path.join(backup, rel)
     os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
@@ -471,8 +479,11 @@ def main():
           % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
-    if os.path.isdir(backup):
+    if backup and os.path.isdir(backup):
         print("Lo que se ha sustituido o quitado esta en %s" % backup)
+    elif not backup and counts["old"]:
+        print("Sin copia: lo sustituido o quitado (%d) no se podra recuperar (con --copia se guarda antes)"
+              % counts["old"])
     if errors:
         print("No se han podido copiar o quitar %d:" % len(errors))
         for line in errors[:15]:
@@ -517,13 +528,15 @@ function project_config_local() {
 }
 
 # actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
-#                     [--bd <fichero>] [--base <base>]
+#                     [--bd <fichero>] [--base <base>] [--copia]
 # El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
 # protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
 # comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
-# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar)
+# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar). Con --copia, lo
+# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no
 function project_update() {
-    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies full ssh_url="" known load_db
+    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies="" full ssh_url="" known load_db
+    local backup=()
     shift
     while [ $# -gt 0 ]; do
         case $1 in
@@ -532,12 +545,13 @@ function project_update() {
             --pull) pull=1 ;;
             --bd) file=$2; shift ;;
             --base) db=$2; shift ;;
+            --copia) backup=(--copia) ;;
             *) folder="" ;;
         esac
         shift
     done
     if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
-        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]"
+        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -589,8 +603,10 @@ function project_update() {
         task_step
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
-        copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
-        [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$HOME/lvm-copias"
+        if [ ${#backup[@]} -gt 0 ]; then
+            copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
+            [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
+        fi
         if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$HOME/.lvm-instalador/temporal" "$DRY"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
@@ -600,7 +616,7 @@ function project_update() {
     if [ -n "$file" ]; then
         task_step
         echo "== BBDD de produccion"
-        import_database "$file" "$db" --crear --proyecto "$folder" || return 1
+        import_database "$file" "$db" --crear --proyecto "$folder" "${backup[@]}" || return 1
     fi
     task_step
     echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"

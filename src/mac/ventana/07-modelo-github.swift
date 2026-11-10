@@ -124,10 +124,11 @@ extension AppModel {
     }
 
     func updateComponents(_ c: ComponentsState) {
-        guard confirm("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
-                      "Actualizar todo", steps: c.items) else { return }
+        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+                            "Actualizar todo", steps: c.items, warning: UPDATE_COPY_WARNING)
+        if !r.ok { return }
         components = nil
-        _ = runTask("Actualizando los componentes", ["componentes-actualizar"], progress: true,
+        _ = runTask("Actualizando los componentes", ["componentes-actualizar"] + (r.copy ? ["--copia"] : []), progress: true,
                     doneText: "Componentes al día", reloadBranches: true) { _, _, _ in self.reloadComponents() }
     }
 

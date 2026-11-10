@@ -64,9 +64,11 @@
 #   lvm-instalador instalar --php 7.4,8.4[,8.3.10] [--si]   (una rama: su ultimo parche; X.Y.Z: ese parche)
 #       Instala sin preguntas (--si confirma)
 #
-#   lvm-instalador actualizar <version>
+#   lvm-instalador actualizar <version> [--copia]
 #       Vuelve a compilar una version con la ultima pila de su rama (y, en la 7.4, 8.0 y 8.1, con
 #       el parche de seguridad contra PHP2Shell; tambien XAMPP-7.4.33, XAMPP-8.0.30 y XAMPP-8.1.34)
+#       Si su MariaDB cambia de rama, empieza con BBDD vacias: --copia guarda antes las de ahora
+#       en ~/nexum-backups (sin ella, no se podran recuperar)
 #
 #   lvm-instalador github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
 #   lvm-instalador github-conectar [--gh] | github-desconectar
@@ -84,22 +86,32 @@
 #       copias; su MariaDB se arranca sola en otro puerto si no esta en marcha). docker: vuelve a su
 #       copia en la MariaDB comun de Docker. Al crearlo: docker-nuevo ... --bd <base> --desde <v> --en-vivo
 #
-#   lvm-instalador componentes | componentes-actualizar
+#   lvm-instalador componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
 #       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
-#       ponerlo todo al dia
+#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
 #
 #   lvm-instalador descargas [vaciar]
 #       La cache de descargas de las pilas propias (/Library/Nexum/descargas): el codigo de cada
 #       componente ya comprobado, para no descargarlo otra vez y para instalar aunque su web no
 #       responda. Sin nada, lo que hay y cuanto ocupa; vaciar, la borra
 #
+#   lvm-instalador copias [vaciar]
+#       Las copias de seguridad de ~/nexum-backups (las que pides con --copia o en las casillas
+#       de la ventana): sin nada, cuantos ficheros hay y cuanto ocupan; vaciar, las borra todas
+#       (la carpeta se queda)
+#
+#   lvm-instalador copias-ficheros [si|no]
+#       Copias de los ficheros que el programa cambia por su cuenta (el de hosts, los vhosts, la
+#       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
+#       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
+#
 #   lvm-instalador pasar-version <origen> <destino>
 #       Tras instalar el parche nuevo a su lado: copia a la nueva las BBDD de la anterior, con sus
 #       vinculos, y la activa si la anterior era la activa (la anterior no se toca)
 #
 #   lvm-instalador desinstalar <version> [--copia]
-#       Borra una version (no la activa); --copia guarda antes sus bases en ~/lvm-copias
+#       Borra una version (no la activa); --copia guarda antes sus bases en ~/nexum-backups
 #
 #
 # === XAMPP OFICIAL ===========================================================================
@@ -125,27 +137,28 @@
 #   lvm-instalador crear-bd <base>
 #       Crea una base vacia (utf8mb4_general_ci)
 #
-#   lvm-instalador importar-bd <fichero> <base> [--crear] [--sin-copia] [--proyecto <carpeta>]
+#   lvm-instalador importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
 #       Carga un .sql, .sql.gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
-#       borran todas sus tablas (con una copia en ~/lvm-copias si tenia alguna; --sin-copia, sin
-#       ella); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
+#       borran todas sus tablas (con --copia, antes se guarda una copia en ~/nexum-backups si tenia
+#       alguna; sin ella, no se podran recuperar); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
 #       con la plantilla; PrestaShop, su parameters.php pasa a usarla
 #
 #   lvm-instalador exportar-bd <base> <fichero.zip|.sql|.sql.gz> [version]
 #       Descarga una copia de una base (sin version, de la activa)
 #
-#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]
+#   lvm-instalador copiar-bd <base> <origen> <destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]
 #       Copia una BBDD a otra version (para probar el proyecto con otro PHP); la de origen no se
 #       toca. --como: nombre de la copia en la de destino (sin el, el mismo). --carpeta: carpeta
 #       del proyecto a la que queda vinculada en la de destino (- = ninguna). Si la de destino ya
-#       tiene una con ese nombre, solo con --sustituir: antes guarda una copia suya en ~/lvm-copias
+#       tiene una con ese nombre, solo con --sustituir (y con --copia, antes guarda una copia suya
+#       en ~/nexum-backups)
 #
 #   lvm-instalador vincular-bd <base> <version> <carpeta|->
 #       La carpeta de htdocs del proyecto de esa BBDD en esa version (Cargar proyecto la carga
 #       con ella). Con -, la BBDD deja de estar vinculada a ninguna carpeta en esa version
 #
 #   lvm-instalador borrar-bd <base> [--copia]
-#       Borra una base; --copia guarda antes una copia en ~/lvm-copias
+#       Borra una base; --copia guarda antes una copia en ~/nexum-backups
 #
 #
 # === PROYECTOS Y DOMINIOS ====================================================================
@@ -185,9 +198,10 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version activa (si no existe)
 #
-#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]
-#       El proyecto con lo de produccion: git pull (si se pide), su codigo (lo sustituido, en ~/lvm-copias),
-#       su BBDD (con la carga protegida de importar-bd) y lo vuelve a cargar
+#   lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
+#       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
+#       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
+#       y la BBDD de antes, en ~/nexum-backups
 #   lvm-instalador hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1 y ::1) o deja de falsear el dominio de un vhost. Un .local se mantiene
 #       siempre en /etc/hosts salvo que se apague aqui (no): se recuerda en
@@ -206,7 +220,8 @@
 #
 #   lvm-instalador vhosts
 #       Edita una copia de XAMPP-compartido/httpd-vhosts.conf y la aplica con sudo: se
-#       comprueba antes, se guarda el anterior en ~/lvm-copias y se recarga Apache
+#       comprueba antes, se guarda el anterior en ~/nexum-backups (con copias-ficheros si) y
+#       se recarga Apache
 #
 #   lvm-instalador hosts
 #       Edita /etc/hosts (con sudo -e)
@@ -269,14 +284,15 @@
 #
 #   lvm-instalador docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> | --volcado <fichero>]
 #   lvm-instalador docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
-#   lvm-instalador docker-pasar <nombre>
+#   lvm-instalador docker-pasar <nombre> [--copia]
 #   lvm-instalador docker-parar-todo
 #   lvm-instalador docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar | dns activar|quitar
 #       Proyectos en Docker con el Apache de Docker (desde la 1.40): no necesitan XAMPP-X y un proyecto
 #       puede ir en varias versiones de PHP a la vez con la misma BBDD (WordPress:
 #       <proyecto>-php83.docker.local; una tienda, <proyecto>.docker.local con la version elegida).
 #       Su BBDD va en una MariaDB comun por version y phpMyAdmin en https://pma.docker.local.
-#       docker-pasar lleva al Apache de Docker un proyecto de antes (con XAMPP-X delante). docker-web:
+#       docker-pasar lleva al Apache de Docker un proyecto de antes (con XAMPP-X delante; --copia: y
+#       guarda su BBDD en ~/nexum-backups). docker-web:
 #       su direccion y sus puertos (127.0.0.2, 80 y 443) y dar de alta esa direccion en este Mac. dns
 #       activar: un DNS para *.docker.test (los dominios de Docker pasan a .docker.test y dejan de ir en
 #       /etc/hosts; web.local y lo demas, igual)
@@ -776,10 +792,15 @@ LOG_DIR="$HOME/.lvm-instalador"
 [ -d "$HOME/.pvm-instalador" ] && [ ! -e "$LOG_DIR" ] && mv "$HOME/.pvm-instalador" "$LOG_DIR"
 # Solo tuya: lleva registros, copias de los vhosts y configuraciones con contraseñas
 [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] && chmod 700 "$LOG_DIR" 2> /dev/null
-# Las copias (BBDD de clientes, vhosts, /etc/hosts anteriores), igual: solo tuyas, aunque la carpeta
-# ya existiera con otros permisos
-[ -d "$HOME/lvm-copias" ] && [ ! -L "$HOME/lvm-copias" ] && [ -O "$HOME/lvm-copias" ] \
-    && chmod 700 "$HOME/lvm-copias" 2> /dev/null
+# Las copias de seguridad (BBDD de clientes, vhosts, /etc/hosts anteriores): solo las que se piden
+# (--copia) y, las de los ficheros que cambia el programa, si esta el ajuste COPIES_FILES_FLAG
+COPIES_DIR="$HOME/nexum-backups"
+COPIES_FILES_FLAG="$LOG_DIR/copias-ficheros"
+# (actualizar, rehacer y componentes-actualizar con --copia: las BBDD de una version que empieza vacia)
+STACK_DB_COPY=0
+# (hasta la 1.57.6 era ~/lvm-copias: copies_migrate la renombra al arrancar, salvo con --simular)
+# Igual que la de los registros: solo tuya, aunque la carpeta ya existiera con otros permisos
+[ -d "$COPIES_DIR" ] && [ ! -L "$COPIES_DIR" ] && [ -O "$COPIES_DIR" ] && chmod 700 "$COPIES_DIR" 2> /dev/null
 LOG="$LOG_DIR/instalacion-$(date +%Y%m%d-%H%M%S).log"
 PHP_TIMEZONE=${PHP_TIMEZONE:-Europe/Madrid}
 # Va al php.ini de cada pila (y lo lee el maestro de PHP-FPM, que es root): solo un nombre de zona
@@ -2159,7 +2180,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.6"
+APP_VERSION="1.57.7"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -2920,7 +2941,8 @@ s#/Applications/(XAMPP-[0-9]+\.[0-9]+(\.[0-9]+)?)/xamppfiles/#/Library/Nexum/\1/
 
 # Abre una copia de los vhosts en el editor ($VISUAL, $EDITOR o nano) y la aplica. Con --aplicar
 # <copia>, la ventana ya la ha editado: se comprueba (vhosts_check y httpd -t), se guarda el
-# anterior en ~/lvm-copias, se escribe con sudo y se recarga Apache si esta en marcha. Si Apache
+# anterior en ~/nexum-backups (si esta el ajuste copias-ficheros), se escribe con sudo y se recarga
+# Apache si esta en marcha. Si Apache
 # no acepta la configuracion nueva, se vuelve a la anterior.
 function edit_vhosts() {
     local mode=$1 copy=${2:-$VHOSTS_COPY} real backup answer
@@ -2982,9 +3004,11 @@ function edit_vhosts() {
         echo "Si de verdad las necesitas, ponlas a mano: sudo -e $real"
         return 1
     fi
-    backup="$HOME/lvm-copias/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p -m 700 "$HOME/lvm-copias" && cp "$real" "$backup" \
-        && echo "Copia de los vhosts anteriores: $backup"
+    if [ -f "$COPIES_FILES_FLAG" ]; then
+        backup="$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p -m 700 "$COPIES_DIR" && cp "$real" "$backup" \
+            && echo "Copia de los vhosts anteriores: $backup"
+    fi
     if ! sudo install -o root -g wheel -m 644 "$snap/nuevo" "$real"; then
         sudo rm -rf "$snap"
         return 1
@@ -3124,8 +3148,8 @@ for name in sorted(os.listdir(src)):
 
 
 # Edita /etc/hosts. Sin argumentos, con sudo -e. Con --aplicar <copia>, la ventana ya ha editado
-# una copia: comprueba que sigue teniendo localhost, guarda el /etc/hosts actual en ~/lvm-copias,
-# escribe la copia encima (con sudo si hace falta; se conservan dueño y permisos) y vacia la cache
+# una copia: comprueba que sigue teniendo localhost, guarda el /etc/hosts actual en ~/nexum-backups
+# (si esta el ajuste copias-ficheros), escribe la copia encima (con sudo si hace falta; se conservan dueño y permisos) y vacia la cache
 # de DNS de macOS
 function edit_hosts() {
     local s=""
@@ -3142,7 +3166,7 @@ function edit_hosts() {
         browser_trust --hosts || true
         return $rc
     fi
-    local copy=$2 backup="$HOME/lvm-copias/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
+    local copy=$2 backup="$COPIES_DIR/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
     # (aparte: en la misma linea, $copy aun seria el de fuera)
     check=$copy
     if [ ! -s "$copy" ]; then
@@ -3205,9 +3229,11 @@ sys.exit(1 if any(c < 32 and c not in (9, 10) or c == 127 for c in d) else 0)' "
         echo "No se cambia $HOSTS_FILE. Si son tuyas, ponlas en la terminal con: lvm-instalador hosts"
         return 1
     fi
-    run mkdir -p -m 700 "$HOME/lvm-copias"
-    run cp "$HOSTS_FILE" "$backup" || return 1
-    echo "Copia del $HOSTS_FILE anterior: $backup"
+    if [ -f "$COPIES_FILES_FLAG" ]; then
+        run mkdir -p -m 700 "$COPIES_DIR"
+        run cp "$HOSTS_FILE" "$backup" || return 1
+        echo "Copia del $HOSTS_FILE anterior: $backup"
+    fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] $s tee $HOSTS_FILE < $copy"
     else
@@ -3887,7 +3913,7 @@ function unload_project_steps() {
 # borrar-proyecto <carpeta> [--bd <base> [--copia]]: borra un proyecto entero. Por orden, y si un paso
 # falla no se sigue (la carpeta, lo ultimo): lo desmonta si es el cargado, lo borra de Docker (sus
 # contenedores y su copia de la BBDD), borra su BBDD de la version activa si se pide (con --copia,
-# antes un volcado en ~/lvm-copias; si la copia falla no se borra nada), quita sus vhosts y las lineas
+# antes un volcado en ~/nexum-backups; si la copia falla no se borra nada), quita sus vhosts y las lineas
 # de sus dominios de /etc/hosts (un dominio real no se queda falseado), lo que el gestor recordaba de
 # el y su carpeta de htdocs. Las BBDD de las otras versiones no se tocan
 function delete_project() {
@@ -4404,7 +4430,7 @@ target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
 simulate = simulate == "1"
 SKIP = {".git", "__MACOSX", ".DS_Store"}
 sys.stdout.reconfigure(errors="replace", line_buffering=True)
-counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0}
+counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0, "old": 0}
 errors, seen = [], set()
 
 
@@ -4487,8 +4513,16 @@ def inner_root(root):
 
 
 def save_old(path, rel):
-    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama)."""
+    """Mueve lo que hay en path a las copias (si no se puede copiar, el error lo recoge quien llama).
+    Sin carpeta de copias (no se ha pedido --copia), se borra."""
+    counts["old"] += 1
     if simulate:
+        return
+    if not backup:
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+        else:
+            os.unlink(path)
         return
     dest = os.path.join(backup, rel)
     os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
@@ -4620,8 +4654,11 @@ def main():
           % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
-    if os.path.isdir(backup):
+    if backup and os.path.isdir(backup):
         print("Lo que se ha sustituido o quitado esta en %s" % backup)
+    elif not backup and counts["old"]:
+        print("Sin copia: lo sustituido o quitado (%d) no se podra recuperar (con --copia se guarda antes)"
+              % counts["old"])
     if errors:
         print("No se han podido copiar o quitar %d:" % len(errors))
         for line in errors[:15]:
@@ -4666,13 +4703,15 @@ function project_config_local() {
 }
 
 # actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
-#                     [--bd <fichero>] [--base <base>]
+#                     [--bd <fichero>] [--base <base>] [--copia]
 # El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
 # protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
 # comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
-# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar)
+# que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar). Con --copia, lo
+# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no
 function project_update() {
-    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies full ssh_url="" known load_db
+    local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies="" full ssh_url="" known load_db
+    local backup=()
     shift
     while [ $# -gt 0 ]; do
         case $1 in
@@ -4681,12 +4720,13 @@ function project_update() {
             --pull) pull=1 ;;
             --bd) file=$2; shift ;;
             --base) db=$2; shift ;;
+            --copia) backup=(--copia) ;;
             *) folder="" ;;
         esac
         shift
     done
     if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
-        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>]"
+        echo "Uso: lvm-instalador actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -4738,8 +4778,10 @@ function project_update() {
         task_step
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
-        copies=$HOME/lvm-copias/$folder-antes-de-actualizar-$stamp
-        [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$HOME/lvm-copias"
+        if [ ${#backup[@]} -gt 0 ]; then
+            copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
+            [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
+        fi
         if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$HOME/.lvm-instalador/temporal" "$DRY"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
@@ -4749,7 +4791,7 @@ function project_update() {
     if [ -n "$file" ]; then
         task_step
         echo "== BBDD de produccion"
-        import_database "$file" "$db" --crear --proyecto "$folder" || return 1
+        import_database "$file" "$db" --crear --proyecto "$folder" "${backup[@]}" || return 1
     fi
     task_step
     echo "== Volviendo a cargar $folder (su configuracion, a la base y al dominio locales)"
@@ -4986,7 +5028,8 @@ function load_project() {
 
 # PrestaShop 1.7+ guarda su configuracion (con la BBDD) en var/cache: si es la de otro sitio (la del
 # contenedor de Docker, db, o la de produccion), la tienda no conecta con su BBDD en LAMPP (error 500).
-# Se aparta (a ~/lvm-copias) la cache cuya BBDD no es la de app/config/parameters.php: se rehace sola
+# Se borra la cache cuya BBDD no es la de app/config/parameters.php (se rehace sola); con el ajuste
+# copias-ficheros, en vez de borrarla se aparta a ~/nexum-backups
 function ps_stale_cache() {
     local root=$HTDOCS_DIR/$1 env
     [ -f "$root/app/config/parameters.php" ] || return 0
@@ -5012,9 +5055,14 @@ EOF
             echo "  [simulacion] se aparta var/cache/$env de $1 (lleva otra BBDD)"
             continue
         fi
-        mkdir -p -m 700 "$HOME/lvm-copias"
-        mv "$root/var/cache/$env" "$HOME/lvm-copias/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
-            && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/lvm-copias, se rehace sola"
+        if [ -f "$COPIES_FILES_FLAG" ]; then
+            mkdir -p -m 700 "$COPIES_DIR"
+            mv "$root/var/cache/$env" "$COPIES_DIR/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
+                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/nexum-backups, se rehace sola"
+        else
+            rm -rf "$root/var/cache/$env" \
+                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): borrada, se rehace sola"
+        fi
     done
     return 0
 }
@@ -5827,7 +5875,8 @@ function server_admin() {
 
 # Comprueba que el dominio tiene vhost http y https apuntando a la carpeta y certificado. Lo que
 # falte se crea como en el manual: certificado <dominio>-selfsigned en XAMPP-compartido/ssl y bloques al final
-# de VHOSTS_FILE (se guarda copia en ~/lvm-copias). Deja PS_RELOAD=1 si ha cambiado algo.
+# de VHOSTS_FILE (con copia en ~/nexum-backups si esta el ajuste copias-ficheros). Deja PS_RELOAD=1
+# si ha cambiado algo.
 function ps_vhost() {
     local folder=$1 domain=$2 alias info http https crt key other s="" block="" openssl=/usr/bin/openssl
     # El dominio va en el vhost, en /etc/hosts y en el nombre del certificado: solo uno valido
@@ -5887,9 +5936,9 @@ $block"
     echo "Añadiendo el vhost de $domain ($([ -z "$http" ] && echo -n "http ")$([ -z "$https" ] && echo -n "https")) a $VHOSTS_FILE..."
     s=""
     [ -w "$VHOSTS_FILE" ] || s=$SUDO
-    if [ -f "$VHOSTS_FILE" ]; then
-        run mkdir -p -m 700 "$HOME/lvm-copias"
-        run cp "$VHOSTS_FILE" "$HOME/lvm-copias/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
+    if [ -f "$VHOSTS_FILE" ] && [ -f "$COPIES_FILES_FLAG" ]; then
+        run mkdir -p -m 700 "$COPIES_DIR"
+        run cp "$VHOSTS_FILE" "$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
     fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] añadir a $VHOSTS_FILE:$block"
@@ -5909,7 +5958,8 @@ $block"
 # falsear el resto de dominios de los vhosts. Modo si/no: solo falsea o deja de falsear uno.
 # Solo toca lineas 127.0.0.1/::1 cuyos nombres sean todos dominios de vhosts de proyectos (nunca
 # localhost, web.local ni el nombre del equipo): las comenta o les quita el # (y añade la linea
-# si no existia). Se escribe con edit_hosts --aplicar (copia del anterior en ~/lvm-copias).
+# si no existia). Se escribe con edit_hosts --aplicar (copia del anterior en ~/nexum-backups si esta
+# el ajuste copias-ficheros).
 function hosts_fake() {
     local mode=$1 copy rc
     shift
@@ -6026,7 +6076,7 @@ EOF
 
 # hosts-enlace: el vhost de los proyectos (web.local) pasa a 127.0.0.1 en hosts, que es donde escucha
 # Apache. Se quita de las lineas que lo llevaban a otra direccion (la del nombre del equipo se queda
-# con sus otros nombres) y se añade su linea. Con copia del anterior en ~/lvm-copias (edit_hosts)
+# con sus otros nombres) y se añade su linea. Con copia del anterior en ~/nexum-backups (edit_hosts, si esta el ajuste)
 function hosts_fix_link() {
     local link copy
     link=$(project_link)
@@ -6767,7 +6817,8 @@ function new_custom_domain() {
 # MariaDB (root sin contraseña) y entraria por FTP en htdocs con la contraseña del Mac, que viaja
 # sin cifrar. Se dejan solo para este Mac (127.0.0.1 y ::1), el FTP deja de arrancar con la version
 # (se activa en la pestaña Servicios cuando haga falta) y los vhosts vuelven a ser de root. Solo
-# se cambia lo que falta; lo anterior queda en ~/lvm-copias.
+# se cambia lo que falta; lo anterior queda en ~/nexum-backups
+# si esta el ajuste copias-ficheros.
 SECURE_MARK=xamppfiles/etc/lvm-seguridad
 
 # Primer vhost del puerto 80: Apache le pasa las peticiones cuyo dominio no tiene ningun vhost. Una web
@@ -8002,9 +8053,10 @@ function secure_version() {
             fi
             continue
         fi
-        # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia)
-        [ -f "$base/$rel" ] && mkdir -p -m 700 "$HOME/lvm-copias" \
-            && cp "$base/$rel" "$HOME/lvm-copias/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
+        # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia; los demas, solo con
+        # el ajuste copias-ficheros)
+        [ -f "$base/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
+            && cp "$base/$rel" "$COPIES_DIR/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
         $SUDO sh -c 'cat "$1" > "$2"' sh "$src" "$base/$rel" || { $SUDO rm -rf "$tmp"; return 2; }
         [[ "$rel" == *.key ]] && $SUDO chmod 600 "$base/$rel"
     done <<< "$list"
@@ -9552,8 +9604,8 @@ function ps_parameters() {
             echo "  [simulacion] $file con la base $db y copia en $saved"
             return 0
         fi
-        [ -f "$file" ] && mkdir -p -m 700 "$HOME/lvm-copias" \
-            && cp "$file" "$HOME/lvm-copias/parameters.php-$folder-$(date +%Y%m%d-%H%M%S)"
+        [ -f "$file" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
+            && cp "$file" "$COPIES_DIR/parameters.php-$folder-$(date +%Y%m%d-%H%M%S)"
         mkdir -p -m 700 "$PS_PARAMS_DIR" || return 1
         python3 -I - "$PS_PARAMS_DIR/.nuevo" "$db" "$prefix" <<'EOF' || { echo "No se ha podido preparar $file"; return 1; }
 import datetime, hashlib, os, secrets, string, sys
@@ -10109,9 +10161,10 @@ function wp_config() {
     fi
 
     mkdir -p -m 700 "$WP_CONFIG_DIR" || return 1
-    if [ -f "$file" ] && ! cmp -s "$file" "$saved"; then
-        mkdir -p -m 700 "$HOME/lvm-copias" && cp "$file" "$HOME/lvm-copias/wp-config.php-$folder-$(date +%Y%m%d-%H%M%S)" \
-            && echo "  El anterior queda en ~/lvm-copias"
+    # (el anterior, en ~/nexum-backups solo con el ajuste copias-ficheros)
+    if [ -f "$file" ] && ! cmp -s "$file" "$saved" && [ -f "$COPIES_FILES_FLAG" ]; then
+        mkdir -p -m 700 "$COPIES_DIR" && cp "$file" "$COPIES_DIR/wp-config.php-$folder-$(date +%Y%m%d-%H%M%S)" \
+            && echo "  El anterior queda en ~/nexum-backups"
     fi
     LVM_WP_CLAVE=${MYSQL_PWD:-} python3 -I - "$src" "$WP_CONFIG_DIR/.nuevo" "$db" "$new_prefix" "$local_db" "$url" <<'EOF' || { echo "No se ha podido preparar el wp-config.php"; return 1; }
 import os, re, secrets, string, sys
@@ -10257,8 +10310,12 @@ function ps_set_db() {
         return 0
     fi
 
-    mkdir -p -m 700 "$PS_PARAMS_DIR" "$HOME/lvm-copias" || return 1
-    cp "$file" "$HOME/lvm-copias/$(basename "$rel")-$folder-$(date +%Y%m%d-%H%M%S)" && echo "  El anterior queda en ~/lvm-copias"
+    mkdir -p -m 700 "$PS_PARAMS_DIR" || return 1
+    # (el anterior, en ~/nexum-backups solo con el ajuste copias-ficheros)
+    if [ -f "$COPIES_FILES_FLAG" ]; then
+        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        cp "$file" "$COPIES_DIR/$(basename "$rel")-$folder-$(date +%Y%m%d-%H%M%S)" && echo "  El anterior queda en ~/nexum-backups"
+    fi
     LVM_PS_CLAVE=${MYSQL_PWD:-} python3 -I - "$file" "$PS_PARAMS_DIR/.nuevo" "$db" "$new_prefix" "$local_db" <<'EOF' || { echo "No se ha podido preparar $rel"; return 1; }
 import os, re, sys
 src, dst, db, prefix, local_db = sys.argv[1:6]
@@ -10594,7 +10651,7 @@ function official_copy_vhosts() {
 
 # Aparta un XAMPP oficial de /Applications/XAMPP para poder usar el enlace, sin borrar nada:
 #   1. lo para y comprueba que no queda nada en marcha (si no, no se mueve nada)
-#   2. copia todas sus bases (.zip) en ~/lvm-copias/XAMPP-oficial-<fecha>
+#   2. copia todas sus bases (.zip) en ~/nexum-backups/XAMPP-oficial-<fecha>
 #   3. copia sus proyectos a XAMPP-compartido/htdocs y sus vhosts al fichero compartido
 #   4. mueve la carpeta a /Applications/XAMPP-oficial-<fecha> (volver-oficial la devuelve)
 function set_aside_official() {
@@ -10602,7 +10659,7 @@ function set_aside_official() {
     local stamp=$(date +%Y%m%d-%H%M%S)
     local aside="$APPS_DIR/XAMPP-oficial-$stamp" user=${SUDO_USER:-$USER} home=$HOME
     [ -n "$SUDO_USER" ] && home=$(dscl . -read "/Users/$SUDO_USER" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')
-    local backup="$home/lvm-copias/XAMPP-oficial-$stamp"
+    local backup="$home/${COPIES_DIR##*/}/XAMPP-oficial-$stamp"
 
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] parar el XAMPP oficial y comprobar que no queda nada en marcha"
@@ -10616,17 +10673,17 @@ function set_aside_official() {
     trap db_cleanup EXIT
     trap 'exit 130' INT TERM HUP
     official_stop || return 1
-    mkdir -p -m 700 "$home/lvm-copias" && mkdir -p "$backup" || return 1
+    mkdir -p -m 700 "$home/${COPIES_DIR##*/}" && mkdir -p "$backup" || return 1
     # Si algo falla, la carpeta de copias queda como incompleta-… (la ventana no la ofrece para cargar)
     local failed="No se ha apartado nada: el XAMPP oficial sigue en $LINK."
-    official_dump_all "$backup" || { mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
+    official_dump_all "$backup" || { mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
     if official_running; then
-        mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"
+        mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"
         echo "El XAMPP oficial se ha vuelto a arrancar: no se mueve nada."
 
         return 1
     fi
-    official_copy_projects || { mv "$backup" "$home/lvm-copias/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
+    official_copy_projects || { mv "$backup" "$home/${COPIES_DIR##*/}/incompleta-XAMPP-oficial-$stamp"; echo "$failed"; return 1; }
     official_copy_vhosts "$backup"
     printf 'carpeta=%s\nfecha=%s\n' "$aside" "$stamp" > "$backup/xampp-oficial.txt"
     # Solo si esto corre como root (con tu usuario, todo lo de la carpeta ya es tuyo), y solo lo que
@@ -10731,7 +10788,7 @@ function remove_blocker() {
 function backup_databases() {
     local version=$1 dir=${2:-$BASE_DIR/XAMPP-$1}
     local user=${SUDO_USER:-$USER}
-    local dest_dir=$(dscl . -read "/Users/$user" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')/lvm-copias
+    local dest_dir=$(dscl . -read "/Users/$user" NFSHomeDirectory 2> /dev/null | awk '{ print $2 }')/${COPIES_DIR##*/}
     local dest="$dest_dir/XAMPP-$version-bases-$(date +%Y%m%d-%H%M%S).tar.gz"
 
     echo "Guardando copia de las bases de datos en $dest..."
@@ -12757,7 +12814,8 @@ function brew_build_deps() {
 # /Applications/XAMPP-X.Y/xamppfiles. Se instala primero en una carpeta temporal (DESTDIR) y solo
 # al final se copia a /Applications, asi que si algo falla no queda nada a medias.
 # Con reemplazar=1 sustituye la version que ya existe. Si su MariaDB es de la misma rama, conserva
-# sus bases de datos; si no, guarda una copia y empieza con unas vacias.
+# sus bases de datos; si no, empieza con unas vacias (con STACK_DB_COPY=1, el --copia de actualizar,
+# antes guarda una copia en ~/nexum-backups).
 function install_stack() {
     local version=$1 replace=${2:-0}
     local FETCH_FRESH=1
@@ -12874,7 +12932,8 @@ function install_stack() {
         if [ "$replace" -ge 1 ] && [ $keep_data -eq 1 ]; then
             echo "  [simulacion] se sustituiria $root conservando sus bases de datos (MariaDB ${mariadb%.*})"
         elif [ "$replace" -ge 1 ]; then
-            echo "  [simulacion] copia de las bases de datos de $root en ~/lvm-copias y bases nuevas y vacias"
+            [ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "  [simulacion] copia de las bases de datos de $root en ~/nexum-backups y bases nuevas y vacias"
+            [ "${STACK_DB_COPY:-0}" -eq 1 ] || echo "  [simulacion] sin copia: bases nuevas y vacias en $root (las anteriores no se podran recuperar)"
         else
             echo "  [simulacion] bases de datos propias y vacias en $target/var/mysql (root sin contraseña)"
         fi
@@ -13109,8 +13168,12 @@ function install_stack() {
         fi
 
         if [ $keep_data -eq 0 ] && [ -d "$target/var/mysql" ] && [ ! -L "$target/var/mysql" ]; then
-            progress 7 97 98 "copia de las bases de datos"
-            backup_databases "$vname" "$root" || { echo "No se pudo guardar la copia de las bases de datos."; stack_fail; }
+            if [ "${STACK_DB_COPY:-0}" -eq 1 ]; then
+                progress 7 97 98 "copia de las bases de datos"
+                backup_databases "$vname" "$root" || { echo "No se pudo guardar la copia de las bases de datos."; stack_fail; }
+            else
+                echo "Sin copia: las bases de datos de ahora no se podran recuperar (con --copia se guardan antes)"
+            fi
         fi
 
         aside=$root.anterior-$(date +%Y%m%d%H%M%S)
@@ -13203,7 +13266,7 @@ function install_stack() {
 
     echo ""
     echo "XAMPP-$vname instalada en $root"
-    [ "$replace" -ge 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias; la copia de las anteriores esta en ~/lvm-copias"
+    [ "$replace" -ge 1 ] && [ $keep_data -eq 0 ] && echo "Empieza con bases de datos vacias$([ "${STACK_DB_COPY:-0}" -eq 1 ] && echo "; la copia de las anteriores esta en ~/nexum-backups")"
     [ "$replace" -ge 1 ] && [ $keep_data -eq 1 ] && echo "Conserva sus bases de datos"
     [ $was_running -eq 0 ] && echo "Para usarla: lvm-instalador use $vname"
 
@@ -13580,7 +13643,7 @@ function panel_set_aside() {
     local text="Hay un XAMPP oficial en $LINK.\n\n"
     text+="Este gestor necesita que $LINK sea un enlace a la version activa. Sin borrar nada:\n"
     text+="  1. Se para (si algo sigue en marcha, no se mueve nada).\n"
-    text+="  2. Se copian todas sus bases de datos (.zip) en ~/lvm-copias/XAMPP-oficial-<fecha>.\n"
+    text+="  2. Se copian todas sus bases de datos (.zip) en ~/nexum-backups/XAMPP-oficial-<fecha>.\n"
     text+="  3. Se copian sus proyectos a $COMMON/htdocs y sus vhosts al fichero compartido.\n"
     text+="  4. Se mueve a $APPS_DIR/XAMPP-oficial-<fecha>.\n\n"
     text+="Despues, activa una version y carga sus bases (en la ventana, en Configuración).\n"
@@ -13915,7 +13978,7 @@ function gui_db_info() {
 }
 
 # borrar-bd <base> [--copia]: elimina la base y todo su contenido. Con --copia guarda antes un
-# volcado en ~/lvm-copias (se puede volver a cargar con importar-bd); si la copia falla, no se borra
+# volcado en ~/nexum-backups (se puede volver a cargar con importar-bd); si la copia falla, no se borra
 function drop_database() {
     local db=$1 backup=0 rc
     [ "$2" == "--copia" ] && backup=1
@@ -13932,12 +13995,12 @@ function drop_database() {
 
     if [ $backup -eq 1 ]; then
         local dump=${LVM_BD_VOLCADO:-$(dirname "$DB_CLIENT")/mysqldump}
-        local dest="$HOME/lvm-copias/XAMPP-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local dest="$COPIES_DIR/XAMPP-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "Guardando copia de $db en $dest..."
         if [ "$DRY" -eq 1 ]; then
             echo "  [simulacion] mysqldump $db | gzip > $dest"
         else
-            mkdir -p -m 700 "$HOME/lvm-copias"
+            mkdir -p -m 700 "$COPIES_DIR"
             if ! ( set -o pipefail; "${DB_SAFE[@]}" "$dump" -uroot --default-character-set=utf8mb4 --single-transaction \
                 --routines --triggers --events "$db" < /dev/null | gzip > "$dest" ); then
                 rm -f "$dest"
@@ -14211,7 +14274,7 @@ function db_temp_stop() {
 }
 
 # copiar-bd <base> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->]
-# [--sustituir]: --como le da otro nombre en la de destino (base_8_4 -> base_8_5) y --carpeta la
+# [--sustituir [--copia]]: --como le da otro nombre en la de destino (base_8_4 -> base_8_5) y --carpeta la
 # vincula alli a esa carpeta de proyecto (- = a ninguna; sin --carpeta, el vinculo no se toca).
 # Copia una base a otra version que no
 # la tiene, para probar el proyecto con otro PHP. Se descarga de la de origen (como exportar-bd) a un
@@ -14221,13 +14284,14 @@ function db_temp_stop() {
 # se toca
 function copy_database() {
     local db=$1 src=$2 dst=$3 sdir ddir tmp rc active
-    local replace=0 load=(--crear) new="" link="" usage=0
+    local replace=0 load=(--crear) new="" link="" usage=0 backup=0
     shift 3 2> /dev/null
-    # --sustituir: si la de destino ya la tiene, antes se guarda una copia suya en ~/lvm-copias y se
-    # carga la de origen encima (la de destino se vacia antes de cargar)
+    # --sustituir: si la de destino ya la tiene, se carga la de origen encima (la de destino se vacia
+    # antes de cargar); con --copia, antes se guarda una copia suya en ~/nexum-backups
     while [ $# -gt 0 ]; do
         case $1 in
             --sustituir) replace=1; shift ;;
+            --copia) backup=1; shift ;;
             --como|--carpeta)
                 [ -n "$2" ] || { usage=1; break; }
                 [ "$1" == --como ] && new=$2 || link=$2
@@ -14236,7 +14300,7 @@ function copy_database() {
         esac
     done
     if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ] || [ $usage -eq 1 ]; then
-        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]"
+        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
         return 1
     fi
     new=${new:-$db}
@@ -14260,9 +14324,8 @@ function copy_database() {
     fi
     if db_names "$ddir" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
-            echo "XAMPP-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
-            # shellcheck disable=SC2088  # (el ~ es un texto que se enseña)
-            echo "~/lvm-copias y se pone la de XAMPP-$src en su lugar; o copiala con otro nombre: --como)"
+            echo "XAMPP-$dst ya tiene una BBDD $new: no se toca (con --sustituir se pone la de XAMPP-$src en"
+            echo "su lugar, y con --copia antes se guarda una copia suya; o copiala con otro nombre: --como)"
             return 1
         fi
         load=(--crear --sin-copia)
@@ -14274,7 +14337,8 @@ function copy_database() {
     [ "$new" != "$db" ] && shown="$db (como $new)"
     echo "Copia de la BBDD $shown: de XAMPP-$src a XAMPP-$dst (XAMPP-$src no se toca)"
     if [ "$DRY" -eq 1 ]; then
-        [ $replace -eq 1 ] && echo "  [simulacion] copia de $new de XAMPP-$dst en ~/lvm-copias (la sustituida)"
+        [ $replace -eq 1 ] && [ $backup -eq 1 ] && echo "  [simulacion] copia de $new de XAMPP-$dst en ~/nexum-backups (la sustituida)"
+        [ $replace -eq 1 ] && [ $backup -eq 0 ] && echo "  [simulacion] sin copia de $new de XAMPP-$dst (la sustituida)"
         echo "  [simulacion] descarga de $db de XAMPP-$src a un fichero temporal en ~/.lvm-instalador"
         if [ "$active" == "$(realpath_f "$ddir")" ] && lampp_running; then
             echo "  [simulacion] carga en el MariaDB en marcha de XAMPP-$dst (importar-bd ${load[*]})"
@@ -14288,11 +14352,14 @@ function copy_database() {
         fi
         return 0
     fi
-    if [ $replace -eq 1 ]; then
-        local backup="$HOME/lvm-copias/XAMPP-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
-        echo "XAMPP-$dst ya tiene $new: antes se guarda una copia suya en $backup"
-        mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-        if ! export_database "$new" "$backup" "$dst"; then
+    if [ $replace -eq 1 ] && [ $backup -eq 0 ]; then
+        echo "XAMPP-$dst ya tiene $new: se sustituye."
+        echo "Sin copia: la que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
+    elif [ $replace -eq 1 ]; then
+        local saved="$COPIES_DIR/XAMPP-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
+        echo "XAMPP-$dst ya tiene $new: antes se guarda una copia suya en $saved"
+        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        if ! export_database "$new" "$saved" "$dst"; then
             echo "No se ha podido guardar la copia de $new de XAMPP-$dst, asi que no se ha cambiado nada."
             return 1
         fi
@@ -14985,13 +15052,13 @@ function export_database() {
     echo "Copia guardada: $dest ($(du -h "$dest" | cut -f1))"
 }
 
-# importar-bd <fichero .sql, .sql.gz o .zip> <base> [--crear] [--sin-copia]: carga el fichero en el
+# importar-bd <fichero .sql, .sql.gz o .zip> <base> [--crear] [--copia]: carga el fichero en el
 # MariaDB de la version activa. --crear crea la base si no existe. Si ya existe, siempre se vacia
 # antes (se borra y se crea de nuevo con su juego de caracteres): asi no quedan tablas que el volcado
 # ya no trae ni filas de una carga anterior que fallo a medias (los volcados de phpMyAdmin no llevan
-# DROP TABLE y sus INSERT se suman a lo que haya). Si tiene tablas, antes se guarda una copia suya en
-# ~/lvm-copias; --sin-copia no la guarda (copiar-bd, que ya la ha guardado). --vaciar se admite, pero
-# ya no hace falta.
+# DROP TABLE y sus INSERT se suman a lo que haya). Si tiene tablas y se pide --copia, antes se guarda
+# una copia suya en ~/nexum-backups (sin --copia, no se guarda y se dice). --sin-copia y --vaciar se
+# admiten, pero ya no hacen falta.
 # Las copias hechas con mariadb-dump moderno empiezan por "/*M!999999\- enable the sandbox mode */",
 # que los clientes de MariaDB anteriores a 10.5.25 no entienden: esa primera linea se quita al
 # vuelo, sin tocar el fichero.
@@ -14999,20 +15066,22 @@ function export_database() {
 # posicion, que se lee con lsof (fd_offset). Con LVM_PROGRESO (o $PROGRESS, en el panel) se escribe
 # una linea S con modo lsof; en una terminal con pv se muestra la barra de pv.
 function import_database() {
-    local file=$1 db=$2 create=0 backup=1 saved="" project="" rc
+    local file=$1 db=$2 create=0 backup=0 told=0 saved="" project="" rc
     shift 2
     while [ $# -gt 0 ]; do
         case "$1" in
             --crear) create=1 ;;
             --vaciar) ;;
-            --sin-copia) backup=0 ;;
+            --copia) backup=1 ;;
+            # (copiar-bd: ya ha guardado la copia, o ya ha dicho que no la hay)
+            --sin-copia) backup=0; told=1 ;;
             --proyecto) project=${2%/}; shift ;;
         esac
         shift
     done
 
     if [ -z "$file" ] || [ -z "$db" ]; then
-        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--sin-copia] [--proyecto <carpeta>]"
+        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
 
         return 1
     fi
@@ -15099,7 +15168,7 @@ function import_database() {
         echo "Creando la base de datos $db..."
         run "${mysql[@]}" -e "CREATE DATABASE \`$db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci" < /dev/null || return 1
     else
-        # (ya existe: se vacia siempre, con copia antes si tiene tablas)
+        # (ya existe: se vacia siempre, con copia antes si tiene tablas y se ha pedido)
         local tables
         tables=$("${mysql[@]}" -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$db'" < /dev/null)
         if ! [[ "$tables" =~ ^[0-9]+$ ]]; then
@@ -15107,14 +15176,14 @@ function import_database() {
             return 1
         fi
         if [ "$tables" -gt 0 ] && [ $backup -eq 1 ]; then
-            saved="$HOME/lvm-copias/XAMPP-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
+            saved="$COPIES_DIR/XAMPP-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
             echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
             echo "Antes se guarda una copia suya en $saved"
             local dump=${LVM_BD_VOLCADO:-$(dirname "$DB_CLIENT")/mysqldump}
             if [ "$DRY" -eq 1 ]; then
                 echo "  [simulacion] mysqldump $db | gzip > $saved"
             else
-                mkdir -p -m 700 "$HOME/lvm-copias"
+                mkdir -p -m 700 "$COPIES_DIR"
                 if ! ( set -o pipefail; "${DB_SAFE[@]}" "$dump" -uroot --default-character-set=utf8mb4 --single-transaction \
                     --routines --triggers --events "$db" < /dev/null | gzip > "$saved" ); then
                     rm -f "$saved"
@@ -15123,6 +15192,10 @@ function import_database() {
                 fi
                 echo "Copia guardada: $saved ($(du -h "$saved" | cut -f1))"
             fi
+        fi
+        if [ "$tables" -gt 0 ] && [ $backup -eq 0 ] && [ $told -eq 0 ]; then
+            echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
+            echo "Sin copia: lo que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
         fi
         echo "Vaciando la base de datos $db..."
         local charset=$("${mysql[@]}" -N -e "SELECT CONCAT(DEFAULT_CHARACTER_SET_NAME, ' COLLATE ', DEFAULT_COLLATION_NAME)
@@ -15450,11 +15523,12 @@ function db_error_log() {
     done | sort -rn | head -1 | cut -d' ' -f2-
 }
 
-# reparar-bd-sistema: pone al dia las tablas del sistema de MariaDB de la version montada (con su
+# reparar-bd-sistema [--copia]: pone al dia las tablas del sistema de MariaDB de la version montada (con su
 # propio mysql_upgrade, solo las del sistema: las bases de los proyectos no se tocan), despues de
-# guardar una copia de la base mysql en ~/lvm-copias, y vacia su registro de errores si es grande
+# guardar (con --copia) una copia de la base mysql en ~/nexum-backups, y vacia su registro de errores si es grande
 function repair_db_system() {
-    local dir name upgrade dump log size backup out
+    local dir name upgrade dump log size backup="" out copy=0
+    [ "$1" == "--copia" ] && copy=1
     dir=$(active_dir)
     if [ -z "$dir" ] || ! lampp_running; then
         echo "La version activa tiene que estar en marcha: arrancala y vuelve a intentarlo."
@@ -15493,21 +15567,24 @@ function repair_db_system() {
     if db_system_outdated; then
         echo "Las tablas del sistema de MariaDB de $name son de una version anterior: se ponen al dia"
         echo "(las bases de los proyectos no se tocan)."
-        backup="$HOME/lvm-copias/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 1 ] && backup="$COPIES_DIR/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 0 ] && echo "Sin copia: las tablas del sistema de ahora no se podran recuperar (con --copia se guardan antes)"
         if [ "$DRY" -eq 1 ]; then
-            echo "  [simulacion] copia de la base mysql en $backup"
+            [ -n "$backup" ] && echo "  [simulacion] copia de la base mysql en $backup"
             echo "  [simulacion] ${upgrade[0]##*/} --upgrade-system-tables --force"
         else
-            mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-            if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
-                rm -f "$backup"
-                echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."
-                return 1
+            if [ -n "$backup" ]; then
+                mkdir -p -m 700 "$COPIES_DIR" || return 1
+                if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
+                    rm -f "$backup"
+                    echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."
+                    return 1
+                fi
+                echo "Copia de las tablas del sistema: $backup"
             fi
-            echo "Copia de las tablas del sistema: $backup"
             if ! out=$("${as_owner[@]}" "${upgrade[@]}" --upgrade-system-tables --force < /dev/null 2>&1); then
                 echo "$out" | tail -8 | sed 's/^/  /'
-                echo "No se han podido poner al dia (la copia esta en $backup)."
+                echo "No se han podido poner al dia${backup:+ (la copia esta en $backup)}."
                 return 1
             fi
             echo "$out" | grep -E '^(Phase|OK)' | sed 's/^/  /'
@@ -15721,9 +15798,13 @@ function panel_db_import() {
     if [ ${#args[@]} -gt 0 ]; then
         text+="Primero se crea la base $db (vacia)."
     else
-        text+="Antes se BORRAN todas las tablas de $db, para que no quede nada de lo anterior. Si tiene alguna, primero se guarda una copia en ~/lvm-copias."
+        text+="Antes se BORRAN todas las tablas de $db, para que no quede nada de lo anterior."
     fi
     ui_yesno "$text\n\n¿Cargar?" || return 0
+    # (solo si ya existe: sin copia, lo que tenga no se podra recuperar)
+    if [ ${#args[@]} -eq 0 ] && ui_yesno "¿Guardar antes una copia de $db en ~/nexum-backups?\n\nSin copia, lo que tenga ahora no se podra recuperar."; then
+        args+=(--copia)
+    fi
 
     if [ "$UI" == "whiptail" ] && [ "$DRY" -eq 0 ]; then
         PROGRESS=$(mktemp /tmp/lvm-progreso-XXXX)
@@ -15772,7 +15853,7 @@ function panel_db_drop() {
         ui_yesno "$text" || return 0
 
         local choice
-        choice=$(ui_menu "Antes de borrar $db puedes guardar una copia en ~/lvm-copias (un .sql.gz que se puede volver a cargar)." \
+        choice=$(ui_menu "Antes de borrar $db puedes guardar una copia en ~/nexum-backups (un .sql.gz que se puede volver a cargar)." \
             "copia" "copia" "Guardar una copia y despues borrar" "sin" "Borrar SIN copia") || return 0
         if [ "$choice" == "copia" ]; then
             backup=1
@@ -15870,7 +15951,7 @@ function panel_rebuild() {
     local old_mariadb=$(stack_fields "$dir" | cut -d'|' -f3) new_mariadb=$(cut -d'|' -f3 <<< "$new")
     IFS='|' read -r -a f <<< "$new"
 
-    local header=$(stack_header "")
+    local header=$(stack_header "") ask_copy=0
     local summary="XAMPP-$version se volvera a compilar con la ultima pila de PHP ${full%.*}:\n\n"
     summary+="$header\n$(printf '%*s' ${#header} "" | tr ' ' '-')\n"
     summary+="$(stack_row "$dir" "" "Ahora")\n"
@@ -15881,9 +15962,10 @@ function panel_rebuild() {
     else
         local count=$(db_names "$dir" | grep -c .)
         summary+="MariaDB $new_mariadb no usa directamente los datos de MariaDB $old_mariadb, asi que\n"
-        summary+="la nueva version empezara con bases de datos vacias. Antes se guarda una\n"
-        summary+="copia de las actuales ($count) en ~/lvm-copias/. Para llevarte alguna, exportala\n"
-        summary+="antes desde phpMyAdmin e importala despues.\n"
+        summary+="la nueva version empezara con bases de datos vacias (ahora tiene $count). Despues\n"
+        summary+="se pregunta si guardar antes una copia en ~/nexum-backups/. Para llevarte alguna,\n"
+        summary+="exportala antes desde phpMyAdmin e importala despues.\n"
+        ask_copy=1
     fi
 
     summary+="\nLa compilacion tarda 20-40 minutos y mientras tanto la version actual sigue\n"
@@ -15906,6 +15988,10 @@ function panel_rebuild() {
     fi
 
     ui_yesno "$summary" || return 0
+    # (sin copia, las bases de ahora no se podran recuperar: la casilla, desmarcada de partida)
+    if [ $ask_copy -eq 1 ] && ui_yesno "¿Guardar antes una copia de las bases de datos de XAMPP-$version en ~/nexum-backups?\n\nSin copia, no se podran recuperar."; then
+        STACK_DB_COPY=1
+    fi
 
     [ "$UI" == "whiptail" ] && clear
     install_plan "rehacer:$full"
@@ -15974,7 +16060,7 @@ function panel_remove() {
 
     local backup=0
     if [ "$own_dbs" -gt 0 ]; then
-        ui_yesno "¿Guardar antes una copia comprimida de las bases de datos de XAMPP-$version?\n\nSe guardara en ~/lvm-copias/ (se necesita espacio libre en tu carpeta personal)." && backup=1
+        ui_yesno "¿Guardar antes una copia comprimida de las bases de datos de XAMPP-$version?\n\nSe guardara en ~/nexum-backups/ (se necesita espacio libre en tu carpeta personal)." && backup=1
 
         # Sin copia, se pide escribir el nombre de la version para confirmar
         if [ $backup -eq 0 ]; then
@@ -18075,6 +18161,16 @@ let SIMULATE = ProcessInfo.processInfo.environment["LVM_SIMULAR"] == "1"
 let RUN_TOKEN = UUID().uuidString.replacingOccurrences(of: "-", with: "")
 let SUDO_MARK = "@@LVM-SUDO-\(RUN_TOKEN)@@"
 let LOG_DIR = NSHomeDirectory() + "/.lvm-instalador"
+/// Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
+/// programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
+let COPIES_DIR = NSHomeDirectory() + "/nexum-backups"
+let COPIES_FILES_FLAG = LOG_DIR + "/copias-ficheros"
+/// La casilla de los diálogos que pueden guardar antes una copia (desmarcada de partida: marcada, --copia) y
+/// el aviso en rojo que sale debajo mientras está desmarcada
+let COPY_CHECKBOX = "Guardar antes una copia en ~/nexum-backups"
+let COPY_WARNING = "Sin copia, lo que se sustituya no se podrá recuperar."
+/// (al actualizar una versión en su carpeta: solo hace falta si MariaDB cambia de rama)
+let UPDATE_COPY_WARNING = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 /// Apartados de la ventana que se han plegado (uno por línea): siguen plegados al volver a abrirla
 let FOLDED_FILE = LOG_DIR + "/ventana-plegados"
 let GREEN = Color(red: 0x45 / 255.0, green: 0xA5 / 255.0, blue: 0x7C / 255.0)
@@ -18679,6 +18775,8 @@ final class DialogValidator: NSObject, NSTextFieldDelegate {
 /// Ventana modal con casilla y campo de texto opcionales.
 /// validate(casilla marcada, texto) -> (se puede aceptar, texto de la nota, la nota es un error).
 /// Si hay casilla y campo, el campo solo se puede usar con la casilla desmarcada (confirmar sin copia).
+/// copyWarning: con casilla, el aviso en rojo que sale debajo de ella mientras está desmarcada (marcada, dónde
+/// queda la copia).
 @discardableResult
 /// okLabel dice lo que hace («Borrar la BBDD»), no «Aceptar»; cancelLabel, lo que hace el otro
 /// botón (Cancelar, o «Seguir» si lo que se confirma es cancelar una tarea)
@@ -18686,7 +18784,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
                value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
-               steps: [String] = [],
+               steps: [String] = [], copyWarning: String? = nil,
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -18732,6 +18830,16 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
         stack.addArrangedSubview(b)
         box = b
     }
+    var copyNote: NSTextField? = nil
+    if let w = copyWarning, box != nil {
+        let n = NSTextField(wrappingLabelWithString: w)
+        n.preferredMaxLayoutWidth = width
+        n.alignment = .center
+        n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        n.textColor = .systemRed
+        stack.addArrangedSubview(n)
+        copyNote = n
+    }
     if hasField {
         if let l = fieldLabel {
             let n = NSTextField(wrappingLabelWithString: l)
@@ -18763,6 +18871,11 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
 
     validator.update = {
         let isChecked = box?.state == .on
+        if let n = copyNote, let w = copyWarning {
+            // (el mismo sitio con otro texto: el diálogo no cambia de alto al marcarla)
+            n.stringValue = isChecked ? "La copia queda en ~/nexum-backups: se puede volver a cargar." : w
+            n.textColor = isChecked ? .secondaryLabelColor : .systemRed
+        }
         if let f = input, box != nil { f.isEnabled = !isChecked }
         if let v = validate {
             let (enabled, message, isError) = v(isChecked, input?.stringValue ?? "")
@@ -18947,6 +19060,36 @@ func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bo
              steps: [String] = []) -> Bool {
     return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
                      destructive: destructive, steps: steps).ok
+}
+
+/// La casilla de guardar antes una copia en ~/nexum-backups (desmarcada) con el aviso en rojo debajo, para un
+/// NSAlert hecho a mano. El validador hay que retenerlo mientras se ve el diálogo (el botón no lo retiene)
+func copyCheckViews(warning: String = COPY_WARNING) -> (box: NSButton, note: NSTextField, validator: DialogValidator) {
+    let validator = DialogValidator()
+    let b = NSButton(checkboxWithTitle: COPY_CHECKBOX, target: validator, action: #selector(DialogValidator.changed(_:)))
+    b.state = .off
+    let n = NSTextField(wrappingLabelWithString: warning)
+    n.preferredMaxLayoutWidth = DIALOG_WIDTH
+    n.alignment = .center
+    n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+    n.textColor = .systemRed
+    validator.update = { [weak b, weak n] in
+        guard let b = b, let n = n else { return }
+        let on = b.state == .on
+        n.stringValue = on ? "La copia queda en ~/nexum-backups: se puede volver a cargar." : warning
+        n.textColor = on ? .secondaryLabelColor : .systemRed
+    }
+    return (b, n, validator)
+}
+
+/// Como confirm, con la casilla de guardar antes una copia en ~/nexum-backups (desmarcada) y, mientras lo
+/// esté, el aviso en rojo (warning). copy: si se ha marcado (se pasa --copia)
+func confirmCopy(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
+                 steps: [String] = [], warning: String = COPY_WARNING) -> (ok: Bool, copy: Bool) {
+    let r = runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+                      destructive: destructive, checkbox: COPY_CHECKBOX, checked: false, steps: steps,
+                      copyWarning: warning)
+    return (r.ok, r.ok && r.checked)
 }
 
 /// Markdown de «lvm-instalador novedades»: «## versión · fecha», viñetas «- » (con dos espacios
@@ -19979,9 +20122,11 @@ final class AppModel: ObservableObject {
     @Published var selProject: String? = nil
     @Published var projKind = "all"
     // Bases de datos: «solo la versión activa» (la activa se ve desplegada al abrir) y lo que ocupan
-    // las copias de ~/lvm-copias ([bytes, ficheros])
+    // las copias de ~/nexum-backups ([bytes, ficheros])
     @Published var dbOnlyActive = false
     @Published var backups: [Int64]? = nil
+    /// Copias de los ficheros que cambia el programa por su cuenta (Configuración, Carpetas; copias-ficheros si|no)
+    @Published var copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
     /// Lo que ocupa cada BBDD («versión|base» → [bytes, cuándo se midió]; gui-bbdd-tamanos)
     @Published var dbSizes: [String: [Int64]] = [:]
     /// Lo que ocupa cada proyecto en el disco: carpeta → [bytes, cuándo se midió]
@@ -20311,10 +20456,11 @@ extension AppModel {
     }
 
     func updateComponents(_ c: ComponentsState) {
-        guard confirm("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
-                      "Actualizar todo", steps: c.items) else { return }
+        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+                            "Actualizar todo", steps: c.items, warning: UPDATE_COPY_WARNING)
+        if !r.ok { return }
         components = nil
-        _ = runTask("Actualizando los componentes", ["componentes-actualizar"], progress: true,
+        _ = runTask("Actualizando los componentes", ["componentes-actualizar"] + (r.copy ? ["--copia"] : []), progress: true,
                     doneText: "Componentes al día", reloadBranches: true) { _, _, _ in self.reloadComponents() }
     }
 
@@ -20766,8 +20912,15 @@ extension AppModel {
                 doneText: "Todas las versiones son solo para este Mac", autoClose: true)
     }
 
+    /// Repara las tablas del sistema de MariaDB (reparar-bd-sistema), con copia antes si se marca
     func repairDbSystem() {
-        runTask("Reparando las tablas del sistema de MariaDB", ["reparar-bd-sistema"],
+        let ver = data?.dbsysVersion ?? ""
+        let c = confirmCopy("¿Reparar las tablas del sistema?", "Las BBDD de los proyectos no se tocan.", "Repararlas",
+                            steps: ["Se ponen al día las tablas del sistema (mysql.*) del MariaDB de XAMPP-\(ver) con el mariadb-upgrade de la versión.",
+                                    "Si el registro de errores es grande, se vacía."],
+                            warning: "Sin copia, las tablas del sistema de ahora no se podrán recuperar.")
+        if !c.ok { return }
+        runTask("Reparando las tablas del sistema de MariaDB", ["reparar-bd-sistema"] + (c.copy ? ["--copia"] : []),
                 doneText: "Tablas del sistema de MariaDB al día", autoClose: true)
     }
 
@@ -21128,6 +21281,29 @@ extension AppModel {
         _ = runTask("Vaciando la caché de descargas", ["descargas", "vaciar"], doneText: "Caché de descargas vacía", autoClose: true)
     }
 
+    /// Configuración, Carpetas: borra las copias de seguridad (lo de dentro de ~/nexum-backups, no la carpeta).
+    /// Alguna copia de root puede pedir la contraseña
+    func clearCopies(_ files: Int, _ size: Int64) {
+        guard confirm("¿Borrar las copias de seguridad?", "Las copias borradas no se pueden recuperar.",
+                      "Borrar las copias", destructive: true,
+                      steps: ["Se borra todo lo que hay en ~/nexum-backups: \(plural(files, "fichero", "ficheros")) (\(fmtSize(size))). La carpeta se queda, vacía.",
+                              "Si alguna copia es del administrador, se pide su contraseña para borrarla."]) else { return }
+        _ = runTask("Borrando las copias de seguridad", ["copias", "vaciar"], doneText: "Copias de seguridad borradas",
+                    autoClose: true) { _, _, _ in self.refreshBackups() }
+    }
+
+    /// Configuración, Carpetas: guardar o no una copia de los ficheros que cambia el programa por su cuenta
+    /// (hosts, vhosts, configuración de los proyectos)
+    func setCopiesFiles(_ on: Bool) {
+        guard on != copiesFiles, !busy else { return }
+        _ = runTask(on ? "Encendiendo las copias de los ficheros" : "Apagando las copias de los ficheros",
+                    ["copias-ficheros", on ? "si" : "no"],
+                    doneText: "Copias de los ficheros que cambia el programa " + (on ? "encendidas" : "apagadas"),
+                    autoClose: true) { _, _, _ in
+            self.copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
+        }
+    }
+
     func clearMail() {
         guard confirm("¿Vaciar la bandeja de Mailpit?", "Se borran todos los correos que han mandado las webs de este Mac.",
                       "Vaciar la bandeja", destructive: true) else { return }
@@ -21140,9 +21316,9 @@ extension AppModel {
 
     func setAside() {
         if !confirm("¿Apartar el XAMPP oficial?",
-                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/lvm-copias), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Configuración (ahí también puedes volver a él). Pide la contraseña de administrador.",
+                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/nexum-backups), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Configuración (ahí también puedes volver a él). Pide la contraseña de administrador.",
                     "Apartar el XAMPP oficial") { return }
-        runTask("Apartando el XAMPP oficial", ["apartar"], doneText: "XAMPP oficial apartado. Sus BBDD están copiadas en ~/lvm-copias")
+        runTask("Apartando el XAMPP oficial", ["apartar"], doneText: "XAMPP oficial apartado. Sus BBDD están copiadas en ~/nexum-backups")
     }
 
     func restoreOfficial(_ aside: String) {
@@ -21176,17 +21352,20 @@ extension AppModel {
             case "no":
                 let inst = self.data?.installs.first(where: { $0.folder == folder })
                 let patch = (self.data?.php2shell[folder] ?? "") == "parcheable" && inst?.php == field(res, 1)
-                // (si la rama de MariaDB cambia, sus BBDD no se pueden conservar: se guardan en ~/lvm-copias)
+                // (si la rama de MariaDB cambia, sus BBDD no se pueden conservar: empieza vacía, con copia antes si se pide)
                 var keep = "Sus BBDD, proyectos y vhosts se conservan."
+                var warning = UPDATE_COPY_WARNING
                 if let i = inst, let b = self.branch(i.php), !b.mariadb.isEmpty, !i.mariadb.hasPrefix(b.mariadb + ".") {
-                    keep = "MariaDB pasa de la \(shortPhp(i.mariadb)) a la \(b.mariadb): sus BBDD se guardan en ~/lvm-copias y empieza vacía. Proyectos y vhosts se conservan."
+                    keep = "MariaDB pasa de la \(shortPhp(i.mariadb)) a la \(b.mariadb): empieza con las BBDD vacías. Proyectos y vhosts se conservan."
+                    warning = "Sin copia, sus BBDD no se podrán recuperar."
                 }
-                if !confirm(patch ? "¿Poner el parche de seguridad a XAMPP-\(folder)?" : "¿Actualizar XAMPP-\(folder)?",
-                            (patch ? "Se vuelve a compilar PHP \(field(res, 1)) con el parche oficial contra PHP2Shell (\(PHP2SHELL_DATE)), y su pila con los últimos parches (unos minutos). "
-                                   : "Se vuelve a compilar con PHP \(field(res, 1)) y los últimos parches de su pila (unos minutos). ")
-                            + keep + " Pide la contraseña de administrador.",
-                            patch ? "Poner el parche" : "Actualizar a PHP \(field(res, 1))") { return }
-                self.runTask("Actualizando XAMPP-\(folder)", ["actualizar", folder], progress: true,
+                let c = confirmCopy(patch ? "¿Poner el parche de seguridad a XAMPP-\(folder)?" : "¿Actualizar XAMPP-\(folder)?",
+                                    (patch ? "Se vuelve a compilar PHP \(field(res, 1)) con el parche oficial contra PHP2Shell (\(PHP2SHELL_DATE)), y su pila con los últimos parches (unos minutos). "
+                                           : "Se vuelve a compilar con PHP \(field(res, 1)) y los últimos parches de su pila (unos minutos). ")
+                                    + keep + " Pide la contraseña de administrador.",
+                                    patch ? "Poner el parche" : "Actualizar a PHP \(field(res, 1))", warning: warning)
+                if !c.ok { return }
+                self.runTask("Actualizando XAMPP-\(folder)", ["actualizar", folder] + (c.copy ? ["--copia"] : []), progress: true,
                              doneText: "XAMPP-\(folder) actualizada", reloadBranches: true)
             default:
                 message("No se ha podido comprobar", "No se ha podido consultar php.net. Comprueba la conexión a internet.", error: true)
@@ -21206,7 +21385,7 @@ extension AppModel {
         } else {
             let r = runDialog(title: "¿Desinstalar XAMPP-\(folder)?", text: text, okLabel: "Desinstalar XAMPP-\(folder)",
                               style: .warning, destructive: true,
-                              checkbox: "Guardar antes una copia de sus BBDD en ~/lvm-copias", checked: true,
+                              checkbox: "Guardar antes una copia de sus BBDD en ~/nexum-backups", checked: false,
                               hasField: true,
                               fieldLabel: "Sin copia, las BBDD no se podrán recuperar. Escribe \(folder) para confirmar:",
                               validate: { checked, typed in (checked || typed.trimmingCharacters(in: .whitespaces) == folder, nil, false) })
@@ -21215,7 +21394,7 @@ extension AppModel {
         }
         expanded.remove(folder)
         runTask("Desinstalando XAMPP-\(folder)", ["desinstalar", folder] + (copy ? ["--copia"] : []),
-                doneText: "XAMPP-\(folder) desinstalada" + (copy ? " (copia en ~/lvm-copias)" : ""),
+                doneText: "XAMPP-\(folder) desinstalada" + (copy ? " (copia en ~/nexum-backups)" : ""),
                 reloadBranches: true)
     }
 
@@ -21352,7 +21531,7 @@ extension AppModel {
             let r = runDialog(title: "¿Borrar la BBDD «\(db)»?",
                               text: "Está en XAMPP-\(folder) y tiene \(plural(tables, "tabla", "tablas")) (\(fmtSize(size))). Se borra todo su contenido y no se puede deshacer.",
                               okLabel: "Borrar la BBDD", style: .critical, destructive: true,
-                              checkbox: "Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)", checked: true,
+                              checkbox: "Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)", checked: false,
                               hasField: true,
                               fieldLabel: "Sin copia, el contenido no se podrá recuperar. Escribe \(db) para confirmar:",
                               validate: { checked, typed in (checked || typed.trimmingCharacters(in: .whitespaces) == db, nil, false) })
@@ -21364,7 +21543,7 @@ extension AppModel {
                         "Borrar la BBDD", destructive: true) { return }
         }
         runTask("Borrando la BBDD \(db)", ["borrar-bd", db] + (copy ? ["--copia"] : []),
-                doneText: "BBDD «\(db)» borrada" + (copy ? " (copia en ~/lvm-copias)" : ""),
+                doneText: "BBDD «\(db)» borrada" + (copy ? " (copia en ~/nexum-backups)" : ""),
                 autoClose: true, env: dbEnv()) { ok, _, _ in
             if ok && self.impDb == db {
                 self.impDb = nil
@@ -21481,16 +21660,17 @@ extension AppModel {
             return
         }
         let name = (path as NSString).lastPathComponent
-        var text = "Se carga en XAMPP-\(d.active). Antes se BORRAN todas las tablas de «\(db)» (si tiene alguna, con una copia en ~/lvm-copias)."
+        var text = "Se carga en XAMPP-\(d.active). Antes se BORRAN todas las tablas de «\(db)», para que no quede nada de lo anterior."
         let project = impProject
         if let p = project {
             text += "\n\nDespués, «\(db)» pasa a ser la BBDD de \(p)" + (projectConfigText(p).map { ": \($0)" } ?? "") + "."
         }
-        if !confirm("¿Cargar \(name) (\(fmtSize(size.int64Value))) en \(db)?", text,
-                    "Vaciar y cargar", destructive: true) { return }
+        let c = confirmCopy("¿Cargar \(name) (\(fmtSize(size.int64Value))) en \(db)?", text,
+                            "Vaciar y cargar", destructive: true)
+        if !c.ok { return }
         checkDbAccess {
             self.runTask("Cargando \(name) en \(db)",
-                         ["importar-bd", path, db] + (project.map { ["--proyecto", $0] } ?? []),
+                         ["importar-bd", path, db] + (project.map { ["--proyecto", $0] } ?? []) + (c.copy ? ["--copia"] : []),
                          progress: true, doneText: "BBDD «\(db)» cargada" + (project.map { " en \($0)" } ?? ""),
                          env: self.dbEnv(),
                          cancelText: ("¿Cancelar la carga?",
@@ -21788,12 +21968,13 @@ extension AppModel {
             what.append(mode == "fusionar" ? "Se fusiona «\(name)» con \(HTDOCS)/\(folder)."
                         : "Se sobrescribe la carpeta con «\(name)» en \(HTDOCS)/\(folder): se borra lo que no traiga.")
         }
-        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)» (antes se guarda una copia).") }
+        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)».") }
         runQuick(["gui-proyecto-git", folder]) { _, out in
             let f = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 })
             guard !code.isEmpty, let g = f, g[1] == "1" else {
-                if confirm("¿Actualizar \(folder)?", "", "Actualizar", steps: what) {
-                    self.upStart(folder, sql, db, code, mode, pull: false)
+                let c = confirmCopy("¿Actualizar \(folder)?", "", "Actualizar", steps: what)
+                if c.ok {
+                    self.upStart(folder, sql, db, code, mode, pull: false, copy: c.copy)
                 }
                 return
             }
@@ -21802,7 +21983,7 @@ extension AppModel {
             if dirty > 0 { state.append(plural(dirty, "cambio", "cambios") + " sin commit") }
             if ahead > 0 { state.append(plural(ahead, "commit", "commits") + " sin subir") }
             var text = [state.joined(separator: "  ·  ")]
-            if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.") }
+            if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido no queda en git (solo en la copia, si la guardas).") }
             let canPull = g[5] == "1" && !g[2].isEmpty
             text.append(canPull ? "Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para sin tocar nada."
                         : "No se puede hacer pull: no tiene origin o no está en una rama.")
@@ -21810,21 +21991,23 @@ extension AppModel {
             alert.messageText = "¿Hacer git pull antes de copiar?"
             let steps = dialogSteps(what)
             let note = dialogLabel(text.joined(separator: "\n\n"), color: .secondaryLabelColor, align: .left)
-            alert.accessoryView = dialogStack([steps, note])
+            let cc = copyCheckViews()
+            alert.accessoryView = dialogStack([steps, note, cc.box, cc.note])
             if canPull { alert.addButton(withTitle: "Hacer pull y copiar") }
             alert.addButton(withTitle: "Copiar sin pull")
             alert.addButton(withTitle: "Cancelar")
-            let resp = alert.runModal()
+            let resp = withExtendedLifetime(cc.validator) { alert.runModal() }
+            let copy = cc.box.state == .on
             if canPull && resp == .alertFirstButtonReturn {
-                self.upStart(folder, sql, db, code, mode, pull: true)
+                self.upStart(folder, sql, db, code, mode, pull: true, copy: copy)
             } else if resp == (canPull ? .alertSecondButtonReturn : .alertFirstButtonReturn) {
-                self.upStart(folder, sql, db, code, mode, pull: false)
+                self.upStart(folder, sql, db, code, mode, pull: false, copy: copy)
             }
         }
     }
 
-    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool) {
-        var args = ["actualizar-proyecto", folder]
+    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool, copy: Bool) {
+        var args = ["actualizar-proyecto", folder] + (copy ? ["--copia"] : [])
         if !code.isEmpty { args += ["--codigo", code, "--modo", mode] + (pull ? ["--pull"] : []) }
         if !sql.isEmpty { args += ["--bd", sql] }
         // (también solo con el código: al volver a cargarlo, su configuración vuelve a esta BBDD)
@@ -21832,7 +22015,8 @@ extension AppModel {
         let go = {
             _ = self.runTask("Actualizando \(folder)", args, progress: true, doneText: "\(folder) actualizado", env: self.dbEnv(),
                              cancelText: ("¿Cancelar la actualización?",
-                                          "El proyecto se queda a medias, con lo hecho hasta ahora. Lo sustituido sigue en ~/lvm-copias.",
+                                          "El proyecto se queda a medias, con lo hecho hasta ahora."
+                                              + (copy ? " Lo sustituido sigue en ~/nexum-backups." : ""),
                                           "Cancelar la actualización"))
         }
         if sql.isEmpty { go() } else { checkDbAccess { go() } }
@@ -22050,7 +22234,7 @@ extension AppModel {
     }
 
     /// borrar-proyecto: su carpeta, sus vhosts y dominios, lo de Docker y, si se quiere, su BBDD de la
-    /// versión activa (la de phpMyAdmin), con copia por defecto. Hay que escribir el nombre de la carpeta
+    /// versión activa (la de phpMyAdmin), con copia si se marca. Hay que escribir el nombre de la carpeta
     /// para confirmar: la carpeta no se puede recuperar
     func deleteProject(_ x: Project) {
         guard let d = data, !busy else { return }
@@ -22073,8 +22257,9 @@ extension AppModel {
             let r2 = runDialog(title: "¿Borrar también su BBDD «\(db)»?",
                                text: "Es la de XAMPP-\(d.active), la que se ve en phpMyAdmin. Si no, solo se borra el proyecto y la BBDD se queda.",
                                okLabel: "Borrar también la BBDD", style: .critical, destructive: true,
-                               checkbox: "Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)", checked: true,
-                               cancelLabel: "Solo el proyecto")
+                               checkbox: "Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)", checked: false,
+                               cancelLabel: "Solo el proyecto",
+                               copyWarning: "Sin copia, la BBDD no se podrá recuperar.")
             if r2.ok {
                 withDb = true
                 copy = r2.checked
@@ -22082,7 +22267,7 @@ extension AppModel {
             }
         }
         let finalArgs = args, useDb = withDb
-        let done = "Proyecto «\(x.name)» borrado" + (useDb ? " con su BBDD" : "") + (useDb && copy ? " (copia en ~/lvm-copias)" : "")
+        let done = "Proyecto «\(x.name)» borrado" + (useDb ? " con su BBDD" : "") + (useDb && copy ? " (copia en ~/nexum-backups)" : "")
         let go: () -> Void = {
             _ = self.runTask("Borrando el proyecto \(x.name)", finalArgs, doneText: done,
                              env: useDb ? self.dbEnv() : [:])
@@ -22140,11 +22325,16 @@ extension AppModel {
         }
         let replace = hasDb(dst, db)
         if replace {
-            notes.append("XAMPP-\(dst) ya tiene \(db): se guarda una copia suya en ~/lvm-copias y se sustituye. Lo que tenía se pierde (salvo en esa copia).")
+            notes.append("XAMPP-\(dst) ya tiene \(db): se sustituye. Lo que tenía se pierde, salvo que guardes antes una copia.")
             args.append("--sustituir")
         }
-        guard confirm(replace ? "¿Sustituir \(db) en XAMPP-\(dst)?" : "¿Copiar \(db) a XAMPP-\(dst)?",
-                      "", replace ? "Sustituir \(db)" : "Copiar a XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
+        if replace {
+            let c = confirmCopy("¿Sustituir \(db) en XAMPP-\(dst)?", "", "Sustituir \(db)", destructive: true, steps: notes)
+            if !c.ok { return }
+            if c.copy { args.append("--copia") }
+        } else {
+            guard confirm("¿Copiar \(db) a XAMPP-\(dst)?", "", "Copiar a XAMPP-\(dst)", steps: notes) else { return }
+        }
         runTask("Copiando \(db) a XAMPP-\(dst)", args, doneText: "\(db) copiada a XAMPP-\(dst)", autoClose: true)
     }
 
@@ -22212,7 +22402,7 @@ extension AppModel {
                 hint.stringValue = "Letras sin acentos, números, _ y - (sin - delante)."
                 hint.textColor = .secondaryLabelColor
             } else if let t = target(), hasDb(t.folder, name) {
-                hint.stringValue = "XAMPP-\(t.folder) ya tiene una BBDD \(name): se sustituye (antes se guarda una copia suya en ~/lvm-copias)."
+                hint.stringValue = "XAMPP-\(t.folder) ya tiene una BBDD \(name): se sustituye (al confirmar puedes guardar antes una copia suya)."
                 hint.textColor = .systemRed
             } else {
                 hint.stringValue = target().map { "Se crea \(name) en XAMPP-\($0.folder)." } ?? ""
@@ -22286,11 +22476,16 @@ extension AppModel {
         }
         let replace = hasDb(dst, name)
         if replace {
-            notes.append("XAMPP-\(dst) ya tiene \(name): se guarda una copia suya en ~/lvm-copias y se sustituye. Lo que tenía se pierde (salvo en esa copia).")
+            notes.append("XAMPP-\(dst) ya tiene \(name): se sustituye. Lo que tenía se pierde, salvo que guardes antes una copia.")
             args.append("--sustituir")
         }
-        guard confirm("¿Replicar en XAMPP-\(dst)?", "",
-                      replace ? "Sustituir y replicar" : "Replicar en XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
+        if replace {
+            let c = confirmCopy("¿Replicar en XAMPP-\(dst)?", "", "Sustituir y replicar", destructive: true, steps: notes)
+            if !c.ok { return }
+            if c.copy { args.append("--copia") }
+        } else {
+            guard confirm("¿Replicar en XAMPP-\(dst)?", "", "Replicar en XAMPP-\(dst)", steps: notes) else { return }
+        }
         runTask("Replicando en XAMPP-\(dst)", args, doneText: "\(db) replicada en XAMPP-\(dst) como \(name)", autoClose: true)
     }
 
@@ -22322,7 +22517,7 @@ extension AppModel {
     }
 
     /// /etc/hosts es de root: se edita una copia en ~/.lvm-instalador y, al pulsar Aplicar, el script
-    /// la escribe encima con sudo (guardando antes el anterior en ~/lvm-copias)
+    /// la escribe encima con sudo (guardando antes el anterior en ~/nexum-backups, si está el ajuste)
     func editHosts() {
         let src = (data ?? AppData()).hosts
         let copy = LOG_DIR + "/hosts"
@@ -22339,7 +22534,9 @@ extension AppModel {
         p.arguments = ["-t", copy]
         try? p.run()
         guard confirm("Editar hosts",
-                      "\(src) es del administrador: se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: el anterior queda en ~/lvm-copias. Pide la contraseña de administrador.",
+                      "\(src) es del administrador: se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»"
+                          + (FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? ": el anterior queda en ~/nexum-backups" : "")
+                          + ". Pide la contraseña de administrador.",
                       "Aplicar los cambios") else { return }
         if FileManager.default.contentsEqual(atPath: src, andPath: copy) {
             toast("No has cambiado nada en \(src) (¿guardaste los cambios?)")
@@ -22350,7 +22547,7 @@ extension AppModel {
 
     /// Los vhosts son del administrador (Apache los lee como root al arrancar): se edita una copia en
     /// ~/.lvm-instalador y, al pulsar Aplicar, el script la comprueba, la escribe con sudo (guardando
-    /// antes la anterior en ~/lvm-copias) y recarga Apache. Si Apache no la acepta, se deja como estaba
+    /// antes la anterior en ~/nexum-backups, si está el ajuste) y recarga Apache. Si Apache no la acepta, se deja como estaba
     func editVhosts() {
         let path = (data ?? AppData()).vhosts
         let real = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
@@ -22369,7 +22566,9 @@ extension AppModel {
         }
         openInEditor(copy)
         guard confirm("Editar vhosts",
-                      "Son del administrador (Apache los lee como root): se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: se comprueban, los de ahora quedan en ~/lvm-copias y se recarga Apache. Si Apache no los acepta, se quedan como estaban. Pide la contraseña de administrador.",
+                      "Son del administrador (Apache los lee como root): se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: se comprueban, "
+                          + (FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? "los de ahora quedan en ~/nexum-backups " : "se escriben ")
+                          + "y se recarga Apache. Si Apache no los acepta, se quedan como estaban. Pide la contraseña de administrador.",
                       "Aplicar los cambios") else { return }
         if FileManager.default.contentsEqual(atPath: real, andPath: copy) {
             toast("No has cambiado nada en los vhosts (¿guardaste los cambios?)")
@@ -22860,6 +23059,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Virtual hosts", "logo:apache", brand("apache")),
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
+    ("Copias de los ficheros", "doc.on.doc.fill", .gray),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
     ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),
@@ -24100,13 +24300,13 @@ extension AppModel {
         toast("Elige el fichero en «Subir o actualizar una BBDD»: proyecto \(x.name)")
     }
 
-    /// Lo que ocupan las copias de seguridad (~/lvm-copias) y cuántos ficheros hay
+    /// Lo que ocupan las copias de seguridad (~/nexum-backups) y cuántos ficheros hay
     func refreshBackups() {
         DispatchQueue.global(qos: .utility).async {
             var size: Int64 = 0
             var n = 0
             let keys: [URLResourceKey] = [.fileSizeKey, .isRegularFileKey]
-            if let en = FileManager.default.enumerator(at: URL(fileURLWithPath: NSHomeDirectory() + "/lvm-copias"),
+            if let en = FileManager.default.enumerator(at: URL(fileURLWithPath: COPIES_DIR),
                                                        includingPropertiesForKeys: keys) {
                 for case let u as URL in en {
                     if let v = try? u.resourceValues(forKeys: Set(keys)), v.isRegularFile == true {
@@ -24933,7 +25133,7 @@ struct WarningsView: View {
                 Group {
                     if !d.dbsysVersion.isEmpty {
                         Card("Tablas del sistema de MariaDB antiguas",
-                             "Las tablas del sistema (mysql.*) son de una MariaDB anterior y el servidor escribe un error cada vez que las usa: su registro de errores no para de crecer. Repararlas las pone al día con el mariadb-upgrade de la versión, sin tocar las BBDD de los proyectos, después de guardar una copia en ~/lvm-copias, y vacía el registro si es grande.") {
+                             "Las tablas del sistema (mysql.*) son de una MariaDB anterior y el servidor escribe un error cada vez que las usa: su registro de errores no para de crecer. Repararlas las pone al día con el mariadb-upgrade de la versión, sin tocar las BBDD de los proyectos (si quieres, después de guardar una copia en ~/nexum-backups), y vacía el registro si es grande.") {
                             Row("MariaDB de XAMPP-\(d.dbsysVersion)", "Registro de errores: \(fmtSize(d.dbsysLog))", trailing: {
                                 Button("Repararlas") { model.repairDbSystem() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
@@ -25366,7 +25566,7 @@ struct UpdateProjectSheet: View {
                         TextField("", text: $model.upDb).frame(width: 220)
                     }
                     if !model.upSql.isEmpty {
-                        Text("(antes se guarda una copia de la actual)").font(.caption).foregroundColor(.secondary)
+                        Text("(al confirmar, puedes guardar antes una copia de la actual)").font(.caption).foregroundColor(.secondary)
                     }
                 }
             }
@@ -25380,7 +25580,7 @@ struct UpdateProjectSheet: View {
                 }
                 .pickerStyle(RadioGroupPickerStyle())
                 .labelsHidden()
-                Text("Se escribe sobre \(HTDOCS)/\(model.upFolder). Su .git no se toca y lo sustituido o borrado queda en ~/lvm-copias.")
+                Text("Se escribe sobre \(HTDOCS)/\(model.upFolder). Su .git no se toca; lo sustituido o borrado solo se puede recuperar si al confirmar guardas antes una copia en ~/nexum-backups.")
                     .font(.caption).foregroundColor(RED).fixedSize(horizontal: false, vertical: true)
             }
             .disabled(model.upCode.isEmpty)
@@ -28004,10 +28204,14 @@ extension AppModel {
 
     /// Un proyecto de antes (con XAMPP-X delante) pasa al Apache de Docker (docker-pasar)
     func dockerPass(_ p: DockerProject) {
-        guard confirm("¿Pasar \(p.folder) al Apache de Docker?",
-                      "Ya no necesitará XAMPP-X y podrás añadirle más versiones de PHP. Antes se guarda una copia de su BBDD (\(p.db)) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus contenedores de ahora, su vhost de XAMPP-X, su clave y su línea de /etc/hosts. Pide la contraseña de administrador.",
-                      "Pasarlo") else { return }
-        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug], progress: true,
+        let c = confirmCopy("¿Pasar \(p.folder) al Apache de Docker?",
+                            "Ya no necesitará XAMPP-X y podrás añadirle más versiones de PHP. Pide la contraseña de administrador.",
+                            "Pasarlo",
+                            steps: ["Su BBDD (\(p.db)) se carga en la MariaDB común de Docker.",
+                                    "Se quitan sus contenedores de ahora, su vhost de XAMPP-X, su clave y su línea de /etc/hosts."],
+                            warning: "Sin copia, su BBDD de ahora no se podrá recuperar.")
+        if !c.ok { return }
+        runTask("Pasando \(p.folder) al Apache de Docker", ["docker-pasar", p.slug] + (c.copy ? ["--copia"] : []), progress: true,
                 doneText: "\(p.folder) ya va con el Apache de Docker") { _, _, _ in self.reloadDocker() }
     }
 }
@@ -28692,7 +28896,7 @@ struct DatabasesView: View {
     func importCard(_ d: AppData) -> some View {
         let act = d.installs.first(where: { $0.folder == d.active })
         let desc = "Carga una copia .sql, .sql.gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa. "
-            + "Antes se borran todas las tablas de la BBDD de destino (con una copia en ~/lvm-copias), para que no quede nada de lo anterior."
+            + "Antes se borran todas las tablas de la BBDD de destino (si quieres, con una copia en ~/nexum-backups), para que no quede nada de lo anterior."
         let dbs = d.dbs[d.active] ?? []
         let hint = model.importHint()
         return VStack(alignment: .leading, spacing: 10) {
@@ -29321,7 +29525,7 @@ struct HostsView: View {
                 // Primero, si el vhost de los proyectos no lleva a este Mac: el navegador no conecta
                 ForEach(model.hostsLinkFix, id: \.self) { f in
                     Card("\(f[0]) no lleva a este Mac",
-                         "Apache solo escucha en 127.0.0.1 y ::1, y en /etc/hosts \(f[1].isEmpty ? "no está" : "apunta a \(f[1])"). El navegador da «No se puede acceder a este sitio web». Arreglarlo hace que \(f[0]) lleve a 127.0.0.1 y ::1 (una sola vez; la copia del /etc/hosts anterior queda en ~/lvm-copias). Pide la contraseña de administrador.") {
+                         "Apache solo escucha en 127.0.0.1 y ::1, y en /etc/hosts \(f[1].isEmpty ? "no está" : "apunta a \(f[1])"). El navegador da «No se puede acceder a este sitio web». Arreglarlo hace que \(f[0]) lleve a 127.0.0.1 y ::1 (una sola vez\(FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? "; la copia del /etc/hosts anterior queda en ~/nexum-backups" : "")). Pide la contraseña de administrador.") {
                         Row("\(f[0]) → \(f[1].isEmpty ? "sin línea en /etc/hosts" : f[1])", "Tiene que ir a 127.0.0.1, donde escucha Apache", trailing: {
                             Button("Arreglarlo") { model.fixHostsLink() }
                                 .buttonStyle(OutlineButton(kind: "primary"))
@@ -29597,8 +29801,24 @@ struct ToolsView: View {
             }
         case "carpetas":
             TileCard("Carpetas") {
-                Tile("Copias de seguridad", "~/lvm-copias: BBDD borradas o desinstaladas, y las del XAMPP oficial") {
-                    Button("Abrir") { openFolder(NSHomeDirectory() + "/lvm-copias") }
+                // Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
+                let bk = model.backups ?? [0, 0]
+                Tile("Copias de seguridad", "~/nexum-backups: las copias que pides al borrar, sustituir o actualizar, y las del XAMPP oficial · "
+                     + (bk[1] > 0 ? "\(fmtSize(bk[0])), \(bk[1]) \(bk[1] == 1 ? "fichero" : "ficheros")" : "vacía")) {
+                    Button("Abrir") {
+                        try? FileManager.default.createDirectory(atPath: COPIES_DIR, withIntermediateDirectories: true,
+                                                                 attributes: [.posixPermissions: 0o700])
+                        openFolder(COPIES_DIR)
+                    }
+                    Button("Borrar…") { model.clearCopies(Int(bk[1]), bk[0]) }.disabled(model.busy || bk[1] == 0)
+                }
+                .onAppear { model.refreshBackups() }
+                // Copias de los ficheros que cambia el programa por su cuenta (lvm-instalador copias-ficheros si|no)
+                Tile("Copias de los ficheros que cambia el programa",
+                     "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos") {
+                    Toggle("", isOn: Binding(get: { model.copiesFiles }, set: { model.setCopiesFiles($0) }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                        .disabled(model.busy)
                 }
                 Tile("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
@@ -29893,7 +30113,7 @@ struct ToolsView: View {
             }
             ForEach(d.copies.keys.sorted(), id: \.self) { folder in
                 Tile("BBDD de \((folder as NSString).lastPathComponent)",
-                    "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/lvm-copias. Las que ya existan en la versión activa no se tocan.") {
+                    "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/nexum-backups. Las que ya existan en la versión activa no se tocan.") {
                     Button("Carpeta") { showFolder(folder) }
                     Button(d.active.isEmpty ? "Cargar" : "Cargar en XAMPP-\(d.active)") { model.importBackups(folder) }
                         .disabled(model.busy || d.active.isEmpty || !d.running)
@@ -30682,7 +30902,7 @@ function gui_data() {
     cert_audit | awk -F'|' '$1 == "C" { print "C|" $2 "|" $5 } $1 == "A" && !seen[$2]++ { print "W|" $2 }
         $1 == "T" && $5 == "0" { print "G|" $2 } $1 == "U" && !gone[$2]++ { print "Q|" $2 }'
     # O|carpeta con las copias de las bases del XAMPP oficial|numero de copias
-    for dir in "$HOME"/lvm-copias/XAMPP-oficial-*/; do
+    for dir in "$COPIES_DIR"/XAMPP-oficial-*/; do
         [ -d "$dir" ] || continue
         set -- "$dir"*.zip
         [ -e "$1" ] && echo "O|${dir%/}|$#"
@@ -34071,12 +34291,14 @@ function docker_stop_all() {
     echo "Todos parados"
 }
 
-# docker-pasar <nombre>: un proyecto de antes (con XAMPP-X delante, con su MariaDB y su phpMyAdmin)
-# pasa al Apache de Docker. Su BBDD se guarda antes en ~/lvm-copias (si algo falla, ahi esta) y se carga
+# docker-pasar <nombre> [--copia]: un proyecto de antes (con XAMPP-X delante, con su MariaDB y su phpMyAdmin)
+# pasa al Apache de Docker. Su BBDD se descarga a un fichero (con --copia, en ~/nexum-backups, y se queda;
+# sin ella, uno temporal que se borra al acabar bien; si algo falla, ahi esta) y se carga
 # en la MariaDB comun; despues se quitan sus contenedores, su vhost de XAMPP-X, su clave y su linea de hosts. Si la
 # carpeta ya esta en el sistema nuevo (otra version de PHP del mismo proyecto), solo se le añade su PHP
 function docker_pass() {
-    local slug=$1 dir folder php maria db target="" p backup
+    local slug=$1 dir folder php maria db target="" p backup copy=0
+    [ "$2" == "--copia" ] && copy=1
     if ! docker_valid_slug "$slug" || [ ! -f "$DOCKER_DIR/$slug/proyecto.conf" ] || docker_web_project "$slug"; then
         echo "No hay ningun proyecto de antes (con XAMPP-X delante) con el nombre $slug"
         return 1
@@ -34089,7 +34311,8 @@ function docker_pass() {
     done
     echo "$slug pasa al Apache de Docker${target:+ (como PHP $php de $target)}"
     if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] copia de $db en ~/lvm-copias, fuera sus contenedores, su vhost y su linea de hosts"
+        [ $copy -eq 1 ] && echo "  [simulacion] copia de $db en ~/nexum-backups, fuera sus contenedores, su vhost y su linea de hosts"
+        [ $copy -eq 0 ] && echo "  [simulacion] sin copia: $db pasa por un fichero temporal; fuera sus contenedores, su vhost y su linea de hosts"
         return 0
     fi
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
@@ -34098,9 +34321,16 @@ function docker_pass() {
     task_plan "Pasando $folder al Apache de Docker" "Copiar su BBDD" "Quitar el proyecto de antes" "Montarlo en el Apache de Docker"
     task_step
     echo "Copia de su BBDD ($db)"
-    mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-    backup="$HOME/lvm-copias/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
-    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d db > /dev/null || return 1
+    if [ $copy -eq 1 ]; then
+        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+    else
+        # (sin copia: un fichero solo tuyo en ~/.lvm-instalador, que se borra cuando ya esta cargada)
+        mkdir -p -m 700 "$LOG_DIR" || return 1
+        backup=$(mktemp "$LOG_DIR/pasar-$slug-XXXXXX") || return 1
+        mv -f "$backup" "$backup.sql.gz" && backup=$backup.sql.gz || { rm -f "$backup"; return 1; }
+    fi
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d db > /dev/null || { rm -f "$backup"; return 1; }
     local i
     for i in $(seq 60); do
         dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
@@ -34117,7 +34347,7 @@ function docker_pass() {
         rm -f "$backup"
         return 1
     fi
-    echo "Copia de $db: $backup"
+    [ $copy -eq 1 ] && echo "Copia de $db: $backup"
     task_step
     docker_action borrar "$slug" || { echo "No se ha podido quitar el proyecto de antes (la copia de su BBDD esta en $backup)"; return 1; }
     task_step
@@ -34127,6 +34357,11 @@ function docker_pass() {
     else
         docker_web_create "$folder" "$php" "$maria" --bd "$db" --volcado "$backup" \
             || { echo "La copia de su BBDD sigue en $backup"; return 1; }
+    fi
+    # (si no se ha cargado, porque ya tenia BBDD, la descarga se queda: es lo unico que hay de ella)
+    if [ $copy -eq 0 ] && [ -z "$target" ]; then
+        rm -f "$backup"
+        echo "Sin copia: la descarga de $db ya esta cargada y se ha borrado (con --copia se guarda en ~/nexum-backups)"
     fi
     echo "$slug ya funciona con el Apache de Docker"
 }
@@ -34239,7 +34474,8 @@ QUE HACE
 - El gestor está en /Library/Nexum/gestor, de root: lo que se ejecuta
   como administrador no lo puede cambiar ningún programa de tu usuario.
 - Actualiza cada versión a los últimos parches de su rama, muestra sus
-  bases de datos y desinstala versiones guardando copia en ~/lvm-copias.
+  bases de datos y desinstala versiones (con copia en ~/nexum-backups,
+  si se pide).
 - De Homebrew solo usa librerias, que se copian dentro de cada versión.
   No instala PHP ni MariaDB en el sistema.
 - Lleva proyectos a Docker Desktop con cualquier versión de PHP, de la
@@ -34248,6 +34484,25 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.7 (10 nov 2026)
+- Copias de seguridad, solo si se piden: al cargar un .sql sobre una
+  BBDD con tablas, sustituir una BBDD al copiarla o replicarla, reparar
+  las tablas del sistema, pasar un proyecto al Apache de Docker,
+  actualizar un proyecto o actualizar una versión que empieza con BBDD
+  vacías, la copia de lo de antes se guarda solo si se marca «Guardar
+  antes una copia» (en la terminal, --copia). Sin ella, se avisa de que
+  no se podrá recuperar. Borrar una BBDD, una versión o un proyecto,
+  igual que antes, pero con la casilla desmarcada de partida.
+- La carpeta de las copias se llama ahora ~/nexum-backups: la de antes
+  (~/lvm-copias) se renombra sola la primera vez, si no hay ya otra.
+- Las copias de los ficheros que el programa cambia por su cuenta (el
+  de hosts, los vhosts, la configuración de los proyectos al cargarlos,
+  lo que cambia asegurar) ya no se guardan siempre: se encienden en
+  Configuración, Carpetas (o lvm-instalador copias-ficheros si). La
+  caché vieja de una tienda, sin ellas, se borra (se rehace sola).
+- Configuración, Carpetas: «Borrar…» las copias de seguridad, con
+  cuántos ficheros hay y cuánto ocupan (o lvm-instalador copias vaciar).
 
 1.57.6 (9 nov 2026)
 - Caché de descargas: el código de cada componente que se instala
@@ -36052,8 +36307,11 @@ function cli_install() {
     install_plan "$selected"
 }
 
+# rehacer|actualizar <version> [--copia]: con --copia, si su MariaDB cambia de rama (empieza con BBDD
+# vacias), antes se guardan las de ahora en ~/nexum-backups
 function cli_rebuild() {
     local version=$1
+    [ "$2" == "--copia" ] && STACK_DB_COPY=1
     local dir=$BASE_DIR/XAMPP-$version
 
     if [ -z "$version" ] || [ ! -f "$dir/xamppfiles/etc/pvm-stack" ]; then
@@ -36190,9 +36448,11 @@ function docker_image_outdated() {
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
-# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
+# version que se rehace (como actualizar --copia)
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    [ "$1" == "--copia" ] && STACK_DB_COPY=1
     echo "Buscando parches nuevos..."
     out=$(components_check)
     while IFS= read -r line; do
@@ -36265,14 +36525,143 @@ function components_update() {
     return $fail
 }
 
+# Hasta la 1.57.6 las copias de seguridad iban en ~/lvm-copias: la primera vez se renombra a
+# ~/nexum-backups (COPIES_DIR). Solo si es una carpeta tuya (no un enlace) y aun no hay ninguna
+# ~/nexum-backups: si estan las dos, no se toca ninguna
+function copies_migrate() {
+    local old=$HOME/lvm-copias
+    [ -d "$old" ] && [ ! -L "$old" ] && [ -O "$old" ] || return 0
+    if [ -e "$COPIES_DIR" ] || [ -L "$COPIES_DIR" ]; then
+        return 0
+    fi
+    mv "$old" "$COPIES_DIR" 2> /dev/null && chmod 700 "$COPIES_DIR" 2> /dev/null
+    return 0
+}
+
+# Lo que ocupa (en KB) dicho para personas: 3,4 MB
+function copies_size_text() {
+    awk -v n="${1:-0}" 'BEGIN {
+        split("KB MB GB TB", u); i = 1
+        while (n >= 1024 && i < 4) { n /= 1024; i++ }
+        s = (i == 1) ? sprintf("%d %s", n, u[i]) : sprintf("%.1f %s", n, u[i])
+        gsub(/\./, ",", s); print s
+    }'
+}
+
+# ¿Hay en ~/nexum-backups carpetas que no son tuyas (copias que hizo root)? Lo de dentro solo se puede
+# borrar con sudo
+function copies_need_root() {
+    [ -d "$COPIES_DIR" ] && [ ! -L "$COPIES_DIR" ] || return 1
+    [ -n "$(find "$COPIES_DIR" -mindepth 1 -type d ! -user "$(id -u)" -print 2> /dev/null | head -1)" ]
+}
+
+# copias [vaciar]: sin nada, cuantos ficheros hay en ~/nexum-backups y cuanto ocupan. vaciar borra todo
+# lo que hay dentro (la carpeta se queda), despues de comprobar que es una carpeta tuya y no un enlace.
+# Lo que no se pueda borrar con tu usuario (copias que hizo root en una carpeta suya) se borra con
+# sudo, solo dentro de esa carpeta y sin pasar a otros discos. Con --simular no se borra nada
+function copies_command() {
+    local dir=$COPIES_DIR files kb left
+    case "$1" in
+        ""|vaciar) ;;
+        *) echo "Uso: lvm-instalador copias [vaciar]"; return 1 ;;
+    esac
+    if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
+        echo "$dir no es una carpeta (es un enlace o un fichero): no se toca"
+        return 1
+    fi
+    if [ ! -d "$dir" ]; then
+        echo "No hay copias de seguridad: $dir no existe"
+        return 0
+    fi
+    if [ ! -O "$dir" ]; then
+        echo "$dir no es tuya: no se toca"
+        return 1
+    fi
+    files=$(find "$dir" -mindepth 1 -type f 2> /dev/null | wc -l | tr -d ' ')
+    kb=$(du -sk "$dir" 2> /dev/null | cut -f1)
+    if [ "$1" != vaciar ]; then
+        echo "Copias de seguridad en $dir: $files $([ "$files" == 1 ] && echo fichero || echo ficheros), $(copies_size_text "${kb:-0}")"
+        return 0
+    fi
+    if [ -z "$(find "$dir" -mindepth 1 -maxdepth 1 2> /dev/null | head -1)" ]; then
+        echo "No hay copias de seguridad que borrar: $dir esta vacia"
+        return 0
+    fi
+    echo "Borrando las copias de seguridad de $dir ($files $([ "$files" == 1 ] && echo fichero || echo ficheros), $(copies_size_text "${kb:-0}"))..."
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] find $dir -xdev -mindepth 1 -delete (la carpeta se queda)"
+        return 0
+    fi
+    # (find -delete no sigue los enlaces: un enlace de dentro se borra, no lo que hay al otro lado)
+    find "$dir" -xdev -mindepth 1 -delete 2> /dev/null
+    left=$(find "$dir" -mindepth 1 -maxdepth 1 2> /dev/null | head -1)
+    if [ -n "$left" ] && [ -n "$SUDO" ]; then
+        echo "Algunas copias son de root: se borran con sudo (solo dentro de $dir)"
+        # (se vuelve a comprobar justo antes: que sigue siendo tu carpeta y no un enlace)
+        if [ -L "$dir" ] || [ ! -d "$dir" ] || [ ! -O "$dir" ]; then
+            echo "$dir ha cambiado: no se borra nada mas"
+            return 1
+        fi
+        sudo find "$dir" -xdev -mindepth 1 -delete
+        left=$(find "$dir" -mindepth 1 -maxdepth 1 2> /dev/null | head -1)
+    fi
+    if [ -n "$left" ]; then
+        echo "No se ha podido borrar todo: queda, por ejemplo, $left"
+        return 1
+    fi
+    echo "Copias de seguridad borradas ($dir esta vacia)"
+}
+
+# copias-ficheros [si|no]: las copias de los ficheros que el programa cambia por su cuenta (el de hosts,
+# los vhosts, la configuracion de los proyectos al cargarlos, lo que cambia asegurar), en ~/nexum-backups
+# antes de cambiarlos. Es el fichero COPIES_FILES_FLAG: si esta, se guardan; si no (lo de partida), no.
+# Sin nada, dice como esta. No pide contraseña
+function copies_files_command() {
+    case "$1" in
+        "")
+            if [ -f "$COPIES_FILES_FLAG" ]; then
+                echo "Copias de los ficheros que cambia el programa: si (en ~/nexum-backups, antes de cambiarlos)"
+            else
+                echo "Copias de los ficheros que cambia el programa: no (con lvm-instalador copias-ficheros si, se guardan)"
+            fi
+            ;;
+        si)
+            if [ "$DRY" -eq 1 ]; then
+                echo "  [simulacion] se crearia $COPIES_FILES_FLAG"
+                return 0
+            fi
+            mkdir -p -m 700 "$LOG_DIR" || return 1
+            # (un enlace en su lugar no se sigue: se quita y se crea el fichero)
+            [ -L "$COPIES_FILES_FLAG" ] && rm -f "$COPIES_FILES_FLAG"
+            [ -f "$COPIES_FILES_FLAG" ] || ( umask 077; : > "$COPIES_FILES_FLAG" ) || return 1
+            echo "Copias de los ficheros que cambia el programa: si (en ~/nexum-backups, antes de cambiarlos)"
+            ;;
+        no)
+            if [ "$DRY" -eq 1 ]; then
+                echo "  [simulacion] se quitaria $COPIES_FILES_FLAG"
+                return 0
+            fi
+            rm -f "$COPIES_FILES_FLAG" || return 1
+            echo "Copias de los ficheros que cambia el programa: no"
+            ;;
+        *) echo "Uso: lvm-instalador copias-ficheros [si|no]"; return 1 ;;
+    esac
+}
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
 fi
 
+# (no en --simular, ni en las pruebas, LVM_PRUEBA, ni al pedir solo la version o las novedades, como
+# hace el empaquetador: tu carpeta se queda como esta)
+case "${1:-}" in
+    version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;
+    *) [ "$DRY" -eq 0 ] && [ -z "$TEST_DIR" ] && copies_migrate ;;
+esac
+
 # Copias de bases, configuraciones de proyectos y registros: solo para tu usuario (en el Mac la
 # carpeta personal suele ser 755: cualquier otro usuario del Mac podria leerlas)
-for dir in "$HOME/lvm-copias" "$LOG_DIR"; do
+for dir in "$COPIES_DIR" "$LOG_DIR"; do
     if [ -d "$dir" ] && [ -O "$dir" ] && [ ! -L "$dir" ]; then
         chmod 700 "$dir" 2> /dev/null
         find "$dir" -maxdepth 2 -type f -user "$(id -u)" -perm +077 -exec chmod go-rwx {} + 2> /dev/null
@@ -36848,7 +37237,9 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|copias-ficheros) ;;
+        # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
+        copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -36921,7 +37312,7 @@ case "$1" in
     docker-php-añadir) docker_web_add "$2" "$3" ;;
     docker-php-quitar) docker_web_remove "$2" "$3" ;;
     docker-php-elegir) docker_web_switch "$2" "$3" ;;
-    docker-pasar) docker_pass "$2" ;;
+    docker-pasar) docker_pass "$2" "$3" ;;
     docker-parar-todo) docker_stop_all ;;
     docker-web) shift; docker_web_command "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" ;;
@@ -36954,7 +37345,7 @@ case "$1" in
     preparar-firma) echo "Ya no hace falta gnupg: las firmas las comprueba el propio gestor con el Python del sistema" ;;
     servicio) service_control "$2" "$3" ;;
     asegurar) secure_command "$2" ;;
-    reparar-bd-sistema) repair_db_system ;;
+    reparar-bd-sistema) repair_db_system "$2" ;;
     arreglar-certificados) fix_certs ;;
     confiar-certificados) browser_trust "$2" ;;
     actualizar-phpmyadmin) update_pma "$2" ;;
@@ -36975,7 +37366,7 @@ case "$1" in
     barrera-web) web_barrier_command "$2" ;;
     correo) mail_command "$2" "$3" ;;
     vincular-bd) link_database "$2" "$3" "$4" ;;
-    rehacer|actualizar) cli_rebuild "$2" ;;
+    rehacer|actualizar) cli_rebuild "$2" "$3" ;;
     github) shift; github_command "$@" ;;
     github-conectar) github_connect "$2" ;;
     github-desconectar) github_disconnect ;;
@@ -36984,11 +37375,13 @@ case "$1" in
     docker-reposo) shift; docker_idle_command "$@" ;;
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     componentes) components_check "$2" ;;
-    componentes-actualizar) components_update ;;
+    componentes-actualizar) components_update "$2" ;;
     descargas) downloads_command "$2" ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;
     acerca|about) echo -e "$(about_text)" ;;
     novedades) changes_text ;;
+    copias) copies_command "$2" ;;
+    copias-ficheros) copies_files_command "$2" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

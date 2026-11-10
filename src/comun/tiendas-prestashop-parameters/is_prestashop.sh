@@ -93,8 +93,8 @@ function ps_parameters() {
             echo "  [simulacion] $file con la base $db y copia en $saved"
             return 0
         fi
-        [ -f "$file" ] && mkdir -p -m 700 "$HOME/lvm-copias" \
-            && cp "$file" "$HOME/lvm-copias/parameters.php-$folder-$(date +%Y%m%d-%H%M%S)"
+        [ -f "$file" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
+            && cp "$file" "$COPIES_DIR/parameters.php-$folder-$(date +%Y%m%d-%H%M%S)"
         mkdir -p -m 700 "$PS_PARAMS_DIR" || return 1
         python3 -I - "$PS_PARAMS_DIR/.nuevo" "$db" "$prefix" <<'EOF' || { echo "No se ha podido preparar $file"; return 1; }
 import datetime, hashlib, os, secrets, string, sys

@@ -93,6 +93,29 @@ extension AppModel {
         _ = runTask("Vaciando la caché de descargas", ["descargas", "vaciar"], doneText: "Caché de descargas vacía", autoClose: true)
     }
 
+    /// Configuración, Carpetas: borra las copias de seguridad (lo de dentro de ~/nexum-backups, no la carpeta).
+    /// Alguna copia de root puede pedir la contraseña
+    func clearCopies(_ files: Int, _ size: Int64) {
+        guard confirm("¿Borrar las copias de seguridad?", "Las copias borradas no se pueden recuperar.",
+                      "Borrar las copias", destructive: true,
+                      steps: ["Se borra todo lo que hay en ~/nexum-backups: \(plural(files, "fichero", "ficheros")) (\(fmtSize(size))). La carpeta se queda, vacía.",
+                              "Si alguna copia es del administrador, se pide su contraseña para borrarla."]) else { return }
+        _ = runTask("Borrando las copias de seguridad", ["copias", "vaciar"], doneText: "Copias de seguridad borradas",
+                    autoClose: true) { _, _, _ in self.refreshBackups() }
+    }
+
+    /// Configuración, Carpetas: guardar o no una copia de los ficheros que cambia el programa por su cuenta
+    /// (hosts, vhosts, configuración de los proyectos)
+    func setCopiesFiles(_ on: Bool) {
+        guard on != copiesFiles, !busy else { return }
+        _ = runTask(on ? "Encendiendo las copias de los ficheros" : "Apagando las copias de los ficheros",
+                    ["copias-ficheros", on ? "si" : "no"],
+                    doneText: "Copias de los ficheros que cambia el programa " + (on ? "encendidas" : "apagadas"),
+                    autoClose: true) { _, _, _ in
+            self.copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
+        }
+    }
+
     func clearMail() {
         guard confirm("¿Vaciar la bandeja de Mailpit?", "Se borran todos los correos que han mandado las webs de este Mac.",
                       "Vaciar la bandeja", destructive: true) else { return }
@@ -105,9 +128,9 @@ extension AppModel {
 
     func setAside() {
         if !confirm("¿Apartar el XAMPP oficial?",
-                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/lvm-copias), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Configuración (ahí también puedes volver a él). Pide la contraseña de administrador.",
+                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/nexum-backups), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Configuración (ahí también puedes volver a él). Pide la contraseña de administrador.",
                     "Apartar el XAMPP oficial") { return }
-        runTask("Apartando el XAMPP oficial", ["apartar"], doneText: "XAMPP oficial apartado. Sus BBDD están copiadas en ~/lvm-copias")
+        runTask("Apartando el XAMPP oficial", ["apartar"], doneText: "XAMPP oficial apartado. Sus BBDD están copiadas en ~/nexum-backups")
     }
 
     func restoreOfficial(_ aside: String) {
@@ -141,17 +164,20 @@ extension AppModel {
             case "no":
                 let inst = self.data?.installs.first(where: { $0.folder == folder })
                 let patch = (self.data?.php2shell[folder] ?? "") == "parcheable" && inst?.php == field(res, 1)
-                // (si la rama de MariaDB cambia, sus BBDD no se pueden conservar: se guardan en ~/lvm-copias)
+                // (si la rama de MariaDB cambia, sus BBDD no se pueden conservar: empieza vacía, con copia antes si se pide)
                 var keep = "Sus BBDD, proyectos y vhosts se conservan."
+                var warning = UPDATE_COPY_WARNING
                 if let i = inst, let b = self.branch(i.php), !b.mariadb.isEmpty, !i.mariadb.hasPrefix(b.mariadb + ".") {
-                    keep = "MariaDB pasa de la \(shortPhp(i.mariadb)) a la \(b.mariadb): sus BBDD se guardan en ~/lvm-copias y empieza vacía. Proyectos y vhosts se conservan."
+                    keep = "MariaDB pasa de la \(shortPhp(i.mariadb)) a la \(b.mariadb): empieza con las BBDD vacías. Proyectos y vhosts se conservan."
+                    warning = "Sin copia, sus BBDD no se podrán recuperar."
                 }
-                if !confirm(patch ? "¿Poner el parche de seguridad a XAMPP-\(folder)?" : "¿Actualizar XAMPP-\(folder)?",
-                            (patch ? "Se vuelve a compilar PHP \(field(res, 1)) con el parche oficial contra PHP2Shell (\(PHP2SHELL_DATE)), y su pila con los últimos parches (unos minutos). "
-                                   : "Se vuelve a compilar con PHP \(field(res, 1)) y los últimos parches de su pila (unos minutos). ")
-                            + keep + " Pide la contraseña de administrador.",
-                            patch ? "Poner el parche" : "Actualizar a PHP \(field(res, 1))") { return }
-                self.runTask("Actualizando XAMPP-\(folder)", ["actualizar", folder], progress: true,
+                let c = confirmCopy(patch ? "¿Poner el parche de seguridad a XAMPP-\(folder)?" : "¿Actualizar XAMPP-\(folder)?",
+                                    (patch ? "Se vuelve a compilar PHP \(field(res, 1)) con el parche oficial contra PHP2Shell (\(PHP2SHELL_DATE)), y su pila con los últimos parches (unos minutos). "
+                                           : "Se vuelve a compilar con PHP \(field(res, 1)) y los últimos parches de su pila (unos minutos). ")
+                                    + keep + " Pide la contraseña de administrador.",
+                                    patch ? "Poner el parche" : "Actualizar a PHP \(field(res, 1))", warning: warning)
+                if !c.ok { return }
+                self.runTask("Actualizando XAMPP-\(folder)", ["actualizar", folder] + (c.copy ? ["--copia"] : []), progress: true,
                              doneText: "XAMPP-\(folder) actualizada", reloadBranches: true)
             default:
                 message("No se ha podido comprobar", "No se ha podido consultar php.net. Comprueba la conexión a internet.", error: true)
@@ -171,7 +197,7 @@ extension AppModel {
         } else {
             let r = runDialog(title: "¿Desinstalar XAMPP-\(folder)?", text: text, okLabel: "Desinstalar XAMPP-\(folder)",
                               style: .warning, destructive: true,
-                              checkbox: "Guardar antes una copia de sus BBDD en ~/lvm-copias", checked: true,
+                              checkbox: "Guardar antes una copia de sus BBDD en ~/nexum-backups", checked: false,
                               hasField: true,
                               fieldLabel: "Sin copia, las BBDD no se podrán recuperar. Escribe \(folder) para confirmar:",
                               validate: { checked, typed in (checked || typed.trimmingCharacters(in: .whitespaces) == folder, nil, false) })
@@ -180,7 +206,7 @@ extension AppModel {
         }
         expanded.remove(folder)
         runTask("Desinstalando XAMPP-\(folder)", ["desinstalar", folder] + (copy ? ["--copia"] : []),
-                doneText: "XAMPP-\(folder) desinstalada" + (copy ? " (copia en ~/lvm-copias)" : ""),
+                doneText: "XAMPP-\(folder) desinstalada" + (copy ? " (copia en ~/nexum-backups)" : ""),
                 reloadBranches: true)
     }
 

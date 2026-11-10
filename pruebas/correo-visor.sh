@@ -14,7 +14,7 @@ else
     check "Linux: el componente se carga al necesitarlo y sin el se dice como ponerlo" '! grep -q "^from gi.repository import.*WebKit2" "$SRC" && grep -q "sudo apt install gir1.2-webkit2-4.1" "$SRC"'
     check "Linux: el visor se saca antes de vaciar la pestaña (si no, GTK lo destruye)" 'grep -A4 "^    def build_tools(self):$" "$SRC" | grep -q "web.get_parent().remove(web)"'
     check "Linux: un visor destruido no se reutiliza" 'grep -q "web.connect(\"destroy\", self.nv_mail_destroyed)" "$SRC"'
-    check "Linux: en la simulacion no se abre (desde ella se puede borrar)" 'sed -n "/^    def nv_mail_view/,/^    def nv_mail_tools/p" "$SRC" | grep -q "if SIMULATE:"'
+    check "Linux: en la simulacion no se abre (desde ella se puede borrar)" 'sed -n "/^    def nv_mail_view/,/^    def nv_mail_tools/p" "$SRC" | grep -q "if SIMULATE and not DEMO:"'
     check "Linux: el boton Correo lleva a su apartado" 'sed -n "/^    def nv_open_mail/,/^    def nv_mail_webkit/p" "$SRC" | grep -q "self.nv_tools_show(\"Correo de pruebas (Mailpit)\")"'
     check "Linux: ya no hay boton Abrir en la bandeja" '! grep -q "Gtk.Button(label=\"Abrir\", tooltip_text=\"Abrir la bandeja\"" "$SRC"'
     # La politica de navegacion, de verdad

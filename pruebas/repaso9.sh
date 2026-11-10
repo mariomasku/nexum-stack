@@ -203,12 +203,16 @@ src=8.2.4; [ $MAC -eq 1 ] && src=8.2
 : > "$LOG"
 out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm DRY=0 copy_database wp_x $src 8.4 2>&1); rc=$?
 check "copiar-bd a una version que ya la tiene, sin --sustituir: no hace nada" '[ $rc -ne 0 ] && [ ! -s "$LOG" ] && grep -q -- "--sustituir" <<< "$out"'
-out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm DRY=0 copy_database wp_x $src 8.4 --sustituir 2>&1); rc=$?
-check "con --sustituir: primero la copia de la de destino en ~/lvm-copias" '[ "$(head -1 "$LOG" | cut -d" " -f1,2,4)" = "EXPORT wp_x 8.4" ] && head -1 "$LOG" | grep -q "/lvm-copias/.*8.4-wp_x-antes-de-copiar-"'
+out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm COPIES_DIR=$W/casa2/nexum-backups DRY=0 copy_database wp_x $src 8.4 --sustituir 2>&1); rc=$?
+check "con --sustituir sin --copia: no guarda la de destino y lo dice" '[ "$(head -1 "$LOG" | cut -d" " -f1,2,4)" = "EXPORT wp_x $src" ] && [ "$(grep -c EXPORT "$LOG")" = 1 ] && grep -q "Sin copia" <<< "$out" && [ ! -e "$W/casa2/nexum-backups" ]'
+check "... y se carga con --crear --sin-copia (ya dicho que no hay copia)" '[ "$(sed -n 2p "$LOG")" = "IMPORT wp_x --crear --sin-copia" ] && [ $rc -eq 0 ]'
+: > "$LOG"
+out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm COPIES_DIR=$W/casa2/nexum-backups DRY=0 copy_database wp_x $src 8.4 --sustituir --copia 2>&1); rc=$?
+check "con --sustituir --copia: primero la copia de la de destino en ~/nexum-backups" '[ "$(head -1 "$LOG" | cut -d" " -f1,2,4)" = "EXPORT wp_x 8.4" ] && head -1 "$LOG" | grep -q "/nexum-backups/.*8.4-wp_x-antes-de-copiar-"'
 check "... despues la de origen, y se carga con --crear --sin-copia (la copia ya esta)" '[ "$(sed -n 2p "$LOG" | cut -d" " -f1,2,4)" = "EXPORT wp_x $src" ] && [ "$(sed -n 3p "$LOG")" = "IMPORT wp_x --crear --sin-copia" ] && [ $rc -eq 0 ]'
 export_database() { echo "EXPORT $1 $2 $3" >> "$LOG"; [ "$3" != 8.4 ]; }
 : > "$LOG"
-out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm DRY=0 copy_database wp_x $src 8.4 --sustituir 2>&1); rc=$?
+out=$(TEST_DIR=$W/v BASE_DIR=$W/v HOME=$W/casa2 LOG_DIR=$W/casa2/.lvm COPIES_DIR=$W/casa2/nexum-backups DRY=0 copy_database wp_x $src 8.4 --sustituir --copia 2>&1); rc=$?
 check "si no se puede guardar la copia de la de destino, no se carga nada" '[ $rc -ne 0 ] && ! grep -q IMPORT "$LOG"'
 db_names() { [[ "$1" == *8.2* ]] && echo wp_x; }
 : > "$LOG"

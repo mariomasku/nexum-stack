@@ -318,13 +318,16 @@ class NvProyectos:
     def nv_docker_pass(self, p):
         """Un proyecto de antes (con LAMPP delante) pasa al Apache de Docker (docker-pasar)."""
         new = self.dk_url(docker_web_domain(dict(p, kind=project_kind(p["folder"])), p["php"]))
+        extra = copy_check("Sin copia, su BBDD de ahora no se podrá recuperar.")
         if not confirm(self.win, "¿Pasar %s al Apache de Docker?" % p["folder"],
-                       "Ya no necesitará LAMPP y podrás añadirle más versiones de PHP. Antes se guarda una copia de "
-                       "su BBDD (%s) en ~/lvm-copias y se carga en la MariaDB común; después se quitan sus "
-                       "contenedores de ahora, su vhost de LAMPP y su línea de /etc/hosts. Se abrirá en %s. "
-                       "Pide la contraseña de administrador." % (p["db"], new), "Pasarlo"):
+                       "Ya no necesitará LAMPP y podrás añadirle más versiones de PHP. Pide la contraseña de "
+                       "administrador.", "Pasarlo",
+                       steps=["Su BBDD (%s) se carga en la MariaDB común de Docker." % p["db"],
+                              "Se quitan sus contenedores de ahora, su vhost de LAMPP y su línea de /etc/hosts.",
+                              "Se abrirá en %s." % new], extra=extra):
             return
-        self.run_task("Pasando %s al Apache de Docker" % p["folder"], ["docker-pasar", p["slug"]], progress=True,
+        args = ["docker-pasar", p["slug"]] + (["--copia"] if extra.wanted else [])
+        self.run_task("Pasando %s al Apache de Docker" % p["folder"], args, progress=True,
                       done_text="%s ya va con el Apache de Docker" % p["folder"],
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 

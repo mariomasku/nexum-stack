@@ -165,7 +165,7 @@ function gui_db_info() {
 }
 
 # borrar-bd <base> [--copia]: elimina la base y todo su contenido. Con --copia guarda antes un
-# volcado en ~/lvm-copias (se puede volver a cargar con importar-bd); si la copia falla, no se borra
+# volcado en ~/nexum-backups (se puede volver a cargar con importar-bd); si la copia falla, no se borra
 function drop_database() {
     local db=$1 backup=0 rc
     [ "$2" == "--copia" ] && backup=1
@@ -181,9 +181,9 @@ function drop_database() {
     fi
 
     if [ $backup -eq 1 ]; then
-        local dest="$HOME/lvm-copias/lampp-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local dest="$COPIES_DIR/lampp-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "Guardando copia de $db..."
-        run mkdir -p -m 700 "$HOME/lvm-copias"
+        run mkdir -p -m 700 "$COPIES_DIR"
         if ! export_database "$db" "$dest" "$DB_FOLDER"; then
             echo "No se ha podido guardar la copia, asi que NO se borra nada."
 
@@ -290,7 +290,7 @@ function db_temp_stop() {
 }
 
 # copiar-bd <base> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->]
-# [--sustituir]: copia una base a otra version, para probar el proyecto con otro PHP. --como le da
+# [--sustituir [--copia]]: copia una base a otra version, para probar el proyecto con otro PHP. --como le da
 # otro nombre en la de destino (base_8_4 -> base_8_5) y --carpeta la vincula alli a esa carpeta de
 # proyecto (- = a ninguna; sin --carpeta, el vinculo no se toca). Se descarga de la de origen (como exportar-bd) a un
 # fichero solo tuyo y se carga en la de destino con la carga protegida de importar-bd (usuario de la
@@ -299,13 +299,14 @@ function db_temp_stop() {
 # se toca
 function copy_database() {
     local db=$1 src=$2 dst=$3 sdir ddir src_owner dst_owner tmp rc active active_owner
-    local replace=0 load=(--crear) new="" link="" usage=0
+    local replace=0 load=(--crear) new="" link="" usage=0 backup=0
     shift 3 2> /dev/null
-    # --sustituir: si la de destino ya la tiene, antes se guarda una copia suya en ~/lvm-copias y se
-    # carga la de origen encima (la de destino se vacia antes de cargar)
+    # --sustituir: si la de destino ya la tiene, se carga la de origen encima (la de destino se vacia
+    # antes de cargar); con --copia, antes se guarda una copia suya en ~/nexum-backups
     while [ $# -gt 0 ]; do
         case $1 in
             --sustituir) replace=1; shift ;;
+            --copia) backup=1; shift ;;
             --como|--carpeta)
                 [ -n "$2" ] || { usage=1; break; }
                 [ "$1" == --como ] && new=$2 || link=$2
@@ -314,7 +315,7 @@ function copy_database() {
         esac
     done
     if [ -z "$db" ] || [ -z "$src" ] || [ -z "$dst" ] || [ $usage -eq 1 ]; then
-        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir]"
+        echo "Uso: lvm-instalador copiar-bd <base de datos> <version de origen> <version de destino> [--como <nombre>] [--carpeta <carpeta|->] [--sustituir [--copia]]"
         return 1
     fi
     new=${new:-$db}
@@ -342,9 +343,8 @@ function copy_database() {
     fi
     if db_names "/opt/lampp-$dst_owner" | grep -qxF "$new"; then
         if [ $replace -eq 0 ]; then
-            echo "lampp-$dst ya tiene una BBDD $new: no se toca (con --sustituir se guarda una copia suya en"
-            # shellcheck disable=SC2088  # (el ~ es un texto que se enseña)
-            echo "~/lvm-copias y se pone la de lampp-$src en su lugar; o copiala con otro nombre: --como)"
+            echo "lampp-$dst ya tiene una BBDD $new: no se toca (con --sustituir se pone la de lampp-$src en"
+            echo "su lugar, y con --copia antes se guarda una copia suya; o copiala con otro nombre: --como)"
             return 1
         fi
         load=(--crear --sin-copia)
@@ -356,7 +356,8 @@ function copy_database() {
     [ -n "$active" ] && { active_owner=$(data_owner "$active"); active_owner=${active_owner:-${active#/opt/lampp-}}; }
     echo "Copia de la BBDD $shown: de lampp-$src a lampp-$dst (lampp-$src no se toca)"
     if [ "$DRY" -eq 1 ]; then
-        [ $replace -eq 1 ] && echo "  [simulacion] copia de $new de lampp-$dst en ~/lvm-copias (la sustituida)"
+        [ $replace -eq 1 ] && [ $backup -eq 1 ] && echo "  [simulacion] copia de $new de lampp-$dst en ~/nexum-backups (la sustituida)"
+        [ $replace -eq 1 ] && [ $backup -eq 0 ] && echo "  [simulacion] sin copia de $new de lampp-$dst (la sustituida)"
         echo "  [simulacion] descarga de $db de lampp-$src a un fichero temporal en ~/.lvm-instalador"
         if [ "$dst_owner" == "$active_owner" ] && lampp_running; then
             echo "  [simulacion] carga en el MariaDB en marcha de lampp-$dst (importar-bd ${load[*]})"
@@ -370,11 +371,14 @@ function copy_database() {
         fi
         return 0
     fi
-    if [ $replace -eq 1 ]; then
-        local backup="$HOME/lvm-copias/lampp-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
-        echo "lampp-$dst ya tiene $new: antes se guarda una copia suya en $backup"
-        mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-        if ! export_database "$new" "$backup" "$dst"; then
+    if [ $replace -eq 1 ] && [ $backup -eq 0 ]; then
+        echo "lampp-$dst ya tiene $new: se sustituye."
+        echo "Sin copia: la que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
+    elif [ $replace -eq 1 ]; then
+        local saved="$COPIES_DIR/lampp-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
+        echo "lampp-$dst ya tiene $new: antes se guarda una copia suya en $saved"
+        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        if ! export_database "$new" "$saved" "$dst"; then
             echo "No se ha podido guardar la copia de $new de lampp-$dst, asi que no se ha cambiado nada."
             return 1
         fi
@@ -1078,13 +1082,13 @@ with zipfile.ZipFile(sys.stdout.buffer, "w", zipfile.ZIP_DEFLATED) as z:
         shutil.copyfileobj(sys.stdin.buffer, m, 1 << 20)
 '
 
-# importar-bd <fichero .sql, .sql.gz o .zip> <base> [--crear] [--sin-copia]: carga el fichero en el
+# importar-bd <fichero .sql, .sql.gz o .zip> <base> [--crear] [--copia]: carga el fichero en el
 # MariaDB de la version activa. --crear crea la base si no existe. Si ya existe, siempre se vacia
 # antes (se borra y se crea de nuevo con su juego de caracteres): asi no quedan tablas que el volcado
 # ya no trae ni filas de una carga anterior que fallo a medias (los volcados de phpMyAdmin no llevan
-# DROP TABLE y sus INSERT se suman a lo que haya). Si tiene tablas, antes se guarda una copia suya en
-# ~/lvm-copias; --sin-copia no la guarda (copiar-bd, que ya la ha guardado). --vaciar se admite, pero
-# ya no hace falta.
+# DROP TABLE y sus INSERT se suman a lo que haya). Si tiene tablas y se pide --copia, antes se guarda
+# una copia suya en ~/nexum-backups (sin --copia, no se guarda y se dice). --sin-copia y --vaciar se
+# admiten, pero ya no hacen falta.
 # Las copias hechas con mariadb-dump moderno empiezan por "/*M!999999\- enable the sandbox mode */",
 # que los clientes de MariaDB anteriores a 10.5.25 (el de XAMPP es 10.4) no entienden: esa primera
 # linea se quita al vuelo, sin tocar el fichero.
@@ -1092,20 +1096,22 @@ with zipfile.ZipFile(sys.stdout.buffer, "w", zipfile.ZIP_DEFLATED) as z:
 # posicion, que se ve en /proc/<pid>/fdinfo/3 (asi lo hace pv -d). Con LVM_PROGRESO se escribe una
 # linea S con modo fdpos para la ventana; en una terminal con pv se muestra la barra de pv.
 function import_database() {
-    local file=$1 db=$2 create=0 backup=1 saved="" project=""
+    local file=$1 db=$2 create=0 backup=0 told=0 saved="" project=""
     shift 2
     while [ $# -gt 0 ]; do
         case "$1" in
             --crear) create=1 ;;
             --vaciar) ;;
-            --sin-copia) backup=0 ;;
+            --copia) backup=1 ;;
+            # (copiar-bd: ya ha guardado la copia, o ya ha dicho que no la hay)
+            --sin-copia) backup=0; told=1 ;;
             --proyecto) project=${2%/}; shift ;;
         esac
         shift
     done
 
     if [ -z "$file" ] || [ -z "$db" ]; then
-        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--sin-copia] [--proyecto <carpeta>]"
+        echo "Uso: lvm-instalador importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
 
         return 1
     fi
@@ -1193,7 +1199,7 @@ function import_database() {
         echo "Creando la base de datos $db..."
         run "${mysql[@]}" -e "CREATE DATABASE \`$db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci" < /dev/null || return 1
     else
-        # (ya existe: se vacia siempre, con copia antes si tiene tablas)
+        # (ya existe: se vacia siempre, con copia antes si tiene tablas y se ha pedido)
         local tables
         tables=$("${mysql[@]}" -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$db'" < /dev/null)
         if ! [[ "$tables" =~ ^[0-9]+$ ]]; then
@@ -1201,14 +1207,18 @@ function import_database() {
             return 1
         fi
         if [ "$tables" -gt 0 ] && [ $backup -eq 1 ]; then
-            saved="$HOME/lvm-copias/lampp-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
+            saved="$COPIES_DIR/lampp-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
             echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
             echo "Antes se guarda una copia suya en $saved"
-            run mkdir -p -m 700 "$HOME/lvm-copias"
+            run mkdir -p -m 700 "$COPIES_DIR"
             if ! export_database "$db" "$saved" "$DB_FOLDER"; then
                 echo "No se ha podido guardar la copia de $db, asi que no se ha cambiado nada."
                 return 1
             fi
+        fi
+        if [ "$tables" -gt 0 ] && [ $backup -eq 0 ] && [ $told -eq 0 ]; then
+            echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
+            echo "Sin copia: lo que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
         fi
         echo "Vaciando la base de datos $db..."
         local charset=$("${mysql[@]}" -N -e "SELECT CONCAT(DEFAULT_CHARACTER_SET_NAME, ' COLLATE ', DEFAULT_COLLATION_NAME)
@@ -1349,11 +1359,12 @@ function db_error_log() {
     find "$1/var/mysql" -maxdepth 1 -type f -name '*.err' -printf '%s %p\n' 2> /dev/null | sort -rn | head -1 | cut -d' ' -f2-
 }
 
-# reparar-bd-sistema: pone al dia las tablas del sistema de MariaDB de la version montada (con su
+# reparar-bd-sistema [--copia]: pone al dia las tablas del sistema de MariaDB de la version montada (con su
 # propio mysql_upgrade, solo las del sistema: las bases de los proyectos no se tocan), despues de
-# guardar una copia de la base mysql en ~/lvm-copias, y vacia su registro de errores si es grande
+# guardar (con --copia) una copia de la base mysql en ~/nexum-backups, y vacia su registro de errores si es grande
 function repair_db_system() {
-    local dir name upgrade dump log size backup out
+    local dir name upgrade dump log size backup="" out copy=0
+    [ "$1" == "--copia" ] && copy=1
     dir=$(active_dir)
     if [ -z "$dir" ] || ! lampp_running; then
         echo "La version activa tiene que estar en marcha: arrancala y vuelve a intentarlo."
@@ -1394,21 +1405,24 @@ function repair_db_system() {
     if db_system_outdated; then
         echo "Las tablas del sistema de MariaDB de $name son de una version anterior: se ponen al dia"
         echo "(las bases de los proyectos no se tocan)."
-        backup="$HOME/lvm-copias/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 1 ] && backup="$COPIES_DIR/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 0 ] && echo "Sin copia: las tablas del sistema de ahora no se podran recuperar (con --copia se guardan antes)"
         if [ "$DRY" -eq 1 ]; then
-            echo "  [simulacion] copia de la base mysql en $backup"
+            [ -n "$backup" ] && echo "  [simulacion] copia de la base mysql en $backup"
             echo "  [simulacion] ${upgrade[0]##*/} --upgrade-system-tables --force"
         else
-            mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-            if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
-                rm -f "$backup"
-                echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."
-                return 1
+            if [ -n "$backup" ]; then
+                mkdir -p -m 700 "$COPIES_DIR" || return 1
+                if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
+                    rm -f "$backup"
+                    echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."
+                    return 1
+                fi
+                echo "Copia de las tablas del sistema: $backup"
             fi
-            echo "Copia de las tablas del sistema: $backup"
             if ! out=$("${as_owner[@]}" "${upgrade[@]}" --upgrade-system-tables --force < /dev/null 2>&1); then
                 echo "$out" | tail -8 | sed 's/^/  /'
-                echo "No se han podido poner al dia (la copia esta en $backup)."
+                echo "No se han podido poner al dia${backup:+ (la copia esta en $backup)}."
                 return 1
             fi
             echo "$out" | grep -E '^(Phase|OK)' | sed 's/^/  /'

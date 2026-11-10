@@ -51,12 +51,13 @@ extension AppModel {
             what.append(mode == "fusionar" ? "Se fusiona «\(name)» con \(HTDOCS)/\(folder)."
                         : "Se sobrescribe la carpeta con «\(name)» en \(HTDOCS)/\(folder): se borra lo que no traiga.")
         }
-        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)» (antes se guarda una copia).") }
+        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)».") }
         runQuick(["gui-proyecto-git", folder]) { _, out in
             let f = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 })
             guard !code.isEmpty, let g = f, g[1] == "1" else {
-                if confirm("¿Actualizar \(folder)?", "", "Actualizar", steps: what) {
-                    self.upStart(folder, sql, db, code, mode, pull: false)
+                let c = confirmCopy("¿Actualizar \(folder)?", "", "Actualizar", steps: what)
+                if c.ok {
+                    self.upStart(folder, sql, db, code, mode, pull: false, copy: c.copy)
                 }
                 return
             }
@@ -65,7 +66,7 @@ extension AppModel {
             if dirty > 0 { state.append(plural(dirty, "cambio", "cambios") + " sin commit") }
             if ahead > 0 { state.append(plural(ahead, "commit", "commits") + " sin subir") }
             var text = [state.joined(separator: "  ·  ")]
-            if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido queda en ~/lvm-copias, pero no en git.") }
+            if dirty > 0 || ahead > 0 { text.append("Revisa antes lo que estás trabajando: lo sustituido no queda en git (solo en la copia, si la guardas).") }
             let canPull = g[5] == "1" && !g[2].isEmpty
             text.append(canPull ? "Con el pull, la carpeta se equipara antes al repositorio. Si choca con tus cambios, se para sin tocar nada."
                         : "No se puede hacer pull: no tiene origin o no está en una rama.")
@@ -73,21 +74,23 @@ extension AppModel {
             alert.messageText = "¿Hacer git pull antes de copiar?"
             let steps = dialogSteps(what)
             let note = dialogLabel(text.joined(separator: "\n\n"), color: .secondaryLabelColor, align: .left)
-            alert.accessoryView = dialogStack([steps, note])
+            let cc = copyCheckViews()
+            alert.accessoryView = dialogStack([steps, note, cc.box, cc.note])
             if canPull { alert.addButton(withTitle: "Hacer pull y copiar") }
             alert.addButton(withTitle: "Copiar sin pull")
             alert.addButton(withTitle: "Cancelar")
-            let resp = alert.runModal()
+            let resp = withExtendedLifetime(cc.validator) { alert.runModal() }
+            let copy = cc.box.state == .on
             if canPull && resp == .alertFirstButtonReturn {
-                self.upStart(folder, sql, db, code, mode, pull: true)
+                self.upStart(folder, sql, db, code, mode, pull: true, copy: copy)
             } else if resp == (canPull ? .alertSecondButtonReturn : .alertFirstButtonReturn) {
-                self.upStart(folder, sql, db, code, mode, pull: false)
+                self.upStart(folder, sql, db, code, mode, pull: false, copy: copy)
             }
         }
     }
 
-    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool) {
-        var args = ["actualizar-proyecto", folder]
+    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool, copy: Bool) {
+        var args = ["actualizar-proyecto", folder] + (copy ? ["--copia"] : [])
         if !code.isEmpty { args += ["--codigo", code, "--modo", mode] + (pull ? ["--pull"] : []) }
         if !sql.isEmpty { args += ["--bd", sql] }
         // (también solo con el código: al volver a cargarlo, su configuración vuelve a esta BBDD)
@@ -95,7 +98,8 @@ extension AppModel {
         let go = {
             _ = self.runTask("Actualizando \(folder)", args, progress: true, doneText: "\(folder) actualizado", env: self.dbEnv(),
                              cancelText: ("¿Cancelar la actualización?",
-                                          "El proyecto se queda a medias, con lo hecho hasta ahora. Lo sustituido sigue en ~/lvm-copias.",
+                                          "El proyecto se queda a medias, con lo hecho hasta ahora."
+                                              + (copy ? " Lo sustituido sigue en ~/nexum-backups." : ""),
                                           "Cancelar la actualización"))
         }
         if sql.isEmpty { go() } else { checkDbAccess { go() } }
@@ -313,7 +317,7 @@ extension AppModel {
     }
 
     /// borrar-proyecto: su carpeta, sus vhosts y dominios, lo de Docker y, si se quiere, su BBDD de la
-    /// versión activa (la de phpMyAdmin), con copia por defecto. Hay que escribir el nombre de la carpeta
+    /// versión activa (la de phpMyAdmin), con copia si se marca. Hay que escribir el nombre de la carpeta
     /// para confirmar: la carpeta no se puede recuperar
     func deleteProject(_ x: Project) {
         guard let d = data, !busy else { return }
@@ -336,8 +340,9 @@ extension AppModel {
             let r2 = runDialog(title: "¿Borrar también su BBDD «\(db)»?",
                                text: "Es la de XAMPP-\(d.active), la que se ve en phpMyAdmin. Si no, solo se borra el proyecto y la BBDD se queda.",
                                okLabel: "Borrar también la BBDD", style: .critical, destructive: true,
-                               checkbox: "Guardar antes una copia en ~/lvm-copias (se puede volver a cargar)", checked: true,
-                               cancelLabel: "Solo el proyecto")
+                               checkbox: "Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)", checked: false,
+                               cancelLabel: "Solo el proyecto",
+                               copyWarning: "Sin copia, la BBDD no se podrá recuperar.")
             if r2.ok {
                 withDb = true
                 copy = r2.checked
@@ -345,7 +350,7 @@ extension AppModel {
             }
         }
         let finalArgs = args, useDb = withDb
-        let done = "Proyecto «\(x.name)» borrado" + (useDb ? " con su BBDD" : "") + (useDb && copy ? " (copia en ~/lvm-copias)" : "")
+        let done = "Proyecto «\(x.name)» borrado" + (useDb ? " con su BBDD" : "") + (useDb && copy ? " (copia en ~/nexum-backups)" : "")
         let go: () -> Void = {
             _ = self.runTask("Borrando el proyecto \(x.name)", finalArgs, doneText: done,
                              env: useDb ? self.dbEnv() : [:])
@@ -403,11 +408,16 @@ extension AppModel {
         }
         let replace = hasDb(dst, db)
         if replace {
-            notes.append("XAMPP-\(dst) ya tiene \(db): se guarda una copia suya en ~/lvm-copias y se sustituye. Lo que tenía se pierde (salvo en esa copia).")
+            notes.append("XAMPP-\(dst) ya tiene \(db): se sustituye. Lo que tenía se pierde, salvo que guardes antes una copia.")
             args.append("--sustituir")
         }
-        guard confirm(replace ? "¿Sustituir \(db) en XAMPP-\(dst)?" : "¿Copiar \(db) a XAMPP-\(dst)?",
-                      "", replace ? "Sustituir \(db)" : "Copiar a XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
+        if replace {
+            let c = confirmCopy("¿Sustituir \(db) en XAMPP-\(dst)?", "", "Sustituir \(db)", destructive: true, steps: notes)
+            if !c.ok { return }
+            if c.copy { args.append("--copia") }
+        } else {
+            guard confirm("¿Copiar \(db) a XAMPP-\(dst)?", "", "Copiar a XAMPP-\(dst)", steps: notes) else { return }
+        }
         runTask("Copiando \(db) a XAMPP-\(dst)", args, doneText: "\(db) copiada a XAMPP-\(dst)", autoClose: true)
     }
 
@@ -475,7 +485,7 @@ extension AppModel {
                 hint.stringValue = "Letras sin acentos, números, _ y - (sin - delante)."
                 hint.textColor = .secondaryLabelColor
             } else if let t = target(), hasDb(t.folder, name) {
-                hint.stringValue = "XAMPP-\(t.folder) ya tiene una BBDD \(name): se sustituye (antes se guarda una copia suya en ~/lvm-copias)."
+                hint.stringValue = "XAMPP-\(t.folder) ya tiene una BBDD \(name): se sustituye (al confirmar puedes guardar antes una copia suya)."
                 hint.textColor = .systemRed
             } else {
                 hint.stringValue = target().map { "Se crea \(name) en XAMPP-\($0.folder)." } ?? ""
@@ -549,11 +559,16 @@ extension AppModel {
         }
         let replace = hasDb(dst, name)
         if replace {
-            notes.append("XAMPP-\(dst) ya tiene \(name): se guarda una copia suya en ~/lvm-copias y se sustituye. Lo que tenía se pierde (salvo en esa copia).")
+            notes.append("XAMPP-\(dst) ya tiene \(name): se sustituye. Lo que tenía se pierde, salvo que guardes antes una copia.")
             args.append("--sustituir")
         }
-        guard confirm("¿Replicar en XAMPP-\(dst)?", "",
-                      replace ? "Sustituir y replicar" : "Replicar en XAMPP-\(dst)", destructive: replace, steps: notes) else { return }
+        if replace {
+            let c = confirmCopy("¿Replicar en XAMPP-\(dst)?", "", "Sustituir y replicar", destructive: true, steps: notes)
+            if !c.ok { return }
+            if c.copy { args.append("--copia") }
+        } else {
+            guard confirm("¿Replicar en XAMPP-\(dst)?", "", "Replicar en XAMPP-\(dst)", steps: notes) else { return }
+        }
         runTask("Replicando en XAMPP-\(dst)", args, doneText: "\(db) replicada en XAMPP-\(dst) como \(name)", autoClose: true)
     }
 
@@ -585,7 +600,7 @@ extension AppModel {
     }
 
     /// /etc/hosts es de root: se edita una copia en ~/.lvm-instalador y, al pulsar Aplicar, el script
-    /// la escribe encima con sudo (guardando antes el anterior en ~/lvm-copias)
+    /// la escribe encima con sudo (guardando antes el anterior en ~/nexum-backups, si está el ajuste)
     func editHosts() {
         let src = (data ?? AppData()).hosts
         let copy = LOG_DIR + "/hosts"
@@ -602,7 +617,9 @@ extension AppModel {
         p.arguments = ["-t", copy]
         try? p.run()
         guard confirm("Editar hosts",
-                      "\(src) es del administrador: se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: el anterior queda en ~/lvm-copias. Pide la contraseña de administrador.",
+                      "\(src) es del administrador: se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»"
+                          + (FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? ": el anterior queda en ~/nexum-backups" : "")
+                          + ". Pide la contraseña de administrador.",
                       "Aplicar los cambios") else { return }
         if FileManager.default.contentsEqual(atPath: src, andPath: copy) {
             toast("No has cambiado nada en \(src) (¿guardaste los cambios?)")
@@ -613,7 +630,7 @@ extension AppModel {
 
     /// Los vhosts son del administrador (Apache los lee como root al arrancar): se edita una copia en
     /// ~/.lvm-instalador y, al pulsar Aplicar, el script la comprueba, la escribe con sudo (guardando
-    /// antes la anterior en ~/lvm-copias) y recarga Apache. Si Apache no la acepta, se deja como estaba
+    /// antes la anterior en ~/nexum-backups, si está el ajuste) y recarga Apache. Si Apache no la acepta, se deja como estaba
     func editVhosts() {
         let path = (data ?? AppData()).vhosts
         let real = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
@@ -632,7 +649,9 @@ extension AppModel {
         }
         openInEditor(copy)
         guard confirm("Editar vhosts",
-                      "Son del administrador (Apache los lee como root): se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: se comprueban, los de ahora quedan en ~/lvm-copias y se recarga Apache. Si Apache no los acepta, se quedan como estaban. Pide la contraseña de administrador.",
+                      "Son del administrador (Apache los lee como root): se ha abierto una copia en el editor. Guarda los cambios y pulsa «Aplicar los cambios»: se comprueban, "
+                          + (FileManager.default.fileExists(atPath: COPIES_FILES_FLAG) ? "los de ahora quedan en ~/nexum-backups " : "se escriben ")
+                          + "y se recarga Apache. Si Apache no los acepta, se quedan como estaban. Pide la contraseña de administrador.",
                       "Aplicar los cambios") else { return }
         if FileManager.default.contentsEqual(atPath: real, andPath: copy) {
             toast("No has cambiado nada en los vhosts (¿guardaste los cambios?)")

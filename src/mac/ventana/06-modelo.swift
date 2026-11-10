@@ -102,9 +102,11 @@ final class AppModel: ObservableObject {
     @Published var selProject: String? = nil
     @Published var projKind = "all"
     // Bases de datos: «solo la versión activa» (la activa se ve desplegada al abrir) y lo que ocupan
-    // las copias de ~/lvm-copias ([bytes, ficheros])
+    // las copias de ~/nexum-backups ([bytes, ficheros])
     @Published var dbOnlyActive = false
     @Published var backups: [Int64]? = nil
+    /// Copias de los ficheros que cambia el programa por su cuenta (Configuración, Carpetas; copias-ficheros si|no)
+    @Published var copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
     /// Lo que ocupa cada BBDD («versión|base» → [bytes, cuándo se midió]; gui-bbdd-tamanos)
     @Published var dbSizes: [String: [Int64]] = [:]
     /// Lo que ocupa cada proyecto en el disco: carpeta → [bytes, cuándo se midió]

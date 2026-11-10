@@ -54,7 +54,7 @@ struct UpdateProjectSheet: View {
                         TextField("", text: $model.upDb).frame(width: 220)
                     }
                     if !model.upSql.isEmpty {
-                        Text("(antes se guarda una copia de la actual)").font(.caption).foregroundColor(.secondary)
+                        Text("(al confirmar, puedes guardar antes una copia de la actual)").font(.caption).foregroundColor(.secondary)
                     }
                 }
             }
@@ -68,7 +68,7 @@ struct UpdateProjectSheet: View {
                 }
                 .pickerStyle(RadioGroupPickerStyle())
                 .labelsHidden()
-                Text("Se escribe sobre \(HTDOCS)/\(model.upFolder). Su .git no se toca y lo sustituido o borrado queda en ~/lvm-copias.")
+                Text("Se escribe sobre \(HTDOCS)/\(model.upFolder). Su .git no se toca; lo sustituido o borrado solo se puede recuperar si al confirmar guardas antes una copia en ~/nexum-backups.")
                     .font(.caption).foregroundColor(RED).fixedSize(horizontal: false, vertical: true)
             }
             .disabled(model.upCode.isEmpty)

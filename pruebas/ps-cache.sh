@@ -1,7 +1,7 @@
 #!/bin/bash
 # La cache de PrestaShop 1.7+ (var/cache/<entorno>/appParameters.php) con la BBDD de otro sitio (la de
 # Docker: db) no deja a la tienda conectar en LAMPP (Linux 1.55.10 / Mac 1.39.21): al cargarla se
-# aparta, y en Docker la cache va en un volumen del contenedor. Uso: ps-cache.sh <lvm-instalador.sh>
+# borra (con copias-ficheros, se aparta), y en Docker la cache va en un volumen del contenedor. Uso: ps-cache.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-ps-cache.XXXX") || exit 1
@@ -16,8 +16,13 @@ params() { printf "<?php return array('parameters' => array(\n    'database_host
 params localhost root > "$T/app/config/parameters.php"
 params db nexum > "$T/var/cache/prod/appParameters.php"
 params localhost root > "$T/var/cache/dev/appParameters.php"
+COPIES_DIR=$HOME/nexum-backups COPIES_FILES_FLAG=$W/copias-ficheros
 o=$(ps_stale_cache tienda)
-check "la cache con la BBDD de Docker se aparta y lo dice" '[ ! -e "$T/var/cache/prod" ] && ls -d "$HOME"/lvm-copias/tienda-cache-prod-* > /dev/null 2>&1 && grep -q "apartada" <<< "$o"'
+check "sin copias-ficheros: la cache con la BBDD de Docker se borra y lo dice" '[ ! -e "$T/var/cache/prod" ] && [ ! -e "$COPIES_DIR" ] && grep -q "borrada" <<< "$o"'
+mkdir -p "$T/var/cache/prod"; params db nexum > "$T/var/cache/prod/appParameters.php"
+: > "$COPIES_FILES_FLAG"
+o=$(ps_stale_cache tienda)
+check "con copias-ficheros: se aparta a ~/nexum-backups y lo dice" '[ ! -e "$T/var/cache/prod" ] && ls -d "$COPIES_DIR"/tienda-cache-prod-* > /dev/null 2>&1 && grep -q "apartada" <<< "$o"'
 check "la cache con la BBDD buena se queda" '[ -f "$T/var/cache/dev/appParameters.php" ]'
 o=$(ps_stale_cache tienda)
 check "otra vez: nada que apartar" '[ -z "$o" ] && [ -f "$T/var/cache/dev/appParameters.php" ]'

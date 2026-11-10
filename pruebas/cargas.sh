@@ -1,6 +1,6 @@
 #!/bin/bash
-# importar-bd sobre una base que ya existe: siempre se vacia antes (con copia en ~/lvm-copias si
-# tiene tablas), contra un MariaDB temporal (mysql_install_db de la 8.2.4 en una carpeta temporal,
+# importar-bd sobre una base que ya existe: siempre se vacia antes (con --copia, y si tiene tablas,
+# antes una copia en ~/nexum-backups), contra un MariaDB temporal (mysql_install_db de la 8.2.4 en una carpeta temporal,
 # sin red: solo un socket; nunca el de una version). Volcados como los de phpMyAdmin: sin DROP TABLE.
 # Uso: cargas.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -48,8 +48,9 @@ export_database() {
 export LVM_BD_VOLCADO=$MDB/mysqldump
 H=$MDB/casa; mkdir -p "$H"
 sql() { "$DB_CLIENT" -uroot -N -e "$1" 2> /dev/null; }
-load() { HOME=$H DRY=0 LVM_PROGRESO="" import_database "$@" < /dev/null 2>&1; }
-copies() { ls "$H/lvm-copias" 2> /dev/null | grep -c -- "-wpz-antes-de-cargar-.*\.sql\.gz$"; }
+C=$H/nexum-backups
+load() { HOME=$H COPIES_DIR=$C DRY=0 LVM_PROGRESO="" import_database "$@" < /dev/null 2>&1; }
+copies() { ls "$C" 2> /dev/null | grep -c -- "-wpz-antes-de-cargar-.*\.sql\.gz$"; }
 
 # Volcado como el de phpMyAdmin: sin DROP TABLE
 cat > "$MDB/volcado.sql" <<'SQL'
@@ -64,27 +65,33 @@ sql "CREATE DATABASE wpz CHARACTER SET latin1 COLLATE latin1_spanish_ci;
      CREATE TABLE wpz.claims (id INT, v VARCHAR(10)); INSERT INTO wpz.claims VALUES (1,'a'),(1,'a'),(2,'b')"
 
 out=$(load "$MDB/volcado.sql" wpz); rc=$?
-check "carga sobre una base con tablas: termina bien" '[ $rc -eq 0 ]' || echo "$out" | tail -5
+check "sin --copia: vacia y carga sin guardar copia, y lo dice" '[ $rc -eq 0 ] && [ "$(copies)" = 0 ] && grep -q "Sin copia" <<< "$out" && [ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ]' || echo "$out" | tail -5
+sql "DROP DATABASE wpz; CREATE DATABASE wpz CHARACTER SET latin1 COLLATE latin1_spanish_ci;
+     CREATE TABLE wpz.vieja (x INT); INSERT INTO wpz.vieja VALUES (7);
+     CREATE TABLE wpz.claims (id INT, v VARCHAR(10)); INSERT INTO wpz.claims VALUES (1,'a'),(1,'a'),(2,'b')"
+
+out=$(load "$MDB/volcado.sql" wpz --copia); rc=$?
+check "carga con --copia sobre una base con tablas: termina bien" '[ $rc -eq 0 ]' || echo "$out" | tail -5
 check "... no queda la tabla que el volcado ya no trae" '[ "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"vieja\"")" = 0 ]'
 check "... ni las filas de la carga a medias: 3 filas, con su clave primaria" '[ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ] && [ "$(sql "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"claims\" AND INDEX_NAME=\"PRIMARY\"")" = 1 ]'
 check "... la base conserva su juego de caracteres" '[ "$(sql "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=\"wpz\"")" = latin1_spanish_ci ]'
-f=$(ls "$H"/lvm-copias/*-wpz-antes-de-cargar-*.sql.gz 2> /dev/null | head -1)
-check "... antes guarda una copia en ~/lvm-copias con lo que tenia (la tabla vieja)" '[ -n "$f" ] && gzip -dc "$f" | grep -q "CREATE TABLE \`vieja\`" && grep -qF "$f" <<< "$out"'
-check "... ~/lvm-copias es solo tuya" '[ "$(command stat -c %a "$H/lvm-copias")" = 700 ]'
+f=$(ls "$C"/*-wpz-antes-de-cargar-*.sql.gz 2> /dev/null | head -1)
+check "... antes guarda una copia en ~/nexum-backups con lo que tenia (la tabla vieja)" '[ -n "$f" ] && gzip -dc "$f" | grep -q "CREATE TABLE \`vieja\`" && grep -qF "$f" <<< "$out"'
+check "... ~/nexum-backups es solo tuya" '[ "$(command stat -c %a "$C")" = 700 ]'
 
 out=$(load "$MDB/volcado.sql" wpz); rc=$?
 check "cargar el mismo volcado otra vez no suma filas ni falla (no lleva DROP TABLE)" '[ $rc -eq 0 ] && [ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ]'
 
 n=$(copies)
 out=$(load "$MDB/volcado.sql" wpz --sin-copia); rc=$?
-check "--sin-copia: vacia y carga sin guardar copia" '[ $rc -eq 0 ] && [ "$(copies)" = "$n" ] && [ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ]'
+check "--sin-copia (copiar-bd): vacia y carga sin guardar copia" '[ $rc -eq 0 ] && [ "$(copies)" = "$n" ] && [ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ]'
 out=$(load "$MDB/volcado.sql" wpz --vaciar); rc=$?
 check "--vaciar se sigue admitiendo" '[ $rc -eq 0 ] && [ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ]'
 
 sql "CREATE DATABASE wpv"
-n=$(ls "$H/lvm-copias" | wc -l)
-out=$(load "$MDB/volcado.sql" wpv); rc=$?
-check "base vacia: carga sin copia (no hay nada que guardar)" '[ $rc -eq 0 ] && [ "$(ls "$H/lvm-copias" | wc -l)" = "$n" ] && [ "$(sql "SELECT COUNT(*) FROM wpv.claims")" = 3 ]'
+n=$(ls "$C" | wc -l)
+out=$(load "$MDB/volcado.sql" wpv --copia); rc=$?
+check "base vacia: carga sin copia aunque se pida (no hay nada que guardar)" '[ $rc -eq 0 ] && [ "$(ls "$C" | wc -l)" = "$n" ] && [ "$(sql "SELECT COUNT(*) FROM wpv.claims")" = 3 ]'
 
 out=$(load "$MDB/volcado.sql" wpn --crear); rc=$?
 check "--crear: crea la base y carga" '[ $rc -eq 0 ] && [ "$(sql "SELECT COUNT(*) FROM wpn.claims")" = 3 ]'
@@ -92,24 +99,24 @@ check "--crear: crea la base y carga" '[ $rc -eq 0 ] && [ "$(sql "SELECT COUNT(*
 # Si no se puede guardar la copia, no se toca nada
 sql "CREATE TABLE wpz.vieja (x INT)"
 NOCOPY=1; export LVM_BD_VOLCADO=/bin/false
-out=$(load "$MDB/volcado.sql" wpz); rc=$?
+out=$(load "$MDB/volcado.sql" wpz --copia); rc=$?
 check "si no se puede guardar la copia, no se vacia ni se carga" '[ $rc -ne 0 ] && [ "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"vieja\"")" = 1 ] && grep -q "no se ha cambiado nada" <<< "$out"'
 NOCOPY=0; export LVM_BD_VOLCADO=$MDB/mysqldump
 
 # Un fichero que no sirve no vacia la base
 printf 'esto no es gzip' > "$MDB/malo.sql.gz"
-out=$(load "$MDB/malo.sql.gz" wpz); rc=$?
+out=$(load "$MDB/malo.sql.gz" wpz --copia); rc=$?
 check "un .gz roto no vacia la base" '[ $rc -ne 0 ] && [ "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"vieja\"")" = 1 ]'
 
 # Volcado que falla a medias: dice donde esta la copia de lo que habia
 printf 'CREATE TABLE a (x INT);\nINSERT INTO noexiste VALUES (1);\n' > "$MDB/roto.sql"
-out=$(load "$MDB/roto.sql" wpz); rc=$?
-check "si el volcado falla, dice donde esta la copia de lo que habia" '[ $rc -ne 0 ] && grep -q "Lo que tenia antes esta en .*lvm-copias/.*-wpz-antes-de-cargar-" <<< "$out"'
+out=$(load "$MDB/roto.sql" wpz --copia); rc=$?
+check "si el volcado falla, dice donde esta la copia de lo que habia" '[ $rc -ne 0 ] && grep -q "Lo que tenia antes esta en .*nexum-backups/.*-wpz-antes-de-cargar-" <<< "$out"'
 
 # Simulacion: no cambia nada
 t0=$(sql "SELECT GROUP_CONCAT(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\"")
-n=$(ls "$H/lvm-copias" | wc -l)
-out=$(HOME=$H DRY=1 import_database "$MDB/volcado.sql" wpz < /dev/null 2>&1); rc=$?
-check "--simular: no vacia ni guarda nada" '[ $rc -eq 0 ] && [ -n "$t0" ] && [ "$(sql "SELECT GROUP_CONCAT(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\"")" = "$t0" ] && [ "$(ls "$H/lvm-copias" | wc -l)" = "$n" ]'
+n=$(ls "$C" | wc -l)
+out=$(HOME=$H COPIES_DIR=$C DRY=1 import_database "$MDB/volcado.sql" wpz --copia < /dev/null 2>&1); rc=$?
+check "--simular: no vacia ni guarda nada" '[ $rc -eq 0 ] && [ -n "$t0" ] && [ "$(sql "SELECT GROUP_CONCAT(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\"")" = "$t0" ] && [ "$(ls "$C" | wc -l)" = "$n" ]'
 
 exit $fail

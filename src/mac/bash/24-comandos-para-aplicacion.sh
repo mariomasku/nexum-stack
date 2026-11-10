@@ -54,7 +54,7 @@ function gui_data() {
     cert_audit | awk -F'|' '$1 == "C" { print "C|" $2 "|" $5 } $1 == "A" && !seen[$2]++ { print "W|" $2 }
         $1 == "T" && $5 == "0" { print "G|" $2 } $1 == "U" && !gone[$2]++ { print "Q|" $2 }'
     # O|carpeta con las copias de las bases del XAMPP oficial|numero de copias
-    for dir in "$HOME"/lvm-copias/XAMPP-oficial-*/; do
+    for dir in "$COPIES_DIR"/XAMPP-oficial-*/; do
         [ -d "$dir" ] || continue
         set -- "$dir"*.zip
         [ -e "$1" ] && echo "O|${dir%/}|$#"

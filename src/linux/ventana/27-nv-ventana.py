@@ -144,8 +144,15 @@ class App2(NvBandeja,
     def nv_capture_all(self):
         """Una captura de cada página y de cada apartado de Configuración en LVM_CAPTURA (nombre-de-pagina.png),
         y se cierra. Para el manual (ayuda/herramientas/capturas-linux.sh) y para revisar la ventana."""
-        steps = [(lambda n=n: self.show_tab(n), "pagina-" + n)
-                 for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
+        # (sin animaciones: los cambios de color de la selección y de los botones se animan, y con la ventana
+        # detrás de otras la animación no avanza: se capturaban a medias, con la selección de antes)
+        quiet = Gtk.CssProvider()
+        quiet.load_from_data(b"* { transition: none; animation: none; }")
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), quiet, Gtk.STYLE_PROVIDER_PRIORITY_USER + 10)
+        # (primero un paso sin captura: la ventana se termina de dibujar; la primera salía en blanco)
+        steps = [(lambda: self.show_tab("versiones"), None)]
+        steps += [(lambda n=n: self.show_tab(n), "pagina-" + n)
+                  for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
         for title, _name, _ic in self.TOOLS_SECTIONS:
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")
             steps.append((lambda t=title: self.nv_tools_show(t), "config-" + slug))
@@ -159,19 +166,27 @@ class App2(NvBandeja,
                     web.load_uri(m["url"] + "view/" + mail_id)
             steps.append((open_mail, "config-correo-abierto"))
 
-        def step(i=[0]):  # noqa: B006 (el contador de los pasos, a propósito)
-            if i[0] >= len(steps):
+        # Paso a paso: cada uno espera a que su captura salga bien antes del siguiente. Una vacía (de un solo
+        # color: la ventana aún cambiaba de tamaño o rehacía la página) se repite un segundo después
+        def run(i):
+            if i >= len(steps):
                 self.nv_exit()
                 return False
-            fn, shot = steps[i[0]]
+            fn, shot = steps[i]
             # (sin el fundido al cambiar de página: con la ventana detrás de otras no avanza, y se capturaba la
             # anterior. Antes de cada paso: Configuración rehace los suyos)
             for w in self.nv_walk(self.win):
                 if isinstance(w, Gtk.Stack):
                     w.set_transition_type(Gtk.StackTransitionType.NONE)
             fn()
-            GLib.timeout_add(1800, lambda: (self.capture(self.win, shot), False)[1])
-            i[0] += 1
-            return True
-        GLib.timeout_add(2500, step)
+
+            def shoot(tries):
+                if shot and not self.capture(self.win, shot, last=tries >= 8) and tries < 8:
+                    GLib.timeout_add(1000, shoot, tries + 1)
+                    return False
+                GLib.timeout_add(600, run, i + 1)
+                return False
+            GLib.timeout_add(1800, shoot, 0)
+            return False
+        GLib.timeout_add(2500, run, 0)
         return False

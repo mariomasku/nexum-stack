@@ -195,12 +195,14 @@ function docker_db_mode() {
 }
 
 #@incluir comun/bbdd-lampp-docker/docker_shared_warn.sh
-# docker-pasar <nombre>: un proyecto de antes (PHP-FPM con LAMPP delante, con su MariaDB y su phpMyAdmin)
-# pasa al Apache de Docker. Su BBDD se guarda antes en ~/lvm-copias (si algo falla, ahi esta) y se carga
+# docker-pasar <nombre> [--copia]: un proyecto de antes (PHP-FPM con LAMPP delante, con su MariaDB y su phpMyAdmin)
+# pasa al Apache de Docker. Su BBDD se descarga a un fichero (con --copia, en ~/nexum-backups, y se queda;
+# sin ella, uno temporal que se borra al acabar bien; si algo falla, ahi esta) y se carga
 # en la MariaDB comun; despues se quitan sus contenedores, su vhost de LAMPP y su linea de hosts. Si la
 # carpeta ya esta en el sistema nuevo (otra version de PHP del mismo proyecto), solo se le añade su PHP
 function docker_pass() {
-    local slug=$1 dir folder php maria db target="" p backup
+    local slug=$1 dir folder php maria db target="" p backup copy=0
+    [ "$2" == "--copia" ] && copy=1
     if ! docker_valid_slug "$slug" || [ ! -f "$DOCKER_DIR/$slug/proyecto.conf" ] || docker_web_project "$slug"; then
         echo "No hay ningun proyecto de antes (con LAMPP delante) con el nombre $slug"
         return 1
@@ -213,7 +215,8 @@ function docker_pass() {
     done
     echo "$slug pasa al Apache de Docker${target:+ (como PHP $php de $target)}"
     if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] copia de $db en ~/lvm-copias, fuera sus contenedores, su vhost y su linea de hosts"
+        [ $copy -eq 1 ] && echo "  [simulacion] copia de $db en ~/nexum-backups, fuera sus contenedores, su vhost y su linea de hosts"
+        [ $copy -eq 0 ] && echo "  [simulacion] sin copia: $db pasa por un fichero temporal; fuera sus contenedores, su vhost y su linea de hosts"
         return 0
     fi
     docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
@@ -222,9 +225,16 @@ function docker_pass() {
     task_plan "Pasando $folder al Apache de Docker" "Copiar su BBDD" "Quitar el proyecto de antes" "Montarlo en el Apache de Docker"
     task_step
     echo "Copia de su BBDD ($db)"
-    mkdir -p -m 700 "$HOME/lvm-copias" || return 1
-    backup="$HOME/lvm-copias/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
-    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d db > /dev/null || return 1
+    if [ $copy -eq 1 ]; then
+        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+    else
+        # (sin copia: un fichero solo tuyo en ~/.lvm-instalador, que se borra cuando ya esta cargada)
+        mkdir -p -m 700 "$LOG_DIR" || return 1
+        backup=$(mktemp "$LOG_DIR/pasar-$slug-XXXXXX") || return 1
+        mv -f "$backup" "$backup.sql.gz" && backup=$backup.sql.gz || { rm -f "$backup"; return 1; }
+    fi
+    dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d db > /dev/null || { rm -f "$backup"; return 1; }
     local i
     for i in $(seq 60); do
         dk compose --project-directory "$dir" -f "$dir/compose.yaml" exec -T db \
@@ -241,7 +251,7 @@ function docker_pass() {
         rm -f "$backup"
         return 1
     fi
-    echo "Copia de $db: $backup"
+    [ $copy -eq 1 ] && echo "Copia de $db: $backup"
     task_step
     docker_action borrar "$slug" || { echo "No se ha podido quitar el proyecto de antes (la copia de su BBDD esta en $backup)"; return 1; }
     task_step
@@ -251,6 +261,11 @@ function docker_pass() {
     else
         docker_web_create "$folder" "$php" "$maria" --bd "$db" --volcado "$backup" \
             || { echo "La copia de su BBDD sigue en $backup"; return 1; }
+    fi
+    # (si no se ha cargado, porque ya tenia BBDD, la descarga se queda: es lo unico que hay de ella)
+    if [ $copy -eq 0 ] && [ -z "$target" ]; then
+        rm -f "$backup"
+        echo "Sin copia: la descarga de $db ya esta cargada y se ha borrado (con --copia se guarda en ~/nexum-backups)"
     fi
     echo "$slug ya funciona con el Apache de Docker"
 }

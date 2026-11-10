@@ -247,7 +247,8 @@ function load_project() {
 
 # PrestaShop 1.7+ guarda su configuracion (con la BBDD) en var/cache: si es la de otro sitio (la del
 # contenedor de Docker, db, o la de produccion), la tienda no conecta con su BBDD en LAMPP (error 500).
-# Se aparta (a ~/lvm-copias) la cache cuya BBDD no es la de app/config/parameters.php: se rehace sola
+# Se borra la cache cuya BBDD no es la de app/config/parameters.php (se rehace sola); con el ajuste
+# copias-ficheros, en vez de borrarla se aparta a ~/nexum-backups
 function ps_stale_cache() {
     local root=$HTDOCS_DIR/$1 env
     [ -f "$root/app/config/parameters.php" ] || return 0
@@ -273,9 +274,14 @@ EOF
             echo "  [simulacion] se aparta var/cache/$env de $1 (lleva otra BBDD)"
             continue
         fi
-        mkdir -p -m 700 "$HOME/lvm-copias"
-        mv "$root/var/cache/$env" "$HOME/lvm-copias/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
-            && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/lvm-copias, se rehace sola"
+        if [ -f "$COPIES_FILES_FLAG" ]; then
+            mkdir -p -m 700 "$COPIES_DIR"
+            mv "$root/var/cache/$env" "$COPIES_DIR/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
+                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/nexum-backups, se rehace sola"
+        else
+            rm -rf "$root/var/cache/$env" \
+                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): borrada, se rehace sola"
+        fi
     done
     return 0
 }

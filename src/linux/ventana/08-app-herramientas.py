@@ -34,11 +34,26 @@ class AppHerramientas:
         box, lb = tile_group("Carpetas")
         add_row(lb, "Proyectos", "/opt/htdocs, compartida por todas las versiones", "Abrir",
                 lambda: self.open_uri(GLib.filename_to_uri("/opt/htdocs")))
-        copies = os.path.expanduser("~/lvm-copias")
-        add_row(lb, "Copias de seguridad", "~/lvm-copias: BBDD borradas o desinstaladas y "
-                "/etc/hosts anteriores", "Abrir",
-                lambda: (os.makedirs(copies, exist_ok=True),
-                         self.open_uri(GLib.filename_to_uri(copies))))
+        # Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
+        n, size = copies_size()
+        row = ActionRow("Copias de seguridad",
+                        "~/nexum-backups: las copias que pides al borrar, sustituir o actualizar · %s"
+                        % ("%s, %s" % (fmt_size(size), plural(n, "fichero", "ficheros")) if n else "vacía"))
+        b = Gtk.Button(label="Abrir", valign=Gtk.Align.CENTER)
+        b.connect("clicked", lambda *_: (os.makedirs(COPIES_DIR, mode=0o700, exist_ok=True),
+                                         self.open_uri(GLib.filename_to_uri(COPIES_DIR))))
+        row.add_suffix(b)
+        b = Gtk.Button(label="Borrar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
+        b.connect("clicked", lambda *_: self.on_clear_copies(n, size))
+        row.add_suffix(b)
+        lb.add(row)
+        # Copias de los ficheros que cambia el programa por su cuenta (lvm-instalador copias-ficheros si|no)
+        row = ActionRow("Copias de los ficheros que cambia el programa",
+                        "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos")
+        sw = Gtk.Switch(active=os.path.exists(COPIES_FILES_FLAG), valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw.connect("notify::active", self.on_copies_files)
+        row.add_suffix(sw)
+        lb.add(row)
         add_row(lb, "Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones "
                 "y de la ventana", "Abrir", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))
         # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
