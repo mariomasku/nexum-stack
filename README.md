@@ -4,7 +4,7 @@ Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
-**Versión actual: 1.57.11** · [Novedades de todas las versiones](CHANGELOG.md)
+**Versión actual: 1.57.12** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe
 
