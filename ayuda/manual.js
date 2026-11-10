@@ -43,7 +43,7 @@
   ponerSistema(so);
 
   // --- Índice: el apartado que se está leyendo, marcado
-  var enlaces = Array.prototype.slice.call(document.querySelectorAll(".indice a[href^='#']"));
+  var enlaces = Array.prototype.slice.call(document.querySelectorAll(".indice > li > a[href^='#']"));
   if ("IntersectionObserver" in window) {
     var obs = new IntersectionObserver(function (entradas) {
       entradas.forEach(function (e) {
@@ -52,11 +52,29 @@
       });
     }, { rootMargin: "-20% 0px -70% 0px" });
     document.querySelectorAll("section.capitulo[id]").forEach(function (s) { obs.observe(s); });
+    var conSub = document.querySelector(".indice .con-sub");
+    if (conSub) {
+      var subEnlaces = Array.prototype.slice.call(conSub.querySelectorAll(".sub a"));
+      var obs2 = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          subEnlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + e.target.id); });
+        });
+      }, { rootMargin: "-15% 0px -75% 0px" });
+      subEnlaces.forEach(function (a) {
+        var h = document.getElementById(a.getAttribute("href").slice(1));
+        if (h && h.tagName === "H3") obs2.observe(h);
+      });
+      var obs3 = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (e) { conSub.classList.toggle("abierto", e.isIntersecting); });
+      }, { rootMargin: "-40% 0px -40% 0px" });
+      obs3.observe(document.getElementById("configuracion"));
+    }
   }
   document.querySelector(".boton-indice").addEventListener("click", function () {
     document.body.classList.toggle("indice-abierto");
   });
-  enlaces.forEach(function (a) {
+  document.querySelectorAll(".indice a").forEach(function (a) {
     a.addEventListener("click", function () { document.body.classList.remove("indice-abierto"); });
   });
 
@@ -64,6 +82,22 @@
   // pulsar uno, se va ahí y se ilumina. Dentro de una pregunta, se despliega; en un punto de una captura, se abre
   var buscar = document.getElementById("buscar");
   var caja = document.getElementById("resultados");
+  // (la lista va en la página, flotando bajo la casilla: dentro del menú lateral la tapaba el índice)
+  document.body.appendChild(caja);
+  function colocar() {
+    var r = buscar.getBoundingClientRect();
+    var ancho = Math.min(560, window.innerWidth - 32);
+    caja.style.top = (r.bottom + 6) + "px";
+    caja.style.left = Math.max(16, Math.min(r.left, window.innerWidth - ancho - 16)) + "px";
+    caja.style.width = ancho + "px";
+    caja.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 24) + "px";
+  }
+  function cerrarLista() { caja.hidden = true; }
+  window.addEventListener("resize", function () { if (!caja.hidden) colocar(); });
+  document.addEventListener("click", function (ev) {
+    if (!caja.hidden && !caja.contains(ev.target) && ev.target !== buscar) cerrarLista();
+  });
+  buscar.addEventListener("focus", function () { if (caja.innerHTML && buscar.value.trim().length >= 2) { colocar(); caja.hidden = false; } });
   function normal(t) { return t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
   function textoDe(el) { return el.textContent.replace(/\s+/g, " ").trim(); }
   // Los trozos que se buscan, en orden, cada uno con dónde está
@@ -99,6 +133,7 @@
   function ir(n) {
     var r = hallados[n];
     if (!r) return;
+    cerrarLista();
     var det = r.el.closest("details");
     if (det) det.open = true;
     document.body.classList.remove("indice-abierto");
@@ -121,6 +156,7 @@
     elegido = -1;
     if (q.length < 2) { caja.hidden = true; caja.innerHTML = ""; return; }
     hallados = trozos.filter(function (t) { return t.norm.indexOf(q) >= 0; });
+    colocar();
     caja.hidden = false;
     if (!hallados.length) {
       caja.innerHTML = '<div class="sin-resultados">No sale en el manual. Prueba con otra palabra (o con parte de ella).</div>';
@@ -138,7 +174,10 @@
     });
   });
   buscar.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape") { buscar.value = ""; buscar.dispatchEvent(new Event("input")); return; }
+    if (ev.key === "Escape") {
+      if (!caja.hidden && buscar.value) { cerrarLista(); return; }
+      buscar.value = ""; buscar.dispatchEvent(new Event("input")); return;
+    }
     if (!hallados.length || caja.hidden) return;
     if (ev.key === "ArrowDown") { ev.preventDefault(); elegido = Math.min(hallados.length - 1, elegido + 1); marcarElegido(); }
     if (ev.key === "ArrowUp") { ev.preventDefault(); elegido = Math.max(0, elegido - 1); marcarElegido(); }

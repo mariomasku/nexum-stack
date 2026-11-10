@@ -70,6 +70,10 @@ kbd { border: 1px solid var(--borde); border-bottom-width: 2px; padding: 0 6px; 
 .indice a:hover { background: var(--borde); }
 .indice a.actual { background: var(--azul); color: #fff; }
 .indice .grupo { margin: 14px 10px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; color: var(--tenue); text-transform: uppercase; }
+/* Configuración: sus apartados, al pasar el ratón (y mientras se lee ese capítulo) */
+.indice .sub { list-style: none; margin: 2px 0 6px 12px; padding: 0 0 0 8px; border-left: 2px solid var(--borde); display: none; font-size: 13.5px; }
+.indice .sub a { padding: 4px 10px; }
+.indice .con-sub:hover .sub, .indice .con-sub:focus-within .sub, .indice .con-sub.abierto .sub { display: block; }
 .indice .pronto a { color: var(--tenue); }
 .indice .pronto a::after { content: " · pronto"; font-size: 12px; }
 .pie-lateral { margin-top: auto; display: flex; gap: 8px; }
@@ -173,8 +177,10 @@ body[data-sistema="linux"] [data-so="mac"], body[data-sistema="mac"] [data-so="l
 
 /* --- Búsqueda: la lista de sitios, debajo de la casilla */
 mark { background: #ffd60a; color: #000; border-radius: 3px; padding: 0 1px; }
-.buscador { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
-.resultados { max-height: 46vh; overflow: auto; background: var(--papel); border: 1px solid var(--borde); border-radius: 10px; padding: 4px; }
+.buscador { flex: none; }
+/* (flotando encima de la página, fuera del menú lateral: dentro, el índice la tapaba) */
+.resultados { position: fixed; z-index: 60; max-height: 70vh; overflow: auto; background: var(--papel); border: 1px solid var(--borde);
+  border-radius: 12px; padding: 6px; box-shadow: 0 16px 48px rgba(0, 0, 0, .25); }
 .resultados .cuantos { font-size: 12px; color: var(--tenue); padding: 4px 8px 6px; }
 .resultados .sin-resultados { font-size: 13.5px; color: var(--tenue); padding: 8px; }
 .resultado { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--texto); font: inherit;
