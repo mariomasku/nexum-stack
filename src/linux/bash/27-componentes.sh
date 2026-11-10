@@ -226,6 +226,13 @@ function upgrade_to() {
 
 #@incluir comun/componentes/copies_migrate.sh
 #@incluir comun/componentes/clean_size_text.sh
+
+# El manual (manual_command): con Linux o Mac ya elegido, y como se abre un fichero en este sistema
+MANUAL_SO=linux
+function manual_open() {
+    xdg-open "$1" > /dev/null 2>&1 &
+}
+#@incluir comun/componentes/manual_command.sh
 # Limpieza en Linux: las versiones son /opt/lampp-* (en las pruebas, las de LVM_PRUEBA), con sus logs, var/mysql
 # y temp sin subcarpeta; la carpeta temporal, /tmp y la tuya (TMPDIR) si es otra
 CLEAN_STACK_SUB=""

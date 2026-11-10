@@ -33,6 +33,8 @@
     });
     document.querySelectorAll("img[data-linux]").forEach(function (img) {
       var src = img.dataset[so] || img.dataset.linux;
+      // (si aún no hay captura del Mac, la de Linux)
+      img.onerror = function () { if (img.getAttribute("src") !== img.dataset.linux) img.setAttribute("src", img.dataset.linux); };
       if (img.getAttribute("src") !== src) img.setAttribute("src", src);
     });
     guardado("nexum-manual-so", so);
@@ -42,34 +44,76 @@
   });
   ponerSistema(so);
 
-  // --- Índice: el apartado que se está leyendo, marcado
+  // --- Un capítulo cada vez: el del índice que se pulse (o el de la dirección, #proyectos), los demás ocultos.
+  // Un apartado de dentro (#limpieza) abre su capítulo y baja hasta él. Atrás y adelante del navegador van por
+  // capítulos y apartados, y al final de cada capítulo, «← Anterior» y «Siguiente →»
+  var capitulos = Array.prototype.slice.call(document.querySelectorAll("section.capitulo[id]"));
   var enlaces = Array.prototype.slice.call(document.querySelectorAll(".indice > li > a[href^='#']"));
-  if ("IntersectionObserver" in window) {
-    var obs = new IntersectionObserver(function (entradas) {
+  var conSub = document.querySelector(".indice .con-sub");
+  var subEnlaces = conSub ? Array.prototype.slice.call(conSub.querySelectorAll(".sub a")) : [];
+  function nombreDe(cap) {
+    var a = document.querySelector('.indice > li > a[href="#' + cap.id + '"]');
+    return a ? textoIndice(a) : cap.querySelector("h1, h2").textContent.trim();
+  }
+  function textoIndice(a) { return a.textContent.replace(/\s+/g, " ").trim(); }
+  capitulos.forEach(function (cap, n) {
+    var pie = document.createElement("nav");
+    pie.className = "pie-capitulo";
+    pie.setAttribute("aria-label", "Capítulo anterior y siguiente");
+    if (n > 0) pie.innerHTML += '<a class="boton ant" href="#' + capitulos[n - 1].id + '">← ' + nombreDe(capitulos[n - 1]) + "</a>";
+    if (n + 1 < capitulos.length) {
+      pie.innerHTML += '<a class="boton azul sig" href="#' + capitulos[n + 1].id + '">' + nombreDe(capitulos[n + 1]) + " →</a>";
+    }
+    cap.appendChild(pie);
+  });
+  var visible = null;
+  function capituloDe(id) {
+    var el = id && document.getElementById(id);
+    if (!el) return null;
+    return { cap: el.closest("section.capitulo"), el: el };
+  }
+  function mostrarCapitulo(cap) {
+    if (!cap || cap === visible) return;
+    capitulos.forEach(function (c) { c.hidden = c !== cap; });
+    visible = cap;
+    enlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + cap.id); });
+    if (conSub) conSub.classList.toggle("abierto", cap.id === "configuracion");
+    subEnlaces.forEach(function (a) { a.classList.remove("actual"); });
+    document.title = nombreDe(cap) + " · Manual de Nexum Dev Stack";
+  }
+  function irA(id, suave) {
+    var d = capituloDe(id) || { cap: capitulos[0], el: capitulos[0] };
+    mostrarCapitulo(d.cap);
+    var det = d.el.closest("details");
+    if (det) det.open = true;
+    subEnlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + d.el.id && d.el !== d.cap); });
+    if (d.el === d.cap) window.scrollTo(0, 0);
+    else d.el.scrollIntoView({ block: "start", behavior: suave ? "smooth" : "auto" });
+  }
+  // (los enlaces de dentro del manual: si es el mismo de la dirección, no cambia nada y no habría salto)
+  document.addEventListener("click", function (ev) {
+    var a = ev.target.closest && ev.target.closest('a[href^="#"]');
+    if (!a || ev.defaultPrevented || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+    var id = decodeURIComponent(a.getAttribute("href").slice(1));
+    if (!capituloDe(id)) return;
+    ev.preventDefault();
+    if (location.hash === "#" + id) irA(id, false);
+    else location.hash = id;
+  });
+  window.addEventListener("hashchange", function () { irA(decodeURIComponent(location.hash.slice(1)), false); });
+  irA(decodeURIComponent(location.hash.slice(1)), false);
+  // (dentro de Configuración, el apartado que se está leyendo, marcado en el índice)
+  if ("IntersectionObserver" in window && subEnlaces.length) {
+    var obs2 = new IntersectionObserver(function (entradas) {
       entradas.forEach(function (e) {
         if (!e.isIntersecting) return;
-        enlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + e.target.id); });
+        subEnlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + e.target.id); });
       });
-    }, { rootMargin: "-20% 0px -70% 0px" });
-    document.querySelectorAll("section.capitulo[id]").forEach(function (s) { obs.observe(s); });
-    var conSub = document.querySelector(".indice .con-sub");
-    if (conSub) {
-      var subEnlaces = Array.prototype.slice.call(conSub.querySelectorAll(".sub a"));
-      var obs2 = new IntersectionObserver(function (entradas) {
-        entradas.forEach(function (e) {
-          if (!e.isIntersecting) return;
-          subEnlaces.forEach(function (a) { a.classList.toggle("actual", a.getAttribute("href") === "#" + e.target.id); });
-        });
-      }, { rootMargin: "-15% 0px -75% 0px" });
-      subEnlaces.forEach(function (a) {
-        var h = document.getElementById(a.getAttribute("href").slice(1));
-        if (h && h.tagName === "H3") obs2.observe(h);
-      });
-      var obs3 = new IntersectionObserver(function (entradas) {
-        entradas.forEach(function (e) { conSub.classList.toggle("abierto", e.isIntersecting); });
-      }, { rootMargin: "-40% 0px -40% 0px" });
-      obs3.observe(document.getElementById("configuracion"));
-    }
+    }, { rootMargin: "-15% 0px -75% 0px" });
+    subEnlaces.forEach(function (a) {
+      var h = document.getElementById(a.getAttribute("href").slice(1));
+      if (h && h.tagName === "H3") obs2.observe(h);
+    });
   }
   document.querySelector(".boton-indice").addEventListener("click", function () {
     document.body.classList.toggle("indice-abierto");
@@ -116,6 +160,7 @@
       var det = el.closest("details");
       var punto = el.closest(".puntos li");
       if (punto) donde = "En la captura: " + textoDe(punto.querySelector("b"));
+      else if (det && det.classList.contains("terminal")) donde = (apartado || "Introducción") + " › En la terminal";
       else if (det) donde = textoDe(det.querySelector("summary"));
       else if (el.closest(".entrada") || (!apartado && el.tagName === "P")) donde = donde || "Introducción";
       var t = textoDe(el);
@@ -134,6 +179,12 @@
     var r = hallados[n];
     if (!r) return;
     cerrarLista();
+    // (su capítulo, a la vista; en la dirección, el capítulo, sin saltar a su principio)
+    var cap = r.el.closest("section.capitulo");
+    mostrarCapitulo(cap);
+    if (cap && location.hash !== "#" + cap.id) {
+      try { history.replaceState(null, "", "#" + cap.id); } catch (e) { /* (file://: no siempre se deja) */ }
+    }
     var det = r.el.closest("details");
     if (det) det.open = true;
     document.body.classList.remove("indice-abierto");

@@ -394,6 +394,14 @@ QUE HACE
 
 VERSIONES
 
+1.57.10 (10 nov 2026)
+- El manual, dentro del programa: «Ayuda», en el menú ☰, lo abre en el
+  navegador en el capítulo de la página en la que estás (en la terminal:
+  lvm-instalador manual). No necesita conexión y se actualiza con el
+  programa.
+- El manual enseña un capítulo cada vez, con «← Anterior» y
+  «Siguiente →» al final; el buscador sigue buscando en todo.
+
 1.57.9 (10 nov 2026)
 - Desplegables con buscador: los de 8 opciones o más (proyectos, BBDD,
   carpetas, versiones...) se abren con «Buscar…». Se escribe y la lista

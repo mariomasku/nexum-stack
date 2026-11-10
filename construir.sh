@@ -11,7 +11,10 @@
 # ficheros NN-*, en el orden de su número y con dos líneas en blanco entre uno y otro: las ventanas,
 # en src/linux/ventana/ (cada apartado, una clase en su fichero) y src/mac/ventana/ (cada apartado en
 # su fichero; AppModel, en una clase con sus propiedades y extensiones). El resultado sigue siendo un
-# solo fichero, como siempre.
+# solo fichero, como siempre. «#@manual linux|mac», la última línea, pone detrás un exit y el manual
+# (ayuda/: la página, su estilo, su código, la tipografía y las capturas de ese sistema; en el Mac, las de
+# Linux que aún no tengan la suya) en un tar en base64, siempre igual para lo mismo (sin fechas ni dueños):
+# lo saca «lvm-instalador manual».
 #
 # Uso: ./construir.sh                      rehace los dos scripts
 #      ./construir.sh --comprobar          no escribe nada: falla si los scripts no son los de src/
@@ -36,6 +39,7 @@ import glob, os, re, sys
 root, mode, out_file = sys.argv[1:4]
 TARGETS = [("src/linux", "lvm-instalador.sh"), ("src/mac", "macos/lvm-instalador.sh")]
 INCLUDE = re.compile(r"#@incluir ((?:comun/[A-Za-z0-9_-]+/)?[A-Za-z0-9_.-]+/?)")
+MANUAL = re.compile(r"#@manual (linux|mac)")
 common_used = {}  # comun/… -> sistemas que lo incluyen
 
 
@@ -55,6 +59,40 @@ def read_folder(path):
     return "\n\n\n".join(read(os.path.join(path, n))[:-1] for n in pieces)
 
 
+def manual(so):
+    """El manual de ese sistema, después de un exit: un tar sin fechas ni dueños, en base64 dentro de un heredoc."""
+    import base64, io, tarfile
+    base = os.path.join(root, "ayuda")
+    names = ["index.html", "estilo.css", "manual.js", "img/nexum.png"]
+    names += sorted("fuentes/" + n for n in os.listdir(os.path.join(base, "fuentes")))
+    linux = sorted(os.listdir(os.path.join(base, "img", "linux")))
+    if so == "linux":
+        names += ["img/linux/" + n for n in linux]
+    else:
+        mac = sorted(os.listdir(os.path.join(base, "img", "mac"))) if os.path.isdir(os.path.join(base, "img", "mac")) else []
+        names += ["img/mac/" + n for n in mac] + ["img/linux/" + n for n in linux if n not in mac]
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w", format=tarfile.USTAR_FORMAT) as tar:
+        dirs = set()
+        for name in names:
+            parts = name.split("/")[:-1]
+            for i in range(1, len(parts) + 1):
+                d = "/".join(parts[:i])
+                if d not in dirs:
+                    dirs.add(d)
+                    info = tarfile.TarInfo(d)
+                    info.type, info.mode, info.mtime = tarfile.DIRTYPE, 0o755, 0
+                    tar.addfile(info)
+            data = open(os.path.join(base, name), "rb").read()
+            info = tarfile.TarInfo(name)
+            info.size, info.mode, info.mtime = len(data), 0o644, 0
+            tar.addfile(info, io.BytesIO(data))
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    body = "\n".join(b64[i:i + 76] for i in range(0, len(b64), 76))
+    return ("# (el script acaba aquí: lo de abajo es el manual, que saca «lvm-instalador manual»)\nexit\n"
+            ": <<'NEXUM_MANUAL'\n" + body + "\nNEXUM_MANUAL")
+
+
 def build(src):
     parts = sorted(glob.glob(os.path.join(root, src, "bash", "[0-9][0-9]-*.sh")))
     if not parts:
@@ -66,6 +104,10 @@ def build(src):
         if not text.endswith("\n"):
             sys.exit("construir: %s no acaba en salto de línea" % path)
         for line in text[:-1].split("\n"):
+            mm = MANUAL.fullmatch(line)
+            if mm:
+                out.append(manual(mm.group(1)))
+                continue
             m = INCLUDE.fullmatch(line)
             if m:
                 name = m.group(1)

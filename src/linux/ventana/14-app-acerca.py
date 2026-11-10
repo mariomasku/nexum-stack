@@ -53,6 +53,35 @@ class AppAcerca:
             return False
         run_quick(["--ayuda"], show)
 
+    # El capítulo del manual de cada pestaña y de cada apartado de Configuración (los id de ayuda/index.html)
+    HELP_TABS = {"proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
+                 "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"}
+    HELP_SECTIONS = {"Parches nuevos": "parches", "Configuración": "vhosts", "Seguridad entre webs": "seguridad-webs",
+                     "Correo de pruebas (Mailpit)": "correo", "Docker": "docker-config",
+                     "Túnel de Cloudflare": "tunel-config", "GitHub (Repositorios)": "github-config",
+                     "Registro de errores": "errores", "Apariencia": "apariencia", "Limpieza": "limpieza",
+                     "Carpetas": "carpetas", "XAMPP sin registrar": "xampp-registrar", "Programa": "programa",
+                     "Información": "informacion"}
+
+    def on_help(self, *_):
+        """Ayuda (menú ☰): el manual, que va dentro del script, en el navegador; en el capítulo de la pestaña
+        abierta (en Configuración, el de su apartado)."""
+        stack = getattr(self, "stack", None)
+        tab = stack.get_visible_child_name() if stack is not None else ""
+        chapter = self.HELP_TABS.get(tab, "ventana")
+        if tab == "config":
+            chapter = self.HELP_SECTIONS.get(getattr(self, "tools_section", None) or "", chapter)
+
+        def opened(rc, out):
+            path = (out.strip().splitlines() or [""])[-1]
+            if rc == 0 and path.startswith("/") and os.path.isfile(path):
+                self.open_uri("file://" + path)
+            else:
+                message(self.win, "No se ha podido abrir el manual", out.strip() or "Error al sacar el manual.",
+                        Gtk.MessageType.ERROR)
+            return False
+        run_quick(["manual", "--ruta", chapter], opened)
+
     def on_changes(self, *_):
         def show(_rc, out):
             dlg = Gtk.Dialog(title="Novedades", transient_for=self.win, modal=True,

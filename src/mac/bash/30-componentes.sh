@@ -154,6 +154,13 @@ function components_update() {
 
 #@incluir comun/componentes/copies_migrate.sh
 #@incluir comun/componentes/clean_size_text.sh
+
+# El manual (manual_command): con Linux o Mac ya elegido, y como se abre un fichero en este sistema
+MANUAL_SO=mac
+function manual_open() {
+    /usr/bin/open "$1"
+}
+#@incluir comun/componentes/manual_command.sh
 # Limpieza en el Mac: las versiones son las de BASE_DIR, con sus logs, var/mysql y temp en xamppfiles; la carpeta
 # temporal, /private/tmp (/tmp es un enlace a ella) y la tuya (TMPDIR, en /var/folders)
 CLEAN_STACK_SUB="xamppfiles/"

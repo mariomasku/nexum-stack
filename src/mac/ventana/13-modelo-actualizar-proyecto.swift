@@ -741,6 +741,27 @@ extension AppModel {
         try? p.run()
     }
 
+    /// Ayuda (menú ☰): el manual, que va dentro del script, en el navegador; en el capítulo de la pestaña abierta
+    /// (en Configuración, el de su apartado). Los capítulos son los id de ayuda/index.html
+    func showHelp() {
+        let tabs = ["proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
+                    "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"]
+        let sections = ["parches": "parches", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo",
+                        "docker": "docker-config", "tunel": "tunel-config", "apariencia": "apariencia",
+                        "github": "github-config", "errores": "errores", "limpieza": "limpieza", "carpetas": "carpetas",
+                        "programa": "programa", "info": "informacion"]
+        var chapter = tabs[tab] ?? "ventana"
+        if tab == "config" { chapter = sections[toolsSection] ?? chapter }
+        runQuick(["manual", "--ruta", chapter]) { code, out in
+            let path = out.split(separator: "\n").last.map(String.init) ?? ""
+            if code == 0 && path.hasPrefix("/") && FileManager.default.fileExists(atPath: path) {
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            } else {
+                showLongText("No se ha podido abrir el manual", out.isEmpty ? "Error al sacar el manual." : out)
+            }
+        }
+    }
+
     func showChanges() {
         runQuick(["novedades"]) { _, out in showLongText("Novedades", out, markdown: true) }
     }

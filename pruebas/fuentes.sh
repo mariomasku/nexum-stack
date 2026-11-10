@@ -18,6 +18,8 @@ check "cada pieza común ($n), incluida una vez en Linux y otra en Mac" 'for f i
 # Una copia del repositorio para estropearla
 mkdir -p "$W/r/macos"
 cp -r "$ROOT/src" "$ROOT/construir.sh" "$W/r/"
+# (el manual va dentro de los scripts: construir.sh lo lee de ayuda/)
+cp -r "$ROOT/ayuda" "$W/r/"
 cp "$ROOT/lvm-instalador.sh" "$W/r/"
 cp "$ROOT/macos/lvm-instalador.sh" "$W/r/macos/"
 check "copia: se comprueba igual" '"$W/r/construir.sh" --comprobar > /dev/null'

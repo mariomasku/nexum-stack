@@ -56,7 +56,7 @@ ln -s "$W/fuera-ajuste" "$COPIES_FILES_FLAG"
 copies_files_command si > /dev/null
 check "copias-ficheros si: un enlace en su lugar no se sigue" '[ -f "$COPIES_FILES_FLAG" ] && [ ! -L "$COPIES_FILES_FLAG" ] && [ ! -e "$W/fuera-ajuste" ]'
 rm -f "$COPIES_FILES_FLAG"
-check "copias-ficheros: en las tareas de la ventana no pide la contraseña" 'grep -E "^        gui-\*\|.*\) ;;$" "$SRC" | grep -q "|copias-ficheros) ;;"'
+check "copias-ficheros: en las tareas de la ventana no pide la contraseña" 'grep -E "^        gui-\*\|.*\) ;;$" "$SRC" | grep -qE "\|copias-ficheros(\|[a-z-]+)*\) ;;"'
 check "las ordenes copias y copias-ficheros" 'grep -qx "    copias) copies_command \"\$2\" ;;" "$SRC" && grep -qx "    copias-ficheros) copies_files_command \"\$2\" ;;" "$SRC"'
 if [ $MAC -eq 0 ]; then
     H=$W/s2; mkdir -p "$H" "$W/bin"

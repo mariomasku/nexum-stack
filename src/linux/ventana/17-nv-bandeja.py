@@ -175,7 +175,8 @@ class NvBandeja:
                  ("Buscar actualizaciones", "software-update-available-symbolic", lambda: self.check_package(manual=True)),
                  ("Abrir el panel en la terminal", "utilities-terminal-symbolic", lambda: self.on_terminal()),
                  ("Carpeta de registros", "folder-documents-symbolic", lambda: self.open_uri("file://" + LOG_DIR))],
-                [("Novedades", "starred-symbolic", lambda: self.on_changes()),
+                [("Ayuda", "help-browser-symbolic", lambda: self.on_help()),
+                 ("Novedades", "starred-symbolic", lambda: self.on_changes()),
                  ("Acerca de Nexum Dev Stack", "help-about-symbolic", lambda: self.on_about())]]):
             if n:
                 mbox.pack_start(Gtk.Separator(margin_top=4, margin_bottom=4), False, False, 0)

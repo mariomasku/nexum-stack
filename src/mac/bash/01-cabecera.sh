@@ -106,6 +106,11 @@
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
+#   lvm-instalador manual [<capitulo>]
+#       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
+#       Con un capitulo (proyectos, bbdd, docker, configuracion, limpieza...), en ese. Con --ruta,
+#       solo dice que fichero abrir
+#
 #   lvm-instalador limpieza
 #       Lo que se puede limpiar, cada cosa con lo que ocupa y cuantos ficheros tiene
 #

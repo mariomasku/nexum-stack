@@ -122,6 +122,9 @@ LOS FICHEROS
                       vhost de dominios desconocidos, certificado de fábrica.
   escritura.sh        PROJECT_WRITE_PY: no escribe fuera de htdocs.
   cache.sh            CLEAN_PY: vacía var/cache sin seguir enlaces.
+  manual.sh           El manual dentro del programa (1.57.10): va al final
+                      del script; manual lo saca (solo si ha cambiado, sin
+                      salirse de su carpeta) y abre el capítulo; «Ayuda».
   limpieza.sh         Limpieza (1.57.9): limpieza, gui-limpieza, limpiar,
                       gui-limpiar-proyecto y limpiar-proyecto en un equipo
                       de prueba. Borra lo que debe y nada más (ajustes de

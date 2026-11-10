@@ -301,6 +301,7 @@ struct MainMenu: View {
             item("Abrir el panel en Terminal", "terminal") { model.openTerminal() }
             item("Carpeta de registros", "folder") { showFolder(LOG_DIR) }
             Divider().padding(.vertical, 4)
+            item("Ayuda", "questionmark.circle") { model.showHelp() }
             item("Novedades", "star") { model.showChanges() }
             item("Acerca de \(model.data?.name ?? "Nexum Dev Stack")", "info.circle") { model.showAbout() }
         }

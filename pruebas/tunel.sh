@@ -156,13 +156,13 @@ check "sin direccion de Cloudflare: lo dice, con lo ultimo de cloudflared" '[ $r
 if grep -q "LVM_SWIFT" "$SRC"; then
     check "ventana (Mac): Compartir en el visor del proyecto cargado y en el de Docker" 'grep -q "items\[\"compartir\"\] = AnyView(model.shareButton(\"http://" "$SRC" && grep -q "model.share(t.1, folder: folder, name: p.folder)" "$SRC"'
     check "ventana (Mac): el logotipo de Cloudflare (solo M, L, C y Z) y su apartado en Configuración" 'grep -qE "^    \"cloudflare\": \"M [0-9. LCMZ-]+\",$" "$SRC" && grep -q "tunnelCard()" "$SRC"'
-    check "ventana (Mac): al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    func share\\(_ url/,/    func shareDialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", String(hours.indexOfSelectedItem + 1)" "$W/share" && ! grep -qi "password\|NSTextField(string" "$W/share" && ! grep -q "\"tunel-config\"" "$SRC"'
+    check "ventana (Mac): al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    func share\\(_ url/,/    func shareDialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", String(hours.indexOfSelectedItem + 1)" "$W/share" && ! grep -qi "password\|NSTextField(string" "$W/share" && ! grep "\"tunel-config\"" "$SRC" | grep -qv ": \"tunel-config\""'
     check "ventana (Mac): el tunel abierto, con su contraseña" 'grep -q "copy(t.password, \"Contraseña copiada\")" "$SRC"'
 else
 # La ventana: Compartir en los dos visores, con el logotipo de Cloudflare, y su apartado en Configuración
 check "ventana: Compartir en el visor del proyecto cargado y en el de Docker" '[ "$(grep -c "self.nv_share_button(" "$SRC")" -ge 2 ] && grep -q "self.nv_share(t, folder, p\[\"folder\"\])" "$SRC"'
 check "ventana: el logotipo de Cloudflare y su apartado en Configuración" 'grep -q "^    \"cloudflare\": ($" "$SRC" && grep -q "self.nv_tunnel_tools()" "$SRC"'
-check "ventana: al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", h, \"--admin\", admin" "$W/share" && ! grep -q "Gtk.Entry\|password\|env=" "$W/share" && ! grep -q "\"tunel-config\"" "$SRC"'
+check "ventana: al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", h, \"--admin\", admin" "$W/share" && ! grep -q "Gtk.Entry\|password\|env=" "$W/share" && ! grep "\"tunel-config\"" "$SRC" | grep -qv ": \"tunel-config\""'
 check "ventana: el tunel abierto, con su contraseña" 'grep -q "password, blocked = st.get(\"password\", \"\"), st.get(\"admin\") != \"permitir\"" "$SRC"'
 fi
 exit $fail
