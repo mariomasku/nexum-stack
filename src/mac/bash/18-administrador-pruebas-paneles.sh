@@ -249,7 +249,9 @@ function official_dump_all() {
     DB_TMP_PID=$server_pid
     for i in $(seq 300); do
         $SUDO test -S "$DB_TMP_SOCK" && break
-        kill -0 $server_pid 2> /dev/null || break
+        # (sin kill -0: el pid es el del sudo, que es de root, y kill -0 a un proceso de root da
+        # «no permitido» aunque siga vivo)
+        /bin/ps -p "$server_pid" > /dev/null 2>&1 || break
         sleep 0.2
     done
     if ! $SUDO test -S "$DB_TMP_SOCK"; then

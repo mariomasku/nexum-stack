@@ -805,7 +805,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.7"
+APP_VERSION="1.57.8"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -13076,6 +13076,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.8 (10 nov 2026)
+- Copiar una BBDD a una versión parada (recrear un proyecto en otra
+  versión de PHP, copiar o descargar una BBDD): su MariaDB temporal se
+  daba por caído nada más arrancarlo y la copia fallaba con «No ha
+  arrancado», aunque estuviera arrancando bien. Ahora se espera a que
+  esté listo.
+
 1.57.7 (10 nov 2026)
 - Copias de seguridad, solo si se piden: al cargar un .sql sobre una
   BBDD con tablas, sustituir una BBDD al copiarla o replicarla, reparar
@@ -18901,7 +18908,9 @@ function db_temp_start() {
     for i in $(seq 300); do
         [ -S "$DB_TMP_SOCK" ] && return 0
         # Si se ha parado (por ejemplo, porque otro MariaDB usa ya esa carpeta), no se espera mas
-        kill -0 $server_pid 2> /dev/null || break
+        # (sin kill -0: el pid es el del sudo, que es de root, y kill -0 a un proceso de root da
+        # «no permitido» aunque siga vivo)
+        [ -d "/proc/$server_pid" ] || break
         sleep 0.2
     done
     echo "No ha arrancado. Ultimas lineas de su registro:"

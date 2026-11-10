@@ -262,7 +262,9 @@ function db_temp_start() {
     for i in $(seq 300); do
         [ -S "$DB_TMP_SOCK" ] && return 0
         # Si se ha parado (por ejemplo, porque otro MariaDB usa ya esa carpeta), no se espera mas
-        kill -0 $server_pid 2> /dev/null || break
+        # (sin kill -0: el pid es el del sudo, que es de root, y kill -0 a un proceso de root da
+        # «no permitido» aunque siga vivo)
+        [ -d "/proc/$server_pid" ] || break
         sleep 0.2
     done
     echo "No ha arrancado. Ultimas lineas de su registro:"

@@ -1124,6 +1124,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.8 (10 nov 2026)
+- Copiar una BBDD a una versión parada (recrear un proyecto en otra
+  versión de PHP, copiar o descargar una BBDD): su MariaDB temporal se
+  daba por caído nada más arrancarlo y la copia fallaba con «No ha
+  arrancado», aunque estuviera arrancando bien. Ahora se espera a que
+  esté listo.
+
 1.57.7 (10 nov 2026)
 - Copias de seguridad, solo si se piden: al cargar un .sql sobre una
   BBDD con tablas, sustituir una BBDD al copiarla o replicarla, reparar

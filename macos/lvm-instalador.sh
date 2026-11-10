@@ -2180,7 +2180,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.7"
+APP_VERSION="1.57.8"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -10480,7 +10480,9 @@ function official_dump_all() {
     DB_TMP_PID=$server_pid
     for i in $(seq 300); do
         $SUDO test -S "$DB_TMP_SOCK" && break
-        kill -0 $server_pid 2> /dev/null || break
+        # (sin kill -0: el pid es el del sudo, que es de root, y kill -0 a un proceso de root da
+        # «no permitido» aunque siga vivo)
+        /bin/ps -p "$server_pid" > /dev/null 2>&1 || break
         sleep 0.2
     done
     if ! $SUDO test -S "$DB_TMP_SOCK"; then
@@ -14184,7 +14186,9 @@ function db_temp_start() {
     local i
     for i in $(seq 300); do
         [ -S "$DB_TMP_SOCK" ] && return 0
-        kill -0 $server_pid 2> /dev/null || break
+        # (sin kill -0: el pid es el del sudo, que es de root, y kill -0 a un proceso de root da
+        # «no permitido» aunque siga vivo)
+        /bin/ps -p "$server_pid" > /dev/null 2>&1 || break
         sleep 0.2
     done
     echo "No ha arrancado. Ultimas lineas de su registro:"
@@ -34484,6 +34488,13 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.8 (10 nov 2026)
+- Copiar una BBDD a un XAMPP parado (recrear un proyecto en otra
+  versión de PHP, copiar o descargar una BBDD, o traer las del XAMPP
+  oficial): su MariaDB temporal se daba por caído nada más arrancarlo
+  y la copia fallaba con «No ha arrancado», aunque estuviera
+  arrancando bien. Ahora se espera a que esté listo.
 
 1.57.7 (10 nov 2026)
 - Copias de seguridad, solo si se piden: al cargar un .sql sobre una
