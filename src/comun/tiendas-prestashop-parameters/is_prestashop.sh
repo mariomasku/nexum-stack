@@ -20,7 +20,7 @@ function is_prestashop() {
 
 # Base de una tienda cuya configuracion no la dice: la indicada, la recordada para la carpeta
 # (~/.lvm-instalador/proyectos) o, en la version activa, la unica ps_<final de la carpeta>
-# (dob-prestashop-mitienda -> ps_mitienda)
+# (prestashop-mitienda -> ps_mitienda)
 function ps_guess_db() {
     local folder=$1 db=$2 tail
     if [ -z "$db" ] && [ -f "$PROJECTS_FILE" ]; then

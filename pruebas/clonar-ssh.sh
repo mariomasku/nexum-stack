@@ -10,7 +10,7 @@ grep -q '^function repo_ssh_url() {' "$SRC" || { echo "  ok    (sin probar por S
 extract "$SRC" repo_ssh_url repo_clone mount_project git_url_ok || exit 1
 
 # Direcciones
-check "github https -> ssh" '[ "$(repo_ssh_url https://github.com/hexer-dev/dob-wordpress-x)" == git@github.com:hexer-dev/dob-wordpress-x.git ]'
+check "github https -> ssh" '[ "$(repo_ssh_url https://github.com/mi-empresa/wordpress-x)" == git@github.com:mi-empresa/wordpress-x.git ]'
 check "con .git y con / al final, igual" '[ "$(repo_ssh_url https://github.com/u/r.git)" == git@github.com:u/r.git ] && [ "$(repo_ssh_url https://github.com/u/r/)" == git@github.com:u/r.git ]'
 check "gitlab con subgrupos y bitbucket" '[ "$(repo_ssh_url https://gitlab.com/grupo/sub/r)" == git@gitlab.com:grupo/sub/r.git ] && [ "$(repo_ssh_url https://bitbucket.org/u/r)" == git@bitbucket.org:u/r.git ]'
 check "otro servidor, ya ssh, sin usuario o con cosas raras: no" '! repo_ssh_url https://git.empresa.es/u/r && ! repo_ssh_url git@github.com:u/r.git && ! repo_ssh_url https://github.com/r && ! repo_ssh_url "https://github.com/u/r;x" && ! repo_ssh_url https://github.com/u/../r'
@@ -36,9 +36,9 @@ db_names() { :; }
 db_valid_name() { true; }
 htdocs_close_world() { :; }
 load_project() { echo "cargar $*"; return 1; }
-out=$(mount_project https://github.com/hexer-dev/privado privado 8.4 wp_privado 2>&1)
-check "privado por https: se prueba por SSH y se clona" 'grep -q "se prueba por SSH, git@github.com:hexer-dev/privado.git" <<< "$out" && [ -d "$HTDOCS_DIR/privado" ] && grep -q "cargar privado 8.4 wp_privado" <<< "$out" && ! grep -q "No se ha podido clonar" <<< "$out"'
-check "por SSH, igual de cerrado (sin terminal, sin ganchos ni credenciales guardadas)" 'grep -q "core.hooksPath=/dev/null -c credential.helper= .* clone --no-recurse-submodules -- git@github.com:hexer-dev/privado.git" "$W/git.log"'
+out=$(mount_project https://github.com/mi-empresa/privado privado 8.4 wp_privado 2>&1)
+check "privado por https: se prueba por SSH y se clona" 'grep -q "se prueba por SSH, git@github.com:mi-empresa/privado.git" <<< "$out" && [ -d "$HTDOCS_DIR/privado" ] && grep -q "cargar privado 8.4 wp_privado" <<< "$out" && ! grep -q "No se ha podido clonar" <<< "$out"'
+check "por SSH, igual de cerrado (sin terminal, sin ganchos ni credenciales guardadas)" 'grep -q "core.hooksPath=/dev/null -c credential.helper= .* clone --no-recurse-submodules -- git@github.com:mi-empresa/privado.git" "$W/git.log"'
 out=$(mount_project https://git.empresa.es/u/privado otro 8.4 wp_otro 2>&1)
 check "otro servidor: no se prueba por SSH y lo dice" '! grep -q "se prueba por SSH" <<< "$out" && grep -q "No se ha podido clonar" <<< "$out" && [ ! -e "$HTDOCS_DIR/otro" ]'
 exit $fail

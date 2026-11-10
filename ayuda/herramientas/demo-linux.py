@@ -35,35 +35,35 @@ ACTIVE = "8.4"
 
 # --- Proyectos: carpeta, tipo, base de datos, versión donde está, dominio real falseado (tiendas)
 PROJECTS = [
-    ("dob-wordpress-panaderialuna", "wp", "wp_panaderialuna", "8.4", ""),
-    ("dob-wordpress-clinicadelsol", "wp", "wp_clinicadelsol", "8.2", ""),
-    ("dob-wordpress-academiaflor", "wp", "wp_academiaflor", "8.1", ""),
-    ("dob-prestashop-ferreterianorte", "ps", "ps_ferreterianorte", "7.4.33", "ferreterianorte.example"),
-    ("dob-prestashop-modaverde", "ps", "ps_modaverde", "8.4", "modaverde.example"),
-    ("dob-php-inventario", "php", "inventario", "8.5", ""),
-    ("dob-html-portfolio", "html", "", "", ""),
+    ("panaderia-luna", "wp", "wp_panaderia_luna", "8.4", ""),
+    ("clinica-del-sol", "wp", "wp_clinica_del_sol", "8.2", ""),
+    ("academia-flor", "wp", "wp_academia_flor", "8.1", ""),
+    ("ferreteria-norte", "ps", "ps_ferreteria_norte", "7.4.33", "ferreterianorte.example"),
+    ("moda-verde", "ps", "ps_moda_verde", "8.4", "modaverde.example"),
+    ("inventario-almacen", "php", "inventario_almacen", "8.5", ""),
+    ("portfolio-estudio", "html", "", "", ""),
 ]
-LOADED = "dob-wordpress-panaderialuna"
+LOADED = "panaderia-luna"
 # Proyectos de Node.js: carpeta, tipo, estado, modo, dirección, Node que pide, dependencias, scripts
 NODE = [
-    ("mskdev-agenda", "Next", "marcha", "dev", "http://127.0.0.1:3000/", "22", "1", "dev build start"),
-    ("mskdev-blogviajes", "Astro", "parado", "", "", "22", "1", "dev build"),
+    ("agenda-citas", "Next", "marcha", "dev", "http://127.0.0.1:3000/", "22", "1", "dev build start"),
+    ("blog-viajes", "Astro", "parado", "", "", "22", "1", "dev build"),
 ]
 # Proyectos de Docker: los de WordPress con su web (php, MariaDB, estado, versiones de PHP)
 DOCKER = [
-    ("dob-wordpress-clinicadelsol", "8.2", "11.8", "marcha", "wp_clinicadelsol", "8.2 8.4"),
-    ("dob-wordpress-academiaflor", "8.4", "11.8", "parado", "wp_academiaflor", "8.4"),
+    ("clinica-del-sol", "8.2", "11.8", "marcha", "wp_clinica_del_sol", "8.2 8.4"),
+    ("academia-flor", "8.4", "11.8", "parado", "wp_academia_flor", "8.4"),
 ]
 GITHUB = ("tu-usuario", "tu-empresa")
 REPOS = [  # nombre, privado, días desde el último cambio, web, descripción, estado
-    ("dob-wordpress-panaderialuna", 1, 1, "https://panaderialuna.example", "Web de la panadería", "clonado"),
-    ("dob-prestashop-ferreterianorte", 1, 3, "https://ferreterianorte.example", "Tienda online", "clonado"),
-    ("dob-prestashop-modaverde", 1, 6, "https://modaverde.example", "", "clonado"),
-    ("dob-wordpress-clinicadelsol", 1, 9, "", "Clínica dental", "clonado"),
-    ("dob-wordpress-hotelmirador", 1, 12, "https://hotelmirador.example", "Reservas del hotel", "nuevo"),
-    ("dob-wordpress-taller-ruiz", 0, 20, "", "", "nuevo"),
-    ("dob-php-inventario", 1, 25, "", "Inventario del almacén", "clonado"),
-    ("dob-prestashop-librosmar", 1, 40, "https://librosmar.example", "", "nuevo"),
+    ("panaderia-luna", 1, 1, "https://panaderialuna.example", "Web de la panadería", "clonado"),
+    ("ferreteria-norte", 1, 3, "https://ferreterianorte.example", "Tienda online", "clonado"),
+    ("moda-verde", 1, 6, "https://modaverde.example", "", "clonado"),
+    ("clinica-del-sol", 1, 9, "", "Clínica dental", "clonado"),
+    ("hotel-mirador", 1, 12, "https://hotelmirador.example", "Reservas del hotel", "nuevo"),
+    ("taller-ruiz", 0, 20, "", "", "nuevo"),
+    ("inventario-almacen", 1, 25, "", "Inventario del almacén", "clonado"),
+    ("libros-mar", 1, 40, "https://librosmar.example", "", "nuevo"),
 ]
 
 # --- Lo que no es de nadie: tal cual lo da el programa
@@ -112,7 +112,7 @@ def gui_datos():
             n += 1
             out.append(("D", ver, db, NOW - n * 3 * DAY, "c"))
     # (una copia antigua de una base, en otra versión: la de la tienda, en la 8.2)
-    out.append(("D", "8.2", "ps_ferreterianorte", NOW - 60 * DAY, "i"))
+    out.append(("D", "8.2", "ps_ferreteria_norte", NOW - 60 * DAY, "i"))
     return lines(out)
 
 
@@ -128,7 +128,7 @@ def gui_hosts():
     for folder, kind, _db, _v, dom in PROJECTS:
         if dom:
             out.append(("F", dom, "www." + dom, folder, 0, 1, 1, 1 if kind == "ps" else 0, 0, ""))
-    out.append(("F", "panaderialuna.test", "", "dob-wordpress-panaderialuna", 0, 1, 1, 0, 1, ""))
+    out.append(("F", "panaderialuna.test", "", "panaderia-luna", 0, 1, 1, 0, 1, ""))
     return lines(out)
 
 
@@ -154,7 +154,7 @@ def gui_docker():
     for folder, php, _m, state, _db, _v in DOCKER:
         up = state == "marcha"
         out.append(("C", "nexum-%s-php%s" % (folder, php.replace(".", "")), "nexum-php:" + php,
-                    "running" if up else "exited", "Up 2 hours" if up else "Exited (0) 3 days ago", "", folder,
+                    "running" if up else "exited", "Up 2 hours" if up else "Exited (0) 3 days ago", "", "nexum-" + folder,
                     "a1b2c3d4e5f6"))
     out.append(("C", "nexum-mariadb-11-8", "mariadb:11.8", "running", "Up 2 hours", "", "nexum-web", "0f1e2d3c4b5a"))
     out.append(("C", "nexum-web", "httpd:2.4", "running", "Up 2 hours", "127.0.0.2:80->80/tcp", "nexum-web", "9a8b7c6d5e4f"))
@@ -172,7 +172,7 @@ def repos():
     out = [("C", login, org, "Organization", 12, len(REPOS))]
     for name, private, days, web, desc, state in REPOS:
         date = __import__("time").strftime("%Y-%m-%d", __import__("time").gmtime(NOW - days * DAY))
-        prefix = name[:name.index("-", 4) + 1]
+        prefix = ""
         out.append(("R", "%s/%s" % (org, name), name, private, date, "main", prefix, web, desc, state,
                     name if state == "clonado" else ""))
     return lines(out)
@@ -224,7 +224,7 @@ def main():
         "gui-bbdd-tamanos": z, "gui-proyectos-tamanos": t, "gui-docker": gui_docker(),
         "gui-docker-estadisticas": "T|12|16110338048\n",
         "gui-node": lines(("P",) + n for n in NODE),
-        "github": lines([("G", 1, GITHUB[0], "gh", GITHUB[1], "dob-wordpress- dob-prestashop-")]),
+        "github": lines([("G", 1, GITHUB[0], "gh", GITHUB[1], "")]),
         "repos": repos(), "tunel": "I|1|2026.10.0|2026.10.0\n",
         "correo": "Correo de pruebas encendido: lo que mandan las webs va a Mailpit\n",
         "httpd-vhosts.conf": vhosts(), "hosts": "127.0.0.1\tlocalhost\n127.0.0.1\tweb.local\n",

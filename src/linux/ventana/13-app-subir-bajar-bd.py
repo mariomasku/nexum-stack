@@ -62,7 +62,7 @@ class AppSubirBajarBD:
                            if act else ""))
         if not act:
             lb.add(ActionRow("No hay ninguna versión activa",
-                             "Activa una versión en la pestaña Versiones para cargar BBDD."))
+                             "Activa una versión en Versiones de PHP para cargar BBDD."))
             return box
 
         f = self.imp["file"]
@@ -138,7 +138,7 @@ class AppSubirBajarBD:
         db = self.imp["db"]
         hint = ""
         if not self.data["running"]:
-            hint = "La versión activa está parada: arráncala en la pestaña Versiones."
+            hint = "La versión activa está parada: arráncala en Versiones de PHP."
         elif not self.imp["file"]:
             hint = "Elige el fichero SQL."
         elif not db:

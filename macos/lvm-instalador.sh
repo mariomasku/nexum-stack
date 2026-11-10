@@ -4043,14 +4043,14 @@ EOF
 # ===========================================================================
 # Los repositorios de una organizacion o cuenta de GitHub, para clonarlos por SSH en htdocs (o, si ya
 # estan, traer sus cambios con git pull). Como DevHub: un token de GitHub (o la sesion de gh) solo para
-# leer la lista, y los prefijos de los nombres que se ven (dob-wordpress-, dob-prestashop-...). El token
+# leer la lista, y los prefijos de los nombres que se ven (wordpress-, tienda-...; sin ninguno, todos). El token
 # va en el Llavero, no en un fichero; GITHUB_CONF_FILE (solo tuyo) lleva:
 #   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
 #   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
 #   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
 GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
 GITHUB_KEYRING_SERVICE=nexum-dev-stack
-GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
+GITHUB_DEFAULT_PREFIXES=""
 
 function github_conf() {
     local v="" p ok=""
@@ -4156,11 +4156,11 @@ function github_command() {
             [ -n "$(github_token)" ] && login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
             echo "G|$([ -n "$login" ] && echo 1 || echo 0)|$login|$(github_conf ORIGEN)|$(github_conf CUENTA)|$(github_conf PREFIJOS)" ;;
         cuenta)
-            # (tambien su direccion de GitHub o con @: https://github.com/hexer-dev, @hexer-dev)
+            # (tambien su direccion de GitHub o con @: https://github.com/mi-empresa, @mi-empresa)
             local a kind
             a=$(printf "%s" "$2" | sed "s/^[[:space:]]*//; s/[[:space:]]*$//")
             a=${a#http://} a=${a#https://} a=${a#www.} a=${a#github.com/} a=${a#@} a=${a%%/*}
-            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como hexer-dev)"; return 1; }
+            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como mi-empresa)"; return 1; }
             # (con la conexion hecha, que exista)
             if [ -n "$(github_token)" ]; then
                 kind=$(github_api "/users/$a" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
@@ -5785,7 +5785,7 @@ function vhost_points_to() {
 # ¿Se parece el dominio a la carpeta? Su nombre registrable (lo de antes de la terminacion:
 # mitienda en www.mitienda.com, ejemplo en tienda.ejemplo.com, cliente en
 # cliente.com.es), de 4 letras o mas, va en el nombre de la carpeta sin sus palabras genericas
-# (dob, prestashop, wordpress...): asi prestashop.com no vale para dob-prestashop-x
+# (prestashop, wordpress...): asi prestashop.com no vale para prestashop-x
 function domain_fits_folder() {
     local domain=${1#www.} folder label w n parts
     folder=$(tr 'A-Z' 'a-z' <<< "$2")
@@ -9479,7 +9479,7 @@ function is_prestashop() {
 
 # Base de una tienda cuya configuracion no la dice: la indicada, la recordada para la carpeta
 # (~/.lvm-instalador/proyectos) o, en la version activa, la unica ps_<final de la carpeta>
-# (dob-prestashop-mitienda -> ps_mitienda)
+# (prestashop-mitienda -> ps_mitienda)
 function ps_guess_db() {
     local folder=$1 db=$2 tail
     if [ -z "$db" ] && [ -f "$PROJECTS_FILE" ]; then
@@ -14343,7 +14343,7 @@ function copy_database() {
             echo "$new queda vinculada al proyecto $link en XAMPP-$dst."
         fi
         echo "$new esta ahora en XAMPP-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null),"
-        echo "cargalo en Versiones y elige XAMPP-$dst."
+        echo "cargalo en Proyectos y elige XAMPP-$dst en su Entorno."
     fi
     return $rc
 }
@@ -20298,7 +20298,7 @@ extension AppModel {
         var args = ["repo-traer", r.full]
         var title = "Clonando \(r.name)"
         if r.state == "clonado" {
-            guard confirm("¿Aplastar \(r.folder) con lo de GitHub?",
+            guard confirm("¿Traer los cambios de GitHub a \(r.folder)?",
                           "Este repositorio ya está clonado en \(HTDOCS)/\(r.folder). Se traen sus cambios de GitHub (git pull) y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca nada y se dice.",
                           "Traer los cambios") else { return }
             args.append("--actualizar")
@@ -21426,7 +21426,7 @@ extension AppModel {
         }
     }
 
-    /// Carpeta que se llama como la base: wp_ajoselpajizo → dob-wordpress-ajoselpajizo (la base sin
+    /// Carpeta que se llama como la base: wp_mitienda → wordpress-mitienda (la base sin
     /// wp_ ni ps_, al final del nombre). Si hay varias, la del mismo tipo (WordPress o tienda)
     func nameMatchProject(_ db: String, _ folders: [String], _ kind: [String: String]) -> String? {
         let low = db.lowercased()
@@ -27269,12 +27269,12 @@ struct GitHubCard: View {
                         .disabled(model.busy)
                 }
             }
-            Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)") {
+            Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)") {
                 TextField("", text: $account).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 170)
                 Button("Guardar") { model.githubSet("cuenta", account.trimmingCharacters(in: .whitespaces)) }
                     .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "") || model.busy)
             }
-            Tile("Prefijos de los repositorios", "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos") {
+            Tile("Prefijos de los repositorios", "Separados por espacios (wordpress- tienda- …); vacío: todos") {
                 TextField("", text: $prefixes).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 240)
                 Button("Guardar") { model.githubSet("prefijos", prefixes.trimmingCharacters(in: .whitespaces)) }
                     .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "") || model.busy)
@@ -28167,7 +28167,7 @@ struct NewProjectWizard: View {
             : Array(model.npRepos.filter { $0.full.lowercased().contains(q) }.prefix(6))
         return VStack(alignment: .leading, spacing: 8) {
             Text("¿De qué repositorio de GitHub? (escribe parte de su nombre)")
-            TextField("dob-wordpress-…", text: Binding(get: { model.npRepoQuery }, set: { model.npRepoTyped($0) }))
+            TextField("nombre del repositorio…", text: Binding(get: { model.npRepoQuery }, set: { model.npRepoTyped($0) }))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
             if !hits.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
@@ -34478,7 +34478,7 @@ VERSIONES
   lo que devuelve la web (también escapadas, como las de Elementor). Los
   proyectos de antes se arreglan al arrancarlos.
 - Configuración, GitHub: la organización o cuenta se puede escribir
-  también como su dirección (https://github.com/hexer-dev) o con @, se
+  también como su dirección (https://github.com/mi-empresa) o con @, se
   comprueba que existe, y si no vale se dice en una ventana y lo escrito
   se queda (antes volvía la de antes sin decir nada).
 - Los proyectos de Docker sin visitas se paran solos (Configuración,
@@ -34490,7 +34490,7 @@ VERSIONES
   terminal: docker-reposo.
 - Pestaña Repositorios (como DevHub): los repositorios de la
   organización o cuenta de GitHub que se elija en Configuración, solo
-  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
+  los de sus prefijos (los que se elijan, como wordpress-; se
   pueden añadir otros, como los de Shopify) o todos, con un buscador.
   «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
   Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
@@ -34665,7 +34665,7 @@ VERSIONES
   como cargar: si un paso falla, el proyecto sigue cargado.
 - Cabecera: «Dev Stack» vuelve a la letra de antes.
 - Acerca de: más corto («Herramientas de desarrollo web en local») y
-  la firma sin HEXER.
+  una firma más corta.
 
 1.39.23 (27 oct 2026)
 - Proyectos: columna «Tamaño», con lo que ocupa cada proyecto en el
@@ -35566,8 +35566,8 @@ VERSIONES
 - Subir una base de datos: el desplegable Proyecto es tan ancho como
   el nombre de carpeta más largo, para verlo entero al elegirlo.
 - Al elegir la base se propone el proyecto que se llama como ella
-  (wp_mitienda -> dob-wordpress-mitienda, ps_mitienda ->
-  dob-prestashop-mitienda), si no hay uno recordado o que ya la use.
+  (wp_mitienda -> wordpress-mitienda, ps_mitienda ->
+  prestashop-mitienda), si no hay uno recordado o que ya la use.
   Si se cambia a mano, se respeta.
 - Lo mismo que Linux 1.28.1.
 

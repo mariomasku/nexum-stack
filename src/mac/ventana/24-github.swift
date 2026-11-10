@@ -121,12 +121,12 @@ struct GitHubCard: View {
                         .disabled(model.busy)
                 }
             }
-            Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)") {
+            Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)") {
                 TextField("", text: $account).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 170)
                 Button("Guardar") { model.githubSet("cuenta", account.trimmingCharacters(in: .whitespaces)) }
                     .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "") || model.busy)
             }
-            Tile("Prefijos de los repositorios", "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos") {
+            Tile("Prefijos de los repositorios", "Separados por espacios (wordpress- tienda- …); vacío: todos") {
                 TextField("", text: $prefixes).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 240)
                 Button("Guardar") { model.githubSet("prefijos", prefixes.trimmingCharacters(in: .whitespaces)) }
                     .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "") || model.busy)

@@ -28,13 +28,13 @@
     <li class="pronto"><a href="#inicio">La ventana de un vistazo</a></li>
     <li class="grupo">Entorno</li>
     <li><a href="#proyectos">Proyectos</a></li>
-    <li class="pronto"><a href="#inicio">Repositorios de GitHub</a></li>
-    <li class="pronto"><a href="#inicio">Versiones de PHP</a></li>
-    <li class="pronto"><a href="#inicio">Bases de datos</a></li>
-    <li class="pronto"><a href="#inicio">Docker</a></li>
-    <li class="pronto"><a href="#inicio">Node.js</a></li>
+    <li><a href="#repositorios">Repositorios de GitHub</a></li>
+    <li><a href="#versiones">Versiones de PHP</a></li>
+    <li><a href="#bbdd">Bases de datos</a></li>
+    <li><a href="#docker">Docker</a></li>
+    <li><a href="#node">Node.js</a></li>
     <li class="grupo">Sistema</li>
-    <li class="pronto"><a href="#inicio">Dominios y hosts</a></li>
+    <li><a href="#dominios">Dominios y hosts</a></li>
     <li class="pronto"><a href="#inicio">Configuración</a></li>
     <li class="pronto"><a href="#inicio">Correo de pruebas</a></li>
     <li class="pronto"><a href="#inicio">Compartir una web</a></li>
@@ -187,6 +187,407 @@
       de hosts, y sus contenedores de Docker si los tiene. Tienes que escribir su nombre para confirmar. Su base de datos solo se borra
       si lo marcas, y puedes guardar antes una copia en <code>~/lvm-copias</code>. <b>La carpeta no se puede recuperar</b>: si está en
       GitHub, vuelve a clonarla con «Nuevo proyecto».</p></details>
+</section>
+
+<!-- =========================================================================================== REPOSITORIOS -->
+<section class="capitulo" id="repositorios">
+  <div class="antetitulo">Entorno</div>
+  <h2>Repositorios de GitHub</h2>
+  <p class="entrada">Los repositorios de tu cuenta o de tu organización en GitHub, para clonarlos en tu equipo con un clic y traer
+    sus cambios cuando los haya.</p>
+  <p>La lista se lee con un <b>token de GitHub</b> (o con tu sesión de la herramienta <code>gh</code>) y los repositorios se clonan
+    <b>por SSH, con tu propia clave</b>. Antes de usar esta página hay que conectar GitHub en
+    <b>Configuración → GitHub</b> (lo explica la primera tarea).</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-repos.png" data-linux="img/linux/pagina-repos.png" data-mac="img/mac/pagina-repos.png"
+           alt="La página Repositorios, con la lista de repositorios de GitHub" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="30" data-y="15.3"><b>De quién son</b><span>La cuenta u organización de GitHub y cuántos repositorios ves de los que tiene.
+        Si usas prefijos (por ejemplo, solo los que empiezan por <code>web-</code>), lo dice.</span></li>
+      <li data-x="28" data-y="20.5"><b>Buscar</b><span>Por nombre, descripción o dirección de la web.</span></li>
+      <li data-x="49" data-y="20.5"><b>Mostrar todos</b><span>Enseña también los que no empiezan por ninguno de tus prefijos. Los archivados no
+        salen nunca.</span></li>
+      <li data-x="97" data-y="20.5"><b>Leer de nuevo</b><span>Vuelve a pedir la lista a GitHub. Al entrar en la página ves al momento la de la
+        última vez, y la nueva llega detrás. Sin conexión se queda la anterior, con un aviso.</span></li>
+      <li data-x="20" data-y="27.8"><b>Cada repositorio</b><span>Su nombre, con un candado si es privado, y debajo si ya está clonado (y en qué
+        carpeta), su descripción, su web y cuándo cambió por última vez.</span></li>
+      <li data-x="86.5" data-y="27.8"><b>Traer cambios</b><span>Si ya está clonado: trae lo nuevo de GitHub (<code>git pull</code>) y lo junta con
+        lo tuyo. Antes te pregunta. Si choca con algo que tienes sin guardar o sin subir, <b>no toca nada</b> y te lo dice.</span></li>
+      <li data-x="88.3" data-y="51.7"><b>Clonar</b><span>Si aún no está en tu equipo: lo clona por SSH en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>,
+        con la carpeta llamada como el repositorio. Después lo verás en Proyectos, listo para cargar.</span></li>
+      <li data-x="93.3" data-y="27.8"><b>Copiar</b><span>Copia su dirección (<code>git@github.com:…</code>) para pegarla, por ejemplo, en
+        «Nuevo proyecto», que además de clonarlo le crea su base de datos.</span></li>
+      <li data-x="96.1" data-y="27.8"><b>Abrir en GitHub</b><span>Abre la página del repositorio en el navegador.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Conectar GitHub (la primera vez)</h3>
+  <ol class="pasos-tarea">
+    <li><b>Ve a Configuración → GitHub</b> y pulsa <b>«Conectar con un token…»</b>. Si usas la herramienta <code>gh</code>, también
+      tienes «Usar la sesión de gh».</li>
+    <li><b>Crea el token.</b> El enlace «Crear un token en GitHub» abre GitHub con los permisos ya marcados: <code>repo</code> (para
+      ver también los privados) y <code>read:org</code> (para los de una organización). Cópialo y pégalo en el campo.</li>
+    <li><b>Pulsa «Conectar».</b> El programa lo comprueba con GitHub y dice «Conectado a GitHub como …». El token se guarda en el
+      llavero de tu sesión, nunca en un fichero.</li>
+    <li><b>Elige de quién ves los repositorios.</b> En «Organización o cuenta» escribe su nombre y pulsa «Guardar». En «Prefijos»
+      puedes poner con qué empiezan los nombres que te interesan, separados por espacios; vacío, se ven todos.</li>
+  </ol>
+
+  <h3>Clonar un repositorio</h3>
+  <ol class="pasos-tarea">
+    <li><b>Búscalo</b> en la lista y pulsa <b>«Clonar»</b>.</li>
+    <li><b>Espera a que acabe.</b> Verás la tarea «Clonando …» y, al terminar, el aviso de que ya está en Proyectos.</li>
+    <li><b>Cárgalo en Proyectos</b> con su versión de PHP y su base de datos. Clonar solo trae el código: la base de datos la cargas
+      tú (en <a href="#bbdd">Bases de datos</a>) o la crea «Nuevo proyecto».</li>
+  </ol>
+  <div class="nota cuidado"><b>Hace falta tu clave SSH en GitHub</b>Si clonar falla, lo más normal es que GitHub no tenga tu clave.
+    Compruébalo en una terminal con <code>ssh -T git@github.com</code>.</div>
+
+  <h3>Preguntas</h3>
+  <details><summary>No veo un repositorio que sé que existe</summary>
+    <p>Puede que no empiece por ninguno de tus prefijos (activa «Mostrar todos»), que esté archivado, o que sea privado de una cuenta
+      que no es la tuya: de otra persona solo se ven sus repositorios públicos. De tu cuenta y de las organizaciones, también los privados.</p></details>
+  <details><summary>¿Clonar me deja el proyecto montado, con su base de datos?</summary>
+    <p>No: solo lo clona. Para clonarlo y montarlo de una vez (carpeta, base de datos y configuración), usa «Nuevo proyecto» en
+      la página <a href="#proyectos">Proyectos</a>.</p></details>
+</section>
+
+<!-- =========================================================================================== VERSIONES -->
+<section class="capitulo" id="versiones">
+  <div class="antetitulo">Entorno</div>
+  <h2>Versiones de PHP</h2>
+  <p class="entrada">Todas tus versiones de PHP instaladas, si tienen soporte y si están al día. Desde aquí se instalan, se activan, se
+    actualizan y se desinstalan.</p>
+  <p>Cada versión es un LAMPP completo en su carpeta, <code data-so="linux">/opt/lampp-8.4</code><code data-so="mac">/Library/Nexum/XAMPP-8.4.27</code>
+    por ejemplo, con su Apache, su MariaDB y <b>sus propias bases de datos</b>. Solo hay una <b>activa</b> a la vez: la que sirve tus
+    proyectos.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-versiones.png" data-linux="img/linux/pagina-versiones.png" data-mac="img/mac/pagina-versiones.png"
+           alt="La página Versiones de PHP, con cinco versiones instaladas" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="93" data-y="14"><b>Instalar versión…</b><span>Abre la lista de las ramas de PHP que hay (de la 7.4 a la 8.5) con su último
+        parche. Marca las que quieras y se compilan en tu equipo, en unos minutos cada una. También puedes elegir un parche concreto
+        («Otro parche concreto…») o un XAMPP oficial para proyectos antiguos.</span></li>
+      <li data-x="82" data-y="14"><b>Componentes</b><span>Qué lleva cada versión: PHP, Apache, MariaDB, FTP, Perl y phpMyAdmin, con su número.
+        Un phpMyAdmin antiguo sale en rojo.</span></li>
+      <li data-x="19.5" data-y="45"><b>La activa</b><span>El punto verde marca la versión que está sirviendo tus proyectos, y en marcha. Las
+        demás, en gris.</span></li>
+      <li data-x="24.5" data-y="25"><b>Nombre, tipo y fecha</b><span>La carpeta de la versión y su tipo: <b>propia</b> (la compila el programa,
+        con componentes al día), <b>XAMPP</b> (un XAMPP oficial) o <b>sobre XAMPP</b>. Debajo, cuándo se publicó ese PHP.</span></li>
+      <li data-x="43" data-y="27"><b>Con parche de seguridad</b><span>Las versiones sin soporte 7.4.33, 8.0.30 y 8.1.34 se compilan con el arreglo
+        oficial de un fallo grave de seguridad (PHP2Shell). Lo dice en verde.</span></li>
+      <li data-x="52.5" data-y="25.5"><b>Soporte</b><span><b>Estable</b> (verde): soporte completo, la mejor para proyectos nuevos.
+        <b>Solo seguridad</b> (ámbar): solo parches de seguridad. <b>Sin soporte</b> (rojo): sin parches, solo para proyectos antiguos.
+        Debajo, hasta cuándo. Los datos son de php.net.</span></li>
+      <li data-x="72" data-y="32"><b>Último parche</b><span><b>Actualizado</b> si tiene el último de su rama, o el que hay disponible. En rojo,
+        <b>Vulnerable (PHP2Shell)</b>: los XAMPP no se pueden arreglar; pásalo a una versión propia con el menú ⋮.</span></li>
+      <li data-x="82" data-y="39"><b>Bases de datos</b><span>Cuántas bases de datos tiene esa versión. Las de cada versión son solo suyas.</span></li>
+      <li data-x="91.5" data-y="45"><b>Activa / Activar</b><span>En la activa pone «Activa». En las demás, al pasar el ratón por la fila aparece
+        <b>«Activar»</b>: para la de ahora y arranca esa. Si es vulnerable, te avisa antes.</span></li>
+      <li data-x="96" data-y="32"><b>Más</b><span>Componentes de esa versión, <b>Actualizar a PHP x.y.z</b> si hay un parche nuevo, actualizar su
+        phpMyAdmin si es antiguo, y <b>Desinstalar…</b></span></li>
+    </ol>
+  </figure>
+
+  <h3>Instalar una versión nueva</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa «Instalar versión…»</b> y marca una o varias ramas. Las que ya tienes salen apagadas.</li>
+    <li><b>Pulsa «Instalar».</b> El programa te dice qué va a instalar y te pide la contraseña de administrador.</li>
+    <li><b>Espera.</b> Cada versión se descarga (comprobando su firma) y se compila: unos minutos. Puedes seguir trabajando: las que ya
+      tienes no se tocan. Con «Seguir en segundo plano», la tarea sigue mientras usas el resto de la ventana.</li>
+    <li><b>Actívala si quieres.</b> Al acabar te ofrece «Activar» la nueva.</li>
+  </ol>
+
+  <h3>Actualizar una versión</h3>
+  <ol class="pasos-tarea">
+    <li><b>Menú ⋮ de la versión → «Actualizar a PHP x.y.z».</b></li>
+    <li><b>Lee lo que va a hacer.</b> Hay dos casos:
+      <ul>
+        <li><b>En su carpeta</b> (las que se llaman como su rama, como <code>lampp-8.4</code>): se rehace con el parche nuevo. Tus bases de
+          datos se conservan si MariaDB sigue en la misma rama; si no, se guarda antes una copia en <code>~/lvm-copias</code>.</li>
+        <li><b>Al lado</b> (un XAMPP o un parche concreto, como <code>lampp-8.3.10</code>): se instala la nueva en otra carpeta y se le
+          copian todas las bases de datos. La de antes no se toca; cuando compruebes que todo va bien, desinstálala.</li>
+      </ul></li>
+    <li><b>Confirma</b> y escribe la contraseña. Mientras se compila, la versión de ahora sigue funcionando.</li>
+  </ol>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Por qué no puedo desinstalar la versión activa?</summary>
+    <p>Porque es la que está sirviendo tus proyectos. Activa antes otra y luego desinstala esa. Al desinstalar se guarda una copia de sus
+      bases de datos en <code>~/lvm-copias</code> (viene marcado); tus proyectos y los vhosts no se tocan.</p></details>
+  <details><summary>Un XAMPP sale «Vulnerable». ¿Qué hago?</summary>
+    <p>Los XAMPP oficiales no se pueden arreglar. En su menú ⋮, «Actualizar a PHP x.y.z + parche de seguridad» instala al lado una versión
+      propia de esa rama con el arreglo, le copia tus bases de datos y, si era la activa, la activa.</p></details>
+</section>
+
+<!-- =========================================================================================== BBDD -->
+<section class="capitulo" id="bbdd">
+  <div class="antetitulo">Entorno</div>
+  <h2>Bases de datos</h2>
+  <p class="entrada">Las bases de datos de cada versión de PHP: cuánto ocupan, cuándo cambiaron y de qué proyecto son. Aquí se crean,
+    se cargan desde un <code>.sql</code>, se copian a otra versión, se descargan y se borran.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-bbdd.png" data-linux="img/linux/pagina-bbdd.png" data-mac="img/mac/pagina-bbdd.png"
+           alt="La página Bases de datos, con el recuadro para subir una copia y la lista por versiones" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="83" data-y="14"><b>phpMyAdmin</b><span>Abre phpMyAdmin de la versión activa (tiene que estar en marcha).</span></li>
+      <li data-x="93" data-y="14"><b>Nueva BBDD…</b><span>Crea una base de datos vacía en la versión activa, en <code>utf8mb4</code>. No pide la
+        contraseña de administrador.</span></li>
+      <li data-x="27" data-y="24"><b>Resumen</b><span>Cuántas bases de datos hay en total y en la versión activa, cuál ha cambiado la última y
+        cuánto ocupan, con el espacio libre del disco. Cada versión se mide cuando está activa y en marcha.</span></li>
+      <li data-x="35" data-y="35"><b>Subir o actualizar una BBDD</b><span>Carga una copia <code>.sql</code>, <code>.sql.gz</code> o
+        <code>.zip</code> en la versión activa. Antes borra todas las tablas de la base de destino, <b>guardando una copia</b> en
+        <code>~/lvm-copias</code>.</span></li>
+      <li data-x="22" data-y="41"><b>El fichero</b><span>Elige la copia. Si se llama como una base de datos que ya tienes, te la propone como destino.</span></li>
+      <li data-x="52" data-y="41"><b>La base de destino</b><span>Dónde se carga. Con <b>+</b> creas una nueva y con la papelera borras la elegida.</span></li>
+      <li data-x="79" data-y="41"><b>Su proyecto (opcional)</b><span>Si es la base nueva de un proyecto, elígelo: se ajusta su configuración para
+        usarla (el <code>wp-config.php</code> de WordPress o el <code>parameters.php</code> de PrestaShop, cuya caché además se vacía).</span></li>
+      <li data-x="94" data-y="45"><b>Cargar</b><span>Se activa cuando está todo elegido; si falta algo, debajo dice qué. Antes de hacer nada te
+        enseña lo que va a pasar.</span></li>
+      <li data-x="27" data-y="52"><b>Buscar</b><span>Por el nombre de la base o de su proyecto. Las versiones que la tienen se despliegan solas.</span></li>
+      <li data-x="96" data-y="52"><b>Solo la versión activa</b><span>Oculta las demás versiones.</span></li>
+      <li data-x="25.7" data-y="62"><b>Cada versión</b><span>Su MariaDB, lo que ocupan sus bases y cuántas tiene. Púlsala para ver sus bases de
+        datos, cada una con su proyecto, su tamaño y cuándo cambió.</span></li>
+      <li data-x="81.5" data-y="68"><b>Acciones</b><span>En cada base: copiarla a otra versión de PHP, descargarla en un <code>.zip</code>,
+        cargar su proyecto y, en la activa, borrarla. En las de PrestaShop, también vaciar la caché de la tienda.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Cargar una copia de producción</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa «Elegir…»</b> y busca el fichero (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>).</li>
+    <li><b>Elige la base de destino</b> (o créala con <b>+</b>) y, si quieres, su proyecto.</li>
+    <li><b>Pulsa «Cargar».</b> El aviso te recuerda que se borran todas sus tablas y que antes se guarda una copia. Confirma con
+      «Vaciar y cargar» y escribe la contraseña.</li>
+    <li><b>Listo.</b> Al acabar dice «BBDD … cargada». Si algo falla al guardar la copia, no se carga nada.</li>
+  </ol>
+
+  <h3>Copiar una base a otra versión de PHP</h3>
+  <ol class="pasos-tarea">
+    <li><b>Despliega la versión</b> donde está y pulsa el icono de <b>copiar</b> de la base.</li>
+    <li><b>Elige la versión de destino.</b> Si ya la tiene, lo dice: se sustituye, guardando antes una copia.</li>
+    <li><b>Confirma.</b> Si el destino no es la activa, se arranca su MariaDB solo para la copia. La de origen no se toca.</li>
+  </ol>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Por qué sale «—» en el tamaño?</summary>
+    <p>Cada versión solo se puede medir cuando está activa y en marcha. Actívala un momento y verás sus tamaños.</p></details>
+  <details><summary>¿Puedo crear o borrar bases en una versión que no es la activa?</summary>
+    <p>No: crear, cargar y borrar se hacen siempre en la activa. En las demás puedes copiar, descargar, cargar su proyecto y vaciar la
+      caché de una tienda.</p></details>
+  <details><summary>He cargado una copia encima de la buena. ¿Puedo volver atrás?</summary>
+    <p>Sí. Antes de cargar se guardó la base tal como estaba en <code>~/lvm-copias</code>, con la fecha en el nombre. Cárgala igual que
+      cualquier otra copia.</p></details>
+</section>
+
+<!-- =========================================================================================== DOCKER -->
+<section class="capitulo" id="docker">
+  <div class="antetitulo">Entorno</div>
+  <h2>Docker</h2>
+  <p class="entrada">Tus proyectos en contenedores, cada uno con su propia versión de PHP y su propia dirección, a la vez que los de
+    LAMPP. Sin escribir comandos.</p>
+  <p>Docker funciona <b>sin root, con tu usuario</b>. Los proyectos los sirve el <b>Apache de Docker</b> (sin necesidad de LAMPP), con las
+    mismas reglas de seguridad, y cada uno tiene su dirección <code>https://…docker.test</code>. Las bases de datos van en una
+    <b>MariaDB común</b> por versión, o, en WordPress, puedes usar <b>en vivo</b> la de una versión LAMPP.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-docker.png" data-linux="img/linux/pagina-docker.png" data-mac="img/mac/pagina-docker.png"
+           alt="La página Docker, con dos proyectos y el Apache de Docker" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="25" data-y="15.3"><b>Docker sin root</b><span>La versión de Docker y que funciona con tu usuario, no como administrador.</span></li>
+      <li data-x="80.1" data-y="13.7"><b>Parar todos</b><span>Para todos los contenedores de Nexum: proyectos, MariaDB comunes, el Apache de Docker
+        y phpMyAdmin. Los de otros programas no se tocan.</span></li>
+      <li data-x="91.7" data-y="13.7"><b>Proyecto en Docker…</b><span>Monta un proyecto de tu carpeta en Docker: eliges su versión de PHP, su MariaDB
+        y, si quieres, la base de datos de LAMPP que se le copia.</span></li>
+      <li data-x="19.4" data-y="21.8"><b>El Apache de Docker</b><span>Si está en marcha, en qué dirección (127.0.0.2) y dónde está su phpMyAdmin
+        (<code>https://pma.docker.test</code>). Con «Parar» lo paras.</span></li>
+      <li data-x="30.9" data-y="32.6"><b>Consumo</b><span>Lo que gastan los contenedores de procesador y de memoria, y cuántos hay en marcha. Se
+        actualiza cada 20 segundos mientras ves la página.</span></li>
+      <li data-x="28.8" data-y="43.4"><b>Contenedores, imágenes y volúmenes</b><span>Las imágenes descargadas (para volver a descargarlas o
+        borrar las que no usa nadie) y los volúmenes, donde se guardan los datos de las bases.</span></li>
+      <li data-x="96.4" data-y="43.4"><b>Buscar y «Solo en marcha»</b><span>Filtra la lista por nombre, o deja solo lo que está funcionando.</span></li>
+      <li data-x="19.6" data-y="54.1"><b>Cada proyecto</b><span>Pulsa la fila para desplegarlo: verás su visor (con los mismos accesos que en
+        Proyectos) y cada uno de sus contenedores. El punto verde dice que está en marcha.</span></li>
+      <li data-x="51.6" data-y="54.1"><b>Sus versiones de PHP</b><span>Con qué PHP funciona. En WordPress puedes tener <b>varias a la vez</b>, cada
+        una con su dirección, sobre la misma carpeta y la misma base de datos.</span></li>
+      <li data-x="76.1" data-y="54.1"><b>Arrancar o parar</b><span>Todos sus servicios. Siguen en marcha aunque cierres la ventana, y nada
+        arranca solo al encender el equipo.</span></li>
+      <li data-x="80.2" data-y="54.1"><b>Abrir y phpMyAdmin</b><span>Su web por <code>https://</code> y su base de datos en phpMyAdmin (solo
+        con el proyecto en marcha).</span></li>
+      <li data-x="84.4" data-y="54.1"><b>La contraseña de su base</b><span>La llave copia la contraseña de <code>root</code> de su MariaDB, para
+        entrar en phpMyAdmin.</span></li>
+      <li data-x="87.2" data-y="54.1"><b>Actualizar la imagen</b><span>Pone su PHP al día con lo último de Docker Hub (parches de seguridad).
+        La base de datos y la configuración no cambian.</span></li>
+      <li data-x="89.9" data-y="54.1"><b>Registros</b><span>Lo último que han dicho sus contenedores: para ver por qué algo no arranca.</span></li>
+      <li data-x="92.7" data-y="54.1"><b>Qué base de datos usa</b><span>Solo WordPress: su copia en la MariaDB de Docker o, <b>en vivo</b>, la de
+        una versión LAMPP (la misma que <code>web.local</code>, sin copias).</span></li>
+      <li data-x="95.5" data-y="54.1"><b>Quitar de Docker</b><span>Borra sus contenedores y su copia de la base de datos. <b>Tu carpeta y las
+        bases de LAMPP no se tocan.</b></span></li>
+      <li data-x="29.1" data-y="66"><b>Lo común</b><span>El Apache de Docker y phpMyAdmin, las MariaDB comunes y los puentes a LAMPP. Si los paras
+        mientras los usa un proyecto, te avisa antes.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Montar un WordPress en Docker</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa «Proyecto en Docker…»</b> (o, en Proyectos, el <b>+</b> de «Entorno» → «En Docker…»).</li>
+    <li><b>Elige</b> la carpeta, la versión de PHP, la de MariaDB y, si quieres, la base de datos de LAMPP que se copia. Su
+      <code>wp-config.php</code> se adapta solo dentro del contenedor: el de tu carpeta no cambia.</li>
+    <li><b>Pulsa «Crear en Docker».</b> Te dice la dirección que tendrá. La primera vez con cada PHP se prepara su imagen, unos minutos.</li>
+    <li><b>Ábrelo.</b> Al acabar te da su dirección <code>https://…docker.test</code>.</li>
+  </ol>
+
+  <h3>Probarlo con otra versión de PHP a la vez</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa su botón de PHP</b> (en la fila) o «Versiones de PHP…» en su visor.</li>
+    <li><b>En «Añadir otra», elige la versión</b> y pulsa «Añadir». Tendrá su propia dirección, con la misma carpeta y la misma base.</li>
+    <li><b>Para quitar una</b>, su papelera (la última no se puede quitar).</li>
+  </ol>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Se paran solos si no los uso?</summary>
+    <p>Sí. En <b>Configuración → Docker</b>, «Parar los proyectos sin visitas»: nunca, a la hora o a las horas que elijas (3, si no
+      cambias nada). Se mira cada 15 minutos, también con la ventana cerrada, y se para también lo común que ya no use nadie.</p></details>
+  <details><summary>¿Por qué me pide la contraseña si Docker va sin root?</summary>
+    <p>Las tareas de la ventana la piden al empezar, como en el resto del programa. Si la has escrito hace poco, no te la vuelve a pedir.</p></details>
+  <details><summary>¿Qué usuario y contraseña pongo en phpMyAdmin?</summary>
+    <p>El usuario es <code>root</code>, y la contraseña la copia la llave del proyecto (o el botón phpMyAdmin de su visor, que además lo abre).</p></details>
+</section>
+
+<!-- =========================================================================================== NODE -->
+<section class="capitulo" id="node">
+  <div class="antetitulo">Entorno</div>
+  <h2>Node.js</h2>
+  <p class="entrada">Tus proyectos hechos con Astro, Next, Nuxt, SvelteKit o Vite, cada uno con su servidor en tu equipo y con la
+    versión de Node que pide.</p>
+  <p>Salen las carpetas de tus proyectos con un <code>package.json</code> (y que no son WordPress, PrestaShop ni Laravel). La versión de
+    Node se lee de su <code>.nvmrc</code>, <code>.node-version</code> o <code>engines</code>; si no la tienes, se descarga, comprobada.
+    <b>Nada de Node pide la contraseña de administrador.</b></p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-node.png" data-linux="img/linux/pagina-node.png" data-mac="img/mac/pagina-node.png"
+           alt="La página Node, con un proyecto en marcha y otro parado" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="19.4" data-y="21.4"><b>En marcha o parado</b><span>Verde si su servidor está funcionando.</span></li>
+      <li data-x="31" data-y="22.6"><b>Qué es y dónde está</b><span>Su tipo (Next, Astro…), la versión de Node que usa y, en marcha, en qué modo
+        y en qué dirección. Si le faltan las dependencias, lo dice: se instalan al arrancar.</span></li>
+      <li data-x="66.2" data-y="21.4"><b>VS Code y su carpeta</b><span>Lo abre en Visual Studio Code o en el explorador de archivos.</span></li>
+      <li data-x="72.4" data-y="21.4"><b>Registro</b><span>Lo último que ha dicho su servidor: el primer sitio donde mirar si algo falla.</span></li>
+      <li data-x="75.5" data-y="21.4"><b>Reiniciar</b><span>Lo para y lo vuelve a arrancar (o lo vuelve a compilar, si va compilado).</span></li>
+      <li data-x="81.1" data-y="21.4"><b>Abrir web</b><span>Abre su dirección en el navegador.</span></li>
+      <li data-x="79.7" data-y="27.6"><b>Arrancar</b><span>En modo desarrollo: los cambios se ven al momento. Prepara Node, instala las
+        dependencias si faltan y arranca su servidor.</span></li>
+      <li data-x="87.4" data-y="27.6"><b>Compilar</b><span>Lo compila y lo arranca como en producción, para ver cómo quedará de verdad.</span></li>
+      <li data-x="88.3" data-y="21.4"><b>Túnel</b><span>Lo comparte por internet con una dirección temporal y contraseña (como «Compartir» en
+        Proyectos). Solo se comparte compilado: si está en desarrollo, te pregunta antes de compilarlo.</span></li>
+      <li data-x="94.3" data-y="21.4"><b>Parar</b><span>Para su servidor y, si lo estabas compartiendo, también el túnel.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Sigue en marcha si cierro la ventana?</summary>
+    <p>Sí: cada servidor va por su cuenta. Páralo desde aquí cuando acabes.</p></details>
+  <details><summary>¿Por qué el túnel compila el proyecto?</summary>
+    <p>Para no sacar de tu equipo el código fuente: lo que se comparte es la versión compilada, como la vería el cliente en producción.</p></details>
+</section>
+
+<!-- =========================================================================================== DOMINIOS -->
+<section class="capitulo" id="dominios">
+  <div class="antetitulo">Sistema</div>
+  <h2>Dominios y hosts</h2>
+  <p class="entrada">Prueba una web con su dominio de verdad, en tu equipo: el navegador abre <code>mitienda.com</code> y lo que ves es tu
+    copia local, con HTTPS de confianza.</p>
+  <p>Eso es <b>falsear un dominio</b>: una línea en el fichero de hosts del sistema (<code>/etc/hosts</code>) hace que ese dominio lleve a
+    tu equipo en vez de a internet. Al dejar de falsearlo, vuelve a llevar a la web real. Cada cambio pide la contraseña de administrador
+    y antes guarda una copia del fichero en <code>~/lvm-copias</code>.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-dominios.png" data-linux="img/linux/pagina-dominios.png" data-mac="img/mac/pagina-dominios.png"
+           alt="La página Dominios y hosts" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="92.1" data-y="13.7"><b>Ver fichero de hosts</b><span>Qué dominios se pueden falsear, cómo está cada uno y el contenido entero del
+        fichero, solo para leer. Para editarlo a mano: menú ☰ → «Editar /etc/hosts».</span></li>
+      <li data-x="19.8" data-y="24.7"><b>Host falseado</b><span>Los dominios que ahora llevan a tu equipo, cada uno con su botón «Abrir». Si no
+        hay ninguno, todos llevan a su web real.</span></li>
+      <li data-x="64" data-y="19.3"><b>Nuevo proyecto con dominio falseado</b><span>Para empezar en local un proyecto con su dominio de producción,
+        sin tocar nada en producción.</span></li>
+      <li data-x="88.1" data-y="24.7"><b>Dominio</b><span>El de producción. Si pegas una dirección entera, se queda solo con el nombre.</span></li>
+      <li data-x="85.3" data-y="30.9"><b>Carpeta</b><span>La del proyecto en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>
+        (por ejemplo, la de un <code>git clone</code>), o una nueva con <b>+</b>. Si ya trae su configuración, te propone su base de datos.</span></li>
+      <li data-x="85.3" data-y="37.1"><b>Base de datos</b><span>Una de la versión activa, una nueva (con <b>+</b>, se crea vacía) o ninguna.</span></li>
+      <li data-x="92.6" data-y="43.3"><b>Crear y falsear</b><span>Te enseña antes los pasos: crear la carpeta si hace falta, su vhost http y https
+        con certificado, la base de datos, y falsear el dominio (dejando de falsear los demás). Debajo dice qué falta, si falta algo.</span></li>
+      <li data-x="19.8" data-y="54.8"><b>Dominios de los vhosts</b><span>Todos los que tienen vhost, con su carpeta. «PrestaShop» marca las
+        tiendas y «Proyecto nuevo» los creados aquí.</span></li>
+      <li data-x="95.4" data-y="54.8"><b>Falsear o no</b><span>Encendido, el dominio lleva a tu equipo; apagado, a la web real. Solo cambia ese
+        dominio (y su <code>www</code>).</span></li>
+      <li data-x="19.8" data-y="67.2"><b>Los .local y .test</b><span>Dominios que solo existen en tu equipo. No se «falsean»: van siempre con su
+        línea en el fichero de hosts, para que nadie de tu red pueda contestar por ellos.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Probar una tienda con su dominio real</h3>
+  <ol class="pasos-tarea">
+    <li><b>Enciende su interruptor</b> en «Dominios de los vhosts» y escribe la contraseña.</li>
+    <li><b>Ábrela.</b> Sale arriba, en «Host falseado», con su botón «Abrir». El navegador la abre en tu equipo con HTTPS de confianza.</li>
+    <li><b>Al acabar, apágalo.</b> El dominio vuelve a llevar a la tienda de verdad. Cargar otro proyecto también deja de falsearlo.</li>
+  </ol>
+  <div class="nota cuidado"><b>Mientras está falseado, no ves la web real</b>Si abres el dominio para mirar algo en producción, verás tu
+    copia. Apágalo antes.</div>
+
+  <h3>Preguntas</h3>
+  <details><summary>El navegador avisa del certificado</summary>
+    <p>El certificado propio de un dominio real solo se acepta mientras está falseado. Si el navegador estaba abierto al falsearlo,
+      ciérralo del todo y vuelve a abrirlo.</p></details>
+  <details><summary>¿Falsear uno deja de falsear los demás?</summary>
+    <p>Con el interruptor, no: solo cambia ese. Con «Crear y falsear» o al cargar un proyecto, sí: queda falseado solo el suyo.</p></details>
+  <details><summary>¿Puedo recuperar el fichero de hosts de antes?</summary>
+    <p>Sí: antes de cada cambio se guarda en <code>~/lvm-copias</code>, con la fecha en el nombre.</p></details>
 </section>
 
 </main>

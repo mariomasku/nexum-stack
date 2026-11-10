@@ -157,7 +157,7 @@ extension AppModel {
         }
     }
 
-    /// Carpeta que se llama como la base: wp_ajoselpajizo → dob-wordpress-ajoselpajizo (la base sin
+    /// Carpeta que se llama como la base: wp_mitienda → wordpress-mitienda (la base sin
     /// wp_ ni ps_, al final del nombre). Si hay varias, la del mismo tipo (WordPress o tienda)
     func nameMatchProject(_ db: String, _ folders: [String], _ kind: [String: String]) -> String? {
         let low = db.lowercased()

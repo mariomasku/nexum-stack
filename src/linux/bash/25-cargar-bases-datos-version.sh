@@ -100,7 +100,7 @@ function gui_db_check() {
     elif [[ "$out" == *1045* ]] || [[ "$out" == *"Access denied"* ]]; then
         echo "clave|$folder"
     else
-        echo "no|El MariaDB de lampp-$folder no está en marcha. Arráncalo en la pestaña Versiones."
+        echo "no|El MariaDB de lampp-$folder no está en marcha. Arráncalo en Versiones de PHP."
     fi
 }
 
@@ -434,7 +434,7 @@ function copy_database() {
             echo "$new queda vinculada al proyecto $link en lampp-$dst."
         fi
         echo "$new esta ahora en lampp-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null), cargalo"
-        echo "en Versiones y elige lampp-$dst."
+        echo "en Proyectos y elige lampp-$dst en su Entorno."
     fi
     return $rc
 }

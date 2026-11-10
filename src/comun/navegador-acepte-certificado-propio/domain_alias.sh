@@ -33,7 +33,7 @@ function vhost_points_to() {
 # ¿Se parece el dominio a la carpeta? Su nombre registrable (lo de antes de la terminacion:
 # mitienda en www.mitienda.com, ejemplo en tienda.ejemplo.com, cliente en
 # cliente.com.es), de 4 letras o mas, va en el nombre de la carpeta sin sus palabras genericas
-# (dob, prestashop, wordpress...): asi prestashop.com no vale para dob-prestashop-x
+# (prestashop, wordpress...): asi prestashop.com no vale para prestashop-x
 function domain_fits_folder() {
     local domain=${1#www.} folder label w n parts
     folder=$(tr 'A-Z' 'a-z' <<< "$2")

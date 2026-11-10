@@ -542,7 +542,7 @@ function copy_database() {
             echo "$new queda vinculada al proyecto $link en XAMPP-$dst."
         fi
         echo "$new esta ahora en XAMPP-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null),"
-        echo "cargalo en Versiones y elige XAMPP-$dst."
+        echo "cargalo en Proyectos y elige XAMPP-$dst en su Entorno."
     fi
     return $rc
 }

@@ -211,12 +211,12 @@ function upgrade_to() {
     echo ""
     if [ "$(active_dir)" == "$src" ]; then
         echo "lampp-$from era la activa: se activa lampp-$to"
-        ( use_lampp "$to" ) || echo "No se ha podido activar lampp-$to: activala en Versiones"
+        ( use_lampp "$to" ) || echo "No se ha podido activar lampp-$to: activala en Versiones de PHP"
     fi
     echo "Copiadas $((n - ${#failed[@]})) de $n BBDD de lampp-$from a lampp-$to."
     [ ${#failed[@]} -gt 0 ] && echo "No se han podido copiar: ${failed[*]} (copialas con copiar-bd)"
     echo "lampp-$from se queda como estaba: cuando compruebes que todo va bien con lampp-$to,"
-    echo "desinstalala (Versiones, menu ⋮ de la version, Desinstalar)."
+    echo "desinstalala (Versiones de PHP, menu ⋮ de la version, Desinstalar)."
     [ ${#failed[@]} -eq 0 ]
 }
 

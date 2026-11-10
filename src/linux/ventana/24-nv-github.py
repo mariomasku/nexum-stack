@@ -44,10 +44,10 @@ class NvGithub:
                 row.add_suffix(b)
             lb.add(row)
             for key, title, sub, value, width in (
-                    ("cuenta", "Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)",
+                    ("cuenta", "Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)",
                      gh["account"], 22),
                     ("prefijos", "Prefijos de los repositorios",
-                     "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos", gh["prefixes"], 34)):
+                     "Separados por espacios (wordpress- tienda- …); vacío: todos", gh["prefixes"], 34)):
                 row = ActionRow(title, sub)
                 entry = Gtk.Entry(text=value, width_chars=width, valign=Gtk.Align.CENTER)
                 save = Gtk.Button(label="Guardar", valign=Gtk.Align.CENTER, sensitive=False)
@@ -135,7 +135,7 @@ class NvGithub:
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         head.pack_start(label("Node", "nv-titulo-grande"), False, False, 0)
         head.pack_start(label("Proyectos de %s hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en "
-                              "este equipo, con tu usuario y con la versión de Node que pide." % HTDOCS,
+                              "este equipo, con tu usuario y con la versión de Node que pide." % ("/opt/htdocs" if DEMO else HTDOCS),
                               "nv-chico", "nv-tenue", wrap=True, xalign=0), False, False, 0)
         box.pack_start(head, False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
@@ -354,7 +354,7 @@ class NvGithub:
 
     def nv_repo_fetch(self, repo):
         if repo["state"] == "clonado":
-            if not confirm(self.win, "¿Aplastar %s con lo de GitHub?" % repo["folder"],
+            if not confirm(self.win, "¿Traer los cambios de GitHub a %s?" % repo["folder"],
                            "Este repositorio ya está clonado en /opt/htdocs/%s. Se traen sus cambios de GitHub (git pull) "
                            "y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca "
                            "nada y se dice." % repo["folder"], "Traer los cambios"):

@@ -36,9 +36,12 @@ except ImportError:
     sys.exit(0)
 
 def edge(values):
-    # el borde: el píxel más oscuro de los primeros 80 (antes, la sombra va aclarándose)
-    part = values[:80]
-    return part.index(min(part))
+    # el borde: el primer salto brusco a oscuro desde fuera (antes, la sombra se oscurece poco a poco). No
+    # el más oscuro: por ahí puede pasar la fila azul del menú lateral
+    for i in range(1, 80):
+        if values[i] < values[i - 1] - 100:
+            return i
+    return 0
 
 for f in sorted(glob.glob(os.path.join(src, "*.png"))):
     im = Image.open(f).convert("RGB")

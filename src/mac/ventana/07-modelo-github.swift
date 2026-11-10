@@ -111,7 +111,7 @@ extension AppModel {
         var args = ["repo-traer", r.full]
         var title = "Clonando \(r.name)"
         if r.state == "clonado" {
-            guard confirm("¿Aplastar \(r.folder) con lo de GitHub?",
+            guard confirm("¿Traer los cambios de GitHub a \(r.folder)?",
                           "Este repositorio ya está clonado en \(HTDOCS)/\(r.folder). Se traen sus cambios de GitHub (git pull) y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca nada y se dice.",
                           "Traer los cambios") else { return }
             args.append("--actualizar")

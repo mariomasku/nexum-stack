@@ -163,7 +163,7 @@ PROJECT_CONFIG_TEXT = {
 
 
 def name_match_project(db, folders):
-    """Carpeta que se llama como la base: wp_ajoselpajizo → dob-wordpress-ajoselpajizo (la base
+    """Carpeta que se llama como la base: wp_mitienda → wordpress-mitienda (la base
     sin wp_ ni ps_, al final del nombre). Si hay varias, la del mismo tipo (WordPress o tienda)."""
     low = db.lower()
     tails = {low}

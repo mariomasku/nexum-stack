@@ -157,12 +157,12 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 ## 1.56.9 · 30 oct 2026
 
 - **Docker:** las imágenes y enlaces que un WordPress guardó trabajando con LAMPP (https://web.local/wp-content/…, o su dominio propio) salen del contenedor: antes se pedían a LAMPP y, sin él en marcha o con otro proyecto en web.local, no se veían. La BBDD no se toca: se cambian en lo que devuelve la web (también escapadas, como las de Elementor). Los proyectos de antes se arreglan al arrancarlos.
-- **Configuración, GitHub:** la organización o cuenta se puede escribir también como su dirección (https://github.com/hexer-dev) o con @, se comprueba que existe, y si no vale se dice en una ventana y lo escrito se queda (antes volvía la de antes sin decir nada).
+- **Configuración, GitHub:** la organización o cuenta se puede escribir también como su dirección (https://github.com/mi-empresa) o con @, se comprueba que existe, y si no vale se dice en una ventana y lo escrito se queda (antes volvía la de antes sin decir nada).
 
 ## 1.56.8 · 29 oct 2026
 
 - Los proyectos de Docker sin visitas se paran solos (Configuración, Docker): uno que lleva las horas elegidas (3 de partida; de 1 a 24, o nunca) sin ninguna visita, tampoco por el túnel, se para, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker). Se mira cada 15 minutos, también con la ventana cerrada (un temporizador de systemctl --user). Al entrar en un proyecto parado, su web lo dice en vez de dar un error. En la terminal: docker-reposo.
-- **Pestaña Repositorios (como DevHub):** los repositorios de la organización o cuenta de GitHub que se elija en Configuración, solo los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se pueden añadir otros, como los de Shopify) o todos, con un buscador. «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos. Si ya está clonado en un proyecto, se pregunta si aplastarlo: se traen sus cambios con git pull y, si chocan con los tuyos, no se toca nada y se dice. La lista se lee con un token de GitHub (se guarda en el llavero de la sesión, no en un fichero) o con la sesión de gh, y la de la última vez sale al momento. En la terminal: github, github-conectar, repos y repo-traer.
+- **Pestaña Repositorios (como DevHub):** los repositorios de la organización o cuenta de GitHub que se elija en Configuración, solo los de sus prefijos (los que se elijan, como wordpress-; se pueden añadir otros, como los de Shopify) o todos, con un buscador. «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos. Si ya está clonado en un proyecto, se pregunta si aplastarlo: se traen sus cambios con git pull y, si chocan con los tuyos, no se toca nada y se dice. La lista se lee con un token de GitHub (se guarda en el llavero de la sesión, no en un fichero) o con la sesión de gh, y la de la última vez sale al momento. En la terminal: github, github-conectar, repos y repo-traer.
 - **Parches nuevos (Configuración):** lo que tiene un parche publicado en cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin), en las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub, sin descargar nada), Mailpit y cloudflared, con «Actualizar todo». Se busca al abrir la ventana cuando toca buscar una versión nueva del programa y, si hay algo, se ofrece actualizarlo. Las MariaDB comunes de Docker se ponen al día solas al cambiar de parche. En la terminal: componentes y componentes-actualizar.
 - **Correo de pruebas (Configuración):** sus tres tarjetas en una fila.
 - **Configuración, Túnel de Cloudflare:** cloudflared y el registro, juntos en una fila, y el túnel abierto debajo, a lo ancho (antes cada uno quedaba suelto).
@@ -227,7 +227,7 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 - **Cancelar ya no deja nada a medias:** desde la ventana, lo que cambia algo pide la contraseña de administrador al empezar, no a mitad. Si se cancela, no se ha hecho nada. Antes, al desmontar el proyecto y cancelar la contraseña, se desmontaba igual. Desmontar es ahora todo o nada, como cargar: si un paso falla, el proyecto sigue cargado.
 - **Cabecera:** «Dev Stack» vuelve a la letra de antes.
-- **Acerca de:** más corto («Herramientas de desarrollo web en local») y la firma sin HEXER.
+- **Acerca de:** más corto («Herramientas de desarrollo web en local») y una firma más corta.
 
 ## 1.55.12 · 27 oct 2026
 
@@ -646,7 +646,7 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 ## 1.28.1 · 19 oct 2026
 
 - **Subir una base de datos:** el desplegable Proyecto es tan ancho como el nombre de carpeta más largo, para verlo entero al elegirlo.
-- Al elegir la base se propone el proyecto que se llama como ella (wp_mitienda -> dob-wordpress-mitienda, ps_mitienda -> dob-prestashop-mitienda), si no hay uno recordado o que ya la use. Si se cambia a mano, se respeta.
+- Al elegir la base se propone el proyecto que se llama como ella (wp_mitienda -> wordpress-mitienda, ps_mitienda -> prestashop-mitienda), si no hay uno recordado o que ya la use. Si se cambia a mano, se respeta.
 
 ## 1.28.0 · 19 oct 2026
 
@@ -847,7 +847,7 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 ## 1.1.0 · 5 oct 2026
 
-- Logo de hexer y firma; el acceso abre la terminal a 100x32.
+- Logo y firma; el acceso abre la terminal a 100x32.
 - Barra de progreso en verde durante las instalaciones.
 
 ## 1.0.0 · 5 oct 2026

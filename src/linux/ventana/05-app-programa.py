@@ -447,7 +447,12 @@ class AppPrograma:
                     Gtk.MessageType.ERROR)
         if d == self.data:
             return False
+        old_active = (self.data or {}).get("active")
         self.data = d
+        # (Dominios y hosts: su campo BBDD es el de la versión activa; si cambia, o si la página se hizo antes de
+        # tener las versiones, se rehace aunque sus dominios sigan igual)
+        if getattr(self, "hosts", None) is not None and old_active != d["active"]:
+            self.build_hosts()
         # (solo la versión: la firma está en Acerca de, en el menú)
         # (la versión va arriba, detrás de «Entornos LAMPP y Docker»; abajo solo el aviso de la simulación)
         self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE and not DEMO else "")

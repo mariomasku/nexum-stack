@@ -353,7 +353,7 @@ lvm-instalador importar-bd copia.sql nueva --crear   # creando la base; si ya ex
 lvm-instalador crear-bd mi_web     # crear una base vacía en la versión activa
 lvm-instalador borrar-bd mi_web --copia   # borrarla guardando antes una copia en ~/lvm-copias
 lvm-instalador exportar-bd mi_web ~/Descargas/mi_web.zip [7.4]       # descargar una copia (sin versión, de la activa)
-lvm-instalador cargar-proyecto dob-wordpress-mi_web [7.4]           # web.local -> esa carpeta (y activa la 7.4)
+lvm-instalador cargar-proyecto wordpress-mi_web [7.4]           # web.local -> esa carpeta (y activa la 7.4)
 lvm-instalador montar-proyecto https://github.com/yo/mi_web.git mi_web 8.4 wp_mi_web [copia.sql]   # clonar, cargar y crear su BBDD
 lvm-instalador desmontar-proyecto                                  # web.local enseña una página vacía
 lvm-instalador vhosts             # editar httpd-vhosts.conf de la versión activa (después, reiniciar)

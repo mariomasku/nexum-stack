@@ -126,7 +126,7 @@ mkdir -p "$HOME"
 valid_project() { [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]; }
 db_valid_name() { [[ "$1" =~ ^[a-z_]+$ ]]; }
 db_connect() { echo connect >> "$W/orden"; }
-repo_clones() { echo "hexer/proyecto proyecto"; }
+repo_clones() { echo "empresa/proyecto proyecto"; }
 repo_pull() { echo "pull $2" >> "$W/orden"; return ${PULL_RC:-0}; }
 htdocs_close_world() { echo cierra >> "$W/orden"; }
 import_database() { echo "bd $*" >> "$W/orden"; return ${BD_RC:-0}; }
@@ -141,7 +141,7 @@ wp_local_url() { echo https://web.local; }
 echo "SELECT 1;" > "$W/d.sql"
 fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "pasos: pull, codigo, BBDD (protegida, de este proyecto) y volver a cargar" '[ $rc -eq 0 ] && [ "$(grep -v connect "$W/orden" | cut -d" " -f1 | tr "\n" " ")" == "pull cierra bd carga " ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto" "$W/orden" && grep -q "carga proyecto  wp_x" "$W/orden" && [ "$(cat "$P/index.php")" == nuevo ] && [ -d "$HOME/lvm-copias" ]'
-check "pull por SSH de su repositorio" 'grep -q "pull git@github.com:hexer/proyecto.git" "$W/orden"'
+check "pull por SSH de su repositorio" 'grep -q "pull git@github.com:empresa/proyecto.git" "$W/orden"'
 fresh; : > "$W/orden"; out=$(PULL_RC=1 project_update proyecto --codigo "$W/normal.zip" --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "si el pull falla, no se copia ni se carga nada" '[ $rc -ne 0 ] && [ "$(cat "$P/index.php")" == viejo ] && ! grep -qE "^(bd|carga)" "$W/orden" && grep -q "No se ha copiado" <<< "$out"'
 fresh; : > "$W/orden"; out=$(BD_RC=1 project_update proyecto --bd "$W/d.sql" --base wp_x); rc=$?

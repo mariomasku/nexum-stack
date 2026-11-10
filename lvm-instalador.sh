@@ -2744,14 +2744,14 @@ EOF
 # ===========================================================================
 # Los repositorios de una organizacion o cuenta de GitHub, para clonarlos por SSH en htdocs (o, si ya
 # estan, traer sus cambios con git pull). Como DevHub: un token de GitHub (o la sesion de gh) solo para
-# leer la lista, y los prefijos de los nombres que se ven (dob-wordpress-, dob-prestashop-...). El token
+# leer la lista, y los prefijos de los nombres que se ven (wordpress-, tienda-...; sin ninguno, todos). El token
 # va en el llavero de la sesión, no en un fichero; GITHUB_CONF_FILE (solo tuyo) lleva:
 #   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
 #   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
 #   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
 GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
 GITHUB_KEYRING_SERVICE=nexum-dev-stack
-GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
+GITHUB_DEFAULT_PREFIXES=""
 
 function github_conf() {
     local v="" p ok=""
@@ -2858,11 +2858,11 @@ function github_command() {
             [ -n "$(github_token)" ] && login=$(github_api /user 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["login"])' 2> /dev/null)
             echo "G|$([ -n "$login" ] && echo 1 || echo 0)|$login|$(github_conf ORIGEN)|$(github_conf CUENTA)|$(github_conf PREFIJOS)" ;;
         cuenta)
-            # (tambien su direccion de GitHub o con @: https://github.com/hexer-dev, @hexer-dev)
+            # (tambien su direccion de GitHub o con @: https://github.com/mi-empresa, @mi-empresa)
             local a kind
             a=$(printf "%s" "$2" | sed "s/^[[:space:]]*//; s/[[:space:]]*$//")
             a=${a#http://} a=${a#https://} a=${a#www.} a=${a#github.com/} a=${a#@} a=${a%%/*}
-            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como hexer-dev)"; return 1; }
+            [[ "$a" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,38})$ ]] || { echo "«$2» no es un nombre de organización o cuenta de GitHub (letras, números y -, como mi-empresa)"; return 1; }
             # (con la conexion hecha, que exista)
             if [ -n "$(github_token)" ]; then
                 kind=$(github_api "/users/$a" 2> /dev/null | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["type"])' 2> /dev/null)
@@ -4536,7 +4536,7 @@ function vhost_points_to() {
 # ¿Se parece el dominio a la carpeta? Su nombre registrable (lo de antes de la terminacion:
 # mitienda en www.mitienda.com, ejemplo en tienda.ejemplo.com, cliente en
 # cliente.com.es), de 4 letras o mas, va en el nombre de la carpeta sin sus palabras genericas
-# (dob, prestashop, wordpress...): asi prestashop.com no vale para dob-prestashop-x
+# (prestashop, wordpress...): asi prestashop.com no vale para prestashop-x
 function domain_fits_folder() {
     local domain=${1#www.} folder label w n parts
     folder=$(tr 'A-Z' 'a-z' <<< "$2")
@@ -7111,7 +7111,7 @@ function is_prestashop() {
 
 # Base de una tienda cuya configuracion no la dice: la indicada, la recordada para la carpeta
 # (~/.lvm-instalador/proyectos) o, en la version activa, la unica ps_<final de la carpeta>
-# (dob-prestashop-mitienda -> ps_mitienda)
+# (prestashop-mitienda -> ps_mitienda)
 function ps_guess_db() {
     local folder=$1 db=$2 tail
     if [ -z "$db" ] && [ -f "$PROJECTS_FILE" ]; then
@@ -13289,7 +13289,7 @@ VERSIONES
   lo que devuelve la web (también escapadas, como las de Elementor). Los
   proyectos de antes se arreglan al arrancarlos.
 - Configuración, GitHub: la organización o cuenta se puede escribir
-  también como su dirección (https://github.com/hexer-dev) o con @, se
+  también como su dirección (https://github.com/mi-empresa) o con @, se
   comprueba que existe, y si no vale se dice en una ventana y lo escrito
   se queda (antes volvía la de antes sin decir nada).
 
@@ -13303,7 +13303,7 @@ VERSIONES
   terminal: docker-reposo.
 - Pestaña Repositorios (como DevHub): los repositorios de la
   organización o cuenta de GitHub que se elija en Configuración, solo
-  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
+  los de sus prefijos (los que se elijan, como wordpress-; se
   pueden añadir otros, como los de Shopify) o todos, con un buscador.
   «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
   Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
@@ -13492,7 +13492,7 @@ VERSIONES
   como cargar: si un paso falla, el proyecto sigue cargado.
 - Cabecera: «Dev Stack» vuelve a la letra de antes.
 - Acerca de: más corto («Herramientas de desarrollo web en local») y
-  la firma sin HEXER.
+  una firma más corta.
 
 1.55.12 (27 oct 2026)
 - Proyectos: columna «Tamaño», con lo que ocupa cada proyecto en el
@@ -14333,8 +14333,8 @@ VERSIONES
 - Subir una base de datos: el desplegable Proyecto es tan ancho como
   el nombre de carpeta más largo, para verlo entero al elegirlo.
 - Al elegir la base se propone el proyecto que se llama como ella
-  (wp_mitienda -> dob-wordpress-mitienda, ps_mitienda ->
-  dob-prestashop-mitienda), si no hay uno recordado o que ya la use.
+  (wp_mitienda -> wordpress-mitienda, ps_mitienda ->
+  prestashop-mitienda), si no hay uno recordado o que ya la use.
   Si se cambia a mano, se respeta.
 
 1.28.0 (19 oct 2026)
@@ -14672,7 +14672,7 @@ VERSIONES
 - Aviso si se acepta la lista sin marcar ninguna versión.
 
 1.1.0 (5 oct 2026)
-- Logo de hexer y firma; el acceso abre la terminal a 100x32.
+- Logo y firma; el acceso abre la terminal a 100x32.
 - Barra de progreso en verde durante las instalaciones.
 
 1.0.0 (5 oct 2026)
@@ -18546,7 +18546,7 @@ function gui_db_check() {
     elif [[ "$out" == *1045* ]] || [[ "$out" == *"Access denied"* ]]; then
         echo "clave|$folder"
     else
-        echo "no|El MariaDB de lampp-$folder no está en marcha. Arráncalo en la pestaña Versiones."
+        echo "no|El MariaDB de lampp-$folder no está en marcha. Arráncalo en Versiones de PHP."
     fi
 }
 
@@ -19031,7 +19031,7 @@ function copy_database() {
             echo "$new queda vinculada al proyecto $link en lampp-$dst."
         fi
         echo "$new esta ahora en lampp-$dst. Para probar el proyecto con PHP $(php_version "$ddir" 2> /dev/null), cargalo"
-        echo "en Versiones y elige lampp-$dst."
+        echo "en Proyectos y elige lampp-$dst en su Entorno."
     fi
     return $rc
 }
@@ -20528,7 +20528,7 @@ PROJECT_CONFIG_TEXT = {
 
 
 def name_match_project(db, folders):
-    """Carpeta que se llama como la base: wp_ajoselpajizo → dob-wordpress-ajoselpajizo (la base
+    """Carpeta que se llama como la base: wp_mitienda → wordpress-mitienda (la base
     sin wp_ ni ps_, al final del nombre). Si hay varias, la del mismo tipo (WordPress o tienda)."""
     low = db.lower()
     tails = {low}
@@ -23668,7 +23668,12 @@ class AppPrograma:
                     Gtk.MessageType.ERROR)
         if d == self.data:
             return False
+        old_active = (self.data or {}).get("active")
         self.data = d
+        # (Dominios y hosts: su campo BBDD es el de la versión activa; si cambia, o si la página se hizo antes de
+        # tener las versiones, se rehace aunque sus dominios sigan igual)
+        if getattr(self, "hosts", None) is not None and old_active != d["active"]:
+            self.build_hosts()
         # (solo la versión: la firma está en Acerca de, en el menú)
         # (la versión va arriba, detrás de «Entornos LAMPP y Docker»; abajo solo el aviso de la simulación)
         self.foot.set_label("SIMULACIÓN: no se cambia nada" if SIMULATE and not DEMO else "")
@@ -23722,7 +23727,7 @@ class AppServicios:
         if not d["active"]:
             box, lb = group("Servicios")
             row = ActionRow("Ninguna versión activa",
-                            "Activa una versión en la pestaña Versiones para ver sus servicios.")
+                            "Activa una versión en Versiones de PHP para ver sus servicios.")
             row.add_prefix(label("●", "punto-gris"))
             lb.add(row)
             self.services_box.pack_start(box, False, False, 0)
@@ -24610,7 +24615,7 @@ class AppVersiones:
         # 1. Repositorio y carpeta: de los de GitHub (pestaña Repositorios) o la dirección de otro
         p1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         p1.pack_start(label("¿De qué repositorio de GitHub? (escribe parte de su nombre)"), False, False, 0)
-        w["repo"] = Gtk.Entry(placeholder_text="dob-wordpress-…", primary_icon_name="system-search-symbolic")
+        w["repo"] = Gtk.Entry(placeholder_text="nombre del repositorio…", primary_icon_name="system-search-symbolic")
         w["repo"].connect("changed", lambda *_: self.new_project_search())
         w["repo"].connect("activate", lambda *_: self.new_project_first_hit())
         w["repo"].connect("key-press-event", self.new_project_search_key)
@@ -26254,8 +26259,8 @@ class AppBasesDatos:
         box.pack_start(css(label("¿A qué versión de PHP copias %s?" % db, wrap=True,
                                  max_width_chars=60), "title-3"), False, False, 0)
         box.pack_start(label("Se copia con el mismo nombre desde lampp-%s, que no se toca. Para "
-                             "copiarla con otro nombre o con otra carpeta de proyecto, usa Replicar "
-                             "(Versiones, Cargar proyecto)." % inst["folder"],
+                             "copiarla con otro nombre o con otra carpeta de proyecto, usa, en "
+                             "Proyectos, el + de «Entorno»: «En otra versión de PHP (copiar su BBDD)…»." % inst["folder"],
                              "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
         # (primero las que no la tienen; dentro, de la más nueva a la más antigua)
@@ -27109,7 +27114,7 @@ class AppSubirBajarBD:
                            if act else ""))
         if not act:
             lb.add(ActionRow("No hay ninguna versión activa",
-                             "Activa una versión en la pestaña Versiones para cargar BBDD."))
+                             "Activa una versión en Versiones de PHP para cargar BBDD."))
             return box
 
         f = self.imp["file"]
@@ -27185,7 +27190,7 @@ class AppSubirBajarBD:
         db = self.imp["db"]
         hint = ""
         if not self.data["running"]:
-            hint = "La versión activa está parada: arráncala en la pestaña Versiones."
+            hint = "La versión activa está parada: arráncala en Versiones de PHP."
         elif not self.imp["file"]:
             hint = "Elige el fichero SQL."
         elif not db:
@@ -31004,10 +31009,10 @@ class NvGithub:
                 row.add_suffix(b)
             lb.add(row)
             for key, title, sub, value, width in (
-                    ("cuenta", "Organización o cuenta", "La de los repositorios que se ven (por ejemplo, hexer-dev)",
+                    ("cuenta", "Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)",
                      gh["account"], 22),
                     ("prefijos", "Prefijos de los repositorios",
-                     "Separados por espacios (dob-wordpress- dob-prestashop- …); vacío: todos", gh["prefixes"], 34)):
+                     "Separados por espacios (wordpress- tienda- …); vacío: todos", gh["prefixes"], 34)):
                 row = ActionRow(title, sub)
                 entry = Gtk.Entry(text=value, width_chars=width, valign=Gtk.Align.CENTER)
                 save = Gtk.Button(label="Guardar", valign=Gtk.Align.CENTER, sensitive=False)
@@ -31095,7 +31100,7 @@ class NvGithub:
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         head.pack_start(label("Node", "nv-titulo-grande"), False, False, 0)
         head.pack_start(label("Proyectos de %s hechos con Astro, Next, Nuxt, SvelteKit o Vite. Cada uno con su servidor en "
-                              "este equipo, con tu usuario y con la versión de Node que pide." % HTDOCS,
+                              "este equipo, con tu usuario y con la versión de Node que pide." % ("/opt/htdocs" if DEMO else HTDOCS),
                               "nv-chico", "nv-tenue", wrap=True, xalign=0), False, False, 0)
         box.pack_start(head, False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
@@ -31314,7 +31319,7 @@ class NvGithub:
 
     def nv_repo_fetch(self, repo):
         if repo["state"] == "clonado":
-            if not confirm(self.win, "¿Aplastar %s con lo de GitHub?" % repo["folder"],
+            if not confirm(self.win, "¿Traer los cambios de GitHub a %s?" % repo["folder"],
                            "Este repositorio ya está clonado en /opt/htdocs/%s. Se traen sus cambios de GitHub (git pull) "
                            "y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca "
                            "nada y se dice." % repo["folder"], "Traer los cambios"):
@@ -32376,16 +32381,30 @@ class NvDocker:
         """El formulario de siempre para crear un proyecto en Docker, en un dialogo."""
         dlg = Gtk.Dialog(title="Proyecto en Docker", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(620, -1)
+        self.nv_docker_dlg = dlg
+        dlg.connect("destroy", lambda *_: setattr(self, "nv_docker_dlg", None))
+        self.nv_docker_new_fill()
+        dlg.show_all()
+
+    def nv_docker_new_fill(self):
+        """El formulario del diálogo «Proyecto en Docker», con lo elegido ahora (al cambiar la carpeta se rehace:
+        la BBDD que se copia y el dominio son los de esa carpeta)."""
+        dlg = getattr(self, "nv_docker_dlg", None)
+        if dlg is None:
+            return
+        area = dlg.get_content_area()
+        for old in area.get_children():
+            area.remove(old)
         form = self.build_docker_new()
         form.set_margin_start(18)
         form.set_margin_end(18)
         form.set_margin_bottom(18)
-        dlg.get_content_area().add(form)
+        area.add(form)
         # (al pulsar «Crear en Docker» se cierra: la tarea va en su ventana)
         for w in self.nv_walk(form):
             if isinstance(w, Gtk.Button) and w.get_label() == "Crear en Docker":
                 w.connect("clicked", lambda *_: dlg.destroy())
-        dlg.show_all()
+        form.show_all()
 
     def nv_walk(self, w):
         yield w
@@ -32398,6 +32417,8 @@ class NvDocker:
         f["source"] = None
         if not f.get("domain_set"):
             f["domain"] = docker_slug(f["folder"] or "") + ".docker.local" if f.get("folder") else ""
+        # (el formulario va en un diálogo: se rehace ahí, con la BBDD y el dominio de la carpeta nueva)
+        self.nv_docker_new_fill()
 
     def on_docker_stats(self, rc, out):
         cores, total, cpu, mem = 1, 0, {}, {}
@@ -33082,6 +33103,11 @@ class App2(NvBandeja,
                 self.nv_exit()
                 return False
             fn, shot = steps[i[0]]
+            # (sin el fundido al cambiar de página: con la ventana detrás de otras no avanza, y se capturaba la
+            # anterior. Antes de cada paso: Configuración rehace los suyos)
+            for w in self.nv_walk(self.win):
+                if isinstance(w, Gtk.Stack):
+                    w.set_transition_type(Gtk.StackTransitionType.NONE)
             fn()
             GLib.timeout_add(1800, lambda: (self.capture(self.win, shot), False)[1])
             i[0] += 1
@@ -34517,12 +34543,12 @@ function upgrade_to() {
     echo ""
     if [ "$(active_dir)" == "$src" ]; then
         echo "lampp-$from era la activa: se activa lampp-$to"
-        ( use_lampp "$to" ) || echo "No se ha podido activar lampp-$to: activala en Versiones"
+        ( use_lampp "$to" ) || echo "No se ha podido activar lampp-$to: activala en Versiones de PHP"
     fi
     echo "Copiadas $((n - ${#failed[@]})) de $n BBDD de lampp-$from a lampp-$to."
     [ ${#failed[@]} -gt 0 ] && echo "No se han podido copiar: ${failed[*]} (copialas con copiar-bd)"
     echo "lampp-$from se queda como estaba: cuando compruebes que todo va bien con lampp-$to,"
-    echo "desinstalala (Versiones, menu ⋮ de la version, Desinstalar)."
+    echo "desinstalala (Versiones de PHP, menu ⋮ de la version, Desinstalar)."
     [ ${#failed[@]} -eq 0 ]
 }
 

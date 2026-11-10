@@ -61,7 +61,7 @@ struct NewProjectWizard: View {
             : Array(model.npRepos.filter { $0.full.lowercased().contains(q) }.prefix(6))
         return VStack(alignment: .leading, spacing: 8) {
             Text("¿De qué repositorio de GitHub? (escribe parte de su nombre)")
-            TextField("dob-wordpress-…", text: Binding(get: { model.npRepoQuery }, set: { model.npRepoTyped($0) }))
+            TextField("nombre del repositorio…", text: Binding(get: { model.npRepoQuery }, set: { model.npRepoTyped($0) }))
                 .textFieldStyle(RoundedBorderTextFieldStyle())
             if !hits.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {

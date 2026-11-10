@@ -117,16 +117,30 @@ class NvDocker:
         """El formulario de siempre para crear un proyecto en Docker, en un dialogo."""
         dlg = Gtk.Dialog(title="Proyecto en Docker", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(620, -1)
+        self.nv_docker_dlg = dlg
+        dlg.connect("destroy", lambda *_: setattr(self, "nv_docker_dlg", None))
+        self.nv_docker_new_fill()
+        dlg.show_all()
+
+    def nv_docker_new_fill(self):
+        """El formulario del diálogo «Proyecto en Docker», con lo elegido ahora (al cambiar la carpeta se rehace:
+        la BBDD que se copia y el dominio son los de esa carpeta)."""
+        dlg = getattr(self, "nv_docker_dlg", None)
+        if dlg is None:
+            return
+        area = dlg.get_content_area()
+        for old in area.get_children():
+            area.remove(old)
         form = self.build_docker_new()
         form.set_margin_start(18)
         form.set_margin_end(18)
         form.set_margin_bottom(18)
-        dlg.get_content_area().add(form)
+        area.add(form)
         # (al pulsar «Crear en Docker» se cierra: la tarea va en su ventana)
         for w in self.nv_walk(form):
             if isinstance(w, Gtk.Button) and w.get_label() == "Crear en Docker":
                 w.connect("clicked", lambda *_: dlg.destroy())
-        dlg.show_all()
+        form.show_all()
 
     def nv_walk(self, w):
         yield w
@@ -139,6 +153,8 @@ class NvDocker:
         f["source"] = None
         if not f.get("domain_set"):
             f["domain"] = docker_slug(f["folder"] or "") + ".docker.local" if f.get("folder") else ""
+        # (el formulario va en un diálogo: se rehace ahí, con la BBDD y el dominio de la carpeta nueva)
+        self.nv_docker_new_fill()
 
     def on_docker_stats(self, rc, out):
         cores, total, cpu, mem = 1, 0, {}, {}

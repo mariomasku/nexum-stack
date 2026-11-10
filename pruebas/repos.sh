@@ -13,7 +13,7 @@ extract "$SRC" github_conf github_conf_set github_token gh_token github_api gith
 MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1
 DRY=0 HTDOCS_DIR=$W/htdocs GITHUB_CONF_FILE=$W/conf/github GITHUB_KEYRING_SERVICE=nexum-dev-stack
-GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-" REPOS_CACHE_FILE=$W/conf/repos-github
+GITHUB_DEFAULT_PREFIXES="wordpress- prestashop-" REPOS_CACHE_FILE=$W/conf/repos-github
 REPO_PROJECTS_FILE=$W/conf/montados GIT_KNOWN_HOSTS="github.com ssh-ed25519 AAAA"
 mkdir -p "$HTDOCS_DIR"
 # El llavero falso: lo que le llega por la entrada y por la linea de ordenes, por separado
@@ -30,27 +30,27 @@ curl() { local url="${@: -1}" hdr=/dev/null a prev=""
     grep -q "Bearer tok_bueno_1234567890abcdef" "$W/curl-entrada" || return 22
     case $url in
         */user) echo '{"login": "yo"}' ;;
-        */users/hexer) echo '{"type": "Organization"}' ;;
+        */users/empresa) echo '{"type": "Organization"}' ;;
         */users/yo) echo '{"type": "User"}' ;;
-        */orgs/hexer/repos?*page=2) : > "$hdr"; cat "$W/pagina2.json" ;;
-        */orgs/hexer/repos?*) printf 'link: <https://api.github.com/orgs/hexer/repos?type=all&sort=pushed&per_page=100&page=2>; rel="next"\r\n' > "$hdr"; cat "$W/pagina1.json" ;;
+        */orgs/empresa/repos?*page=2) : > "$hdr"; cat "$W/pagina2.json" ;;
+        */orgs/empresa/repos?*) printf 'link: <https://api.github.com/orgs/empresa/repos?type=all&sort=pushed&per_page=100&page=2>; rel="next"\r\n' > "$hdr"; cat "$W/pagina1.json" ;;
         *) return 22 ;;
     esac; }
 cat > "$W/pagina1.json" << 'J'
-[{"full_name": "hexer/dob-wordpress-uno", "name": "dob-wordpress-uno", "private": true, "archived": false, "pushed_at": "2026-10-28T10:00:00Z", "default_branch": "master", "homepage": "https://uno.es", "description": "La | web de uno", "owner": {"login": "hexer"}},
- {"full_name": "hexer/dob-prestashop-dos", "name": "dob-prestashop-dos", "private": true, "archived": false, "pushed_at": "2026-10-27T10:00:00Z", "default_branch": "main", "homepage": null, "description": null, "owner": {"login": "hexer"}},
- {"full_name": "hexer/dob-wordpress-viejo", "name": "dob-wordpress-viejo", "private": false, "archived": true, "pushed_at": "2020-01-01T10:00:00Z", "default_branch": "master", "homepage": "", "description": "", "owner": {"login": "hexer"}}]
+[{"full_name": "empresa/wordpress-uno", "name": "wordpress-uno", "private": true, "archived": false, "pushed_at": "2026-10-28T10:00:00Z", "default_branch": "master", "homepage": "https://uno.es", "description": "La | web de uno", "owner": {"login": "empresa"}},
+ {"full_name": "empresa/prestashop-dos", "name": "prestashop-dos", "private": true, "archived": false, "pushed_at": "2026-10-27T10:00:00Z", "default_branch": "main", "homepage": null, "description": null, "owner": {"login": "empresa"}},
+ {"full_name": "empresa/wordpress-viejo", "name": "wordpress-viejo", "private": false, "archived": true, "pushed_at": "2020-01-01T10:00:00Z", "default_branch": "master", "homepage": "", "description": "", "owner": {"login": "empresa"}}]
 J
 cat > "$W/pagina2.json" << 'J'
-[{"full_name": "hexer/herramientas", "name": "herramientas", "private": false, "archived": false, "pushed_at": "2026-10-01T10:00:00Z", "default_branch": "main", "homepage": "", "description": "Scripts", "owner": {"login": "hexer"}},
- {"full_name": "hexer/dob-wordpress-tres", "name": "dob-wordpress-tres", "private": true, "archived": false, "pushed_at": "2026-09-01T10:00:00Z", "default_branch": "master", "homepage": "", "description": "", "owner": {"login": "hexer"}}]
+[{"full_name": "empresa/herramientas", "name": "herramientas", "private": false, "archived": false, "pushed_at": "2026-10-01T10:00:00Z", "default_branch": "main", "homepage": "", "description": "Scripts", "owner": {"login": "empresa"}},
+ {"full_name": "empresa/wordpress-tres", "name": "wordpress-tres", "private": true, "archived": false, "pushed_at": "2026-09-01T10:00:00Z", "default_branch": "master", "homepage": "", "description": "", "owner": {"login": "empresa"}}]
 J
 
 # Configuracion
-check "sin configurar: los prefijos de DevHub, sin cuenta ni conexion" '[ "$(github_conf PREFIJOS)" == "dob-wordpress- dob-prestashop-" ] && [ -z "$(github_conf CUENTA)" ] && [ -z "$(github_token)" ]'
-check "la cuenta y los prefijos: solo nombres validos" '! github_command cuenta "a b" > /dev/null && ! github_command prefijos "ok mal/o" > /dev/null && github_command cuenta hexer > /dev/null && github_command prefijos "dob-wordpress- dob-prestashop- dob-shopify-" > /dev/null && [ "$(github_conf PREFIJOS)" == "dob-wordpress- dob-prestashop- dob-shopify-" ]'
+check "sin configurar: los prefijos de DevHub, sin cuenta ni conexion" '[ "$(github_conf PREFIJOS)" == "wordpress- prestashop-" ] && [ -z "$(github_conf CUENTA)" ] && [ -z "$(github_token)" ]'
+check "la cuenta y los prefijos: solo nombres validos" '! github_command cuenta "a b" > /dev/null && ! github_command prefijos "ok mal/o" > /dev/null && github_command cuenta empresa > /dev/null && github_command prefijos "wordpress- prestashop- shopify-" > /dev/null && [ "$(github_conf PREFIJOS)" == "wordpress- prestashop- shopify-" ]'
 check "el fichero, solo tuyo" '[ "$(stat -c %a "$GITHUB_CONF_FILE" 2> /dev/null || stat -f %Lp "$GITHUB_CONF_FILE")" == 600 ]'
-check "prefijos vacios: todos" 'github_command prefijos "" > /dev/null && [ -z "$(github_conf PREFIJOS)" ] && github_command prefijos "dob-wordpress- dob-prestashop-" > /dev/null'
+check "prefijos vacios: todos" 'github_command prefijos "" > /dev/null && [ -z "$(github_conf PREFIJOS)" ] && github_command prefijos "wordpress- prestashop-" > /dev/null'
 
 # Conectar con un token (por la entrada)
 out=$(echo "no vale" | github_connect 2>&1); rc=$?
@@ -60,28 +60,28 @@ check "conectar: un token que GitHub no acepta, no se guarda" '[ $rc -ne 0 ] && 
 out=$(echo "tok_bueno_1234567890abcdef" | github_connect 2>&1); rc=$?
 check "conectar: con el bueno, lo dice y va al llavero" '[ $rc -eq 0 ] && grep -q "Conectado a GitHub como yo" <<< "$out" && grep -q tok_bueno "$W/llavero" && [ "$(github_conf ORIGEN)" == llavero ]'
 check "el token nunca en la linea de ordenes (ni del llavero ni de curl) ni en un fichero de Nexum" '! grep -q tok_bueno "$W/llavero.log" "$W/curl.log" && ! grep -rq tok_bueno "$W/conf"'
-check "cuenta: tambien su direccion de GitHub o con @ (se queda el nombre)" 'github_command cuenta "https://github.com/hexer/" > /dev/null && [ "$(github_conf CUENTA)" == hexer ] && github_command cuenta "@hexer" > /dev/null && [ "$(github_conf CUENTA)" == hexer ]'
+check "cuenta: tambien su direccion de GitHub o con @ (se queda el nombre)" 'github_command cuenta "https://github.com/empresa/" > /dev/null && [ "$(github_conf CUENTA)" == empresa ] && github_command cuenta "@empresa" > /dev/null && [ "$(github_conf CUENTA)" == empresa ]'
 out=$(github_command cuenta noexiste 2>&1); rc=$?
-check "cuenta: una que no existe en GitHub, no se guarda y se dice" '[ $rc -ne 0 ] && grep -q "no hay ninguna organización ni cuenta noexiste" <<< "$out" && [ "$(github_conf CUENTA)" == hexer ]'
-check "github estado: conectado, quien, como, la cuenta y los prefijos" '[ "$(github_command estado)" == "G|1|yo|llavero|hexer|dob-wordpress- dob-prestashop-" ]'
+check "cuenta: una que no existe en GitHub, no se guarda y se dice" '[ $rc -ne 0 ] && grep -q "no hay ninguna organización ni cuenta noexiste" <<< "$out" && [ "$(github_conf CUENTA)" == empresa ]'
+check "github estado: conectado, quien, como, la cuenta y los prefijos" '[ "$(github_command estado)" == "G|1|yo|llavero|empresa|wordpress- prestashop-" ]'
 
 # La lista
 out=$(repos_list); rc=$?
-check "lista: las dos paginas, sin los archivados y solo los de los prefijos" '[ $rc -eq 0 ] && grep -qx "C|yo|hexer|Organization|4|3" <<< "$out" && grep -q "^R|hexer/dob-wordpress-tres|" <<< "$out" && ! grep -q "herramientas\|viejo" <<< "$out"'
-check "lista: cada uno con lo suyo (privado, fecha, rama, prefijo, web; sin | en la descripcion)" 'grep -qx "R|hexer/dob-wordpress-uno|dob-wordpress-uno|1|2026-10-28|master|dob-wordpress-|https://uno.es|La web de uno|nuevo|" <<< "$out"'
-check "mostrar todos" 'repos_list --todos | grep -q "^R|hexer/herramientas|"'
-check "cache: solo tuya, y la lista sin preguntar a GitHub" '[ "$(stat -c %a "$REPOS_CACHE_FILE" 2> /dev/null || stat -f %Lp "$REPOS_CACHE_FILE")" == 600 ] && : > "$W/curl.log" && repos_list --cache | grep -qx "C|yo|hexer|Organization|4|3" && ! grep -q "/repos" "$W/curl.log"'
-check "cache de otra cuenta: no vale" 'github_command cuenta otra > /dev/null; [ -z "$(repos_list --cache)" ]; github_command cuenta hexer > /dev/null'
+check "lista: las dos paginas, sin los archivados y solo los de los prefijos" '[ $rc -eq 0 ] && grep -qx "C|yo|empresa|Organization|4|3" <<< "$out" && grep -q "^R|empresa/wordpress-tres|" <<< "$out" && ! grep -q "herramientas\|viejo" <<< "$out"'
+check "lista: cada uno con lo suyo (privado, fecha, rama, prefijo, web; sin | en la descripcion)" 'grep -qx "R|empresa/wordpress-uno|wordpress-uno|1|2026-10-28|master|wordpress-|https://uno.es|La web de uno|nuevo|" <<< "$out"'
+check "mostrar todos" 'repos_list --todos | grep -q "^R|empresa/herramientas|"'
+check "cache: solo tuya, y la lista sin preguntar a GitHub" '[ "$(stat -c %a "$REPOS_CACHE_FILE" 2> /dev/null || stat -f %Lp "$REPOS_CACHE_FILE")" == 600 ] && : > "$W/curl.log" && repos_list --cache | grep -qx "C|yo|empresa|Organization|4|3" && ! grep -q "/repos" "$W/curl.log"'
+check "cache de otra cuenta: no vale" 'github_command cuenta otra > /dev/null; [ -z "$(repos_list --cache)" ]; github_command cuenta empresa > /dev/null'
 # Ya clonados (origin por https o por SSH, en minusculas o no) y una carpeta con su nombre que es otra cosa
-mkdir -p "$HTDOCS_DIR/uno-local/.git" "$HTDOCS_DIR/dos/.git" "$HTDOCS_DIR/dob-wordpress-tres"
-printf '[remote "origin"]\n\turl = https://github.com/Hexer/dob-wordpress-uno.git\n' > "$HTDOCS_DIR/uno-local/.git/config"
-printf '[core]\n\tbare = false\n[remote "origin"]\n\turl = git@github.com:hexer/dob-prestashop-dos.git\n\tfetch = +refs/heads/*\n' > "$HTDOCS_DIR/dos/.git/config"
+mkdir -p "$HTDOCS_DIR/uno-local/.git" "$HTDOCS_DIR/dos/.git" "$HTDOCS_DIR/wordpress-tres"
+printf '[remote "origin"]\n\turl = https://github.com/Empresa/wordpress-uno.git\n' > "$HTDOCS_DIR/uno-local/.git/config"
+printf '[core]\n\tbare = false\n[remote "origin"]\n\turl = git@github.com:empresa/prestashop-dos.git\n\tfetch = +refs/heads/*\n' > "$HTDOCS_DIR/dos/.git/config"
 out=$(repos_list --cache)
-check "ya clonado: en que carpeta (por https o por SSH)" 'grep -q "^R|hexer/dob-wordpress-uno|.*|clonado|uno-local$" <<< "$out" && grep -q "^R|hexer/dob-prestashop-dos|.*|clonado|dos$" <<< "$out"'
-check "una carpeta con su nombre que no es ese repositorio: ocupado" 'grep -q "^R|hexer/dob-wordpress-tres|.*|ocupado|dob-wordpress-tres$" <<< "$out"'
+check "ya clonado: en que carpeta (por https o por SSH)" 'grep -q "^R|empresa/wordpress-uno|.*|clonado|uno-local$" <<< "$out" && grep -q "^R|empresa/prestashop-dos|.*|clonado|dos$" <<< "$out"'
+check "una carpeta con su nombre que no es ese repositorio: ocupado" 'grep -q "^R|empresa/wordpress-tres|.*|ocupado|wordpress-tres$" <<< "$out"'
 github_command cuenta yo > /dev/null
 check "la cuenta de quien conecta (User): tambien sus privados" ': > "$W/curl.log"; repos_list > /dev/null; grep -q "/user/repos?affiliation=owner" "$W/curl.log"'
-github_command cuenta hexer > /dev/null
+github_command cuenta empresa > /dev/null
 
 # Clonar y traer cambios (git falso)
 repo_clone() { echo "clone $*" >> "$W/git.log"; mkdir -p "$2/.git"; printf '[remote "origin"]\n\turl = %s\n' "$1" > "$2/.git/config"; }
@@ -89,21 +89,21 @@ htdocs_close_world() { :; }
 PULL_RC=0
 no_tty() { echo "no_tty $*" >> "$W/git.log"; [ "$*" == *" merge "* ] && return 0; return $PULL_RC; }
 git() { case "$*" in *"symbolic-ref"*) echo master ;; *"remote.origin.url"*) sed -n 's/^\turl = //p' "${2}/.git/config" ;; *"branch.master.merge"*) echo refs/heads/master ;; *"merge --abort"*) echo abort >> "$W/git.log" ;; esac; }
-out=$(repo_fetch "hexer/dob-wordpress-nuevo" 2>&1); rc=$?
-check "clonar: por SSH, en htdocs con su nombre, y apuntado como de repositorio" '[ $rc -eq 0 ] && grep -q "^clone git@github.com:hexer/dob-wordpress-nuevo.git $HTDOCS_DIR/dob-wordpress-nuevo " "$W/git.log" && grep -qx dob-wordpress-nuevo "$REPO_PROJECTS_FILE"'
-check "clonar: nombres raros, no" '! repo_fetch "hexer/../x" > /dev/null 2>&1 && ! repo_fetch "-x/y" > /dev/null 2>&1 && ! repo_fetch "solo" > /dev/null 2>&1'
-out=$(repo_fetch "hexer/dob-wordpress-tres" 2>&1); rc=$?
+out=$(repo_fetch "empresa/wordpress-nuevo" 2>&1); rc=$?
+check "clonar: por SSH, en htdocs con su nombre, y apuntado como de repositorio" '[ $rc -eq 0 ] && grep -q "^clone git@github.com:empresa/wordpress-nuevo.git $HTDOCS_DIR/wordpress-nuevo " "$W/git.log" && grep -qx wordpress-nuevo "$REPO_PROJECTS_FILE"'
+check "clonar: nombres raros, no" '! repo_fetch "empresa/../x" > /dev/null 2>&1 && ! repo_fetch "-x/y" > /dev/null 2>&1 && ! repo_fetch "solo" > /dev/null 2>&1'
+out=$(repo_fetch "empresa/wordpress-tres" 2>&1); rc=$?
 check "clonar: con una carpeta de su nombre que es otra cosa, no se toca" '[ $rc -ne 0 ] && grep -q "no es un clon" <<< "$out"'
-out=$(repo_fetch "Hexer/dob-wordpress-uno" 2>&1); rc=$?
+out=$(repo_fetch "Empresa/wordpress-uno" 2>&1); rc=$?
 check "ya clonado: lo dice (EXISTE, para preguntar) y no hace nada" '[ $rc -eq 3 ] && grep -qx "EXISTE|uno-local" <<< "$out"'
 : > "$W/git.log"
-out=$(repo_fetch "hexer/dob-wordpress-uno" --actualizar 2>&1); rc=$?
-check "aplastar: git pull en su carpeta (origin https: por SSH, su rama), sin ganchos ni preguntas" '[ $rc -eq 0 ] && grep -q "no_tty git -C $HTDOCS_DIR/uno-local -c core.hooksPath=/dev/null .* pull --no-rebase --no-edit git@github.com:hexer/dob-wordpress-uno.git master" "$W/git.log"'
+out=$(repo_fetch "empresa/wordpress-uno" --actualizar 2>&1); rc=$?
+check "traer los cambios: git pull en su carpeta (origin https: por SSH, su rama), sin ganchos ni preguntas" '[ $rc -eq 0 ] && grep -q "no_tty git -C $HTDOCS_DIR/uno-local -c core.hooksPath=/dev/null .* pull --no-rebase --no-edit git@github.com:empresa/wordpress-uno.git master" "$W/git.log"'
 : > "$W/git.log"
-repo_fetch "hexer/dob-prestashop-dos" --actualizar > /dev/null 2>&1
-check "aplastar: origin ya por SSH, git pull normal" 'grep -q "pull --no-rebase --no-edit$" "$W/git.log"'
+repo_fetch "empresa/prestashop-dos" --actualizar > /dev/null 2>&1
+check "traer los cambios: origin ya por SSH, git pull normal" 'grep -q "pull --no-rebase --no-edit$" "$W/git.log"'
 PULL_RC=1; mkdir -p "$HTDOCS_DIR/dos/.git"; touch "$HTDOCS_DIR/dos/.git/MERGE_HEAD"
-out=$(repo_fetch "hexer/dob-prestashop-dos" --actualizar 2>&1); rc=$?
+out=$(repo_fetch "empresa/prestashop-dos" --actualizar 2>&1); rc=$?
 check "si choca con lo tuyo: se deshace, no se toca nada y se dice" '[ $rc -ne 0 ] && grep -q "No se ha tocado nada" <<< "$out" && grep -qx abort "$W/git.log"'
 
 # El token de gh no espera a su vigilante (eran 15 s en cada llamada) y la lista de la ultima vez no lo pide
@@ -126,11 +126,11 @@ if [ $MAC -eq 1 ]; then
     check "ventana (Mac): la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")" "$SRC" && grep -q "case \"repos\": ReposView()" "$SRC" && grep -q "^            GitHubCard()$" "$SRC" && grep -q "runQuick(\[\"github-conectar\"\], input:" "$SRC"'
     check "ventana (Mac): si la cuenta no vale, se dice en una ventana y lo escrito se queda" 'grep -q "message(\"No se ha guardado\"" "$SRC"'
     check "ventana (Mac): el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "Button(action: { openURL(\"https://github.com/\" + item.full) })" "$SRC" && grep -q ".tip(\"Abrir en GitHub\")" "$SRC"'
-    check "ventana (Mac): ya clonado, se pregunta si aplastar antes de git pull" 'grep -q "guard confirm(\"¿Aplastar" "$SRC" && grep -q "args.append(\"--actualizar\")" "$SRC"'
+    check "ventana (Mac): ya clonado, se pregunta antes de traer los cambios (git pull)" 'grep -q "guard confirm(\"¿Traer los cambios de GitHub a" "$SRC" && grep -q "args.append(\"--actualizar\")" "$SRC"'
 else
     check "ventana: la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")," "$SRC" && grep -q "        self.nv_github_tools()" "$SRC" && grep -q "run_quick_input(\[\"github-conectar\"\], token" "$SRC"'
     check "ventana: si la cuenta no vale, se dice en una ventana y lo escrito se queda" 'grep -q "self.nv_github_saved))" "$SRC" && grep -q "message(self.win, \"No se ha guardado\"" "$SRC"'
     check "ventana: el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "gh.add(MonoLogo(\"github\", 18))" "$SRC" && grep -q "self.open_uri(\"https://github.com/%s\" % repo\[\"full\"\])" "$SRC"'
-    check "ventana: ya clonado, se pregunta si aplastar antes de git pull" 'grep -q "if not confirm(self.win, \"¿Aplastar" "$SRC" && grep -q "\[\"repo-traer\", repo\[\"full\"\], \"--actualizar\"\]" "$SRC"'
+    check "ventana: ya clonado, se pregunta antes de traer los cambios (git pull)" 'grep -q "if not confirm(self.win, \"¿Traer los cambios de GitHub a" "$SRC" && grep -q "\[\"repo-traer\", repo\[\"full\"\], \"--actualizar\"\]" "$SRC"'
 fi
 exit $fail

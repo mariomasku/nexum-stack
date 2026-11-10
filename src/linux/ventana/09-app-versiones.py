@@ -163,7 +163,7 @@ class AppVersiones:
         # 1. Repositorio y carpeta: de los de GitHub (pestaña Repositorios) o la dirección de otro
         p1 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         p1.pack_start(label("¿De qué repositorio de GitHub? (escribe parte de su nombre)"), False, False, 0)
-        w["repo"] = Gtk.Entry(placeholder_text="dob-wordpress-…", primary_icon_name="system-search-symbolic")
+        w["repo"] = Gtk.Entry(placeholder_text="nombre del repositorio…", primary_icon_name="system-search-symbolic")
         w["repo"].connect("changed", lambda *_: self.new_project_search())
         w["repo"].connect("activate", lambda *_: self.new_project_first_hit())
         w["repo"].connect("key-press-event", self.new_project_search_key)

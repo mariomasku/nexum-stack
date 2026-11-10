@@ -23,7 +23,7 @@ class AppServicios:
         if not d["active"]:
             box, lb = group("Servicios")
             row = ActionRow("Ninguna versión activa",
-                            "Activa una versión en la pestaña Versiones para ver sus servicios.")
+                            "Activa una versión en Versiones de PHP para ver sus servicios.")
             row.add_prefix(label("●", "punto-gris"))
             lb.add(row)
             self.services_box.pack_start(box, False, False, 0)

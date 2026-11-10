@@ -155,6 +155,11 @@ class App2(NvBandeja,
                 self.nv_exit()
                 return False
             fn, shot = steps[i[0]]
+            # (sin el fundido al cambiar de página: con la ventana detrás de otras no avanza, y se capturaba la
+            # anterior. Antes de cada paso: Configuración rehace los suyos)
+            for w in self.nv_walk(self.win):
+                if isinstance(w, Gtk.Stack):
+                    w.set_transition_type(Gtk.StackTransitionType.NONE)
             fn()
             GLib.timeout_add(1800, lambda: (self.capture(self.win, shot), False)[1])
             i[0] += 1

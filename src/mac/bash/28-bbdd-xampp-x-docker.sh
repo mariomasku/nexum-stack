@@ -607,7 +607,7 @@ VERSIONES
   lo que devuelve la web (también escapadas, como las de Elementor). Los
   proyectos de antes se arreglan al arrancarlos.
 - Configuración, GitHub: la organización o cuenta se puede escribir
-  también como su dirección (https://github.com/hexer-dev) o con @, se
+  también como su dirección (https://github.com/mi-empresa) o con @, se
   comprueba que existe, y si no vale se dice en una ventana y lo escrito
   se queda (antes volvía la de antes sin decir nada).
 - Los proyectos de Docker sin visitas se paran solos (Configuración,
@@ -619,7 +619,7 @@ VERSIONES
   terminal: docker-reposo.
 - Pestaña Repositorios (como DevHub): los repositorios de la
   organización o cuenta de GitHub que se elija en Configuración, solo
-  los de sus prefijos (de partida dob-wordpress- y dob-prestashop-; se
+  los de sus prefijos (los que se elijan, como wordpress-; se
   pueden añadir otros, como los de Shopify) o todos, con un buscador.
   «Clonar» lo clona por SSH, con tu clave, en la carpeta de proyectos.
   Si ya está clonado en un proyecto, se pregunta si aplastarlo: se
@@ -794,7 +794,7 @@ VERSIONES
   como cargar: si un paso falla, el proyecto sigue cargado.
 - Cabecera: «Dev Stack» vuelve a la letra de antes.
 - Acerca de: más corto («Herramientas de desarrollo web en local») y
-  la firma sin HEXER.
+  una firma más corta.
 
 1.39.23 (27 oct 2026)
 - Proyectos: columna «Tamaño», con lo que ocupa cada proyecto en el
@@ -1695,8 +1695,8 @@ VERSIONES
 - Subir una base de datos: el desplegable Proyecto es tan ancho como
   el nombre de carpeta más largo, para verlo entero al elegirlo.
 - Al elegir la base se propone el proyecto que se llama como ella
-  (wp_mitienda -> dob-wordpress-mitienda, ps_mitienda ->
-  dob-prestashop-mitienda), si no hay uno recordado o que ya la use.
+  (wp_mitienda -> wordpress-mitienda, ps_mitienda ->
+  prestashop-mitienda), si no hay uno recordado o que ya la use.
   Si se cambia a mano, se respeta.
 - Lo mismo que Linux 1.28.1.
 

@@ -121,8 +121,8 @@ class AppBasesDatos:
         box.pack_start(css(label("¿A qué versión de PHP copias %s?" % db, wrap=True,
                                  max_width_chars=60), "title-3"), False, False, 0)
         box.pack_start(label("Se copia con el mismo nombre desde lampp-%s, que no se toca. Para "
-                             "copiarla con otro nombre o con otra carpeta de proyecto, usa Replicar "
-                             "(Versiones, Cargar proyecto)." % inst["folder"],
+                             "copiarla con otro nombre o con otra carpeta de proyecto, usa, en "
+                             "Proyectos, el + de «Entorno»: «En otra versión de PHP (copiar su BBDD)…»." % inst["folder"],
                              "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
         # (primero las que no la tienen; dentro, de la más nueva a la más antigua)
