@@ -195,6 +195,7 @@ def htdocs(root):
         os.makedirs(p)
         if kind == "wp":
             os.makedirs(os.path.join(p, "wp-includes"))
+            os.makedirs(os.path.join(p, "wp-admin"))
             with open(os.path.join(p, "wp-config.php"), "w") as f:
                 f.write("<?php\ndefine('DB_NAME', '%s');\n" % db)
         elif kind == "ps":

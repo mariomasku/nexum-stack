@@ -813,19 +813,41 @@ class NvGithub:
         until = time.strftime("%H:%M", time.localtime(st["expires"]))
         clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         dlg = Gtk.Dialog(title="Túnel de Cloudflare", transient_for=self.win, modal=True, use_header_bar=True)
-        dlg.set_default_size(560, -1)
+        dlg.set_default_size(640, -1)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
         head = Gtk.Box(spacing=10)
         head.pack_start(logo("cloudflare", 30), False, False, 0)
         head.pack_start(label("Compartiendo %s" % st["target"], "nv-titulo", wrap=True), False, False, 0)
         box.pack_start(head, False, False, 0)
-        grid = Gtk.Grid(column_spacing=14, row_spacing=8, margin_top=4)
-        for n, (title, value) in enumerate((("Dirección", st["url"]), ("Contraseña", password))):
-            grid.attach(label(title, "nv-tenue", xalign=0), 0, n, 1, 1)
-            grid.attach(label(value, "nv-mono", selectable=True, xalign=0, hexpand=True), 1, n, 1, 1)
-            grid.attach(nv_button("edit-copy-symbolic", None, "Copiar", lambda *_, v=value, w=title: (
-                clip.set_text(v, -1), self.toast("%s copiada" % w)), flat=True), 2, n, 1, 1)
-        box.pack_start(grid, False, False, 0)
+        # La dirección y la contraseña, cada una en su fila: su nombre encima, el valor a la izquierda y Copiar a
+        # la derecha. Lo copiado se dice debajo, en verde (el aviso de la ventana queda detrás del diálogo)
+        copied = label("", "nv-verde", xalign=0)
+        timer = [0]
+
+        def copy(text, what):
+            clip.set_text(text, -1)
+            copied.set_label("✓ %s" % what)
+            if timer[0]:
+                GLib.source_remove(timer[0])
+            timer[0] = GLib.timeout_add_seconds(4, lambda: (copied.set_label(""), timer.__setitem__(0, 0), False)[2])
+        fields = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=4), "caja")
+        fields.set_header_func(lambda row, before: row.set_header(Gtk.Separator() if before is not None else None))
+        for title, value in (("Dirección", st["url"]), ("Contraseña", password)):
+            row = Gtk.Box(spacing=12, margin=12)
+            texts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, valign=Gtk.Align.CENTER)
+            texts.pack_start(label(title, "nv-tenue", "nv-chico", xalign=0, halign=Gtk.Align.START), False, False, 0)
+            texts.pack_start(label(value, "nv-mono", selectable=True, xalign=0, halign=Gtk.Align.START,
+                                   ellipsize=3, max_width_chars=60, tooltip_text=value), False, False, 0)
+            row.pack_start(texts, True, True, 0)
+            b = nv_button("edit-copy-symbolic", "Copiar", "Copiar %s" % title.lower(),
+                          lambda *_, v=value, w=title: copy(v, "%s copiada" % w))
+            b.set_valign(Gtk.Align.CENTER)
+            row.pack_end(b, False, False, 0)
+            r = Gtk.ListBoxRow(activatable=False, selectable=False)
+            r.add(row)
+            fields.add(r)
+        box.pack_start(fields, False, False, 0)
+        box.pack_start(copied, False, False, 0)
         box.pack_start(label("Se cierra solo a las %s. %s Quién entra y lo que se bloquea queda en el registro del "
                              "túnel (Configuración, Túnel de Cloudflare)." % (
                                  until, "El panel de administración va bloqueado." if blocked
@@ -834,7 +856,7 @@ class NvGithub:
         acts = Gtk.Box(spacing=8)
         msg = ("Te paso la web en pruebas:\n%s\nContraseña: %s\n(Funciona hasta las %s.)" % (st["url"], password, until))
         acts.pack_start(nv_button("mail-send-symbolic", "Copiar para enviar", "Copiar dirección y contraseña",
-                                  lambda *_: (clip.set_text(msg, -1), self.toast("Texto para enviar copiado")), "nv-azul"),
+                                  lambda *_: copy(msg, "Dirección y contraseña copiadas, listas para enviar"), "nv-azul"),
                         False, False, 0)
         acts.pack_start(nv_button("web-browser-symbolic", "Abrir", "Abrirla tú en el navegador",
                                   lambda *_: self.open_uri(st["url"])), False, False, 0)

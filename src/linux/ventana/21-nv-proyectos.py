@@ -24,9 +24,9 @@ class NvProyectos:
         self.nv_list = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "nv-grupo")
         self.nv_list.set_filter_func(self.nv_filter)
         self.nv_list.connect("row-activated", lambda _l, r: r.project is not None and self.nv_select(r.project))
-        self.proj_page.pack_start(self.nv_list, False, False, 0)
+        self.proj_list_page.pack_start(self.nv_list, False, False, 0)
         self.nv_count = label("", "nv-chico", "nv-tenue")
-        self.proj_page.pack_start(self.nv_count, False, False, 0)
+        self.proj_list_page.pack_start(self.nv_count, False, False, 0)
 
     def nv_filter(self, row):
         x = row.project

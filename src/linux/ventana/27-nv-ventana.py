@@ -99,7 +99,8 @@ class App2(NvBandeja,
         self.tools_wrap.pack_start(self.page_tools, True, True, 0)
         self.page_hosts, self.hosts_box = new_page()
         self.page_docker, self.docker_box = new_page(940)
-        self.page_projects, self.proj_page = new_page(940)
+        # (el visor, fijo arriba: solo la lista de proyectos se desplaza)
+        self.page_projects, self.proj_page, self.proj_list_page, self.proj_scroll = new_split_page(940)
         self.page_repos, self.repos_page = new_page(940)
         self.repos, self.repos_all, self.github = None, False, None
         self.page_node, self.node_page = new_page(940)

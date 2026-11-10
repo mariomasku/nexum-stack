@@ -394,6 +394,45 @@ struct WidePage<Content: View>: View {
     }
 }
 
+/// Como WidePage, en dos partes: arriba, fija (no se va al desplazar: el visor de Proyectos), y debajo lo que
+/// se desplaza (la lista)
+struct SplitPage<Head: View, Content: View>: View {
+    let width: CGFloat
+    /// Al cambiar, la lista sube hasta arriba poco a poco
+    let top: Int
+    let head: Head
+    let content: Content
+    init(width: CGFloat = 980, top: Int = 0, @ViewBuilder head: () -> Head, @ViewBuilder content: () -> Content) {
+        self.width = width
+        self.top = top
+        self.head = head()
+        self.content = content()
+    }
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 18) { head }
+                .frame(maxWidth: width, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) { content }
+                        .frame(maxWidth: width, alignment: .leading)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                        .frame(maxWidth: .infinity)
+                        .id("arriba")
+                }
+                .onChange(of: top) { _ in
+                    withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("arriba", anchor: .top) }
+                }
+            }
+        }
+    }
+}
+
 /// Título grande de una página, con su explicación debajo. Delante, un símbolo (Dominios y hosts,
 /// Configuración) o el logotipo de un paquete en su color (Versiones de PHP, como la ballena de Docker)
 struct PageTitle: View {

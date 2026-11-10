@@ -521,8 +521,9 @@ class AppBasesDatos:
             if self.data is not None and target != self.data["active"]:
                 self.data = dict(self.data, active=target)
             self.update_project_search()
-            # (la página sube sola hasta el visor, arriba: sin desplazarla a mano)
-            GLib.timeout_add(120, lambda: smooth_scroll(self.page_projects) and False)
+            # (la lista sube sola hasta arriba, donde está el cargado: sin desplazarla a mano. El visor ya está
+            # a la vista, fijo; en la ventana antigua, la página entera)
+            GLib.timeout_add(120, lambda: smooth_scroll(getattr(self, "proj_scroll", self.page_projects)) and False)
 
             def got(_rc, out):
                 # Tienda PrestaShop: su dominio queda falseado (se ve en la pestaña Hosts)

@@ -123,40 +123,79 @@ extension AppModel {
         let alert = NSAlert()
         alert.messageText = "Compartiendo \(t.target)"
         alert.addButton(withTitle: "Listo")
-        alert.addButton(withTitle: "Copiar para enviar")
         let close = alert.addButton(withTitle: "Cerrar el túnel")
         close.hasDestructiveAction = true
+        // La dirección y la contraseña, cada una en su recuadro: su nombre encima, el valor a la izquierda y
+        // Copiar a la derecha. Lo copiado se dice debajo, en verde (el aviso de la ventana queda detrás)
+        let copied = NSTextField(labelWithString: "")
+        copied.textColor = .systemGreen
+        copied.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
+        copied.alignment = .left
+        copied.translatesAutoresizingMaskIntoConstraints = false
+        copied.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+        var stamp = 0
+        func copy(_ text: String, _ what: String) {
+            copyText(text)
+            copied.stringValue = "✓ \(what)"
+            stamp += 1
+            let mine = stamp
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { if stamp == mine { copied.stringValue = "" } }
+        }
+        let message = "Te paso la web en pruebas:\n\(t.url)\nContraseña: \(t.password)\n(Funciona hasta las \(hour).)"
         let copyURL = DialogValidator()
-        copyURL.update = { copyText(t.url); self.toast("Dirección copiada") }
+        copyURL.update = { copy(t.url, "Dirección copiada") }
         let copyPass = DialogValidator()
-        copyPass.update = { copyText(t.password); self.toast("Contraseña copiada") }
-        func line(_ title: String, _ value: String, _ v: DialogValidator) -> NSView {
+        copyPass.update = { copy(t.password, "Contraseña copiada") }
+        let copyAll = DialogValidator()
+        copyAll.update = { copy(message, "Dirección y contraseña copiadas, listas para enviar") }
+        func field(_ title: String, _ value: String, _ v: DialogValidator) -> NSView {
             let l = NSTextField(labelWithString: title)
             l.textColor = .secondaryLabelColor
-            l.translatesAutoresizingMaskIntoConstraints = false
-            l.widthAnchor.constraint(equalToConstant: 90).isActive = true
+            l.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
             let val = NSTextField(labelWithString: value)
             val.font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
             val.isSelectable = true
+            val.lineBreakMode = .byTruncatingMiddle
+            val.toolTip = value
+            val.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            let texts = NSStackView(views: [l, val])
+            texts.orientation = .vertical
+            texts.alignment = .leading
+            texts.spacing = 2
             let b = NSButton(title: "Copiar", target: v, action: #selector(DialogValidator.changed(_:)))
-            let row = NSStackView(views: [l, val, b])
+            b.setContentHuggingPriority(.required, for: .horizontal)
+            let row = NSStackView(views: [texts, NSView(), b])
             row.orientation = .horizontal
+            row.alignment = .centerY
             row.spacing = 10
-            return row
+            row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+            let box = NSBox()
+            box.boxType = .custom
+            box.cornerRadius = 8
+            box.borderColor = .separatorColor
+            box.fillColor = .controlBackgroundColor
+            box.contentViewMargins = .zero
+            box.contentView = row
+            box.translatesAutoresizingMaskIntoConstraints = false
+            box.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+            return box
         }
+        let send = NSButton(title: "Copiar para enviar", target: copyAll, action: #selector(DialogValidator.changed(_:)))
+        send.bezelColor = .controlAccentColor
+        let sendRow = NSStackView(views: [send, NSView()])
+        sendRow.orientation = .horizontal
+        sendRow.translatesAutoresizingMaskIntoConstraints = false
+        sendRow.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
         alert.accessoryView = dialogStack([
-            line("Dirección", t.url, copyURL), line("Contraseña", t.password, copyPass),
+            field("Dirección", t.url, copyURL), field("Contraseña", t.password, copyPass), sendRow, copied,
             dialogLabel("Se cierra solo a las \(hour). "
                         + (t.block ? "El panel de administración va bloqueado." : "⚠ El panel de administración no va bloqueado.")
                         + " Quién entra y lo que se bloquea queda en el registro del túnel (Configuración, Túnel de Cloudflare).",
-                        color: .secondaryLabelColor),
-        ], spacing: 12)
+                        color: .secondaryLabelColor, align: .left),
+        ], spacing: 10)
         let r = alert.runStyled()
-        withExtendedLifetime([copyURL, copyPass]) {}
+        withExtendedLifetime([copyURL, copyPass, copyAll]) {}
         if r == .alertSecondButtonReturn {
-            copyText("Te paso la web en pruebas:\n\(t.url)\nContraseña: \(t.password)\n(Funciona hasta las \(hour).)")
-            toast("Texto para enviar copiado")
-        } else if r == .alertThirdButtonReturn {
             tunnelClose()
         }
     }

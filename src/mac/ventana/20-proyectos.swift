@@ -130,17 +130,21 @@ struct ProjectsView: View {
 
     var body: some View {
         // (al menos tan ancha como la tabla de proyectos: si no, se aprietan el proyecto cargado y la tabla)
-        WidePage(width: Swift.max(980, model.projectsTableWidth), top: model.scrollTop) {
+        // (el visor y la cabecera de la lista, fijos arriba: solo la tabla se desplaza)
+        SplitPage(width: Swift.max(980, model.projectsTableWidth), top: model.scrollTop, head: {
             if let p = model.projects, let d = model.data {
                 hero(p, d)
                 listHead()
+            }
+        }, content: {
+            if let p = model.projects, model.data != nil {
                 projectTable(p)
                 Text(plural(p.list.count, "proyecto", "proyectos") + " en \(HTDOCS)")
                     .font(.caption).foregroundColor(.secondary)
             } else {
                 Loading()
             }
-        }
+        })
         .sheet(isPresented: $model.upShown) {
             UpdateProjectSheet().environmentObject(model).buttonStyle(PointerButtonStyle())
         }

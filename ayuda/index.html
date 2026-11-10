@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de Nexum Dev Stack</title>
+<meta name="description" content="Manual de Nexum Dev Stack para Linux y Mac: qué hace cada pantalla, cómo se hace cada tarea y qué hacer si algo falla.">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body data-sistema="linux">
+<button class="boton boton-indice" type="button">☰ Índice</button>
+<div class="marco">
+
+<nav class="lateral" aria-label="Índice del manual">
+  <a class="marca" href="#inicio">
+    <img src="img/nexum.png" width="36" height="36" alt="">
+    <span><b><span class="nexum">NEXUM</span> <span class="dev">Dev Stack</span></b><small>Manual · versión 1.57.6</small></span>
+  </a>
+  <input class="buscar" id="buscar" type="search" placeholder="Buscar en el manual…" aria-label="Buscar en el manual">
+  <div class="sistema" role="group" aria-label="Tu sistema">
+    <button type="button" data-valor="linux" aria-pressed="true">Linux</button>
+    <button type="button" data-valor="mac" aria-pressed="false">Mac</button>
+  </div>
+  <ul class="indice">
+    <li class="grupo">Empezar</li>
+    <li><a href="#inicio">Qué es Nexum Dev Stack</a></li>
+    <li class="pronto"><a href="#inicio">Instalar y actualizar</a></li>
+    <li class="pronto"><a href="#inicio">La ventana de un vistazo</a></li>
+    <li class="grupo">Entorno</li>
+    <li><a href="#proyectos">Proyectos</a></li>
+    <li class="pronto"><a href="#inicio">Repositorios de GitHub</a></li>
+    <li class="pronto"><a href="#inicio">Versiones de PHP</a></li>
+    <li class="pronto"><a href="#inicio">Bases de datos</a></li>
+    <li class="pronto"><a href="#inicio">Docker</a></li>
+    <li class="pronto"><a href="#inicio">Node.js</a></li>
+    <li class="grupo">Sistema</li>
+    <li class="pronto"><a href="#inicio">Dominios y hosts</a></li>
+    <li class="pronto"><a href="#inicio">Configuración</a></li>
+    <li class="pronto"><a href="#inicio">Correo de pruebas</a></li>
+    <li class="pronto"><a href="#inicio">Compartir una web</a></li>
+    <li class="grupo">Más</li>
+    <li class="pronto"><a href="#inicio">Seguridad</a></li>
+    <li class="pronto"><a href="#inicio">Comandos de la terminal</a></li>
+    <li class="pronto"><a href="#inicio">Si algo falla</a></li>
+    <li class="pronto"><a href="#inicio">Glosario</a></li>
+  </ul>
+  <div class="pie-lateral">
+    <button class="boton" id="tema" type="button">Claro / oscuro</button>
+    <button class="boton" type="button" onclick="window.print()">Imprimir</button>
+  </div>
+</nav>
+
+<main>
+<p id="sin-resultados" class="sin-resultados" hidden>No hay nada en el manual con eso. Prueba con otra palabra.</p>
+
+<!-- =========================================================================================== INICIO -->
+<section class="capitulo" id="inicio">
+  <div class="antetitulo">Manual de uso</div>
+  <h1 class="titulo-marca"><span class="nexum">NEXUM</span> <span class="dev">Dev Stack</span></h1>
+  <p class="entrada">Tu entorno de desarrollo web en un solo programa: todas las versiones de PHP que necesites, cada una con su
+    Apache y su MariaDB, tus proyectos, sus bases de datos, Docker, dominios de prueba y correo, desde una ventana.</p>
+
+  <p>Cada proyecto necesita su versión de PHP: una tienda antigua sigue en PHP 7.4, un WordPress nuevo ya pide la 8.4. Nexum Dev Stack
+    monta un <b>LAMPP para cada versión de PHP</b> (Apache, PHP, MariaDB, Perl, ProFTPD y phpMyAdmin, compilados desde el código oficial)
+    y te deja cambiar de una a otra con un clic. Tus proyectos están en una sola carpeta, <code data-so="linux">/opt/htdocs</code><code data-so="mac">/Library/Nexum/XAMPP-compartido/htdocs</code>,
+    y los ven todas las versiones.</p>
+
+  <div class="tarjetas">
+    <div class="tarjeta"><span class="ico">🐘</span><b>Todas las versiones de PHP</b><p>De la 7.4 a la 8.5, el último parche o uno concreto. Cada una con sus propias bases de datos.</p></div>
+    <div class="tarjeta"><span class="ico">📁</span><b>Tus proyectos, a un clic</b><p>Cargas uno y se abre en <code>web.local</code> con la versión de PHP y la base de datos que elijas.</p></div>
+    <div class="tarjeta"><span class="ico">🐳</span><b>Docker sin complicaciones</b><p>Un proyecto de WordPress en un contenedor, con su propia versión de PHP, sin escribir un solo comando.</p></div>
+    <div class="tarjeta"><span class="ico">🌐</span><b>Dominios de verdad, en tu equipo</b><p>Falsea el dominio de una tienda para probarla con su dirección real, con HTTPS de confianza.</p></div>
+    <div class="tarjeta"><span class="ico">✉️</span><b>Correo de pruebas</b><p>Lo que mandan tus webs llega a una bandeja local (Mailpit), nunca a un cliente real.</p></div>
+    <div class="tarjeta"><span class="ico">🔒</span><b>Seguro por defecto</b><p>Lo que se descarga se comprueba con su firma, nada de PHP ni MariaDB se instala en el sistema y tus versiones se cierran a la red con un clic.</p></div>
+  </div>
+
+  <h3>Cómo leer este manual</h3>
+  <ul>
+    <li><b>Cada pantalla tiene números.</b> Pulsa un número sobre la captura para ver qué hace esa parte, o
+      <b>«Recorrido guiado»</b> para verlas todas, una tras otra (también con las flechas <kbd>←</kbd> <kbd>→</kbd> del teclado).</li>
+    <li><b>Tareas paso a paso:</b> cómo se hace lo de siempre (cargar un proyecto, cambiar de versión…), con lo que verás en cada paso.</li>
+    <li><b>Linux o Mac:</b> arriba a la izquierda. El manual enseña solo lo de tu sistema; lo que es igual en los dos, se ve siempre.</li>
+    <li><b>Buscar:</b> escribe en el buscador y quedan solo los apartados que hablan de eso, con la palabra resaltada.</li>
+  </ul>
+  <div class="nota"><b>Las capturas son de ejemplo</b>Los proyectos, bases de datos y dominios que ves («Panadería Luna», «Ferretería
+    Norte»…) son inventados. En tu equipo verás los tuyos.</div>
+</section>
+
+<!-- =========================================================================================== PROYECTOS -->
+<section class="capitulo" id="proyectos">
+  <div class="antetitulo">Entorno</div>
+  <h2>Proyectos</h2>
+  <p class="entrada">La página principal: el proyecto con el que estás trabajando, arriba, con todo lo que puedes hacer con él, y
+    debajo la lista de todos tus proyectos.</p>
+  <p>Un <b>proyecto</b> es cada carpeta de <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>: un WordPress,
+    una tienda PrestaShop, una web en PHP o en HTML. <b>Cargarlo</b> hace que <code>http://web.local/</code> lo abra, con la versión
+    de PHP y la base de datos que elijas. Solo hay uno cargado a la vez; los demás siguen en su carpeta, sin cambiar nada.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-proyectos.png" data-linux="img/linux/pagina-proyectos.png" data-mac="img/mac/pagina-proyectos.png"
+           alt="La página Proyectos, con el proyecto cargado arriba y la lista de proyectos debajo" width="1442" height="919">
+    </div>
+    <ol class="puntos">
+      <li data-x="30.3" data-y="4.1"><b>La versión activa</b><span>La versión de PHP que sirve tus proyectos ahora mismo (aquí PHP 8.4.27,
+        en <code>lampp-8.4</code>), con un punto verde si Apache y MariaDB están en marcha, y lo que gastan de procesador y memoria. Púlsala
+        para arrancar, parar o reiniciar sus servicios.</span></li>
+      <li data-x="70.4" data-y="4.1"><b>El menú</b><span>Tema claro u oscuro, editar los vhosts y el fichero de hosts, volver a leer las
+        versiones, buscar una versión nueva del programa, la carpeta de registros, las novedades y este manual.</span></li>
+      <li data-x="78.4" data-y="4.1"><b>Correo</b><span>La bandeja de pruebas: los correos que han mandado tus webs (un pedido, un
+        formulario de contacto…). Ninguno sale de tu equipo. El número dice cuántos hay sin leer.</span></li>
+      <li data-x="85.0" data-y="4.1"><b>Terminal</b><span>Abre una terminal abajo, dentro de la ventana, para lanzar <code>git</code>,
+        <code>composer</code>, <code>wp</code> o lo que necesites. Su botón «Proyecto cargado» te lleva a la carpeta del proyecto.</span></li>
+      <li data-x="14.2" data-y="26.1"><b>El menú lateral</b><span>Las páginas del programa: lo de tu trabajo (proyectos, repositorios,
+        versiones de PHP, bases de datos, Docker y Node) y, debajo, lo del sistema (dominios y configuración).</span></li>
+      <li data-x="21.1" data-y="20.7"><b>El proyecto cargado</b><span>Su nombre y su carpeta. El punto verde de «Proyecto cargado» dice que
+        es el que abre <code>web.local</code>. Arriba a la derecha ves a dónde va su correo y en qué dirección está.</span></li>
+      <li data-x="60.7" data-y="22.1"><b>Llevarlo a otro entorno</b><span>El <b>+</b> lo lleva a otra versión de PHP (copiando allí su
+        base de datos) o a Docker, para probarlo con otro PHP sin tocar el de ahora.</span></li>
+      <li data-x="77.5" data-y="22.1"><b>Entorno (versión de PHP)</b><span>Con qué versión se abre el proyecto. Al elegir otra, se
+        carga con esa versión y la base de datos que tenga en ella.</span></li>
+      <li data-x="80.9" data-y="18.6"><b>Su base de datos</b><span>La base de datos que usa en esa versión (cada versión de PHP tiene
+        las suyas). Si el proyecto no tiene ninguna, lo dice.</span></li>
+      <li data-x="94.2" data-y="22.1"><b>Vincular</b><span>Elige qué base de datos usa el proyecto en cada versión, por si no se llama
+        como su carpeta o tienes varias copias (una antigua y una nueva).</span></li>
+      <li data-x="20.7" data-y="30.8"><b>Accesos directos</b><span><b>Abrir web</b> lo abre en el navegador; <b>VS Code</b>, su carpeta
+        en Visual Studio Code; <b>phpMyAdmin</b>, su base de datos, y <b>Panel</b>, el escritorio de WordPress o el panel de PrestaShop.</span></li>
+      <li data-x="52.4" data-y="30.8"><b>Docker</b><span>Lo monta también en Docker, en su propio contenedor, con la versión de PHP que
+        elijas. El de LAMPP sigue igual.</span></li>
+      <li data-x="59.2" data-y="30.8"><b>Compartir</b><span>Le da una dirección de internet temporal (un túnel de Cloudflare) para
+        enseñárselo a alguien: lleva una contraseña nueva al azar y se cierra solo a las horas que digas (2, si no cambias nada).</span></li>
+      <li data-x="67.6" data-y="30.8"><b>Log</b><span>El final del registro de errores de Apache: lo primero que hay que mirar cuando una
+        página sale en blanco o con un error 500.</span></li>
+      <li data-x="72.9" data-y="30.8"><b>Actualizar</b><span>Lo pone al día con lo de producción: su base de datos (un fichero
+        <code>.sql</code>) y su código (de GitHub o de un <code>.zip</code>). Antes de cambiar nada guarda una copia.</span></li>
+      <li data-x="81.1" data-y="30.8"><b>Desmontar</b><span>Lo descarga: <code>web.local</code> deja de abrirlo. No se borra nada, ni la
+        carpeta ni la base de datos.</span></li>
+      <li data-x="91" data-y="30.8"><b>Falsear Host</b><span>Si el proyecto tiene un dominio en los vhosts, este interruptor hace que su
+        dirección de verdad se abra en tu equipo y no en internet. Sirve para probar una tienda con su dominio real.</span></li>
+      <li data-x="95.2" data-y="30.8"><b>Más</b><span>Abrir su carpeta, vincular sus bases de datos, las imágenes de producción, vaciar la
+        caché de una tienda, elegir qué botones se ven y en qué orden, o borrar el proyecto.</span></li>
+      <li data-x="65.0" data-y="39.8"><b>Buscar y filtrar</b><span>Escribe parte de su nombre para encontrarlo, y elige qué tipo ver: todos,
+        WordPress, PrestaShop u otros.</span></li>
+      <li data-x="88.1" data-y="39.8"><b>Nuevo proyecto</b><span>Clona un repositorio de GitHub en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>
+        y lo deja montado: su carpeta, su base de datos y su configuración.</span></li>
+      <li data-x="94.9" data-y="49.5"><b>El que está cargado</b><span>En la lista, el cargado va resaltado y con la etiqueta «Cargado».
+        Pulsa cualquier otra fila para verla arriba y cargarla.</span></li>
+      <li data-x="64.5" data-y="54.3"><b>Dónde está cada uno</b><span>En qué versiones de PHP tiene base de datos (8.2, 8.4…) y, en azul,
+        si también está en Docker. Su tamaño y el nombre de su base de datos van al lado.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Cargar un proyecto</h3>
+  <ol class="pasos-tarea">
+    <li><b>Elígelo en la lista.</b> Pulsa su fila: aparece arriba, todavía como «Proyecto elegido».</li>
+    <li><b>Mira el entorno.</b> En «Entorno» está la versión de PHP con la que se abrirá, y a su lado la base de datos que usará en ella.
+      Si quieres otra versión, elígela en esa lista.</li>
+    <li><b>Pulsa «Cargar».</b> Si hace falta cambiar de versión de PHP o de configuración, el programa te lo dice antes y puede pedirte
+      la contraseña de administrador.</li>
+    <li><b>Ábrelo.</b> El punto se pone verde («Proyecto cargado») y aparecen sus accesos directos: pulsa <b>Abrir web</b> y lo verás en
+      <code>http://web.local/</code>.</li>
+  </ol>
+  <div class="nota"><b>¿Y si no tiene base de datos en esa versión?</b>Puedes cargar su <code>.sql</code> desde la página Bases de datos o
+    llevarlo con el <b>+</b> de «Entorno» desde otra versión donde sí esté.</div>
+
+  <h3>Probar un proyecto con otra versión de PHP</h3>
+  <ol class="pasos-tarea">
+    <li><b>Pulsa el + de «Entorno»</b> y elige «En otra versión de PHP (copiar su BBDD)…».</li>
+    <li><b>Elige la versión y confirma.</b> Antes de hacer nada, el programa te enseña qué va a hacer, con los pasos numerados.</li>
+    <li><b>Elige esa versión en «Entorno».</b> Se carga con ella. La versión de antes no cambia: puedes volver cuando quieras.</li>
+  </ol>
+
+  <h3>Preguntas</h3>
+  <details><summary>¿Por qué web.local?</summary>
+    <p>Es la dirección del proyecto cargado, y siempre es la misma: cargues el que cargues, lo abres en <code>http://web.local/</code>.
+      Así no hace falta crear un dominio para cada proyecto ni cambiar la configuración de ninguno.</p></details>
+  <details><summary>¿Puedo tener varios proyectos abiertos a la vez?</summary>
+    <p>En <code>web.local</code>, solo el cargado. Para tener otro a la vez, móntalo en Docker: cada proyecto de Docker tiene su propia
+      dirección y su propia versión de PHP.</p></details>
+  <details><summary>¿Qué se borra al borrar un proyecto?</summary>
+    <p>Antes de hacerlo, el programa te dice exactamente qué se borra: su carpeta, sus vhosts y las líneas de sus dominios en el fichero
+      de hosts, y sus contenedores de Docker si los tiene. Tienes que escribir su nombre para confirmar. Su base de datos solo se borra
+      si lo marcas, y puedes guardar antes una copia en <code>~/lvm-copias</code>. <b>La carpeta no se puede recuperar</b>: si está en
+      GitHub, vuelve a clonarla con «Nuevo proyecto».</p></details>
+</section>
+
+</main>
+</div>
+<script src="manual.js"></script>
+</body>
+</html>

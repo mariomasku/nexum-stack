@@ -262,6 +262,29 @@ def new_page(width=860):
     return sw, content
 
 
+def new_split_page(width=860):
+    """Como new_page, en dos partes: arriba, fija (no se va al desplazar: el visor de Proyectos), y debajo lo
+    que se desplaza (la lista). Devuelve (página, caja de arriba, caja de abajo, su ScrolledWindow)."""
+    page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, margin_top=26, margin_bottom=14)
+    top.set_size_request(width, -1)
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
+    bottom = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, margin_bottom=26)
+    bottom.set_size_request(width, -1)
+    sw.add(bottom)
+    page.pack_start(top, False, False, 0)
+    page.pack_start(sw, True, True, 0)
+
+    def fit(_w, alloc):
+        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        for box in (top, bottom):
+            if box.get_margin_start() != side:
+                box.set_margin_start(side)
+                box.set_margin_end(side)
+    page.connect("size-allocate", fit)
+    return page, top, bottom, sw
+
+
 def nv_dot(on):
     return label("●", "nv-verde" if on else "nv-gris")
 

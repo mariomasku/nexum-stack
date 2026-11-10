@@ -24,7 +24,7 @@ check "botones: «Personalizar los botones…» en el menú ⋮ y en Configuraci
 # Lo que gasta Nexum, arriba
 check "consumo: CPU y RAM en el recuadro de arriba, cada 3 s y fuera de la interfaz" 'grep -q "usageText()" "$SRC" && grep -q "Timer.scheduledTimer(withTimeInterval: 3, repeats: true)" "$SRC" && grep -q "DispatchQueue.global(qos: .utility).async" "$SRC"'
 # Al cargar un proyecto
-check "al cargar un proyecto, la página sube sola hasta el visor" 'grep -q "self.scrollTop += 1" "$SRC" && grep -q "WidePage(width: Swift.max(980, model.projectsTableWidth), top: model.scrollTop)" "$SRC" && grep -q "proxy.scrollTo(\"arriba\", anchor: .top)" "$SRC"'
+check "al cargar un proyecto, la página sube sola hasta el visor" 'grep -q "self.scrollTop += 1" "$SRC" && grep -q "SplitPage(width: Swift.max(980, model.projectsTableWidth), top: model.scrollTop, head:" "$SRC" && grep -q "proxy.scrollTo(\"arriba\", anchor: .top)" "$SRC"'
 # Docker
 check "Docker: los proyectos nuevos, con el Apache de Docker (formulario y desde Proyectos)" '[ "$(grep -c "\[\"docker-nuevo\", " "$SRC")" -eq 2 ] && ! grep -q "\[\"docker-crear\", " "$SRC"'
 check "Docker: la franja del Apache de Docker (Permitir, Arrancar o Parar) y su apartado en Configuración" 'grep -q "webStrip(k)" "$SRC" && grep -q "dockerCard()" "$SRC" && grep -q "model.dockerWebCommand(\"permitir\")" "$SRC"'

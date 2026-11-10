@@ -83,7 +83,7 @@ check "actualizaciones: si se dice que no, ya no se apunta la versión rechazada
 check "ventana: «Personalizar los botones…» en el menú ⋮ y en Configuración" 'grep -q "(\"Personalizar los botones…\", lambda: self.nv_buttons_dialog())" "$SRC" && grep -q "lb = block(\"Visor de los proyectos\"" "$SRC"'
 check "ventana: Desmontar, ⋮ y los fijos de Docker, del mismo estilo y tamaño" 'grep -q "\[(eject, (\"icono\", \"media-eject-symbolic\"), \"Desmontar\")\]" "$SRC" && grep -q "self.nv_restyle(more, buttons_conf()" "$SRC" && grep -q "self.nv_restyle(power, conf" "$SRC" && grep -q "self.nv_restyle(vb, conf" "$SRC"'
 check "ventana: sin nombre, el cuadrado mide lo mismo de alto que de ancho" 'grep -q "b.set_size_request(side, side)" "$SRC"'
-check "ventana: al cargar un proyecto, la página sube sola hasta el visor" 'grep -q "smooth_scroll(self.page_projects)" "$SRC"'
+check "ventana: al cargar un proyecto, la lista sube sola (el visor, fijo arriba)" 'grep -qF "smooth_scroll(getattr(self, \"proj_scroll\", self.page_projects))" "$SRC" && grep -qF "self.proj_list_page.pack_start(self.nv_list" "$SRC"'
 check "ventana: los dos visores colocan sus botones con lo elegido" '[ "$(grep -c "self.nv_place_buttons(acts, btns" "$SRC")" -eq 2 ]'
 check "configuración: sus apartados en tarjetas de dos en dos (Docker: dirección y puertos juntos, a lo ancho)" '[ "$(grep -c "tile_group(\"" "$SRC")" -ge 10 ] && grep -q "^class TileGrid(Gtk.Grid):" "$SRC" && grep -q "row = ActionRow(\"Dirección y puertos\"," "$SRC"'
 check "botones: el configurador en horizontal (cabe en un portátil)" 'grep -q "cols = Gtk.Box(spacing=26)" "$SRC" && grep -q "side.pack_start(preview, False, False, 0)" "$SRC"'
