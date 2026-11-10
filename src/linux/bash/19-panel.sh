@@ -1131,6 +1131,10 @@ QUE HACE
 
 VERSIONES
 
+1.57.13 (11 nov 2026)
+- Mac: el diálogo del túnel abierto se veía con la dirección y la
+  contraseña unas encima de otras. En Linux no cambia nada.
+
 1.57.12 (10 nov 2026)
 - Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con
   su vhost pero sin su carpeta en htdocs (Apache avisaba de cada uno al

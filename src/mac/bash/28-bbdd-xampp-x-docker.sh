@@ -394,6 +394,11 @@ QUE HACE
 
 VERSIONES
 
+1.57.13 (11 nov 2026)
+- Compartir (túnel): el diálogo del túnel abierto se veía con la
+  dirección, la contraseña y sus «Copiar» unos encima de otros. Cada una
+  va en su recuadro, con su alto.
+
 1.57.12 (10 nov 2026)
 - Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con
   su vhost pero sin su carpeta en htdocs (Apache avisaba de cada uno al

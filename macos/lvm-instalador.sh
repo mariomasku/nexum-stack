@@ -2227,7 +2227,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.12"
+APP_VERSION="1.57.13"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan nexum-mac-<version>.zip (hasta la 1.57.10, lvm-instalador-mac-<version>.zip; la 1.57.11
@@ -29307,21 +29307,23 @@ extension AppModel {
             texts.spacing = 2
             let b = NSButton(title: "Copiar", target: v, action: #selector(DialogValidator.changed(_:)))
             b.setContentHuggingPriority(.required, for: .horizontal)
+            // (la fila misma hace de recuadro: su alto sale de lo que lleva dentro. Dentro de un NSBox con solo el
+            // ancho, el diálogo le daba 0 de alto y las dos filas se pintaban una encima de otra)
             let row = NSStackView(views: [texts, NSView(), b])
             row.orientation = .horizontal
             row.alignment = .centerY
             row.spacing = 10
             row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
-            let box = NSBox()
-            box.boxType = .custom
-            box.cornerRadius = 8
-            box.borderColor = .separatorColor
-            box.fillColor = .controlBackgroundColor
-            box.contentViewMargins = .zero
-            box.contentView = row
-            box.translatesAutoresizingMaskIntoConstraints = false
-            box.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
-            return box
+            row.wantsLayer = true
+            row.layer?.cornerRadius = 8
+            row.layer?.borderWidth = 1
+            row.layer?.borderColor = NSColor.separatorColor.cgColor
+            row.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            row.translatesAutoresizingMaskIntoConstraints = false
+            row.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+            row.setContentHuggingPriority(.required, for: .vertical)
+            row.setContentCompressionResistancePriority(.required, for: .vertical)
+            return row
         }
         let open = NSButton(title: "Abrir", target: openURL, action: #selector(DialogValidator.changed(_:)))
         open.toolTip = "Abrirla tú en el navegador"
@@ -36288,6 +36290,11 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.13 (11 nov 2026)
+- Compartir (túnel): el diálogo del túnel abierto se veía con la
+  dirección, la contraseña y sus «Copiar» unos encima de otros. Cada una
+  va en su recuadro, con su alto.
 
 1.57.12 (10 nov 2026)
 - Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con

@@ -165,4 +165,7 @@ check "ventana: el logotipo de Cloudflare y su apartado en Configuración" 'grep
 check "ventana: al compartir se eligen las horas y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    def nv_share\\(self/,/    def nv_share_dialog/" "$SRC" > "$W/share" && grep -q "\"--horas\", h, \"--admin\", admin" "$W/share" && ! grep -q "Gtk.Entry\|password\|env=" "$W/share" && ! grep "\"tunel-config\"" "$SRC" | grep -qv ": \"tunel-config\""'
 check "ventana: el tunel abierto, con su contraseña" 'grep -q "password, blocked = st.get(\"password\", \"\"), st.get(\"admin\") != \"permitir\"" "$SRC"'
 fi
+if grep -q "^let ERROR_LOG = " "$SRC"; then
+    check "ventana (Mac): las filas del túnel abierto se dan su alto (sin NSBox, que se quedaba a 0) y se copian por separado" 'awk "/    func shareDialog\\(\\)/,/    func tunnelClose/" "$SRC" > "$W/dlg" && ! grep -qF "NSBox()" "$W/dlg" && grep -qF "row.layer?.cornerRadius = 8" "$W/dlg" && ! grep -q "Copiar para enviar" "$W/dlg"'
+fi
 exit $fail

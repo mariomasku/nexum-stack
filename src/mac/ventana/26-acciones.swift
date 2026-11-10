@@ -164,21 +164,23 @@ extension AppModel {
             texts.spacing = 2
             let b = NSButton(title: "Copiar", target: v, action: #selector(DialogValidator.changed(_:)))
             b.setContentHuggingPriority(.required, for: .horizontal)
+            // (la fila misma hace de recuadro: su alto sale de lo que lleva dentro. Dentro de un NSBox con solo el
+            // ancho, el diálogo le daba 0 de alto y las dos filas se pintaban una encima de otra)
             let row = NSStackView(views: [texts, NSView(), b])
             row.orientation = .horizontal
             row.alignment = .centerY
             row.spacing = 10
             row.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
-            let box = NSBox()
-            box.boxType = .custom
-            box.cornerRadius = 8
-            box.borderColor = .separatorColor
-            box.fillColor = .controlBackgroundColor
-            box.contentViewMargins = .zero
-            box.contentView = row
-            box.translatesAutoresizingMaskIntoConstraints = false
-            box.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
-            return box
+            row.wantsLayer = true
+            row.layer?.cornerRadius = 8
+            row.layer?.borderWidth = 1
+            row.layer?.borderColor = NSColor.separatorColor.cgColor
+            row.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            row.translatesAutoresizingMaskIntoConstraints = false
+            row.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+            row.setContentHuggingPriority(.required, for: .vertical)
+            row.setContentCompressionResistancePriority(.required, for: .vertical)
+            return row
         }
         let open = NSButton(title: "Abrir", target: openURL, action: #selector(DialogValidator.changed(_:)))
         open.toolTip = "Abrirla tú en el navegador"

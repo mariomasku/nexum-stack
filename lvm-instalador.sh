@@ -858,7 +858,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.12"
+APP_VERSION="1.57.13"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -13607,6 +13607,10 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.57.13 (11 nov 2026)
+- Mac: el diálogo del túnel abierto se veía con la dirección y la
+  contraseña unas encima de otras. En Linux no cambia nada.
 
 1.57.12 (10 nov 2026)
 - Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con
