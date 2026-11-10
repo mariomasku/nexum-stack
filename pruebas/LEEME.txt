@@ -121,7 +121,15 @@ LOS FICHEROS
                       skip-networking, secure_file_priv, local-infile, FTP,
                       vhost de dominios desconocidos, certificado de fábrica.
   escritura.sh        PROJECT_WRITE_PY: no escribe fuera de htdocs.
-  cache.sh            CACHE_CLEAR_PY: vacía var/cache sin seguir enlaces.
+  cache.sh            CLEAN_PY: vacía var/cache sin seguir enlaces.
+  limpieza.sh         Limpieza (1.57.9): limpieza, gui-limpieza, limpiar,
+                      gui-limpiar-proyecto y limpiar-proyecto en un equipo
+                      de prueba. Borra lo que debe y nada más (ajustes de
+                      ~/.lvm-instalador, uploads, img, .pid, cgisock, datos
+                      de MariaDB e index.php intactos), no sigue enlaces,
+                      con --simular no borra nada, los registros de las
+                      versiones quedan a 0 bytes y los temporales recientes
+                      o en uso siguen. Sin sudo de verdad.
   web.sh              Reglas web en un Apache temporal: ficheros que no se
                       sirven (.env, .git, copias, claves...), CSRF contra
                       phpMyAdmin, phpMyAdmin solo en 127.0.0.1, TRACE.

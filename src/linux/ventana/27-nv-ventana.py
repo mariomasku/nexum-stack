@@ -39,9 +39,17 @@ class App2(NvBandeja,
 
         # Los desplegables se abren debajo del boton, como una lista. Sin esto, GTK 3 pone la opcion
         # elegida encima del boton y, con muchas (los proyectos), deja huecos vacios por arriba o abajo
+        # Y los de 8 opciones o más, con buscador (combo_search): el menú de GTK se cierra nada más abrirse
+        def popup_shown(combo, _pspec):
+            if combo.get_property("popup-shown") and not combo.get_has_entry() \
+                    and len(combo.get_model() or []) >= COMBO_SEARCH_MIN:
+                combo.popdown()
+                GLib.idle_add(lambda: (combo_search(combo), False)[1])
+
         def combo_hook(widget, *_):
             if isinstance(widget, Gtk.ComboBox) and widget.get_wrap_width() == 0:
                 widget.set_wrap_width(1)
+                widget.connect("notify::popup-shown", popup_shown)
             return True
         GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
         for text in (CSS, NEW_CSS):

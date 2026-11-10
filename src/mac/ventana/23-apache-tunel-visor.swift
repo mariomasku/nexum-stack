@@ -323,13 +323,10 @@ struct ButtonsPanel: View {
               VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Text("Estilo").frame(width: 70, alignment: .leading)
-                    Picker("", selection: Binding(get: { conf.style }, set: { s in
+                    SearchPicker(selection: Binding(get: { conf.style }, set: { s in
                         conf.style = s
                         if !sizeTouched { conf.size = VISOR_SIZES[s] ?? conf.size }
-                    })) {
-                        ForEach(VISOR_STYLES, id: \.0) { st in Text(st.1).tag(st.0) }
-                    }
-                    .labelsHidden()
+                    }), items: VISOR_STYLES, width: 220)
                 }
                 HStack(spacing: 12) {
                     Text("Tamaño").frame(width: 70, alignment: .leading)

@@ -21,12 +21,15 @@ function ps_clear_cache() {
     # Los ficheros que creo Apache como daemon (antes de User/Group) solo se borran con sudo
     find "$cache" -mindepth 1 ! -user "$(id -un)" -print -quit 2> /dev/null | grep -q . && s=sudo
     echo "Vaciando la cache de $folder (var/cache)..."
-    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi: si entre
-    # la comprobacion y el borrado cambian var por un enlace (a /var), falla en lugar de vaciar otra
-    if [ -n "$s" ]; then
-        run $s python3 -I -c "$CACHE_CLEAR_PY" "$cache" "$HTDOCS_DIR"
+    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi (CLEAN_PY,
+    # dentro de la tienda): si entre la comprobacion y el borrado cambian var por un enlace (a /var),
+    # falla en lugar de vaciar otra
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se vaciaria $cache${s:+ (con sudo, sin seguir enlaces)}"
+    elif [ -n "$s" ]; then
+        $s python3 -I -c "$CLEAN_PY" limpiar "cache|$HTDOCS_DIR/$folder|vaciar|var/cache||" > /dev/null
     else
-        run find "$cache" -mindepth 1 -delete
+        find "$cache" -xdev -mindepth 1 -delete
     fi || { echo "No se ha podido vaciar $cache"; return 1; }
     echo "Cache de $folder vaciada"
 }

@@ -50,14 +50,10 @@ struct InstallSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     Text("Rama:")
-                    Picker("", selection: Binding(get: { model.patchBranch }, set: { model.loadPatches($0) })) {
-                        Text("Elige una rama").tag("")
-                        ForEach(list) { b in
-                            Text("PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? "")).tag(b.branch)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 240)
+                    SearchPicker(selection: Binding(get: { model.patchBranch }, set: { model.loadPatches($0) }),
+                                 items: [("", "Elige una rama")] + list.map { b in
+                                     (b.branch, "PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? ""))
+                                 }, width: 240)
                     .disabled(model.busy)
                     Spacer(minLength: 8)
                 }

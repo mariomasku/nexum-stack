@@ -229,6 +229,80 @@ extension AppModel {
                 doneText: "Caché vaciada", autoClose: true)
     }
 
+    /// ⋮, Limpiar proyecto…: lo que tiene de caché, registros y restos de actualizaciones (gui-limpiar-proyecto),
+    /// cada cosa con sus carpetas, lo que ocupa y su casilla (marcada); se confirma con lo que se va a hacer y se
+    /// lanza limpiar-proyecto con lo marcado. Si no tiene nada, se dice
+    func cleanProject(_ x: Project) {
+        let name = x.name
+        runQuick(["gui-limpiar-proyecto", name]) { _, out in
+            var found: [(key: String, size: CleanSize, paths: String)] = []
+            for f in parseLines(out) where f.count >= 5 && f[0] == "P" {
+                if let b = Int64(f[2]), let n = Int(f[3]), n > 0 {
+                    found.append((key: f[1], size: CleanSize(bytes: b, files: n), paths: f[4]))
+                }
+            }
+            guard !found.isEmpty else {
+                message("Nada que limpiar", "No hay cachés ni registros que limpiar en \(name).")
+                return
+            }
+            // Una casilla por cosa (marcadas), con sus carpetas debajo, y el aviso en rojo
+            let alert = NSAlert()
+            alert.messageText = "Limpiar «\(name)»"
+            alert.informativeText = "Marca lo que quieres limpiar. Las carpetas se quedan, vacías; nada de las imágenes ni de lo que se sube a la web."
+            alert.alertStyle = .informational
+            let ok = alert.addButton(withTitle: "Limpiar lo marcado…")
+            ok.hasDestructiveAction = true
+            ok.keyEquivalent = ""
+            let cancel = alert.addButton(withTitle: "Cancelar")
+            cancel.keyEquivalent = "\u{1b}"
+            let validator = DialogValidator()
+            let stack = NSStackView()
+            stack.orientation = .vertical
+            stack.alignment = .leading
+            stack.spacing = 4
+            var made: [NSButton] = []
+            for it in found {
+                let title = PROJECT_CLEAN_ITEMS.first(where: { $0.key == it.key })?.title ?? it.key
+                let b = NSButton(checkboxWithTitle: "\(title) · \(cleanSizeText(it.size))", target: validator,
+                                 action: #selector(DialogValidator.changed(_:)))
+                b.state = .on
+                stack.addArrangedSubview(b)
+                let p = NSTextField(wrappingLabelWithString: it.paths.split(separator: ",").joined(separator: ", "))
+                p.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+                p.textColor = .secondaryLabelColor
+                p.preferredMaxLayoutWidth = DIALOG_WIDTH - 22
+                let row = NSStackView(views: [p])
+                row.edgeInsets = NSEdgeInsets(top: 0, left: 22, bottom: 6, right: 0)
+                stack.addArrangedSubview(row)
+                made.append(b)
+            }
+            let boxes = made
+            let w = NSTextField(wrappingLabelWithString: CLEAN_WARNING)
+            w.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+            w.textColor = .systemRed
+            w.preferredMaxLayoutWidth = DIALOG_WIDTH
+            stack.addArrangedSubview(w)
+            validator.update = { ok.isEnabled = boxes.contains { $0.state == .on } }
+            validator.update()
+            stack.layoutSubtreeIfNeeded()
+            stack.frame = NSRect(x: 0, y: 0, width: DIALOG_WIDTH, height: max(stack.fittingSize.height, 24))
+            alert.accessoryView = stack
+            // (el validador, vivo mientras se ve el diálogo: el botón no lo retiene)
+            let resp = withExtendedLifetime(validator) { alert.runStyled() }
+            guard resp == .alertFirstButtonReturn else { return }
+            let chosen = zip(found, boxes).filter { $0.1.state == .on }.map { $0.0 }
+            guard !chosen.isEmpty else { return }
+            let steps = chosen.map { it -> String in
+                let info = PROJECT_CLEAN_ITEMS.first(where: { $0.key == it.key })
+                return "\(info?.title ?? it.key) (\(cleanSizeText(it.size))): \(info?.step ?? "se limpia") (\(it.paths.split(separator: ",").joined(separator: ", ")))."
+            }
+            guard confirm("¿Limpiar «\(name)»?", "Si algo es del administrador (lo que creó Apache), se pide su contraseña.",
+                          "Limpiar", destructive: true, steps: steps, warning: CLEAN_WARNING) else { return }
+            self.runTask("Limpiando \(name)", ["limpiar-proyecto", name] + chosen.map { $0.key },
+                         doneText: "\(name) limpio", autoClose: true)
+        }
+    }
+
     /// Dominio de producción para las imágenes que faltan: el campo con el que había o el propuesto;
     /// vacío (si ya había uno), deja de pedirlas. done(dominio o "" para quitar)
     private func askMedia(_ title: String, _ text: String, saved: String, value: String,

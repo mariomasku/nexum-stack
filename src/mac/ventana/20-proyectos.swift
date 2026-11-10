@@ -252,12 +252,8 @@ struct ProjectsView: View {
             .tip("Añadir entorno")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
-                Picker("", selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) })) {
-                    if envs.isEmpty { Text("Sin entornos").tag("") }
-                    ForEach(envs, id: \.0) { e in Text(e.1).tag(e.0) }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) }),
+                             items: envs.isEmpty ? [("", "Sin entornos")] as [(String, String)] : envs.map { ($0.0, $0.1) })
                 .disabled(envs.isEmpty || model.busy)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -396,6 +392,7 @@ struct ProjectsView: View {
         if x.kind == "ps" && !db.isEmpty {
             items.append(("Vaciar la caché de la tienda", { model.clearCache(db) }))
         }
+        items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
         if x.kind == "ps" {
             items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
         } else if x.kind == "wp" {
@@ -445,14 +442,8 @@ struct ProjectsView: View {
             PageTitle(title: "Proyectos", sub: "")
             Spacer(minLength: 8)
             SearchField(text: $model.projQuery, placeholder: "Buscar proyecto o BBDD").frame(width: 220)
-            Picker("", selection: $model.projKind) {
-                Text("Todos").tag("all")
-                Text("WordPress").tag("wp")
-                Text("PrestaShop").tag("ps")
-                Text("Otros").tag("")
-            }
-            .labelsHidden()
-            .frame(width: 120)
+            SearchPicker(selection: $model.projKind,
+                         items: [("all", "Todos"), ("wp", "WordPress"), ("ps", "PrestaShop"), ("", "Otros")], width: 120)
             // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
             Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
@@ -558,6 +549,7 @@ struct ProjectsView: View {
                         if x.kind == "ps" && !model.projectBase(x).isEmpty {
                             Button("Vaciar la caché de la tienda") { model.clearCache(model.projectBase(x)) }
                         }
+                        Button("Limpiar proyecto…") { model.cleanProject(x) }
                         if x.kind == "ps" {
                             Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
                         } else if x.kind == "wp" {

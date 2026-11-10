@@ -64,20 +64,16 @@ struct IdleStopCard: View {
                  (hours != "0" ? "Un proyecto de Docker que lleva esas horas sin ninguna visita (tampoco por el túnel) se para solo, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker): no gasta memoria ni CPU de la máquina virtual. Se mira cada 15 minutos, también con la ventana cerrada. Al entrar en uno parado, la web lo dice: se arranca en la pestaña Docker."
                   : "Apagado: los proyectos de Docker siguen en marcha hasta que se paren a mano")
                  + (hours != "0" && !last.isEmpty ? "\nLo último: " + last : "")) {
-                Picker("", selection: Binding(get: { hours }, set: { h in
+                SearchPicker(selection: Binding(get: { hours }, set: { h in
                     guard h != hours else { return }
                     hours = h
                     runQuick(["docker-reposo", "horas", h]) { _, out in
                         model.toast(out.split(separator: "\n").last.map(String.init) ?? "Hecho")
                         read()
                     }
-                })) {
-                    ForEach(choices + (choices.contains(hours) ? [] : [hours]), id: \.self) { h in
-                        Text(h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas").tag(h)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 210)
+                }), items: (choices + (choices.contains(hours) ? [] : [hours])).map { h in
+                    (h, h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas")
+                }, width: 210)
                 .disabled(model.busy)
             }
         }

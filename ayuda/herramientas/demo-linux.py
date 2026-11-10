@@ -154,6 +154,34 @@ def sizes():
     return lines(z), lines(t)
 
 
+def gui_limpieza():
+    """Configuración, Limpieza: lo que ocupa cada cosa (inventado)."""
+    MB = 1024 * 1024
+    return lines([("L", "descargas", 1288 * MB, 23), ("L", "copias", 412 * MB, 9), ("L", "correo", 3 * MB, 57),
+                  ("L", "registros", 18 * MB, 31), ("L", "registros-versiones", 264 * MB, 48),
+                  ("L", "caches-proyectos", 731 * MB, 18342), ("L", "temporales", 96 * MB, 412),
+                  ("L", "sesiones", 2 * MB, 140)])
+
+
+def gui_limpiar_proyecto():
+    """⋮, Limpiar proyecto…: lo de cada WordPress y cada tienda (inventado)."""
+    out = {}
+    MB = 1024 * 1024
+    for n, (folder, kind, *_rest) in enumerate(PROJECTS):
+        if kind == "wp":
+            rows = [("P", "cache", (40 + n * 13) * MB, 1200 + n * 97, "wp-content/cache"),
+                    ("P", "registros", (2 + n) * MB, 3, "wp-content/debug.log,wp-content/uploads/wc-logs/*.log")]
+            if n == 0:
+                rows.append(("P", "actualizaciones", 6 * MB, 214, "wp-content/upgrade,wp-content/upgrade-temp-backup"))
+        elif kind == "ps":
+            rows = [("P", "cache", (180 + n * 21) * MB, 5400 + n * 311, "var/cache,cache/smarty/compile,cache/smarty/cache"),
+                    ("P", "registros", (9 + n) * MB, 12, "var/logs,modules/*/logs/*.log")]
+        else:
+            continue
+        out["gui-limpiar-proyecto_" + folder] = lines(rows)
+    return out
+
+
 def gui_docker():
     out = [("S", 1, 1, "29.1.3", 1, 0),
            ("V", "8.5 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2 7.1 7.0 5.6", "11.8 11.4 10.11 10.6 10.5 10.4")]
@@ -239,7 +267,9 @@ def main():
         "repos": repos(), "tunel": "I|1|2026.10.0|2026.10.0\n",
         "correo": "Correo de pruebas encendido: lo que mandan las webs va a Mailpit\n",
         "httpd-vhosts.conf": vhosts(), "hosts": "127.0.0.1\tlocalhost\n127.0.0.1\tweb.local\n",
+        "gui-limpieza": gui_limpieza(),
     }
+    files.update(gui_limpiar_proyecto())
     # (gui-vuelta: varias de una vez, como las da el programa)
     files["gui-vuelta"] = "".join("@@%s|0\n%s" % (k, files[k]) for k in ("gui-datos", "gui-hosts", "gui-servicios", "gui-proyectos"))
     for name, text in files.items():

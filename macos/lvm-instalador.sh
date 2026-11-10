@@ -106,6 +106,17 @@
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
+#   lvm-instalador limpieza
+#       Lo que se puede limpiar, cada cosa con lo que ocupa y cuantos ficheros tiene
+#
+#   lvm-instalador limpiar <clave>...
+#       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
+#       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
+#       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
+#       PHP y MariaDB de cada version: se vacian), caches-proyectos (la cache de todos los proyectos),
+#       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
+#       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
+#
 #   lvm-instalador pasar-version <origen> <destino>
 #       Tras instalar el parche nuevo a su lado: copia a la nueva las BBDD de la anterior, con sus
 #       vinculos, y la activa si la anterior era la activa (la anterior no se toca)
@@ -193,6 +204,11 @@
 #
 #   lvm-instalador vaciar-cache <carpeta> | --bd <base>
 #       Vacia var/cache de una tienda PrestaShop (por carpeta o base)
+#
+#   lvm-instalador limpiar-proyecto <carpeta> [cache] [registros] [actualizaciones]
+#       Vacia las caches, los registros y los restos de las actualizaciones de un WordPress o de una
+#       tienda PrestaShop (sin claves, todo). Nada de wp-content/uploads (salvo los registros de
+#       WooCommerce) ni de img/. Las carpetas se quedan, vacias. No se puede recuperar
 #
 #   lvm-instalador nuevo-dominio <dominio> <carpeta> [base]
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
@@ -2180,7 +2196,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.8"
+APP_VERSION="1.57.9"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan lvm-instalador-mac-<version>.zip y su firma (.zip.sig), hecha con la clave de
@@ -9646,36 +9662,399 @@ EOF
     return 0
 }
 
-# Vacia una carpeta (var/cache de una tienda) como root sin seguir enlaces en ningun momento: la ruta
-# se recorre desde / con O_NOFOLLOW y tiene que estar dentro de htdocs; dentro, los enlaces se
-# borran (no se sigue a donde apuntan). CACHE_CLEAR_PY <carpeta> <htdocs>
-CACHE_CLEAR_PY='
-import os, stat, sys
-target, top = sys.argv[1], os.path.realpath(sys.argv[2])
-real = os.path.realpath(target)
-if not real.startswith(top + "/") or not real.endswith("/var/cache"):
-    sys.exit("%s no esta dentro de %s: no se vacia" % (target, top))
-fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
-for p in [p for p in real.split("/") if p]:
-    nfd = os.open(p, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-    os.close(fd)
-    fd = nfd
-dev = os.fstat(fd).st_dev
-def empty(dfd):
-    for e in os.scandir(dfd):
-        st = os.stat(e.name, dir_fd=dfd, follow_symlinks=False)
-        if stat.S_ISDIR(st.st_mode) and st.st_dev == dev:
-            sub = os.open(e.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dfd)
-            try:
-                empty(sub)
-            finally:
-                os.close(sub)
-            os.rmdir(e.name, dir_fd=dfd)
-        elif not stat.S_ISDIR(st.st_mode):
-            os.unlink(e.name, dir_fd=dfd)
-empty(fd)
-'
+# Medir, simular o limpiar sin seguir enlaces en ningun momento (limpieza, limpiar-proyecto y la var/cache
+# de una tienda con sudo). Cada regla dice que limpiar dentro de una carpeta raiz:
+#   <clave>|<raiz>|<tipo>|<ruta dentro de la raiz>|<patron>|<opciones>   (el patron puede llevar |)
+# tipos: vaciar (todo lo de dentro de <ruta>, que se queda), ficheros (los de <ruta> que cumplen el patron,
+# con comodines), entradas (lo de <ruta> cuyo nombre cumple el patron, una expresion: ficheros o carpetas
+# enteras) y truncar (los ficheros de <ruta> que cumplen el patron se dejan a 0 bytes: los que un servicio
+# tiene abiertos). Las partes de <ruta> pueden llevar comodines (modules/*/logs).
+# opciones (separadas por comas): index (los index.php se quedan), edad=<segundos> (solo lo que lleva ese
+# tiempo sin cambiar, ni ello ni nada de dentro), uso (no lo que tiene abierto un proceso, ni un socket o un
+# .pid vivo dentro), uid=<n> (solo lo de ese usuario), solo=dir|fich.
+# La raiz no puede ser un enlace; se abre desde / con O_NOFOLLOW (su ruta real) y desde ella cada carpeta,
+# tambien con O_NOFOLLOW: un enlace en la ruta hace que esa regla no limpie nada. Dentro, los enlaces se
+# borran sin seguirlos, no se pasa a otro disco (st_dev de la raiz) y todo se borra con su carpeta abierta
+# (unlinkat/rmdir con dir_fd): si algo cambia por un enlace entre medias, falla en lugar de borrar fuera.
+# Escribe L|<clave>|<bytes>|<ficheros>|<1 si hace falta root> por cada clave (en limpiar, lo borrado) y
+# P|<clave>|<ruta> de cada regla con algo; al limpiar, Q|<clave>|<ruta> de lo que no se ha podido borrar
+# (sale con 3) y U|<clave>|<ruta> de lo que se deja por estar en uso.
+# Uso: CLEAN_PY medir|simular|limpiar <regla>...
+CLEAN_PY='
+import errno, fnmatch, os, re, socket, stat, subprocess, sys, time
+mode, rules = sys.argv[1], sys.argv[2:]
+me = os.geteuid()
+now = time.time()
+DIR = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+totals, order, paths, left, busy = {}, [], [], [], []
+_open = None
 
+
+def open_paths():
+    """Lo que tienen abierto los procesos que se pueden ver (como root, todos) y los sockets en uso."""
+    global _open
+    if _open is not None:
+        return _open
+    found = set()
+    if os.path.isdir("/proc/self/fd"):
+        for pid in os.listdir("/proc"):
+            # (sin este mismo proceso: tiene abiertas las carpetas que esta mirando)
+            if not pid.isdigit() or int(pid) == os.getpid():
+                continue
+            try:
+                found.add(os.readlink("/proc/%s/cwd" % pid))
+            except OSError:
+                pass
+            try:
+                fds = os.listdir("/proc/%s/fd" % pid)
+            except OSError:
+                continue
+            for n in fds:
+                try:
+                    p = os.readlink("/proc/%s/fd/%s" % (pid, n))
+                except OSError:
+                    continue
+                if p.startswith("/"):
+                    found.add(p[:-10] if p.endswith(" (deleted)") else p)
+        try:
+            with open("/proc/net/unix") as f:
+                for line in f.read().splitlines()[1:]:
+                    parts = line.split()
+                    if len(parts) >= 8 and parts[-1].startswith("/"):
+                        found.add(parts[-1])
+        except OSError:
+            pass
+    else:
+        # (en el Mac, lsof: los de tu usuario o, como root, todos)
+        try:
+            out = subprocess.run(["lsof", "-n", "-P", "-w", "-Fn"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, timeout=30).stdout.decode("utf-8", "replace")
+            found.update(line[1:] for line in out.splitlines() if line.startswith("n/"))
+        except (OSError, subprocess.SubprocessError):
+            pass
+    _open = found
+    return found
+
+
+def alive(pid):
+    if pid <= 1:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def socket_alive(path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(1)
+    try:
+        s.connect(path)
+        return True
+    except OSError as e:
+        return e.errno not in (errno.ECONNREFUSED, errno.ENOENT, errno.ENOTSOCK)
+    finally:
+        s.close()
+
+
+def in_use(path, info):
+    for p in open_paths():
+        if p == path or p.startswith(path + "/"):
+            return True
+    if any(alive(p) for p in info["pids"]):
+        return True
+    return any(socket_alive(s) for s in info["socks"])
+
+
+def can_remove(dpath, dst, st):
+    """Se puede borrar sin root: la carpeta es escribible y, si es como /tmp (sticky), la entrada es tuya."""
+    if me == 0:
+        return True
+    if dst.st_mode & stat.S_ISVTX and st.st_uid != me and dst.st_uid != me:
+        return False
+    return os.access(dpath, os.W_OK | os.X_OK)
+
+
+def new_info():
+    return {"bytes": 0, "files": 0, "newest": 0, "root": False, "pids": [], "socks": []}
+
+
+def scan(dfd, dpath, dst, name, st, dev, keep, info):
+    """Suma en info lo que se borraria de la entrada name de dfd (st es su lstat)."""
+    path = dpath + "/" + name
+    info["newest"] = max(info["newest"], st.st_mtime)
+    if stat.S_ISDIR(st.st_mode):
+        if st.st_dev != dev:
+            return
+        if not can_remove(dpath, dst, st):
+            info["root"] = True
+        try:
+            sub = os.open(name, DIR, dir_fd=dfd)
+        except OSError:
+            info["root"] = True
+            return
+        try:
+            for n in os.listdir(sub):
+                try:
+                    s = os.stat(n, dir_fd=sub, follow_symlinks=False)
+                except OSError:
+                    continue
+                scan(sub, path, st, n, s, dev, keep, info)
+        except OSError:
+            info["root"] = True
+        finally:
+            os.close(sub)
+        return
+    if keep and name == "index.php":
+        return
+    if not can_remove(dpath, dst, st):
+        info["root"] = True
+    info["files"] += 1
+    if stat.S_ISREG(st.st_mode):
+        info["bytes"] += st.st_size
+        if name.endswith(".pid") and st.st_size < 64:
+            try:
+                fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
+                with os.fdopen(fd) as f:
+                    info["pids"].append(int(f.read(30).strip() or 0))
+            except (OSError, ValueError):
+                pass
+    elif stat.S_ISSOCK(st.st_mode):
+        info["socks"].append(path)
+
+
+def remove(dfd, dpath, name, st, dev, keep, res):
+    """Borra la entrada name de dfd sin seguir enlaces. Devuelve True si ya no esta."""
+    path = dpath + "/" + name
+    if stat.S_ISDIR(st.st_mode):
+        if st.st_dev != dev:
+            return False
+        try:
+            sub = os.open(name, DIR, dir_fd=dfd)
+            if os.fstat(sub).st_dev != dev:
+                os.close(sub)
+                return False
+        except OSError:
+            left.append((res["key"], path))
+            return False
+        gone = True
+        try:
+            for n in os.listdir(sub):
+                try:
+                    s = os.stat(n, dir_fd=sub, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not remove(sub, path, n, s, dev, keep, res):
+                    gone = False
+        except OSError:
+            left.append((res["key"], path))
+            gone = False
+        finally:
+            os.close(sub)
+        if not gone:
+            return False
+        try:
+            os.rmdir(name, dir_fd=dfd)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            left.append((res["key"], path))
+            return False
+        return True
+    if keep and name == "index.php":
+        return False
+    try:
+        os.unlink(name, dir_fd=dfd)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        left.append((res["key"], path))
+        return False
+    res["files"] += 1
+    if stat.S_ISREG(st.st_mode):
+        res["bytes"] += st.st_size
+    return True
+
+
+def root_fd(root):
+    """La raiz abierta desde / sin seguir enlaces (su ruta real): (fd, disco, ruta)."""
+    if os.path.islink(root):
+        raise OSError(errno.ELOOP, "es un enlace", root)
+    real = os.path.realpath(root)
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    for p in [p for p in real.split("/") if p]:
+        try:
+            nfd = os.open(p, DIR, dir_fd=fd)
+        finally:
+            os.close(fd)
+        fd = nfd
+    return fd, os.fstat(fd).st_dev, real
+
+
+def targets(fd, path, rel, dev):
+    """Las carpetas rel de dentro de fd (cada parte puede llevar comodines), sin seguir enlaces ni pasar
+    a otro disco: [(fd, ruta, lstat)]. Cierra fd."""
+    cur = [(fd, path)]
+    for seg in [s for s in rel.split("/") if s and s != "."]:
+        nxt = []
+        for dfd, dpath in cur:
+            try:
+                if seg == "..":
+                    names = []
+                elif any(c in seg for c in "*?["):
+                    names = sorted(n for n in os.listdir(dfd) if fnmatch.fnmatchcase(n, seg))
+                else:
+                    names = [seg]
+                for n in names:
+                    try:
+                        st = os.stat(n, dir_fd=dfd, follow_symlinks=False)
+                        if stat.S_ISDIR(st.st_mode) and st.st_dev == dev:
+                            nxt.append((os.open(n, DIR, dir_fd=dfd), dpath + "/" + n))
+                    except OSError:
+                        continue
+            except OSError:
+                pass
+            finally:
+                os.close(dfd)
+        cur = nxt
+    out = []
+    for dfd, dpath in cur:
+        st = os.fstat(dfd)
+        if st.st_dev == dev:
+            out.append((dfd, dpath, st))
+        else:
+            os.close(dfd)
+    return out
+
+
+def entries(dfd, kind, pattern, opts):
+    """Las entradas de la carpeta que entran en la regla: [(nombre, lstat)]."""
+    out = []
+    try:
+        names = sorted(os.listdir(dfd))
+    except OSError:
+        return out
+    for n in names:
+        if kind == "entradas":
+            if not re.fullmatch(pattern, n):
+                continue
+        elif kind in ("ficheros", "truncar") and not fnmatch.fnmatchcase(n, pattern):
+            continue
+        try:
+            st = os.stat(n, dir_fd=dfd, follow_symlinks=False)
+        except OSError:
+            continue
+        isdir = stat.S_ISDIR(st.st_mode)
+        if kind in ("ficheros", "truncar") and isdir:
+            continue
+        if kind == "truncar" and (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1):
+            continue
+        if opts.get("solo") == "dir" and not isdir or opts.get("solo") == "fich" and not stat.S_ISREG(st.st_mode):
+            continue
+        if "uid" in opts and str(st.st_uid) != opts["uid"]:
+            continue
+        out.append((n, st))
+    return out
+
+
+def truncate(dfd, dpath, name, st, res):
+    path = dpath + "/" + name
+    try:
+        fd = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
+    except OSError:
+        left.append((res["key"], path))
+        return
+    try:
+        now_st = os.fstat(fd)
+        if (now_st.st_ino, now_st.st_dev) != (st.st_ino, st.st_dev) or now_st.st_nlink != 1 \
+                or not stat.S_ISREG(now_st.st_mode):
+            left.append((res["key"], path))
+            return
+        os.ftruncate(fd, 0)
+        res["files"] += 1
+        res["bytes"] += now_st.st_size
+    except OSError:
+        left.append((res["key"], path))
+    finally:
+        os.close(fd)
+
+
+for rule in rules:
+    # (el patron de las entradas puede llevar | : es lo que queda entre la ruta y las opciones)
+    parts = rule.split("|")
+    if len(parts) < 6 or parts[2] not in ("vaciar", "ficheros", "entradas", "truncar"):
+        print("Regla no valida: %s" % rule, file=sys.stderr)
+        continue
+    key, root, kind, rel, pattern, optstr = parts[0], parts[1], parts[2], parts[3], "|".join(parts[4:-1]), parts[-1]
+    opts = dict((o.split("=", 1) + [""])[:2] for o in optstr.split(",") if o)
+    keep = "index" in opts
+    if key not in totals:
+        totals[key] = {"key": key, "bytes": 0, "files": 0, "root": False}
+        order.append(key)
+    tot = totals[key]
+    if not os.path.lexists(root):
+        continue
+    try:
+        fd, dev, real = root_fd(root)
+    except OSError as e:
+        print("%s: %s, no se toca" % (root, e.strerror or e), file=sys.stderr)
+        continue
+    label = rel if kind == "vaciar" else (rel + "/" + pattern if rel not in ("", ".") else pattern)
+    found = False
+    for dfd, dpath, dst in targets(fd, real, rel, dev):
+        try:
+            names = entries(dfd, kind, pattern, opts) if kind != "vaciar" else entries(dfd, "", "", opts)
+            for n, st in names:
+                if kind == "truncar":
+                    if st.st_size == 0:
+                        continue
+                    found = True
+                    if me != 0 and not os.access(dpath + "/" + n, os.W_OK):
+                        tot["root"] = True
+                    if mode == "limpiar":
+                        truncate(dfd, dpath, n, st, tot)
+                    else:
+                        tot["files"] += 1
+                        tot["bytes"] += st.st_size
+                    continue
+                info = new_info()
+                scan(dfd, dpath, dst, n, st, dev, keep, info)
+                if not info["files"]:
+                    # (una carpeta vacia de las entradas tambien es un resto: cuenta como uno)
+                    if not (stat.S_ISDIR(st.st_mode) and kind == "entradas"):
+                        continue
+                    info["files"] = 1
+                if "edad" in opts and now - info["newest"] < float(opts["edad"] or 0):
+                    continue
+                if "uso" in opts and in_use(dpath + "/" + n, info):
+                    busy.append((key, dpath + "/" + n))
+                    continue
+                found = True
+                if mode == "limpiar":
+                    remove(dfd, dpath, n, st, dev, keep, tot)
+                else:
+                    tot["files"] += info["files"]
+                    tot["bytes"] += info["bytes"]
+                    tot["root"] = tot["root"] or info["root"]
+        finally:
+            os.close(dfd)
+    if found and (key, label) not in paths:
+        paths.append((key, label))
+
+for key in order:
+    t = totals[key]
+    print("L|%s|%d|%d|%d" % (key, t["bytes"], t["files"], 1 if t["root"] else 0))
+for key, label in paths:
+    print("P|%s|%s" % (key, label))
+for key, path in busy:
+    print("U|%s|%s" % (key, path))
+for key, path in left:
+    print("Q|%s|%s" % (key, path))
+sys.exit(3 if left else 0)
+'
 # vaciar-cache <carpeta>: borra el contenido de var/cache de una tienda (PrestaShop 1.7 la usa para
 # Symfony y da error 500 con la de otro equipo). Si no tiene var/cache no hace nada.
 function ps_clear_cache() {
@@ -9698,12 +10077,15 @@ function ps_clear_cache() {
     # Los ficheros que creo Apache como daemon (antes de User/Group) solo se borran con sudo
     find "$cache" -mindepth 1 ! -user "$(id -un)" -print -quit 2> /dev/null | grep -q . && s=$SUDO
     echo "Vaciando la cache de $folder (var/cache)..."
-    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi: si entre
-    # la comprobacion y el borrado cambian var por un enlace (a /var), falla en lugar de vaciar otra
-    if [ -n "$s" ]; then
-        run $s python3 -I -c "$CACHE_CLEAR_PY" "$cache" "$HTDOCS_DIR"
+    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi (CLEAN_PY,
+    # dentro de la tienda): si entre la comprobacion y el borrado cambian var por un enlace (a /var),
+    # falla en lugar de vaciar otra
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se vaciaria $cache${s:+ (con sudo, sin seguir enlaces)}"
+    elif [ -n "$s" ]; then
+        $s python3 -I -c "$CLEAN_PY" limpiar "cache|$HTDOCS_DIR/$folder|vaciar|var/cache||" > /dev/null
     else
-        run find "$cache" -mindepth 1 -delete
+        find "$cache" -xdev -mindepth 1 -delete
     fi || { echo "No se ha podido vaciar $cache"; return 1; }
     echo "Cache de $folder vaciada"
 }
@@ -18788,7 +19170,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
                value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
-               steps: [String] = [], copyWarning: String? = nil,
+               steps: [String] = [], copyWarning: String? = nil, warning: String? = nil,
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -18822,6 +19204,15 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
         l.translatesAutoresizingMaskIntoConstraints = false
         l.widthAnchor.constraint(equalToConstant: width).isActive = true
         stack.addArrangedSubview(l)
+    }
+    // (warning: un aviso en rojo debajo del texto, como «no se puede recuperar» de la limpieza)
+    if let w = warning {
+        let n = NSTextField(wrappingLabelWithString: w)
+        n.preferredMaxLayoutWidth = width
+        n.alignment = .center
+        n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        n.textColor = .systemRed
+        stack.addArrangedSubview(n)
     }
     let validator = DialogValidator()
     var box: NSButton? = nil
@@ -19059,11 +19450,11 @@ func message(_ title: String, _ text: String = "", error: Bool = false) {
 }
 
 /// steps: los cambios que se van a hacer (numerados, con «Qué se va a realizar»); text va entonces
-/// debajo, como nota
+/// debajo, como nota. warning: un aviso en rojo debajo de todo
 func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
-             steps: [String] = []) -> Bool {
+             steps: [String] = [], warning: String? = nil) -> Bool {
     return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
-                     destructive: destructive, steps: steps).ok
+                     destructive: destructive, steps: steps, warning: warning).ok
 }
 
 /// La casilla de guardar antes una copia en ~/nexum-backups (desmarcada) con el aviso en rojo debajo, para un
@@ -20131,6 +20522,9 @@ final class AppModel: ObservableObject {
     @Published var backups: [Int64]? = nil
     /// Copias de los ficheros que cambia el programa por su cuenta (Configuración, Carpetas; copias-ficheros si|no)
     @Published var copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
+    /// Configuración, Limpieza: las casillas que se han cambiado (clave → marcada); las demás, como vienen
+    /// en CLEAN_ITEMS. Se recuerdan mientras la ventana está abierta, como en Linux
+    @Published var cleanMarks: [String: Bool] = [:]
     /// Lo que ocupa cada BBDD («versión|base» → [bytes, cuándo se midió]; gui-bbdd-tamanos)
     @Published var dbSizes: [String: [Int64]] = [:]
     /// Lo que ocupa cada proyecto en el disco: carpeta → [bytes, cuándo se midió]
@@ -21296,6 +21690,19 @@ extension AppModel {
                     autoClose: true) { _, _, _ in self.refreshBackups() }
     }
 
+    /// Configuración, Limpieza: confirma con lo que se va a hacer, numerado, y el aviso en rojo, y lanza
+    /// limpiar <claves> como tarea; al acabar, done (se vuelve a medir)
+    func cleanRun(_ keys: [String], _ sizes: [String: CleanSize], _ done: @escaping () -> Void) {
+        guard !keys.isEmpty else { return }
+        let steps = keys.compactMap { k -> String? in
+            guard let it = CLEAN_ITEMS.first(where: { $0.key == k }), let v = sizes[k] else { return nil }
+            return "\(it.title) (\(cleanSizeText(v))): \(it.step)."
+        }
+        guard confirm("¿Limpiar lo marcado?", "Si algo es del administrador (lo de root), se pide su contraseña.",
+                      "Limpiar", destructive: true, steps: steps, warning: CLEAN_WARNING) else { return }
+        runTask("Limpiando", ["limpiar"] + keys, doneText: "Limpieza terminada") { _, _, _ in done() }
+    }
+
     /// Configuración, Carpetas: guardar o no una copia de los ficheros que cambia el programa por su cuenta
     /// (hosts, vhosts, configuración de los proyectos)
     func setCopiesFiles(_ on: Bool) {
@@ -22148,6 +22555,80 @@ extension AppModel {
     func clearCache(_ db: String) {
         runTask("Vaciando la caché de la tienda de \(db)", ["vaciar-cache", "--bd", db],
                 doneText: "Caché vaciada", autoClose: true)
+    }
+
+    /// ⋮, Limpiar proyecto…: lo que tiene de caché, registros y restos de actualizaciones (gui-limpiar-proyecto),
+    /// cada cosa con sus carpetas, lo que ocupa y su casilla (marcada); se confirma con lo que se va a hacer y se
+    /// lanza limpiar-proyecto con lo marcado. Si no tiene nada, se dice
+    func cleanProject(_ x: Project) {
+        let name = x.name
+        runQuick(["gui-limpiar-proyecto", name]) { _, out in
+            var found: [(key: String, size: CleanSize, paths: String)] = []
+            for f in parseLines(out) where f.count >= 5 && f[0] == "P" {
+                if let b = Int64(f[2]), let n = Int(f[3]), n > 0 {
+                    found.append((key: f[1], size: CleanSize(bytes: b, files: n), paths: f[4]))
+                }
+            }
+            guard !found.isEmpty else {
+                message("Nada que limpiar", "No hay cachés ni registros que limpiar en \(name).")
+                return
+            }
+            // Una casilla por cosa (marcadas), con sus carpetas debajo, y el aviso en rojo
+            let alert = NSAlert()
+            alert.messageText = "Limpiar «\(name)»"
+            alert.informativeText = "Marca lo que quieres limpiar. Las carpetas se quedan, vacías; nada de las imágenes ni de lo que se sube a la web."
+            alert.alertStyle = .informational
+            let ok = alert.addButton(withTitle: "Limpiar lo marcado…")
+            ok.hasDestructiveAction = true
+            ok.keyEquivalent = ""
+            let cancel = alert.addButton(withTitle: "Cancelar")
+            cancel.keyEquivalent = "\u{1b}"
+            let validator = DialogValidator()
+            let stack = NSStackView()
+            stack.orientation = .vertical
+            stack.alignment = .leading
+            stack.spacing = 4
+            var made: [NSButton] = []
+            for it in found {
+                let title = PROJECT_CLEAN_ITEMS.first(where: { $0.key == it.key })?.title ?? it.key
+                let b = NSButton(checkboxWithTitle: "\(title) · \(cleanSizeText(it.size))", target: validator,
+                                 action: #selector(DialogValidator.changed(_:)))
+                b.state = .on
+                stack.addArrangedSubview(b)
+                let p = NSTextField(wrappingLabelWithString: it.paths.split(separator: ",").joined(separator: ", "))
+                p.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+                p.textColor = .secondaryLabelColor
+                p.preferredMaxLayoutWidth = DIALOG_WIDTH - 22
+                let row = NSStackView(views: [p])
+                row.edgeInsets = NSEdgeInsets(top: 0, left: 22, bottom: 6, right: 0)
+                stack.addArrangedSubview(row)
+                made.append(b)
+            }
+            let boxes = made
+            let w = NSTextField(wrappingLabelWithString: CLEAN_WARNING)
+            w.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+            w.textColor = .systemRed
+            w.preferredMaxLayoutWidth = DIALOG_WIDTH
+            stack.addArrangedSubview(w)
+            validator.update = { ok.isEnabled = boxes.contains { $0.state == .on } }
+            validator.update()
+            stack.layoutSubtreeIfNeeded()
+            stack.frame = NSRect(x: 0, y: 0, width: DIALOG_WIDTH, height: max(stack.fittingSize.height, 24))
+            alert.accessoryView = stack
+            // (el validador, vivo mientras se ve el diálogo: el botón no lo retiene)
+            let resp = withExtendedLifetime(validator) { alert.runStyled() }
+            guard resp == .alertFirstButtonReturn else { return }
+            let chosen = zip(found, boxes).filter { $0.1.state == .on }.map { $0.0 }
+            guard !chosen.isEmpty else { return }
+            let steps = chosen.map { it -> String in
+                let info = PROJECT_CLEAN_ITEMS.first(where: { $0.key == it.key })
+                return "\(info?.title ?? it.key) (\(cleanSizeText(it.size))): \(info?.step ?? "se limpia") (\(it.paths.split(separator: ",").joined(separator: ", ")))."
+            }
+            guard confirm("¿Limpiar «\(name)»?", "Si algo es del administrador (lo que creó Apache), se pide su contraseña.",
+                          "Limpiar", destructive: true, steps: steps, warning: CLEAN_WARNING) else { return }
+            self.runTask("Limpiando \(name)", ["limpiar-proyecto", name] + chosen.map { $0.key },
+                         doneText: "\(name) limpio", autoClose: true)
+        }
     }
 
     /// Dominio de producción para las imágenes que faltan: el campo con el que había o el propuesto;
@@ -23038,6 +23519,13 @@ let ROW_ICONS_EXACT: [String: (String, Color)] = [
     "Novedades": ("star.fill", .yellow),
     "Acerca de": ("info", .gray),
     "error_log": ("logo:apache", brand("apache")),
+    // (Configuración, Limpieza: cada cosa con su icono, como las dos primeras)
+    "Correo de pruebas": ("logo:mailpit", brand("mailpit")),
+    "Registros del programa": ("doc.text.fill", .gray),
+    "Registros de las versiones": ("logo:apache", brand("apache")),
+    "Cachés de los proyectos": ("folder.fill", .cyan),
+    "Temporales": ("trash.fill", .gray),
+    "Sesiones de PHP": ("logo:php", brand("php")),
 ]
 let ROW_ICONS: [(String, String, Color)] = [
     ("Versiones sin proteger", "network", .red),
@@ -23501,6 +23989,8 @@ struct IconButton: View {
 let ACCENT = hexColor(0x0A84FF)
 /// Tema de la ventana elegido en el menú: claro u oscuro (sin fichero, el del Mac)
 let THEME_FILE = LOG_DIR + "/ventana-tema"
+/// La última versión que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
+let LAST_VERSION_FILE = LOG_DIR + "/ultima-version"
 /// Página de descarga de Docker Desktop (en el Mac no se instala desde aquí)
 let DOCKER_DOWNLOAD = "https://www.docker.com/products/docker-desktop/"
 
@@ -23786,6 +24276,152 @@ struct SearchField: View {
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.15), lineWidth: 1))
+    }
+}
+
+/// Los desplegables de la ventana, con buscador como en Linux: con COMBO_SEARCH_MIN opciones o más, al pulsarlo sale
+/// la lista con un campo «Buscar…»; se escribe y se queda solo lo que lleva ese texto (como la barra de búsqueda de
+/// los proyectos), las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada. Con menos, el Picker de siempre.
+/// items: (valor, texto)
+let COMBO_SEARCH_MIN = 8
+
+struct SearchPicker: View {
+    @Binding var selection: String
+    let items: [(String, String)]
+    var width: CGFloat = 230
+    @State private var open = false
+    @State private var query = ""
+    @State private var mark = 0
+    @State private var hover = false
+    @Environment(\.isEnabled) var enabled
+
+    var body: some View {
+        if items.count < COMBO_SEARCH_MIN {
+            Picker("", selection: $selection) {
+                ForEach(items, id: \.0) { Text($0.1).tag($0.0) }
+            }
+            .labelsHidden()
+            .frame(width: width)
+        } else {
+            Button(action: { query = ""; mark = shown().firstIndex(where: { $0.0 == selection }) ?? 0; open = true }) {
+                HStack(spacing: 6) {
+                    Text(items.first(where: { $0.0 == selection })?.1 ?? "").lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .frame(width: width, height: 22)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color(NSColor.controlColor)))
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.primary.opacity(hover && enabled ? 0.30 : 0.18), lineWidth: 1))
+                .contentShape(Rectangle())
+                .opacity(enabled ? 1 : 0.5)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .onHover { hover = $0 }
+            .hoverPointer()
+            .popover(isPresented: $open, arrowEdge: .bottom) { list() }
+        }
+    }
+
+    func shown() -> [(String, String)] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty ? items : items.filter { $0.1.lowercased().contains(q) }
+    }
+
+    func choose(_ i: Int) {
+        let rows = shown()
+        if i >= 0 && i < rows.count { selection = rows[i].0 }
+        open = false
+    }
+
+    func list() -> some View {
+        let rows = shown()
+        return VStack(alignment: .leading, spacing: 6) {
+            KeySearchField(text: $query, placeholder: "Buscar…",
+                           onMove: { step in
+                               let n = shown().count
+                               if n > 0 { mark = Swift.min(Swift.max(mark + step, 0), n - 1) }
+                           },
+                           onEnter: { choose(mark) }, onEscape: { open = false })
+                .frame(height: 24)
+                .onChange(of: query) { _ in mark = 0 }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if rows.isEmpty {
+                            Text("Sin resultados").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(10)
+                        }
+                        ForEach(Array(rows.enumerated()), id: \.element.0) { n, r in
+                            Text(r.1).lineLimit(1).truncationMode(.tail)
+                                .foregroundColor(n == mark ? .white : .primary)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 5).fill(n == mark ? ACCENT : Color.clear))
+                                .contentShape(Rectangle())
+                                .onTapGesture { choose(n) }
+                                .onHover { if $0 { mark = n } }
+                                .id(n)
+                        }
+                    }
+                }
+                .frame(maxHeight: 340)
+                .onChange(of: mark) { m in proxy.scrollTo(m) }
+                .onAppear { proxy.scrollTo(mark, anchor: .center) }
+            }
+        }
+        .padding(8)
+        .frame(width: Swift.max(width, 260))
+    }
+}
+
+/// Campo de búsqueda que pasa las flechas, Intro y Esc (el TextField de SwiftUI de macOS 12 no los da)
+struct KeySearchField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let onMove: (Int) -> Void
+    let onEnter: () -> Void
+    let onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let f = NSSearchField()
+        f.placeholderString = placeholder
+        f.delegate = context.coordinator
+        f.sendsSearchStringImmediately = true
+        // (con el foco ya puesto: se escribe nada más abrir)
+        DispatchQueue.main.async { f.window?.makeFirstResponder(f) }
+        return f
+    }
+
+    func updateNSView(_ f: NSSearchField, context: Context) {
+        context.coordinator.parent = self
+        if f.stringValue != text { f.stringValue = text }
+    }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var parent: KeySearchField
+        init(_ p: KeySearchField) { parent = p }
+
+        func controlTextDidChange(_ n: Notification) {
+            if let f = n.object as? NSSearchField { parent.text = f.stringValue }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
+            switch sel {
+            case #selector(NSResponder.moveDown(_:)): parent.onMove(1)
+            case #selector(NSResponder.moveUp(_:)): parent.onMove(-1)
+            case #selector(NSResponder.pageDown(_:)), #selector(NSResponder.scrollPageDown(_:)): parent.onMove(8)
+            case #selector(NSResponder.pageUp(_:)), #selector(NSResponder.scrollPageUp(_:)): parent.onMove(-8)
+            case #selector(NSResponder.insertNewline(_:)): parent.onEnter()
+            // (Esc con texto lo vacía; vacío, cierra)
+            case #selector(NSResponder.cancelOperation(_:)):
+                if parent.text.isEmpty { parent.onEscape() } else { parent.text = "" }
+            default: return false
+            }
+            return true
+        }
     }
 }
 
@@ -24226,7 +24862,21 @@ extension AppModel {
             openTab("versiones")
             return
         }
+        if d.running {
+            try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true)
+            try? (d.active + "\n").write(toFile: LAST_VERSION_FILE, atomically: true, encoding: .utf8)
+        }
         control(d.running ? "parar" : "arrancar", d.running ? "Parando" : "Arrancando")
+    }
+
+    /// Las versiones instaladas para ▶ sin ninguna activa: la última que se usó, la primera
+    func powerChoices() -> (last: String, installs: [Install]) {
+        let last = ((try? String(contentsOfFile: LAST_VERSION_FILE, encoding: .utf8)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let list = (data?.installs ?? []).sorted { a, b in
+            a.folder == last ? b.folder != last : (b.folder == last ? false : a.folder < b.folder)
+        }
+        return (last, list)
     }
 
     /// Rama de php.net de una versión de PHP (8.4.12 → la de 8.4), nil si no se ha consultado
@@ -24861,6 +25511,8 @@ struct TopBar: View {
     @Environment(\.colorScheme) var scheme
     @State private var menuOpen = false
     @State private var servicesOpen = false
+    @State private var powerOpen = false
+    @State private var powerHover = false
     @State private var servicesHover = false
     @State private var warnOpen = false
 
@@ -24934,6 +25586,9 @@ struct TopBar: View {
                 if let a = act {
                     Text("XAMPP-\(a.folder)").font(.system(size: 10.5, design: .monospaced)).foregroundColor(.secondary)
                         .lineLimit(1).fixedSize()
+                } else {
+                    Text("pulsa ▶ para arrancar una").font(.system(size: 10.5)).foregroundColor(.secondary)
+                        .lineLimit(1).fixedSize()
                 }
             }
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
@@ -24961,6 +25616,8 @@ struct TopBar: View {
                 // (los recuadros de arriba no heredan el estilo de los botones de la ventana)
                 ServicesView(close: { servicesOpen = false }).environmentObject(model).buttonStyle(PointerButtonStyle()).frame(width: 660, height: 470)
             }
+            // (a la derecha de los servicios)
+            powerButton()
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
             usageText()
         }
@@ -24969,6 +25626,56 @@ struct TopBar: View {
         .background(SoftSunken(radius: 12))
         .fixedSize(horizontal: true, vertical: false)
         .layoutPriority(1)
+    }
+
+    /// ▶ / ■ del visor: arranca la versión activa o la para y desactiva; sin ninguna activa, ▶ despliega
+    /// las versiones instaladas para elegir cuál arrancar
+    func powerButton() -> some View {
+        let d = model.data
+        let active = d?.active ?? ""
+        let on = !active.isEmpty && (d?.running ?? false)
+        let tip = on ? "Parar y desactivar XAMPP-\(active)" : active.isEmpty ? "Arrancar una versión" : "Arrancar XAMPP-\(active)"
+        return Button(action: {
+            if active.isEmpty { powerOpen.toggle() } else { model.power() }
+        }) {
+            // (solo el icono, verde o rojo, sin recuadro; al pasar el ratón, un fondo suave)
+            Image(systemName: on ? "stop.fill" : "play.fill").font(.system(size: 17, weight: .semibold))
+                .foregroundColor(on ? RED : GREEN)
+                .frame(width: 28, height: 28)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(powerHover || powerOpen ? 0.10 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(d == nil || (active.isEmpty && (d?.installs.isEmpty ?? true)))
+        .onHover { powerHover = $0 }
+        .hoverPointer()
+        .tip(tip)
+        .popover(isPresented: $powerOpen, arrowEdge: .bottom) {
+            let c = model.powerChoices()
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Arrancar una versión").font(.system(size: 11)).foregroundColor(.secondary)
+                    .padding(.horizontal, 8).padding(.bottom, 4)
+                ForEach(c.installs) { i in
+                    Button(action: { powerOpen = false; model.activate(i.folder) }) {
+                        HStack(spacing: 10) {
+                            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 16, height: 16)
+                            Text("PHP \(i.php)").font(.system(size: 13))
+                            Text("XAMPP-\(i.folder)").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                            Spacer(minLength: 12)
+                            if i.folder == c.last {
+                                Text("la última").font(.system(size: 11)).foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .hoverPointer()
+                }
+            }
+            .padding(8)
+            .frame(minWidth: 280)
+        }
     }
 
     /// Lo que gastan Nexum y sus servicios juntos: la CPU en % de todo el Mac (todos los núcleos son el
@@ -25768,12 +26475,8 @@ struct ProjectsView: View {
             .tip("Añadir entorno")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
-                Picker("", selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) })) {
-                    if envs.isEmpty { Text("Sin entornos").tag("") }
-                    ForEach(envs, id: \.0) { e in Text(e.1).tag(e.0) }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) }),
+                             items: envs.isEmpty ? [("", "Sin entornos")] as [(String, String)] : envs.map { ($0.0, $0.1) })
                 .disabled(envs.isEmpty || model.busy)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -25912,6 +26615,7 @@ struct ProjectsView: View {
         if x.kind == "ps" && !db.isEmpty {
             items.append(("Vaciar la caché de la tienda", { model.clearCache(db) }))
         }
+        items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
         if x.kind == "ps" {
             items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
         } else if x.kind == "wp" {
@@ -25961,14 +26665,8 @@ struct ProjectsView: View {
             PageTitle(title: "Proyectos", sub: "")
             Spacer(minLength: 8)
             SearchField(text: $model.projQuery, placeholder: "Buscar proyecto o BBDD").frame(width: 220)
-            Picker("", selection: $model.projKind) {
-                Text("Todos").tag("all")
-                Text("WordPress").tag("wp")
-                Text("PrestaShop").tag("ps")
-                Text("Otros").tag("")
-            }
-            .labelsHidden()
-            .frame(width: 120)
+            SearchPicker(selection: $model.projKind,
+                         items: [("all", "Todos"), ("wp", "WordPress"), ("ps", "PrestaShop"), ("", "Otros")], width: 120)
             // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
             Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
@@ -26074,6 +26772,7 @@ struct ProjectsView: View {
                         if x.kind == "ps" && !model.projectBase(x).isEmpty {
                             Button("Vaciar la caché de la tienda") { model.clearCache(model.projectBase(x)) }
                         }
+                        Button("Limpiar proyecto…") { model.cleanProject(x) }
                         if x.kind == "ps" {
                             Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
                         } else if x.kind == "wp" {
@@ -27284,13 +27983,10 @@ struct ButtonsPanel: View {
               VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Text("Estilo").frame(width: 70, alignment: .leading)
-                    Picker("", selection: Binding(get: { conf.style }, set: { s in
+                    SearchPicker(selection: Binding(get: { conf.style }, set: { s in
                         conf.style = s
                         if !sizeTouched { conf.size = VISOR_SIZES[s] ?? conf.size }
-                    })) {
-                        ForEach(VISOR_STYLES, id: \.0) { st in Text(st.1).tag(st.0) }
-                    }
-                    .labelsHidden()
+                    }), items: VISOR_STYLES, width: 220)
                 }
                 HStack(spacing: 12) {
                     Text("Tamaño").frame(width: 70, alignment: .leading)
@@ -27416,20 +28112,16 @@ struct IdleStopCard: View {
                  (hours != "0" ? "Un proyecto de Docker que lleva esas horas sin ninguna visita (tampoco por el túnel) se para solo, y con él lo común que ya no use nadie (su MariaDB, el Apache de Docker): no gasta memoria ni CPU de la máquina virtual. Se mira cada 15 minutos, también con la ventana cerrada. Al entrar en uno parado, la web lo dice: se arranca en la pestaña Docker."
                   : "Apagado: los proyectos de Docker siguen en marcha hasta que se paren a mano")
                  + (hours != "0" && !last.isEmpty ? "\nLo último: " + last : "")) {
-                Picker("", selection: Binding(get: { hours }, set: { h in
+                SearchPicker(selection: Binding(get: { hours }, set: { h in
                     guard h != hours else { return }
                     hours = h
                     runQuick(["docker-reposo", "horas", h]) { _, out in
                         model.toast(out.split(separator: "\n").last.map(String.init) ?? "Hecho")
                         read()
                     }
-                })) {
-                    ForEach(choices + (choices.contains(hours) ? [] : [hours]), id: \.self) { h in
-                        Text(h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas").tag(h)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 210)
+                }), items: (choices + (choices.contains(hours) ? [] : [hours])).map { h in
+                    (h, h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas")
+                }, width: 210)
                 .disabled(model.busy)
             }
         }
@@ -28239,22 +28931,14 @@ struct DockerNewPanel: View {
                 .font(.callout).foregroundColor(.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
             formRow("Carpeta") {
-                Picker("", selection: Binding(get: { model.dkForm.folder }, set: { v in
+                SearchPicker(selection: Binding(get: { model.dkForm.folder }, set: { v in
                     model.dkForm.folder = v
                     model.dkForm.source = ""
                     if !model.dkForm.domainSet { model.dkForm.domain = dockerSlug(v) + ".docker.local" }
-                })) {
-                    ForEach(folders, id: \.self) { Text($0).tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: wide)
+                }), items: folders.map { ($0, $0) }, width: wide)
             }
             formRow("PHP") {
-                Picker("", selection: $model.dkForm.php) {
-                    ForEach(k.php, id: \.self) { Text("PHP \($0)").tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: 180)
+                SearchPicker(selection: $model.dkForm.php, items: k.php.map { ($0, "PHP \($0)") }, width: 180)
                 // (las imágenes oficiales de 8.1 y anteriores ya no reciben parches: siguen con PHP2Shell)
                 if verParts(model.dkForm.php).lexicographicallyPrecedes([8, 2]) && !model.dkForm.php.isEmpty {
                     Text("Vulnerable (PHP2Shell)").font(.caption.weight(.bold)).foregroundColor(RED)
@@ -28262,30 +28946,19 @@ struct DockerNewPanel: View {
                 }
             }
             formRow("MariaDB") {
-                Picker("", selection: $model.dkForm.maria) {
-                    ForEach(k.maria, id: \.self) { Text("MariaDB \($0)").tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: 180)
+                SearchPicker(selection: $model.dkForm.maria, items: k.maria.map { ($0, "MariaDB \($0)") }, width: 180)
             }
             formRow("BBDD") {
-                Picker("", selection: $model.dkForm.source) {
-                    Text("— Ninguna: vacía —").tag("")
-                    ForEach(Array(pairs.enumerated()), id: \.offset) { _, pr in
-                        Text("\(pr.1) (XAMPP-\(pr.0.folder))").tag("\(pr.0.folder)|\(pr.1)")
-                    }
-                }
-                .labelsHidden()
-                .frame(width: wide)
+                SearchPicker(selection: $model.dkForm.source,
+                             items: [("", "— Ninguna: vacía —")] + pairs.map { pr in ("\(pr.0.folder)|\(pr.1)", "\(pr.1) (XAMPP-\(pr.0.folder))") },
+                             width: wide)
             }
             if !model.dkForm.source.isEmpty && x?.kind == "wp" {
                 formRow("Cómo") {
-                    Picker("", selection: $model.dkForm.live) {
-                        Text("En vivo: la misma que web.local (sin copias)").tag(true)
-                        Text("Una copia en Docker").tag(false)
-                    }
-                    .labelsHidden()
-                    .frame(width: wide)
+                    SearchPicker(selection: Binding(get: { model.dkForm.live ? "vivo" : "copia" },
+                                                    set: { model.dkForm.live = $0 == "vivo" }),
+                                 items: [("vivo", "En vivo: la misma que web.local (sin copias)"), ("copia", "Una copia en Docker")],
+                                 width: wide)
                 }
             }
             if folders.isEmpty {
@@ -28531,14 +29204,10 @@ struct InstallSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
                     Text("Rama:")
-                    Picker("", selection: Binding(get: { model.patchBranch }, set: { model.loadPatches($0) })) {
-                        Text("Elige una rama").tag("")
-                        ForEach(list) { b in
-                            Text("PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? "")).tag(b.branch)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 240)
+                    SearchPicker(selection: Binding(get: { model.patchBranch }, set: { model.loadPatches($0) }),
+                                 items: [("", "Elige una rama")] + list.map { b in
+                                     (b.branch, "PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? ""))
+                                 }, width: 240)
                     .disabled(model.busy)
                     Spacer(minLength: 8)
                 }
@@ -28929,13 +29598,10 @@ struct DatabasesView: View {
                     }
                     importColumn("BBDD de destino") {
                         HStack(spacing: 4) {
-                            Picker("", selection: Binding(get: { model.impDb ?? "" },
-                                                          set: { model.impDb = $0.isEmpty ? nil : $0 })) {
-                                if model.impDb == nil { Text("Elige una BBDD").tag("") }
-                                ForEach(dbs, id: \.self) { Text($0).tag($0) }
-                            }
-                            .labelsHidden()
-                            .frame(minWidth: 150, maxWidth: 260)
+                            SearchPicker(selection: Binding(get: { model.impDb ?? "" },
+                                                            set: { model.impDb = $0.isEmpty ? nil : $0 }),
+                                         items: (model.impDb == nil ? [("", "Elige una BBDD")] : [] as [(String, String)]) + dbs.map { ($0, $0) },
+                                         width: 230)
                             IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.createDb() }
                                 .disabled(model.busy)
                             IconButton(symbol: "trash", help: "Borrar la BBDD elegida") {
@@ -28945,13 +29611,9 @@ struct DatabasesView: View {
                         }
                     }
                     importColumn("Proyecto (opcional)") {
-                        Picker("", selection: Binding(get: { model.impProject ?? "" },
-                                                      set: { model.impProject = $0.isEmpty ? nil : $0 })) {
-                            Text("Ninguno").tag("")
-                            ForEach(model.impProjects, id: \.self) { Text($0).tag($0) }
-                        }
-                        .labelsHidden()
-                        .frame(minWidth: 150, maxWidth: 260)
+                        SearchPicker(selection: Binding(get: { model.impProject ?? "" },
+                                                        set: { model.impProject = $0.isEmpty ? nil : $0 }),
+                                     items: [("", "Ninguno")] + model.impProjects.map { ($0, $0) }, width: 230)
                         Text(model.importProjectHint()).font(.caption).foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -29593,27 +30255,16 @@ struct HostsView: View {
             }
             Divider()
             Row("Carpeta", withDomain[model.newFolder].map { "Ya tiene el dominio \($0)" } ?? "En htdocs (git clone) o nueva") {
-                Picker("", selection: Binding(get: { model.newFolder }, set: { model.pickNewFolder($0) })) {
-                    if model.newFolder.isEmpty { Text("Elige una carpeta").tag("") }
-                    ForEach(folderChoices, id: \.self) { f in
-                        Text(folders.contains(f) ? f : "\(f) (nueva)").tag(f)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: Binding(get: { model.newFolder }, set: { model.pickNewFolder($0) }),
+                             items: (model.newFolder.isEmpty ? [("", "Elige una carpeta")] : [] as [(String, String)])
+                                 + folderChoices.map { f in (f, folders.contains(f) ? f : "\(f) (nueva)") })
                 IconButton(symbol: "plus", help: "Crear una carpeta nueva") { model.askNewDomainName(db: false) }
                     .disabled(model.busy)
             }
             Divider()
             Row("BBDD", active.isEmpty ? "No hay ninguna versión activa" : "En XAMPP-\(active)") {
-                Picker("", selection: $model.newDb) {
-                    Text("Sin BBDD").tag("")
-                    ForEach(dbChoices, id: \.self) { db in
-                        Text(dbs.contains(db) ? db : "\(db) (nueva)").tag(db)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: $model.newDb,
+                             items: [("", "Sin BBDD")] + dbChoices.map { db in (db, dbs.contains(db) ? db : "\(db) (nueva)") })
                 .disabled(active.isEmpty)
                 IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.askNewDomainName(db: true) }
                     .disabled(model.busy || active.isEmpty)
@@ -29703,6 +30354,7 @@ struct ToolsView: View {
         ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
         ("errores", "Registro de errores", "exclamationmark.triangle"),
+        ("limpieza", "Limpieza", "sparkles"),
         ("carpetas", "Carpetas", "folder"),
         ("oficial", "XAMPP oficial", "externaldrive"),
         ("programa", "Programa", "menubar.rectangle"),
@@ -29803,6 +30455,8 @@ struct ToolsView: View {
                 }
                 errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
             }
+        case "limpieza":
+            CleanCard()
         case "carpetas":
             TileCard("Carpetas") {
                 // Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
@@ -30007,13 +30661,9 @@ struct ToolsView: View {
                      lead: AnyView(LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 20, height: 20)),
                      tail: AnyView(mailSwitch(m))) {
                 Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
-                    Picker("", selection: Binding(get: { m.wp }, set: { model.setMailWp($0) })) {
-                        Text("Llevarlos a Mailpit").tag("mailpit")
-                        Text("Desactivarlos en la copia local").tag("desactivar")
-                        Text("No tocarlos").tag("nada")
-                    }
-                    .labelsHidden()
-                    .frame(width: 250)
+                    SearchPicker(selection: Binding(get: { m.wp }, set: { model.setMailWp($0) }),
+                                 items: [("mailpit", "Llevarlos a Mailpit"), ("desactivar", "Desactivarlos en la copia local"),
+                                         ("nada", "No tocarlos")], width: 250)
                     .disabled(!m.on || model.busy)
                     .tip("Qué hacer con sus plugins de correo")
                 }
@@ -30128,6 +30778,126 @@ struct ToolsView: View {
                 Tile((a as NSString).lastPathComponent, "Si algo no va: se desactiva la versión del gestor y vuelve a /Applications/XAMPP") {
                     Button("Volver al XAMPP oficial…") { model.restoreOfficial(a) }.disabled(model.busy || d.official)
                 }
+            }
+        }
+    }
+}
+
+/// Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...), como en Linux: cada cosa, con su título, lo que
+/// es y qué pasa si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
+struct CleanItem {
+    let key: String
+    let title: String
+    let desc: String
+    let step: String
+    let on: Bool
+}
+
+let CLEAN_ITEMS: [CleanItem] = [
+    CleanItem(key: "descargas", title: "Caché de descargas",
+              desc: "El código ya descargado y comprobado de PHP, Apache, MariaDB… (\(DL_CACHE_DIR)). Si se limpia, la próxima instalación lo descarga otra vez.",
+              step: "se vacía \(DL_CACHE_DIR)", on: true),
+    CleanItem(key: "copias", title: "Copias de seguridad",
+              desc: "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden volver a cargar.",
+              step: "se borra todo lo de ~/nexum-backups (la carpeta se queda)", on: false),
+    CleanItem(key: "correo", title: "Correo de pruebas",
+              desc: "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía (Mailpit tiene que estar en marcha).",
+              step: "se vacía la bandeja de Mailpit", on: false),
+    CleanItem(key: "registros", title: "Registros del programa",
+              desc: "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
+              step: "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", on: true),
+    CleanItem(key: "registros-versiones", title: "Registros de las versiones",
+              desc: "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: se pierde lo que decían hasta ahora.",
+              step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", on: true),
+    CleanItem(key: "caches-proyectos", title: "Cachés de los proyectos",
+              desc: "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace sola: la primera visita va algo más lenta.",
+              step: "se vacían las cachés de los proyectos de \(HTDOCS)", on: true),
+    CleanItem(key: "temporales", title: "Temporales",
+              desc: "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un día sin cambiar y nada está usando.",
+              step: "se borran los temporales del programa de más de un día que nada usa", on: true),
+    CleanItem(key: "sesiones", title: "Sesiones de PHP",
+              desc: "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones abiertas en las webs locales (hay que volver a entrar en su administración).",
+              step: "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", on: false),
+]
+
+/// Limpiar proyecto (gui-limpiar-proyecto y limpiar-proyecto): cada clave, con su título y lo que se hace
+let PROJECT_CLEAN_ITEMS: [(key: String, title: String, step: String)] = [
+    ("cache", "Caché", "se vacía su caché"),
+    ("registros", "Registros", "se borran sus registros"),
+    ("actualizaciones", "Restos de actualizaciones", "se vacían los restos de las actualizaciones"),
+]
+
+/// El aviso en rojo de las confirmaciones de la limpieza
+let CLEAN_WARNING = "Lo que se limpia no se puede recuperar: no se hacen copias."
+
+/// Lo que ocupa una cosa que se puede limpiar (de gui-limpieza o gui-limpiar-proyecto)
+struct CleanSize {
+    let bytes: Int64
+    let files: Int
+}
+
+func cleanSizeText(_ v: CleanSize) -> String {
+    return "\(fmtSize(v.bytes)) · \(plural(v.files, "fichero", "ficheros"))"
+}
+
+/// Configuración, Limpieza: lo que Nexum va dejando con el uso, cada cosa con lo que ocupa y su casilla; arriba,
+/// el total, y debajo «Limpiar lo marcado…». Se mide por detrás (gui-limpieza): hasta entonces, «Midiendo…»
+struct CleanCard: View {
+    @EnvironmentObject var model: AppModel
+    /// Lo que ocupa cada cosa; nil mientras se mide
+    @State private var sizes: [String: CleanSize]? = nil
+    @State private var failed = ""
+
+    func marked(_ it: CleanItem) -> Bool {
+        return model.cleanMarks[it.key] ?? it.on
+    }
+
+    var body: some View {
+        let s = sizes ?? [:]
+        let picked = CLEAN_ITEMS.filter { marked($0) && (s[$0.key]?.files ?? 0) > 0 }.map { $0.key }
+        let all = s.values.filter { $0.files > 0 }.reduce(Int64(0)) { $0 + $1.bytes }
+        let sel = picked.reduce(Int64(0)) { $0 + (s[$1]?.bytes ?? 0) }
+        let summary = sizes == nil ? (failed.isEmpty ? "Midiendo…" : failed)
+            : (all > 0 ? "Total: \(fmtSize(all)) · marcado: \(fmtSize(sel))" : "Total: nada que limpiar")
+        return VStack(alignment: .leading, spacing: 12) {
+            TileCard("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar espacio. Lo que se limpia no se puede recuperar: no se hacen copias.") {
+                Tile("Lo que se puede limpiar", summary)
+                ForEach(CLEAN_ITEMS, id: \.key) { it in
+                    let v = s[it.key] ?? CleanSize(bytes: 0, files: 0)
+                    Tile(it.title, it.desc) {
+                        Text(sizes == nil ? "…" : (v.files > 0 ? cleanSizeText(v) : "Vacío"))
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(minWidth: 150, alignment: .trailing)
+                        Toggle("", isOn: Binding(get: { marked(it) }, set: { model.cleanMarks[it.key] = $0 }))
+                            .toggleStyle(CheckboxToggleStyle()).labelsHidden()
+                            .disabled(model.busy || v.files == 0)
+                    }
+                }
+            }
+            HStack {
+                Spacer(minLength: 0)
+                Button("Limpiar lo marcado…") { model.cleanRun(picked, s) { measure() } }
+                    .buttonStyle(OutlineButton(kind: "stop"))
+                    .disabled(model.busy || picked.isEmpty)
+            }
+        }
+        .onAppear { measure() }
+    }
+
+    func measure() {
+        runQuick(["gui-limpieza"]) { _, out in
+            var got: [String: CleanSize] = [:]
+            for f in parseLines(out) where f.count >= 4 && f[0] == "L" {
+                if let b = Int64(f[2]), let n = Int(f[3]) {
+                    got[f[1]] = CleanSize(bytes: b, files: n)
+                }
+            }
+            if got.isEmpty {
+                failed = "No se ha podido medir"
+                sizes = nil
+            } else {
+                failed = ""
+                sizes = got
             }
         }
     }
@@ -34489,6 +35259,24 @@ QUE HACE
 
 VERSIONES
 
+1.57.9 (10 nov 2026)
+- Desplegables con buscador: los de 8 opciones o más (proyectos, BBDD,
+  carpetas, versiones...) se abren con «Buscar…». Se escribe y la lista
+  se queda con lo que lleva ese texto; las flechas eligen, Intro la
+  escoge y Esc cierra.
+- ▶ / ■ en el visor de arriba, a la derecha de Apache y MariaDB: ■ para
+  y desactiva la versión, ▶ la arranca. Sin ninguna activa, ▶ despliega
+  las versiones instaladas (la última que se usó, la primera) para
+  arrancar una.
+- Limpieza, en Configuración: la caché de descargas, las copias de
+  seguridad, el correo de Mailpit, los registros del programa y de cada
+  versión (se vacían), la caché de todos los proyectos, los temporales
+  que deja el programa y las sesiones de PHP, cada cosa con lo que ocupa.
+  Se marca lo que se quiere limpiar (en la terminal: limpieza y limpiar).
+- Limpiar proyecto, en el ⋮ de cada proyecto: su caché, sus registros y,
+  en WordPress, los restos de las actualizaciones. Nunca las imágenes
+  (uploads ni img). En la terminal: limpiar-proyecto.
+
 1.57.8 (10 nov 2026)
 - Copiar una BBDD a un XAMPP parado (recrear un proyecto en otra
   versión de PHP, copiar o descargar una BBDD, o traer las del XAMPP
@@ -36658,6 +37446,422 @@ function copies_files_command() {
         *) echo "Uso: lvm-instalador copias-ficheros [si|no]"; return 1 ;;
     esac
 }
+# Limpieza (1.57.9): lo que el programa va dejando y se puede borrar (limpieza, gui-limpieza, limpiar
+# <clave>...) y las cachés y registros de un proyecto (gui-limpiar-proyecto, limpiar-proyecto). Todo se
+# mide y se borra con CLEAN_PY: sin seguir enlaces, solo dentro de su carpeta y sin pasar a otro disco.
+# Lo que es de root, con sudo y con el mismo CLEAN_PY. Sin copias de seguridad: lo borrado no se recupera.
+# Las claves, en el orden de la ventana
+CLEAN_KEYS=(descargas copias correo registros registros-versiones caches-proyectos temporales sesiones)
+CLEAN_PROJECT_KEYS=(cache registros actualizaciones)
+# Los temporales, solo si llevan un dia sin cambiar (ellos y lo que tienen dentro)
+CLEAN_AGE=86400
+
+# Lo que ocupa (en bytes) dicho para personas: 3,4 MB
+function clean_size_text() {
+    awk -v n="${1:-0}" 'BEGIN {
+        split("B KB MB GB TB", u); i = 1
+        while (n >= 1024 && i < 5) { n /= 1024; i++ }
+        s = (i == 1) ? sprintf("%d %s", n, u[i]) : sprintf("%.1f %s", n, u[i])
+        gsub(/\./, ",", s); print s
+    }'
+}
+
+function clean_files_text() {
+    [ "${1:-0}" == 1 ] && echo "1 fichero" || echo "${1:-0} ficheros"
+}
+
+function clean_title() {
+    case $1 in
+        descargas) echo "Caché de descargas" ;;
+        copias) echo "Copias de seguridad" ;;
+        correo) echo "Correo de pruebas (Mailpit)" ;;
+        registros) echo "Registros del programa" ;;
+        registros-versiones) echo "Registros de las versiones" ;;
+        caches-proyectos) echo "Cachés de los proyectos" ;;
+        temporales) echo "Temporales" ;;
+        sesiones) echo "Sesiones de PHP" ;;
+        cache) echo "Caché" ;;
+        actualizaciones) echo "Restos de actualizaciones" ;;
+    esac
+}
+
+# Las carpetas de los proyectos de htdocs (sin enlaces, con un nombre valido)
+function clean_projects() {
+    local d n
+    for d in "$HTDOCS_DIR"/*/; do
+        d=${d%/} n=${d##*/}
+        [ -d "$d" ] && [ ! -L "$d" ] && [[ "$n" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && echo "$n"
+    done
+}
+
+# clean_project_rules <carpeta> [<clave>...]: las reglas de CLEAN_PY de un proyecto (todas sus claves si
+# no se dice ninguna). Solo las de lo que es: WordPress (wp-content y wp-config.php o wp-includes) o
+# PrestaShop (sus clases o su PrestaShopBundle). Nada de wp-content/uploads (salvo los registros de
+# WooCommerce, wc-logs) ni de img/ de las tiendas
+function clean_project_rules() {
+    local dir=$HTDOCS_DIR/$1
+    shift
+    local want=" ${*:-${CLEAN_PROJECT_KEYS[*]}} "
+    if [ -d "$dir/wp-content" ] && { [ -f "$dir/wp-config.php" ] || [ -d "$dir/wp-includes" ]; }; then
+        if [[ "$want" == *" cache "* ]]; then
+            echo "cache|$dir|vaciar|wp-content/cache||"
+        fi
+        if [[ "$want" == *" registros "* ]]; then
+            echo "registros|$dir|ficheros|wp-content|debug.log|"
+            echo "registros|$dir|ficheros|wp-content/uploads/wc-logs|*.log|"
+        fi
+        if [[ "$want" == *" actualizaciones "* ]]; then
+            echo "actualizaciones|$dir|vaciar|wp-content/upgrade||"
+            echo "actualizaciones|$dir|vaciar|wp-content/upgrade-temp-backup||"
+        fi
+    fi
+    if [ -f "$dir/classes/PrestaShopAutoload.php" ] || [ -d "$dir/src/PrestaShopBundle" ]; then
+        # (los index.php que trae PrestaShop en sus carpetas de cache y de registros se quedan)
+        if [[ "$want" == *" cache "* ]]; then
+            echo "cache|$dir|vaciar|var/cache||"
+            echo "cache|$dir|vaciar|cache/smarty/compile||index"
+            echo "cache|$dir|vaciar|cache/smarty/cache||index"
+            echo "cache|$dir|vaciar|cache/cachefs||index"
+        fi
+        if [[ "$want" == *" registros "* ]]; then
+            echo "registros|$dir|vaciar|var/logs||index"
+            echo "registros|$dir|vaciar|log||index"
+            echo "registros|$dir|ficheros|modules/*/logs|*.log|"
+            echo "registros|$dir|ficheros|modules/*/log|*.log|"
+        fi
+    fi
+}
+
+# clean_rules <clave>: las reglas de CLEAN_PY de una clave de limpiar (descargas, copias y correo, solo
+# para medirlas: se limpian con lo suyo)
+function clean_rules() {
+    local d t p me
+    me=$(id -u)
+    case $1 in
+        descargas) echo "descargas|$DL_CACHE_DIR|entradas|.|"'(?!.*[.]sha256$).+'"|solo=fich" ;;
+        copias) echo "copias|$COPIES_DIR|vaciar|||" ;;
+        correo) echo "correo|$MAILPIT_DATA|vaciar|||" ;;
+        registros)
+            # Solo estos (ninguno es un ajuste): los de las instalaciones y lo que dejan las que fallan
+            # (pila-<version>-<fecha>), el de install-db, el de los proyectos sin visitas, los de los
+            # proyectos de Node y el de la compilacion de la ventana del Mac. Lo que tenga abierto una tarea
+            # en marcha se deja; ventana.log, que la ventana tiene abierto mientras esta abierta, se vacia
+            [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] || return 0
+            echo "registros|$LOG_DIR|ficheros|.|instalacion-*.log|uso"
+            echo "registros|$LOG_DIR|ficheros|.|install-db.log|uso"
+            echo "registros|$LOG_DIR|ficheros|.|docker-reposo.log|uso"
+            echo "registros|$LOG_DIR|entradas|.|pila-[A-Za-z0-9._]+-[0-9]{8}-[0-9]{6}|solo=dir,uso"
+            echo "registros|$LOG_DIR|ficheros|node/proyectos|*.log|uso"
+            echo "registros|$LOG_DIR|ficheros|app|compilar.log|uso"
+            echo "registros|$LOG_DIR|truncar|.|ventana.log|"
+            ;;
+        registros-versiones)
+            # Se vacian (Apache, PHP-FPM y MariaDB los tienen abiertos): los de Apache (logs/*_log, con los
+            # de cada vhost y el de errores de PHP), el de PHP-FPM y el .err de MariaDB. Ni los .pid, ni los
+            # cgisock, ni nada mas de los datos de MariaDB
+            while IFS= read -r d; do
+                [ -n "$d" ] || continue
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}logs|*_log|"
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}logs|php-fpm.log|"
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}var/mysql|*.err|"
+            done < <(clean_version_dirs)
+            ;;
+        caches-proyectos)
+            while IFS= read -r p; do
+                clean_project_rules "$p" cache | sed 's/^cache|/caches-proyectos|/'
+            done < <(clean_projects)
+            ;;
+        temporales)
+            # Los del programa que llevan un dia sin cambiar y no estan en uso (un MariaDB temporal en
+            # marcha tiene su socket en /tmp/lvm-mysql-XXXX): las carpetas y ficheros lvm-* que crea en la
+            # carpeta temporal y, en ~/.lvm-instalador, temporal/ (actualizar proyecto), las listas y carpetas
+            # de ps-imagenes, los ficheros de mktemp de los vhosts, hosts, correo y BBDD de Docker, y las
+            # descargas a medias de Mailpit, cloudflared y Node. No las copias de pasar a Docker
+            # (pasar-*): si el paso falla a medias, son la unica copia de su BBDD
+            for t in "${CLEAN_TMP_DIRS[@]}"; do
+                echo "temporales|$t|entradas|.|lvm-(seguridad|mysql|conocidos|hosts|progreso|vhosts|vhosts-cert|cert|ca|pma|actualizar|mailpit|xampp|pila|icono|copia|cliente|bash|instalar|gpg|dns|github|gh|direccion)[.-].+|edad=$CLEAN_AGE,uso"
+            done
+            if [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ]; then
+                echo "temporales|$LOG_DIR|vaciar|temporal||edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|ps-imagenes-[a-z0-9_]{8}|solo=dir,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|(ps-imagenes-lista|vhosts-docker|hosts-docker|vhost-docker|vhosts-media|vhosts-borrar|hosts-borrar|correo)-[A-Za-z0-9]{6}|solo=fich,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|(docker|copia)-.+-[A-Za-z0-9]{6}([.]sql[.]gz)?|solo=fich,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|mailpit-descarga[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|tunel|(abrir|cloudflared-descarga)[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|node|descarga[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+            fi
+            ;;
+        sesiones)
+            # Las de cada version: los XAMPP las guardan en su temp (session.save_path); las pilas propias
+            # no lo cambian y van a la carpeta temporal, donde solo se borran las tuyas
+            while IFS= read -r d; do
+                [ -n "$d" ] && echo "sesiones|$d|ficheros|${CLEAN_STACK_SUB}temp|sess_*|"
+            done < <(clean_version_dirs)
+            for t in "${CLEAN_TMP_DIRS[@]}"; do
+                echo "sesiones|$t|ficheros|.|sess_*|uid=$me"
+            done
+            ;;
+    esac
+}
+
+# Los correos de Mailpit: los que dice su API si esta en marcha o, si no, los de su base (sin cambiarla)
+function clean_mail_count() {
+    local n=""
+    if [ -n "$(mailpit_pid)" ]; then
+        n=$(curl -fs --noproxy '*' --max-time 5 "${MAIL_UI_URL}api/v1/messages?limit=1" 2> /dev/null \
+            | grep -oE '"total":[0-9]+' | head -1 | cut -d: -f2)
+    fi
+    if [ -z "$n" ] && [ -f "$MAILPIT_DATA/mailpit.db" ] && [ ! -L "$MAILPIT_DATA/mailpit.db" ]; then
+        n=$(python3 -I -c 'import sqlite3, sys
+c = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)
+print(c.execute("SELECT COUNT(*) FROM mailbox").fetchone()[0])' "$MAILPIT_DATA/mailpit.db" 2> /dev/null)
+    fi
+    [[ "$n" =~ ^[0-9]+$ ]] && echo "$n" || echo 0
+}
+
+# clean_measure <clave>...: L|<clave>|<bytes>|<ficheros>|<1 si hace falta root> de cada una, sin pedir
+# contraseña (lo que no se puede leer con tu usuario no cuenta). Correo: sus correos y su carpeta
+function clean_measure() {
+    local rules=() k line out b f r
+    for k in "$@"; do
+        while IFS= read -r line; do
+            [ -n "$line" ] && rules+=("$line")
+        done < <(clean_rules "$k")
+    done
+    out=""
+    [ ${#rules[@]} -gt 0 ] && out=$(python3 -I -c "$CLEAN_PY" medir "${rules[@]}" < /dev/null 2> /dev/null)
+    for k in "$@"; do
+        line=$(grep -m 1 "^L|$k|" <<< "$out")
+        IFS='|' read -r _ _ b f r <<< "${line:-L|$k|0|0|0}"
+        case $k in
+            correo) f=$(clean_mail_count); [ "$f" -gt 0 ] || b=0; r=0 ;;
+            copias) copies_need_root && r=1 ;;
+        esac
+        echo "L|$k|${b:-0}|${f:-0}|${r:-0}"
+    done
+}
+
+function clean_valid_key() {
+    local k
+    for k in "${CLEAN_KEYS[@]}"; do
+        [ "$k" == "$1" ] && return 0
+    done
+    return 1
+}
+
+# limpieza: cada cosa que se puede limpiar, con lo que ocupa y cuantos ficheros
+function clean_list() {
+    local k b f total=0 line
+    echo "Lo que se puede limpiar (lvm-instalador limpiar <clave>...):"
+    while IFS='|' read -r _ k b f _; do
+        total=$((total + b))
+        if [ "$f" -gt 0 ]; then
+            printf '  %-20s %-30s %s · %s\n' "$k" "$(clean_title "$k")" "$(clean_size_text "$b")" "$(clean_files_text "$f")"
+        else
+            printf '  %-20s %-30s %s\n' "$k" "$(clean_title "$k")" "vacío"
+        fi
+    done < <(clean_measure "${CLEAN_KEYS[@]}")
+    echo "Total: $(clean_size_text "$total"). Lo que se limpia no se puede recuperar (no se hacen copias)."
+}
+
+# ¿Hace falta root para limpiar estas claves? (para pedir la contraseña antes de empezar)
+function clean_need_root() {
+    local k b f r
+    [ $# -gt 0 ] || return 1
+    while IFS='|' read -r _ k b f r; do
+        [ "${f:-0}" -gt 0 ] && [ "$r" == 1 ] && return 0
+    done < <(clean_measure "$@" 2> /dev/null)
+    return 1
+}
+
+# clean_run <clave> <texto> <reglas...>: limpia con CLEAN_PY como tu usuario y, si algo es de root, otra
+# vez con sudo (el mismo CLEAN_PY: solo dentro de sus carpetas y sin seguir enlaces). Con --simular, solo
+# dice lo que borraria
+function clean_run() {
+    local key=$1 title=$2 out out2 rc b f n verb=borrados
+    shift 2
+    [ $# -gt 0 ] || return 0
+    [ "$key" == registros-versiones ] && verb=vaciados
+    if [ "$DRY" -eq 1 ]; then
+        out=$(python3 -I -c "$CLEAN_PY" simular "$@" < /dev/null 2> /dev/null)
+        b=$(awk -F'|' '$1 == "L" { s += $3 } END { print s + 0 }' <<< "$out")
+        f=$(awk -F'|' '$1 == "L" { s += $4 } END { print s + 0 }' <<< "$out")
+        echo "  [simulacion] $title: se $([ "$verb" == vaciados ] && echo vaciarian || echo borrarian) $(clean_files_text "$f") ($(clean_size_text "$b"))"
+        return 0
+    fi
+    out=$(python3 -I -c "$CLEAN_PY" limpiar "$@" < /dev/null 2>&1)
+    rc=$?
+    if [ $rc -eq 3 ] && [ -n "$SUDO" ]; then
+        echo "$title: parte es de root, se limpia con sudo (solo dentro de sus carpetas, sin seguir enlaces)"
+        out2=$(sudo python3 -I -c "$CLEAN_PY" limpiar "$@" < /dev/null 2>&1)
+        rc=$?
+        out=$(grep -v '^Q|' <<< "$out"; echo "$out2")
+    fi
+    b=$(awk -F'|' '$1 == "L" { s += $3 } END { print s + 0 }' <<< "$out")
+    f=$(awk -F'|' '$1 == "L" { s += $4 } END { print s + 0 }' <<< "$out")
+    echo "$title: $verb $(clean_files_text "$f") ($(clean_size_text "$b"))"
+    n=$(grep '^U|' <<< "$out" | sort -u | grep -c .)
+    if [ "$n" -gt 0 ]; then
+        echo "  En uso, se deja$([ "$n" -gt 5 ] && echo " (y $((n - 5)) más)"):"
+        grep '^U|' <<< "$out" | sort -u | head -5 | cut -d'|' -f3- | sed 's/^/    /'
+    fi
+    grep -vE '^[LPUQ]\|' <<< "$out" | grep . | head -5 | sed 's/^/  /'
+    if [ $rc -ne 0 ]; then
+        n=$(grep -c '^Q|' <<< "$out")
+        echo "  No se ha podido limpiar todo$([ "$n" -gt 5 ] && echo " ($n sitios)"):"
+        grep '^Q|' <<< "$out" | head -5 | cut -d'|' -f3- | sed 's/^/    /'
+        return 1
+    fi
+    return 0
+}
+
+# Mailpit: con su API (correo vaciar). Si no esta en marcha, no se puede
+function clean_mail() {
+    if [ -z "$(mailpit_pid)" ] && [ "$DRY" -eq 0 ]; then
+        echo "Correo de pruebas: Mailpit no esta en marcha (va con la version activa): arrancala y vuelve a limpiarlo"
+        return 1
+    fi
+    mail_command vaciar
+}
+
+# limpiar <clave>...: limpia esas cosas (lo que esta vacio, nada). Pide sudo solo si alguna lo necesita
+function clean_command() {
+    local k b f r keys=() rc=0 line
+    if [ $# -eq 0 ]; then
+        echo "Uso: lvm-instalador limpiar <clave>... (claves: ${CLEAN_KEYS[*]}; lvm-instalador limpieza dice lo que ocupa cada una)"
+        return 1
+    fi
+    for k in "$@"; do
+        clean_valid_key "$k" || { echo "Clave no valida: $k (claves: ${CLEAN_KEYS[*]})"; return 1; }
+        [[ " ${keys[*]} " == *" $k "* ]] || keys+=("$k")
+    done
+    echo "Limpiando (no se puede recuperar: no se hacen copias)..."
+    # (lo medido, antes: dentro del bucle, sudo y lo demas no tienen que leer de una tuberia)
+    local measured=() projects=()
+    mapfile -t measured < <(clean_measure "${keys[@]}")
+    for line in "${measured[@]}"; do
+        IFS='|' read -r _ k b f r <<< "$line"
+        if [ "${f:-0}" -eq 0 ]; then
+            echo "$(clean_title "$k"): nada que limpiar"
+            continue
+        fi
+        case $k in
+            descargas) downloads_command vaciar || rc=1 ;;
+            copias) copies_command vaciar || rc=1 ;;
+            correo) clean_mail || rc=1 ;;
+            caches-proyectos)
+                mapfile -t projects < <(clean_projects)
+                for line in "${projects[@]}"; do
+                    clean_project_key "$line" cache quiet || rc=1
+                done
+                ;;
+            *)
+                local rules=()
+                while IFS= read -r line; do
+                    [ -n "$line" ] && rules+=("$line")
+                done < <(clean_rules "$k")
+                clean_run "$k" "$(clean_title "$k")" "${rules[@]}" < /dev/null || rc=1
+                ;;
+        esac
+    done
+    [ $rc -eq 0 ] && echo "Limpieza terminada" || echo "Limpieza terminada, pero algo no se ha podido limpiar: mira lo de arriba"
+    return $rc
+}
+
+# Lo que se limpiaria de un proyecto, por clave: <clave>|<bytes>|<ficheros>|<root>|<rutas separadas por ,>
+function clean_project_measure() {
+    local folder=$1 rules=() line out k b f r
+    shift
+    while IFS= read -r line; do
+        [ -n "$line" ] && rules+=("$line")
+    done < <(clean_project_rules "$folder" "$@")
+    [ ${#rules[@]} -gt 0 ] || return 0
+    out=$(python3 -I -c "$CLEAN_PY" medir "${rules[@]}" < /dev/null 2> /dev/null)
+    while IFS='|' read -r _ k b f r; do
+        [ -n "$k" ] || continue
+        echo "$k|$b|$f|$r|$(awk -F'|' -v k="$k" '$1 == "P" && $2 == k { printf "%s%s", (n++ ? "," : ""), $3 }' <<< "$out")"
+    done < <(grep '^L|' <<< "$out")
+}
+
+# gui-limpiar-proyecto <carpeta>: P|<clave>|<bytes>|<ficheros>|<rutas> de lo que tiene algo
+function gui_clean_project() {
+    local folder=${1%/} k b f r paths
+    valid_project "$folder" > /dev/null || return 1
+    while IFS='|' read -r k b f r paths; do
+        [ "${f:-0}" -gt 0 ] && echo "P|$k|$b|$f|$paths"
+    done < <(clean_project_measure "$folder")
+    return 0
+}
+
+function clean_project_need_root() {
+    local folder=${1%/} k b f r paths
+    valid_project "$folder" > /dev/null 2>&1 || return 1
+    shift
+    while IFS='|' read -r k b f r paths; do
+        [ "${f:-0}" -gt 0 ] && [ "$r" == 1 ] && return 0
+    done < <(clean_project_measure "$folder" "$@")
+    return 1
+}
+
+# clean_project_key <carpeta> <clave> [quiet]: limpia esa clave del proyecto. La var/cache de una tienda,
+# con ps_clear_cache (vaciar-cache); lo demas, con clean_run. quiet: sin decir nada si no hay nada
+function clean_project_key() {
+    local folder=$1 key=$2 quiet=$3 rules=() line b f r paths
+    IFS='|' read -r _ b f r paths <<< "$(clean_project_measure "$folder" "$key")"
+    if [ "${f:-0}" -eq 0 ]; then
+        [ -n "$quiet" ] || echo "$(clean_title "$key") de $folder: nada que limpiar"
+        return 0
+    fi
+    while IFS= read -r line; do
+        [ -n "$line" ] && rules+=("$line")
+    done < <(clean_project_rules "$folder" "$key")
+    if [ "$key" == cache ] && [[ ",$paths," == *",var/cache,"* ]]; then
+        ps_clear_cache "$folder" || return 1
+        local rest=() x
+        for x in "${rules[@]}"; do
+            [[ "$x" == *"|vaciar|var/cache||" ]] || rest+=("$x")
+        done
+        rules=("${rest[@]}")
+        [ "$paths" == var/cache ] && return 0
+    fi
+    clean_run "$key" "$(clean_title "$key") de $folder" "${rules[@]}"
+}
+
+# limpiar-proyecto <carpeta> [<clave>...]: sus cachés, registros y restos de actualizaciones (sin claves,
+# todo lo que tenga). Las carpetas se vacian, no se borran
+function clean_project_command() {
+    local folder=${1%/} k keys=() rc=0
+    valid_project "$folder" || return 1
+    shift
+    for k in "$@"; do
+        [[ " ${CLEAN_PROJECT_KEYS[*]} " == *" $k "* ]] || { echo "Clave no valida: $k (claves: ${CLEAN_PROJECT_KEYS[*]})"; return 1; }
+        [[ " ${keys[*]} " == *" $k "* ]] || keys+=("$k")
+    done
+    [ ${#keys[@]} -gt 0 ] || keys=("${CLEAN_PROJECT_KEYS[@]}")
+    if [ -z "$(clean_project_rules "$folder" "${keys[@]}")" ]; then
+        echo "No hay cachés ni registros que limpiar en $folder (no es un WordPress ni una tienda PrestaShop)"
+        return 0
+    fi
+    echo "Limpiando $folder (no se puede recuperar: no se hacen copias)..."
+    for k in "${keys[@]}"; do
+        clean_project_key "$folder" "$k" || rc=1
+    done
+    return $rc
+}
+# Limpieza en el Mac: las versiones son las de BASE_DIR, con sus logs, var/mysql y temp en xamppfiles; la carpeta
+# temporal, /private/tmp (/tmp es un enlace a ella) y la tuya (TMPDIR, en /var/folders)
+CLEAN_STACK_SUB="xamppfiles/"
+CLEAN_TMP_DIRS=(/private/tmp)
+if [ -n "$TEST_DIR" ]; then
+    CLEAN_TMP_DIRS=("$TEST_DIR/tmp")
+elif [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && [ ! -L "${TMPDIR%/}" ] && [ -O "$TMPDIR" ]; then
+    [ "$(cd "$TMPDIR" && pwd -P)" == "/private/tmp" ] || CLEAN_TMP_DIRS+=("${TMPDIR%/}")
+fi
+
+function clean_version_dirs() {
+    version_dirs
+}
+
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
@@ -37248,9 +38452,12 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|copias-ficheros) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros) ;;
         # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
         copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
+        # (limpiar y limpiar-proyecto: solo si algo de lo que se va a limpiar es de root)
+        limpiar) clean_need_root "${@:2}" && { sudo_first || exit 130; } ;;
+        limpiar-proyecto) clean_project_need_root "${@:2}" && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -37393,6 +38600,11 @@ case "$1" in
     novedades) changes_text ;;
     copias) copies_command "$2" ;;
     copias-ficheros) copies_files_command "$2" ;;
+    limpieza) clean_list ;;
+    gui-limpieza) clean_measure "${CLEAN_KEYS[@]}" | cut -d'|' -f1-4 ;;
+    limpiar) shift; clean_command "$@" ;;
+    gui-limpiar-proyecto) gui_clean_project "$2" ;;
+    limpiar-proyecto) shift; clean_project_command "$@" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

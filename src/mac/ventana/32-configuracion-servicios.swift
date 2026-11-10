@@ -281,27 +281,16 @@ struct HostsView: View {
             }
             Divider()
             Row("Carpeta", withDomain[model.newFolder].map { "Ya tiene el dominio \($0)" } ?? "En htdocs (git clone) o nueva") {
-                Picker("", selection: Binding(get: { model.newFolder }, set: { model.pickNewFolder($0) })) {
-                    if model.newFolder.isEmpty { Text("Elige una carpeta").tag("") }
-                    ForEach(folderChoices, id: \.self) { f in
-                        Text(folders.contains(f) ? f : "\(f) (nueva)").tag(f)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: Binding(get: { model.newFolder }, set: { model.pickNewFolder($0) }),
+                             items: (model.newFolder.isEmpty ? [("", "Elige una carpeta")] : [] as [(String, String)])
+                                 + folderChoices.map { f in (f, folders.contains(f) ? f : "\(f) (nueva)") })
                 IconButton(symbol: "plus", help: "Crear una carpeta nueva") { model.askNewDomainName(db: false) }
                     .disabled(model.busy)
             }
             Divider()
             Row("BBDD", active.isEmpty ? "No hay ninguna versión activa" : "En XAMPP-\(active)") {
-                Picker("", selection: $model.newDb) {
-                    Text("Sin BBDD").tag("")
-                    ForEach(dbChoices, id: \.self) { db in
-                        Text(dbs.contains(db) ? db : "\(db) (nueva)").tag(db)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 230)
+                SearchPicker(selection: $model.newDb,
+                             items: [("", "Sin BBDD")] + dbChoices.map { db in (db, dbs.contains(db) ? db : "\(db) (nueva)") })
                 .disabled(active.isEmpty)
                 IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.askNewDomainName(db: true) }
                     .disabled(model.busy || active.isEmpty)
@@ -391,6 +380,7 @@ struct ToolsView: View {
         ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
         ("errores", "Registro de errores", "exclamationmark.triangle"),
+        ("limpieza", "Limpieza", "sparkles"),
         ("carpetas", "Carpetas", "folder"),
         ("oficial", "XAMPP oficial", "externaldrive"),
         ("programa", "Programa", "menubar.rectangle"),
@@ -491,6 +481,8 @@ struct ToolsView: View {
                 }
                 errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
             }
+        case "limpieza":
+            CleanCard()
         case "carpetas":
             TileCard("Carpetas") {
                 // Copias de seguridad: abrirlas y borrarlas (lvm-instalador copias vaciar)
@@ -695,13 +687,9 @@ struct ToolsView: View {
                      lead: AnyView(LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 20, height: 20)),
                      tail: AnyView(mailSwitch(m))) {
                 Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
-                    Picker("", selection: Binding(get: { m.wp }, set: { model.setMailWp($0) })) {
-                        Text("Llevarlos a Mailpit").tag("mailpit")
-                        Text("Desactivarlos en la copia local").tag("desactivar")
-                        Text("No tocarlos").tag("nada")
-                    }
-                    .labelsHidden()
-                    .frame(width: 250)
+                    SearchPicker(selection: Binding(get: { m.wp }, set: { model.setMailWp($0) }),
+                                 items: [("mailpit", "Llevarlos a Mailpit"), ("desactivar", "Desactivarlos en la copia local"),
+                                         ("nada", "No tocarlos")], width: 250)
                     .disabled(!m.on || model.busy)
                     .tip("Qué hacer con sus plugins de correo")
                 }
@@ -816,6 +804,126 @@ struct ToolsView: View {
                 Tile((a as NSString).lastPathComponent, "Si algo no va: se desactiva la versión del gestor y vuelve a /Applications/XAMPP") {
                     Button("Volver al XAMPP oficial…") { model.restoreOfficial(a) }.disabled(model.busy || d.official)
                 }
+            }
+        }
+    }
+}
+
+/// Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...), como en Linux: cada cosa, con su título, lo que
+/// es y qué pasa si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
+struct CleanItem {
+    let key: String
+    let title: String
+    let desc: String
+    let step: String
+    let on: Bool
+}
+
+let CLEAN_ITEMS: [CleanItem] = [
+    CleanItem(key: "descargas", title: "Caché de descargas",
+              desc: "El código ya descargado y comprobado de PHP, Apache, MariaDB… (\(DL_CACHE_DIR)). Si se limpia, la próxima instalación lo descarga otra vez.",
+              step: "se vacía \(DL_CACHE_DIR)", on: true),
+    CleanItem(key: "copias", title: "Copias de seguridad",
+              desc: "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden volver a cargar.",
+              step: "se borra todo lo de ~/nexum-backups (la carpeta se queda)", on: false),
+    CleanItem(key: "correo", title: "Correo de pruebas",
+              desc: "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía (Mailpit tiene que estar en marcha).",
+              step: "se vacía la bandeja de Mailpit", on: false),
+    CleanItem(key: "registros", title: "Registros del programa",
+              desc: "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
+              step: "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", on: true),
+    CleanItem(key: "registros-versiones", title: "Registros de las versiones",
+              desc: "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: se pierde lo que decían hasta ahora.",
+              step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", on: true),
+    CleanItem(key: "caches-proyectos", title: "Cachés de los proyectos",
+              desc: "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace sola: la primera visita va algo más lenta.",
+              step: "se vacían las cachés de los proyectos de \(HTDOCS)", on: true),
+    CleanItem(key: "temporales", title: "Temporales",
+              desc: "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un día sin cambiar y nada está usando.",
+              step: "se borran los temporales del programa de más de un día que nada usa", on: true),
+    CleanItem(key: "sesiones", title: "Sesiones de PHP",
+              desc: "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones abiertas en las webs locales (hay que volver a entrar en su administración).",
+              step: "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", on: false),
+]
+
+/// Limpiar proyecto (gui-limpiar-proyecto y limpiar-proyecto): cada clave, con su título y lo que se hace
+let PROJECT_CLEAN_ITEMS: [(key: String, title: String, step: String)] = [
+    ("cache", "Caché", "se vacía su caché"),
+    ("registros", "Registros", "se borran sus registros"),
+    ("actualizaciones", "Restos de actualizaciones", "se vacían los restos de las actualizaciones"),
+]
+
+/// El aviso en rojo de las confirmaciones de la limpieza
+let CLEAN_WARNING = "Lo que se limpia no se puede recuperar: no se hacen copias."
+
+/// Lo que ocupa una cosa que se puede limpiar (de gui-limpieza o gui-limpiar-proyecto)
+struct CleanSize {
+    let bytes: Int64
+    let files: Int
+}
+
+func cleanSizeText(_ v: CleanSize) -> String {
+    return "\(fmtSize(v.bytes)) · \(plural(v.files, "fichero", "ficheros"))"
+}
+
+/// Configuración, Limpieza: lo que Nexum va dejando con el uso, cada cosa con lo que ocupa y su casilla; arriba,
+/// el total, y debajo «Limpiar lo marcado…». Se mide por detrás (gui-limpieza): hasta entonces, «Midiendo…»
+struct CleanCard: View {
+    @EnvironmentObject var model: AppModel
+    /// Lo que ocupa cada cosa; nil mientras se mide
+    @State private var sizes: [String: CleanSize]? = nil
+    @State private var failed = ""
+
+    func marked(_ it: CleanItem) -> Bool {
+        return model.cleanMarks[it.key] ?? it.on
+    }
+
+    var body: some View {
+        let s = sizes ?? [:]
+        let picked = CLEAN_ITEMS.filter { marked($0) && (s[$0.key]?.files ?? 0) > 0 }.map { $0.key }
+        let all = s.values.filter { $0.files > 0 }.reduce(Int64(0)) { $0 + $1.bytes }
+        let sel = picked.reduce(Int64(0)) { $0 + (s[$1]?.bytes ?? 0) }
+        let summary = sizes == nil ? (failed.isEmpty ? "Midiendo…" : failed)
+            : (all > 0 ? "Total: \(fmtSize(all)) · marcado: \(fmtSize(sel))" : "Total: nada que limpiar")
+        return VStack(alignment: .leading, spacing: 12) {
+            TileCard("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar espacio. Lo que se limpia no se puede recuperar: no se hacen copias.") {
+                Tile("Lo que se puede limpiar", summary)
+                ForEach(CLEAN_ITEMS, id: \.key) { it in
+                    let v = s[it.key] ?? CleanSize(bytes: 0, files: 0)
+                    Tile(it.title, it.desc) {
+                        Text(sizes == nil ? "…" : (v.files > 0 ? cleanSizeText(v) : "Vacío"))
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(minWidth: 150, alignment: .trailing)
+                        Toggle("", isOn: Binding(get: { marked(it) }, set: { model.cleanMarks[it.key] = $0 }))
+                            .toggleStyle(CheckboxToggleStyle()).labelsHidden()
+                            .disabled(model.busy || v.files == 0)
+                    }
+                }
+            }
+            HStack {
+                Spacer(minLength: 0)
+                Button("Limpiar lo marcado…") { model.cleanRun(picked, s) { measure() } }
+                    .buttonStyle(OutlineButton(kind: "stop"))
+                    .disabled(model.busy || picked.isEmpty)
+            }
+        }
+        .onAppear { measure() }
+    }
+
+    func measure() {
+        runQuick(["gui-limpieza"]) { _, out in
+            var got: [String: CleanSize] = [:]
+            for f in parseLines(out) where f.count >= 4 && f[0] == "L" {
+                if let b = Int64(f[2]), let n = Int(f[3]) {
+                    got[f[1]] = CleanSize(bytes: b, files: n)
+                }
+            }
+            if got.isEmpty {
+                failed = "No se ha podido medir"
+                sizes = nil
+            } else {
+                failed = ""
+                sizes = got
             }
         }
     }

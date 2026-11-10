@@ -53,6 +53,8 @@ LOG_DIR = os.path.expanduser("~/.lvm-instalador")
 # programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
 COPIES_DIR = os.path.expanduser("~/nexum-backups")
 COPIES_FILES_FLAG = os.path.join(LOG_DIR, "copias-ficheros")
+# La ultima version que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
+LAST_VERSION_FILE = os.path.join(LOG_DIR, "ultima-version")
 # El aviso de la casilla de copia al actualizar una versión en su carpeta (solo hace falta si MariaDB cambia de rama)
 UPDATE_COPY_WARN = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")

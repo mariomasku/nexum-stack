@@ -104,6 +104,19 @@ extension AppModel {
                     autoClose: true) { _, _, _ in self.refreshBackups() }
     }
 
+    /// Configuración, Limpieza: confirma con lo que se va a hacer, numerado, y el aviso en rojo, y lanza
+    /// limpiar <claves> como tarea; al acabar, done (se vuelve a medir)
+    func cleanRun(_ keys: [String], _ sizes: [String: CleanSize], _ done: @escaping () -> Void) {
+        guard !keys.isEmpty else { return }
+        let steps = keys.compactMap { k -> String? in
+            guard let it = CLEAN_ITEMS.first(where: { $0.key == k }), let v = sizes[k] else { return nil }
+            return "\(it.title) (\(cleanSizeText(v))): \(it.step)."
+        }
+        guard confirm("¿Limpiar lo marcado?", "Si algo es del administrador (lo de root), se pide su contraseña.",
+                      "Limpiar", destructive: true, steps: steps, warning: CLEAN_WARNING) else { return }
+        runTask("Limpiando", ["limpiar"] + keys, doneText: "Limpieza terminada") { _, _, _ in done() }
+    }
+
     /// Configuración, Carpetas: guardar o no una copia de los ficheros que cambia el programa por su cuenta
     /// (hosts, vhosts, configuración de los proyectos)
     func setCopiesFiles(_ on: Bool) {

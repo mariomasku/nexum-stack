@@ -4,6 +4,8 @@
 let ACCENT = hexColor(0x0A84FF)
 /// Tema de la ventana elegido en el menú: claro u oscuro (sin fichero, el del Mac)
 let THEME_FILE = LOG_DIR + "/ventana-tema"
+/// La última versión que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
+let LAST_VERSION_FILE = LOG_DIR + "/ultima-version"
 /// Página de descarga de Docker Desktop (en el Mac no se instala desde aquí)
 let DOCKER_DOWNLOAD = "https://www.docker.com/products/docker-desktop/"
 
@@ -289,6 +291,152 @@ struct SearchField: View {
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.textBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.15), lineWidth: 1))
+    }
+}
+
+/// Los desplegables de la ventana, con buscador como en Linux: con COMBO_SEARCH_MIN opciones o más, al pulsarlo sale
+/// la lista con un campo «Buscar…»; se escribe y se queda solo lo que lleva ese texto (como la barra de búsqueda de
+/// los proyectos), las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada. Con menos, el Picker de siempre.
+/// items: (valor, texto)
+let COMBO_SEARCH_MIN = 8
+
+struct SearchPicker: View {
+    @Binding var selection: String
+    let items: [(String, String)]
+    var width: CGFloat = 230
+    @State private var open = false
+    @State private var query = ""
+    @State private var mark = 0
+    @State private var hover = false
+    @Environment(\.isEnabled) var enabled
+
+    var body: some View {
+        if items.count < COMBO_SEARCH_MIN {
+            Picker("", selection: $selection) {
+                ForEach(items, id: \.0) { Text($0.1).tag($0.0) }
+            }
+            .labelsHidden()
+            .frame(width: width)
+        } else {
+            Button(action: { query = ""; mark = shown().firstIndex(where: { $0.0 == selection }) ?? 0; open = true }) {
+                HStack(spacing: 6) {
+                    Text(items.first(where: { $0.0 == selection })?.1 ?? "").lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .frame(width: width, height: 22)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color(NSColor.controlColor)))
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.primary.opacity(hover && enabled ? 0.30 : 0.18), lineWidth: 1))
+                .contentShape(Rectangle())
+                .opacity(enabled ? 1 : 0.5)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .onHover { hover = $0 }
+            .hoverPointer()
+            .popover(isPresented: $open, arrowEdge: .bottom) { list() }
+        }
+    }
+
+    func shown() -> [(String, String)] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty ? items : items.filter { $0.1.lowercased().contains(q) }
+    }
+
+    func choose(_ i: Int) {
+        let rows = shown()
+        if i >= 0 && i < rows.count { selection = rows[i].0 }
+        open = false
+    }
+
+    func list() -> some View {
+        let rows = shown()
+        return VStack(alignment: .leading, spacing: 6) {
+            KeySearchField(text: $query, placeholder: "Buscar…",
+                           onMove: { step in
+                               let n = shown().count
+                               if n > 0 { mark = Swift.min(Swift.max(mark + step, 0), n - 1) }
+                           },
+                           onEnter: { choose(mark) }, onEscape: { open = false })
+                .frame(height: 24)
+                .onChange(of: query) { _ in mark = 0 }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if rows.isEmpty {
+                            Text("Sin resultados").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(10)
+                        }
+                        ForEach(Array(rows.enumerated()), id: \.element.0) { n, r in
+                            Text(r.1).lineLimit(1).truncationMode(.tail)
+                                .foregroundColor(n == mark ? .white : .primary)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 5).fill(n == mark ? ACCENT : Color.clear))
+                                .contentShape(Rectangle())
+                                .onTapGesture { choose(n) }
+                                .onHover { if $0 { mark = n } }
+                                .id(n)
+                        }
+                    }
+                }
+                .frame(maxHeight: 340)
+                .onChange(of: mark) { m in proxy.scrollTo(m) }
+                .onAppear { proxy.scrollTo(mark, anchor: .center) }
+            }
+        }
+        .padding(8)
+        .frame(width: Swift.max(width, 260))
+    }
+}
+
+/// Campo de búsqueda que pasa las flechas, Intro y Esc (el TextField de SwiftUI de macOS 12 no los da)
+struct KeySearchField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let onMove: (Int) -> Void
+    let onEnter: () -> Void
+    let onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let f = NSSearchField()
+        f.placeholderString = placeholder
+        f.delegate = context.coordinator
+        f.sendsSearchStringImmediately = true
+        // (con el foco ya puesto: se escribe nada más abrir)
+        DispatchQueue.main.async { f.window?.makeFirstResponder(f) }
+        return f
+    }
+
+    func updateNSView(_ f: NSSearchField, context: Context) {
+        context.coordinator.parent = self
+        if f.stringValue != text { f.stringValue = text }
+    }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var parent: KeySearchField
+        init(_ p: KeySearchField) { parent = p }
+
+        func controlTextDidChange(_ n: Notification) {
+            if let f = n.object as? NSSearchField { parent.text = f.stringValue }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
+            switch sel {
+            case #selector(NSResponder.moveDown(_:)): parent.onMove(1)
+            case #selector(NSResponder.moveUp(_:)): parent.onMove(-1)
+            case #selector(NSResponder.pageDown(_:)), #selector(NSResponder.scrollPageDown(_:)): parent.onMove(8)
+            case #selector(NSResponder.pageUp(_:)), #selector(NSResponder.scrollPageUp(_:)): parent.onMove(-8)
+            case #selector(NSResponder.insertNewline(_:)): parent.onEnter()
+            // (Esc con texto lo vacía; vacío, cierra)
+            case #selector(NSResponder.cancelOperation(_:)):
+                if parent.text.isEmpty { parent.onEscape() } else { parent.text = "" }
+            default: return false
+            }
+            return true
+        }
     }
 }
 

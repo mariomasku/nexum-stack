@@ -261,6 +261,7 @@ class NvActualizarProyecto:
             items.append(("Vaciar la caché de la tienda", lambda: self.run_task(
                 "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
                 done_text="Caché vaciada", auto_close=True)))
+        items.append(("Limpiar proyecto…", lambda: self.nv_clean_project(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
         elif x["kind"] == "wp":
@@ -344,6 +345,73 @@ class NvActualizarProyecto:
         self.check_db_access(lambda _pwd: self.run_task(
             "Descargando las imágenes de %s" % name, ["ps-imagenes", name], env=self.db_env(),
             done_text="Imágenes de %s descargadas" % name))
+
+    # Limpiar proyecto (gui-limpiar-proyecto y limpiar-proyecto): cada clave, con su título y lo que se hace
+    PROJECT_CLEAN_ITEMS = [("cache", "Caché", "se vacía su caché"),
+                           ("registros", "Registros", "se borran sus registros"),
+                           ("actualizaciones", "Restos de actualizaciones", "se vacían los restos de las actualizaciones")]
+
+    def nv_clean_project(self, x):
+        """⋮, Limpiar proyecto…: lo que tiene de caché, registros y restos de actualizaciones (gui-limpiar-proyecto),
+        cada cosa con sus carpetas, lo que ocupa y su casilla (marcada); se confirma con lo que se va a hacer y se
+        lanza limpiar-proyecto con lo marcado. Si no tiene nada, se dice."""
+        name = x["name"]
+
+        def got(_rc, out):
+            found = [(f[1], int(f[2]), int(f[3]), f[4]) for f in parse_lines(out)
+                     if f[0] == "P" and len(f) >= 5 and f[2].isdigit() and f[3].isdigit() and int(f[3]) > 0]
+            if not found:
+                message(self.win, "Nada que limpiar", "No hay cachés ni registros que limpiar en %s." % name)
+                return False
+            self.nv_clean_project_dialog(name, found)
+            return False
+        run_quick(["gui-limpiar-proyecto", name], got)
+
+    def nv_clean_project_dialog(self, name, found):
+        info = {k: (t, step) for k, t, step in self.PROJECT_CLEAN_ITEMS}
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE, text="Limpiar «%s»" % name)
+        dlg.format_secondary_text("Marca lo que quieres limpiar. Las carpetas se quedan, vacías; nada de las "
+                                  "imágenes ni de lo que se sube a la web.")
+        widen(dlg)
+        extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        checks = []
+        for key, b, n, paths in found:
+            title = info.get(key, (key, ""))[0]
+            chk = Gtk.CheckButton(label="%s · %s · %s" % (title, fmt_size(b), plural(n, "fichero", "ficheros")),
+                                  active=True, margin_top=6)
+            extra.pack_start(chk, False, False, 0)
+            extra.pack_start(css(label(", ".join(p for p in paths.split(",") if p), wrap=True, xalign=0,
+                                       max_width_chars=60, margin_start=26), "dim-label", "subtitulo"), False, False, 0)
+            checks.append((key, b, n, paths, chk))
+        extra.pack_start(label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                               max_width_chars=60, xalign=0, margin_top=10), False, False, 0)
+        dlg.get_message_area().pack_start(extra, False, False, 0)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Limpiar lo marcado…", Gtk.ResponseType.ACCEPT), "destructive-action")
+        dlg.set_default_response(Gtk.ResponseType.CANCEL)
+
+        def update(*_):
+            ok.set_sensitive(any(c[4].get_active() for c in checks))
+        for c in checks:
+            c[4].connect("toggled", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        chosen = [c[:4] for c in checks if c[4].get_active()]
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not chosen:
+            return
+        steps = ["%s (%s · %s): %s (%s)." % (info.get(k, (k, ""))[0], fmt_size(b), plural(n, "fichero", "ficheros"),
+                                             info.get(k, ("", "se limpia"))[1], paths.replace(",", ", "))
+                 for k, b, n, paths in chosen]
+        warn = label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                     max_width_chars=60, xalign=0)
+        if not confirm(self.win, "¿Limpiar «%s»?" % name, "Si algo es del administrador (lo que creó Apache), se "
+                       "pide su contraseña.", "Limpiar", destructive=True, extra=warn, steps=steps):
+            return
+        self.run_task("Limpiando %s" % name, ["limpiar-proyecto", name] + [k for k, *_r in chosen],
+                      done_text="%s limpio" % name, auto_close=True)
 
     def nv_delete_project(self, x):
         """Borra el proyecto entero (borrar-proyecto): su carpeta, sus vhosts y dominios, lo de Docker y,

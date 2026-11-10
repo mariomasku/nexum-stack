@@ -534,6 +534,13 @@ ROW_ICONS_EXACT = {
     "Novedades": ("icono", "starred-symbolic", ""),
     "Acerca de": ("icono", "help-about-symbolic", ""),
     "error_log": ("logo", "apache"),
+    # (Configuración, Limpieza: cada cosa con su icono, como las dos primeras)
+    "Correo de pruebas": ("logo", "mailpit"),
+    "Registros del programa": ("icono", "document-open-recent-symbolic", ""),
+    "Registros de las versiones": ("logo", "apache"),
+    "Cachés de los proyectos": ("icono", "folder-symbolic", ""),
+    "Temporales": ("icono", "user-trash-symbolic", ""),
+    "Sesiones de PHP": ("logo", "php"),
 }
 ROW_ICONS = [
     ("Versiones sin proteger", ("icono", "network-wired-symbolic", "aviso-suave")),
@@ -1119,3 +1126,89 @@ def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=
     resp = run_dialog(dlg)
     dlg.destroy()
     return resp == Gtk.ResponseType.ACCEPT
+
+
+# Los desplegables de la ventana con COMBO_SEARCH_MIN opciones o más: al abrirlos, en lugar del menú de
+# GTK, una lista con un buscador. Se escribe y se queda solo lo que lleva ese texto, como en la barra de
+# búsqueda de los proyectos; las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada
+COMBO_SEARCH_MIN = 8
+
+
+def combo_search(combo):
+    """Si combo tiene COMBO_SEARCH_MIN opciones o más, abre su lista con buscador y devuelve True."""
+    model = combo.get_model()
+    if model is None or len(model) < COMBO_SEARCH_MIN or not isinstance(model[0][0], str):
+        return False
+    names = [row[0] for row in model]
+    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.BOTTOM, modal=True)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
+    entry = Gtk.SearchEntry(placeholder_text="Buscar…")
+    lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE, activate_on_single_click=True)
+    for i, name in enumerate(names):
+        row = Gtk.ListBoxRow()
+        row.index, row.key = i, name.lower()
+        row.add(label(name, xalign=0, margin_start=8, margin_end=8, margin_top=5, margin_bottom=5,
+                      ellipsize=3, max_width_chars=60))
+        lb.add(row)
+    query = [""]
+    lb.set_filter_func(lambda r: query[0] in r.key)
+    empty = css(label("Sin resultados", xalign=0.5, margin=10), "dim-label")
+    empty.set_no_show_all(True)
+    lb.set_placeholder(empty)
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                            max_content_height=360, min_content_width=max(combo.get_allocated_width(), 240))
+    sw.add(lb)
+    box.pack_start(entry, False, False, 0)
+    box.pack_start(sw, True, True, 0)
+    pop.add(box)
+
+    def visible():
+        return [r for r in lb.get_children() if r.get_child_visible() and query[0] in r.key]
+
+    def select(row):
+        lb.select_row(row)
+        if row is not None:
+            # (que se vea: la lista baja o sube hasta ella)
+            GLib.idle_add(lambda: (sw.get_vadjustment().clamp_page(*row_span(row)), False)[1])
+
+    def row_span(row):
+        a = row.get_allocation()
+        return a.y, a.y + a.height
+
+    def choose(row):
+        if row is not None:
+            combo.set_active(row.index)
+        pop.popdown()
+
+    def changed(*_):
+        query[0] = entry.get_text().strip().lower()
+        lb.invalidate_filter()
+        rows = visible()
+        select(rows[0] if rows else None)
+
+    def keys(_w, ev):
+        rows = visible()
+        cur = lb.get_selected_row()
+        pos = rows.index(cur) if cur in rows else -1
+        step = {Gdk.KEY_Down: 1, Gdk.KEY_Up: -1, Gdk.KEY_Page_Down: 8, Gdk.KEY_Page_Up: -8}.get(ev.keyval)
+        if step and rows:
+            select(rows[min(max(pos + step, 0), len(rows) - 1)])
+            return True
+        if ev.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            choose(cur if pos >= 0 else (rows[0] if rows else None))
+            return True
+        return False
+    entry.connect("search-changed", changed)
+    entry.connect("key-press-event", keys)
+    # (Esc en el buscador lo vacía; con él vacío, cierra)
+    entry.connect("stop-search", lambda *_: pop.popdown())
+    lb.connect("row-activated", lambda _lb, row: choose(row))
+    pop.connect("closed", lambda *_: GLib.idle_add(pop.destroy))
+    box.show_all()
+    combo.search_popover = pop
+    active = combo.get_active()
+    pop.popup()
+    entry.grab_focus()
+    if 0 <= active < len(names):
+        select(lb.get_row_at_index(active))
+    return True

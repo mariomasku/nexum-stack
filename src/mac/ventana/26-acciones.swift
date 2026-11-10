@@ -392,22 +392,14 @@ struct DockerNewPanel: View {
                 .font(.callout).foregroundColor(.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
             formRow("Carpeta") {
-                Picker("", selection: Binding(get: { model.dkForm.folder }, set: { v in
+                SearchPicker(selection: Binding(get: { model.dkForm.folder }, set: { v in
                     model.dkForm.folder = v
                     model.dkForm.source = ""
                     if !model.dkForm.domainSet { model.dkForm.domain = dockerSlug(v) + ".docker.local" }
-                })) {
-                    ForEach(folders, id: \.self) { Text($0).tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: wide)
+                }), items: folders.map { ($0, $0) }, width: wide)
             }
             formRow("PHP") {
-                Picker("", selection: $model.dkForm.php) {
-                    ForEach(k.php, id: \.self) { Text("PHP \($0)").tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: 180)
+                SearchPicker(selection: $model.dkForm.php, items: k.php.map { ($0, "PHP \($0)") }, width: 180)
                 // (las imágenes oficiales de 8.1 y anteriores ya no reciben parches: siguen con PHP2Shell)
                 if verParts(model.dkForm.php).lexicographicallyPrecedes([8, 2]) && !model.dkForm.php.isEmpty {
                     Text("Vulnerable (PHP2Shell)").font(.caption.weight(.bold)).foregroundColor(RED)
@@ -415,30 +407,19 @@ struct DockerNewPanel: View {
                 }
             }
             formRow("MariaDB") {
-                Picker("", selection: $model.dkForm.maria) {
-                    ForEach(k.maria, id: \.self) { Text("MariaDB \($0)").tag($0) }
-                }
-                .labelsHidden()
-                .frame(width: 180)
+                SearchPicker(selection: $model.dkForm.maria, items: k.maria.map { ($0, "MariaDB \($0)") }, width: 180)
             }
             formRow("BBDD") {
-                Picker("", selection: $model.dkForm.source) {
-                    Text("— Ninguna: vacía —").tag("")
-                    ForEach(Array(pairs.enumerated()), id: \.offset) { _, pr in
-                        Text("\(pr.1) (XAMPP-\(pr.0.folder))").tag("\(pr.0.folder)|\(pr.1)")
-                    }
-                }
-                .labelsHidden()
-                .frame(width: wide)
+                SearchPicker(selection: $model.dkForm.source,
+                             items: [("", "— Ninguna: vacía —")] + pairs.map { pr in ("\(pr.0.folder)|\(pr.1)", "\(pr.1) (XAMPP-\(pr.0.folder))") },
+                             width: wide)
             }
             if !model.dkForm.source.isEmpty && x?.kind == "wp" {
                 formRow("Cómo") {
-                    Picker("", selection: $model.dkForm.live) {
-                        Text("En vivo: la misma que web.local (sin copias)").tag(true)
-                        Text("Una copia en Docker").tag(false)
-                    }
-                    .labelsHidden()
-                    .frame(width: wide)
+                    SearchPicker(selection: Binding(get: { model.dkForm.live ? "vivo" : "copia" },
+                                                    set: { model.dkForm.live = $0 == "vivo" }),
+                                 items: [("vivo", "En vivo: la misma que web.local (sin copias)"), ("copia", "Una copia en Docker")],
+                                 width: wide)
                 }
             }
             if folders.isEmpty {

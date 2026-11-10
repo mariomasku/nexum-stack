@@ -153,6 +153,21 @@ function components_update() {
 }
 
 #@incluir comun/componentes/copies_migrate.sh
+#@incluir comun/componentes/clean_size_text.sh
+# Limpieza en el Mac: las versiones son las de BASE_DIR, con sus logs, var/mysql y temp en xamppfiles; la carpeta
+# temporal, /private/tmp (/tmp es un enlace a ella) y la tuya (TMPDIR, en /var/folders)
+CLEAN_STACK_SUB="xamppfiles/"
+CLEAN_TMP_DIRS=(/private/tmp)
+if [ -n "$TEST_DIR" ]; then
+    CLEAN_TMP_DIRS=("$TEST_DIR/tmp")
+elif [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && [ ! -L "${TMPDIR%/}" ] && [ -O "$TMPDIR" ]; then
+    [ "$(cd "$TMPDIR" && pwd -P)" == "/private/tmp" ] || CLEAN_TMP_DIRS+=("${TMPDIR%/}")
+fi
+
+function clean_version_dirs() {
+    version_dirs
+}
+
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift

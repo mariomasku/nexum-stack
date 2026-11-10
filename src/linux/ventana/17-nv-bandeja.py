@@ -198,6 +198,12 @@ class NvBandeja:
         # Recuadro de la version montada: el logotipo de PHP y su version y Apache y MariaDB con su punto
         # (verde si estan en marcha); al pulsar en ellos, sus servicios (arrancarlos, pararlos...)
         pill = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-pastilla")
+        # ▶ / ■ (a la derecha de los servicios): arrancar o parar la version; sin ninguna activa, ▶
+        # despliega las versiones para elegir
+        self.power_btn = css(Gtk.Button(valign=Gtk.Align.CENTER), "nv-encender", "nv-play")
+        self.power_img = symbol("media-playback-start-symbolic", 22)
+        self.power_btn.add(self.power_img)
+        self.power_btn.connect("clicked", lambda *_: self.nv_power_click())
         pill.pack_start(Gtk.Box(), False, False, 4)
         pill.pack_start(logo("php", 18), False, False, 0)
         self.status_lbl = label("…")
@@ -217,6 +223,7 @@ class NvBandeja:
         self.services_pop = Gtk.Popover(relative_to=self.status_btn)
         self.status_btn.set_popover(self.services_pop)
         pill.pack_start(self.status_btn, False, False, 0)
+        pill.pack_start(self.power_btn, False, False, 0)
         # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,

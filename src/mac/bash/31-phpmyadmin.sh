@@ -228,9 +228,12 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|copias-ficheros) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros) ;;
         # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
         copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
+        # (limpiar y limpiar-proyecto: solo si algo de lo que se va a limpiar es de root)
+        limpiar) clean_need_root "${@:2}" && { sudo_first || exit 130; } ;;
+        limpiar-proyecto) clean_project_need_root "${@:2}" && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -373,6 +376,11 @@ case "$1" in
     novedades) changes_text ;;
     copias) copies_command "$2" ;;
     copias-ficheros) copies_files_command "$2" ;;
+    limpieza) clean_list ;;
+    gui-limpieza) clean_measure "${CLEAN_KEYS[@]}" | cut -d'|' -f1-4 ;;
+    limpiar) shift; clean_command "$@" ;;
+    gui-limpiar-proyecto) gui_clean_project "$2" ;;
+    limpiar-proyecto) shift; clean_project_command "$@" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

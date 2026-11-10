@@ -268,13 +268,10 @@ struct DatabasesView: View {
                     }
                     importColumn("BBDD de destino") {
                         HStack(spacing: 4) {
-                            Picker("", selection: Binding(get: { model.impDb ?? "" },
-                                                          set: { model.impDb = $0.isEmpty ? nil : $0 })) {
-                                if model.impDb == nil { Text("Elige una BBDD").tag("") }
-                                ForEach(dbs, id: \.self) { Text($0).tag($0) }
-                            }
-                            .labelsHidden()
-                            .frame(minWidth: 150, maxWidth: 260)
+                            SearchPicker(selection: Binding(get: { model.impDb ?? "" },
+                                                            set: { model.impDb = $0.isEmpty ? nil : $0 }),
+                                         items: (model.impDb == nil ? [("", "Elige una BBDD")] : [] as [(String, String)]) + dbs.map { ($0, $0) },
+                                         width: 230)
                             IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.createDb() }
                                 .disabled(model.busy)
                             IconButton(symbol: "trash", help: "Borrar la BBDD elegida") {
@@ -284,13 +281,9 @@ struct DatabasesView: View {
                         }
                     }
                     importColumn("Proyecto (opcional)") {
-                        Picker("", selection: Binding(get: { model.impProject ?? "" },
-                                                      set: { model.impProject = $0.isEmpty ? nil : $0 })) {
-                            Text("Ninguno").tag("")
-                            ForEach(model.impProjects, id: \.self) { Text($0).tag($0) }
-                        }
-                        .labelsHidden()
-                        .frame(minWidth: 150, maxWidth: 260)
+                        SearchPicker(selection: Binding(get: { model.impProject ?? "" },
+                                                        set: { model.impProject = $0.isEmpty ? nil : $0 }),
+                                     items: [("", "Ninguno")] + model.impProjects.map { ($0, $0) }, width: 230)
                         Text(model.importProjectHint()).font(.caption).foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

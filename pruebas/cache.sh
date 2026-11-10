@@ -1,19 +1,23 @@
 #!/bin/bash
-# Pruebas de CACHE_CLEAR_PY (como tu usuario). Uso: cache.sh <script>
+# Pruebas de CLEAN_PY vaciando la var/cache de una tienda, como hace vaciar-cache con sudo (como tu
+# usuario). Uso: cache.sh <script>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-cache.XXXX"); trap 'rm -rf "$W"' EXIT
-CC=$( ( eval "$(sed -n "/^CACHE_CLEAR_PY='/,/^'\$/p" "$SRC")"; printf '%s' "$CACHE_CLEAR_PY" ) )
+CC=$( ( eval "$(sed -n "/^CLEAN_PY='/,/^'\$/p" "$SRC")"; printf '%s' "$CLEAN_PY" ) )
 H=$W/htdocs; mkdir -p "$H/tienda/var/cache/prod/sub" "$W/sistema/cache"
 touch "$H/tienda/var/cache/a" "$H/tienda/var/cache/prod/sub/b" "$W/sistema/cache/importante" "$W/sistema/fuera"
 ln -s "$W/sistema" "$H/tienda/var/cache/enlace"
-python3 -I -c "$CC" "$H/tienda/var/cache" "$H"
+python3 -I -c "$CC" limpiar "cache|$H/tienda|vaciar|var/cache||" > /dev/null
 check "vacia var/cache" '[ -d "$H/tienda/var/cache" ] && [ -z "$(ls -A "$H/tienda/var/cache")" ]'
 check "un enlace dentro se borra sin seguirlo" '[ -f "$W/sistema/fuera" ] && [ -f "$W/sistema/cache/importante" ]'
 mkdir -p "$H/t2"; ln -s "$W/sistema" "$H/t2/var"
-out=$(python3 -I -c "$CC" "$H/t2/var/cache" "$H" 2>&1)
-check "var cambiado por un enlace fuera: no vacia" '[ -f "$W/sistema/cache/importante" ] && echo "$out" | grep -q "no esta dentro"'
+python3 -I -c "$CC" limpiar "cache|$H/t2|vaciar|var/cache||" > /dev/null 2>&1
+check "var cambiado por un enlace fuera: no vacia" '[ -f "$W/sistema/cache/importante" ]'
 mkdir -p "$H/t3/real/var/cache"; touch "$H/t3/real/var/cache/x"; ln -s "$H/t3/real/var" "$H/t3/var"
-python3 -I -c "$CC" "$H/t3/var/cache" "$H" > /dev/null 2>&1
-check "solo carpetas que acaban en var/cache" 'python3 -I -c "$CC" "$H/tienda" "$H" > /dev/null 2>&1; [ $? -ne 0 ] && [ -d "$H/tienda/var" ]'
+python3 -I -c "$CC" limpiar "cache|$H/t3|vaciar|var/cache||" > /dev/null 2>&1
+check "var enlazado a otra carpeta de la misma tienda: tampoco (no se sigue ningun enlace)" '[ -f "$H/t3/real/var/cache/x" ]'
+ln -s "$H/tienda" "$H/t4"
+out=$(python3 -I -c "$CC" limpiar "cache|$H/t4|vaciar|var/cache||" 2>&1)
+check "la tienda es un enlace: no se toca" 'echo "$out" | grep -q "enlace"'
 exit $fail

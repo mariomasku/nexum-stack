@@ -225,6 +225,25 @@ function upgrade_to() {
 }
 
 #@incluir comun/componentes/copies_migrate.sh
+#@incluir comun/componentes/clean_size_text.sh
+# Limpieza en Linux: las versiones son /opt/lampp-* (en las pruebas, las de LVM_PRUEBA), con sus logs, var/mysql
+# y temp sin subcarpeta; la carpeta temporal, /tmp y la tuya (TMPDIR) si es otra
+CLEAN_STACK_SUB=""
+CLEAN_TMP_DIRS=(/tmp)
+if [ -n "$TEST_DIR" ]; then
+    CLEAN_TMP_DIRS=("$TEST_DIR/tmp")
+elif [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && [ ! -L "${TMPDIR%/}" ] && [ -O "$TMPDIR" ]; then
+    [ "$(cd "$TMPDIR" && pwd -P)" == "/tmp" ] || CLEAN_TMP_DIRS+=("${TMPDIR%/}")
+fi
+
+function clean_version_dirs() {
+    if [ -n "$TEST_DIR" ]; then
+        find "$TEST_DIR" -maxdepth 1 -type d -name "lampp-*" 2> /dev/null | sort -V
+    else
+        lampp_dirs
+    fi
+}
+
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift

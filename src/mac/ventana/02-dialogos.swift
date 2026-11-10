@@ -130,7 +130,7 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
                destructive: Bool = false, checkbox: String? = nil, checked: Bool = true,
                hasField: Bool = false, fieldLabel: String? = nil, placeholder: String = "",
                value: String = "", secure: Bool = false, cancelLabel: String = "Cancelar",
-               steps: [String] = [], copyWarning: String? = nil,
+               steps: [String] = [], copyWarning: String? = nil, warning: String? = nil,
                validate: ((Bool, String) -> (Bool, String?, Bool))? = nil) -> DialogResult {
     let alert = NSAlert()
     alert.messageText = title
@@ -164,6 +164,15 @@ func runDialog(title: String, text: String, okLabel: String, style: NSAlert.Styl
         l.translatesAutoresizingMaskIntoConstraints = false
         l.widthAnchor.constraint(equalToConstant: width).isActive = true
         stack.addArrangedSubview(l)
+    }
+    // (warning: un aviso en rojo debajo del texto, como «no se puede recuperar» de la limpieza)
+    if let w = warning {
+        let n = NSTextField(wrappingLabelWithString: w)
+        n.preferredMaxLayoutWidth = width
+        n.alignment = .center
+        n.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        n.textColor = .systemRed
+        stack.addArrangedSubview(n)
     }
     let validator = DialogValidator()
     var box: NSButton? = nil
@@ -401,11 +410,11 @@ func message(_ title: String, _ text: String = "", error: Bool = false) {
 }
 
 /// steps: los cambios que se van a hacer (numerados, con «Qué se va a realizar»); text va entonces
-/// debajo, como nota
+/// debajo, como nota. warning: un aviso en rojo debajo de todo
 func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
-             steps: [String] = []) -> Bool {
+             steps: [String] = [], warning: String? = nil) -> Bool {
     return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
-                     destructive: destructive, steps: steps).ok
+                     destructive: destructive, steps: steps, warning: warning).ok
 }
 
 /// La casilla de guardar antes una copia en ~/nexum-backups (desmarcada) con el aviso en rojo debajo, para un

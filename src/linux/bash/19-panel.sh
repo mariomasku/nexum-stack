@@ -1124,6 +1124,24 @@ QUE HACE
 
 VERSIONES
 
+1.57.9 (10 nov 2026)
+- Desplegables con buscador: los de 8 opciones o más (proyectos, BBDD,
+  carpetas, versiones...) se abren con «Buscar…». Se escribe y la lista
+  se queda con lo que lleva ese texto; las flechas eligen, Intro la
+  escoge y Esc cierra.
+- ▶ / ■ en el visor de arriba, a la derecha de Apache y MariaDB: ■ para
+  y desactiva la versión, ▶ la arranca. Sin ninguna activa, ▶ despliega
+  las versiones instaladas (la última que se usó, la primera) para
+  arrancar una.
+- Limpieza, en Configuración: la caché de descargas, las copias de
+  seguridad, el correo de Mailpit, los registros del programa y de cada
+  versión (se vacían), la caché de todos los proyectos, los temporales
+  que deja el programa y las sesiones de PHP, cada cosa con lo que ocupa.
+  Se marca lo que se quiere limpiar (en la terminal: limpieza y limpiar).
+- Limpiar proyecto, en el ⋮ de cada proyecto: su caché, sus registros y,
+  en WordPress, los restos de las actualizaciones. Nunca las imágenes
+  (uploads ni img). En la terminal: limpiar-proyecto.
+
 1.57.8 (10 nov 2026)
 - Copiar una BBDD a una versión parada (recrear un proyecto en otra
   versión de PHP, copiar o descargar una BBDD): su MariaDB temporal se

@@ -109,6 +109,17 @@
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
+#   lvm-instalador limpieza
+#       Lo que se puede limpiar, cada cosa con lo que ocupa y cuantos ficheros tiene
+#
+#   lvm-instalador limpiar <clave>...
+#       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
+#       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
+#       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
+#       PHP y MariaDB de cada version: se vacian), caches-proyectos (la cache de todos los proyectos),
+#       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
+#       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
+#
 #   lvm-instalador actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
@@ -232,6 +243,11 @@
 #
 #   lvm-instalador vaciar-cache <carpeta> | --bd <base>
 #       Vacia var/cache de una tienda PrestaShop (por carpeta o base)
+#
+#   lvm-instalador limpiar-proyecto <carpeta> [cache] [registros] [actualizaciones]
+#       Vacia las caches, los registros y los restos de las actualizaciones de un WordPress o de una
+#       tienda PrestaShop (sin claves, todo). Nada de wp-content/uploads (salvo los registros de
+#       WooCommerce) ni de img/. Las carpetas se quedan, vacias. No se puede recuperar
 #
 #   lvm-instalador nuevo-dominio <dominio> <carpeta> [base]
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
@@ -805,7 +821,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.8"
+APP_VERSION="1.57.9"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

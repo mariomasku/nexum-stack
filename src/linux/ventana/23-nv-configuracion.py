@@ -83,6 +83,7 @@ class NvConfiguracion:
         self.nv_mail_tools()
         self.nv_github_tools()
         self.nv_look_tools()
+        self.nv_clean_tools()
         self.nv_tools_sections()
         self.tools_title = self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
                                               "Elige un apartado en la columna de la izquierda")
@@ -99,6 +100,7 @@ class NvConfiguracion:
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
                       ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
                       ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
+                      ("Limpieza", "Limpieza", "edit-clear-all-symbolic"),
                       ("Carpetas", "Carpetas", "folder-symbolic"),
                       ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
                       ("Programa", "Programa", "system-software-install-symbolic"),
@@ -211,6 +213,125 @@ class NvConfiguracion:
         for c in getattr(self, "tools_extra", {}).get(sec, []):
             tl.pack_start(c, False, False, 0)
             c.show_all()
+
+    # Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...): cada cosa, con su título, lo que es y qué pasa
+    # si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
+    CLEAN_ITEMS = [
+        ("descargas", "Caché de descargas",
+         "El código ya descargado y comprobado de PHP, Apache, MariaDB… (%s). Si se limpia, la próxima "
+         "instalación lo descarga otra vez." % DL_CACHE_DIR,
+         "se vacía %s" % DL_CACHE_DIR, True),
+        ("copias", "Copias de seguridad",
+         "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden "
+         "volver a cargar.",
+         "se borra todo lo de ~/nexum-backups (la carpeta se queda)", False),
+        ("correo", "Correo de pruebas",
+         "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía "
+         "(Mailpit tiene que estar en marcha).",
+         "se vacía la bandeja de Mailpit", False),
+        ("registros", "Registros del programa",
+         "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes "
+         "no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
+         "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", True),
+        ("registros-versiones", "Registros de las versiones",
+         "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: "
+         "se pierde lo que decían hasta ahora.",
+         "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", True),
+        ("caches-proyectos", "Cachés de los proyectos",
+         "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace "
+         "sola: la primera visita va algo más lenta.",
+         "se vacían las cachés de los proyectos de %s" % HTDOCS, True),
+        ("temporales", "Temporales",
+         "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un "
+         "día sin cambiar y nada está usando.",
+         "se borran los temporales del programa de más de un día que nada usa", True),
+        ("sesiones", "Sesiones de PHP",
+         "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones "
+         "abiertas en las webs locales (hay que volver a entrar en su administración).",
+         "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", False)]
+
+    def nv_clean_tools(self):
+        """Configuración, Limpieza: lo que Nexum va dejando con el uso, cada cosa con lo que ocupa y su casilla;
+        arriba, el total, y debajo «Limpiar lo marcado…». Se mide por detrás (gui-limpieza): hasta entonces,
+        «Midiendo…». Las casillas se recuerdan mientras la ventana está abierta."""
+        box, lb = tile_group("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar "
+                             "espacio. Lo que se limpia no se puede recuperar: no se hacen copias.")
+        total = ActionRow("Lo que se puede limpiar", "Midiendo…")
+        total.add_prefix(icon("edit-clear-all-symbolic", 18))
+        lb.add(total)
+        marks = getattr(self, "clean_marks", None)
+        if marks is None:
+            marks = self.clean_marks = {k: on for k, _t, _d, _s, on in self.CLEAN_ITEMS}
+        sizes = {}
+        rows = {}
+        btn = css(Gtk.Button(label="Limpiar lo marcado…", halign=Gtk.Align.END, margin_top=12, sensitive=False),
+                  "destructive-action")
+
+        def picked():
+            return [k for k, *_r in self.CLEAN_ITEMS if marks.get(k) and sizes.get(k, (0, 0))[1] > 0]
+
+        def update():
+            keys = picked()
+            btn.set_sensitive(bool(keys) and not self.busy)
+            if sizes:
+                all_b = sum(b for b, n in sizes.values() if n)
+                sel = sum(sizes[k][0] for k in keys)
+                total.subtitle.set_label("Total: %s · marcado: %s" % (fmt_size(all_b), fmt_size(sel)) if all_b
+                                         else "Total: nada que limpiar")
+
+        def toggled(w, key):
+            marks[key] = w.get_active()
+            update()
+        for key, title, desc, _step, _on in self.CLEAN_ITEMS:
+            row = ActionRow(title, desc)
+            row.subtitle.set_ellipsize(0)
+            row.subtitle.set_line_wrap(True)
+            row.subtitle.set_xalign(0)
+            size = label("…", "dim-label", width_chars=22, xalign=1)
+            chk = Gtk.CheckButton(active=marks.get(key, False), valign=Gtk.Align.CENTER, sensitive=False)
+            chk.connect("toggled", toggled, key)
+            row.add_suffix(size)
+            row.add_suffix(chk)
+            lb.add(row)
+            rows[key] = (size, chk)
+        btn.connect("clicked", lambda *_: self.nv_clean_run(dict(sizes), picked()))
+        box.pack_start(btn, False, False, 0)
+        self.tools_box.pack_start(box, False, False, 0)
+        box.show_all()
+
+        def got(rc, out):
+            # (si Configuración se ha rehecho mientras tanto, estas filas ya no están en la ventana)
+            if total.subtitle.get_toplevel() is not self.win:
+                return False
+            for f in parse_lines(out):
+                if f[0] == "L" and len(f) >= 4 and f[2].isdigit() and f[3].isdigit():
+                    sizes[f[1]] = (int(f[2]), int(f[3]))
+            for key, (size, chk) in rows.items():
+                b, n = sizes.get(key, (0, 0))
+                size.set_label("%s · %s" % (fmt_size(b), plural(n, "fichero", "ficheros")) if n else "Vacío")
+                chk.set_sensitive(n > 0 and not self.busy)
+            if not sizes:
+                total.subtitle.set_label("No se ha podido medir: %s" % (out.strip().splitlines() or ["sin respuesta"])[-1])
+            update()
+            return False
+        run_quick(["gui-limpieza"], got)
+
+    def nv_clean_run(self, sizes, keys):
+        """«Limpiar lo marcado…»: confirma con lo que se va a hacer, numerado, y el aviso en rojo, y lanza
+        limpiar <claves> como tarea; al acabar, se vuelve a medir."""
+        if not keys:
+            return
+        info = {k: (t, step) for k, t, _d, step, _on in self.CLEAN_ITEMS}
+        steps = ["%s (%s · %s): %s." % (info[k][0], fmt_size(sizes[k][0]), plural(sizes[k][1], "fichero", "ficheros"),
+                                        info[k][1]) for k in keys]
+        warn = label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                     max_width_chars=60, xalign=0)
+        if not confirm(self.win, "¿Limpiar lo marcado?",
+                       "Si algo es del administrador (lo de root), se pide su contraseña.", "Limpiar",
+                       destructive=True, extra=warn, steps=steps):
+            return
+        self.run_task("Limpiando", ["limpiar"] + keys, done_text="Limpieza terminada",
+                      on_done=lambda *_: self.build_tools())
 
     def nv_tools_show(self, section):
         """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS)."""

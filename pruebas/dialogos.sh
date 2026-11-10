@@ -5,7 +5,7 @@
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 if grep -q "^let ERROR_LOG = " "$SRC"; then
-    check "Mac: confirm y runDialog aceptan los pasos" 'grep -qF "             steps: [String] = []) -> Bool {" "$SRC" && grep -qF "destructive: destructive, steps: steps).ok" "$SRC"'
+    check "Mac: confirm y runDialog aceptan los pasos" 'grep -qF "             steps: [String] = [], warning: String? = nil) -> Bool {" "$SRC" && grep -qF "destructive: destructive, steps: steps, warning: warning).ok" "$SRC"'
     check "Mac: «Qué se va a realizar», numerado y a la izquierda" 'grep -qF "\"Qué se va a realizar\\n\"" "$SRC" && grep -qF "NSAttributedString(string: \"\\(i + 1).\"" "$SRC" && grep -qF "l.alignment = .left" "$SRC"'
     check "Mac: con pasos, la nota a la izquierda" 'grep -qF "steps.isEmpty ? dialogLabel(text) : dialogLabel(text, color: .secondaryLabelColor, align: .left)" "$SRC"'
     check "Mac: crear dominio, copiar, replicar, cargar, actualizar, instalar y Actualizar todo, con pasos" '[ "$(grep -cE "steps: (steps|notes|what|c\.items|list\.map|notes \+ )" "$SRC")" -ge 7 ]'

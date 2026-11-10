@@ -109,6 +109,17 @@
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
+#   lvm-instalador limpieza
+#       Lo que se puede limpiar, cada cosa con lo que ocupa y cuantos ficheros tiene
+#
+#   lvm-instalador limpiar <clave>...
+#       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
+#       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
+#       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
+#       PHP y MariaDB de cada version: se vacian), caches-proyectos (la cache de todos los proyectos),
+#       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
+#       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
+#
 #   lvm-instalador actualizar-a <version> <php>
 #       Pasa una version a otro parche de su rama (una lampp-8.3.10, que se queda en su
 #       parche, o un XAMPP, que no se puede arreglar): instala PHP <php> al lado, en
@@ -232,6 +243,11 @@
 #
 #   lvm-instalador vaciar-cache <carpeta> | --bd <base>
 #       Vacia var/cache de una tienda PrestaShop (por carpeta o base)
+#
+#   lvm-instalador limpiar-proyecto <carpeta> [cache] [registros] [actualizaciones]
+#       Vacia las caches, los registros y los restos de las actualizaciones de un WordPress o de una
+#       tienda PrestaShop (sin claves, todo). Nada de wp-content/uploads (salvo los registros de
+#       WooCommerce) ni de img/. Las carpetas se quedan, vacias. No se puede recuperar
 #
 #   lvm-instalador nuevo-dominio <dominio> <carpeta> [base]
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
@@ -805,7 +821,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.8"
+APP_VERSION="1.57.9"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # lvm-instalador_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte
@@ -7278,36 +7294,399 @@ EOF
     return 0
 }
 
-# Vacia una carpeta (var/cache de una tienda) como root sin seguir enlaces en ningun momento: la ruta
-# se recorre desde / con O_NOFOLLOW y tiene que estar dentro de htdocs; dentro, los enlaces se
-# borran (no se sigue a donde apuntan). CACHE_CLEAR_PY <carpeta> <htdocs>
-CACHE_CLEAR_PY='
-import os, stat, sys
-target, top = sys.argv[1], os.path.realpath(sys.argv[2])
-real = os.path.realpath(target)
-if not real.startswith(top + "/") or not real.endswith("/var/cache"):
-    sys.exit("%s no esta dentro de %s: no se vacia" % (target, top))
-fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
-for p in [p for p in real.split("/") if p]:
-    nfd = os.open(p, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-    os.close(fd)
-    fd = nfd
-dev = os.fstat(fd).st_dev
-def empty(dfd):
-    for e in os.scandir(dfd):
-        st = os.stat(e.name, dir_fd=dfd, follow_symlinks=False)
-        if stat.S_ISDIR(st.st_mode) and st.st_dev == dev:
-            sub = os.open(e.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dfd)
-            try:
-                empty(sub)
-            finally:
-                os.close(sub)
-            os.rmdir(e.name, dir_fd=dfd)
-        elif not stat.S_ISDIR(st.st_mode):
-            os.unlink(e.name, dir_fd=dfd)
-empty(fd)
-'
+# Medir, simular o limpiar sin seguir enlaces en ningun momento (limpieza, limpiar-proyecto y la var/cache
+# de una tienda con sudo). Cada regla dice que limpiar dentro de una carpeta raiz:
+#   <clave>|<raiz>|<tipo>|<ruta dentro de la raiz>|<patron>|<opciones>   (el patron puede llevar |)
+# tipos: vaciar (todo lo de dentro de <ruta>, que se queda), ficheros (los de <ruta> que cumplen el patron,
+# con comodines), entradas (lo de <ruta> cuyo nombre cumple el patron, una expresion: ficheros o carpetas
+# enteras) y truncar (los ficheros de <ruta> que cumplen el patron se dejan a 0 bytes: los que un servicio
+# tiene abiertos). Las partes de <ruta> pueden llevar comodines (modules/*/logs).
+# opciones (separadas por comas): index (los index.php se quedan), edad=<segundos> (solo lo que lleva ese
+# tiempo sin cambiar, ni ello ni nada de dentro), uso (no lo que tiene abierto un proceso, ni un socket o un
+# .pid vivo dentro), uid=<n> (solo lo de ese usuario), solo=dir|fich.
+# La raiz no puede ser un enlace; se abre desde / con O_NOFOLLOW (su ruta real) y desde ella cada carpeta,
+# tambien con O_NOFOLLOW: un enlace en la ruta hace que esa regla no limpie nada. Dentro, los enlaces se
+# borran sin seguirlos, no se pasa a otro disco (st_dev de la raiz) y todo se borra con su carpeta abierta
+# (unlinkat/rmdir con dir_fd): si algo cambia por un enlace entre medias, falla en lugar de borrar fuera.
+# Escribe L|<clave>|<bytes>|<ficheros>|<1 si hace falta root> por cada clave (en limpiar, lo borrado) y
+# P|<clave>|<ruta> de cada regla con algo; al limpiar, Q|<clave>|<ruta> de lo que no se ha podido borrar
+# (sale con 3) y U|<clave>|<ruta> de lo que se deja por estar en uso.
+# Uso: CLEAN_PY medir|simular|limpiar <regla>...
+CLEAN_PY='
+import errno, fnmatch, os, re, socket, stat, subprocess, sys, time
+mode, rules = sys.argv[1], sys.argv[2:]
+me = os.geteuid()
+now = time.time()
+DIR = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+totals, order, paths, left, busy = {}, [], [], [], []
+_open = None
 
+
+def open_paths():
+    """Lo que tienen abierto los procesos que se pueden ver (como root, todos) y los sockets en uso."""
+    global _open
+    if _open is not None:
+        return _open
+    found = set()
+    if os.path.isdir("/proc/self/fd"):
+        for pid in os.listdir("/proc"):
+            # (sin este mismo proceso: tiene abiertas las carpetas que esta mirando)
+            if not pid.isdigit() or int(pid) == os.getpid():
+                continue
+            try:
+                found.add(os.readlink("/proc/%s/cwd" % pid))
+            except OSError:
+                pass
+            try:
+                fds = os.listdir("/proc/%s/fd" % pid)
+            except OSError:
+                continue
+            for n in fds:
+                try:
+                    p = os.readlink("/proc/%s/fd/%s" % (pid, n))
+                except OSError:
+                    continue
+                if p.startswith("/"):
+                    found.add(p[:-10] if p.endswith(" (deleted)") else p)
+        try:
+            with open("/proc/net/unix") as f:
+                for line in f.read().splitlines()[1:]:
+                    parts = line.split()
+                    if len(parts) >= 8 and parts[-1].startswith("/"):
+                        found.add(parts[-1])
+        except OSError:
+            pass
+    else:
+        # (en el Mac, lsof: los de tu usuario o, como root, todos)
+        try:
+            out = subprocess.run(["lsof", "-n", "-P", "-w", "-Fn"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, timeout=30).stdout.decode("utf-8", "replace")
+            found.update(line[1:] for line in out.splitlines() if line.startswith("n/"))
+        except (OSError, subprocess.SubprocessError):
+            pass
+    _open = found
+    return found
+
+
+def alive(pid):
+    if pid <= 1:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def socket_alive(path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(1)
+    try:
+        s.connect(path)
+        return True
+    except OSError as e:
+        return e.errno not in (errno.ECONNREFUSED, errno.ENOENT, errno.ENOTSOCK)
+    finally:
+        s.close()
+
+
+def in_use(path, info):
+    for p in open_paths():
+        if p == path or p.startswith(path + "/"):
+            return True
+    if any(alive(p) for p in info["pids"]):
+        return True
+    return any(socket_alive(s) for s in info["socks"])
+
+
+def can_remove(dpath, dst, st):
+    """Se puede borrar sin root: la carpeta es escribible y, si es como /tmp (sticky), la entrada es tuya."""
+    if me == 0:
+        return True
+    if dst.st_mode & stat.S_ISVTX and st.st_uid != me and dst.st_uid != me:
+        return False
+    return os.access(dpath, os.W_OK | os.X_OK)
+
+
+def new_info():
+    return {"bytes": 0, "files": 0, "newest": 0, "root": False, "pids": [], "socks": []}
+
+
+def scan(dfd, dpath, dst, name, st, dev, keep, info):
+    """Suma en info lo que se borraria de la entrada name de dfd (st es su lstat)."""
+    path = dpath + "/" + name
+    info["newest"] = max(info["newest"], st.st_mtime)
+    if stat.S_ISDIR(st.st_mode):
+        if st.st_dev != dev:
+            return
+        if not can_remove(dpath, dst, st):
+            info["root"] = True
+        try:
+            sub = os.open(name, DIR, dir_fd=dfd)
+        except OSError:
+            info["root"] = True
+            return
+        try:
+            for n in os.listdir(sub):
+                try:
+                    s = os.stat(n, dir_fd=sub, follow_symlinks=False)
+                except OSError:
+                    continue
+                scan(sub, path, st, n, s, dev, keep, info)
+        except OSError:
+            info["root"] = True
+        finally:
+            os.close(sub)
+        return
+    if keep and name == "index.php":
+        return
+    if not can_remove(dpath, dst, st):
+        info["root"] = True
+    info["files"] += 1
+    if stat.S_ISREG(st.st_mode):
+        info["bytes"] += st.st_size
+        if name.endswith(".pid") and st.st_size < 64:
+            try:
+                fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
+                with os.fdopen(fd) as f:
+                    info["pids"].append(int(f.read(30).strip() or 0))
+            except (OSError, ValueError):
+                pass
+    elif stat.S_ISSOCK(st.st_mode):
+        info["socks"].append(path)
+
+
+def remove(dfd, dpath, name, st, dev, keep, res):
+    """Borra la entrada name de dfd sin seguir enlaces. Devuelve True si ya no esta."""
+    path = dpath + "/" + name
+    if stat.S_ISDIR(st.st_mode):
+        if st.st_dev != dev:
+            return False
+        try:
+            sub = os.open(name, DIR, dir_fd=dfd)
+            if os.fstat(sub).st_dev != dev:
+                os.close(sub)
+                return False
+        except OSError:
+            left.append((res["key"], path))
+            return False
+        gone = True
+        try:
+            for n in os.listdir(sub):
+                try:
+                    s = os.stat(n, dir_fd=sub, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not remove(sub, path, n, s, dev, keep, res):
+                    gone = False
+        except OSError:
+            left.append((res["key"], path))
+            gone = False
+        finally:
+            os.close(sub)
+        if not gone:
+            return False
+        try:
+            os.rmdir(name, dir_fd=dfd)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            left.append((res["key"], path))
+            return False
+        return True
+    if keep and name == "index.php":
+        return False
+    try:
+        os.unlink(name, dir_fd=dfd)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        left.append((res["key"], path))
+        return False
+    res["files"] += 1
+    if stat.S_ISREG(st.st_mode):
+        res["bytes"] += st.st_size
+    return True
+
+
+def root_fd(root):
+    """La raiz abierta desde / sin seguir enlaces (su ruta real): (fd, disco, ruta)."""
+    if os.path.islink(root):
+        raise OSError(errno.ELOOP, "es un enlace", root)
+    real = os.path.realpath(root)
+    fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    for p in [p for p in real.split("/") if p]:
+        try:
+            nfd = os.open(p, DIR, dir_fd=fd)
+        finally:
+            os.close(fd)
+        fd = nfd
+    return fd, os.fstat(fd).st_dev, real
+
+
+def targets(fd, path, rel, dev):
+    """Las carpetas rel de dentro de fd (cada parte puede llevar comodines), sin seguir enlaces ni pasar
+    a otro disco: [(fd, ruta, lstat)]. Cierra fd."""
+    cur = [(fd, path)]
+    for seg in [s for s in rel.split("/") if s and s != "."]:
+        nxt = []
+        for dfd, dpath in cur:
+            try:
+                if seg == "..":
+                    names = []
+                elif any(c in seg for c in "*?["):
+                    names = sorted(n for n in os.listdir(dfd) if fnmatch.fnmatchcase(n, seg))
+                else:
+                    names = [seg]
+                for n in names:
+                    try:
+                        st = os.stat(n, dir_fd=dfd, follow_symlinks=False)
+                        if stat.S_ISDIR(st.st_mode) and st.st_dev == dev:
+                            nxt.append((os.open(n, DIR, dir_fd=dfd), dpath + "/" + n))
+                    except OSError:
+                        continue
+            except OSError:
+                pass
+            finally:
+                os.close(dfd)
+        cur = nxt
+    out = []
+    for dfd, dpath in cur:
+        st = os.fstat(dfd)
+        if st.st_dev == dev:
+            out.append((dfd, dpath, st))
+        else:
+            os.close(dfd)
+    return out
+
+
+def entries(dfd, kind, pattern, opts):
+    """Las entradas de la carpeta que entran en la regla: [(nombre, lstat)]."""
+    out = []
+    try:
+        names = sorted(os.listdir(dfd))
+    except OSError:
+        return out
+    for n in names:
+        if kind == "entradas":
+            if not re.fullmatch(pattern, n):
+                continue
+        elif kind in ("ficheros", "truncar") and not fnmatch.fnmatchcase(n, pattern):
+            continue
+        try:
+            st = os.stat(n, dir_fd=dfd, follow_symlinks=False)
+        except OSError:
+            continue
+        isdir = stat.S_ISDIR(st.st_mode)
+        if kind in ("ficheros", "truncar") and isdir:
+            continue
+        if kind == "truncar" and (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1):
+            continue
+        if opts.get("solo") == "dir" and not isdir or opts.get("solo") == "fich" and not stat.S_ISREG(st.st_mode):
+            continue
+        if "uid" in opts and str(st.st_uid) != opts["uid"]:
+            continue
+        out.append((n, st))
+    return out
+
+
+def truncate(dfd, dpath, name, st, res):
+    path = dpath + "/" + name
+    try:
+        fd = os.open(name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dfd)
+    except OSError:
+        left.append((res["key"], path))
+        return
+    try:
+        now_st = os.fstat(fd)
+        if (now_st.st_ino, now_st.st_dev) != (st.st_ino, st.st_dev) or now_st.st_nlink != 1 \
+                or not stat.S_ISREG(now_st.st_mode):
+            left.append((res["key"], path))
+            return
+        os.ftruncate(fd, 0)
+        res["files"] += 1
+        res["bytes"] += now_st.st_size
+    except OSError:
+        left.append((res["key"], path))
+    finally:
+        os.close(fd)
+
+
+for rule in rules:
+    # (el patron de las entradas puede llevar | : es lo que queda entre la ruta y las opciones)
+    parts = rule.split("|")
+    if len(parts) < 6 or parts[2] not in ("vaciar", "ficheros", "entradas", "truncar"):
+        print("Regla no valida: %s" % rule, file=sys.stderr)
+        continue
+    key, root, kind, rel, pattern, optstr = parts[0], parts[1], parts[2], parts[3], "|".join(parts[4:-1]), parts[-1]
+    opts = dict((o.split("=", 1) + [""])[:2] for o in optstr.split(",") if o)
+    keep = "index" in opts
+    if key not in totals:
+        totals[key] = {"key": key, "bytes": 0, "files": 0, "root": False}
+        order.append(key)
+    tot = totals[key]
+    if not os.path.lexists(root):
+        continue
+    try:
+        fd, dev, real = root_fd(root)
+    except OSError as e:
+        print("%s: %s, no se toca" % (root, e.strerror or e), file=sys.stderr)
+        continue
+    label = rel if kind == "vaciar" else (rel + "/" + pattern if rel not in ("", ".") else pattern)
+    found = False
+    for dfd, dpath, dst in targets(fd, real, rel, dev):
+        try:
+            names = entries(dfd, kind, pattern, opts) if kind != "vaciar" else entries(dfd, "", "", opts)
+            for n, st in names:
+                if kind == "truncar":
+                    if st.st_size == 0:
+                        continue
+                    found = True
+                    if me != 0 and not os.access(dpath + "/" + n, os.W_OK):
+                        tot["root"] = True
+                    if mode == "limpiar":
+                        truncate(dfd, dpath, n, st, tot)
+                    else:
+                        tot["files"] += 1
+                        tot["bytes"] += st.st_size
+                    continue
+                info = new_info()
+                scan(dfd, dpath, dst, n, st, dev, keep, info)
+                if not info["files"]:
+                    # (una carpeta vacia de las entradas tambien es un resto: cuenta como uno)
+                    if not (stat.S_ISDIR(st.st_mode) and kind == "entradas"):
+                        continue
+                    info["files"] = 1
+                if "edad" in opts and now - info["newest"] < float(opts["edad"] or 0):
+                    continue
+                if "uso" in opts and in_use(dpath + "/" + n, info):
+                    busy.append((key, dpath + "/" + n))
+                    continue
+                found = True
+                if mode == "limpiar":
+                    remove(dfd, dpath, n, st, dev, keep, tot)
+                else:
+                    tot["files"] += info["files"]
+                    tot["bytes"] += info["bytes"]
+                    tot["root"] = tot["root"] or info["root"]
+        finally:
+            os.close(dfd)
+    if found and (key, label) not in paths:
+        paths.append((key, label))
+
+for key in order:
+    t = totals[key]
+    print("L|%s|%d|%d|%d" % (key, t["bytes"], t["files"], 1 if t["root"] else 0))
+for key, label in paths:
+    print("P|%s|%s" % (key, label))
+for key, path in busy:
+    print("U|%s|%s" % (key, path))
+for key, path in left:
+    print("Q|%s|%s" % (key, path))
+sys.exit(3 if left else 0)
+'
 # vaciar-cache <carpeta>: borra el contenido de var/cache de una tienda (PrestaShop 1.7 la usa para
 # Symfony y da error 500 con la de otro equipo). Si no tiene var/cache no hace nada.
 function ps_clear_cache() {
@@ -7330,12 +7709,15 @@ function ps_clear_cache() {
     # Los ficheros que creo Apache como daemon (antes de User/Group) solo se borran con sudo
     find "$cache" -mindepth 1 ! -user "$(id -un)" -print -quit 2> /dev/null | grep -q . && s=sudo
     echo "Vaciando la cache de $folder (var/cache)..."
-    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi: si entre
-    # la comprobacion y el borrado cambian var por un enlace (a /var), falla en lugar de vaciar otra
-    if [ -n "$s" ]; then
-        run $s python3 -I -c "$CACHE_CLEAR_PY" "$cache" "$HTDOCS_DIR"
+    # Con sudo, root abre var/cache carpeta a carpeta sin seguir enlaces y borra desde ahi (CLEAN_PY,
+    # dentro de la tienda): si entre la comprobacion y el borrado cambian var por un enlace (a /var),
+    # falla en lugar de vaciar otra
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se vaciaria $cache${s:+ (con sudo, sin seguir enlaces)}"
+    elif [ -n "$s" ]; then
+        $s python3 -I -c "$CLEAN_PY" limpiar "cache|$HTDOCS_DIR/$folder|vaciar|var/cache||" > /dev/null
     else
-        run find "$cache" -mindepth 1 -delete
+        find "$cache" -xdev -mindepth 1 -delete
     fi || { echo "No se ha podido vaciar $cache"; return 1; }
     echo "Cache de $folder vaciada"
 }
@@ -13075,6 +13457,24 @@ QUE HACE
   llega a nadie.
 
 VERSIONES
+
+1.57.9 (10 nov 2026)
+- Desplegables con buscador: los de 8 opciones o más (proyectos, BBDD,
+  carpetas, versiones...) se abren con «Buscar…». Se escribe y la lista
+  se queda con lo que lleva ese texto; las flechas eligen, Intro la
+  escoge y Esc cierra.
+- ▶ / ■ en el visor de arriba, a la derecha de Apache y MariaDB: ■ para
+  y desactiva la versión, ▶ la arranca. Sin ninguna activa, ▶ despliega
+  las versiones instaladas (la última que se usó, la primera) para
+  arrancar una.
+- Limpieza, en Configuración: la caché de descargas, las copias de
+  seguridad, el correo de Mailpit, los registros del programa y de cada
+  versión (se vacían), la caché de todos los proyectos, los temporales
+  que deja el programa y las sesiones de PHP, cada cosa con lo que ocupa.
+  Se marca lo que se quiere limpiar (en la terminal: limpieza y limpiar).
+- Limpiar proyecto, en el ⋮ de cada proyecto: su caché, sus registros y,
+  en WordPress, los restos de las actualizaciones. Nunca las imágenes
+  (uploads ni img). En la terminal: limpiar-proyecto.
 
 1.57.8 (10 nov 2026)
 - Copiar una BBDD a una versión parada (recrear un proyecto en otra
@@ -20544,6 +20944,8 @@ LOG_DIR = os.path.expanduser("~/.lvm-instalador")
 # programa si está el ajuste COPIES_FILES_FLAG (lvm-instalador copias-ficheros si|no)
 COPIES_DIR = os.path.expanduser("~/nexum-backups")
 COPIES_FILES_FLAG = os.path.join(LOG_DIR, "copias-ficheros")
+# La ultima version que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
+LAST_VERSION_FILE = os.path.join(LOG_DIR, "ultima-version")
 # El aviso de la casilla de copia al actualizar una versión en su carpeta (solo hace falta si MariaDB cambia de rama)
 UPDATE_COPY_WARN = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")
@@ -21501,6 +21903,13 @@ ROW_ICONS_EXACT = {
     "Novedades": ("icono", "starred-symbolic", ""),
     "Acerca de": ("icono", "help-about-symbolic", ""),
     "error_log": ("logo", "apache"),
+    # (Configuración, Limpieza: cada cosa con su icono, como las dos primeras)
+    "Correo de pruebas": ("logo", "mailpit"),
+    "Registros del programa": ("icono", "document-open-recent-symbolic", ""),
+    "Registros de las versiones": ("logo", "apache"),
+    "Cachés de los proyectos": ("icono", "folder-symbolic", ""),
+    "Temporales": ("icono", "user-trash-symbolic", ""),
+    "Sesiones de PHP": ("logo", "php"),
 }
 ROW_ICONS = [
     ("Versiones sin proteger", ("icono", "network-wired-symbolic", "aviso-suave")),
@@ -22086,6 +22495,92 @@ def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=
     resp = run_dialog(dlg)
     dlg.destroy()
     return resp == Gtk.ResponseType.ACCEPT
+
+
+# Los desplegables de la ventana con COMBO_SEARCH_MIN opciones o más: al abrirlos, en lugar del menú de
+# GTK, una lista con un buscador. Se escribe y se queda solo lo que lleva ese texto, como en la barra de
+# búsqueda de los proyectos; las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada
+COMBO_SEARCH_MIN = 8
+
+
+def combo_search(combo):
+    """Si combo tiene COMBO_SEARCH_MIN opciones o más, abre su lista con buscador y devuelve True."""
+    model = combo.get_model()
+    if model is None or len(model) < COMBO_SEARCH_MIN or not isinstance(model[0][0], str):
+        return False
+    names = [row[0] for row in model]
+    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.BOTTOM, modal=True)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
+    entry = Gtk.SearchEntry(placeholder_text="Buscar…")
+    lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE, activate_on_single_click=True)
+    for i, name in enumerate(names):
+        row = Gtk.ListBoxRow()
+        row.index, row.key = i, name.lower()
+        row.add(label(name, xalign=0, margin_start=8, margin_end=8, margin_top=5, margin_bottom=5,
+                      ellipsize=3, max_width_chars=60))
+        lb.add(row)
+    query = [""]
+    lb.set_filter_func(lambda r: query[0] in r.key)
+    empty = css(label("Sin resultados", xalign=0.5, margin=10), "dim-label")
+    empty.set_no_show_all(True)
+    lb.set_placeholder(empty)
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                            max_content_height=360, min_content_width=max(combo.get_allocated_width(), 240))
+    sw.add(lb)
+    box.pack_start(entry, False, False, 0)
+    box.pack_start(sw, True, True, 0)
+    pop.add(box)
+
+    def visible():
+        return [r for r in lb.get_children() if r.get_child_visible() and query[0] in r.key]
+
+    def select(row):
+        lb.select_row(row)
+        if row is not None:
+            # (que se vea: la lista baja o sube hasta ella)
+            GLib.idle_add(lambda: (sw.get_vadjustment().clamp_page(*row_span(row)), False)[1])
+
+    def row_span(row):
+        a = row.get_allocation()
+        return a.y, a.y + a.height
+
+    def choose(row):
+        if row is not None:
+            combo.set_active(row.index)
+        pop.popdown()
+
+    def changed(*_):
+        query[0] = entry.get_text().strip().lower()
+        lb.invalidate_filter()
+        rows = visible()
+        select(rows[0] if rows else None)
+
+    def keys(_w, ev):
+        rows = visible()
+        cur = lb.get_selected_row()
+        pos = rows.index(cur) if cur in rows else -1
+        step = {Gdk.KEY_Down: 1, Gdk.KEY_Up: -1, Gdk.KEY_Page_Down: 8, Gdk.KEY_Page_Up: -8}.get(ev.keyval)
+        if step and rows:
+            select(rows[min(max(pos + step, 0), len(rows) - 1)])
+            return True
+        if ev.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            choose(cur if pos >= 0 else (rows[0] if rows else None))
+            return True
+        return False
+    entry.connect("search-changed", changed)
+    entry.connect("key-press-event", keys)
+    # (Esc en el buscador lo vacía; con él vacío, cierra)
+    entry.connect("stop-search", lambda *_: pop.popdown())
+    lb.connect("row-activated", lambda _lb, row: choose(row))
+    pop.connect("closed", lambda *_: GLib.idle_add(pop.destroy))
+    box.show_all()
+    combo.search_popover = pop
+    active = combo.get_active()
+    pop.popup()
+    entry.grab_focus()
+    if 0 <= active < len(names):
+        select(lb.get_row_at_index(active))
+    return True
 
 
 # ---------------------------------------------------------------- llamadas al script
@@ -28055,6 +28550,12 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 .nv-pastilla button { border: none; background: transparent; box-shadow: none; }
 .nv-pastilla button.nv-servicios { border-radius: 8px; padding: 2px 8px; }
 .nv-pastilla button.nv-servicios:hover, .nv-pastilla button.nv-servicios:checked { background-color: alpha(@theme_fg_color, 0.10); }
+/* Arrancar o parar la version desde el visor: solo el icono, verde (▶) o rojo (■), sin recuadro */
+.nv-pastilla button.nv-encender { border-radius: 8px; padding: 2px 4px; }
+.nv-pastilla button.nv-encender.nv-play { color: %(g)s; }
+.nv-pastilla button.nv-encender.nv-stop { color: #e5534b; }
+.nv-pastilla button.nv-encender:hover { background-color: alpha(@theme_fg_color, 0.10); }
+.nv-pastilla button.nv-encender:disabled { opacity: 0.45; }
 /* Subir o actualizar una BBDD: un visor un poco hundido, como el de arriba */
 .nv-hundido { background-color: shade(@theme_bg_color, 0.86); border: 1px solid alpha(black, 0.20); border-radius: 12px;
               box-shadow: inset 0 2px 6px alpha(black, 0.35), inset 0 0 0 1px alpha(black, 0.10); padding: 14px 16px; }
@@ -28543,6 +29044,12 @@ class NvBandeja:
         # Recuadro de la version montada: el logotipo de PHP y su version y Apache y MariaDB con su punto
         # (verde si estan en marcha); al pulsar en ellos, sus servicios (arrancarlos, pararlos...)
         pill = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-pastilla")
+        # ▶ / ■ (a la derecha de los servicios): arrancar o parar la version; sin ninguna activa, ▶
+        # despliega las versiones para elegir
+        self.power_btn = css(Gtk.Button(valign=Gtk.Align.CENTER), "nv-encender", "nv-play")
+        self.power_img = symbol("media-playback-start-symbolic", 22)
+        self.power_btn.add(self.power_img)
+        self.power_btn.connect("clicked", lambda *_: self.nv_power_click())
         pill.pack_start(Gtk.Box(), False, False, 4)
         pill.pack_start(logo("php", 18), False, False, 0)
         self.status_lbl = label("…")
@@ -28562,6 +29069,7 @@ class NvBandeja:
         self.services_pop = Gtk.Popover(relative_to=self.status_btn)
         self.status_btn.set_popover(self.services_pop)
         pill.pack_start(self.status_btn, False, False, 0)
+        pill.pack_start(self.power_btn, False, False, 0)
         # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
         pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,
@@ -29382,7 +29890,7 @@ class NvDatosAvisos:
         if d:
             act = next((i for i in d["installs"] if i["folder"] == d["active"]), None)
             self.status_lbl.set_label("PHP %s" % act["php"] if act else "Ninguna versión activa")
-            self.status_sub.set_label("lampp-%s" % d["active"] if act else "")
+            self.status_sub.set_label("lampp-%s" % d["active"] if act else "pulsa ▶ para arrancar una")
             self.nv_power_state()
             self.nv_projects_refresh()
             self.nv_mail_header()
@@ -29406,6 +29914,65 @@ class NvDatosAvisos:
             ctx.remove_class("nv-gris" if on else "nv-verde")
             ctx.add_class("nv-verde" if on else "nv-gris")
             (ctx.add_class if on else ctx.remove_class)("nv-latido")
+        self.nv_power_button()
+
+    def nv_power_button(self):
+        """El ▶ / ■ del visor, según esté la versión activa (o sin ninguna)."""
+        d = self.data or {}
+        on = bool(d.get("active")) and bool(d.get("running"))
+        ctx = self.power_btn.get_style_context()
+        ctx.remove_class("nv-play" if on else "nv-stop")
+        ctx.add_class("nv-stop" if on else "nv-play")
+        self.power_img.set_from_icon_name("media-playback-stop-symbolic" if on else "media-playback-start-symbolic",
+                                          Gtk.IconSize.MENU)
+        self.power_img.set_pixel_size(22)
+        if on:
+            tip = "Parar y desactivar lampp-%s" % d["active"]
+        elif d.get("active"):
+            tip = "Arrancar lampp-%s" % d["active"]
+        else:
+            tip = "Arrancar una versión"
+        self.power_btn.set_tooltip_text(tip)
+        self.power_btn.set_sensitive(bool(d.get("active") or d.get("installs")))
+
+    def nv_power_click(self):
+        d = self.data or {}
+        if d.get("active"):
+            if d.get("running"):
+                try:
+                    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+                    with open(LAST_VERSION_FILE, "w") as fh:
+                        fh.write(d["active"] + "\n")
+                except OSError:
+                    pass
+            self.nv_power()
+            return
+        # Sin ninguna activa: las versiones instaladas, la última que se usó la primera
+        try:
+            with open(LAST_VERSION_FILE) as fh:
+                last = fh.read().strip()
+        except OSError:
+            last = ""
+        installs = sorted(d.get("installs") or [], key=lambda i: (i["folder"] != last, i["folder"]))
+        pop = Gtk.Popover(relative_to=self.power_btn, position=Gtk.PositionType.BOTTOM)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1, margin=6)
+        box.pack_start(label("Arrancar una versión", "nv-chico", "nv-tenue", margin_start=8, margin_bottom=4),
+                       False, False, 0)
+        for i in installs:
+            b = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE), "nv-menuitem")
+            row = Gtk.Box(spacing=10)
+            row.pack_start(logo("php", 16), False, False, 0)
+            row.pack_start(label("PHP %s" % i["php"]), False, False, 0)
+            row.pack_start(label("lampp-%s" % i["folder"], "nv-tenue", "nv-mono", "nv-chico"), True, True, 0)
+            if i["folder"] == last:
+                row.pack_end(label("la última", "nv-chico", "nv-tenue"), False, False, 0)
+            b.add(row)
+            b.connect("clicked", lambda _b, f=i["folder"]: (pop.popdown(), self.on_activate_version(None, f)))
+            box.pack_start(b, False, False, 0)
+        pop.add(box)
+        box.show_all()
+        pop.connect("closed", lambda *_: GLib.idle_add(pop.destroy))
+        pop.popup()
 
     def update_project_search(self):
         # (la busqueda de siempre sigue funcionando por detras: la usa el asistente de proyecto nuevo)
@@ -30714,6 +31281,7 @@ class NvActualizarProyecto:
             items.append(("Vaciar la caché de la tienda", lambda: self.run_task(
                 "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
                 done_text="Caché vaciada", auto_close=True)))
+        items.append(("Limpiar proyecto…", lambda: self.nv_clean_project(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
         elif x["kind"] == "wp":
@@ -30797,6 +31365,73 @@ class NvActualizarProyecto:
         self.check_db_access(lambda _pwd: self.run_task(
             "Descargando las imágenes de %s" % name, ["ps-imagenes", name], env=self.db_env(),
             done_text="Imágenes de %s descargadas" % name))
+
+    # Limpiar proyecto (gui-limpiar-proyecto y limpiar-proyecto): cada clave, con su título y lo que se hace
+    PROJECT_CLEAN_ITEMS = [("cache", "Caché", "se vacía su caché"),
+                           ("registros", "Registros", "se borran sus registros"),
+                           ("actualizaciones", "Restos de actualizaciones", "se vacían los restos de las actualizaciones")]
+
+    def nv_clean_project(self, x):
+        """⋮, Limpiar proyecto…: lo que tiene de caché, registros y restos de actualizaciones (gui-limpiar-proyecto),
+        cada cosa con sus carpetas, lo que ocupa y su casilla (marcada); se confirma con lo que se va a hacer y se
+        lanza limpiar-proyecto con lo marcado. Si no tiene nada, se dice."""
+        name = x["name"]
+
+        def got(_rc, out):
+            found = [(f[1], int(f[2]), int(f[3]), f[4]) for f in parse_lines(out)
+                     if f[0] == "P" and len(f) >= 5 and f[2].isdigit() and f[3].isdigit() and int(f[3]) > 0]
+            if not found:
+                message(self.win, "Nada que limpiar", "No hay cachés ni registros que limpiar en %s." % name)
+                return False
+            self.nv_clean_project_dialog(name, found)
+            return False
+        run_quick(["gui-limpiar-proyecto", name], got)
+
+    def nv_clean_project_dialog(self, name, found):
+        info = {k: (t, step) for k, t, step in self.PROJECT_CLEAN_ITEMS}
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE, text="Limpiar «%s»" % name)
+        dlg.format_secondary_text("Marca lo que quieres limpiar. Las carpetas se quedan, vacías; nada de las "
+                                  "imágenes ni de lo que se sube a la web.")
+        widen(dlg)
+        extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        checks = []
+        for key, b, n, paths in found:
+            title = info.get(key, (key, ""))[0]
+            chk = Gtk.CheckButton(label="%s · %s · %s" % (title, fmt_size(b), plural(n, "fichero", "ficheros")),
+                                  active=True, margin_top=6)
+            extra.pack_start(chk, False, False, 0)
+            extra.pack_start(css(label(", ".join(p for p in paths.split(",") if p), wrap=True, xalign=0,
+                                       max_width_chars=60, margin_start=26), "dim-label", "subtitulo"), False, False, 0)
+            checks.append((key, b, n, paths, chk))
+        extra.pack_start(label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                               max_width_chars=60, xalign=0, margin_top=10), False, False, 0)
+        dlg.get_message_area().pack_start(extra, False, False, 0)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Limpiar lo marcado…", Gtk.ResponseType.ACCEPT), "destructive-action")
+        dlg.set_default_response(Gtk.ResponseType.CANCEL)
+
+        def update(*_):
+            ok.set_sensitive(any(c[4].get_active() for c in checks))
+        for c in checks:
+            c[4].connect("toggled", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        chosen = [c[:4] for c in checks if c[4].get_active()]
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not chosen:
+            return
+        steps = ["%s (%s · %s): %s (%s)." % (info.get(k, (k, ""))[0], fmt_size(b), plural(n, "fichero", "ficheros"),
+                                             info.get(k, ("", "se limpia"))[1], paths.replace(",", ", "))
+                 for k, b, n, paths in chosen]
+        warn = label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                     max_width_chars=60, xalign=0)
+        if not confirm(self.win, "¿Limpiar «%s»?" % name, "Si algo es del administrador (lo que creó Apache), se "
+                       "pide su contraseña.", "Limpiar", destructive=True, extra=warn, steps=steps):
+            return
+        self.run_task("Limpiando %s" % name, ["limpiar-proyecto", name] + [k for k, *_r in chosen],
+                      done_text="%s limpio" % name, auto_close=True)
 
     def nv_delete_project(self, x):
         """Borra el proyecto entero (borrar-proyecto): su carpeta, sus vhosts y dominios, lo de Docker y,
@@ -30980,6 +31615,7 @@ class NvConfiguracion:
         self.nv_mail_tools()
         self.nv_github_tools()
         self.nv_look_tools()
+        self.nv_clean_tools()
         self.nv_tools_sections()
         self.tools_title = self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
                                               "Elige un apartado en la columna de la izquierda")
@@ -30996,6 +31632,7 @@ class NvConfiguracion:
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
                       ("Registro de errores", "Registro de errores", "dialog-warning-symbolic"),
                       ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
+                      ("Limpieza", "Limpieza", "edit-clear-all-symbolic"),
                       ("Carpetas", "Carpetas", "folder-symbolic"),
                       ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
                       ("Programa", "Programa", "system-software-install-symbolic"),
@@ -31108,6 +31745,125 @@ class NvConfiguracion:
         for c in getattr(self, "tools_extra", {}).get(sec, []):
             tl.pack_start(c, False, False, 0)
             c.show_all()
+
+    # Limpieza (lvm-instalador gui-limpieza y limpiar <clave>...): cada cosa, con su título, lo que es y qué pasa
+    # si se limpia, lo que se hace (en la confirmación) y si va marcada de partida
+    CLEAN_ITEMS = [
+        ("descargas", "Caché de descargas",
+         "El código ya descargado y comprobado de PHP, Apache, MariaDB… (%s). Si se limpia, la próxima "
+         "instalación lo descarga otra vez." % DL_CACHE_DIR,
+         "se vacía %s" % DL_CACHE_DIR, True),
+        ("copias", "Copias de seguridad",
+         "Las de ~/nexum-backups (las que pides con «Guardar antes una copia»). Si se limpian, ya no se pueden "
+         "volver a cargar.",
+         "se borra todo lo de ~/nexum-backups (la carpeta se queda)", False),
+        ("correo", "Correo de pruebas",
+         "Los correos de las webs locales que ha recogido Mailpit. Si se limpia, su bandeja se queda vacía "
+         "(Mailpit tiene que estar en marcha).",
+         "se vacía la bandeja de Mailpit", False),
+        ("registros", "Registros del programa",
+         "Los de las instalaciones (y lo que dejan las que fallan) y los de Node, en ~/.lvm-instalador. Sus ajustes "
+         "no se tocan; si se limpian, ya no se puede ver qué pasó en una instalación anterior.",
+         "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que tenga abierto una tarea)", True),
+        ("registros-versiones", "Registros de las versiones",
+         "Los de Apache (con los de cada web), PHP-FPM, PHP y MariaDB de cada versión. Se vacían, no se borran: "
+         "se pierde lo que decían hasta ahora.",
+         "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión", True),
+        ("caches-proyectos", "Cachés de los proyectos",
+         "La caché de cada WordPress (wp-content/cache) y de cada tienda (var/cache y la de Smarty). Se rehace "
+         "sola: la primera visita va algo más lenta.",
+         "se vacían las cachés de los proyectos de %s" % HTDOCS, True),
+        ("temporales", "Temporales",
+         "Lo que dejan las tareas en la carpeta temporal y en ~/.lvm-instalador. Solo lo que lleva más de un "
+         "día sin cambiar y nada está usando.",
+         "se borran los temporales del programa de más de un día que nada usa", True),
+        ("sesiones", "Sesiones de PHP",
+         "Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se cierran las sesiones "
+         "abiertas en las webs locales (hay que volver a entrar en su administración).",
+         "se borran las sesiones de PHP: se cierran las sesiones abiertas en las webs locales", False)]
+
+    def nv_clean_tools(self):
+        """Configuración, Limpieza: lo que Nexum va dejando con el uso, cada cosa con lo que ocupa y su casilla;
+        arriba, el total, y debajo «Limpiar lo marcado…». Se mide por detrás (gui-limpieza): hasta entonces,
+        «Midiendo…». Las casillas se recuerdan mientras la ventana está abierta."""
+        box, lb = tile_group("Limpieza", "Lo que Nexum va dejando con el uso y se puede borrar para recuperar "
+                             "espacio. Lo que se limpia no se puede recuperar: no se hacen copias.")
+        total = ActionRow("Lo que se puede limpiar", "Midiendo…")
+        total.add_prefix(icon("edit-clear-all-symbolic", 18))
+        lb.add(total)
+        marks = getattr(self, "clean_marks", None)
+        if marks is None:
+            marks = self.clean_marks = {k: on for k, _t, _d, _s, on in self.CLEAN_ITEMS}
+        sizes = {}
+        rows = {}
+        btn = css(Gtk.Button(label="Limpiar lo marcado…", halign=Gtk.Align.END, margin_top=12, sensitive=False),
+                  "destructive-action")
+
+        def picked():
+            return [k for k, *_r in self.CLEAN_ITEMS if marks.get(k) and sizes.get(k, (0, 0))[1] > 0]
+
+        def update():
+            keys = picked()
+            btn.set_sensitive(bool(keys) and not self.busy)
+            if sizes:
+                all_b = sum(b for b, n in sizes.values() if n)
+                sel = sum(sizes[k][0] for k in keys)
+                total.subtitle.set_label("Total: %s · marcado: %s" % (fmt_size(all_b), fmt_size(sel)) if all_b
+                                         else "Total: nada que limpiar")
+
+        def toggled(w, key):
+            marks[key] = w.get_active()
+            update()
+        for key, title, desc, _step, _on in self.CLEAN_ITEMS:
+            row = ActionRow(title, desc)
+            row.subtitle.set_ellipsize(0)
+            row.subtitle.set_line_wrap(True)
+            row.subtitle.set_xalign(0)
+            size = label("…", "dim-label", width_chars=22, xalign=1)
+            chk = Gtk.CheckButton(active=marks.get(key, False), valign=Gtk.Align.CENTER, sensitive=False)
+            chk.connect("toggled", toggled, key)
+            row.add_suffix(size)
+            row.add_suffix(chk)
+            lb.add(row)
+            rows[key] = (size, chk)
+        btn.connect("clicked", lambda *_: self.nv_clean_run(dict(sizes), picked()))
+        box.pack_start(btn, False, False, 0)
+        self.tools_box.pack_start(box, False, False, 0)
+        box.show_all()
+
+        def got(rc, out):
+            # (si Configuración se ha rehecho mientras tanto, estas filas ya no están en la ventana)
+            if total.subtitle.get_toplevel() is not self.win:
+                return False
+            for f in parse_lines(out):
+                if f[0] == "L" and len(f) >= 4 and f[2].isdigit() and f[3].isdigit():
+                    sizes[f[1]] = (int(f[2]), int(f[3]))
+            for key, (size, chk) in rows.items():
+                b, n = sizes.get(key, (0, 0))
+                size.set_label("%s · %s" % (fmt_size(b), plural(n, "fichero", "ficheros")) if n else "Vacío")
+                chk.set_sensitive(n > 0 and not self.busy)
+            if not sizes:
+                total.subtitle.set_label("No se ha podido medir: %s" % (out.strip().splitlines() or ["sin respuesta"])[-1])
+            update()
+            return False
+        run_quick(["gui-limpieza"], got)
+
+    def nv_clean_run(self, sizes, keys):
+        """«Limpiar lo marcado…»: confirma con lo que se va a hacer, numerado, y el aviso en rojo, y lanza
+        limpiar <claves> como tarea; al acabar, se vuelve a medir."""
+        if not keys:
+            return
+        info = {k: (t, step) for k, t, _d, step, _on in self.CLEAN_ITEMS}
+        steps = ["%s (%s · %s): %s." % (info[k][0], fmt_size(sizes[k][0]), plural(sizes[k][1], "fichero", "ficheros"),
+                                        info[k][1]) for k in keys]
+        warn = label("Lo que se limpia no se puede recuperar: no se hacen copias.", "aviso-rojo", wrap=True,
+                     max_width_chars=60, xalign=0)
+        if not confirm(self.win, "¿Limpiar lo marcado?",
+                       "Si algo es del administrador (lo de root), se pide su contraseña.", "Limpiar",
+                       destructive=True, extra=warn, steps=steps):
+            return
+        self.run_task("Limpiando", ["limpiar"] + keys, done_text="Limpieza terminada",
+                      on_done=lambda *_: self.build_tools())
 
     def nv_tools_show(self, section):
         """Abre Configuración en ese apartado (su título, como en TOOLS_SECTIONS)."""
@@ -33273,9 +34029,17 @@ class App2(NvBandeja,
 
         # Los desplegables se abren debajo del boton, como una lista. Sin esto, GTK 3 pone la opcion
         # elegida encima del boton y, con muchas (los proyectos), deja huecos vacios por arriba o abajo
+        # Y los de 8 opciones o más, con buscador (combo_search): el menú de GTK se cierra nada más abrirse
+        def popup_shown(combo, _pspec):
+            if combo.get_property("popup-shown") and not combo.get_has_entry() \
+                    and len(combo.get_model() or []) >= COMBO_SEARCH_MIN:
+                combo.popdown()
+                GLib.idle_add(lambda: (combo_search(combo), False)[1])
+
         def combo_hook(widget, *_):
             if isinstance(widget, Gtk.ComboBox) and widget.get_wrap_width() == 0:
                 widget.set_wrap_width(1)
+                widget.connect("notify::popup-shown", popup_shown)
             return True
         GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
         for text in (CSS, NEW_CSS):
@@ -34991,6 +35755,426 @@ function copies_files_command() {
         *) echo "Uso: lvm-instalador copias-ficheros [si|no]"; return 1 ;;
     esac
 }
+# Limpieza (1.57.9): lo que el programa va dejando y se puede borrar (limpieza, gui-limpieza, limpiar
+# <clave>...) y las cachés y registros de un proyecto (gui-limpiar-proyecto, limpiar-proyecto). Todo se
+# mide y se borra con CLEAN_PY: sin seguir enlaces, solo dentro de su carpeta y sin pasar a otro disco.
+# Lo que es de root, con sudo y con el mismo CLEAN_PY. Sin copias de seguridad: lo borrado no se recupera.
+# Las claves, en el orden de la ventana
+CLEAN_KEYS=(descargas copias correo registros registros-versiones caches-proyectos temporales sesiones)
+CLEAN_PROJECT_KEYS=(cache registros actualizaciones)
+# Los temporales, solo si llevan un dia sin cambiar (ellos y lo que tienen dentro)
+CLEAN_AGE=86400
+
+# Lo que ocupa (en bytes) dicho para personas: 3,4 MB
+function clean_size_text() {
+    awk -v n="${1:-0}" 'BEGIN {
+        split("B KB MB GB TB", u); i = 1
+        while (n >= 1024 && i < 5) { n /= 1024; i++ }
+        s = (i == 1) ? sprintf("%d %s", n, u[i]) : sprintf("%.1f %s", n, u[i])
+        gsub(/\./, ",", s); print s
+    }'
+}
+
+function clean_files_text() {
+    [ "${1:-0}" == 1 ] && echo "1 fichero" || echo "${1:-0} ficheros"
+}
+
+function clean_title() {
+    case $1 in
+        descargas) echo "Caché de descargas" ;;
+        copias) echo "Copias de seguridad" ;;
+        correo) echo "Correo de pruebas (Mailpit)" ;;
+        registros) echo "Registros del programa" ;;
+        registros-versiones) echo "Registros de las versiones" ;;
+        caches-proyectos) echo "Cachés de los proyectos" ;;
+        temporales) echo "Temporales" ;;
+        sesiones) echo "Sesiones de PHP" ;;
+        cache) echo "Caché" ;;
+        actualizaciones) echo "Restos de actualizaciones" ;;
+    esac
+}
+
+# Las carpetas de los proyectos de htdocs (sin enlaces, con un nombre valido)
+function clean_projects() {
+    local d n
+    for d in "$HTDOCS_DIR"/*/; do
+        d=${d%/} n=${d##*/}
+        [ -d "$d" ] && [ ! -L "$d" ] && [[ "$n" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && echo "$n"
+    done
+}
+
+# clean_project_rules <carpeta> [<clave>...]: las reglas de CLEAN_PY de un proyecto (todas sus claves si
+# no se dice ninguna). Solo las de lo que es: WordPress (wp-content y wp-config.php o wp-includes) o
+# PrestaShop (sus clases o su PrestaShopBundle). Nada de wp-content/uploads (salvo los registros de
+# WooCommerce, wc-logs) ni de img/ de las tiendas
+function clean_project_rules() {
+    local dir=$HTDOCS_DIR/$1
+    shift
+    local want=" ${*:-${CLEAN_PROJECT_KEYS[*]}} "
+    if [ -d "$dir/wp-content" ] && { [ -f "$dir/wp-config.php" ] || [ -d "$dir/wp-includes" ]; }; then
+        if [[ "$want" == *" cache "* ]]; then
+            echo "cache|$dir|vaciar|wp-content/cache||"
+        fi
+        if [[ "$want" == *" registros "* ]]; then
+            echo "registros|$dir|ficheros|wp-content|debug.log|"
+            echo "registros|$dir|ficheros|wp-content/uploads/wc-logs|*.log|"
+        fi
+        if [[ "$want" == *" actualizaciones "* ]]; then
+            echo "actualizaciones|$dir|vaciar|wp-content/upgrade||"
+            echo "actualizaciones|$dir|vaciar|wp-content/upgrade-temp-backup||"
+        fi
+    fi
+    if [ -f "$dir/classes/PrestaShopAutoload.php" ] || [ -d "$dir/src/PrestaShopBundle" ]; then
+        # (los index.php que trae PrestaShop en sus carpetas de cache y de registros se quedan)
+        if [[ "$want" == *" cache "* ]]; then
+            echo "cache|$dir|vaciar|var/cache||"
+            echo "cache|$dir|vaciar|cache/smarty/compile||index"
+            echo "cache|$dir|vaciar|cache/smarty/cache||index"
+            echo "cache|$dir|vaciar|cache/cachefs||index"
+        fi
+        if [[ "$want" == *" registros "* ]]; then
+            echo "registros|$dir|vaciar|var/logs||index"
+            echo "registros|$dir|vaciar|log||index"
+            echo "registros|$dir|ficheros|modules/*/logs|*.log|"
+            echo "registros|$dir|ficheros|modules/*/log|*.log|"
+        fi
+    fi
+}
+
+# clean_rules <clave>: las reglas de CLEAN_PY de una clave de limpiar (descargas, copias y correo, solo
+# para medirlas: se limpian con lo suyo)
+function clean_rules() {
+    local d t p me
+    me=$(id -u)
+    case $1 in
+        descargas) echo "descargas|$DL_CACHE_DIR|entradas|.|"'(?!.*[.]sha256$).+'"|solo=fich" ;;
+        copias) echo "copias|$COPIES_DIR|vaciar|||" ;;
+        correo) echo "correo|$MAILPIT_DATA|vaciar|||" ;;
+        registros)
+            # Solo estos (ninguno es un ajuste): los de las instalaciones y lo que dejan las que fallan
+            # (pila-<version>-<fecha>), el de install-db, el de los proyectos sin visitas, los de los
+            # proyectos de Node y el de la compilacion de la ventana del Mac. Lo que tenga abierto una tarea
+            # en marcha se deja; ventana.log, que la ventana tiene abierto mientras esta abierta, se vacia
+            [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] || return 0
+            echo "registros|$LOG_DIR|ficheros|.|instalacion-*.log|uso"
+            echo "registros|$LOG_DIR|ficheros|.|install-db.log|uso"
+            echo "registros|$LOG_DIR|ficheros|.|docker-reposo.log|uso"
+            echo "registros|$LOG_DIR|entradas|.|pila-[A-Za-z0-9._]+-[0-9]{8}-[0-9]{6}|solo=dir,uso"
+            echo "registros|$LOG_DIR|ficheros|node/proyectos|*.log|uso"
+            echo "registros|$LOG_DIR|ficheros|app|compilar.log|uso"
+            echo "registros|$LOG_DIR|truncar|.|ventana.log|"
+            ;;
+        registros-versiones)
+            # Se vacian (Apache, PHP-FPM y MariaDB los tienen abiertos): los de Apache (logs/*_log, con los
+            # de cada vhost y el de errores de PHP), el de PHP-FPM y el .err de MariaDB. Ni los .pid, ni los
+            # cgisock, ni nada mas de los datos de MariaDB
+            while IFS= read -r d; do
+                [ -n "$d" ] || continue
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}logs|*_log|"
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}logs|php-fpm.log|"
+                echo "registros-versiones|$d|truncar|${CLEAN_STACK_SUB}var/mysql|*.err|"
+            done < <(clean_version_dirs)
+            ;;
+        caches-proyectos)
+            while IFS= read -r p; do
+                clean_project_rules "$p" cache | sed 's/^cache|/caches-proyectos|/'
+            done < <(clean_projects)
+            ;;
+        temporales)
+            # Los del programa que llevan un dia sin cambiar y no estan en uso (un MariaDB temporal en
+            # marcha tiene su socket en /tmp/lvm-mysql-XXXX): las carpetas y ficheros lvm-* que crea en la
+            # carpeta temporal y, en ~/.lvm-instalador, temporal/ (actualizar proyecto), las listas y carpetas
+            # de ps-imagenes, los ficheros de mktemp de los vhosts, hosts, correo y BBDD de Docker, y las
+            # descargas a medias de Mailpit, cloudflared y Node. No las copias de pasar a Docker
+            # (pasar-*): si el paso falla a medias, son la unica copia de su BBDD
+            for t in "${CLEAN_TMP_DIRS[@]}"; do
+                echo "temporales|$t|entradas|.|lvm-(seguridad|mysql|conocidos|hosts|progreso|vhosts|vhosts-cert|cert|ca|pma|actualizar|mailpit|xampp|pila|icono|copia|cliente|bash|instalar|gpg|dns|github|gh|direccion)[.-].+|edad=$CLEAN_AGE,uso"
+            done
+            if [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ]; then
+                echo "temporales|$LOG_DIR|vaciar|temporal||edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|ps-imagenes-[a-z0-9_]{8}|solo=dir,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|(ps-imagenes-lista|vhosts-docker|hosts-docker|vhost-docker|vhosts-media|vhosts-borrar|hosts-borrar|correo)-[A-Za-z0-9]{6}|solo=fich,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|(docker|copia)-.+-[A-Za-z0-9]{6}([.]sql[.]gz)?|solo=fich,edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|.|mailpit-descarga[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|tunel|(abrir|cloudflared-descarga)[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+                echo "temporales|$LOG_DIR|entradas|node|descarga[.][A-Za-z0-9]{6}|edad=$CLEAN_AGE,uso"
+            fi
+            ;;
+        sesiones)
+            # Las de cada version: los XAMPP las guardan en su temp (session.save_path); las pilas propias
+            # no lo cambian y van a la carpeta temporal, donde solo se borran las tuyas
+            while IFS= read -r d; do
+                [ -n "$d" ] && echo "sesiones|$d|ficheros|${CLEAN_STACK_SUB}temp|sess_*|"
+            done < <(clean_version_dirs)
+            for t in "${CLEAN_TMP_DIRS[@]}"; do
+                echo "sesiones|$t|ficheros|.|sess_*|uid=$me"
+            done
+            ;;
+    esac
+}
+
+# Los correos de Mailpit: los que dice su API si esta en marcha o, si no, los de su base (sin cambiarla)
+function clean_mail_count() {
+    local n=""
+    if [ -n "$(mailpit_pid)" ]; then
+        n=$(curl -fs --noproxy '*' --max-time 5 "${MAIL_UI_URL}api/v1/messages?limit=1" 2> /dev/null \
+            | grep -oE '"total":[0-9]+' | head -1 | cut -d: -f2)
+    fi
+    if [ -z "$n" ] && [ -f "$MAILPIT_DATA/mailpit.db" ] && [ ! -L "$MAILPIT_DATA/mailpit.db" ]; then
+        n=$(python3 -I -c 'import sqlite3, sys
+c = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)
+print(c.execute("SELECT COUNT(*) FROM mailbox").fetchone()[0])' "$MAILPIT_DATA/mailpit.db" 2> /dev/null)
+    fi
+    [[ "$n" =~ ^[0-9]+$ ]] && echo "$n" || echo 0
+}
+
+# clean_measure <clave>...: L|<clave>|<bytes>|<ficheros>|<1 si hace falta root> de cada una, sin pedir
+# contraseña (lo que no se puede leer con tu usuario no cuenta). Correo: sus correos y su carpeta
+function clean_measure() {
+    local rules=() k line out b f r
+    for k in "$@"; do
+        while IFS= read -r line; do
+            [ -n "$line" ] && rules+=("$line")
+        done < <(clean_rules "$k")
+    done
+    out=""
+    [ ${#rules[@]} -gt 0 ] && out=$(python3 -I -c "$CLEAN_PY" medir "${rules[@]}" < /dev/null 2> /dev/null)
+    for k in "$@"; do
+        line=$(grep -m 1 "^L|$k|" <<< "$out")
+        IFS='|' read -r _ _ b f r <<< "${line:-L|$k|0|0|0}"
+        case $k in
+            correo) f=$(clean_mail_count); [ "$f" -gt 0 ] || b=0; r=0 ;;
+            copias) copies_need_root && r=1 ;;
+        esac
+        echo "L|$k|${b:-0}|${f:-0}|${r:-0}"
+    done
+}
+
+function clean_valid_key() {
+    local k
+    for k in "${CLEAN_KEYS[@]}"; do
+        [ "$k" == "$1" ] && return 0
+    done
+    return 1
+}
+
+# limpieza: cada cosa que se puede limpiar, con lo que ocupa y cuantos ficheros
+function clean_list() {
+    local k b f total=0 line
+    echo "Lo que se puede limpiar (lvm-instalador limpiar <clave>...):"
+    while IFS='|' read -r _ k b f _; do
+        total=$((total + b))
+        if [ "$f" -gt 0 ]; then
+            printf '  %-20s %-30s %s · %s\n' "$k" "$(clean_title "$k")" "$(clean_size_text "$b")" "$(clean_files_text "$f")"
+        else
+            printf '  %-20s %-30s %s\n' "$k" "$(clean_title "$k")" "vacío"
+        fi
+    done < <(clean_measure "${CLEAN_KEYS[@]}")
+    echo "Total: $(clean_size_text "$total"). Lo que se limpia no se puede recuperar (no se hacen copias)."
+}
+
+# ¿Hace falta root para limpiar estas claves? (para pedir la contraseña antes de empezar)
+function clean_need_root() {
+    local k b f r
+    [ $# -gt 0 ] || return 1
+    while IFS='|' read -r _ k b f r; do
+        [ "${f:-0}" -gt 0 ] && [ "$r" == 1 ] && return 0
+    done < <(clean_measure "$@" 2> /dev/null)
+    return 1
+}
+
+# clean_run <clave> <texto> <reglas...>: limpia con CLEAN_PY como tu usuario y, si algo es de root, otra
+# vez con sudo (el mismo CLEAN_PY: solo dentro de sus carpetas y sin seguir enlaces). Con --simular, solo
+# dice lo que borraria
+function clean_run() {
+    local key=$1 title=$2 out out2 rc b f n verb=borrados
+    shift 2
+    [ $# -gt 0 ] || return 0
+    [ "$key" == registros-versiones ] && verb=vaciados
+    if [ "$DRY" -eq 1 ]; then
+        out=$(python3 -I -c "$CLEAN_PY" simular "$@" < /dev/null 2> /dev/null)
+        b=$(awk -F'|' '$1 == "L" { s += $3 } END { print s + 0 }' <<< "$out")
+        f=$(awk -F'|' '$1 == "L" { s += $4 } END { print s + 0 }' <<< "$out")
+        echo "  [simulacion] $title: se $([ "$verb" == vaciados ] && echo vaciarian || echo borrarian) $(clean_files_text "$f") ($(clean_size_text "$b"))"
+        return 0
+    fi
+    out=$(python3 -I -c "$CLEAN_PY" limpiar "$@" < /dev/null 2>&1)
+    rc=$?
+    if [ $rc -eq 3 ] && [ -n "$SUDO" ]; then
+        echo "$title: parte es de root, se limpia con sudo (solo dentro de sus carpetas, sin seguir enlaces)"
+        out2=$(sudo python3 -I -c "$CLEAN_PY" limpiar "$@" < /dev/null 2>&1)
+        rc=$?
+        out=$(grep -v '^Q|' <<< "$out"; echo "$out2")
+    fi
+    b=$(awk -F'|' '$1 == "L" { s += $3 } END { print s + 0 }' <<< "$out")
+    f=$(awk -F'|' '$1 == "L" { s += $4 } END { print s + 0 }' <<< "$out")
+    echo "$title: $verb $(clean_files_text "$f") ($(clean_size_text "$b"))"
+    n=$(grep '^U|' <<< "$out" | sort -u | grep -c .)
+    if [ "$n" -gt 0 ]; then
+        echo "  En uso, se deja$([ "$n" -gt 5 ] && echo " (y $((n - 5)) más)"):"
+        grep '^U|' <<< "$out" | sort -u | head -5 | cut -d'|' -f3- | sed 's/^/    /'
+    fi
+    grep -vE '^[LPUQ]\|' <<< "$out" | grep . | head -5 | sed 's/^/  /'
+    if [ $rc -ne 0 ]; then
+        n=$(grep -c '^Q|' <<< "$out")
+        echo "  No se ha podido limpiar todo$([ "$n" -gt 5 ] && echo " ($n sitios)"):"
+        grep '^Q|' <<< "$out" | head -5 | cut -d'|' -f3- | sed 's/^/    /'
+        return 1
+    fi
+    return 0
+}
+
+# Mailpit: con su API (correo vaciar). Si no esta en marcha, no se puede
+function clean_mail() {
+    if [ -z "$(mailpit_pid)" ] && [ "$DRY" -eq 0 ]; then
+        echo "Correo de pruebas: Mailpit no esta en marcha (va con la version activa): arrancala y vuelve a limpiarlo"
+        return 1
+    fi
+    mail_command vaciar
+}
+
+# limpiar <clave>...: limpia esas cosas (lo que esta vacio, nada). Pide sudo solo si alguna lo necesita
+function clean_command() {
+    local k b f r keys=() rc=0 line
+    if [ $# -eq 0 ]; then
+        echo "Uso: lvm-instalador limpiar <clave>... (claves: ${CLEAN_KEYS[*]}; lvm-instalador limpieza dice lo que ocupa cada una)"
+        return 1
+    fi
+    for k in "$@"; do
+        clean_valid_key "$k" || { echo "Clave no valida: $k (claves: ${CLEAN_KEYS[*]})"; return 1; }
+        [[ " ${keys[*]} " == *" $k "* ]] || keys+=("$k")
+    done
+    echo "Limpiando (no se puede recuperar: no se hacen copias)..."
+    # (lo medido, antes: dentro del bucle, sudo y lo demas no tienen que leer de una tuberia)
+    local measured=() projects=()
+    mapfile -t measured < <(clean_measure "${keys[@]}")
+    for line in "${measured[@]}"; do
+        IFS='|' read -r _ k b f r <<< "$line"
+        if [ "${f:-0}" -eq 0 ]; then
+            echo "$(clean_title "$k"): nada que limpiar"
+            continue
+        fi
+        case $k in
+            descargas) downloads_command vaciar || rc=1 ;;
+            copias) copies_command vaciar || rc=1 ;;
+            correo) clean_mail || rc=1 ;;
+            caches-proyectos)
+                mapfile -t projects < <(clean_projects)
+                for line in "${projects[@]}"; do
+                    clean_project_key "$line" cache quiet || rc=1
+                done
+                ;;
+            *)
+                local rules=()
+                while IFS= read -r line; do
+                    [ -n "$line" ] && rules+=("$line")
+                done < <(clean_rules "$k")
+                clean_run "$k" "$(clean_title "$k")" "${rules[@]}" < /dev/null || rc=1
+                ;;
+        esac
+    done
+    [ $rc -eq 0 ] && echo "Limpieza terminada" || echo "Limpieza terminada, pero algo no se ha podido limpiar: mira lo de arriba"
+    return $rc
+}
+
+# Lo que se limpiaria de un proyecto, por clave: <clave>|<bytes>|<ficheros>|<root>|<rutas separadas por ,>
+function clean_project_measure() {
+    local folder=$1 rules=() line out k b f r
+    shift
+    while IFS= read -r line; do
+        [ -n "$line" ] && rules+=("$line")
+    done < <(clean_project_rules "$folder" "$@")
+    [ ${#rules[@]} -gt 0 ] || return 0
+    out=$(python3 -I -c "$CLEAN_PY" medir "${rules[@]}" < /dev/null 2> /dev/null)
+    while IFS='|' read -r _ k b f r; do
+        [ -n "$k" ] || continue
+        echo "$k|$b|$f|$r|$(awk -F'|' -v k="$k" '$1 == "P" && $2 == k { printf "%s%s", (n++ ? "," : ""), $3 }' <<< "$out")"
+    done < <(grep '^L|' <<< "$out")
+}
+
+# gui-limpiar-proyecto <carpeta>: P|<clave>|<bytes>|<ficheros>|<rutas> de lo que tiene algo
+function gui_clean_project() {
+    local folder=${1%/} k b f r paths
+    valid_project "$folder" > /dev/null || return 1
+    while IFS='|' read -r k b f r paths; do
+        [ "${f:-0}" -gt 0 ] && echo "P|$k|$b|$f|$paths"
+    done < <(clean_project_measure "$folder")
+    return 0
+}
+
+function clean_project_need_root() {
+    local folder=${1%/} k b f r paths
+    valid_project "$folder" > /dev/null 2>&1 || return 1
+    shift
+    while IFS='|' read -r k b f r paths; do
+        [ "${f:-0}" -gt 0 ] && [ "$r" == 1 ] && return 0
+    done < <(clean_project_measure "$folder" "$@")
+    return 1
+}
+
+# clean_project_key <carpeta> <clave> [quiet]: limpia esa clave del proyecto. La var/cache de una tienda,
+# con ps_clear_cache (vaciar-cache); lo demas, con clean_run. quiet: sin decir nada si no hay nada
+function clean_project_key() {
+    local folder=$1 key=$2 quiet=$3 rules=() line b f r paths
+    IFS='|' read -r _ b f r paths <<< "$(clean_project_measure "$folder" "$key")"
+    if [ "${f:-0}" -eq 0 ]; then
+        [ -n "$quiet" ] || echo "$(clean_title "$key") de $folder: nada que limpiar"
+        return 0
+    fi
+    while IFS= read -r line; do
+        [ -n "$line" ] && rules+=("$line")
+    done < <(clean_project_rules "$folder" "$key")
+    if [ "$key" == cache ] && [[ ",$paths," == *",var/cache,"* ]]; then
+        ps_clear_cache "$folder" || return 1
+        local rest=() x
+        for x in "${rules[@]}"; do
+            [[ "$x" == *"|vaciar|var/cache||" ]] || rest+=("$x")
+        done
+        rules=("${rest[@]}")
+        [ "$paths" == var/cache ] && return 0
+    fi
+    clean_run "$key" "$(clean_title "$key") de $folder" "${rules[@]}"
+}
+
+# limpiar-proyecto <carpeta> [<clave>...]: sus cachés, registros y restos de actualizaciones (sin claves,
+# todo lo que tenga). Las carpetas se vacian, no se borran
+function clean_project_command() {
+    local folder=${1%/} k keys=() rc=0
+    valid_project "$folder" || return 1
+    shift
+    for k in "$@"; do
+        [[ " ${CLEAN_PROJECT_KEYS[*]} " == *" $k "* ]] || { echo "Clave no valida: $k (claves: ${CLEAN_PROJECT_KEYS[*]})"; return 1; }
+        [[ " ${keys[*]} " == *" $k "* ]] || keys+=("$k")
+    done
+    [ ${#keys[@]} -gt 0 ] || keys=("${CLEAN_PROJECT_KEYS[@]}")
+    if [ -z "$(clean_project_rules "$folder" "${keys[@]}")" ]; then
+        echo "No hay cachés ni registros que limpiar en $folder (no es un WordPress ni una tienda PrestaShop)"
+        return 0
+    fi
+    echo "Limpiando $folder (no se puede recuperar: no se hacen copias)..."
+    for k in "${keys[@]}"; do
+        clean_project_key "$folder" "$k" || rc=1
+    done
+    return $rc
+}
+# Limpieza en Linux: las versiones son /opt/lampp-* (en las pruebas, las de LVM_PRUEBA), con sus logs, var/mysql
+# y temp sin subcarpeta; la carpeta temporal, /tmp y la tuya (TMPDIR) si es otra
+CLEAN_STACK_SUB=""
+CLEAN_TMP_DIRS=(/tmp)
+if [ -n "$TEST_DIR" ]; then
+    CLEAN_TMP_DIRS=("$TEST_DIR/tmp")
+elif [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ] && [ ! -L "${TMPDIR%/}" ] && [ -O "$TMPDIR" ]; then
+    [ "$(cd "$TMPDIR" && pwd -P)" == "/tmp" ] || CLEAN_TMP_DIRS+=("${TMPDIR%/}")
+fi
+
+function clean_version_dirs() {
+    if [ -n "$TEST_DIR" ]; then
+        find "$TEST_DIR" -maxdepth 1 -type d -name "lampp-*" 2> /dev/null | sort -V
+    else
+        lampp_dirs
+    fi
+}
+
 if [ "$1" == "--simular" ]; then
     DRY=1
     shift
@@ -35573,9 +36757,12 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|copias-ficheros) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros) ;;
         # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
         copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
+        # (limpiar y limpiar-proyecto: solo si algo de lo que se va a limpiar es de root)
+        limpiar) clean_need_root "${@:2}" && { sudo_first || exit 130; } ;;
+        limpiar-proyecto) clean_project_need_root "${@:2}" && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -35724,6 +36911,11 @@ case "$1" in
     novedades) changes_text ;;
     copias) copies_command "$2" ;;
     copias-ficheros) copies_files_command "$2" ;;
+    limpieza) clean_list ;;
+    gui-limpieza) clean_measure "${CLEAN_KEYS[@]}" | cut -d'|' -f1-4 ;;
+    limpiar) shift; clean_command "$@" ;;
+    gui-limpiar-proyecto) gui_clean_project "$2" ;;
+    limpiar-proyecto) shift; clean_project_command "$@" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

@@ -44,6 +44,8 @@ struct TopBar: View {
     @Environment(\.colorScheme) var scheme
     @State private var menuOpen = false
     @State private var servicesOpen = false
+    @State private var powerOpen = false
+    @State private var powerHover = false
     @State private var servicesHover = false
     @State private var warnOpen = false
 
@@ -117,6 +119,9 @@ struct TopBar: View {
                 if let a = act {
                     Text("XAMPP-\(a.folder)").font(.system(size: 10.5, design: .monospaced)).foregroundColor(.secondary)
                         .lineLimit(1).fixedSize()
+                } else {
+                    Text("pulsa ▶ para arrancar una").font(.system(size: 10.5)).foregroundColor(.secondary)
+                        .lineLimit(1).fixedSize()
                 }
             }
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
@@ -144,6 +149,8 @@ struct TopBar: View {
                 // (los recuadros de arriba no heredan el estilo de los botones de la ventana)
                 ServicesView(close: { servicesOpen = false }).environmentObject(model).buttonStyle(PointerButtonStyle()).frame(width: 660, height: 470)
             }
+            // (a la derecha de los servicios)
+            powerButton()
             Rectangle().fill(Color.primary.opacity(0.15)).frame(width: 1, height: 22)
             usageText()
         }
@@ -152,6 +159,56 @@ struct TopBar: View {
         .background(SoftSunken(radius: 12))
         .fixedSize(horizontal: true, vertical: false)
         .layoutPriority(1)
+    }
+
+    /// ▶ / ■ del visor: arranca la versión activa o la para y desactiva; sin ninguna activa, ▶ despliega
+    /// las versiones instaladas para elegir cuál arrancar
+    func powerButton() -> some View {
+        let d = model.data
+        let active = d?.active ?? ""
+        let on = !active.isEmpty && (d?.running ?? false)
+        let tip = on ? "Parar y desactivar XAMPP-\(active)" : active.isEmpty ? "Arrancar una versión" : "Arrancar XAMPP-\(active)"
+        return Button(action: {
+            if active.isEmpty { powerOpen.toggle() } else { model.power() }
+        }) {
+            // (solo el icono, verde o rojo, sin recuadro; al pasar el ratón, un fondo suave)
+            Image(systemName: on ? "stop.fill" : "play.fill").font(.system(size: 17, weight: .semibold))
+                .foregroundColor(on ? RED : GREEN)
+                .frame(width: 28, height: 28)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(powerHover || powerOpen ? 0.10 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(d == nil || (active.isEmpty && (d?.installs.isEmpty ?? true)))
+        .onHover { powerHover = $0 }
+        .hoverPointer()
+        .tip(tip)
+        .popover(isPresented: $powerOpen, arrowEdge: .bottom) {
+            let c = model.powerChoices()
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Arrancar una versión").font(.system(size: 11)).foregroundColor(.secondary)
+                    .padding(.horizontal, 8).padding(.bottom, 4)
+                ForEach(c.installs) { i in
+                    Button(action: { powerOpen = false; model.activate(i.folder) }) {
+                        HStack(spacing: 10) {
+                            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 16, height: 16)
+                            Text("PHP \(i.php)").font(.system(size: 13))
+                            Text("XAMPP-\(i.folder)").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
+                            Spacer(minLength: 12)
+                            if i.folder == c.last {
+                                Text("la última").font(.system(size: 11)).foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .hoverPointer()
+                }
+            }
+            .padding(8)
+            .frame(minWidth: 280)
+        }
     }
 
     /// Lo que gastan Nexum y sus servicios juntos: la CPU en % de todo el Mac (todos los núcleos son el

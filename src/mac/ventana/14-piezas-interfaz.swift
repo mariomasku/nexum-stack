@@ -413,6 +413,13 @@ let ROW_ICONS_EXACT: [String: (String, Color)] = [
     "Novedades": ("star.fill", .yellow),
     "Acerca de": ("info", .gray),
     "error_log": ("logo:apache", brand("apache")),
+    // (Configuración, Limpieza: cada cosa con su icono, como las dos primeras)
+    "Correo de pruebas": ("logo:mailpit", brand("mailpit")),
+    "Registros del programa": ("doc.text.fill", .gray),
+    "Registros de las versiones": ("logo:apache", brand("apache")),
+    "Cachés de los proyectos": ("folder.fill", .cyan),
+    "Temporales": ("trash.fill", .gray),
+    "Sesiones de PHP": ("logo:php", brand("php")),
 ]
 let ROW_ICONS: [(String, String, Color)] = [
     ("Versiones sin proteger", "network", .red),

@@ -53,7 +53,21 @@ extension AppModel {
             openTab("versiones")
             return
         }
+        if d.running {
+            try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true)
+            try? (d.active + "\n").write(toFile: LAST_VERSION_FILE, atomically: true, encoding: .utf8)
+        }
         control(d.running ? "parar" : "arrancar", d.running ? "Parando" : "Arrancando")
+    }
+
+    /// Las versiones instaladas para ▶ sin ninguna activa: la última que se usó, la primera
+    func powerChoices() -> (last: String, installs: [Install]) {
+        let last = ((try? String(contentsOfFile: LAST_VERSION_FILE, encoding: .utf8)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let list = (data?.installs ?? []).sorted { a, b in
+            a.folder == last ? b.folder != last : (b.folder == last ? false : a.folder < b.folder)
+        }
+        return (last, list)
     }
 
     /// Rama de php.net de una versión de PHP (8.4.12 → la de 8.4), nil si no se ha consultado

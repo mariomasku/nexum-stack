@@ -107,6 +107,9 @@ final class AppModel: ObservableObject {
     @Published var backups: [Int64]? = nil
     /// Copias de los ficheros que cambia el programa por su cuenta (Configuración, Carpetas; copias-ficheros si|no)
     @Published var copiesFiles = FileManager.default.fileExists(atPath: COPIES_FILES_FLAG)
+    /// Configuración, Limpieza: las casillas que se han cambiado (clave → marcada); las demás, como vienen
+    /// en CLEAN_ITEMS. Se recuerdan mientras la ventana está abierta, como en Linux
+    @Published var cleanMarks: [String: Bool] = [:]
     /// Lo que ocupa cada BBDD («versión|base» → [bytes, cuándo se midió]; gui-bbdd-tamanos)
     @Published var dbSizes: [String: [Int64]] = [:]
     /// Lo que ocupa cada proyecto en el disco: carpeta → [bytes, cuándo se midió]

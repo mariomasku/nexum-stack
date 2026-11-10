@@ -42,6 +42,12 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 .nv-pastilla button { border: none; background: transparent; box-shadow: none; }
 .nv-pastilla button.nv-servicios { border-radius: 8px; padding: 2px 8px; }
 .nv-pastilla button.nv-servicios:hover, .nv-pastilla button.nv-servicios:checked { background-color: alpha(@theme_fg_color, 0.10); }
+/* Arrancar o parar la version desde el visor: solo el icono, verde (▶) o rojo (■), sin recuadro */
+.nv-pastilla button.nv-encender { border-radius: 8px; padding: 2px 4px; }
+.nv-pastilla button.nv-encender.nv-play { color: %(g)s; }
+.nv-pastilla button.nv-encender.nv-stop { color: #e5534b; }
+.nv-pastilla button.nv-encender:hover { background-color: alpha(@theme_fg_color, 0.10); }
+.nv-pastilla button.nv-encender:disabled { opacity: 0.45; }
 /* Subir o actualizar una BBDD: un visor un poco hundido, como el de arriba */
 .nv-hundido { background-color: shade(@theme_bg_color, 0.86); border: 1px solid alpha(black, 0.20); border-radius: 12px;
               box-shadow: inset 0 2px 6px alpha(black, 0.35), inset 0 0 0 1px alpha(black, 0.10); padding: 14px 16px; }

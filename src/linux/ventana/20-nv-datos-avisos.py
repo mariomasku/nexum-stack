@@ -8,7 +8,7 @@ class NvDatosAvisos:
         if d:
             act = next((i for i in d["installs"] if i["folder"] == d["active"]), None)
             self.status_lbl.set_label("PHP %s" % act["php"] if act else "Ninguna versión activa")
-            self.status_sub.set_label("lampp-%s" % d["active"] if act else "")
+            self.status_sub.set_label("lampp-%s" % d["active"] if act else "pulsa ▶ para arrancar una")
             self.nv_power_state()
             self.nv_projects_refresh()
             self.nv_mail_header()
@@ -32,6 +32,65 @@ class NvDatosAvisos:
             ctx.remove_class("nv-gris" if on else "nv-verde")
             ctx.add_class("nv-verde" if on else "nv-gris")
             (ctx.add_class if on else ctx.remove_class)("nv-latido")
+        self.nv_power_button()
+
+    def nv_power_button(self):
+        """El ▶ / ■ del visor, según esté la versión activa (o sin ninguna)."""
+        d = self.data or {}
+        on = bool(d.get("active")) and bool(d.get("running"))
+        ctx = self.power_btn.get_style_context()
+        ctx.remove_class("nv-play" if on else "nv-stop")
+        ctx.add_class("nv-stop" if on else "nv-play")
+        self.power_img.set_from_icon_name("media-playback-stop-symbolic" if on else "media-playback-start-symbolic",
+                                          Gtk.IconSize.MENU)
+        self.power_img.set_pixel_size(22)
+        if on:
+            tip = "Parar y desactivar lampp-%s" % d["active"]
+        elif d.get("active"):
+            tip = "Arrancar lampp-%s" % d["active"]
+        else:
+            tip = "Arrancar una versión"
+        self.power_btn.set_tooltip_text(tip)
+        self.power_btn.set_sensitive(bool(d.get("active") or d.get("installs")))
+
+    def nv_power_click(self):
+        d = self.data or {}
+        if d.get("active"):
+            if d.get("running"):
+                try:
+                    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+                    with open(LAST_VERSION_FILE, "w") as fh:
+                        fh.write(d["active"] + "\n")
+                except OSError:
+                    pass
+            self.nv_power()
+            return
+        # Sin ninguna activa: las versiones instaladas, la última que se usó la primera
+        try:
+            with open(LAST_VERSION_FILE) as fh:
+                last = fh.read().strip()
+        except OSError:
+            last = ""
+        installs = sorted(d.get("installs") or [], key=lambda i: (i["folder"] != last, i["folder"]))
+        pop = Gtk.Popover(relative_to=self.power_btn, position=Gtk.PositionType.BOTTOM)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1, margin=6)
+        box.pack_start(label("Arrancar una versión", "nv-chico", "nv-tenue", margin_start=8, margin_bottom=4),
+                       False, False, 0)
+        for i in installs:
+            b = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE), "nv-menuitem")
+            row = Gtk.Box(spacing=10)
+            row.pack_start(logo("php", 16), False, False, 0)
+            row.pack_start(label("PHP %s" % i["php"]), False, False, 0)
+            row.pack_start(label("lampp-%s" % i["folder"], "nv-tenue", "nv-mono", "nv-chico"), True, True, 0)
+            if i["folder"] == last:
+                row.pack_end(label("la última", "nv-chico", "nv-tenue"), False, False, 0)
+            b.add(row)
+            b.connect("clicked", lambda _b, f=i["folder"]: (pop.popdown(), self.on_activate_version(None, f)))
+            box.pack_start(b, False, False, 0)
+        pop.add(box)
+        box.show_all()
+        pop.connect("closed", lambda *_: GLib.idle_add(pop.destroy))
+        pop.popup()
 
     def update_project_search(self):
         # (la busqueda de siempre sigue funcionando por detras: la usa el asistente de proyecto nuevo)

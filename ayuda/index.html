@@ -50,6 +50,7 @@
         <li><a href="#github-config">GitHub</a></li>
         <li><a href="#errores">Registro de errores</a></li>
         <li><a href="#apariencia">Apariencia</a></li>
+        <li><a href="#limpieza">Limpieza</a></li>
         <li><a href="#carpetas">Carpetas</a></li>
         <li data-so="linux"><a href="#xampp-registrar">XAMPP sin registrar</a></li>
         <li><a href="#programa">Programa</a></li>
@@ -177,10 +178,14 @@
       <li data-x="9.5" data-y="4.1"><b>El programa y su versión</b><span>Debajo del nombre, «Entornos LAMPP y Docker» y la versión del programa
         que tienes instalada. «Acerca de Nexum Dev Stack», en el menú ☰, da más detalles.</span></li>
       <li data-x="33.5" data-y="4.1"><b>La versión activa</b><span>El PHP que está sirviendo tus proyectos y su carpeta (por ejemplo
-        «PHP 8.4.27 lampp-8.4»). Si no hay ninguna, pone «Ninguna versión activa».</span></li>
+        «PHP 8.4.27 lampp-8.4»). Si no hay ninguna, pone «Ninguna versión activa» y «pulsa ▶ para arrancar una».</span></li>
       <li data-x="48.5" data-y="4.1"><b>Apache y MariaDB</b><span>El punto está verde (y late) si el servicio está en marcha, y gris si está
         parado. Púlsalo: se despliegan los servicios de la versión activa, con sus puertos y sus botones para arrancar, parar o reiniciar cada
         uno.</span></li>
+      <li data-x="54.5" data-y="4.1"><b>▶ / ■</b><span>Arranca o para la versión activa sin abrir nada más. <b>■</b> (rojo), con la versión en
+        marcha, la para y la desactiva, como «Parar y desactivar». <b>▶</b> (verde), con la versión parada, la arranca. Si no hay ninguna
+        activa, <b>▶</b> despliega las versiones que tienes instaladas, con la última que usaste la primera («la última»), y arranca la que
+        elijas.</span></li>
       <li data-x="61.4" data-y="4.1"><b>Lo que gasta</b><span>La CPU y la memoria que usan el programa y sus servicios juntos. Deja el ratón
         encima para ver cada parte por separado. Se mide cada 3 segundos.</span></li>
       <li data-x="70.4" data-y="4.1"><b>El menú ☰</b><span>Tema claro u oscuro, editar los vhosts y el fichero de hosts, volver a leer las
@@ -199,6 +204,11 @@
     </ol>
   </figure>
 
+  <div class="nota"><b>Desplegables con buscador</b>Cualquier desplegable de 8 opciones o más (proyectos, bases de datos, carpetas,
+    versiones…) se abre con un campo «Buscar…» arriba. Empieza a escribir y la lista se queda solo con lo que lleva ese texto, como en la barra de búsqueda de
+    los proyectos. Las flechas mueven la selección, Intro elige la marcada y Esc cierra sin cambiar nada (con algo escrito, Esc primero lo
+    borra). Los cortos, de menos de 8 opciones, se abren como siempre.</div>
+
   <div class="nota"><b>Dos botones que solo salen a veces</b>A la izquierda del recuadro de la versión activa pueden aparecer dos botones
     más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo con un número), cuando hay algo que conviene
     hacer, y el de la <b>tarea en segundo plano</b> (una flecha verde que late), cuando una tarea sigue trabajando sin su ventana.</div>
@@ -206,7 +216,8 @@
   <div data-so="linux">
   <h3>Los servicios de la versión activa</h3>
   <p>Pulsa «Apache · MariaDB» en el recuadro de arriba. Se despliega un panel con los servicios de la versión activa. Si no hay ninguna
-    activa, te dice «Ninguna versión activa» y que actives una en <a href="#versiones">Versiones de PHP</a>.</p>
+    activa, te dice «Ninguna versión activa»: arranca una con <b>▶</b>, en el mismo recuadro, o actívala en
+    <a href="#versiones">Versiones de PHP</a>.</p>
   <ul>
     <li><b>Arriba</b>, «Servicios de lampp-8.4» y cuántos están en marcha («2 de 3 en marcha»). A la derecha, una pastilla: <b>«Solo desde
       este equipo»</b> (verde) o <b>«Abierto a la red»</b> (rojo), si se puede entrar desde otros equipos.</li>
@@ -745,6 +756,8 @@
       tocan.</b> La copia de Docker se borra sin guardar antes otra.</li>
     <li><b>«Vaciar la caché de la tienda»</b>: solo en PrestaShop. Borra lo que hay en su <code>var/cache</code> (se rehace sola). No
       pregunta antes ni guarda copia.</li>
+    <li><b>«Limpiar proyecto…»</b>: su caché, sus registros y, en WordPress, los restos de las actualizaciones. Ver
+      <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</li>
     <li><b>«Descargar de producción las imágenes que faltan…»</b> (PrestaShop) o <b>«Imágenes de producción…»</b> (WordPress): ver
       <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
     <li><b>«Personalizar los botones…»</b>: ver <a href="#personalizar-botones">Personalizar los botones</a>.</li>
@@ -760,6 +773,27 @@
     <li><b>«Importar SQL…»</b>: te lleva a <a href="#bbdd">Bases de datos</a>, a «Subir o actualizar una BBDD», con ese proyecto y su base
       de la versión activa ya elegidos. Solo falta el fichero.</li>
   </ul>
+
+  <h3 id="limpiar-proyecto">Limpiar un proyecto</h3>
+  <p>«Limpiar proyecto…», en cualquiera de los dos menús ⋮. Sirve para quitar lo que el proyecto va acumulando sin que te haga falta: su
+    caché y sus registros. Las imágenes y todo lo que se sube a la web no se tocan nunca (ni <code>wp-content/uploads</code> ni el
+    <code>img</code> de PrestaShop), y las carpetas se quedan, vacías.</p>
+  <ul>
+    <li><b>Caché</b>. WordPress: <code>wp-content/cache</code>. PrestaShop: <code>var/cache</code> y la de Smarty
+      (<code>cache/smarty/compile</code>, <code>cache/smarty/cache</code>) y, en las 1.6, <code>cache/cachefs</code>. Se rehace sola: la
+      primera visita va algo más lenta.</li>
+    <li><b>Registros</b>. WordPress: <code>wp-content/debug.log</code> y los de WooCommerce (<code>wp-content/uploads/wc-logs</code>).
+      PrestaShop: <code>var/logs</code>, <code>log</code> en las 1.6 y los registros de los módulos (<code>modules/…/logs</code>).</li>
+    <li><b>Restos de actualizaciones</b> (WordPress): <code>wp-content/upgrade</code> y <code>wp-content/upgrade-temp-backup</code>, lo
+      que deja WordPress al actualizar.</li>
+  </ul>
+  <p>El diálogo «Limpiar «panaderia-luna»» enseña solo lo que ese proyecto tiene, cada cosa con sus carpetas, lo que ocupa y cuántos
+    ficheros, y con su casilla marcada. Desmarca lo que quieras conservar y pulsa <b>«Limpiar lo marcado…»</b>. Te pregunta antes
+    «¿Limpiar «panaderia-luna»?», con lo que se va a hacer numerado y el aviso en rojo «Lo que se limpia no se puede recuperar: no se
+    hacen copias.». Pulsa «Limpiar», en rojo. Si algo es del administrador (lo que creó Apache), se pide su contraseña. Si el proyecto no
+    tiene nada, te lo dice: «No hay cachés ni registros que limpiar en …».</p>
+  <p>En la terminal: <code>lvm-instalador limpiar-proyecto panaderia-luna</code> (todo) o con lo que quieras limpiar detrás
+    (<code>cache</code>, <code>registros</code>, <code>actualizaciones</code>).</p>
 
   <h3 id="borrar-proyecto">Borrar un proyecto</h3>
   <p>«Borrar el proyecto…», en cualquiera de los dos menús ⋮.</p>
@@ -1788,6 +1822,7 @@
     <li><a href="#github-config">GitHub</a></li>
     <li><a href="#errores">Registro de errores</a></li>
     <li><a href="#apariencia">Apariencia</a></li>
+    <li><a href="#limpieza">Limpieza</a></li>
     <li><a href="#carpetas">Carpetas</a></li>
     <li data-so="linux"><a href="#xampp-registrar">XAMPP sin registrar</a></li>
     <li><a href="#programa">Programa</a></li>
@@ -2039,6 +2074,57 @@
     <ul>
       <li><b>De partida:</b> iconos sin color, sin logotipos y todas las páginas a la vista; botones con su nombre, todos y en el orden de la lista.</li>
       <li><b>Los botones del visor</b> valen para el del proyecto cargado y el de Docker. Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.</li>
+    </ul>
+  </div>
+
+  <h3 id="limpieza">Limpieza</h3>
+  <p>Lo que el programa y tus webs van dejando con el uso y se puede borrar para recuperar espacio, cada cosa con lo que ocupa. Lo que se
+    limpia no se puede recuperar: no se hacen copias.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-limpieza.png" data-linux="img/linux/config-limpieza.png" data-mac="img/mac/config-limpieza.png" alt="Configuración, Limpieza" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="41" data-y="22"><b>Lo que se puede limpiar</b><span>El total de todo y lo que suma lo que tienes marcado. Mientras mide,
+        pone «Midiendo…».</span></li>
+      <li data-x="41" data-y="27.3"><b>Caché de descargas</b><span>Lo ya descargado y comprobado de PHP, Apache, MariaDB…<span data-so="linux">
+        (<code>/var/cache/nexum-stack</code>)</span>. Si se limpia, la próxima instalación lo descarga otra vez. Las versiones instaladas no
+        se tocan.</span></li>
+      <li data-x="41" data-y="35.2"><b>Copias de seguridad</b><span>Todo lo de <code>~/nexum-backups</code>, las copias que pides con
+        «Guardar antes una copia». La carpeta se queda. Viene desmarcada.</span></li>
+      <li data-x="41" data-y="42.3"><b>Correo de pruebas</b><span>Los correos que ha recogido Mailpit: la bandeja se queda vacía. Mailpit tiene
+        que estar en marcha. Viene desmarcado.</span></li>
+      <li data-x="41" data-y="50.2"><b>Registros del programa</b><span>Los de las instalaciones (y lo que dejan las que fallan) y los de Node,
+        en <code>~/.lvm-instalador</code>. Tus ajustes no se tocan, ni el registro de una tarea que esté en marcha.</span></li>
+      <li data-x="41" data-y="58.1"><b>Registros de las versiones</b><span>Los de Apache (también el de cada web), PHP-FPM, PHP y MariaDB de
+        cada versión. Se vacían, no se borran, porque los servicios los tienen abiertos: se pierde lo que decían hasta ahora.</span></li>
+      <li data-x="41" data-y="66.1"><b>Cachés de los proyectos</b><span>La caché de todos tus proyectos a la vez, la misma que
+        <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</span></li>
+      <li data-x="39" data-y="74.1"><b>Temporales</b><span>Lo que dejan las tareas en la carpeta temporal y en
+        <code>~/.lvm-instalador</code>. Solo lo que lleva más de un día sin cambiar y nada está usando.</span></li>
+      <li data-x="40" data-y="82"><b>Sesiones de PHP</b><span>Los ficheros de sesión de las webs locales de cada versión. Si se limpian, se
+        cierran las sesiones abiertas: hay que volver a entrar en la administración de cada web. Viene desmarcado.</span></li>
+      <li data-x="96.5" data-y="29.2"><b>Lo que ocupa y su casilla</b><span>Cada cosa dice lo que ocupa y cuántos ficheros tiene, o «Vacío»
+        (y entonces su casilla está apagada). Marca lo que quieras limpiar: lo que marques se recuerda mientras la ventana sigue
+        abierta.</span></li>
+      <li data-x="91.9" data-y="90.9"><b>Limpiar lo marcado…</b><span>Te pregunta antes «¿Limpiar lo marcado?», con lo que se va a hacer
+        numerado (cada cosa con lo que ocupa) y el aviso en rojo «Lo que se limpia no se puede recuperar: no se hacen copias.». Pulsa
+        «Limpiar», en rojo. Si algo es del administrador, se pide su contraseña. Al acabar, vuelve a medir. Apagado si no hay nada
+        marcado.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li>Solo lo que se marca. De partida van marcados la caché de descargas, los registros del programa y de las versiones, las cachés de
+        los proyectos y los temporales; sin marcar, las copias de seguridad, el correo y las sesiones de PHP.</li>
+      <li>En la terminal: <code>lvm-instalador limpieza</code> dice lo que ocupa cada cosa y <code>lvm-instalador limpiar</code> con lo
+        que quieras detrás (<code>descargas</code>, <code>copias</code>, <code>correo</code>, <code>registros</code>,
+        <code>registros-versiones</code>, <code>caches-proyectos</code>, <code>temporales</code>, <code>sesiones</code>) lo limpia.</li>
     </ul>
   </div>
 
@@ -2412,6 +2498,10 @@
       dicen al empezar («Sin copia: …»).</dd>
     <dt><code>copias-ficheros si</code> · <code>copias-ficheros no</code></dt><dd>Enciende o apaga las copias del fichero de hosts, los
       vhosts y la configuración de los proyectos antes de cambiarlos (sin nada, dice cómo está).</dd>
+    <dt><code>limpieza</code> · <code>limpiar &lt;qué&gt;…</code></dt><dd>Lo que se puede limpiar y lo que ocupa cada cosa, o limpiarlo (ver
+      <a href="#limpieza">Limpieza</a>).</dd>
+    <dt><code>limpiar-proyecto &lt;carpeta&gt; [cache] [registros] [actualizaciones]</code></dt><dd>La caché, los registros y los restos
+      de actualizaciones de un proyecto (sin nada detrás, todo). Ver <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</dd>
     <dt><code>novedades</code> · <code>version</code></dt><dd>Qué ha cambiado en cada versión, y la versión del programa.</dd>
   </dl>
 </section>
