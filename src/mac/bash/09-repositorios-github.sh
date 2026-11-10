@@ -52,7 +52,7 @@ function github_connect() {
 }
 
 function github_disconnect() {
-    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token de el Llavero"; return 0; }
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token del Llavero"; return 0; }
     security delete-generic-password -s "$GITHUB_KEYRING_SERVICE" -a github > /dev/null 2>&1
     github_conf_set ORIGEN ""
     echo "Desconectado de GitHub (el token ya no está en el Llavero)"

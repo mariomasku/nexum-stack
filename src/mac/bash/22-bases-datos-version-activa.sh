@@ -191,21 +191,16 @@ function drop_database() {
     fi
 
     if [ $backup -eq 1 ]; then
-        local dump=${LVM_BD_VOLCADO:-$(dirname "$DB_CLIENT")/mysqldump}
+        # (con export_database, como en Linux: la copia no lleva el administrador de pruebas ni los cambios del
+        # correo de pruebas, que son de este Mac, y la descarga es la misma que «Descargar»)
         local dest="$COPIES_DIR/XAMPP-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
-        echo "Guardando copia de $db en $dest..."
-        if [ "$DRY" -eq 1 ]; then
-            echo "  [simulacion] mysqldump $db | gzip > $dest"
-        else
-            mkdir -p -m 700 "$COPIES_DIR"
-            if ! ( set -o pipefail; "${DB_SAFE[@]}" "$dump" -uroot --default-character-set=utf8mb4 --single-transaction \
-                --routines --triggers --events "$db" < /dev/null | gzip > "$dest" ); then
-                rm -f "$dest"
-                echo "No se ha podido guardar la copia, asi que NO se borra nada."
+        echo "Guardando copia de $db..."
+        run mkdir -p -m 700 "$COPIES_DIR"
+        if ! export_database "$db" "$dest" "$DB_FOLDER"; then
+            rm -f "$dest"
+            echo "No se ha podido guardar la copia, asi que NO se borra nada."
 
-                return 1
-            fi
-            echo "Copia guardada: $dest ($(du -h "$dest" | cut -f1))"
+            return 1
         fi
     fi
 
@@ -1374,6 +1369,7 @@ function import_database() {
     return 0
 }
 
+#@incluir comun/cargar-bases-datos-version/import_need_root.sh
 #@incluir comun/cargar-bases-datos-version/db_neutralize_invoker.sh
 # Tablas del sistema de MariaDB (mysql.*) de una version anterior a la del servidor: los datos de
 # XAMPP vienen de una MariaDB antigua sin poner al dia, y el servidor escribe un error en su registro

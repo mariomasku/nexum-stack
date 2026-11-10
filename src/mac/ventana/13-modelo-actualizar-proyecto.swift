@@ -156,6 +156,15 @@ extension AppModel {
             if npFake && !matches(DOMAIN_RX, dom) {
                 return (false, dom.isEmpty ? "" : "Dominio no válido (por ejemplo: midominio.com)")
             }
+            // (un vhost de ese dominio que lleva a otra carpeta: nuevo-dominio no lo toca y pararía a mitad;
+            // uno que ya lleva a esta, se usa)
+            let folder: String = npFolder.trimmingCharacters(in: .whitespaces)
+            if npFake, let other = (hosts ?? []).first(where: { (h: HostEntry) -> Bool in
+                h.folder != folder && ([h.name.lowercased()] + h.alias.lowercased().split(separator: " ").map(String.init)).contains(dom)
+            }) {
+                let to: String = other.folder.isEmpty ? "una carpeta de fuera de htdocs" : "htdocs/\(other.folder)"
+                return (false, "Ya hay un vhost para \(dom) que lleva a \(to), no a esta carpeta: no se puede falsear para este proyecto. Apágalo aquí o cambia ese vhost («Editar vhosts»).")
+            }
             return (true, "")
         default:
             let db = npDb.trimmingCharacters(in: .whitespaces)
@@ -226,6 +235,12 @@ extension AppModel {
     /// Vaciar var/cache de la tienda PrestaShop de la base (la carpeta la busca el script)
     func clearCache(_ db: String) {
         runTask("Vaciando la caché de la tienda de \(db)", ["vaciar-cache", "--bd", db],
+                doneText: "Caché vaciada", autoClose: true)
+    }
+
+    /// Menú ⋮ de un proyecto: vaciar var/cache de esa tienda (por su carpeta: varias pueden usar la misma base)
+    func clearCache(folder: String, db: String) {
+        runTask("Vaciando la caché de la tienda de \(db)", ["vaciar-cache", folder],
                 doneText: "Caché vaciada", autoClose: true)
     }
 

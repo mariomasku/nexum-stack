@@ -396,7 +396,7 @@ class AppPrograma:
              "unregistered": False, "native": True, "launcher": True,
              "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
-             "stray": "", "exposed": "", "unsecured": [], "certs": [], "cas": [], "untrusted": [], "stale": [],
+             "stray": "", "orphans": [], "exposed": "", "unsecured": [], "certs": [], "cas": [], "untrusted": [], "stale": [],
              "dbsys": None, "php2shell": {},
              "mail": {"installed": False, "on": True, "wp": "mailpit", "running": False, "version": "",
                       "url": "http://127.0.0.1:8025/", "offer": ""}}
@@ -420,6 +420,9 @@ class AppPrograma:
                 d["vhosts"], d["hosts"] = f[1], f[2]
             elif f[0] == "Z" and len(f) >= 2:
                 d["stray"] = "|".join(f[1:])
+            elif f[0] == "W" and len(f) >= 3:
+                # (vhosts de proyectos cuya carpeta ya no está en htdocs)
+                d["orphans"].append((f[1], f[2]))
             elif f[0] == "N" and len(f) >= 2:
                 d["exposed"] = "|".join(f[1:])
             elif f[0] == "U" and len(f) >= 2:

@@ -21,7 +21,7 @@ check "tareas de la ventana: limpieza sin contraseña; limpiar, solo si algo es 
 check "vaciar-cache con sudo usa CLEAN_PY (ya no hay CACHE_CLEAR_PY)" '! grep -q CACHE_CLEAR_PY "$SRC" && grep -q "python3 -I -c \"\$CLEAN_PY\" limpiar \"cache|\$HTDOCS_DIR/\$folder|vaciar|var/cache||\"" "$SRC"'
 check "sin copias de seguridad en la limpieza" '! awk "/^function clean_size_text\\(\\) \\{/,/^function clean_project_command/" "$SRC" | grep -q "COPIES_DIR/"'
 
-extract "$SRC" clean_size_text clean_files_text clean_title clean_projects clean_project_rules clean_rules \
+extract "$SRC" clean_size_text clean_files_text clean_title clean_project_title clean_projects clean_project_rules clean_rules \
     clean_mail_count clean_measure clean_valid_key clean_list clean_need_root clean_run clean_mail clean_command \
     clean_project_measure gui_clean_project clean_project_need_root clean_project_key clean_project_command \
     clean_version_dirs valid_project ps_clear_cache downloads_command copies_command copies_need_root \
@@ -213,6 +213,7 @@ check "limpiar-proyecto de la tienda: var/logs vacia y los registros de los modu
 check "limpiar-proyecto de la tienda: img/ intacta y un modulo enlazado a fuera no se sigue" '[ -s "$S/img/p/1.jpg" ] && [ -s "$R/fuera/logs/ajeno.log" ] && [ -L "$S/modules/fuera" ]'
 o=$(clean_project_command tienda16 registros 2>&1)
 check "limpiar-proyecto de la tienda 1.6: log/ sin su index.php" '[ "$(ls -A "$O/log")" = index.php ]'
+check "limpiar-proyecto: dice «Registros de <carpeta>» (no los del programa)" 'grep -q "^Registros de tienda16: borrados " <<< "$o" && ! grep -q "Registros del programa" <<< "$o"'
 o=$(clean_project_command blog registros actualizaciones 2>&1); rc=$?
 check "limpiar-proyecto del WordPress: debug.log y los wc-logs/*.log fuera; uploads intacto (salvo wc-logs)" '[ $rc -eq 0 ] && [ ! -e "$P/wp-content/debug.log" ] && [ ! -e "$P/wp-content/uploads/wc-logs/fatal-errors-2026.log" ] && [ -s "$P/wp-content/uploads/wc-logs/index.html" ] && [ -s "$P/wp-content/uploads/2026/11/foto.jpg" ] && [ -s "$P/wp-content/uploads/2026/11/no-es-wc.log" ]'
 check "limpiar-proyecto del WordPress: upgrade y upgrade-temp-backup vacias (las carpetas se quedan)" '[ -d "$P/wp-content/upgrade" ] && [ -z "$(ls -A "$P/wp-content/upgrade")" ] && [ -d "$P/wp-content/upgrade-temp-backup" ] && [ -z "$(ls -A "$P/wp-content/upgrade-temp-backup")" ]'

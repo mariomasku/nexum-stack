@@ -808,13 +808,16 @@ function new_custom_domain() {
 
         return 1
     fi
-    owner=$(vhosts_info | awk -F'|' -v d="$domain" '$3 == d || index(" " $4 " ", " " d " ") { print $2; exit }')
+    # Un vhost del dominio que ya lleva a esa carpeta se usa (se le añade lo que le falte); uno que lleva a
+    # otra, no se toca: se para antes de cambiar nada
+    owner=$(vhosts_info | awk -F'|' -v d="$domain" -v f="$folder" '($3 == d || index(" " $4 " ", " " d " ")) && $2 != f { print ($2 == "" ? "?" : $2); exit }')
     if [ -n "$owner" ]; then
-        echo "Ya hay un vhost para $domain (carpeta ${owner:-desconocida}). Para falsearlo usa su"
-        echo "interruptor en Dominios y hosts (o: nexum hosts-falsear $domain si)."
+        echo "Ya hay un vhost para $domain que lleva a $([ "$owner" == "?" ] && echo "una carpeta de fuera de $HTDOCS_DIR" || echo "$HTDOCS_DIR/$owner"), no a $folder."
+        echo "No se cambia nada. Para falsearlo usa su interruptor en Dominios y hosts (o: nexum hosts-falsear $domain si)."
 
         return 1
     fi
+    vhost_points_to "$domain" "$folder" && echo "Ya hay un vhost para $domain que lleva a $folder: se usa"
     if [ -n "$db" ]; then
         db_valid_name "$db" || return 1
     fi

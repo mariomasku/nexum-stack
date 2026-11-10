@@ -323,7 +323,9 @@ struct DockerView: View {
                                : "Abrir su phpMyAdmin (http://127.0.0.1:\(p.pma)/): pide usuario y contraseña") { model.dockerOpenPma(p) }
                         .disabled(!up || (!p.isWeb && p.pma.isEmpty))
                     iconAction("key", "Ver y copiar el usuario y la contraseña de su phpMyAdmin") { model.dockerPassword(p) }
-                    iconAction("arrow.triangle.2.circlepath", "Actualizar la imagen de PHP " + (p.isWeb ? p.versions.joined(separator: ", ") : p.php) + " (la descarga otra vez, con sus últimos parches)") {
+                    iconAction("arrow.triangle.2.circlepath", p.isWeb && p.versions.count > 1
+                               ? "Actualizar las imágenes de PHP " + p.versions.joined(separator: ", ") + " (las descarga otra vez, con sus últimos parches)"
+                               : "Actualizar la imagen de PHP " + (p.isWeb ? p.versions.joined(separator: ", ") : p.php) + " (la descarga otra vez, con sus últimos parches)") {
                         model.dockerUpdateImage(p)
                     }
                     .disabled(model.busy)
@@ -494,8 +496,8 @@ struct DockerView: View {
             if let n = webC { model.dockerWebLog(p, n) }
         }.disabled(webC == nil))
         if let x = model.projects?.list.first(where: { $0.name == p.folder }), x.kind == "wp" || x.kind == "ps" {
-            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Importar", icon: .logo("imagenes"),
-                                                    tip: "Importar imágenes de producción") {
+            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
+                                                    tip: "Traer de producción las imágenes que falten") {
                 model.importImages(x)
             }.disabled(model.busy))
         }

@@ -431,7 +431,7 @@ WantedBy=default.target
 function docker_install() {
     local me=$(id -un) p missing=""
     if ! command -v apt-get > /dev/null; then
-        echo "Docker sin root solo se instala solo en Ubuntu o Debian. Instalalo a mano: https://docs.docker.com/engine/security/rootless/"
+        echo "Docker sin root solo se instala en Ubuntu o Debian. Instalalo a mano: https://docs.docker.com/engine/security/rootless/"
         return 1
     fi
     for p in $DOCKER_PACKAGES; do
@@ -812,10 +812,15 @@ function docker_test_admin() {
     test_admin "$db" "$folder"
 }
 
-# docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>
+#@incluir comun/docker/docker_db_backup.sh
+# docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
+# una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {
     local action=$1 slug=$2 dir
     docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    if [ "$action" == borrar ] && [ "$3" == --copia ]; then
+        docker_db_backup "$slug" || return 1
+    fi
     # (los del Apache de Docker: lo suyo es distinto)
     if docker_web_project "$slug"; then
         case $action in

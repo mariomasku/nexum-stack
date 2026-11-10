@@ -59,9 +59,11 @@ extension AppModel {
     func setMail(_ on: Bool) {
         guard let m = data?.mail, m.on != on, !busy else { return }
         var args = ["correo", on ? "si" : "no"]
-        if on && !m.installed && confirm("¿Instalar Mailpit?",
-                       "El correo de las webs irá a Mailpit, que se descarga de GitHub (Mailpit \(m.offer), comprobado antes de instalarlo, de root en /Library/Nexum/mailpit). Sin él, el correo no sale ni se ve. Pide la contraseña de administrador.",
-                       "Instalar Mailpit") {
+        // (la primera vez: sin Mailpit no se enciende; cancelarlo deja el correo como estaba)
+        if on && !m.installed {
+            guard confirm("¿Instalar Mailpit?",
+                          "El correo de las webs irá a Mailpit, que se descarga de GitHub (Mailpit \(m.offer), comprobado antes de instalarlo, de root en /Library/Nexum/mailpit). Sin él, el correo no sale ni se ve. Pide la contraseña de administrador.",
+                          "Instalar Mailpit") else { return }
             args.append("--instalar")
         }
         if !on && !confirm("¿Apagar el correo de pruebas?",
@@ -149,7 +151,7 @@ extension AppModel {
     func restoreOfficial(_ aside: String) {
         let name = (aside as NSString).lastPathComponent
         if !confirm("¿Volver al XAMPP oficial?",
-                    "Se para la versión activa y \(name) vuelve a /Applications/XAMPP y arranca. Las versiones del gestor, sus BBDD y las copias no se tocan. Pide la contraseña de administrador.",
+                    "Se para la versión activa y \(name) vuelve a /Applications/XAMPP. Después, arráncalo desde su propio panel (manager-osx): el programa no ejecuta su script como administrador. Las versiones del gestor, sus BBDD y las copias no se tocan. Pide la contraseña de administrador.",
                     "Volver al XAMPP oficial") { return }
         runTask("Volviendo al XAMPP oficial", ["volver-oficial", aside], doneText: "El XAMPP oficial vuelve a estar en /Applications/XAMPP", autoClose: true)
     }

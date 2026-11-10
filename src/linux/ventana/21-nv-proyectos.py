@@ -360,19 +360,28 @@ class NvProyectos:
                             "de seguridad. phpMyAdmin: %s" % (w["ip"], w["http"], w["https"], self.dk_url(docker_pma_domain())),
                             "nv-chico", "nv-tenue", ellipsize=3), False, False, 0)
         r.pack_start(tt, True, True, 0)
-        r.pack_end(nv_button(None, "Parar" if up else "Arrancar", None, lambda *_: self.run_task(
+        # (al pararlo, antes se pregunta diciendo qué proyectos se quedan sin web, como en su fila)
+        r.pack_end(nv_button(None, "Parar" if up else "Arrancar", None, lambda *_: (
+            not up or self.nv_stop_shared_ok(["nexum-web"], "el Apache de Docker")) and self.run_task(
             ("Parando" if up else "Arrancando") + " el Apache de Docker", ["docker-web", "parar" if up else "arrancar"],
             auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))), False, False, 0)
         box.pack_start(r, False, False, 0)
 
     def nv_docker_update_image(self, p):
-        if not confirm(self.win, "¿Actualizar la imagen de PHP %s?" % p["php"],
-                       "Se rehace con los últimos parches de Docker Hub y se recrea el contenedor de PHP de "
-                       "%s. Su BBDD y su configuración no cambian." % p["folder"],
-                       "Actualizar la imagen"):
+        # (docker-imagen rehace las de todas sus versiones de PHP: con el Apache de Docker, puede tener varias)
+        vs = p["versions"] if p.get("web") else [p["php"]]
+        many = len(vs) > 1
+        what = "%s de PHP %s" % ("las imágenes" if many else "la imagen", ", ".join(vs))
+        if not confirm(self.win, "¿Actualizar %s?" % what,
+                       "Se %s con los últimos parches de Docker Hub y se %s de %s. Su BBDD y su "
+                       "configuración no cambian." % ("rehacen" if many else "rehace",
+                                                     "recrean sus contenedores de PHP" if many else
+                                                     "recrea su contenedor de PHP", p["folder"]),
+                       "Actualizar las imágenes" if many else "Actualizar la imagen"):
             return
-        self.run_task("%s: imagen de PHP %s" % (p["folder"], p["php"]), ["docker-imagen", p["slug"]], progress=True,
-                      done_text="%s ya usa la imagen nueva de PHP %s" % (p["folder"], p["php"]),
+        self.run_task("%s: %s" % (p["folder"], what), ["docker-imagen", p["slug"]], progress=True,
+                      done_text="%s ya usa %s de PHP %s" % (p["folder"], "las imágenes nuevas" if many else
+                                                            "la imagen nueva", ", ".join(vs)),
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 
     def nv_docker_of(self, name):

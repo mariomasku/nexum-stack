@@ -229,11 +229,19 @@ function node_log() {
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
         gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
+        # (el tunel y los repositorios, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|borrar-bd) ;;
+        # (confiar: el certificado va a tu llavero, y el Mac pide la contraseña en su propio aviso)
+        docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
+        # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
+        importar-bd) import_need_root "${@:4}" && { sudo_first || exit 130; } ;;
         # (copias: solo vaciar, y solo si hay copias de root que tu usuario no puede borrar)
         copias) [ "$2" == vaciar ] && copies_need_root && { sudo_first || exit 130; } ;;
         # (limpiar y limpiar-proyecto: solo si algo de lo que se va a limpiar es de root)
         limpiar) clean_need_root "${@:2}" && { sudo_first || exit 130; } ;;
         limpiar-proyecto) clean_project_need_root "${@:2}" && { sudo_first || exit 130; } ;;
+        # (vhosts-sin-carpeta: solo quitar los cambia)
+        vhosts-sin-carpeta) [ "$2" == quitar ] && { sudo_first || exit 130; } ;;
         *) sudo_first || exit 130 ;;
     esac
 fi
@@ -309,7 +317,7 @@ case "$1" in
     docker-pasar) docker_pass "$2" "$3" ;;
     docker-parar-todo) docker_stop_all ;;
     docker-web) shift; docker_web_command "$@" ;;
-    docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" ;;
+    docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" "$3" ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
@@ -382,6 +390,7 @@ case "$1" in
     gui-limpiar-proyecto) gui_clean_project "$2" ;;
     limpiar-proyecto) shift; clean_project_command "$@" ;;
     manual) shift; manual_command "$@" ;;
+    vhosts-sin-carpeta) vhosts_orphans "$2" ;;
     -h|--help|--ayuda) sed -n '3,/^$/p' "$SELF" | sed 's/^# \{0,1\}//' ;;
     *) echo "Accion desconocida: $1 (usa --ayuda)"; exit 1 ;;
 esac

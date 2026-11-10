@@ -144,7 +144,7 @@ function panel_set_aside() {
 
 function panel_restore_official() {
     local aside=$(ls -d "$APPS_DIR"/XAMPP-oficial-* 2> /dev/null | sort | tail -1)
-    ui_yesno "Se para y desactiva la version activa del gestor y $aside\nvuelve a $LINK, y se arranca.\n\nLas versiones del gestor, sus bases de datos y las copias no se tocan.\n\n¿Volver al XAMPP oficial?" || return 0
+    ui_yesno "Se para y desactiva la version activa del gestor y $aside\nvuelve a $LINK (despues, arrancalo desde su panel, manager-osx).\n\nLas versiones del gestor, sus bases de datos y las copias no se tocan.\n\n¿Volver al XAMPP oficial?" || return 0
     [ "$UI" == "whiptail" ] && clear
     restore_official "$aside"
     [ -t 0 ] && [ "$NO_ASK" != "1" ] && read -p "Pulsa Intro para volver al panel... " _

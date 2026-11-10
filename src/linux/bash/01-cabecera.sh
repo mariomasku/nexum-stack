@@ -62,8 +62,8 @@
 # === INSTALAR, ACTUALIZAR Y DESINSTALAR ======================================================
 #
 #   nexum instalar [--xampp 7.4,8.1] [--php 7.4,8.4,8.3.10] [--si]
-#       Instala sin preguntas. 8.4 = ultimo parche de la rama en lampp-8.4; 8.3.10 = ese
-#       parche en lampp-8.3.10; --si confirma
+#       Instala sin preguntas. 8.4 = ultimo parche de la rama, en la carpeta de su version
+#       completa (lampp-8.4.27); 8.3.10 = ese parche en lampp-8.3.10; --si confirma
 #
 #   nexum add-php <version>
 #       Instala una version de PHP con su pila propia
@@ -77,6 +77,10 @@
 #       pasan a pila propia)
 #       Si su MariaDB cambia de rama, empieza con BBDD vacias: --copia guarda antes las de ahora
 #       en ~/nexum-backups (sin ella, no se podran recuperar)
+#
+#   nexum actualizar-phpmyadmin <version> | --todas
+#       Pone en esa version (o en todas) el phpMyAdmin mas nuevo que admite su PHP, comprobado con
+#       su sha256 y con su configuracion de antes; el anterior queda en phpmyadmin.anterior
 #
 #   nexum github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
 #   nexum github-conectar [--gh] | github-desconectar
@@ -108,6 +112,11 @@
 #       Copias de los ficheros que el programa cambia por su cuenta (el de hosts, los vhosts, la
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
+#
+#   nexum vhosts-sin-carpeta [quitar]
+#       Los vhosts de proyectos cuya carpeta ya no esta en htdocs (Apache avisa de cada uno al arrancar:
+#       «DocumentRoot [...] does not exist»). Con quitar, se quitan del fichero de vhosts (lo comprueba
+#       Apache y se recarga). Las carpetas, las BBDD y /etc/hosts no se tocan
 #
 #   nexum manual [<capitulo>]
 #       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
@@ -167,6 +176,10 @@
 #       tiene una con ese nombre, solo con --sustituir (y con --copia, antes guarda una copia suya
 #       en ~/nexum-backups)
 #
+#   nexum docker-instalar
+#       Docker sin root (Ubuntu o Debian): los paquetes que falten (con sudo), apaga el Docker del
+#       sistema (el de root), prepara los rangos de usuarios y arranca el servicio con tu usuario
+#
 #   nexum docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> [--en-vivo] | --volcado <fichero>]
 #   nexum docker-bd <nombre> lampp <version> | docker
 #       --en-vivo y docker-bd lampp: un WordPress de Docker con la BBDD de esa version LAMPP en vivo, la
@@ -197,11 +210,15 @@
 #   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   nexum docker-php <nombre> <version de PHP>
 #   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
+#   nexum docker-borrar <nombre> --copia
+#       Antes de borrarlo, una copia de su BBDD de Docker en ~/nexum-backups (si falla, no se borra nada)
 #   nexum docker-imagen <nombre>
 #   nexum docker-usuario-pruebas <nombre>
 #       Proyectos en Docker sin root (pestaña Docker): docker-php cambia su version de PHP;
 #       docker-imagen rehace su imagen de PHP con lo ultimo de Docker Hub (parches de seguridad);
 #       docker-usuario-pruebas pone el administrador de pruebas en la BBDD de su contenedor
+#   nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>
+#       Uno solo de los contenedores de un proyecto en Docker
 #   nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
 #   nexum docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
@@ -213,6 +230,11 @@
 #
 #   nexum borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/nexum-backups
+#
+#   nexum reparar-bd-sistema [--copia]
+#       Pone al dia las tablas del sistema de MariaDB de la version montada (las bases de los
+#       proyectos no se tocan) y vacia su registro de errores si es grande; --copia guarda antes
+#       la base mysql en ~/nexum-backups
 #
 #
 # === PROYECTOS Y DOMINIOS ====================================================================
@@ -235,6 +257,11 @@
 #   nexum desmontar-proyecto
 #       web.local deja de apuntar al proyecto cargado y enseña una pagina vacia; los dominios
 #       falseados de una tienda PrestaShop dejan de estarlo
+#
+#   nexum borrar-proyecto <carpeta> [--bd <base> [--copia]]
+#       Borra un proyecto entero: lo desmonta si es el cargado, lo quita de Docker, borra su BBDD de
+#       la version activa si se pide (--copia: antes, un volcado en ~/nexum-backups), sus vhosts, sus
+#       dominios de /etc/hosts y, lo ultimo, su carpeta. Si un paso falla, no se sigue
 #
 #   nexum usuario-pruebas <base> [carpeta]
 #       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop):
@@ -272,9 +299,10 @@
 #   nexum media-proyecto <carpeta> <dominio de produccion>|quitar
 #       Lo mismo para un WordPress, en el vhost de los proyectos (web.local) mientras este cargado
 #
-#   nexum ps-imagenes <carpeta>
+#   nexum ps-imagenes <carpeta> [dominio de produccion]
 #       Descarga de la web real las imagenes de una tienda PrestaShop que faltan en img (productos,
-#       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts)
+#       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts).
+#       Sin dominio, el de su base (o el guardado de su proyecto de Docker)
 #
 #   nexum vhosts
 #       Edita una copia de los vhosts y la aplica con sudo: se comprueba antes, se guarda el
@@ -282,6 +310,10 @@
 #
 #   nexum hosts
 #       Edita /etc/hosts (con sudoedit)
+#
+#   nexum hosts-enlace
+#       El vhost de los proyectos (web.local) pasa a 127.0.0.1 en /etc/hosts, donde escucha
+#       Apache: se quita de las lineas que lo llevaban a otra direccion y se añade la suya
 #
 #
 # === SERVICIOS Y SEGURIDAD ===================================================================
@@ -826,7 +858,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.11"
+APP_VERSION="1.57.12"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

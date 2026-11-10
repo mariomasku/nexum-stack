@@ -394,6 +394,40 @@ QUE HACE
 
 VERSIONES
 
+1.57.12 (10 nov 2026)
+- Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con
+  su vhost pero sin su carpeta en htdocs (Apache avisaba de cada uno al
+  arrancar: «AH00112: Warning: DocumentRoot [...] does not exist»), con
+  «Quitarlos». Solo cambia el fichero de vhosts: las carpetas, las BBDD
+  y /etc/hosts no se tocan. En la terminal: nexum vhosts-sin-carpeta
+  [quitar].
+- Ya no piden la contraseña de administrador lo que no la necesita:
+  compartir (el túnel), Clonar y Traer cambios, borrar una BBDD y
+  «Confiar» en el certificado de Docker. Cargar un .sql la pide solo si
+  va a vaciar una caché de tienda que es del administrador.
+- Cancelar «¿Instalar Mailpit?» deja el correo de pruebas apagado.
+- «Vaciar la caché de la tienda» (⋮) va por la carpeta del proyecto: ya
+  no falla si varias carpetas usan la misma BBDD.
+- Nuevo proyecto con dominio falseado: si el dominio ya tiene vhost con
+  esa carpeta, se usa; si lleva a otra, se dice antes de empezar.
+- «Imágenes de producción» (antes «Importar») en el visor.
+- Borrar de Docker, con la casilla «Guardar antes una copia» (nexum
+  docker-borrar <nombre> --copia). Parar el Apache de Docker pregunta
+  antes qué proyectos dejan de verse.
+- Textos que no cuadraban: «Actualizar las imágenes» (rehace las de
+  todas sus versiones), «Eliminar de Docker (PHP 8.4)…», la barrera
+  recarga Apache (no lo reinicia), «Registros de <carpeta>» al limpiar
+  un proyecto, erratas y la ayuda de la terminal con todas las órdenes.
+- Seguridad: al encender o apagar la barrera entre webs, el Apache de
+  Docker se pone al día al momento (antes de esto, solo al arrancar).
+- Seguridad: install-php-extensions (en las imágenes de PHP de Docker),
+  fijado por su huella, como en Linux.
+- Seguridad: la copia al borrar una BBDD no lleva el administrador de
+  pruebas ni los cambios del correo (como «Descargar» y como en Linux).
+- «Volver al XAMPP oficial» y la tarjeta de los vhosts dicen lo que hacen
+  de verdad.
+- Menú lateral: el logotipo de Node se ve también en la pestaña elegida.
+
 1.57.11 (10 nov 2026)
 - La orden de la terminal es nexum: nexum ventana, nexum use 8.4,
   nexum --ayuda... lvm-instalador ya no existe (ni como otro nombre).

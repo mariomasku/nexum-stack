@@ -61,8 +61,31 @@ private var brandImages: [String: NSImage] = [:]
 
 func brandImage(_ key: String) -> NSImage? {
     if let i = brandImages[key] { return i }
-    guard let b = BRAND_PDF[key], let d = Data(base64Encoded: b), let i = NSImage(data: d) else { return nil }
+    guard let b = BRAND_PDF[key], let d = Data(base64Encoded: b), let i = NSImage(data: d),
+          i.size.width > 0, i.size.height > 0 else { return nil }
     brandImages[key] = i
+    return i
+}
+
+/// El logotipo entero de un color (su forma, con su transparencia), dibujado aquí: sin .renderingMode(.template),
+/// que con los PDF con degradados (el hexágono de Node) lo pintaba como un bloque o no lo pintaba, y cada color
+/// con su propia imagen (la del título de la página, sin tinte, no comparte la de la barra lateral)
+private var brandTinted: [String: NSImage] = [:]
+
+func brandImage(_ key: String, tint: NSColor) -> NSImage? {
+    guard let base = brandImage(key) else { return nil }
+    // (en sRGB, para leer sus componentes; si no se puede, el azul de los acentos)
+    let c: NSColor = tint.usingColorSpace(.sRGB) ?? NSColor(srgbRed: 0x0A / 255.0, green: 0x84 / 255.0, blue: 1, alpha: 1)
+    let id = "\(key)|" + String(format: "%.3f|%.3f|%.3f|%.3f", Double(c.redComponent), Double(c.greenComponent),
+                                Double(c.blueComponent), Double(c.alphaComponent))
+    if let i = brandTinted[id] { return i }
+    let i = NSImage(size: base.size, flipped: false) { rect in
+        base.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+        c.set()
+        rect.fill(using: .sourceAtop)
+        return true
+    }
+    brandTinted[id] = i
     return i
 }
 
@@ -77,7 +100,7 @@ let CROSS_SITE_HELP: [(String, String, String)] = [
     ("info.circle", "Cuándo apagarla",
      "Al probar una pasarela de pago (Redsys, PayPal, Stripe…): al acabar el pago, el banco te devuelve a la tienda mandando un formulario desde su web, y la barrera lo para (sale «Otra web ha intentado mandar algo a esta»). Apágala mientras pruebas los pagos y vuelve a encenderla al acabar."),
     ("network", "Dónde se aplica",
-     "En todas tus versiones de PHP: localhost, los dominios falseados y los vhosts de los proyectos. Al cambiarla se reinicia Apache."),
+     "En todas tus versiones de PHP (localhost, los dominios falseados y los vhosts de los proyectos) y en el Apache de Docker. Al cambiarla se recargan, si están en marcha."),
 ]
 
 struct AppearanceCard: View {
@@ -163,14 +186,17 @@ struct BrandImage: View {
 
     var body: some View {
         let k = key == "node" ? (scheme == .dark ? "node-oscuro" : "node-claro") : key
-        if let img = brandImage(k) {
-            if let c = tint, key != "php" {
-                Image(nsImage: img).renderingMode(.template).resizable().aspectRatio(contentMode: .fit)
-                    .frame(height: height).foregroundColor(c)
-            } else {
-                Image(nsImage: img).resizable().aspectRatio(contentMode: .fit).frame(height: height)
-            }
+        if let c = tint, key != "php", let img = brandImage(k, tint: brandTintColor(c)) {
+            Image(nsImage: img).resizable().aspectRatio(contentMode: .fit).frame(height: height)
+        } else if let img = brandImage(k) {
+            Image(nsImage: img).resizable().aspectRatio(contentMode: .fit).frame(height: height)
         }
+    }
+
+    /// (el color del texto, resuelto con el tema: dentro del dibujo de la imagen no se sabe cuál es)
+    func brandTintColor(_ c: Color) -> NSColor {
+        if c == Color.primary { return scheme == .dark ? NSColor.white : NSColor.black }
+        return NSColor(c)
     }
 }
 

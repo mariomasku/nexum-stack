@@ -130,7 +130,22 @@ out=$(gui_docker)
 check "gui-docker: contenedores para la consola (C|)" 'grep -q "^C|" <<< "$out" || ! grep -q "{{.Label" "$SRC"'
 
 # --- Borrar ---
-docker_action borrar mi-tienda-8-4 > /dev/null 2>&1
+# (1.57.12: docker-borrar --copia, antes un volcado de su BBDD de Docker en ~/nexum-backups; si falla, nada se borra)
+COPIA=()
+if grep -q '^function docker_db_backup() {' "$SRC"; then
+    extract "$SRC" docker_db_backup || exit 1
+    COPIES_DIR=$W/copias
+    : > "$W/docker.log"
+    # (el docker falso no da nada al volcar: la copia sale vacia)
+    check "borrar --copia: si la copia falla, no se borra nada" '! docker_action borrar mi-tienda-8-4 --copia > /dev/null 2>&1 && [ -f "$D/proyecto.conf" ] && ! grep -q "down -v" "$W/docker.log" && [ -z "$(ls "$COPIES_DIR" 2> /dev/null)" ]'
+    sed -i 's|^    compose) \[\[ "\$\*" == \*" exec "\* \]\] \&\& cat > /dev/null; exit 0 ;;|    compose) [[ "$*" == *" exec "* ]] \&\& cat > /dev/null; [[ "$*" == *mariadb-dump* ]] \&\& for i in 1 2 3 4 5; do echo "CREATE TABLE wp_options (option_id INT, option_name VARCHAR(191));"; done; exit 0 ;;|' "$DOCKER_BIN"
+    COPIA=(--copia)
+fi
+docker_action borrar mi-tienda-8-4 "${COPIA[@]}" > /dev/null 2>&1
+if [ ${#COPIA[@]} -gt 0 ]; then
+    check "borrar --copia: su BBDD de Docker, antes, en ~/nexum-backups" 'f=$(ls "$COPIES_DIR"/docker-mi-tienda-8-4-wp_t-*.sql.gz) && gzip -dc "$f" | grep -q "CREATE TABLE wp_options" && grep -q "exec -T db sh -c .*mariadb-dump" "$W/docker.log"'
+    cp "$W/docker-bueno" "$DOCKER_BIN"
+fi
 check "borrar: contenedores y su BBDD (down -v)" 'grep -q "compose .* down -v" "$W/docker.log"'
 # (solo los suyos: el de mi-tienda-8-4-php82, la misma carpeta con otro PHP, se queda)
 check "borrar: sin su vhost, con los demas" '! grep -qE "mi-tienda-8-4(:|\.docker\.local)" "$ACTIVE_VHOSTS" && grep -q "ServerName web.local" "$ACTIVE_VHOSTS"'

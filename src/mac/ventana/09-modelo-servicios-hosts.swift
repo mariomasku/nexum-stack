@@ -201,6 +201,19 @@ extension AppModel {
     }
 
     /// Cierra los procesos de XAMPP de otras versiones que se quedaron en memoria
+    /// Quita los vhosts de los proyectos cuya carpeta ya no existe (vhosts-sin-carpeta quitar)
+    func removeOrphanVhosts() {
+        let orphans = data?.orphans ?? []
+        guard !orphans.isEmpty else { return }
+        let steps = orphans.map { "Se quitan del fichero de vhosts los de \($0.0) (\($0.1.isEmpty ? "sin dominio" : $0.1))." }
+            + ["Apache comprueba el fichero y se recarga."]
+        guard confirm("¿Quitar los vhosts de carpetas que ya no existen?",
+                      "Las carpetas, las BBDD y /etc/hosts no se tocan. Pide la contraseña de administrador.",
+                      "Quitarlos", destructive: true, steps: steps) else { return }
+        runTask("Quitando vhosts de carpetas que ya no existen", ["vhosts-sin-carpeta", "quitar"],
+                doneText: "Vhosts quitados", autoClose: true)
+    }
+
     func closeStray() {
         runTask("Cerrando los procesos que sobran", ["cerrar-procesos"],
                 doneText: "Solo queda en memoria la versión montada", autoClose: true) { ok, _, _ in

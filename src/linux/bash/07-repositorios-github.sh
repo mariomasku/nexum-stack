@@ -53,7 +53,7 @@ function github_connect() {
 }
 
 function github_disconnect() {
-    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token de el llavero de la sesión"; return 0; }
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] se quitaria el token del llavero de la sesión"; return 0; }
     command -v secret-tool > /dev/null && secret-tool clear service "$GITHUB_KEYRING_SERVICE" account github 2> /dev/null
     github_conf_set ORIGEN ""
     echo "Desconectado de GitHub (el token ya no está en el llavero de la sesión)"

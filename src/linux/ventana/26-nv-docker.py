@@ -598,8 +598,10 @@ class NvDocker:
                      lambda p=p: self.open_uri(self.dk_pma_url(p)), up),
                     ("dialog-password-symbolic", "Copiar la contraseña de root de su BBDD (para su phpMyAdmin)",
                      lambda p=p: self.nv_docker_copy_pass(p), True),
-                    ("software-update-available-symbolic", "Actualizar la imagen de PHP %s con lo último de Docker Hub "
-                     "(parches de seguridad); la BBDD y la configuración no cambian" % p["php"],
+                    ("software-update-available-symbolic", "Actualizar %s con lo último de Docker Hub "
+                     "(parches de seguridad); la BBDD y la configuración no cambian"
+                     % ("las imágenes de PHP %s" % ", ".join(p["versions"]) if web and len(p["versions"]) > 1
+                        else "la imagen de PHP %s" % (", ".join(p["versions"]) if web else p["php"])),
                      lambda p=p: self.nv_docker_update_image(p), True),
                     ("text-x-generic-symbolic", "Registros", lambda p=p: self.run_task("Registros de %s" % p["folder"], ["docker-registros", p["slug"]]), True)] + (
                     [("network-transmit-receive-symbolic", "BBDD: la de LAMPP en vivo (la misma que web.local) o su copia de Docker",

@@ -199,6 +199,11 @@ function web_barrier_command() {
         echo "Recargando Apache de la version activa..."
         xampp_ctl reloadapache > /dev/null || { echo "No se ha podido recargar Apache: reinicia la version activa."; return 1; }
     fi
+    # (y el Apache de Docker, si lo hay: lleva las mismas reglas de seguridad. Se rehace su configuracion y,
+    # si esta en marcha, se recarga sin cortar las conexiones; parado, la toma al arrancar)
+    if [ -f "$DOCKER_WEB_DIR/conf/httpd.conf" ]; then
+        docker_web_reload || echo "Aviso: el Apache de Docker no se ha podido poner al dia; la tomara al arrancar"
+    fi
     echo "Listo"
 }
 

@@ -139,7 +139,7 @@ VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", 
                  ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
                  ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
-                 ("imagenes", "Importar", ("logo", "imagenes"))]
+                 ("imagenes", "Imágenes de producción", ("logo", "imagenes"))]
 # Configuración, Seguridad entre webs: qué es, en cuatro puntos (el mismo texto en el Mac)
 CROSS_SITE_HELP = [
     ("dialog-warning-symbolic", "El problema",
@@ -155,8 +155,8 @@ CROSS_SITE_HELP = [
      "tienda mandando un formulario desde su web, y la barrera lo para (sale «Otra web ha intentado mandar algo a "
      "esta»). Apágala mientras pruebas los pagos y vuelve a encenderla al acabar."),
     ("network-workgroup-symbolic", "Dónde se aplica",
-     "En todas tus versiones de PHP: localhost, web.local, los dominios falseados y los vhosts de los proyectos. "
-     "Al cambiarla se reinicia Apache."),
+     "En todas tus versiones de PHP (localhost, web.local, los dominios falseados y los vhosts de los proyectos) y en "
+     "el Apache de Docker. Al cambiarla se recargan, si están en marcha."),
 ]
 
 BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),

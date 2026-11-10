@@ -675,6 +675,7 @@ func warningCount(_ d: AppData) -> Int {
     if !d.untrusted.isEmpty { n += 1 }
     if !d.stale.isEmpty { n += 1 }
     if !d.stray.isEmpty { n += 1 }
+    if !d.orphans.isEmpty { n += 1 }
     if d.installs.contains(where: { php2shellVulnerable(d.php2shell[$0.folder] ?? "ok") }) { n += 1 }
     return n
 }

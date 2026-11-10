@@ -169,6 +169,7 @@ function create_project_vhost() {
 }
 
 #@incluir comun/proyectos-opt-htdocs/valid_project.sh
+#@incluir comun/proyectos-opt-htdocs/vhosts_orphans.sh
 # ¿Se puede escribir este fichero sin salirse de la carpeta del proyecto? Ni el fichero ni las
 # carpetas de su ruta pueden ser enlaces que lleven fuera: un repositorio podria traer wp-config.php
 # como enlace a un fichero del sistema, y con sudo se escribiria encima.

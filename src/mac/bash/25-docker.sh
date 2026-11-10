@@ -345,6 +345,10 @@ function docker_install() {
 # del Mac). PHP corre como www-data dentro del contenedor.
 # docker_php_image <version> [--nueva]: con --nueva, se rehace descargando otra vez la de Docker Hub
 DOCKER_IMAGE_SCHEMA=2
+# (install-php-extensions, fijado por su huella, como en Linux: la etiqueta 2 la puede mover cualquiera que
+# llegue a esa cuenta de Docker Hub. Es la 2.12.3, del 20/10/2026, para amd64 y arm64; para otra: docker
+# buildx imagetools inspect)
+DOCKER_EXT_INSTALLER="mlocati/php-extension-installer:2.12.3@sha256:ac4b252c153a9f6de5578ff2c417790aba836bb49855543144606033eceda253"
 function docker_php_image() {
     local php=$1 fresh=$2 dir=$DOCKER_DIR/imagenes/php-$1 have
     if [ "$DRY" -eq 0 ] && [ "$fresh" != --nueva ]; then
@@ -355,9 +359,7 @@ function docker_php_image() {
     # (con la version de PHP en el nombre del FROM y en las extensiones, nada mas del exterior)
     {
         printf 'FROM php:%s-apache\nLABEL nexum.esquema="%s"\n' "$php" "$DOCKER_IMAGE_SCHEMA"
-        cat << 'EOF'
-COPY --from=mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-EOF
+        printf 'COPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\n' "$DOCKER_EXT_INSTALLER"
         printf 'RUN install-php-extensions %s\n' "$DOCKER_PHP_EXT"
         cat << 'EOF'
 COPY nexum-web.conf /etc/apache2/sites-available/000-default.conf
@@ -875,10 +877,15 @@ function docker_test_admin() {
     test_admin "$db" "$folder"
 }
 
-# docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre>
+#@incluir comun/docker/docker_db_backup.sh
+# docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
+# una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {
     local action=$1 slug=$2 dir
     docker_valid_slug "$slug" && [ -f "$DOCKER_DIR/$slug/proyecto.conf" ] || { echo "No hay ningun proyecto en Docker con el nombre $slug"; return 1; }
+    if [ "$action" == borrar ] && [ "$3" == --copia ]; then
+        docker_db_backup "$slug" || return 1
+    fi
     # (los del Apache de Docker, desde la 1.40)
     if docker_web_project "$slug"; then
         docker_web_action "$action" "$slug"

@@ -281,12 +281,14 @@ class NvCorreo:
             return
         args = ["correo", "si" if on else "no"]
         if on and not m.get("installed"):
-            # (la primera vez: se ofrece instalar Mailpit, que se descarga de GitHub)
-            if confirm(self.win, "¿Instalar Mailpit?",
-                       "El correo de las webs irá a Mailpit, que se descarga de GitHub (Mailpit %s, comprobado "
-                       "antes de instalarlo). Sin él, el correo no sale ni se ve." % (m.get("offer") or ""),
-                       "Instalar Mailpit"):
-                args.append("--instalar")
+            # (la primera vez: se ofrece instalar Mailpit, que se descarga de GitHub; sin él, no se enciende)
+            if not confirm(self.win, "¿Instalar Mailpit?",
+                           "El correo de las webs irá a Mailpit, que se descarga de GitHub (Mailpit %s, comprobado "
+                           "antes de instalarlo). Sin él, el correo no sale ni se ve." % (m.get("offer") or ""),
+                           "Instalar Mailpit"):
+                sw.set_active(False)
+                return
+            args.append("--instalar")
         if not on and not confirm(self.win, "¿Apagar el correo de pruebas?",
                                   "Lo que manden las webs (pedidos, formularios, contraseñas) podrá llegar de verdad "
                                   "a los clientes de las BBDD copiadas.", "Apagarlo", destructive=True):

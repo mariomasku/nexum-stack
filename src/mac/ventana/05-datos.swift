@@ -53,6 +53,8 @@ struct AppData: Equatable {
     var dbDates: [String: DbDate] = [:]
     /// Procesos de XAMPP en memoria que no son de la versión montada (resumen)
     var stray = ""
+    /// Vhosts de proyectos cuya carpeta ya no está en htdocs: (carpeta, dominios)
+    var orphans: [(String, String)] = []
     /// Servicios de la versión montada a los que se puede entrar desde otros equipos de la red
     var exposed = ""
     /// Versiones a las que les falta algo para ser solo de este Mac (asegurar --todas)

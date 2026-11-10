@@ -70,6 +70,10 @@
 #       Si su MariaDB cambia de rama, empieza con BBDD vacias: --copia guarda antes las de ahora
 #       en ~/nexum-backups (sin ella, no se podran recuperar)
 #
+#   nexum actualizar-phpmyadmin <version> | --todas
+#       Pone en esa version (o en todas) el phpMyAdmin mas nuevo que admite su PHP, comprobado con
+#       su sha256 y con su configuracion de antes; el anterior queda en phpmyadmin.anterior
+#
 #   nexum github [estado] | cuenta <organizacion> | prefijos "<p1> <p2>"
 #   nexum github-conectar [--gh] | github-desconectar
 #   nexum repos [--todos] [--cache] | repo-traer <dueño/repo> [--actualizar]
@@ -106,6 +110,11 @@
 #       configuracion de los proyectos al cargarlos, lo que cambia asegurar) en ~/nexum-backups,
 #       antes de cambiarlos. Apagadas si no se encienden. Sin argumento, como estan
 #
+#   nexum vhosts-sin-carpeta [quitar]
+#       Los vhosts de proyectos cuya carpeta ya no esta en htdocs (Apache avisa de cada uno al arrancar:
+#       «DocumentRoot [...] does not exist»). Con quitar, se quitan del fichero de vhosts (lo comprueba
+#       Apache y se recarga). Las carpetas, las BBDD y /etc/hosts no se tocan
+#
 #   nexum manual [<capitulo>]
 #       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
 #       Con un capitulo (proyectos, bbdd, docker, configuracion, limpieza...), en ese. Con --ruta,
@@ -133,8 +142,8 @@
 # === XAMPP OFICIAL ===========================================================================
 #
 #   nexum apartar
-#       Aparta un XAMPP oficial de /Applications/XAMPP: copia sus bases (.zip en ~/lvm-
-#       copias), sus proyectos y sus vhosts, y lo mueve
+#       Aparta un XAMPP oficial de /Applications/XAMPP: copia sus bases (.zip en
+#       ~/nexum-backups), sus proyectos y sus vhosts, y lo mueve
 #
 #   nexum importar-copias <carpeta>
 #       Carga en la version activa las bases .zip de una carpeta
@@ -176,6 +185,11 @@
 #   nexum borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/nexum-backups
 #
+#   nexum reparar-bd-sistema [--copia]
+#       Pone al dia las tablas del sistema de MariaDB de la version montada (las bases de los
+#       proyectos no se tocan) y vacia su registro de errores si es grande; --copia guarda antes
+#       la base mysql en ~/nexum-backups
+#
 #
 # === PROYECTOS Y DOMINIOS ====================================================================
 #
@@ -196,6 +210,11 @@
 #   nexum desmontar-proyecto
 #       web.local deja de apuntar al proyecto cargado y enseña una pagina vacia; los dominios
 #       falseados de una tienda PrestaShop dejan de estarlo
+#
+#   nexum borrar-proyecto <carpeta> [--bd <base> [--copia]]
+#       Borra un proyecto entero: lo desmonta si es el cargado, lo quita de Docker, borra su BBDD de
+#       la version activa si se pide (--copia: antes, un volcado en ~/nexum-backups), sus vhosts, sus
+#       dominios de /etc/hosts y, lo ultimo, su carpeta. Si un paso falla, no se sigue
 #
 #   nexum usuario-pruebas <base> [carpeta]
 #       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop):
@@ -235,9 +254,10 @@
 #   nexum media-proyecto <carpeta> <dominio de produccion>|quitar
 #       Lo mismo para un WordPress, en el vhost de los proyectos (web.local) mientras este cargado
 #
-#   nexum ps-imagenes <carpeta>
+#   nexum ps-imagenes <carpeta> [dominio de produccion]
 #       Descarga de la web real las imagenes de una tienda PrestaShop que faltan en img (productos,
-#       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts)
+#       categorias y marcas, segun su base), resolviendo el dominio con DNS cifrado (sin /etc/hosts).
+#       Sin dominio, el de su base (o el guardado de su proyecto de Docker)
 #
 #   nexum vhosts
 #       Edita una copia de XAMPP-compartido/httpd-vhosts.conf y la aplica con sudo: se
@@ -246,6 +266,10 @@
 #
 #   nexum hosts
 #       Edita /etc/hosts (con sudo -e)
+#
+#   nexum hosts-enlace
+#       El vhost de los proyectos (web.local) pasa a 127.0.0.1 en /etc/hosts, donde escucha
+#       Apache: se quita de las lineas que lo llevaban a otra direccion y se añade la suya
 #
 #
 # === SERVICIOS Y SEGURIDAD ===================================================================
@@ -332,6 +356,8 @@
 #       Proyectos en Docker Desktop (pestaña Docker), por su dominio <carpeta>.docker.local desde
 #       el Apache de la version activa: docker-php cambia su version de PHP. --nombre: la misma
 #       carpeta otra vez, con otro nombre (otra version de PHP)
+#   nexum docker-borrar <nombre> --copia
+#       Antes de borrarlo, una copia de su BBDD de Docker en ~/nexum-backups (si falla, no se borra nada)
 #
 #   nexum docker-imagen <nombre>
 #       Rehace su imagen de PHP descargando otra vez la oficial (ultimos parches) y su contenedor

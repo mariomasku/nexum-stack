@@ -231,6 +231,11 @@ function gui_data() {
     # Procesos de LAMPP en memoria que no son de la version montada
     local stray=$(stray_summary)
     [ -n "$stray" ] && echo "Z|$stray"
+    # Vhosts de proyectos cuya carpeta ya no esta en htdocs: W|carpeta|dominios (Apache avisa de cada uno al
+    # arrancar)
+    local vh
+    vh=$(readlink -f "$ACTIVE_VHOSTS" 2> /dev/null)
+    [ -n "$vh" ] && [ -f "$vh" ] && python3 -I -c "$VHOSTS_ORPHANS_PY" "$vh" "$HTDOCS_DIR" lista 2> /dev/null
     # Servicios de la version montada a los que se puede entrar desde otros equipos de la red
     local exposed=$(exposed_summary)
     [ -n "$exposed" ] && echo "N|$exposed"

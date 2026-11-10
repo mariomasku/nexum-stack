@@ -37,6 +37,14 @@ function clean_title() {
     esac
 }
 
+# El de una clave de un proyecto («Registros de <carpeta>», no los del programa)
+function clean_project_title() {
+    case $2 in
+        registros) echo "Registros de $1" ;;
+        *) echo "$(clean_title "$2") de $1" ;;
+    esac
+}
+
 # Las carpetas de los proyectos de htdocs (sin enlaces, con un nombre valido)
 function clean_projects() {
     local d n
@@ -364,7 +372,7 @@ function clean_project_key() {
     local folder=$1 key=$2 quiet=$3 rules=() line b f r paths
     IFS='|' read -r _ b f r paths <<< "$(clean_project_measure "$folder" "$key")"
     if [ "${f:-0}" -eq 0 ]; then
-        [ -n "$quiet" ] || echo "$(clean_title "$key") de $folder: nada que limpiar"
+        [ -n "$quiet" ] || echo "$(clean_project_title "$folder" "$key"): nada que limpiar"
         return 0
     fi
     while IFS= read -r line; do
@@ -379,7 +387,7 @@ function clean_project_key() {
         rules=("${rest[@]}")
         [ "$paths" == var/cache ] && return 0
     fi
-    clean_run "$key" "$(clean_title "$key") de $folder" "${rules[@]}"
+    clean_run "$key" "$(clean_project_title "$folder" "$key")" "${rules[@]}"
 }
 
 # limpiar-proyecto <carpeta> [<clave>...]: sus cachés, registros y restos de actualizaciones (sin claves,

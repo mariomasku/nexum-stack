@@ -219,12 +219,14 @@ class AppDocker:
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 
     def on_docker_delete(self, p):
+        # (la casilla de la copia: un volcado de su BBDD de Docker en ~/nexum-backups, con docker-borrar --copia)
+        extra = copy_check("Sin copia, su BBDD de Docker no se podrá recuperar.")
         if not confirm(self.win, "¿Borrar %s de Docker?" % p["folder"],
                        "Se borran sus contenedores, su copia de la BBDD (%s) y su vhost (%s). La carpeta "
                        "y las BBDD de LAMPP no se tocan." % (p["db"], p["domain"]),
-                       "Borrar de Docker", destructive=True):
+                       "Borrar de Docker", destructive=True, extra=extra):
             return
-        self.run_task("Borrando %s de Docker" % p["folder"], ["docker-borrar", p["slug"]],
+        self.run_task("Borrando %s de Docker" % p["folder"], ["docker-borrar", p["slug"]] + (["--copia"] if extra.wanted else []),
                       done_text="%s borrado de Docker" % p["folder"], auto_close=True,
                       on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
 

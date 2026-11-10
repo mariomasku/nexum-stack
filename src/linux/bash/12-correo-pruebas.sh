@@ -1092,6 +1092,11 @@ function cross_site_command() {
     if [ $rc -eq 0 ] && lampp_running; then
         run sudo /opt/lampp/lampp reloadapache > /dev/null || { echo "No se ha podido recargar Apache"; return 1; }
     fi
+    # (y el Apache de Docker, si lo hay: lleva las mismas reglas de seguridad. Se rehace su configuracion y,
+    # si esta en marcha, se recarga sin cortar las conexiones; parado, la toma al arrancar)
+    if [ -f "$DOCKER_WEB_DIR/conf/httpd.conf" ]; then
+        docker_web_reload || echo "Aviso: el Apache de Docker no se ha podido poner al dia; la tomara al arrancar"
+    fi
     if cross_site_on; then
         echo "Barrera entre webs encendida: otra web no puede mandar nada a tus proyectos"
     else

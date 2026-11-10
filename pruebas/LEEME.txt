@@ -122,6 +122,12 @@ LOS FICHEROS
                       vhost de dominios desconocidos, certificado de fábrica.
   escritura.sh        PROJECT_WRITE_PY: no escribe fuera de htdocs.
   cache.sh            CLEAN_PY: vacía var/cache sin seguir enlaces.
+  seguridad-docker.sh La barrera entre webs llega al Apache de Docker, la
+                      imagen de install-php-extensions fijada en el Mac y la
+                      copia del Mac al borrar una BBDD (1.57.12).
+  vhosts-sin-carpeta.sh  Vhosts de carpetas que ya no existen (1.57.12): los
+                      lista y los quita sin tocar localhost, los de fuera
+                      de htdocs ni los de carpetas que existen.
   manual.sh           El manual dentro del programa (1.57.10): va al final
                       del script; manual lo saca (solo si ha cambiado, sin
                       salirse de su carpeta) y abre el capítulo; «Ayuda».

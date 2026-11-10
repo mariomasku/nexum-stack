@@ -101,7 +101,8 @@ func clockTime(_ t: Int) -> String {
 /// nombre. Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre
 let VISOR_BUTTONS: [(String, String)] = [("web", "Abrir web"), ("vscode", "VS Code"), ("pma", "phpMyAdmin"),
                                          ("panel", "Panel"), ("docker", "Docker"), ("compartir", "Compartir"),
-                                         ("log", "Log"), ("actualizar", "Actualizar"), ("imagenes", "Importar")]
+                                         ("log", "Log"), ("actualizar", "Actualizar"),
+                                         ("imagenes", "Imágenes de producción")]
 let VISOR_STYLES: [(String, String)] = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
                                         ("grande", "Icono y nombre (cuadrado)")]
 /// Lado del cuadrado de cada estilo si no se ha elegido otro, y lo que deja el deslizador (con el nombre

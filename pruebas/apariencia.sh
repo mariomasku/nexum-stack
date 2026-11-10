@@ -40,6 +40,7 @@ PY
     check "Mac: Docker y Node con su logotipo, PHP en color" 'grep -qF "if look.marcas && (key == \"docker\" || key == \"node\") {" "$SRC" && grep -qF "if look.marcas && look.color && key == \"versiones\" {" "$SRC"'
     check "Mac: apartado Apariencia" 'grep -qF "(\"apariencia\", \"Apariencia\", \"paintpalette\")" "$SRC" && grep -qF "case \"apariencia\":" "$SRC" && grep -q "^struct AppearanceCard: View {" "$SRC"'
     check "Mac: las imagenes se leen una vez" 'grep -A2 "^func brandImage" "$SRC" | grep -qF "if let i = brandImages[key] { return i }"'
+    check "Mac: el logotipo de un color se dibuja aparte (sin plantilla y sin compartir la imagen sin tinte)" '! sed -n "/^struct BrandImage: View {/,/^}/p" "$SRC" | grep -qF "renderingMode(.template)" && sed -n "/^struct BrandImage: View {/,/^}/p" "$SRC" | grep -qF "brandImage(k, tint: brandTintColor(c))" && sed -n "/^func brandImage(_ key: String, tint: NSColor)/,/^}/p" "$SRC" | grep -qF "rect.fill(using: .sourceAtop)"'
 else
     # look_conf y look_save de verdad, en una carpeta de prueba
     python3 -I - "$SRC" "$W" > "$W/look" << 'PY'

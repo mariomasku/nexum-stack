@@ -373,8 +373,8 @@ struct ProjectsView: View {
             model.upOpen(x)
         }.disabled(model.busy))
         if x.kind == "wp" || x.kind == "ps" {
-            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Importar", icon: .logo("imagenes"),
-                                                    tip: "Importar imágenes de producción") {
+            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
+                                                    tip: "Traer de producción las imágenes que falten") {
                 model.importImages(x)
             }.disabled(model.busy))
         }
@@ -387,10 +387,11 @@ struct ProjectsView: View {
         var items: [(String, () -> Void)] = [("Opciones de la BBDD…", { model.linkProject(x) }),
                                              ("Abrir la carpeta", { showFolder(HTDOCS + "/" + x.name) })]
         for dp in model.dockerOf(x.name) {
-            items.append(("Eliminar de Docker…", { model.dockerDelete(dp) }))
+            // (uno por entorno de Docker: cada uno dice el suyo)
+            items.append(("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…", { model.dockerDelete(dp) }))
         }
         if x.kind == "ps" && !db.isEmpty {
-            items.append(("Vaciar la caché de la tienda", { model.clearCache(db) }))
+            items.append(("Vaciar la caché de la tienda", { model.clearCache(folder: x.name, db: db) }))
         }
         items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
         if x.kind == "ps" {
@@ -548,10 +549,10 @@ struct ProjectsView: View {
                         Button("Opciones de la BBDD…") { model.linkProject(x) }
                         Button("Abrir la carpeta") { showFolder(HTDOCS + "/" + x.name) }
                         ForEach(model.dockerOf(x.name)) { dp in
-                            Button("Eliminar de Docker…") { model.dockerDelete(dp) }
+                            Button("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…") { model.dockerDelete(dp) }
                         }
                         if x.kind == "ps" && !model.projectBase(x).isEmpty {
-                            Button("Vaciar la caché de la tienda") { model.clearCache(model.projectBase(x)) }
+                            Button("Vaciar la caché de la tienda") { model.clearCache(folder: x.name, db: model.projectBase(x)) }
                         }
                         Button("Limpiar proyecto…") { model.cleanProject(x) }
                         if x.kind == "ps" {

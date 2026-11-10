@@ -463,7 +463,7 @@ function use_version() {
 
     # PHP2Shell: se avisa (la ventana ya lo ha preguntado antes)
     case "$(php2shell_state "$(php_version "$dir")" "$dir")" in
-        actualizable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell (CVE-2026-109618/109619): instala el ultimo parche de su rama." ;;
+        actualizable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell (CVE-2026-109618/109619): pasala al ultimo parche de su rama con nexum actualizar $version (o instala el parche a su lado y nexum pasar-version)." ;;
         parcheable) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell: nexum actualizar $version le pone el parche de seguridad." ;;
         sin-arreglo) echo "Aviso: PHP $(php_version "$dir") es vulnerable a PHP2Shell y no tiene arreglo: usala solo con proyectos de confianza." ;;
     esac

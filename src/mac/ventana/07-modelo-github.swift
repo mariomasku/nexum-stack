@@ -208,6 +208,8 @@ extension AppModel {
                 d.hosts = f[2]
             case "Z" where f.count >= 2:
                 d.stray = f[1...].joined(separator: "|")
+            case "W" where f.count >= 3:
+                d.orphans.append((f[1], f[2]))
             case "N" where f.count >= 2:
                 d.exposed = f[1...].joined(separator: "|")
             case "U" where f.count >= 2:

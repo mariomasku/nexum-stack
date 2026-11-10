@@ -484,7 +484,7 @@ struct ToolsView: View {
     func section(_ key: String, _ d: AppData) -> some View {
         switch key {
         case "hosts":
-            TileCard("Vhosts y hosts", "Después de cambiar los vhosts, reinicia la versión activa para aplicarlos.") {
+            TileCard("Vhosts y hosts", "Al aplicar los vhosts se comprueban y, si la versión activa está en marcha, se recarga Apache.") {
                 Tile("Virtual hosts", d.vhosts) {
                     Button("Editar…") { model.editVhosts() }.disabled(model.busy)
                 }

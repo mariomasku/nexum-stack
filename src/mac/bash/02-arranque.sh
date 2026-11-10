@@ -1819,7 +1819,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.11"
+APP_VERSION="1.57.12"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan nexum-mac-<version>.zip (hasta la 1.57.10, lvm-instalador-mac-<version>.zip; la 1.57.11

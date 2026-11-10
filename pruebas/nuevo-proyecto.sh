@@ -54,4 +54,27 @@ print(hosts_view_text(hs, '/etc/hosts', '/v.conf', '127.0.0.1 a.es'))")
     check "Linux: falsear su dominio despues de montarlo" 'grep -q "\[\"nuevo-dominio\", domain, folder\]" "$SRC"'
     check "Linux: la caja de la terminal, con el mismo margen arriba que abajo" 'grep -q "margin: 12px 14px 12px 14px;" "$SRC" && grep -q "padding: 10px 10px 10px 10px; }" "$SRC"'
 fi
+# (1.57.12) nuevo-dominio con un vhost del dominio: si lleva a esa carpeta, se usa y sigue; si lleva a otra,
+# se para antes de cambiar nada. El asistente lo dice en el paso 4, antes de empezar
+if grep -q 'vhost_points_to "$domain" "$folder" && echo "Ya hay un vhost para $domain que lleva a $folder: se usa"' "$SRC"; then
+    (
+        extract "$SRC" new_custom_domain vhost_points_to valid_domain || exit 1
+        NT=$(mktemp -d); trap 'rm -rf "$NT"' EXIT
+        HTDOCS_DIR=$NT/htdocs DRY=1 PROJECT_VHOST=web.local CUSTOM_DOMAINS_FILE=$NT/dominios
+        mkdir -p "$HTDOCS_DIR/panaderia-luna"
+        project_link() { echo web.local; }
+        vhosts_info() { echo "443|panaderia-luna|panaderia-luna.com|www.panaderia-luna.com||"; echo "443||fuera.com|||"; }
+        ps_vhost() { echo "PS_VHOST $*"; }
+        hosts_fake() { echo "FALSEA $*"; }
+        run() { echo "RUN $*"; }
+        out=$(new_custom_domain panaderia-luna.com panaderia-luna 2>&1); rc=$?
+        check "nuevo-dominio: el vhost del dominio ya lleva a esa carpeta: se usa y sigue (vhost, falsear)" '[ $rc -eq 0 ] && grep -q "que lleva a panaderia-luna: se usa" <<< "$out" && grep -q "^PS_VHOST panaderia-luna panaderia-luna.com" <<< "$out" && grep -q "^FALSEA cargar panaderia-luna.com" <<< "$out"'
+        out=$(new_custom_domain www.panaderia-luna.com otra-luna 2>&1); rc=$?
+        check "nuevo-dominio: el vhost lleva a otra carpeta: lo dice y no cambia nada" '[ $rc -ne 0 ] && grep -q "lleva a $HTDOCS_DIR/panaderia-luna, no a otra-luna" <<< "$out" && ! grep -q "PS_VHOST\|FALSEA\|RUN" <<< "$out"'
+        out=$(new_custom_domain fuera.com otra-luna 2>&1); rc=$?
+        check "nuevo-dominio: el vhost lleva fuera de htdocs: lo dice y no cambia nada" '[ $rc -ne 0 ] && grep -q "una carpeta de fuera de" <<< "$out" && ! grep -q "PS_VHOST" <<< "$out"'
+        exit $fail
+    ) || fail=1
+    check "asistente: el paso 4 avisa antes de empezar si el dominio lleva a otra carpeta" 'grep -qF "Ya hay un vhost para" "$SRC" && { grep -qF "and dom in [h[\"name\"].lower()] + h[\"alias\"].lower().split()), None)" "$SRC" || grep -qF "h.folder != folder && ([h.name.lowercased()]" "$SRC"; }'
+fi
 exit $fail

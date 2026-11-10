@@ -2,6 +2,20 @@ class AppVersiones:
     """Versiones de PHP y cargar un proyecto."""
 
     # ---------------------------------------------------------- versiones
+    def on_orphan_vhosts(self):
+        """Quita los vhosts de los proyectos cuya carpeta ya no existe (vhosts-sin-carpeta quitar)."""
+        orphans = (self.data or {}).get("orphans") or []
+        if not orphans:
+            return
+        steps = ["Se quitan del fichero de vhosts los de %s (%s)." % (n, dm or "sin dominio") for n, dm in orphans]
+        steps.append("Apache comprueba el fichero y se recarga.")
+        if not confirm(self.win, "¿Quitar los vhosts de carpetas que ya no existen?",
+                       "Las carpetas, las BBDD y /etc/hosts no se tocan. Pide la contraseña de administrador.",
+                       "Quitarlos", destructive=True, steps=steps):
+            return
+        self.run_task("Quitando vhosts de carpetas que ya no existen", ["vhosts-sin-carpeta", "quitar"],
+                      done_text="Vhosts quitados", auto_close=True)
+
     def on_close_stray(self, *_):
         self.run_task("Cerrando los procesos que sobran", ["cerrar-procesos"],
                       done_text="Solo queda en memoria la versión montada", auto_close=True,
@@ -342,8 +356,18 @@ class AppVersiones:
             dom = w["domain"].get_text().strip().lower()
             w["domain"].set_sensitive(w["fake"].get_active())
             ok, err = True, ""
+            # (un vhost de ese dominio que lleva a otra carpeta: nuevo-dominio no lo toca y pararía a mitad;
+            # uno que ya lleva a esta, se usa)
+            folder = w["folder"].get_text().strip()
+            other = next((h for h in self.hosts or [] if h["folder"] != folder
+                          and dom in [h["name"].lower()] + h["alias"].lower().split()), None)
             if w["fake"].get_active() and not re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", dom):
                 ok, err = False, ("Dominio no válido (por ejemplo: midominio.com)" if dom else "")
+            elif w["fake"].get_active() and other:
+                ok, err = False, ("Ya hay un vhost para %s que lleva a %s, no a esta carpeta: no se puede falsear "
+                                  "para este proyecto. Apágalo aquí o cambia ese vhost (☰, «Editar vhosts»)."
+                                  % (dom, "/opt/htdocs/" + other["folder"] if other["folder"]
+                                     else "una carpeta de fuera de /opt/htdocs"))
             w["err4"].set_label(err)
             w["err4"].set_visible(bool(err))
         w["next"].set_sensitive(ok and not self.busy)
@@ -910,6 +934,23 @@ class AppVersiones:
             row.subtitle.set_ellipsize(0)
             b = css(Gtk.Button(label="Cerrarlos"), "destructive-action")
             b.connect("clicked", self.on_close_stray)
+            row.add_suffix(b)
+            lb.add(row)
+            self.ver_box.pack_start(box, False, False, 0)
+        if d.get("orphans"):
+            # Vhosts de proyectos cuya carpeta ya no está en htdocs: Apache avisa de cada uno al arrancar
+            box, lb = group("Hay vhosts de carpetas que ya no existen",
+                            "Estos proyectos tienen su vhost, pero su carpeta ya no está en %s (se borró, se movió o "
+                            "no se ha vuelto a clonar). Apache arranca igual, pero avisa de cada uno al arrancar "
+                            "(«DocumentRoot … does not exist»). Quitarlos solo cambia el fichero de vhosts: las "
+                            "carpetas, las BBDD y /etc/hosts no se tocan." % HTDOCS)
+            for name, domains in d["orphans"]:
+                row = ActionRow(name, domains or "sin dominio")
+                row.add_prefix(icon("folder-symbolic", 18))
+                lb.add(row)
+            row = ActionRow("Quitar sus vhosts", "Pide la contraseña de administrador")
+            b = css(Gtk.Button(label="Quitarlos"), "destructive-action")
+            b.connect("clicked", lambda *_: self.on_orphan_vhosts())
             row.add_suffix(b)
             lb.add(row)
             self.ver_box.pack_start(box, False, False, 0)

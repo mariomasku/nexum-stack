@@ -1337,6 +1337,7 @@ function import_database() {
     return 0
 }
 
+#@incluir comun/cargar-bases-datos-version/import_need_root.sh
 #@incluir comun/cargar-bases-datos-version/db_neutralize_invoker.sh
 # MariaDB de XAMPP trae un usuario anonimo (sin nombre ni contraseña) y permisos para cualquiera
 # sobre las bases test y test_*: se quitan (las pilas propias ya se crean sin ellos). Con la version

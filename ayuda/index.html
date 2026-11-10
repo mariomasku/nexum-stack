@@ -556,6 +556,30 @@
         </ol>
         <p>Para comprobarlo: <code>nexum procesos</code>; los que sobraban llevaban «&lt;- sobra» al final.</p>
       </details></li>
+    <li><b>«Hay vhosts de carpetas que ya no existen»</b>: un proyecto tiene su vhost (el trozo del fichero de vhosts que le dice a
+      Apache qué carpeta sirve su dominio), pero su carpeta ya no está en <code>/opt/htdocs</code>: la borraste, la moviste o no la has
+      vuelto a clonar. Apache arranca igual, pero al arrancar escribe un aviso por cada uno (dos por proyecto, el de <code>http</code> y
+      el de <code>https</code>): <code>AH00112: Warning: DocumentRoot [/opt/lampp/htdocs/moda-verde] does not exist</code>. El aviso
+      dice qué carpetas faltan, con sus dominios. <b>«Quitarlos»</b> te pregunta antes, con lo que se va a quitar numerado, y pide la
+      contraseña de administrador. Solo cambia el fichero de vhosts: las carpetas, las bases de datos y <code>/etc/hosts</code> no se
+      tocan. El vhost de <code>localhost</code> y los que llevan a carpetas de fuera de <code>/opt/htdocs</code> no se tocan nunca.
+      <details class="terminal"><summary>En la terminal</summary>
+        <p>La orden del programa: <code>nexum vhosts-sin-carpeta</code> (los enseña) y <code>nexum vhosts-sin-carpeta quitar</code> (los
+          quita).</p>
+        <p>Lo que hace, paso a paso:</p>
+        <ol>
+          <li>Lee el fichero de vhosts de la versión activa (<span data-so="linux"><code>/opt/lampp/etc/extra/httpd-vhosts.conf</code></span><span
+            data-so="mac">el de <code>/Applications/XAMPP</code></span>) y, de cada bloque <code>&lt;VirtualHost&gt;</code>, su
+            <code>DocumentRoot</code>.</li>
+          <li>Si lleva a <code>…/htdocs/&lt;carpeta&gt;</code> y esa carpeta no existe, lo apunta, con sus <code>ServerName</code> y
+            <code>ServerAlias</code>.</li>
+          <li>Con <code>quitar</code>: escribe una copia sin esos bloques en <code>~/.lvm-instalador</code> y la aplica como «Editar
+            vhosts»: Apache la comprueba (<code>httpd -t</code>), se escribe con <code>sudo</code> (guardando antes la de ahora en
+            <code>~/nexum-backups</code> si tienes encendidas las copias de los ficheros que cambia el programa) y se recarga Apache.</li>
+        </ol>
+        <p>Para comprobarlo: <code>nexum vhosts-sin-carpeta</code> dice «Todos los vhosts de proyectos tienen su carpeta», y al arrancar
+          la versión ya no sale ningún <code>AH00112</code>.</p>
+      </details></li>
     <li><b>«Tablas del sistema de MariaDB antiguas»</b>: MariaDB guarda sus usuarios y permisos en unas tablas propias
       (<code>mysql.*</code>). Si son de una MariaDB anterior, el registro de errores no para de crecer (te dice cuánto ocupa).
       <b>«Repararlas»</b> te pregunta antes, con la casilla «Guardar antes una copia en ~/nexum-backups» (desmarcada; sin ella avisa en
@@ -1161,7 +1185,8 @@
     producción. Se abre con el <b>+</b> de «Entorno» → <b>«En otra versión de PHP (copiar su BBDD)…»</b> o con «Añadir entorno en otra
     versión de PHP…» del <a href="#menu-fila">menú de una fila</a>. Hace falta tener al menos dos versiones con sus propias bases.</p>
   <ul>
-    <li><b>Proyecto</b>: el cargado (o el de la fila desde la que lo has abierto). Solo salen los que tienen base en alguna versión.</li>
+    <li><b>Proyecto</b>: el que estás viendo arriba, si lo abres con el <b>+</b>, o el de la fila desde la que lo has abierto. Solo salen
+      los que tienen base en alguna versión.</li>
     <li><b>Desde</b>: de qué versión se copia, con su base: «PHP 8.4.27 (lampp-8.4) · BBDD wp_panaderia_luna».</li>
     <li><b>A la versión</b>: la de destino.</li>
     <li><b>Nombre de la BBDD</b>: se propone solo, con la versión al final (<code>wp_panaderia_luna_8_4</code> →
@@ -1201,8 +1226,10 @@
     </ol>
     <p>Para comprobarlo: <code>nexum list-db</code> (sale en la versión de destino).</p>
   </details>
-  <p>El <b>+</b> tiene una segunda opción, <b>«En Docker…»</b>: lleva a la página <a href="#docker">Docker</a> con el proyecto ya elegido
-    para «Proyecto en Docker…».</p>
+  <p>El <b>+</b> tiene una segunda opción, <b>«En Docker…»</b>: abre el diálogo de «Proyecto en Docker…» (ver <a href="#docker">Docker</a>)
+    con el proyecto ya elegido. Si ya está en Docker, o Docker no está instalado o en marcha, hace lo mismo que «Añadir entorno en
+    Docker…» del menú ⋮ de su fila (instalarlo o arrancarlo, o añadirle otra versión de PHP). Las dos opciones son siempre para el proyecto
+    que estás viendo.</p>
 
   <!-- ------------------------------------------------------------------ botones -->
   <h3 id="botones-proyecto">Los botones del proyecto cargado</h3>
@@ -1263,7 +1290,7 @@
       data-so="mac">tail -n 400 /Applications/XAMPP/xamppfiles/logs/error_log</code> (con <code>tail -f</code>, lo vas viendo según
       llega).</li>
     <li><b>«Actualizar»</b>: lo pone al día con lo de producción. Ver <a href="#actualizar-proyecto">Actualizar un proyecto</a>.</li>
-    <li><b>«Importar»</b>: solo en WordPress y PrestaShop. Abre lo de las <a href="#imagenes-produccion">imágenes de producción</a>.</li>
+    <li><b>«Imágenes de producción»</b>: solo en WordPress y PrestaShop. Ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
     <li><b>Desmontar (⏏)</b>: ver <a href="#desmontar">Desmontar</a>.</li>
     <li><b>Falsear Host</b>: ver <a href="#falsear-host">Falsear Host</a>.</li>
     <li><b>⋮</b>: ver <a href="#menu-mas">el menú Más</a>.</li>
@@ -1376,7 +1403,7 @@
   <h3 id="imagenes-produccion">Imágenes de producción</h3>
   <p>Las imágenes de una web (las de <code>wp-content/uploads</code> o <code>img</code>) no suelen ir en git, así que tu copia local se ve
     sin fotos. El programa lo arregla de dos formas distintas, según el tipo de proyecto. En los dos casos se abre con el botón
-    <b>«Importar»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
+    <b>«Imágenes de producción»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
 
   <p><b>WordPress: «Imágenes de producción…»</b>. No descarga nada: lo que falte se pide a la web real.</p>
   <ul>
@@ -1511,14 +1538,19 @@
   <ul>
     <li><b>«Opciones de la BBDD…»</b>: ver <a href="#vincular">Opciones de la BBDD</a>.</li>
     <li><b>«Abrir la carpeta»</b>: abre su carpeta en el gestor de archivos<span data-so="mac"> (el Finder)</span>. No cambia nada.</li>
-    <li><b>«Eliminar de Docker…»</b>: solo si está en Docker (una por cada entorno de Docker). Pregunta «¿Borrar panaderia-luna de Docker?»:
-      se borran sus contenedores, su copia de la base de datos en Docker y su vhost de Docker. <b>La carpeta y las bases de LAMPP no se
-      tocan.</b> La copia de Docker se borra sin guardar antes otra.</li>
+    <li><b>«Eliminar de Docker (PHP 8.4)…»</b>: solo si está en Docker, una por cada entorno de Docker, cada una con sus versiones de PHP.
+      Pregunta «¿Borrar panaderia-luna de Docker?»: se borran sus contenedores, su copia de la base de datos en Docker y su vhost de Docker.
+      <b>La carpeta y las bases de LAMPP no se tocan.</b> Con la casilla <b>«Guardar antes una copia en ~/nexum-backups»</b> (sin marcar:
+      mientras lo está, el aviso en rojo dice que su base de Docker no se podrá recuperar), antes se guarda un volcado de su base de Docker.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum docker-borrar panaderia-luna</code> (su nombre en Docker).</p>
+    <p>La orden del programa: <code>nexum docker-borrar panaderia-luna</code> (su nombre en Docker); con la casilla marcada,
+      <code>nexum docker-borrar panaderia-luna --copia</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
+      <li>Con <code>--copia</code>, primero guarda su base de Docker en
+        <code>~/nexum-backups/docker-panaderia-luna-wp_panaderia_luna-&lt;fecha&gt;.sql.gz</code>, con <code>mariadb-dump</code> dentro de su
+        MariaDB de Docker. Si la copia falla, no se borra nada.</li>
       <li>Para y borra sus contenedores y sus volúmenes (los discos de datos de Docker): <code>docker compose --project-directory
         ~/.lvm-instalador/docker/panaderia-luna down -v</code>.</li>
       <li>Borra su base de la MariaDB común de Docker y su usuario (<code>DROP DATABASE</code>, <code>DROP USER</code>). Si iba en vivo
@@ -1644,7 +1676,7 @@
     botones del proyecto cargado y para los del visor de un proyecto de Docker. Solo cambia cómo se ve la ventana: no toca ningún
     proyecto.</p>
   <ul>
-    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Importar. Su casilla
+    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
       dice si se ve («Verlo en el visor»), y las flechas <b>«Antes»</b> y <b>«Después»</b> lo mueven.</li>
     <li><b>Estilo</b>: <b>«Con su nombre»</b> (como vienen), <b>«Solo el icono (cuadrado)»</b> o <b>«Icono y nombre (cuadrado)»</b>. Con solo
       el icono, el nombre sale al dejar el ratón encima.</li>
@@ -1698,7 +1730,8 @@
     <li><b>Paso 4 de 4: dominio de producción.</b> Enciende «¿Falsear su dominio de producción en este equipo?» y escribe el dominio (como
       <code>panaderia-luna.com</code>) para que el navegador abra tu copia local con su dirección de verdad. Lo necesitan las tiendas
       PrestaShop y los WordPress con el dominio en su base. Si no, se abre en <code>web.local</code>. Si el repositorio de GitHub tiene su
-      web puesta, el dominio ya viene escrito (y, en una tienda, encendido).</li>
+      web puesta, el dominio ya viene escrito (y, en una tienda, encendido). Si ese dominio ya tiene un vhost que lleva a otra carpeta, lo
+      dice en rojo y «Montar proyecto» no se puede pulsar: apágalo o cambia ese vhost. Si lleva a la carpeta del proyecto, se usa.</li>
   </ol>
   <p>Al pulsar <b>«Montar proyecto»</b>: clona el repositorio, lo carga en esa versión (pide la contraseña de administrador) y crea la base
     o carga el volcado. Después, si lo has pedido, falsea el dominio. Al acabar, queda como proyecto cargado.</p>
@@ -1801,11 +1834,11 @@
         carpeta), su descripción, su web y cuándo cambió por última vez. Delante, el logotipo de WordPress o de PrestaShop si su nombre lo
         lleva; si no, el de GitHub. Los más recientes salen primero.</span></li>
       <li data-x="86.5" data-y="27.8"><b>Traer cambios</b><span>Si ya está clonado: trae lo nuevo de GitHub (<code>git pull</code>) y lo junta con
-        lo tuyo. Antes te pregunta. Si choca con algo que tienes sin guardar o sin subir, <b>no toca nada</b> y te lo dice. Pide la contraseña
-        de administrador.</span></li>
+        lo tuyo. Antes te pregunta. Si choca con algo que tienes sin guardar o sin subir, <b>no toca nada</b> y te lo dice. Va con tu usuario:
+        no pide la contraseña de administrador.</span></li>
       <li data-x="88.3" data-y="51.7"><b>Clonar</b><span>Si aún no está en tu equipo: lo clona por SSH en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>,
-        con la carpeta llamada como el repositorio. Después lo verás en Proyectos, listo para cargar. Pide la contraseña de administrador.
-        Si ya hay una carpeta con ese nombre que no es este repositorio, el botón sale gris («Ya hay una carpeta con ese nombre»).</span></li>
+        con la carpeta llamada como el repositorio. Después lo verás en Proyectos, listo para cargar. Va con tu usuario: no pide la contraseña de
+        administrador. Si ya hay una carpeta con ese nombre que no es este repositorio, el botón sale gris («Ya hay una carpeta con ese nombre»).</span></li>
       <li data-x="93.3" data-y="27.8"><b>Copiar repositorio</b><span>Copia su dirección (<code>git@github.com:…</code>) para pegarla, por ejemplo, en
         «Nuevo proyecto», que además de clonarlo le crea su base de datos. Abajo sale «Repositorio copiado: …».</span></li>
       <li data-x="96.1" data-y="27.8"><b>Abrir en GitHub</b><span>Abre la página del repositorio en el navegador.</span></li>
@@ -1883,8 +1916,7 @@
 
   <h3>Clonar un repositorio</h3>
   <ol class="pasos-tarea">
-    <li><b>Búscalo</b> en la lista y pulsa <b>«Clonar»</b>.</li>
-    <li><b>Escribe la contraseña de administrador</b> si te la pide, al empezar la tarea.</li>
+    <li><b>Búscalo</b> en la lista y pulsa <b>«Clonar»</b>. No pide la contraseña de administrador.</li>
     <li><b>Espera a que acabe.</b> Verás la tarea «Clonando …» y, al terminar, el aviso «…, en Proyectos». Se clona con tu usuario (los
       ficheros son tuyos, no del administrador).</li>
     <li><b>Cárgalo en Proyectos</b> con su versión de PHP y su base de datos. Clonar solo trae el código: la base de datos la cargas
@@ -1920,7 +1952,7 @@
   <ol class="pasos-tarea">
     <li><b>Pulsa «Traer cambios»</b> en su fila.</li>
     <li><b>Confirma.</b> Te pregunta «¿Traer los cambios de GitHub a …?» y explica que se juntan con los tuyos. Pulsa <b>«Traer los cambios»</b>
-      y escribe la contraseña de administrador si te la pide.</li>
+      (no pide la contraseña de administrador: va con tu usuario).</li>
     <li><b>Mira el resultado.</b> Si va bien, dice que la carpeta está al día con GitHub y en qué rama. Si choca con lo que tienes sin guardar
       o sin subir (o no hay conexión), no toca nada: guarda o sube tus cambios (<code>git status</code>) y vuelve a probar.</li>
   </ol>
@@ -2889,7 +2921,7 @@
     <li><b>Decide si guardas una copia.</b> «Guardar antes una copia en ~/nexum-backups (se puede volver a cargar)» viene desmarcada.
       Márcala si la base no está en producción ni en otra versión. Sin copia, sale en rojo «Sin copia, el contenido no se podrá
       recuperar.» y tienes que escribir el nombre de la base para confirmar.</li>
-    <li><b>Pulsa «Borrar la BBDD».</b> Pide la contraseña de administrador. Al acabar dice «BBDD «…» borrada» (con «(copia en
+    <li><b>Pulsa «Borrar la BBDD».</b> No pide la contraseña de administrador: se borra en el MariaDB en marcha. Al acabar dice «BBDD «…» borrada» (con «(copia en
       ~/nexum-backups)» si la has guardado).</li>
   </ol>
   <p>La copia se llama <code>~/nexum-backups/lampp-&lt;versión&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>. Si la has pedido y no se puede
@@ -3070,8 +3102,8 @@
         MariaDB y, si quieres, la base de datos de LAMPP que se le copia.</span></li>
       <li data-x="19.4" data-y="21.8"><b>El Apache de Docker</b><span>Si está en marcha, en qué dirección y puertos, y dónde está su phpMyAdmin.
         Solo sale si tienes algún proyecto con el Apache de Docker.</span></li>
-      <li data-x="94.9" data-y="21.7"><b>Parar / Arrancar</b><span>Para o arranca el Apache de Docker. Este botón no avisa si hay proyectos
-        usándolo: al pararlo, dejan de verse.</span></li>
+      <li data-x="94.9" data-y="21.7"><b>Parar / Arrancar</b><span>Para o arranca el Apache de Docker. Si al pararlo hay proyectos en marcha
+        que lo usan, antes te dice cuáles se quedan sin web y te pregunta.</span></li>
       <li data-x="30.9" data-y="32.6"><b>Consumo</b><span>Lo que gastan los contenedores de procesador y de memoria, y cuántos hay en marcha. Se
         actualiza cada 20 segundos, con la ventana delante y esta página abierta.</span></li>
       <li data-x="22.2" data-y="43.4"><b>Contenedores</b><span>Tus proyectos en Docker y lo común, con sus contenedores. Es la vista de la
@@ -3095,14 +3127,14 @@
         la llave. Solo con el proyecto en marcha.</span></li>
       <li data-x="84.5" data-y="54.1"><b>La llave</b><span>Copia la contraseña de <code>root</code> de su base de datos, para entrar en
         phpMyAdmin.</span></li>
-      <li data-x="87.2" data-y="54.1"><b>Actualizar la imagen</b><span>Pone su PHP al día con lo último de Docker Hub (parches de seguridad).
-        La base de datos y la configuración no cambian. Antes te pregunta.</span></li>
+      <li data-x="87.2" data-y="54.1"><b>Actualizar la imagen</b><span>Pone su PHP al día con lo último de Docker Hub (parches de seguridad):
+        las imágenes de todas sus versiones de PHP. La base de datos y la configuración no cambian. Antes te pregunta.</span></li>
       <li data-x="90" data-y="54.1"><b>Registros</b><span>Lo último que han dicho sus contenedores (200 líneas): para ver por qué algo no
         arranca.</span></li>
       <li data-x="92.7" data-y="54.1"><b>Qué base de datos usa</b><span>Solo WordPress con el Apache de Docker: su copia en la MariaDB de Docker
         o, <b>en vivo</b>, la de una versión LAMPP (la misma que <code>web.local</code>, sin copias).</span></li>
-      <li data-x="95.5" data-y="54.1"><b>Eliminar de Docker</b><span>Borra sus contenedores y su base de datos de Docker, <b>sin guardar copia</b>.
-        Tu carpeta y las bases de LAMPP no se tocan. Antes te pregunta.</span></li>
+      <li data-x="95.5" data-y="54.1"><b>Eliminar de Docker</b><span>Borra sus contenedores y su base de datos de Docker; antes te pregunta, con la
+        casilla de guardar antes una copia de esa base. Tu carpeta y las bases de LAMPP no se tocan.</span></li>
       <li data-x="29.1" data-y="66"><b>Lo común</b><span>El Apache de Docker y phpMyAdmin, las MariaDB comunes y los puentes a LAMPP, cada uno con
         su fila.</span></li>
       <li data-x="76.1" data-y="66.2"><b>Arrancar o parar lo común</b><span>Si lo paras mientras lo usa algún proyecto en marcha, antes te dice
@@ -3243,7 +3275,8 @@
 
   <h3 id="docker-apache">El Apache de Docker: arrancar y parar</h3>
   <p>El Apache de Docker es uno para todos los proyectos de Docker. Se arranca solo al arrancar cualquiera de ellos y se para solo cuando ya no
-    queda ninguno en marcha. Su botón «Parar / Arrancar» (en la fila de arriba o en «Lo común») lo hace a mano.</p>
+    queda ninguno en marcha. Su botón «Parar / Arrancar» (en la fila de arriba o en «Lo común») lo hace a mano; al pararlo, si
+    lo usa algún proyecto en marcha, antes te dice cuáles dejarán de verse y te pregunta.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-web arrancar</code> o <code>nexum docker-web parar</code>.</p>
     <p>Lo que hace al arrancar, paso a paso:</p>
@@ -3281,7 +3314,7 @@
     <li><b>«VS Code»</b>: abre la carpeta en Visual Studio Code (si lo tienes instalado).</li>
     <li><b>«Log»</b>: los últimos errores de PHP de la web, en una ventana con <b>«Copiar todo»</b> y <b>«Actualizar»</b>. Solo con su
       contenedor de PHP en marcha.</li>
-    <li><b>«Importar»</b> (WordPress y PrestaShop): «Importar imágenes de producción».</li>
+    <li><b>«Imágenes de producción»</b> (WordPress y PrestaShop): trae de producción las imágenes que falten. Ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
     <li><b>«Versiones de PHP…»</b> (los del Apache de Docker) o <b>«Pasar al Apache de Docker»</b> (los de antes).</li>
     <li><b>«Arrancar»</b> o <b>«Parar»</b>: todos sus contenedores.</li>
   </ul>
@@ -3588,8 +3621,9 @@
 
   <h3 id="docker-imagen">Actualizar la imagen de PHP</h3>
   <p>El icono de actualizar te pregunta «¿Actualizar la imagen de PHP …?»: se rehace con los últimos parches de Docker Hub y se vuelve a crear
-    su contenedor de PHP. Pulsa <b>«Actualizar la imagen»</b>. Su base de datos y su configuración no cambian. En un proyecto del Apache de
-    Docker se rehacen las imágenes de <b>todas</b> sus versiones de PHP. Si falla, sigue con la imagen de antes.</p>
+    su contenedor de PHP. Pulsa <b>«Actualizar la imagen»</b>. Su base de datos y su configuración no cambian. Un proyecto del Apache de
+    Docker con varias versiones de PHP pregunta «¿Actualizar las imágenes de PHP 8.3, 8.4?» y se rehacen las de <b>todas</b> ellas
+    (<b>«Actualizar las imágenes»</b>). Si falla, sigue con la imagen de antes.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-imagen academia-flor</code>.</p>
     <p>Lo que hace, paso a paso:</p>
@@ -3607,13 +3641,20 @@
   <h3 id="docker-borrar">Eliminar un proyecto de Docker</h3>
   <p>La papelera de la fila te pregunta «¿Borrar … de Docker?». Se borran sus contenedores, su base de datos de Docker y su vhost, y sus
     direcciones dejan de estar en <code>/etc/hosts</code>. Pulsa <b>«Borrar de Docker»</b>.</p>
-  <div class="nota cuidado"><b>No se guarda copia de su base de Docker</b>Lo que hayas cambiado en la base de Docker se pierde. Si lo
-    necesitas, descárgalo antes desde su phpMyAdmin. Tu carpeta y las bases de datos de LAMPP no se tocan; si el WordPress usaba en vivo la de
-    LAMPP, esa sigue intacta.</div>
+  <div class="nota cuidado"><b>Su base de Docker solo se guarda si marcas la casilla</b>La casilla <b>«Guardar antes una copia en
+    ~/nexum-backups»</b> va sin marcar; mientras lo está, el aviso en rojo te recuerda que lo que hayas cambiado en la base de Docker no se
+    podrá recuperar. Marcada, antes de borrar nada se guarda un volcado de esa base (se puede volver a cargar con «Importar SQL…»); si la
+    copia falla, no se borra nada. Tu carpeta y las bases de datos de LAMPP no se tocan; si el WordPress usaba en vivo la de LAMPP, esa sigue
+    intacta (y no hay base de Docker que copiar).</div>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum docker-borrar academia-flor</code>.</p>
+    <p>La orden del programa: <code>nexum docker-borrar academia-flor</code>; con la casilla marcada,
+      <code>nexum docker-borrar academia-flor --copia</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
+      <li>Con <code>--copia</code>, guarda antes su base en <code>~/nexum-backups/docker-academia-flor-academia_flor-&lt;fecha&gt;.sql.gz</code>:
+        <code>mariadb-dump --single-transaction --routines --triggers --events academia_flor</code> dentro de
+        <code>nexum-mariadb-11-8</code> (en un proyecto de antes, dentro de su propio contenedor de MariaDB), comprimido con
+        <code>gzip</code>.</li>
       <li>Quita sus contenedores y sus volúmenes propios: <code>docker compose down -v</code> en <code>~/.lvm-instalador/docker/academia-flor</code>.</li>
       <li>Si usaba en vivo la base de LAMPP, quita el puente si ya no lo usa nadie.</li>
       <li>Borra su base y su usuario de la MariaDB común (si usaba en vivo la de LAMPP, solo su copia de Docker, si tenía):
@@ -3623,7 +3664,7 @@
       <li>Borra su carpeta del programa: <code>rm -rf ~/.lvm-instalador/docker/academia-flor</code>. Tu carpeta del proyecto no se toca.</li>
       <li>Rehace la configuración del Apache de Docker sin sus vhosts y la recarga.</li>
     </ol>
-    <p>En un proyecto de antes, en lugar de los pasos 3 y 6 quita su bloque de los vhosts de LAMPP. Para comprobarlo:
+    <p>En un proyecto de antes, en lugar de los pasos 4 y 7 quita su bloque de los vhosts de LAMPP. Para comprobarlo:
       <code>docker ps -a --filter name=nexum-academia-flor</code> no enseña nada.</p>
   </details>
 
@@ -3664,7 +3705,7 @@
     <code>~/.lvm-instalador/node</code>. Si el proyecto no pide ninguna, se usa la más nueva que tengas o, si no tienes ninguna, se
     descarga Node 26.</p>
   <p>Arrancar, compilar, parar y ver el registro <b>no piden la contraseña de administrador</b>: todo va con tu usuario. El <b>«Túnel»</b>
-    sí la pide, como «Compartir» en las demás páginas. Si no hay ningún proyecto de Node, la página dice «Ningún proyecto de Node».</p>
+    tampoco, como «Compartir» en las demás páginas. Si no hay ningún proyecto de Node, la página dice «Ningún proyecto de Node».</p>
 
   <figure class="pantalla">
     <div class="barra">
@@ -3778,7 +3819,7 @@
   <ol class="pasos-tarea">
     <li><b>Pulsa «Túnel».</b> Si está en desarrollo, te pregunta «¿Compilar … para compartirlo?»: «Está en desarrollo, y lo que se comparte es
       la versión compilada. Se para y arranca compilado: los cambios ya no se verán al momento.» Pulsa <b>«Compilar y compartir»</b>.</li>
-    <li><b>Elige cuánto dura y si se bloquea el panel</b> en el diálogo «Compartir» y pulsa «Compartir». Pide la contraseña de administrador.
+    <li><b>Elige cuánto dura y si se bloquea el panel</b> en el diálogo «Compartir» y pulsa «Compartir». No pide la contraseña de administrador.
       Lo explica entero <a href="#compartir">Compartir una web</a>.</li>
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
@@ -3967,13 +4008,15 @@
       estarlo). Pulsa <b>«Crear y falsear»</b> y escribe la contraseña de administrador.</li>
     <li><b>Al terminar</b>, abajo sale «… falseado: https://… → …». Ya puedes abrirlo con su dominio real.</li>
   </ol>
-  <div class="nota"><b>Si el dominio ya tiene vhost</b>No se puede crear otra vez: usa su interruptor en «Dominios de los vhosts».</div>
+  <div class="nota"><b>Si el dominio ya tiene vhost</b>Si lleva a la carpeta que has elegido, se usa (se le añade lo que le falte, como el
+    https o su certificado). Si lleva a otra, no se cambia nada: para falsearlo, usa su interruptor en «Dominios de los vhosts».</div>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum nuevo-dominio panaderia-luna.com panaderia-luna wp_panaderia_luna</code> (dominio, carpeta y,
       si quieres, la base de datos).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Comprueba que el dominio es válido, que no es el de los proyectos y que no tiene vhost.</li>
+      <li>Comprueba que el dominio es válido, que no es el de los proyectos y que no tiene un vhost que lleve a otra carpeta (uno que ya
+        lleva a esta, se usa).</li>
       <li>Si la carpeta no existe, la crea: <span data-so="linux"><code>mkdir -p /opt/htdocs/panaderia-luna</code> (con <code>sudo</code> y
         <code>sudo chown</code> a tu usuario si la carpeta de proyectos no es tuya)</span><span
         data-so="mac"><code>mkdir -p /Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code></span>.</li>
@@ -4597,6 +4640,7 @@
         <li>Si no se puede en alguna versión, deshace el cambio en todas: «No se ha podido cambiar en todas las versiones: se deja como
           estaba».</li>
         <li>Si Apache está en marcha: <code>sudo /opt/lampp/lampp reloadapache</code>.</li>
+        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code>, o
         <code>grep -c "barrera entre webs" /opt/lampp/etc/extra/lvm-dominio-desconocido.conf</code> (más de 0: encendida).</p>
@@ -4614,6 +4658,7 @@
           salvo abrir una página con un enlace.</li>
         <li>Si no se puede en alguna versión, deshace el cambio en todas.</li>
         <li>Si Apache está en marcha: <code>sudo /Applications/XAMPP/xamppfiles/xampp reloadapache</code>.</li>
+        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code> («Barrera entre webs: puesta» o «apagada»).</p>
     </div>
@@ -4641,7 +4686,7 @@
     <ol class="puntos">
       <li data-x="40" data-y="26"><b>Dirección y puertos</b><span>Dónde escucha el Apache de Docker: 127.0.0.2, con 80 y 443, de partida. Cambia los campos «Dirección», «HTTP» y «HTTPS» y pulsa «Guardar». Con 80 y 443, las direcciones van sin puerto; con otro HTTPS, lo llevan (<code>https://…:8443</code>). HTTP lleva siempre a https.</span></li>
       <li data-x="40" data-y="38"><b>DNS de *.docker.test</b><span>Con «Activar», los dominios de Docker pasan a <code>.docker.test</code>, dejan de ir en el fichero de hosts y no se pide la contraseña por los dominios al añadir proyectos o versiones de PHP. Puesto, el botón dice «Quitar».</span></li>
-      <li data-x="77" data-y="38"><b>Certificado de Docker</b><span>«Confiar» hace que el navegador acepte los <code>https://</code> de Docker sin aviso. Solo vale para esos dominios: no es de una autoridad de certificación. Pide la contraseña de administrador.</span></li>
+      <li data-x="77" data-y="38"><b>Certificado de Docker</b><span>«Confiar» hace que el navegador acepte los <code>https://</code> de Docker sin aviso. Solo vale para esos dominios: no es de una autoridad de certificación. <span data-so="linux">No pide la contraseña de administrador: va a los navegadores de tu usuario.</span><span data-so="mac">El Mac te pide tu contraseña en su propio aviso (va a tu llavero).</span></span></li>
       <li data-x="42" data-y="55"><b>Parar los proyectos sin visitas</b><span>Cuántas horas sin visitas tiene que estar un proyecto para pararse solo, con lo común que no use nadie (su MariaDB, el Apache de Docker). Debajo, «Lo último: …» dice qué pasó la última vez.</span></li>
       <li data-x="91" data-y="58"><b>Cuándo</b><span>«Nunca», «A la hora sin visitas», o «A las 2, 3, 4, 6, 8, 12 o 24 h sin visitas». Se aplica al momento, sin contraseña.</span></li>
     </ol>
@@ -4826,7 +4871,7 @@
       <img src="img/linux/config-tunel-de-cloudflare.png" data-linux="img/linux/config-tunel-de-cloudflare.png" data-mac="img/mac/config-tunel-de-cloudflare.png" alt="Configuración, Túnel de Cloudflare" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
-      <li data-x="39" data-y="25"><b>cloudflared</b><span>Su versión y dónde está. Si aún no está: «Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)», con «Instalar». Si hay una nueva, «Actualizar a la X». Se descarga comprobada y, desde la ventana, pide la contraseña de administrador.</span></li>
+      <li data-x="39" data-y="25"><b>cloudflared</b><span>Su versión y dónde está. Si aún no está: «Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)», con «Instalar». Si hay una nueva, «Actualizar a la X». Se descarga comprobada, con tu usuario (no pide la contraseña de administrador).</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
@@ -4975,7 +5020,7 @@
   </figure>
   <p><b>El diálogo «Botones del proyecto»</b></p>
   <ul>
-    <li><b>La lista</b>: Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Importar. La casilla de cada uno lo enseña u
+    <li><b>La lista</b>: Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
       oculta en el visor; las flechas «Antes» y «Después» lo mueven.</li>
     <li><b>«Estilo»</b>: «Con su nombre», «Solo el icono (cuadrado)» o «Icono y nombre (cuadrado)».</li>
     <li><b>«Tamaño»</b>: el lado del cuadrado, de 32 a 128 px, con su medida al lado. Con «Con su nombre» no se usa. De partida, 44 px solo con el
@@ -5328,8 +5373,8 @@
     <li><b>Pulsa el interruptor</b> que hay al lado del título del apartado.</li>
     <li><b>Si lo apagas</b>, te pregunta «¿Apagar el correo de pruebas?»: lo que manden las webs (pedidos, formularios, contraseñas) podrá llegar
       de verdad a los clientes de las bases copiadas. Pulsa <b>«Apagarlo»</b> (en rojo) o «Cancelar».</li>
-    <li><b>Si lo enciendes sin tener Mailpit</b>, te pregunta «¿Instalar Mailpit?» y pulsa <b>«Instalar Mailpit»</b>. Si pulsas «Cancelar», el
-      correo se enciende igual, pero sin Mailpit: el correo de las webs no sale ni se ve hasta que lo instales.</li>
+    <li><b>Si lo enciendes sin tener Mailpit</b>, te pregunta «¿Instalar Mailpit?» y pulsa <b>«Instalar Mailpit»</b>. Si pulsas «Cancelar», no se
+      enciende nada: el correo de pruebas sigue apagado, sin Mailpit.</li>
     <li><b>Escribe la contraseña de administrador.</b> Se aplica a todas tus versiones. Si no se puede, se deja como estaba.</li>
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
@@ -5551,7 +5596,7 @@
     <li><b>Deja encendido «Bloquear el panel de administración»</b>: así nadie puede intentar entrar en el escritorio de WordPress o en el de
       PrestaShop por el túnel (tus bases llevan el administrador de pruebas, con una contraseña conocida). Si lo apagas, la nota de debajo te
       avisa en rojo.</li>
-    <li><b>Pulsa «Compartir»</b> y escribe la contraseña de administrador. La primera vez se descarga antes cloudflared, el programa de Cloudflare
+    <li><b>Pulsa «Compartir»</b> (no pide la contraseña de administrador). La primera vez se descarga antes cloudflared, el programa de Cloudflare
       (<span data-so="linux">unos 40 MB</span><span data-so="mac">unos 20 MB</span>, comprobado).</li>
     <li><b>Copia lo que vas a enviar.</b> Sale el diálogo del túnel con la dirección y la contraseña.</li>
     <li><b>Cuando acabe</b>, se cierra solo a su hora, aunque cierres la ventana. Para cerrarlo antes: «Cerrar el túnel».</li>
@@ -5738,8 +5783,8 @@
   <p>Cuando tienes abierta una web cualquiera en el navegador, esa web podría intentar enviar algo a tus proyectos locales (un formulario o una
     petición a <code>https://tienda-luna.local/admin/…</code>), y el navegador lo mandaría con tus sesiones abiertas. La barrera lo impide: desde
     otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. Va encendida de partida, en
-    todas las versiones. El Apache de Docker la lleva también: toma cómo está cada vez que arranca o recarga su configuración (al arrancar,
-    añadir o quitar un proyecto de Docker).</p>
+    todas las versiones. El Apache de Docker la lleva también: al cambiarla, se rehace su configuración y, si está en marcha, se recarga
+    al momento.</p>
   <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración
     → Seguridad entre webs</a>, con el interruptor «Barrera entre webs», y vuelve a encenderla al acabar. Pide la contraseña de administrador.</p>
   <details class="terminal"><summary>En la terminal</summary>
@@ -5755,6 +5800,7 @@
         puede en alguna, lo deja todo como estaba.</li>
       <li>Si Apache está en marcha, lo recarga:
         <span data-so="linux"><code>sudo /opt/lampp/lampp reloadapache</code></span><span data-so="mac"><code>sudo /Library/Nexum/XAMPP-8.4.27/xamppfiles/xampp reloadapache</code></span>.</li>
+      <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum barrera-web</code> dice si está encendida o apagada.</p>
   </details>
@@ -6033,7 +6079,7 @@
       de un vhost. Con <code>no</code>, el navegador vuelve a ir a la web real. Un <code>.local</code> se queda siempre en
       <code>/etc/hosts</code> salvo que lo apagues aquí. Ejemplo: <code>nexum hosts-falsear ferreteria-norte.com si</code>.</dd>
     <dt><code>nuevo-dominio &lt;dominio&gt; &lt;carpeta&gt; [base]</code></dt><dd>Proyecto nuevo con su dominio de producción falseado:
-      crea la carpeta (o usa la que haya), su vhost con certificado https y una base vacía con ese nombre en la versión activa (si no
+      crea la carpeta (o usa la que haya), su vhost con certificado https (o usa el que ya lleve a esa carpeta) y una base vacía con ese nombre en la versión activa (si no
       existe). Ejemplo: <code>nexum nuevo-dominio moda-verde.com moda-verde</code>.</dd>
     <dt><code>media-produccion &lt;dominio .local&gt; &lt;dominio de producción&gt;|quitar</code></dt><dd>Lo que le falte en local de
       <code>wp-content/uploads</code> o <code>img</code> (las imágenes, que no van en git) se pide a la web de producción. Solo en vhosts
@@ -6130,7 +6176,8 @@
     <dt><code>docker-php &lt;nombre&gt; &lt;php&gt;</code></dt><dd>Cambia la versión de PHP de un proyecto de Docker. Ejemplo:
       <code>nexum docker-php academia-flor 8.3</code>.</dd>
     <dt><code>docker-arrancar</code> · <code>docker-parar</code> · <code>docker-registros</code> · <code>docker-borrar &lt;nombre&gt;</code></dt>
-    <dd>Arranca, para, enseña lo que han escrito sus contenedores (sus <b>registros</b>), o borra un proyecto de Docker. Ejemplo:
+    <dd>Arranca, para, enseña lo que han escrito sus contenedores (sus <b>registros</b>), o borra un proyecto de Docker (con
+      <code>--copia</code>, antes guarda su base de Docker en <code>~/nexum-backups</code>). Ejemplo:
       <code>nexum docker-registros academia-flor</code>.</dd>
     <dt><code>docker-imagen &lt;nombre&gt;</code></dt><dd>Rehace su imagen de PHP con lo último de Docker Hub (con los parches de
       seguridad). Ejemplo: <code>nexum docker-imagen academia-flor</code>.</dd>
@@ -6201,6 +6248,10 @@
       MariaDB de cada versión: se vacían), <code>caches-proyectos</code>, <code>temporales</code> y <code>sesiones</code> (se cierran las
       sesiones abiertas en tus webs locales). Pide la contraseña solo si algo es del administrador. No se hacen copias. Ejemplo:
       <code>nexum limpiar registros temporales</code>.</dd>
+    <dt><code>vhosts-sin-carpeta [quitar]</code></dt><dd>Los vhosts de proyectos cuya carpeta ya no está en <code>/opt/htdocs</code>
+      (Apache avisa de cada uno al arrancar: «DocumentRoot […] does not exist»). Con <code>quitar</code>, se quitan del fichero de vhosts
+      (pide la contraseña). Las carpetas, las bases de datos y <code>/etc/hosts</code> no se tocan. Ejemplo:
+      <code>nexum vhosts-sin-carpeta</code>.</dd>
     <dt><code>manual [--ruta] [&lt;capítulo&gt;]</code></dt><dd>Abre este manual en el navegador, al principio o en ese capítulo
       (<code>proyectos</code>, <code>bbdd</code>, <code>docker</code>, <code>limpieza</code>…). Va dentro del programa: se saca a
       <code>~/.lvm-instalador/ayuda</code>. Con <code>--ruta</code>, solo dice qué fichero abrir. Ejemplo: <code>nexum manual
@@ -6343,6 +6394,11 @@
     <p>Al cambiar de versión, algún programa de la anterior no se cerró. Gasta memoria y puede quitarle los puertos a la activa.</p>
     <p><b>Compruébalo:</b> <code>nexum procesos</code>. <b>Arréglalo:</b> «Cerrarlos» en los avisos, o
       <code>nexum cerrar-procesos</code>.</p></details>
+  <details><summary>Al arrancar sale «AH00112: Warning: DocumentRoot […] does not exist»</summary>
+    <p>Es Apache: al arrancar, lee el fichero de vhosts y avisa de cada vhost cuya carpeta no existe. Pasa cuando borras o mueves la carpeta
+      de un proyecto sin borrar el proyecto desde el programa. Apache funciona igual; solo es el aviso.</p>
+    <p><b>Compruébalo:</b> <code>nexum vhosts-sin-carpeta</code>. <b>Arréglalo:</b> «Quitarlos» en el aviso «Hay vhosts de carpetas que
+      ya no existen», o <code>nexum vhosts-sin-carpeta quitar</code>.</p></details>
   <details><summary>Aviso «Tablas del sistema de MariaDB antiguas»</summary>
     <p>Vienen de una versión anterior de MariaDB y llenan su registro de errores. «Repararlas» las pone al día, sin tocar las bases de tus
       proyectos y, si marcas su casilla, guardando antes una copia en <code>~/nexum-backups</code>.</p>

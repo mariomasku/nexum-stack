@@ -87,4 +87,28 @@ if grep -q '^function unload_project_steps() {' "$SRC"; then
     SUDO=""
 fi
 check "tareas de la ventana: lo que cambia algo pide la contraseña antes de empezar" 'grep -q "env\[\"LVM_TAREA\"\] = \"1\"\|extra\[\"LVM_TAREA\"\] = \"1\"" "$SRC" && sed -n "/^if \[ \"\${LVM_TAREA:-}\" == 1 \]; then/,/^fi/p" "$SRC" | grep -q "\*) sudo_first || exit 130 ;;"'
+# (1.57.12) Lo que no usa sudo no la pide: el tunel, los repositorios, confiar en el certificado de
+# Docker y borrar o cargar una BBDD en el MariaDB en marcha (cargarla para una tienda, solo si su
+# var/cache tiene ficheros de otro usuario, que se borran con sudo)
+if grep -q '^function import_need_root() {' "$SRC"; then
+    extract "$SRC" import_need_root || exit 1
+    gate=$(sed -n '/^if \[ "${LVM_TAREA:-}" == 1 \]; then/,/^fi/p' "$SRC")
+    asks() { ( LVM_TAREA=1; sudo_first() { echo PIDE; return 0; }; copies_need_root() { return 1; }
+               clean_need_root() { return 1; }; clean_project_need_root() { return 1; }
+               set -- "$@"; eval "$gate" ) 2>&1 | grep -q PIDE; }
+    for c in "tunel-abrir http://panaderia-luna.local" tunel-instalar "repo-traer luna/panaderia-luna" \
+             "repo-traer luna/panaderia-luna --actualizar" "docker-web confiar" "borrar-bd wp_panaderia_luna --copia" \
+             "importar-bd /tmp/x.sql wp_panaderia_luna --copia"; do
+        # shellcheck disable=SC2086
+        check "tareas de la ventana: $c no pide la contraseña" '! asks $c'
+    done
+    check "tareas de la ventana: docker-web permitir sí la pide" 'asks docker-web permitir'
+    mkdir -p "$HTDOCS_DIR/prestashop-luna/var/cache/prod"
+    is_prestashop() { [[ "$1" == prestashop-* ]]; }
+    valid_project() { [ -d "$HTDOCS_DIR/$1" ]; }
+    check "importar-bd para una tienda con la cache tuya: no la pide" '! asks importar-bd /tmp/x.sql ps_luna --proyecto prestashop-luna'
+    id() { [ "$1" == -un ] && echo root || command id "$@"; }
+    check "importar-bd para una tienda con ficheros de otro en su cache: la pide antes" 'asks importar-bd /tmp/x.sql ps_luna --proyecto prestashop-luna'
+    unset -f id
+fi
 exit $fail

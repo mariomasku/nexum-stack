@@ -374,11 +374,14 @@ extension AppModel {
     }
 
     func dockerDelete(_ p: DockerProject) {
-        guard confirm("¿Borrar \(p.folder) de Docker?",
-                      p.isWeb ? "Se borran sus contenedores, su BBDD (\(p.db)) y su usuario de la MariaDB común y sus dominios; no se puede deshacer. La carpeta y las BBDD de XAMPP-X no se tocan. Pide la contraseña de administrador."
-                        : "Se borran sus contenedores, su copia de la BBDD (\(p.db)) y su vhost (\(p.domain)); no se puede deshacer. La carpeta y las BBDD de XAMPP-X no se tocan. Pide la contraseña de administrador.",
-                      "Borrar de Docker", destructive: true) else { return }
-        runTask("Borrando \(p.folder) de Docker", ["docker-borrar", p.slug],
+        // (la casilla de la copia: un volcado de su BBDD de Docker en ~/nexum-backups, con docker-borrar --copia)
+        let r = confirmCopy("¿Borrar \(p.folder) de Docker?",
+                            p.isWeb ? "Se borran sus contenedores, su BBDD (\(p.db)) y su usuario de la MariaDB común y sus dominios; no se puede deshacer. La carpeta y las BBDD de XAMPP-X no se tocan. Pide la contraseña de administrador."
+                              : "Se borran sus contenedores, su copia de la BBDD (\(p.db)) y su vhost (\(p.domain)); no se puede deshacer. La carpeta y las BBDD de XAMPP-X no se tocan. Pide la contraseña de administrador.",
+                            "Borrar de Docker", destructive: true,
+                            warning: "Sin copia, su BBDD de Docker no se podrá recuperar.")
+        guard r.ok else { return }
+        runTask("Borrando \(p.folder) de Docker", ["docker-borrar", p.slug] + (r.copy ? ["--copia"] : []),
                 doneText: "\(p.folder) borrado de Docker", autoClose: true)
     }
 
@@ -414,12 +417,16 @@ extension AppModel {
 
     /// Rehace la imagen de PHP de un proyecto con la última de Docker Hub (parches de seguridad)
     func dockerUpdateImage(_ p: DockerProject) {
+        // (docker-imagen rehace las de todas sus versiones de PHP: con el Apache de Docker, puede tener varias)
         let vs = p.isWeb ? p.versions.joined(separator: ", ") : p.php
-        guard confirm("¿Actualizar la imagen de PHP \(vs)?",
-                      "Se descarga otra vez la imagen oficial (php:<versión>-apache, con sus últimos parches), se rehace y se vuelve a crear el contenedor de PHP de \(p.folder). Su BBDD y su configuración no se tocan. Tarda unos minutos.",
-                      "Actualizar la imagen") else { return }
-        runTask("Actualizando la imagen de PHP \(vs)", ["docker-imagen", p.slug], progress: true,
-                doneText: "\(p.folder) con la imagen nueva de PHP \(vs)")
+        let many = p.isWeb && p.versions.count > 1
+        let what = (many ? "las imágenes de PHP " : "la imagen de PHP ") + vs
+        guard confirm("¿Actualizar \(what)?",
+                      many ? "Se descarga otra vez la imagen oficial de cada una (php:<versión>-apache, con sus últimos parches), se rehacen y se vuelven a crear los contenedores de PHP de \(p.folder). Su BBDD y su configuración no se tocan. Tarda unos minutos."
+                        : "Se descarga otra vez la imagen oficial (php:<versión>-apache, con sus últimos parches), se rehace y se vuelve a crear el contenedor de PHP de \(p.folder). Su BBDD y su configuración no se tocan. Tarda unos minutos.",
+                      many ? "Actualizar las imágenes" : "Actualizar la imagen") else { return }
+        runTask("Actualizando \(what)", ["docker-imagen", p.slug], progress: true,
+                doneText: "\(p.folder) con \(many ? "las imágenes nuevas" : "la imagen nueva") de PHP \(vs)")
     }
 
     /// Usuario y contraseña del phpMyAdmin de un proyecto (ya no entra solo como root)

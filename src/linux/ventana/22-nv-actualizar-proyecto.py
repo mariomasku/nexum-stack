@@ -234,11 +234,25 @@ class NvActualizarProyecto:
 
     def nv_add_env_menu(self, x):
         return self.nv_menu_button(None, "list-add-symbolic", [
-            ("En otra versión de PHP (copiar su BBDD)…", lambda: self.on_replicate()),
-            ("En Docker…", lambda: (self.docker_form.update(folder=x["name"], source=None, domain_set=False,
-                                                           domain=docker_slug(x["name"]) + ".docker.local"),
-                                    self.show_tab("docker"), self.docker is not None and self.build_docker()))],
+            ("En otra versión de PHP (copiar su BBDD)…", lambda: self.on_replicate(x)),
+            ("En Docker…", lambda: self.nv_docker_new_for(x))],
             "Añadir entorno: llevar el proyecto a otra versión de PHP o a Docker")
+
+    def nv_docker_new_for(self, x):
+        """«En Docker…» del + de Entorno: el diálogo «Proyecto en Docker» con ese proyecto elegido. Con Docker
+        apagado o sin instalar, o si el proyecto ya está en Docker (su carpeta no sale en ese diálogo), lo
+        mismo que «Añadir entorno en Docker…» del menú ⋮ (instalarlo, arrancarlo u otra versión de PHP)."""
+        def got(rc, out):
+            self.on_docker_data(rc, out)
+            d = self.docker or {}
+            if not d.get("ready") or not d.get("php") or self.nv_docker_of(x["name"]):
+                self.nv_docker_add_env(x)
+                return False
+            self.docker_form.update(folder=x["name"], source=None, domain_set=False,
+                                    domain=docker_slug(x["name"]) + ".docker.local")
+            self.nv_docker_new()
+            return False
+        run_quick(["gui-docker"], got)
 
     def nv_row_menu(self, x):
         """Menú ⋮ de una fila de la lista (aparece al pasar el ratón, con Cargar): llevar el proyecto a
@@ -255,11 +269,13 @@ class NvActualizarProyecto:
         items = [("Opciones de la BBDD…", lambda: self.on_link_project(x)),
                  ("Abrir la carpeta", lambda: self.open_uri("file://%s/%s" % (HTDOCS, x["name"])))]
         for dp in self.nv_docker_of(x["name"]):
-            items.append(("Eliminar de Docker…", lambda dp=dp: self.on_docker_delete(dp)))
+            # (uno por entorno de Docker: cada uno dice el suyo)
+            items.append(("Eliminar de Docker (PHP %s)…" % ", ".join(dp.get("versions") or [dp["php"]]),
+                          lambda dp=dp: self.on_docker_delete(dp)))
         db = self.project_base(x)
         if x["kind"] == "ps" and db:
             items.append(("Vaciar la caché de la tienda", lambda: self.run_task(
-                "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
+                "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", x["name"]],
                 done_text="Caché vaciada", auto_close=True)))
         items.append(("Limpiar proyecto…", lambda: self.nv_clean_project(x)))
         if x["kind"] == "ps":
@@ -271,8 +287,9 @@ class NvActualizarProyecto:
         return items
 
     def nv_images_button(self, x):
-        """Importar imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""
-        b = nv_button(logo("imagenes", 18), "Importar", "Importar imágenes de producción",
+        """Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""
+        b = nv_button(logo("imagenes", 18), "Imágenes de producción",
+                      "Traer de producción las imágenes que falten",
                       lambda *_: self.nv_wp_media(x) if x["kind"] == "wp" else self.nv_ps_images(x), "nv-proyecto-btn")
         b.set_sensitive(not self.busy)
         return b
