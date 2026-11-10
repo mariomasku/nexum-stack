@@ -469,8 +469,8 @@ struct WarningsView: View {
                     if !d.orphans.isEmpty {
                         Card("Hay vhosts de carpetas que ya no existen",
                              "Estos proyectos tienen su vhost, pero su carpeta ya no está en \(HTDOCS) (se borró, se movió o no se ha vuelto a clonar). Apache arranca igual, pero avisa de cada uno al arrancar («DocumentRoot … does not exist»). Quitarlos solo cambia el fichero de vhosts: las carpetas, las BBDD y /etc/hosts no se tocan.") {
-                            ForEach(d.orphans, id: \.0) { o in
-                                Row(o.0, o.1.isEmpty ? "sin dominio" : o.1)
+                            ForEach(d.orphans, id: \.folder) { o in
+                                Row(o.folder, o.domains.isEmpty ? "sin dominio" : o.domains)
                             }
                             Row("Quitar sus vhosts", "Pide la contraseña de administrador") {
                                 Button("Quitarlos") { model.removeOrphanVhosts() }.disabled(model.busy)

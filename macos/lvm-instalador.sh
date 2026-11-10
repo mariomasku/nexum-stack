@@ -20638,6 +20638,12 @@ final class TaskRunner: ObservableObject, Identifiable {
 
 // MARK: - Datos
 
+/// Un proyecto con su vhost pero sin su carpeta en htdocs (W|carpeta|dominios de gui-datos)
+struct OrphanVhost: Equatable {
+    let folder: String
+    let domains: String
+}
+
 struct Install: Identifiable, Equatable {
     let folder, php, apache, mariadb, ftp, perl, pma, blocker: String
     var id: String { return folder }
@@ -20691,8 +20697,8 @@ struct AppData: Equatable {
     var dbDates: [String: DbDate] = [:]
     /// Procesos de XAMPP en memoria que no son de la versión montada (resumen)
     var stray = ""
-    /// Vhosts de proyectos cuya carpeta ya no está en htdocs: (carpeta, dominios)
-    var orphans: [(String, String)] = []
+    /// Vhosts de proyectos cuya carpeta ya no está en htdocs
+    var orphans: [OrphanVhost] = []
     /// Servicios de la versión montada a los que se puede entrar desde otros equipos de la red
     var exposed = ""
     /// Versiones a las que les falta algo para ser solo de este Mac (asegurar --todas)
@@ -21317,7 +21323,7 @@ extension AppModel {
             case "Z" where f.count >= 2:
                 d.stray = f[1...].joined(separator: "|")
             case "W" where f.count >= 3:
-                d.orphans.append((f[1], f[2]))
+                d.orphans.append(OrphanVhost(folder: f[1], domains: f[2]))
             case "N" where f.count >= 2:
                 d.exposed = f[1...].joined(separator: "|")
             case "U" where f.count >= 2:
@@ -21840,7 +21846,7 @@ extension AppModel {
     func removeOrphanVhosts() {
         let orphans = data?.orphans ?? []
         guard !orphans.isEmpty else { return }
-        let steps = orphans.map { "Se quitan del fichero de vhosts los de \($0.0) (\($0.1.isEmpty ? "sin dominio" : $0.1))." }
+        let steps = orphans.map { "Se quitan del fichero de vhosts los de \($0.folder) (\($0.domains.isEmpty ? "sin dominio" : $0.domains))." }
             + ["Apache comprueba el fichero y se recarga."]
         guard confirm("¿Quitar los vhosts de carpetas que ya no existen?",
                       "Las carpetas, las BBDD y /etc/hosts no se tocan. Pide la contraseña de administrador.",
@@ -26461,8 +26467,8 @@ struct WarningsView: View {
                     if !d.orphans.isEmpty {
                         Card("Hay vhosts de carpetas que ya no existen",
                              "Estos proyectos tienen su vhost, pero su carpeta ya no está en \(HTDOCS) (se borró, se movió o no se ha vuelto a clonar). Apache arranca igual, pero avisa de cada uno al arrancar («DocumentRoot … does not exist»). Quitarlos solo cambia el fichero de vhosts: las carpetas, las BBDD y /etc/hosts no se tocan.") {
-                            ForEach(d.orphans, id: \.0) { o in
-                                Row(o.0, o.1.isEmpty ? "sin dominio" : o.1)
+                            ForEach(d.orphans, id: \.folder) { o in
+                                Row(o.folder, o.domains.isEmpty ? "sin dominio" : o.domains)
                             }
                             Row("Quitar sus vhosts", "Pide la contraseña de administrador") {
                                 Button("Quitarlos") { model.removeOrphanVhosts() }.disabled(model.busy)

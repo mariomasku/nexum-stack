@@ -205,7 +205,7 @@ extension AppModel {
     func removeOrphanVhosts() {
         let orphans = data?.orphans ?? []
         guard !orphans.isEmpty else { return }
-        let steps = orphans.map { "Se quitan del fichero de vhosts los de \($0.0) (\($0.1.isEmpty ? "sin dominio" : $0.1))." }
+        let steps = orphans.map { "Se quitan del fichero de vhosts los de \($0.folder) (\($0.domains.isEmpty ? "sin dominio" : $0.domains))." }
             + ["Apache comprueba el fichero y se recarga."]
         guard confirm("¿Quitar los vhosts de carpetas que ya no existen?",
                       "Las carpetas, las BBDD y /etc/hosts no se tocan. Pide la contraseña de administrador.",

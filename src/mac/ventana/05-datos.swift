@@ -1,5 +1,11 @@
 // MARK: - Datos
 
+/// Un proyecto con su vhost pero sin su carpeta en htdocs (W|carpeta|dominios de gui-datos)
+struct OrphanVhost: Equatable {
+    let folder: String
+    let domains: String
+}
+
 struct Install: Identifiable, Equatable {
     let folder, php, apache, mariadb, ftp, perl, pma, blocker: String
     var id: String { return folder }
@@ -53,8 +59,8 @@ struct AppData: Equatable {
     var dbDates: [String: DbDate] = [:]
     /// Procesos de XAMPP en memoria que no son de la versión montada (resumen)
     var stray = ""
-    /// Vhosts de proyectos cuya carpeta ya no está en htdocs: (carpeta, dominios)
-    var orphans: [(String, String)] = []
+    /// Vhosts de proyectos cuya carpeta ya no está en htdocs
+    var orphans: [OrphanVhost] = []
     /// Servicios de la versión montada a los que se puede entrar desde otros equipos de la red
     var exposed = ""
     /// Versiones a las que les falta algo para ser solo de este Mac (asegurar --todas)
