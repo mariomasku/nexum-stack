@@ -4,6 +4,13 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.13 · 11 nov 2026
+
+- **Dominios y hosts:** arriba, a la izquierda, el recuadro con los dominios falseados (también los .local) y, a su derecha, el nuevo proyecto con dominio falseado; debajo, los dominios de los vhosts en dos columnas.
+- Los avisos de abajo, más grandes y en forma de píldora, con el logotipo de Nexum y un borde con los colores de su icono.
+- **Configuración, General, Registro de tareas:** se ven 4 (con más, la lista se desplaza en su recuadro) y «Vaciar el registro…» borra los de las tareas que ya han acabado, sin ir a Limpieza.
+- **Mac:** el diálogo del túnel abierto se veía con la dirección y la contraseña unas encima de otras. En Linux no cambia nada.
+
 ## 1.57.12 · 10 nov 2026
 
 - Aviso «Hay vhosts de carpetas que ya no existen»: los proyectos con su vhost pero sin su carpeta en htdocs (Apache avisaba de cada uno al arrancar: «AH00112: Warning: DocumentRoot [...] does not exist»), con «Quitarlos». Solo cambia el fichero de vhosts: las carpetas, las BBDD y `/etc/hosts` no se tocan. En la terminal: nexum vhosts-sin-carpeta [quitar].
