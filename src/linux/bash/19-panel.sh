@@ -1132,6 +1132,9 @@ QUE HACE
 VERSIONES
 
 1.57.13 (11 nov 2026)
+- Configuración, General, Registro de tareas: se ven 4 (con más, la
+  lista se desplaza en su recuadro) y «Vaciar el registro…» borra los de
+  las tareas que ya han acabado, sin ir a Limpieza.
 - Mac: el diálogo del túnel abierto se veía con la dirección y la
   contraseña unas encima de otras. En Linux no cambia nada.
 

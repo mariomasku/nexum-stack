@@ -395,6 +395,9 @@ QUE HACE
 VERSIONES
 
 1.57.13 (11 nov 2026)
+- Configuración, General, Registro de tareas: se ven 4 (con más, la
+  lista se desplaza en su recuadro) y «Vaciar el registro…» borra los de
+  las tareas que ya han acabado, sin ir a Limpieza.
 - Compartir (túnel): el diálogo del túnel abierto se veía con la
   dirección, la contraseña y sus «Copiar» unos encima de otros. Cada una
   va en su recuadro, con su alto.

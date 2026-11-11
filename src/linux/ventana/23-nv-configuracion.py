@@ -431,6 +431,18 @@ class NvConfiguracion:
                              "guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha "
                              "dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las %d últimas en %s, solo "
                              "para ti; las contraseñas y los tokens no se escriben." % (TASKS_KEEP, where))
+        # (con más de 4, la lista se desplaza dentro de su recuadro: se ven 4 y el resto, con su barra)
+        parent = lb.get_parent()
+        pos = parent.get_children().index(lb) if isinstance(parent, Gtk.Box) else None
+        parent.remove(lb)
+        self.tasks_sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                                           max_content_height=4 * 58)
+        self.tasks_sw.add(lb)
+        if pos is None:
+            parent.add(self.tasks_sw)
+        else:
+            parent.pack_start(self.tasks_sw, False, False, 0)
+            parent.reorder_child(self.tasks_sw, pos)
         self.tasks_lb = lb
         self.tasks_line = Gtk.Box(spacing=8, halign=Gtk.Align.END, margin_top=6)
         box.pack_start(self.tasks_line, False, False, 0)
@@ -439,15 +451,14 @@ class NvConfiguracion:
         box.show_all()
 
     def nv_tasks_fill(self):
-        """Las filas del registro de tareas (las 15 más nuevas; «Ver más», de 50 en 50). Se rehacen al acabar
-        cada tarea."""
+        """Las filas del registro de tareas, todas (se ven 4: el resto, desplazando la lista), con «Vaciar el
+        registro…» y «Abrir la carpeta». Se rehacen al empezar y al acabar cada tarea."""
         lb, line = getattr(self, "tasks_lb", None), getattr(self, "tasks_line", None)
         if lb is None or line is None:
             return
         clear(lb)
         clear(line)
         logs = task_logs()
-        shown = getattr(self, "tasks_shown", 15)
         marks = {"ok": ("object-select-symbolic", "punto-verde", "Terminada bien"),
                  "error": ("dialog-error-symbolic", "error", "Ha fallado"),
                  "cancel": ("process-stop-symbolic", "dim-label", "Cancelada"),
@@ -456,7 +467,7 @@ class NvConfiguracion:
             row = ActionRow("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
             row.add_prefix(icon("document-open-recent-symbolic", 18))
             lb.add(row)
-        for e in logs[:shown]:
+        for e in logs:
             ic, cls, tip = marks[e["state"]]
             row = ActionRow(e["title"], "%s  ·  %s" % (e["when"], e["result"]), activatable=True)
             mark = css(icon(ic, 18), cls)
@@ -468,15 +479,44 @@ class NvConfiguracion:
             b.connect("clicked", lambda _b, p=e["path"]: self.nv_task_log_show(p))
             row.add_suffix(b)
             lb.add(row)
-        if len(logs) > shown:
-            more = Gtk.Button(label="Ver más (%d)" % (len(logs) - shown))
-            more.connect("clicked", lambda *_: (setattr(self, "tasks_shown", shown + 50), self.nv_tasks_fill()))
-            line.pack_start(more, False, False, 0)
+        done = [e for e in logs if e["state"] != "run"]
+        empty = css(Gtk.Button(label="Vaciar el registro…", sensitive=bool(done)), "destructive-action")
+        empty.connect("clicked", lambda *_: self.nv_tasks_empty())
+        line.pack_start(empty, False, False, 0)
         folder = Gtk.Button(label="Abrir la carpeta")
         folder.connect("clicked", lambda *_: (task_log_dir(), self.open_uri(GLib.filename_to_uri(TASKS_DIR))))
         line.pack_start(folder, False, False, 0)
         lb.show_all()
         line.show_all()
+
+        # (el alto justo de las 4 primeras filas, el que pide cada una: con menos, el de las que haya)
+        sw = getattr(self, "tasks_sw", None)
+        if sw is not None:
+            h = sum(r.get_preferred_height()[1] for r in lb.get_children()[:4])
+            if h > 0:
+                sw.set_min_content_height(h)
+                sw.set_max_content_height(h)
+
+    def nv_tasks_empty(self):
+        """«Vaciar el registro…»: borra los registros de las tareas que ya han acabado (el de una en marcha se
+        queda), sin seguir enlaces."""
+        done = [e for e in task_logs() if e["state"] != "run"]
+        if not done or not confirm(
+                self.win, "¿Vaciar el registro de tareas?",
+                "Las tareas en marcha se quedan. Lo borrado no se puede recuperar.", "Vaciar", destructive=True,
+                steps=["Se borran los registros de %s de %s." % (plural(len(done), "tarea", "tareas"),
+                                                                  "~/.lvm-instalador/tareas")]):
+            return
+        n = 0
+        for e in done:
+            try:
+                if not os.path.islink(e["path"]):
+                    os.unlink(e["path"])
+                    n += 1
+            except OSError:
+                pass
+        self.toast("Registro de tareas vaciado: %s" % plural(n, "tarea borrada", "tareas borradas"))
+        self.nv_tasks_fill()
 
     def nv_task_log_show(self, path):
         """Una tarea del registro, entera: su orden y toda su salida, con «Copiar» y «Abrir la carpeta»."""

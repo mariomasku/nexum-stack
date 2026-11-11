@@ -887,27 +887,23 @@ struct ToolsView: View {
 struct TaskLogsCard: View {
     @EnvironmentObject var model: AppModel
     @State private var logs: [TaskLogEntry] = []
-    /// Cuántas se ven (las 15 más nuevas; «Ver más», de 50 en 50)
-    @State private var shown = 15
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TileCard(wide: true) {
-                if logs.isEmpty {
-                    Tile("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
+            // (todas, pero se ven 4: con más, la lista se desplaza dentro de su recuadro)
+            if logs.count > 4 {
+                TileCard(wide: true) {
+                    ScrollView { VStack(spacing: 0) { rows() } }
+                        .frame(height: 4 * 54)
                 }
-                ForEach(Array(logs.prefix(shown))) { e in
-                    Tile(e.title, e.when + "  ·  " + e.result, leading: { mark(e.state) }) {
-                        Button("Ver") { showTaskLog(e.path) }
-                            .tip(e.command)
-                    }
-                }
+            } else {
+                TileCard(wide: true) { rows() }
             }
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
-                if logs.count > shown {
-                    Button("Ver más (\(logs.count - shown))") { shown += 50 }
-                }
+                Button("Vaciar el registro…") { empty() }
+                    .buttonStyle(OutlineButton(kind: "stop"))
+                    .disabled(model.busy || !logs.contains(where: { $0.state != "run" }))
                 Button("Abrir la carpeta") {
                     _ = taskLogDir()
                     NSWorkspace.shared.open(URL(fileURLWithPath: TASKS_DIR))
@@ -916,6 +912,37 @@ struct TaskLogsCard: View {
         }
         .onAppear { logs = taskLogs() }
         .onChange(of: model.taskLogsChanged) { _ in logs = taskLogs() }
+    }
+
+    @ViewBuilder
+    func rows() -> some View {
+        if logs.isEmpty {
+            Tile("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
+        }
+        ForEach(logs) { e in
+            Tile(e.title, e.when + "  ·  " + e.result, leading: { mark(e.state) }) {
+                Button("Ver") { showTaskLog(e.path) }
+                    .tip(e.command)
+            }
+        }
+    }
+
+    /// «Vaciar el registro…»: borra los registros de las tareas que ya han acabado (el de una en marcha se queda),
+    /// sin seguir enlaces
+    func empty() {
+        let done = taskLogs().filter { $0.state != "run" }
+        guard !done.isEmpty, confirm("¿Vaciar el registro de tareas?", "Las tareas en marcha se quedan. Lo borrado no se puede recuperar.",
+                                     "Vaciar", destructive: true,
+                                     steps: ["Se borran los registros de \(plural(done.count, "tarea", "tareas")) de ~/.lvm-instalador/tareas."])
+        else { return }
+        var n = 0
+        for e in done {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: e.path)
+            if (attrs?[.type] as? FileAttributeType) == .typeSymbolicLink { continue }
+            if (try? FileManager.default.removeItem(atPath: e.path)) != nil { n += 1 }
+        }
+        model.toast("Registro de tareas vaciado: \(plural(n, "tarea borrada", "tareas borradas"))")
+        logs = taskLogs()
     }
 
     /// Cómo acabó: bien (verde), mal (rojo), cancelada o en marcha
