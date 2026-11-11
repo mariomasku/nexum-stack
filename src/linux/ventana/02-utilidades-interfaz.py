@@ -1216,3 +1216,40 @@ def combo_search(combo):
     if 0 <= active < len(names):
         select(lb.get_row_at_index(active))
     return True
+
+
+# Los colores del icono de Nexum (el borde del aviso de abajo): azul, verde, amarillo, rojo y magenta
+NEXUM_COLORS = [(0x00, 0x6C, 0xB7), (0x88, 0xBB, 0x1D), (0xFF, 0xB6, 0x08), (0xFF, 0x00, 0x00), (0xF2, 0x00, 0x93)]
+
+
+def toast_paint(widget, cr):
+    """El fondo del aviso de abajo: una píldora (los extremos redondos del todo y el centro recto) del color de la
+    ventana, con una sombra suave y un borde de 3 px con los colores del icono de Nexum. Su relleno (CSS
+    .nv-toast) deja sitio a la sombra."""
+    import cairo
+    import math
+    a = widget.get_allocation()
+    x, y, w, h = 0.5, 0.5, a.width - 1.0, a.height - 1.0
+
+    def pill(px, py, pw, ph):
+        r = ph / 2.0
+        cr.new_path()
+        cr.arc(px + r, py + r, r, math.pi / 2, 3 * math.pi / 2)
+        cr.arc(px + pw - r, py + r, r, 3 * math.pi / 2, math.pi / 2)
+        cr.close_path()
+    # (la sombra: la misma píldora, unas veces, cada vez más grande y más transparente)
+    for i in range(6, 0, -1):
+        pill(x + 6 - i, y + 8 - i + 2, w - 12 + 2 * i, h - 12 + 2 * i)
+        cr.set_source_rgba(0, 0, 0, 0.035)
+        cr.fill()
+    ok, bg = widget.get_style_context().lookup_color("theme_bg_color")
+    pill(x + 6, y + 6, w - 12, h - 12)
+    cr.set_source_rgba(bg.red, bg.green, bg.blue, 1) if ok else cr.set_source_rgb(0.18, 0.18, 0.18)
+    cr.fill_preserve()
+    grad = cairo.LinearGradient(x, 0, x + w, 0)
+    for n, (rr, gg, bb) in enumerate(NEXUM_COLORS):
+        grad.add_color_stop_rgb(n / (len(NEXUM_COLORS) - 1), rr / 255.0, gg / 255.0, bb / 255.0)
+    cr.set_source(grad)
+    cr.set_line_width(3)
+    cr.stroke()
+    return False

@@ -83,12 +83,23 @@ struct ContentView: View {
 
     @ViewBuilder
     func toastView() -> some View {
+        // (grande, con el logotipo de Nexum al principio y un borde con los colores de su icono; en forma de
+        // píldora: los extremos redondos del todo y el centro recto)
         if let t = model.toastText {
-            Text(t)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Capsule().fill(Color(NSColor.windowBackgroundColor)).shadow(radius: 4))
-                .padding(.bottom, 24)
+            let shape = Capsule()
+            HStack(spacing: 14) {
+                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
+                Text(t).font(.system(size: 15, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.leading, 30)
+            .padding(.trailing, 36)
+            .padding(.vertical, 12)
+            .frame(maxWidth: 620)
+            .background(shape.fill(Color(NSColor.windowBackgroundColor)))
+            .overlay(shape.strokeBorder(LinearGradient(colors: NEXUM_COLORS, startPoint: .leading, endPoint: .trailing),
+                                        lineWidth: 3))
+            .shadow(color: Color.black.opacity(0.30), radius: 9, y: 4)
+            .padding(.bottom, 24)
         }
     }
 }

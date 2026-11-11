@@ -1132,6 +1132,11 @@ QUE HACE
 VERSIONES
 
 1.57.13 (11 nov 2026)
+- Dominios y hosts: arriba, a la izquierda, el recuadro con los dominios
+  falseados (también los .local) y, a su derecha, el nuevo proyecto con
+  dominio falseado; debajo, los dominios de los vhosts en dos columnas.
+- Los avisos de abajo, más grandes y en forma de píldora, con el logotipo
+  de Nexum y un borde con los colores de su icono.
 - Configuración, General, Registro de tareas: se ven 4 (con más, la
   lista se desplaza en su recuadro) y «Vaciar el registro…» borra los de
   las tareas que ya han acabado, sin ir a Limpieza.

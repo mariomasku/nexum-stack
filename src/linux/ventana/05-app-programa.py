@@ -169,14 +169,21 @@ class AppPrograma:
     def build_toast(self):
         self.toast_rev = Gtk.Revealer(halign=Gtk.Align.CENTER, valign=Gtk.Align.END,
                                       margin_bottom=48)
-        box = css(Gtk.Box(spacing=12), "app-notification")
-        self.toast_lbl = Gtk.Label()
+        # (grande, con el logotipo de Nexum al principio, en una píldora con el borde de los colores de su icono)
+        box = css(Gtk.Box(spacing=14), "nv-toast")
+        box.connect("draw", toast_paint)
+        self.toast_img = Gtk.Image()
+        box.pack_start(self.toast_img, False, False, 0)
+        self.toast_lbl = css(Gtk.Label(wrap=True, max_width_chars=70, xalign=0), "nv-toast-texto")
         box.pack_start(self.toast_lbl, False, False, 0)
         self.toast_rev.add(box)
         self.toast_timer = None
         return self.toast_rev
 
     def toast(self, text):
+        """Un aviso abajo, unos segundos."""
+        self.toast_img.set_from_icon_name(getattr(self, "icon", ICON), Gtk.IconSize.DIALOG)
+        self.toast_img.set_pixel_size(34)
         self.toast_lbl.set_label(text)
         self.toast_rev.set_reveal_child(True)
         if self.toast_timer:

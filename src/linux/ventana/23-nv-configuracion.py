@@ -507,6 +507,10 @@ class NvConfiguracion:
                 steps=["Se borran los registros de %s de %s." % (plural(len(done), "tarea", "tareas"),
                                                                   "~/.lvm-instalador/tareas")]):
             return
+        # (en simulación no se borra nada: solo se dice lo que se haría)
+        if SIMULATE:
+            self.toast("[simulación] se borrarían los registros de %s" % plural(len(done), "tarea", "tareas"))
+            return
         n = 0
         for e in done:
             try:

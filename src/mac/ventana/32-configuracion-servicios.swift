@@ -178,7 +178,10 @@ struct OneThirdTwoThirds<First: View, Second: View>: View {
     let second: Second
     @State private var width: CGFloat = 0
     private let spacing: CGFloat = 18
-    init(@ViewBuilder first: () -> First, @ViewBuilder second: () -> Second) {
+    /// La parte del ancho del primero (de partida, un tercio; el segundo, el resto)
+    private let share: CGFloat
+    init(share: CGFloat = 1.0 / 3, @ViewBuilder first: () -> First, @ViewBuilder second: () -> Second) {
+        self.share = share
         self.first = first()
         self.second = second()
     }
@@ -191,8 +194,8 @@ struct OneThirdTwoThirds<First: View, Second: View>: View {
             .frame(height: 0)
             if width > 0 {
                 HStack(alignment: .top, spacing: spacing) {
-                    first.frame(width: unit, alignment: .topLeading)
-                    second.frame(width: unit * 2, alignment: .topLeading)
+                    first.frame(width: unit * 3 * share, alignment: .topLeading)
+                    second.frame(width: unit * 3 * (1 - share), alignment: .topLeading)
                 }
             }
         }
@@ -225,24 +228,32 @@ struct HostsView: View {
                         })
                     }
                 }
-                // Arriba, en un recuadro como el visor de Proyectos: todos los que llevan a este Mac (también
-                // los .local), en dos columnas, cada uno con su interruptor
-                hostsVisor(fakes(hosts))
-                // Debajo, en la misma fila: los demás dominios de los vhosts ocupan 1/3 y el proyecto nuevo, 2/3
-                OneThirdTwoThirds(first: {
-                    Card("Dominios de los vhosts",
-                         "Los que llevan a su web real. Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1) y sube al recuadro de arriba. Se pide la contraseña de administrador para cambiar /etc/hosts.") {
-                        if rest(hosts).isEmpty {
-                            Row("No hay más dominios", "Los vhosts están en XAMPP-compartido/httpd-vhosts.conf")
-                        }
-                        ForEach(rest(hosts), id: \.name) { h in
-                            if h.name != rest(hosts).first?.name { Divider() }
-                            hostRow(h)
-                        }
-                    }
+                // Arriba, en la misma fila: a la izquierda (1/3), en un recuadro como el visor de Proyectos, todos
+                // los que llevan a este Mac (también los .local), cada uno con su interruptor; a la derecha (2/3),
+                // el proyecto nuevo con dominio falseado
+                // (2/5 para que se lean los dominios con sus botones; 3/5 para el formulario)
+                OneThirdTwoThirds(share: 0.4, first: {
+                    hostsVisor(fakes(hosts))
                 }, second: {
                     newDomainCard(hosts)
                 })
+                // Debajo, a todo el ancho y en dos columnas (de dos en dos, por filas): los demás dominios de los vhosts
+                let others = rest(hosts)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text("Dominios de los vhosts").font(.system(size: 13.5, weight: .semibold))
+                        Image(systemName: "info.circle").foregroundColor(.secondary)
+                            .tip("Los que llevan a su web real. Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1) y sube al recuadro de arriba. Se pide la contraseña de administrador para cambiar /etc/hosts.")
+                    }
+                    if others.isEmpty {
+                        Card { Row("No hay más dominios", "Los vhosts están en XAMPP-compartido/httpd-vhosts.conf") }
+                    } else {
+                        HStack(alignment: .top, spacing: 18) {
+                            hostColumn(others.enumerated().filter { $0.offset % 2 == 0 }.map { $0.element })
+                            hostColumn(others.enumerated().filter { $0.offset % 2 == 1 }.map { $0.element })
+                        }
+                    }
+                }
             } else {
                 Loading()
             }
@@ -310,11 +321,9 @@ struct HostsView: View {
         return hosts.filter { !$0.fake }
     }
 
-    /// El recuadro de arriba, como el visor de Proyectos: su cabecera (el punto verde si hay alguno) y, en una
-    /// tarjeta, los dominios falseados en dos columnas (de dos en dos, por filas), cada uno con su interruptor
+    /// El recuadro de arriba a la izquierda, como el visor de Proyectos: su cabecera (el punto verde si hay alguno)
+    /// y, en una tarjeta, los dominios falseados uno debajo de otro, cada uno con su interruptor
     func hostsVisor(_ fake: [HostEntry]) -> some View {
-        let left: [HostEntry] = fake.enumerated().filter { $0.offset % 2 == 0 }.map { $0.element }
-        let right: [HostEntry] = fake.enumerated().filter { $0.offset % 2 == 1 }.map { $0.element }
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 StatusDot(on: !fake.isEmpty, blink: false)
@@ -328,21 +337,17 @@ struct HostsView: View {
                         .font(.caption).foregroundColor(.secondary)
                 }
             }
-            VStack(alignment: .leading, spacing: 0) {
-                if fake.isEmpty {
-                    Text("Ningún dominio falseado: los dominios de los vhosts llevan a sus webs reales.")
-                        .foregroundColor(.secondary)
-                } else {
-                    HStack(alignment: .top, spacing: 18) {
-                        hostColumn(left)
-                        hostColumn(right)
-                    }
-                }
+            // (un solo recuadro: la lista misma; sin ninguno, la tarjeta con lo que pasa)
+            if fake.isEmpty {
+                Text("Ningún dominio falseado: los dominios de los vhosts llevan a sus webs reales.")
+                    .foregroundColor(.secondary)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
+            } else {
+                hostColumn(fake)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.03)))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
         }
     }
 
@@ -935,6 +940,11 @@ struct TaskLogsCard: View {
                                      "Vaciar", destructive: true,
                                      steps: ["Se borran los registros de \(plural(done.count, "tarea", "tareas")) de ~/.lvm-instalador/tareas."])
         else { return }
+        // (en simulación no se borra nada: solo se dice lo que se haría)
+        if SIMULATE {
+            model.toast("[simulación] se borrarían los registros de \(plural(done.count, "tarea", "tareas"))")
+            return
+        }
         var n = 0
         for e in done {
             let attrs = try? FileManager.default.attributesOfItem(atPath: e.path)

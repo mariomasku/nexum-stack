@@ -46,36 +46,47 @@ class AppHosts:
             lb.add(row)
             self.hosts_box.pack_start(box, False, False, 0)
 
-        # Arriba, en un recuadro como el visor de Proyectos: todos los que llevan a este equipo (también
-        # los .local), en dos columnas, cada uno con su interruptor
-        self.hosts_box.pack_start(self.hosts_visor(fake), False, False, 0)
+        # Arriba, en la misma fila: a la izquierda, en un recuadro como el visor de Proyectos, todos los que
+        # llevan a este equipo (también los .local), cada uno con su interruptor; a la derecha, el proyecto nuevo
+        # con dominio falseado
+        # (2/5 para que se lean los dominios con sus botones; 3/5 para el formulario)
+        grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
+        visor = self.hosts_visor(fake)
+        visor.set_valign(Gtk.Align.START)
+        grid.attach(visor, 0, 0, 2, 1)
+        new_domain = self.build_new_domain()
+        new_domain.set_valign(Gtk.Align.START)
+        grid.attach(new_domain, 2, 0, 3, 1)
+        self.hosts_box.pack_start(grid, False, False, 0)
 
-        # Debajo, en la misma fila: los demás dominios de los vhosts ocupan 1/3 y el proyecto nuevo, 2/3
+        # Debajo, a todo el ancho y en dos columnas: los demás dominios de los vhosts
         box, lb = group("Dominios de los vhosts",
                         "Los que llevan a su web real. Encendido, el dominio lleva a este equipo "
                         "(127.0.0.1) y sube al recuadro de arriba. Se pide la contraseña de sudo "
                         "para cambiar /etc/hosts.")
         if not rest:
-            row = ActionRow("No hay más dominios",
-                            "Los vhosts están en /opt/config/httpd-vhosts.conf")
-            # (en un tercio de la pestaña no cabe en una línea)
-            row.subtitle.set_line_wrap(True)
-            row.subtitle.set_ellipsize(0)
-            lb.add(row)
-        for h in rest:
-            lb.add(self.host_row(h))
-        grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
-        box.set_valign(Gtk.Align.START)
-        grid.attach(box, 0, 0, 1, 1)
-        new_domain = self.build_new_domain()
-        new_domain.set_valign(Gtk.Align.START)
-        grid.attach(new_domain, 1, 0, 2, 1)
-        self.hosts_box.pack_start(grid, False, False, 0)
+            lb.add(ActionRow("No hay más dominios", "Los vhosts están en /opt/config/httpd-vhosts.conf"))
+            self.hosts_box.pack_start(box, False, False, 0)
+        else:
+            # (de dos en dos, por filas: la primera columna, los de número par)
+            parent = lb.get_parent()
+            pos = parent.get_children().index(lb)
+            parent.remove(lb)
+            cols = Gtk.Grid(column_spacing=18, column_homogeneous=True, margin_top=6)
+            lists = [css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
+                     for _c in range(2)]
+            for n, h in enumerate(rest):
+                lists[n % 2].add(self.host_row(h))
+            for c, l2 in enumerate(lists):
+                cols.attach(l2 if l2.get_children() else Gtk.Box(), c, 0, 1, 1)
+            parent.pack_start(cols, False, False, 0)
+            parent.reorder_child(cols, pos)
+            self.hosts_box.pack_start(box, False, False, 0)
         self.hosts_box.show_all()
 
     def hosts_visor(self, fake):
-        """El recuadro de arriba de Dominios y hosts, como el visor de Proyectos: su cabecera (el punto verde
-        si hay alguno) y, en una tarjeta, los dominios falseados en dos columnas, cada uno con su interruptor."""
+        """El recuadro de arriba a la izquierda de Dominios y hosts, como el visor de Proyectos: su cabecera (el
+        punto verde si hay alguno) y, en una tarjeta, los dominios falseados, cada uno con su interruptor."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         head = Gtk.Box(spacing=8)
         head.pack_start(nv_dot(bool(fake)), False, False, 0)
@@ -89,24 +100,17 @@ class AppHosts:
             head.pack_end(label("%d %s a este equipo" % (len(fake), "lleva" if len(fake) == 1 else "llevan"),
                                 "nv-chico", "nv-tenue"), False, False, 0)
         box.pack_start(head, False, False, 0)
-        card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-tarjeta")
+        # (un solo recuadro: la lista misma; sin ninguno, la tarjeta con lo que pasa)
         if not fake:
+            card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL), "nv-tarjeta")
             card.pack_start(label("Ningún dominio falseado: los dominios de los vhosts llevan a sus webs reales.",
                                   "nv-tenue", xalign=0, wrap=True), False, False, 0)
+            box.pack_start(card, False, False, 0)
         else:
-            # (de dos en dos, por filas: la primera columna, los de número par)
-            grid = Gtk.Grid(column_spacing=18, column_homogeneous=True)
-            cols = [css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "nv-grupo")
-                    for _c in range(2)]
-            for n, h in enumerate(fake):
-                cols[n % 2].add(self.host_row(h))
-            for c, lb in enumerate(cols):
-                if lb.get_children():
-                    grid.attach(lb, c, 0, 1, 1)
-                else:
-                    grid.attach(Gtk.Box(), c, 0, 1, 1)
-            card.pack_start(grid, False, False, 0)
-        box.pack_start(card, False, False, 0)
+            lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
+            for h in fake:
+                lb.add(self.host_row(h))
+            box.pack_start(lb, False, False, 0)
         return box
 
     def build_new_domain(self):

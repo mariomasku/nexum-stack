@@ -178,8 +178,9 @@ extension AppModel {
             row.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
             row.translatesAutoresizingMaskIntoConstraints = false
             row.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
-            row.setContentHuggingPriority(.required, for: .vertical)
-            row.setContentCompressionResistancePriority(.required, for: .vertical)
+            // (y su alto, fijo: el título pequeño, el valor y el botón caben en 58; así el diálogo sabe cuánto mide
+            // antes de dibujarse y no monta una fila encima de otra)
+            row.heightAnchor.constraint(equalToConstant: 58).isActive = true
             return row
         }
         let open = NSButton(title: "Abrir", target: openURL, action: #selector(DialogValidator.changed(_:)))

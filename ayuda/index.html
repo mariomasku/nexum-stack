@@ -3899,28 +3899,28 @@
       <li data-x="92.1" data-y="13.7"><b>Ver fichero de hosts</b><span>Arriba, qué dominios se pueden falsear y cómo está cada uno («falseado» o
         «sin falsear»; los <code>.local</code>, «encendido» o «apagado»), con su carpeta; debajo, el contenido entero del fichero. Solo para
         leer, con «Copiar todo» y «Actualizar». Para editarlo a mano: menú ☰ → «Editar /etc/hosts», o Configuración → Vhosts y hosts.</span></li>
-      <li data-x="19.8" data-y="26.5"><b>Dominios y hosts falseados</b><span>Arriba, en un recuadro como el visor de Proyectos: todos los dominios que
-        llevan a tu equipo, también los <code>.local</code>, en dos columnas. Cada uno con su botón «Abrir» y su interruptor; a la derecha de
+      <li data-x="24" data-y="24.5"><b>Dominios y hosts falseados</b><span>Arriba a la izquierda, en su recuadro: todos los dominios que
+        llevan a tu equipo, también los <code>.local</code>, uno debajo de otro. Cada uno con su botón «Abrir» y su interruptor; a la derecha de
         la cabecera, cuántos son. Si no hay ninguno, dice «Ningún dominio falseado»: todos llevan a su web real.</span></li>
-      <li data-x="64" data-y="34.8"><b>Nuevo proyecto con dominio falseado</b><span>Para empezar en local un proyecto con su dominio de producción,
+      <li data-x="62" data-y="19.2"><b>Nuevo proyecto con dominio falseado</b><span>Para empezar en local un proyecto con su dominio de producción,
         sin tocar nada en producción. Al acabarlo, se exporta a producción tal cual.</span></li>
-      <li data-x="88.1" data-y="40.3"><b>Dominio</b><span>El de producción. Si pegas una dirección entera, se queda solo con el nombre.</span></li>
-      <li data-x="85.3" data-y="46.5"><b>Carpeta</b><span>La del proyecto en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>
+      <li data-x="88.1" data-y="24.6"><b>Dominio</b><span>El de producción. Si pegas una dirección entera, se queda solo con el nombre.</span></li>
+      <li data-x="85.3" data-y="30.8"><b>Carpeta</b><span>La del proyecto en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>
         (por ejemplo, la de un <code>git clone</code>). Si ya tiene un dominio, lo dice debajo. Si ya trae su configuración, te propone su base
         de datos («BBDD de su configuración: …»).</span></li>
-      <li data-x="95.8" data-y="46.5"><b>Carpeta nueva (+)</b><span>Pide su nombre (letras sin acentos, números, punto, _ y -); si lo dejas vacío,
+      <li data-x="95.8" data-y="30.8"><b>Carpeta nueva (+)</b><span>Pide su nombre (letras sin acentos, números, punto, _ y -); si lo dejas vacío,
         se llama como el dominio. Se crea al pulsar «Crear y falsear». Si vas a clonar el proyecto con git, clónalo antes y elige su carpeta.</span></li>
-      <li data-x="85.3" data-y="52.7"><b>Base de datos</b><span>«Sin BBDD» o una de la versión activa. Sin versión activa, no se puede elegir.</span></li>
-      <li data-x="95.8" data-y="52.7"><b>BBDD nueva (+)</b><span>Pide el nombre de la base de producción (letras sin acentos, números, _ y -). Se crea
+      <li data-x="85.3" data-y="37"><b>Base de datos</b><span>«Sin BBDD» o una de la versión activa. Sin versión activa, no se puede elegir.</span></li>
+      <li data-x="95.8" data-y="37"><b>BBDD nueva (+)</b><span>Pide el nombre de la base de producción (letras sin acentos, números, _ y -). Se crea
         vacía en la versión activa al pulsar «Crear y falsear». Si ya existe, te dice que la elijas en la lista.</span></li>
-      <li data-x="92.6" data-y="58.9"><b>Crear y falsear</b><span>Te enseña antes los pasos: crear la carpeta si hace falta, su vhost http y https
+      <li data-x="92.6" data-y="43.2"><b>Crear y falsear</b><span>Te enseña antes los pasos: crear la carpeta si hace falta, su vhost http y https
         con certificado, la base de datos, y falsear el dominio (dejando de falsear los demás). Pide la contraseña de administrador. Mientras
         falta algo, el botón está apagado y a su izquierda dice qué falta.</span></li>
-      <li data-x="19.8" data-y="39.5"><b>Dominios de los vhosts</b><span>Los demás que tienen vhost, los que llevan a su web real, con su carpeta y,
-        si le falta algo, «sin https» o «falta el certificado». «PrestaShop» marca las tiendas.</span></li>
-      <li data-x="41" data-y="40.4"><b>Falsear o no</b><span>Encendido, el dominio lleva a tu equipo y sube al recuadro de arriba; apagado, lleva
+      <li data-x="20" data-y="49.3"><b>Dominios de los vhosts</b><span>Los demás que tienen vhost, los que llevan a su web real, con su carpeta y,
+        si le falta algo, «sin https» o «falta el certificado». «PrestaShop» marca las tiendas. Van debajo, a todo el ancho y en dos columnas.</span></li>
+      <li data-x="54.6" data-y="54.8"><b>Falsear o no</b><span>Encendido, el dominio lleva a tu equipo y sube al recuadro de arriba; apagado, lleva
         a la web real y baja aquí. Solo cambia ese dominio (y su <code>www</code>). Pide la contraseña de administrador.</span></li>
-      <li data-x="34.7" data-y="51.8"><b>Proyecto nuevo</b><span>Marca los dominios creados aquí con «Crear y falsear». Su dominio queda unido a su
+      <li data-x="34.7" data-y="60"><b>Proyecto nuevo</b><span>Marca los dominios creados aquí con «Crear y falsear». Su dominio queda unido a su
         carpeta: al cargar el proyecto se vuelve a falsear.</span></li>
     </ol>
   </figure>

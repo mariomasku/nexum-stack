@@ -4,6 +4,8 @@
 let ACCENT = hexColor(0x0A84FF)
 /// Tema de la ventana elegido en el menú: claro u oscuro (sin fichero, el del Mac)
 let THEME_FILE = LOG_DIR + "/ventana-tema"
+/// Los colores del icono de Nexum (el borde del aviso de abajo): azul, verde, amarillo, rojo y magenta
+let NEXUM_COLORS: [Color] = [hexColor(0x006CB7), hexColor(0x88BB1D), hexColor(0xFFB608), hexColor(0xFF0000), hexColor(0xF20093)]
 /// La última versión que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
 let LAST_VERSION_FILE = LOG_DIR + "/ultima-version"
 /// Página de descarga de Docker Desktop (en el Mac no se instala desde aquí)

@@ -37,6 +37,10 @@ NEW_CSS = """
 /* Barra de arriba mas alta, y el recuadro de la version montada, hundido (como una pantallita). Como en el Mac:
    un velo del color de la letra (en el tema claro, casi el fondo; en el oscuro, algo mas claro) y una sombra suave */
 headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+/* El aviso de abajo (toast): grande, con el logotipo de Nexum. La píldora (el fondo y el borde con los colores
+   de su icono) la pinta toast_paint: aquí, solo sus márgenes */
+.nv-toast { padding: 15px 40px 15px 34px; }
+.nv-toast-texto { font-size: 1.15em; font-weight: 600; }
 .nv-pastilla { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
                padding: 3px 4px; box-shadow: inset 0 1px 3px alpha(black, 0.16); }
 .nv-pastilla button { border: none; background: transparent; box-shadow: none; }
