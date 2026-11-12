@@ -360,7 +360,7 @@ function copy_database() {
     if [ "$DRY" -eq 1 ]; then
         [ $replace -eq 1 ] && [ $backup -eq 1 ] && echo "  [simulacion] copia de $new de lampp-$dst en ~/nexum-backups (la sustituida)"
         [ $replace -eq 1 ] && [ $backup -eq 0 ] && echo "  [simulacion] sin copia de $new de lampp-$dst (la sustituida)"
-        echo "  [simulacion] descarga de $db de lampp-$src a un fichero temporal en ~/.lvm-instalador"
+        echo "  [simulacion] descarga de $db de lampp-$src a un fichero temporal en ~/.nexum"
         if [ "$dst_owner" == "$active_owner" ] && lampp_running; then
             echo "  [simulacion] carga en el MariaDB en marcha de lampp-$dst (importar-bd ${load[*]})"
         else
@@ -1123,7 +1123,7 @@ function import_database() {
         return 1
     fi
     db_valid_name "$db" || return 1
-    # (como en el resto: sin ., .. ni saltos de linea, que meterian lineas en ~/.lvm-instalador/proyectos)
+    # (como en el resto: sin ., .. ni saltos de linea, que meterian lineas en ~/.nexum/proyectos)
     if [ -n "$project" ] && ! valid_project "$project"; then
         return 1
     fi

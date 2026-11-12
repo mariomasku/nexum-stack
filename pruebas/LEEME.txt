@@ -128,19 +128,39 @@ LOS FICHEROS
   vhosts-sin-carpeta.sh  Vhosts de carpetas que ya no existen (1.57.12): los
                       lista y los quita sin tocar localhost, los de fuera
                       de htdocs ni los de carpetas que existen.
+  exportar-proyecto.sh  Exportar proyecto (1.57.14): exportar-proyecto y
+                      gui-exportar-proyecto con un repositorio git de
+                      mentira en una carpeta temporal (HOME, htdocs,
+                      descargas y la versión, de mentira; la BBDD, con un
+                      export_database falso). Con cambios sin commit no
+                      exporta; limpio, el zip ..._nexum.zip con el código
+                      sin .git, la base y el LEEME; --sin-bd, --sin-codigo,
+                      --bd y --destino; los enlaces que salen no se siguen;
+                      si falla la base o se cancela no queda ningún zip ni
+                      .parte; --simular no crea nada.
+  carpeta-nexum.sh    La carpeta de los ajustes, ~/.nexum (1.57.14): la de
+                      antes (~/.lvm-instalador) se renombra al arrancar
+                      (la misma carpeta, con lo que tenía) y queda como
+                      enlace relativo a .nexum; con las dos, con un enlace,
+                      con un fichero o con un enlace roto no se toca nada
+                      (con las dos, un aviso); cortada a medias se
+                      completa; no con --simular, en las pruebas ni con
+                      version, y entonces sigue con la de antes sin crear
+                      ~/.nexum. El script entero, con HOME temporal; en el
+                      Mac, la función y la ventana (settingsMigrate).
   manual.sh           El manual dentro del programa (1.57.10): va al final
                       del script; manual lo saca (solo si ha cambiado, sin
                       salirse de su carpeta) y abre el capítulo; «Ayuda».
   limpieza.sh         Limpieza (1.57.9): limpieza, gui-limpieza, limpiar,
                       gui-limpiar-proyecto y limpiar-proyecto en un equipo
                       de prueba. Borra lo que debe y nada más (ajustes de
-                      ~/.lvm-instalador, uploads, img, .pid, cgisock, datos
+                      ~/.nexum, uploads, img, .pid, cgisock, datos
                       de MariaDB e index.php intactos), no sigue enlaces,
                       con --simular no borra nada, los registros de las
                       versiones quedan a 0 bytes y los temporales recientes
                       o en uso siguen. Sin sudo de verdad.
   registro-tareas.sh  Configuración, General y el registro de tareas: cada
-                      tarea guarda el suyo en ~/.lvm-instalador/tareas (700
+                      tarea guarda el suyo en ~/.nexum/tareas (700
                       y 600), con la orden de nexum y sin secretos (ni
                       MYSQL_PWD, ni contraseñas, ni tokens); se quedan las
                       200 últimas y un enlace no se lee.

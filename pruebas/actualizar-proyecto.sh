@@ -126,7 +126,7 @@ fi
 # El orden de los pasos, y que un fallo pare los siguientes
 extract "$SRC" project_update gui_project_git project_config_db project_config_local || exit 1
 PROJECT_CODE_PY=$CODE
-HTDOCS_DIR=$W/htdocs HOME=$W/casa COPIES_DIR=$W/casa/nexum-backups DRY=0 SUDO="" GIT_KNOWN_HOSTS=x
+HTDOCS_DIR=$W/htdocs HOME=$W/casa LOG_DIR=$W/casa/.nexum COPIES_DIR=$W/casa/nexum-backups DRY=0 SUDO="" GIT_KNOWN_HOSTS=x
 mkdir -p "$HOME"
 valid_project() { [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]; }
 db_valid_name() { [[ "$1" =~ ^[a-z_]+$ ]]; }

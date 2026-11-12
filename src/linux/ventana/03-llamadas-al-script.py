@@ -234,7 +234,8 @@ def usage_group(pid, argv, cgroup, own):
         return "lampp"
     if os.path.basename(first) == "mailpit" and "/mailpit/" in first:
         return "mailpit"
-    if "nexum-tunel" in argv or first == os.path.join(LOG_DIR, "tunel", "cloudflared"):
+    if "nexum-tunel" in argv or first in (os.path.join(LOG_DIR, "tunel", "cloudflared"),
+                                          os.path.join(LOG_DIR_OLD, "tunel", "cloudflared")):
         return "tunel"
     # Docker sin root: dockerd y los suyos en su servicio de usuario y cada contenedor en su scope
     if "user@%d.service" % os.getuid() in cgroup and ("/docker.service" in cgroup or "/docker-" in cgroup):

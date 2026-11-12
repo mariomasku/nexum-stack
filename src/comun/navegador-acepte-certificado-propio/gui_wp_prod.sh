@@ -205,7 +205,7 @@ EOF
 
 # Dominios .local apagados a mano en la pestaña Hosts: ya no se mantienen en /etc/hosts.
 # local_off si|no <dominio...>: no = apagado (se recuerda), si = encendido (se olvida)
-LOCAL_OFF_FILE="$HOME/.lvm-instalador/locales-apagados"
+LOCAL_OFF_FILE="$LOG_DIR/locales-apagados"
 # (en simulacion no se guarda: los apagados van aqui, para que hosts_fake enseñe lo que haria)
 LOCAL_OFF_DRY=""
 function local_off() {

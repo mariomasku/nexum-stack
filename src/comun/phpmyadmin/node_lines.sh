@@ -34,7 +34,7 @@ function node_find() {
     [ -n "$best" ] && echo "$best"
 }
 
-# Descarga Node <mayor> de nodejs.org en ~/.lvm-instalador/node y lo comprueba con su lista de sumas sha256
+# Descarga Node <mayor> de nodejs.org en ~/.nexum/node y lo comprueba con su lista de sumas sha256
 function node_install() {
     local major=$1 base=https://nodejs.org/dist os arch sums name sha got tmp top version tls=(--proto =https --tlsv1.2)
     [[ "$major" =~ ^[0-9]+$ ]] || { echo "Versión de Node no válida: $major"; return 1; }

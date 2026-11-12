@@ -143,7 +143,7 @@ sudo /opt/lampp/lampp start | stop | restart | status     # lo mismo, como en XA
 
 La lista completa de comandos está en [Comandos sin panel](#comandos-sin-panel).
 
-Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). Desde la 1.50.0 busca la última Release del repositorio de GitHub (y, sin conexión, un `.deb` con su `.sig` en Descargas): si es más nueva que la versión instalada, la descarga a `~/.lvm-instalador/actualizaciones`, comprueba su firma, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Un paquete sin la firma de quien publica el programa no se instala desde la ventana. Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/nexum_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `nexum novedades`.
+Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). Desde la 1.50.0 busca la última Release del repositorio de GitHub (y, sin conexión, un `.deb` con su `.sig` en Descargas): si es más nueva que la versión instalada, la descarga a `~/.nexum/actualizaciones`, comprueba su firma, muestra su fecha y su huella y ofrece «Actualizar a la X» (pide la contraseña con pkexec, lo instala y se vuelve a abrir). Un paquete sin la firma de quien publica el programa no se instala desde la ventana. Si esa versión hay que instalarla una vez en la terminal, la ventana lo explica y da la orden para copiar. El Centro de aplicaciones de Ubuntu no ofrece actualizar un `.deb` suelto; desde la terminal: `sudo apt install ~/Descargas/nexum_<versión>_all.deb`. El número aparece en el pie de la ventana y en el panel, debajo de la firma. La lista de cambios está en [CHANGELOG.md](CHANGELOG.md), en «Novedades» (menú de la ventana), en la opción «Acerca de» del panel y en `nexum novedades`.
 
 ---
 
@@ -168,7 +168,7 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
   - **Línea del modo sandbox:** los `mariadb-dump` modernos ponen como primera línea `/*M!999999\- enable the sandbox mode */`. El cliente de MariaDB de XAMPP (10.4) no la entiende y daba «Unknown command '\-'». Ahora esa línea se quita al vuelo, sin tocar el fichero.
 - **Buscar una base de datos:** filtra mientras escribes, sin recargar nada. Cada resultado dice en qué versión está, con qué PHP y qué MariaDB, y resalta lo escrito. Un punto verde marca las que están en la versión activa; en ellas, el botón **Elegir como destino** la deja elegida para cargar una copia.
 - **Cargar proyecto:** cada resultado del buscador tiene este botón. Busca en `/opt/htdocs` la carpeta cuya configuración usa esa base (`wp-config.php`, `app/config/parameters.php` o `config/settings.inc.php` de PrestaShop, o `.env`) y la carga directamente en la versión de PHP de ese resultado. Si esa versión no es la activa, avisa de que se cambia de versión de PHP, para la que está en marcha y activa la del proyecto. Cambia el enlace del vhost para que apunte a esa carpeta. Es lo mismo que `unlink web.local; ln -s <carpeta>/ web.local`. El nombre del enlace (`web.local`) se lee del `DocumentRoot` de `/opt/config/httpd-vhosts.conf`. Si ningún vhost apunta a un enlace de `/opt/htdocs` (un equipo sin vhosts propios), al cargar el primer proyecto se crea `web.local`: sus vhosts http y https (sin caché en el navegador) en ese fichero, su certificado autofirmado en `/opt/config/ssl` y su línea en `/etc/hosts`. La ventana lo avisa antes de cargar y pide la contraseña de sudo.
-  - Si ninguna carpeta usa la base, o la usan varias, se elige de una lista con buscador. La elección se recuerda para esa base en `~/.lvm-instalador/proyectos`, y «Cambiar…» permite cambiarla.
+  - Si ninguna carpeta usa la base, o la usan varias, se elige de una lista con buscador. La elección se recuerda para esa base en `~/.nexum/proyectos`, y «Cambiar…» permite cambiarla.
   - Si la base está en más de una versión, sale un resultado por versión: se carga en la del resultado que pulses.
   - Si no cambia de versión, recarga Apache (recarga suave, y PHP-FPM en las pilas propias). Sin ella, cada proceso de PHP recuerda durante 120 s (`realpath_cache_ttl`) adónde apuntaba el enlace y sigue sirviendo el proyecto anterior. Si cambia de versión no hace falta, porque la activación ya reinicia todo.
   - Para que el navegador tampoco muestre el proyecto anterior desde su caché, conviene poner `Header always set Cache-Control "no-store"` (dentro de `<IfModule headers_module>`) en los vhosts de `web.local`.
@@ -184,7 +184,7 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
   - En la terminal, a mano: `nexum hosts-falsear <dominio> si|no`.
 - **Solo la versión montada en memoria:** todos los LAMPP se arrancan por el enlace `/opt/lampp`, así que sus procesos se llaman igual (`/opt/lampp/bin/httpd`…) sea cual sea la versión, y el `lampp stop` de XAMPP solo cierra lo que encuentra en sus `.pid`. Al montar otra versión, al pulsar **Parar** y al parar desde la terminal, el gestor comprueba que no quede ningún proceso de LAMPP (Apache, MariaDB, ProFTPD, PHP-FPM) y cierra los que sigan vivos: primero de forma normal (a MariaDB le da hasta 90 s para guardar) y después a la fuerza. Antes de arrancar cierra los de otras versiones. La versión de cada proceso se sabe por su ruta real, por los `.pid` de cada versión, por su proceso padre y, si solo pone `/opt/lampp/`, por si arrancó antes o después de montar la versión actual. En la terminal: `nexum procesos` y `nexum cerrar-procesos [--todos]`.
   - Que Apache tenga varios procesos es normal: uno principal (root) y varios de trabajo que atienden las peticiones (con XAMPP, de 5 a 10 esperando). Todos son de la misma versión.
-- **Editar vhosts** (menú, debajo de Abrir phpMyAdmin): los vhosts (`/opt/config/httpd-vhosts.conf`, compartidos por todas las versiones) son del administrador, porque Apache los lee como root al arrancar. Se abre una copia en `~/.lvm-instalador/httpd-vhosts.conf` con el editor de textos. Al pulsar **Aplicar**:
+- **Editar vhosts** (menú, debajo de Abrir phpMyAdmin): los vhosts (`/opt/config/httpd-vhosts.conf`, compartidos por todas las versiones) son del administrador, porque Apache los lee como root al arrancar. Se abre una copia en `~/.nexum/httpd-vhosts.conf` con el editor de textos. Al pulsar **Aplicar**:
   - se comprueba que solo lleva directivas de vhosts (nada de `LoadModule`, `Include`, `Listen`, `PidFile` ni registros con `|orden` o fuera de `logs/`);
   - se guarda la anterior en `~/lvm-copias` y se escribe la nueva con sudo;
   - Apache la prueba (`httpd -t`): si no la acepta, se deja como estaba; si la acepta, se recarga Apache.
@@ -198,12 +198,12 @@ Para actualizar, pulsa **Buscar actualizaciones** (menú ☰ o Herramientas). De
 - **Crear y borrar bases de datos** (solo en la versión activa, que tiene que estar en marcha): «Crear base de datos…» en su lista o el botón **+** junto al destino de la carga. La base se crea vacía en utf8mb4_general_ci. La papelera de cada base, o la que está junto al destino, la borra tras una confirmación. Si la base tiene tablas, avisa de que se elimina todo su contenido y es irreversible, y propone guardar antes una copia `.sql.gz` en `~/lvm-copias`, que se puede volver a cargar. Sin copia, hay que escribir el nombre de la base para confirmar. Si la copia falla, no se borra nada.
 - **Desinstalar:** propone guardar antes una copia de las bases de datos en `~/lvm-copias`. Si se quita la copia, hay que escribir el nombre de la versión para confirmar.
 - **Menú (☰):** abrir localhost o phpMyAdmin, volver a leer las versiones, abrir el panel en la terminal, la carpeta de registros, «Novedades» y «Acerca de».
-- La ventana no repite la lógica del instalador: ejecuta los mismos comandos que la terminal. El código de la ventana (Python, GTK 3) va dentro de `lvm-instalador.sh` y se escribe en `~/.lvm-instalador/ventana.py` al abrirla.
+- La ventana no repite la lógica del instalador: ejecuta los mismos comandos que la terminal. El código de la ventana (Python, GTK 3) va dentro de `lvm-instalador.sh` y se escribe en `~/.nexum/ventana.py` al abrirla.
 - `nexum --simular ventana` abre la ventana en modo simulación.
 
 ## Apariencia
 
-En **Configuración → Apariencia** (desde la 1.57.1). Se guarda al momento, en `~/.lvm-instalador/apariencia`, el mismo fichero en Linux y en Mac, y no hace más lenta la ventana: solo se rehace el menú lateral y los logotipos se dibujan una vez.
+En **Configuración → Apariencia** (desde la 1.57.1). Se guarda al momento, en `~/.nexum/apariencia`, el mismo fichero en Linux y en Mac, y no hace más lenta la ventana: solo se rehace el menú lateral y los logotipos se dibujan una vez.
 
 - **Iconos en color:** cada apartado del menú lateral con su color (Docker, PHP, Node, Bases de datos…). Apagado, de un color, como el texto.
 - **Logotipos de Docker, Node y PHP:** Docker y Node con su logotipo y su tipografía en lugar del nombre, y PHP con su óvalo (este, solo con los iconos en color). Son los oficiales de docker.com, nodejs.org y php.net.
@@ -225,7 +225,7 @@ Desde la 1.57.0, los proyectos de `/opt/htdocs` hechos con **Astro, Next, Nuxt, 
 - **Compilar:** como en producción.
 - **Túnel:** lo comparte con el mismo túnel de Cloudflare, con contraseña y con cierre automático. Siempre comparte la versión compilada: si el proyecto está parado o en desarrollo, lo compila y arranca antes (en desarrollo te lo pregunta). El código fuente no sale del equipo. El túnel no deja pasar rutas ocultas como `/node_modules/.vite`, por eso el modo desarrollo no se comparte.
 - **Con el proyecto en marcha:** **Abrir web**, **Parar** y un botón para reiniciarlo o volver a compilarlo. Con su icono, siempre: **VS Code**, su **carpeta** y su **registro**.
-- **Node:** usa la versión que pide el proyecto (`.nvmrc`, `.node-version` o `engines`). Si no la encuentra ni en nvm ni en el sistema, la descarga de nodejs.org en `~/.lvm-instalador/node` y la comprueba con la lista `SHASUMS256.txt` de esa misma web.
+- **Node:** usa la versión que pide el proyecto (`.nvmrc`, `.node-version` o `engines`). Si no la encuentra ni en nvm ni en el sistema, la descarga de nodejs.org en `~/.nexum/node` y la comprueba con la lista `SHASUMS256.txt` de esa misma web.
 - **Dependencias:** se instalan si faltan o si cambió el fichero de bloqueo. Instalarlas ejecuta los scripts de los paquetes con tu usuario: arranca solo proyectos de los que te fíes.
 - **Astro con el adaptador de Vercel, Netlify o Cloudflare:** se compila con `@astrojs/node` sin tocar la configuración ni el `package.json` del proyecto, porque esos adaptadores no se pueden servir en local. Las tareas programadas de esos alojamientos no se ejecutan.
 - **Parar** cierra el servidor con todos sus procesos y, si se estaba compartiendo, también su túnel. Cerrar la ventana no lo para.
@@ -437,7 +437,7 @@ Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equi
 - **Desde la 1.42.0** (se aplica con **Protegerlas**):
   - **Volcados:** aunque se cierre la ventana a mitad de la carga, se limpia igual: no queda nada `INVOKER` ni eventos; un evento del volcado que ya estuviera en marcha se corta (`KILL USER`); el usuario de la BBDD ya no puede crear vistas, rutinas ni eventos después, y root repasa la base al final. No se carga nada si MariaDB tiene activos FEDERATED, CONNECT o SPIDER (con ellos, una tabla podría entrar como root).
   - **Vhosts:** los certificados y las claves solo de las carpetas del gestor (si un vhost antiguo usa otra ruta, **Arreglarlos** en Versiones lo pasa), y los registros no pueden llamarse como los ficheros de control de Apache (`.pid`).
-  - **Dominios `.local`:** los que tienen vhost van siempre en `/etc/hosts`. Sin esa línea, el equipo los pregunta a la red local (mDNS) y cualquiera en la misma wifi podría contestar con su web. Desde la 1.50.1 se pueden apagar a mano en la pestaña Hosts (avisa antes): su línea queda comentada y se recuerda en `~/.lvm-instalador/locales-apagados` para no volver a añadirla.
+  - **Dominios `.local`:** los que tienen vhost van siempre en `/etc/hosts`. Sin esa línea, el equipo los pregunta a la red local (mDNS) y cualquiera en la misma wifi podría contestar con su web. Desde la 1.50.1 se pueden apagar a mano en la pestaña Hosts (avisa antes): su línea queda comentada y se recuerda en `~/.nexum/locales-apagados` para no volver a añadirla.
   - **htdocs:** Protegerlas y Cargar proyecto quitan la escritura para cualquier usuario del equipo (plugins y cachés que dejan carpetas en 777). Apache sigue pudiendo escribir, porque corre con tu usuario.
   - **Más ficheros que no se sirven:** claves (`.pem`, `.key`, `.p12`), `.ini`, `.conf` y las exportaciones de clientes de PrestaShop (`customers_export_*.csv`).
   - Un dominio guardado para un proyecto solo se falsea si ya tiene su vhost o se parece al nombre de la carpeta.
@@ -471,7 +471,7 @@ Desde la 1.29.0, el gestor deja cada versión cerrada a la red y protege el equi
 - **Ficheros de los proyectos.** Si `wp-config.php`, `parameters.php`, `settings.inc.php` o `var/cache` son enlaces a otra carpeta, no se tocan. Los nombres de bases, prefijos de tablas y carpetas que vienen de un proyecto se comprueban antes de usarlos en consultas o en los vhosts.
 - **Contraseña de administrador.** La ventana solo la envía si la pide un `sudo` de verdad de la tarea (de root, en su terminal y con el eco apagado).
 - **Actualizaciones.** Se buscan solo cuando se pide (Buscar actualizaciones), en las Releases de GitHub. Cada paquete va firmado con la clave de quien publica el programa: la firma se comprueba antes de ofrecerlo y otra vez como root antes de instalarlo, y no se acepta uno sin firma válida, más viejo que el instalado o que lleve ficheros fuera de los suyos. Antes de instalarlo se muestran su fecha y su huella SHA-256.
-- **Copias.** `~/lvm-copias` y `~/.lvm-instalador` (copias de bases y de configuraciones con contraseñas) solo son accesibles para tu usuario.
+- **Copias.** `~/lvm-copias` y `~/.nexum` (copias de bases y de configuraciones con contraseñas) solo son accesibles para tu usuario.
 
 Límite que no se puede cerrar desde el gestor: un programa que ya corre con tu usuario puede cambiar tus accesos directos (`~/.local/share/applications`) o tu `.bashrc` y mostrarte una ventana falsa que pida la contraseña. El gestor solo la pide en su ventana o en la de polkit; si algo la pide de forma rara, no la escribas.
 
@@ -496,9 +496,9 @@ Lo que sigue igual a propósito: MariaDB con root sin contraseña y Apache con t
 | Error 503 en una versión PHP nuevo | `sudo /opt/lampp/lampp status` y `sudo tail /opt/lampp/logs/php-fpm.log` |
 | MariaDB no arranca | `sudo tail /opt/lampp/var/mysql/mysqld.err` |
 | Errores de PHP | `/opt/lampp/logs/error_log` |
-| Una instalación de PHP falla | No queda nada instalado. Los logs de la compilación se guardan en `~/.lvm-instalador/pila-<versión>-<fecha>/` |
+| Una instalación de PHP falla | No queda nada instalado. Los logs de la compilación se guardan en `~/.nexum/pila-<versión>-<fecha>/` |
 | Una instalación de XAMPP falla a medias | Revisa el log indicado al final y borra la versión con `nexum desinstalar <version>` |
-| Logs de cada instalación | `~/.lvm-instalador/` |
+| Logs de cada instalación | `~/.nexum/` |
 | Volver a la versión anterior | `nexum use <version>` |
 | Al actualizar: «El paquete trae otro /opt/nexum/nexum-actualizar» y «Tubería rota» | No es un error: esa versión cambia el ayudante de actualización (la 1.44.0, viniendo de la 1.43 o anterior). Se instala una vez en la terminal: `sudo apt install ~/Descargas/nexum_<versión>_all.deb`. Desde la 1.45.0 la ventana lo explica y copia la orden |
 

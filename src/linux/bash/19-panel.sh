@@ -1131,6 +1131,26 @@ QUE HACE
 
 VERSIONES
 
+1.57.14 (11 nov 2026)
+- Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en
+  un desplegable (15 y 30 minutos, 1, 2, 3, 4, 6, 8 o 12 horas); en la
+  terminal, tunel-abrir --minutos 15-720 (--horas sigue valiendo).
+- Terminal, «Vaciar DNS»: en Ubuntu 20.04 (y Linux Mint 20) escribe
+  sudo systemd-resolve --flush-cache, y desde la 22.04, sudo resolvectl
+  flush-caches. Mira qué sistema es y qué orden está instalada.
+- Proyectos, menú ⋮ del proyecto cargado, «Exportar proyecto…»: un zip
+  en Descargas con su código (sin .git), su BBDD (sin el administrador
+  de pruebas, como «Descargar») y un LEEME-nexum.txt, con el nombre
+  <carpeta>_php<rama>_<fecha>_nexum.zip. Si tiene cambios sin commit
+  en git, no deja exportar y dice cuáles. Si falla o se cancela, no
+  queda nada a medias. En la terminal: nexum exportar-proyecto.
+- Los ajustes, registros y datos del programa pasan a ~/.nexum: la
+  primera vez que se abre se renombra la carpeta de antes (sin copiar
+  nada) y en su sitio se deja un enlace a ~/.nexum, para que lo que aún
+  la use (Docker sin root, sus contenedores, el temporizador, una
+  ventana abierta) siga funcionando. Si ya hay una ~/.nexum, no se toca
+  ninguna de las dos. Con --simular no se cambia nada.
+
 1.57.13 (11 nov 2026)
 - Dominios y hosts: arriba, a la izquierda, el recuadro con los dominios
   falseados (también los .local) y, a su derecha, el nuevo proyecto con

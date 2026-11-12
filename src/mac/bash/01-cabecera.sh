@@ -116,7 +116,7 @@
 #       Apache y se recarga). Las carpetas, las BBDD y /etc/hosts no se tocan
 #
 #   nexum manual [<capitulo>]
-#       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
+#       Abre el manual en el navegador (va dentro de este script; se saca a ~/.nexum/ayuda).
 #       Con un capitulo (proyectos, bbdd, docker, configuracion, limpieza...), en ese. Con --ruta,
 #       solo dice que fichero abrir
 #
@@ -126,7 +126,7 @@
 #   nexum limpiar <clave>...
 #       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
 #       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
-#       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
+#       programa en ~/.nexum, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
 #       PHP y MariaDB de cada version: se vacian), caches-proyectos (la cache de todos los proyectos),
 #       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
 #       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
@@ -242,10 +242,17 @@
 #       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
 #       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
 #       y la BBDD de antes, en ~/nexum-backups
+#
+#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]
+#       Un zip del proyecto en ~/Downloads:
+#       <carpeta>_php<rama>_<fecha>_nexum.zip, con su codigo (sin .git), su BBDD de la version activa
+#       (la vinculada o --bd; como exportar-bd, sin el administrador de pruebas) y un LEEME-nexum.txt.
+#       Si es un repositorio git con cambios sin commit, no se exporta. Si falla, no queda nada
+#
 #   nexum hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1 y ::1) o deja de falsear el dominio de un vhost. Un .local se mantiene
 #       siempre en /etc/hosts salvo que se apague aqui (no): se recuerda en
-#       ~/.lvm-instalador/locales-apagados y con si se vuelve a mantener
+#       ~/.nexum/locales-apagados y con si se vuelve a mantener
 #
 #   nexum media-produccion <dominio .local> <dominio de produccion>|quitar
 #       Lo que falte en local de wp-content/uploads o img (no van en git) se pide a la web de
@@ -344,12 +351,12 @@
 #   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
 #   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
 #   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
-#   nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
+#   nexum tunel-abrir <direccion local> [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]
 #   nexum tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
 #       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
-#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice). La web no se toca: el
-#       dominio local se cambia por el del tunel al pasar
+#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice; desde 15 minutos). La web no
+#       se toca: el dominio local se cambia por el del tunel al pasar
 #   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   nexum docker-php <nombre> <version de PHP>
 #   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>

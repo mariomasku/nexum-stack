@@ -81,9 +81,10 @@ extension AppModel {
             row.spacing = 10
             return row
         }
-        let hours = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 110, height: 26), pullsDown: false)
-        hours.addItems(withTitles: (1...12).map { plural($0, "hora", "horas") })
-        hours.selectItem(at: 1)
+        // (desde 15 minutos; de partida, 2 horas)
+        let hours = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 130, height: 26), pullsDown: false)
+        hours.addItems(withTitles: TUNNEL_TIMES.map { $0.1 })
+        hours.selectItem(at: TUNNEL_TIMES.firstIndex(where: { $0.0 == 120 }) ?? 0)
         let block = NSButton(checkboxWithTitle: "Bloquear el panel de administración (tus BBDD llevan el administrador de pruebas)",
                              target: nil, action: nil)
         block.state = .on
@@ -92,7 +93,8 @@ extension AppModel {
             line("Se cierra solo en", [hours]), block,
         ], spacing: 12)
         guard alert.runStyled() == .alertFirstButtonReturn else { return }
-        let args = ["tunel-abrir", url, folder, "--horas", String(hours.indexOfSelectedItem + 1),
+        let minutes = TUNNEL_TIMES[Swift.max(0, Swift.min(hours.indexOfSelectedItem, TUNNEL_TIMES.count - 1))].0
+        let args = ["tunel-abrir", url, folder, "--minutos", String(minutes),
                     "--admin", block.state == .on ? "bloquear" : "permitir"]
         let open: () -> Void = {
             _ = self.runTask("Abriendo el túnel de \(name)", args, doneText: "Túnel abierto", autoClose: true) { ok, _, _ in

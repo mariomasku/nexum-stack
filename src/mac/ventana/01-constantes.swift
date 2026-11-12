@@ -20,7 +20,69 @@ let SIMULATE = ProcessInfo.processInfo.environment["LVM_SIMULAR"] == "1"
 // para que un volcado o un fichero de un proyecto que salga en el registro no pueda imitarlas
 let RUN_TOKEN = UUID().uuidString.replacingOccurrences(of: "-", with: "")
 let SUDO_MARK = "@@LVM-SUDO-\(RUN_TOKEN)@@"
-let LOG_DIR = NSHomeDirectory() + "/.lvm-instalador"
+/// Ajustes y registros (LOG_DIR del script): ~/.nexum. Hasta la 1.57.13 eran ~/.lvm-instalador: el script y la
+/// ventana (settingsMigrate, al abrirse) la renombran a ~/.nexum y dejan un enlace en su sitio. Si no se ha pasado
+/// (en simulación, en las pruebas o si no se ha podido), la de antes, como el script: no se crea una ~/.nexum al lado
+let SETTINGS_DIR = NSHomeDirectory() + "/.nexum"
+let SETTINGS_OLD_DIR = NSHomeDirectory() + "/.lvm-instalador"
+let LOG_DIR: String = {
+    var st = stat()
+    if lstat(SETTINGS_DIR, &st) != 0 && lstat(SETTINGS_OLD_DIR, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR {
+        return SETTINGS_OLD_DIR
+    }
+    return SETTINGS_DIR
+}()
+
+/// La migración de settings_migrate del script, con las mismas reglas: la ventana se abre sola (sin el script)
+/// y crea cosas en LOG_DIR (el tema, la apariencia...), así que la hace ella al abrirse, antes de tocar LOG_DIR.
+/// Solo si ~/.lvm-instalador es una carpeta tuya (no un enlace) y no hay ninguna ~/.nexum (ni un enlace roto):
+/// rename (sin copiar) y ~/.lvm-instalador como enlace relativo a .nexum. Si están las dos, no se toca ninguna (y se
+/// avisa una vez en ~/.nexum/carpeta-anterior.log). Con la marca .pasando-a-nexum dentro, una que se cortó entre
+/// el rename y el enlace se completa la siguiente vez. No en simulación ni en las pruebas (LVM_PRUEBA)
+func settingsMigrate() {
+    if SIMULATE || !(ProcessInfo.processInfo.environment["LVM_PRUEBA"] ?? "").isEmpty { return }
+    let old = SETTINGS_OLD_DIR, new = SETTINGS_DIR, link = (SETTINGS_DIR as NSString).lastPathComponent
+    let mark = new + "/.pasando-a-nexum", both = new + "/carpeta-anterior.log"
+    func kind(_ p: String) -> mode_t? {
+        var st = stat()
+        return lstat(p, &st) == 0 ? st.st_mode & S_IFMT : nil
+    }
+    func mine(_ p: String) -> Bool {
+        var st = stat()
+        return lstat(p, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR && st.st_uid == getuid()
+    }
+    let oldKind = kind(old)
+    if oldKind == S_IFLNK {
+        // (cortada entre el enlace y quitar la marca)
+        if kind(mark) == S_IFREG && mine(new) { unlink(mark) }
+        return
+    }
+    if oldKind == nil {
+        // (cortada entre el rename y el enlace: ~/.nexum lleva la marca)
+        if kind(mark) == S_IFREG && mine(new) && symlink(link, old) == 0 { unlink(mark) }
+        return
+    }
+    guard mine(old) else { return }
+    if kind(new) != nil {
+        if mine(new) && kind(both) == nil {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            let text = "\(f.string(from: Date())) Están \(old) y \(new): no se toca ninguna. Los ajustes que se usan son los de \(new); mira qué hay en \(old) y, si ya no hace falta, bórrala.\n"
+            FileManager.default.createFile(atPath: both, contents: text.data(using: .utf8), attributes: [.posixPermissions: 0o600])
+        }
+        return
+    }
+    let fd = Darwin.open(old + "/.pasando-a-nexum", O_WRONLY | O_CREAT | O_NOFOLLOW, 0o600)
+    if fd < 0 { return }
+    Darwin.close(fd)
+    // (justo antes, otra vez: que no haya aparecido una ~/.nexum)
+    if kind(new) != nil || Darwin.rename(old, new) != 0 {
+        unlink(old + "/.pasando-a-nexum")
+        return
+    }
+    if symlink(link, old) == 0 { unlink(mark) }
+}
+
 /// Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
 /// programa si está el ajuste COPIES_FILES_FLAG (nexum copias-ficheros si|no)
 let COPIES_DIR = NSHomeDirectory() + "/nexum-backups"
@@ -435,7 +497,7 @@ func copyName(_ db: String, _ php: String) -> String {
     return name.count <= 64 ? name : db
 }
 
-/// Guarda vínculos (base, versión, carpeta; carpeta vacía = ninguna) en ~/.lvm-instalador/proyectos,
+/// Guarda vínculos (base, versión, carpeta; carpeta vacía = ninguna) en ~/.nexum/proyectos,
 /// como base@versión=carpeta. Devuelve el error o nil
 func writeLinks(_ changes: [(String, String, String)]) -> String? {
     let path = LOG_DIR + "/proyectos"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Limpieza (Linux y Mac 1.57.9): limpieza, gui-limpieza y limpiar <clave>..., y gui-limpiar-proyecto y
-# limpiar-proyecto. Que borra lo que debe y nada mas: los ajustes de ~/.lvm-instalador, uploads e img, los
+# limpiar-proyecto. Que borra lo que debe y nada mas: los ajustes de ~/.nexum, uploads e img, los
 # .pid y cgisock, los datos de MariaDB y los index.php de PrestaShop se quedan; no sigue enlaces; con
 # --simular no borra nada; los registros de las versiones quedan a 0 bytes; los temporales recientes o en
 # uso siguen. Todo en carpetas temporales, sin sudo de verdad (un sudo falso que solo lo apunta).
@@ -37,7 +37,7 @@ run() { if [ "$DRY" -eq 1 ]; then echo "  [simulacion] $*"; else "$@"; fi; }
 # Un equipo de prueba: HOME, htdocs, las versiones, la caché de descargas y la carpeta temporal, en $1
 fixture() {
     local R=$1 L V T
-    L=$R/home/.lvm-instalador T=$R/tmp
+    L=$R/home/.nexum T=$R/tmp
     mkdir -p "$L" "$R/home/nexum-backups/sub" "$R/descargas" "$T" "$R/fuera/dentro" "$R/htdocs"
     echo "no se toca" > "$R/fuera/dentro/importante"
     # Ajustes (nada de esto se borra nunca)
@@ -118,8 +118,8 @@ fixture() {
 # Las variables del script para un equipo de prueba
 use() {
     local R=$1
-    HOME=$R/home LOG_DIR=$R/home/.lvm-instalador COPIES_DIR=$R/home/nexum-backups HTDOCS_DIR=$R/htdocs
-    DL_CACHE_DIR=$R/descargas TEST_DIR=$R BASE_DIR=$R MAILPIT_DATA=$R/home/.lvm-instalador/mailpit
+    HOME=$R/home LOG_DIR=$R/home/.nexum COPIES_DIR=$R/home/nexum-backups HTDOCS_DIR=$R/htdocs
+    DL_CACHE_DIR=$R/descargas TEST_DIR=$R BASE_DIR=$R MAILPIT_DATA=$R/home/.nexum/mailpit
     CLEAN_TMP_DIRS=("$R/tmp") DRY=0 SUDO=""
 }
 listing() { (cd "$1" && find . -printf '%p %s %y\n' 2> /dev/null | sort) || (cd "$1" && find . | sort); }
@@ -133,7 +133,7 @@ s.bind(sys.argv[1])
 s.listen(1)
 time.sleep(120)' "$R/tmp/lvm-mysql-sock/mysql.sock" &
     PIDS+=($!)
-    ( exec 3>> "$R/home/.lvm-instalador/instalacion-20260202-101010.log"; sleep 120 ) &
+    ( exec 3>> "$R/home/.nexum/instalacion-20260202-101010.log"; sleep 120 ) &
     PIDS+=($!)
     for _ in $(seq 50); do [ -S "$R/tmp/lvm-mysql-sock/mysql.sock" ] && break; sleep 0.1; done
     touch -h -d "2 days ago" "$R/tmp/lvm-mysql-sock/mysql.sock" "$R/tmp/lvm-mysql-sock"
@@ -171,7 +171,7 @@ o=$(clean_command 2>&1); rc=$?
 check "limpiar sin claves: uso" '[ $rc -ne 0 ] && grep -q "Uso:" <<< "$o"'
 
 # --- registros ---
-L=$R/home/.lvm-instalador
+L=$R/home/.nexum
 o=$(clean_command registros 2>&1); rc=$?
 check "registros: borra los de las instalaciones, install-db, el de reposo, los de Node y pila-<version>-<fecha>" '[ $rc -eq 0 ] && [ ! -e "$L/instalacion-20260101-101010.log" ] && [ ! -e "$L/install-db.log" ] && [ ! -e "$L/docker-reposo.log" ] && [ ! -e "$L/node/proyectos/web.log" ] && [ ! -e "$L/pila-8.4-20261108-105826" ]'
 check "registros: ventana.log (abierto por la ventana) se vacia, no se borra" '[ -f "$L/ventana.log" ] && [ ! -s "$L/ventana.log" ]'
@@ -182,7 +182,7 @@ for f in apariencia botones-visor copias-ficheros ultima-version dominios proyec
     httpd-vhosts.conf certificados actualizaciones-arranques; do
     [ "$(cat "$L/$f" 2> /dev/null)" = "ajuste $f" ] || ok_settings=0
 done
-check "registros: los ajustes de ~/.lvm-instalador, intactos" '[ $ok_settings -eq 1 ]'
+check "registros: los ajustes de ~/.nexum, intactos" '[ $ok_settings -eq 1 ]'
 check "registros: tunel, docker, mailpit, prestashop, wordpress y otro.log (no es del programa), intactos" '[ -s "$L/tunel/registro" ] && [ -s "$L/tunel/estado" ] && [ -s "$L/docker/web/web.conf" ] && [ -s "$L/mailpit/mailpit.db" ] && [ -s "$L/mailpit/mailpit.log" ] && [ -s "$L/prestashop/tienda.parameters.php" ] && [ -s "$L/wordpress/plantilla" ] && [ -s "$L/otro.log" ]'
 
 # --- registros-versiones ---
@@ -226,7 +226,7 @@ check "temporales: los lvm-* viejos se borran" '[ $rc -eq 0 ] && [ ! -e "$T/lvm-
 check "temporales: los de menos de un dia siguen" '[ -s "$T/lvm-pila-8.4-nuev/build.log" ] && [ -s "$L/temporal/actualizar-nuevo/f" ]'
 check "temporales: en uso (un .pid vivo, un socket con su servidor), siguen" '[ -s "$T/lvm-mysql-vivo/mysql.pid" ] && [ -S "$T/lvm-mysql-sock/mysql.sock" ]'
 check "temporales: lo que no es del programa (lvm-pruebas, otra-cosa, sesiones) sigue" '[ -d "$T/lvm-pruebas.ABCDEF" ] && [ -d "$T/otra-cosa" ] && [ -f "$T/sess_mia" ]'
-check "temporales de ~/.lvm-instalador: temporal/ vieja, ps-imagenes y los de mktemp; la carpeta temporal se queda" '[ -d "$L/temporal" ] && [ ! -e "$L/temporal/actualizar-viejo" ] && [ ! -e "$L/ps-imagenes-abcd1234" ] && [ ! -e "$L/ps-imagenes-lista-Ab12Cd" ] && [ ! -e "$L/vhosts-docker-Xy12Zw" ]'
+check "temporales de ~/.nexum: temporal/ vieja, ps-imagenes y los de mktemp; la carpeta temporal se queda" '[ -d "$L/temporal" ] && [ ! -e "$L/temporal/actualizar-viejo" ] && [ ! -e "$L/ps-imagenes-abcd1234" ] && [ ! -e "$L/ps-imagenes-lista-Ab12Cd" ] && [ ! -e "$L/vhosts-docker-Xy12Zw" ]'
 check "temporales: la copia de pasar a Docker (pasar-*) sigue: puede ser la unica de su BBDD" '[ -s "$L/pasar-web-Ab12Cd.sql.gz" ]'
 
 # --- sesiones ---
@@ -249,10 +249,10 @@ sudo() { echo "sudo $1 $2 $3" >> "$W/sudo.log"; [ "$1" == python3 ] && [ "$2" ==
 o=$(SUDO=sudo clean_command temporales 2>&1); rc=$?
 check "con sudo: solo CLEAN_PY (nada de rm ni find), y lo borra" '[ $rc -eq 0 ] && [ ! -e "$R/tmp/lvm-mysql-viej" ] && [ "$(grep -c . "$W/sudo.log")" = 1 ] && grep -qx "sudo python3 -I -c" "$W/sudo.log" && grep -q "con sudo" <<< "$o"'
 unset -f sudo
-chmod 555 "$R/home/.lvm-instalador/pila-8.4-20261108-105826"
+chmod 555 "$R/home/.nexum/pila-8.4-20261108-105826"
 o=$(clean_command registros 2>&1); rc=$?
-check "sin sudo, lo que no se puede borrar se dice (y lo demas se borra)" '[ $rc -ne 0 ] && grep -q "No se ha podido limpiar todo" <<< "$o" && [ ! -e "$R/home/.lvm-instalador/install-db.log" ]'
-chmod 755 "$R/home/.lvm-instalador/pila-8.4-20261108-105826"
+check "sin sudo, lo que no se puede borrar se dice (y lo demas se borra)" '[ $rc -ne 0 ] && grep -q "No se ha podido limpiar todo" <<< "$o" && [ ! -e "$R/home/.nexum/install-db.log" ]'
+chmod 755 "$R/home/.nexum/pila-8.4-20261108-105826"
 
 # --- CLEAN_PY: la raiz y la ruta sin enlaces, dentro de su carpeta ---
 mkdir -p "$W/c/real/cache" "$W/c/proy"; echo x > "$W/c/real/cache/f"; ln -s "$W/c/real" "$W/c/enlace"; ln -s "$W/c/real/cache" "$W/c/proy/cache"
@@ -277,7 +277,7 @@ if [ $MAC -eq 0 ]; then
     "${E[@]}" bash "$SRC" --simular limpiar-proyecto tienda > /dev/null 2>&1
     check "el script con --simular: limpiar y limpiar-proyecto no tocan nada" '[ "$(listing "$R")" = "$before" ]'
     o=$("${E[@]}" bash "$SRC" limpiar registros registros-versiones caches-proyectos 2>&1); rc=$?
-    check "el script: limpiar" '[ $rc -eq 0 ] && [ ! -e "$R/home/.lvm-instalador/install-db.log" ] && [ ! -s "$R/lampp-8.4/logs/error_log" ] && [ -f "$R/lampp-8.4/logs/error_log" ] && [ -s "$R/home/.lvm-instalador/apariencia" ] && grep -q "Limpieza terminada" <<< "$o"'
+    check "el script: limpiar" '[ $rc -eq 0 ] && [ ! -e "$R/home/.nexum/install-db.log" ] && [ ! -s "$R/lampp-8.4/logs/error_log" ] && [ -f "$R/lampp-8.4/logs/error_log" ] && [ -s "$R/home/.nexum/apariencia" ] && grep -q "Limpieza terminada" <<< "$o"'
     o=$("${E[@]}" bash "$SRC" limpiar-proyecto blog 2>&1); rc=$?
     check "el script: limpiar-proyecto" '[ $rc -eq 0 ] && [ ! -e "$R/htdocs/blog/wp-content/debug.log" ] && [ -s "$R/htdocs/blog/wp-content/uploads/2026/11/foto.jpg" ]'
     mkdir -p "$W/bin"; printf '#!/bin/sh\necho "$@" >> %s/sudo-script.log\nexit 1\n' "$W" > "$W/bin/sudo"; chmod +x "$W/bin/sudo"

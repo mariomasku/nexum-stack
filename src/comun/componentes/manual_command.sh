@@ -1,5 +1,5 @@
 # manual [--ruta] [<capitulo>]: el manual (ayuda/), que va dentro de este mismo script (al final, después
-# del exit, en base64: un solo fichero, también al actualizar). Se saca a ~/.lvm-instalador/ayuda la
+# del exit, en base64: un solo fichero, también al actualizar). Se saca a ~/.nexum/ayuda la
 # primera vez y cada vez que cambia (su huella), y se abre en el navegador en <capitulo> (proyectos,
 # limpieza…), con Linux o Mac ya elegido. --ruta: solo dice qué abrir (lo abre la ventana).
 # El navegador no siempre respeta lo de detrás de # al abrir un fichero: se abre abrir.html, que lleva a

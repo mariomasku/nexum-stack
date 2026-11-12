@@ -275,10 +275,10 @@ class NvConfiguracion:
         ("registros", "Registros del programa",
          "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones "
          "(y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node "
-         "parados y el de la ventana. Están en ~/.lvm-instalador. Solo sirven para ver qué pasó en una tarea "
+         "parados y el de la ventana. Están en ~/.nexum. Solo sirven para ver qué pasó en una tarea "
          "anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un "
          "servidor en marcha: el programa y tus proyectos siguen igual.",
-         "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que esté usando una tarea o un "
+         "se borran los registros de ~/.nexum (no sus ajustes ni lo que esté usando una tarea o un "
          "servidor de Node en marcha)", True),
         ("registros-versiones", "Registros de las versiones",
          "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, "
@@ -297,7 +297,7 @@ class NvConfiguracion:
         ("temporales", "Temporales",
          "Ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una "
          "descarga, el volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en /tmp y "
-         "en ~/.lvm-instalador. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y "
+         "en ~/.nexum. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y "
          "no está usando ningún programa (un MariaDB temporal en marcha, por ejemplo, se deja). No afecta a "
          "ningún proyecto ni a ninguna versión.",
          "se borran los temporales del programa de más de un día que nada usa", True),
@@ -424,7 +424,7 @@ class NvConfiguracion:
         últimas de TASKS_DIR), cada una con su fecha y cómo acabó; al pulsarla, entera."""
         # (en la demostración, la de siempre: la de verdad es la de su carpeta de ejemplo)
         home = os.path.expanduser("~")
-        where = "~/.lvm-instalador/tareas" if DEMO else "~" + TASKS_DIR[len(home):] \
+        where = "~/.nexum/tareas" if DEMO else "~" + TASKS_DIR[len(home):] \
             if TASKS_DIR.startswith(home + os.sep) else TASKS_DIR
         box, lb = tile_group("Registro de tareas",
                              "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) "
@@ -505,7 +505,7 @@ class NvConfiguracion:
                 self.win, "¿Vaciar el registro de tareas?",
                 "Las tareas en marcha se quedan. Lo borrado no se puede recuperar.", "Vaciar", destructive=True,
                 steps=["Se borran los registros de %s de %s." % (plural(len(done), "tarea", "tareas"),
-                                                                  "~/.lvm-instalador/tareas")]):
+                                                                  "~/.nexum/tareas")]):
             return
         # (en simulación no se borra nada: solo se dice lo que se haría)
         if SIMULATE:

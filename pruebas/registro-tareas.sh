@@ -1,6 +1,6 @@
 #!/bin/bash
 # Configuración, General y el registro de tareas: cada tarea de la ventana guarda el suyo en
-# ~/.lvm-instalador/tareas (solo tuyo, 600), con la orden de nexum y su salida, sin secretos, y se quedan las
+# ~/.nexum/tareas (solo tuyo, 600), con la orden de nexum y su salida, sin secretos, y se quedan las
 # 200 últimas. Uso: registro-tareas.sh <script>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
@@ -24,7 +24,7 @@ src = open(sys.argv[1], encoding="utf-8").read()
 gui = src[src.index("cat <<'LVM_GUI_PY'"):]
 code = gui[gui.index("# Registro de tareas: cada tarea de la ventana"):gui.index("class Task:")]
 home = sys.argv[2]
-DEMO, SIMULATE, LOG_DIR = "", False, os.path.join(home, ".lvm-instalador")
+DEMO, SIMULATE, LOG_DIR = "", False, os.path.join(home, ".nexum")
 exec(code)
 print("DIR=" + str(task_log_dir() == TASKS_DIR))
 print("MODO_DIR=%o" % stat.S_IMODE(os.stat(TASKS_DIR).st_mode))

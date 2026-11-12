@@ -10,7 +10,7 @@
 # wp-config.php (o parameters.php / settings.inc.php) se sustituye por uno con la BBDD del contenedor:
 # el del proyecto no se toca, y la carpeta se puede seguir usando con LAMPP a la vez.
 # (LVM_DOCKER, LVM_DOCKER_DIR y LVM_DOCKER_HOST solo para pruebas)
-DOCKER_DIR=${LVM_DOCKER_DIR:-$HOME/.lvm-instalador/docker}
+DOCKER_DIR=${LVM_DOCKER_DIR:-$LOG_DIR/docker}
 DOCKER_BIN=${LVM_DOCKER:-/usr/bin/docker}
 # Versiones que se ofrecen: imagenes oficiales php:<version>-fpm y mariadb:<version> de Docker Hub
 DOCKER_PHP_VERSIONS="8.5 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2 7.1 7.0 5.6"
@@ -398,13 +398,15 @@ fi
 rm -f /run/docker /run/containerd /run/xtables.lock
 exec /usr/bin/dockerd "$@"
 '
+# (ExecStart, en LOG_DIR: ~/.nexum/docker. Uno de antes con ~/.nexum sigue yendo por su enlace,
+# y se reescribe al volver a preparar Docker sin root)
 DOCKER_UNIT='[Unit]
 Description=Docker sin root (Nexum Dev Stack)
 Documentation=https://docs.docker.com/engine/security/rootless/
 
 [Service]
 Environment=PATH=/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=%h/.lvm-instalador/docker/bin/dockerd-rootless
+ExecStart=%h/'"${LOG_DIR#"$HOME"/}"'/docker/bin/dockerd-rootless
 ExecReload=/bin/kill -s HUP $MAINPID
 TimeoutSec=0
 RestartSec=2

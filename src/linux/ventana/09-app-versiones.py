@@ -1256,7 +1256,7 @@ class AppVersiones:
 
     def on_vhosts(self, *_):
         """Los vhosts son del administrador (Apache los lee como root al arrancar): se edita una
-        copia en ~/.lvm-instalador y, al pulsar Aplicar, el script la comprueba, la escribe con sudo
+        copia en ~/.nexum y, al pulsar Aplicar, el script la comprueba, la escribe con sudo
         (guardando antes la anterior en ~/nexum-backups, si está el ajuste) y recarga Apache."""
         if not self.data:
             return
@@ -1303,7 +1303,7 @@ class AppVersiones:
                       done_text="Vhosts actualizados", auto_close=True)
 
     def on_hosts(self, *_):
-        """/etc/hosts es de root: se edita una copia en ~/.lvm-instalador y, al pulsar Aplicar,
+        """/etc/hosts es de root: se edita una copia en ~/.nexum y, al pulsar Aplicar,
         el script la escribe encima con sudo (guardando antes el anterior en ~/nexum-backups, si está el
         ajuste)."""
         src = self.data["hosts"] if self.data else "/etc/hosts"

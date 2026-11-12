@@ -6,10 +6,10 @@
 # crea con la base cargada en local y claves nuevas, y se guarda una copia en PS_PARAMS_DIR para
 # volver a ponerla (con las mismas claves) si se pierde. La primera vez que se carga una tienda se
 # vacia su var/cache (la de produccion da error 500 en local); se apunta en PS_LOADED_FILE.
-PS_PARAMS_DIR="$HOME/.lvm-instalador/prestashop"
-PS_LOADED_FILE="$HOME/.lvm-instalador/prestashop-cargados"
+PS_PARAMS_DIR="$LOG_DIR/prestashop"
+PS_LOADED_FILE="$LOG_DIR/prestashop-cargados"
 # Carpetas clonadas con montar-proyecto (el dominio de su base no se falsea solo)
-REPO_PROJECTS_FILE="$HOME/.lvm-instalador/montados-de-repositorio"
+REPO_PROJECTS_FILE="$LOG_DIR/montados-de-repositorio"
 
 # ¿Es una tienda PrestaShop? Por su configuracion, sus carpetas o "prestashop" en el nombre
 function is_prestashop() {
@@ -19,7 +19,7 @@ function is_prestashop() {
 }
 
 # Base de una tienda cuya configuracion no la dice: la indicada, la recordada para la carpeta
-# (~/.lvm-instalador/proyectos) o, en la version activa, la unica ps_<final de la carpeta>
+# (~/.nexum/proyectos) o, en la version activa, la unica ps_<final de la carpeta>
 # (prestashop-mitienda -> ps_mitienda)
 function ps_guess_db() {
     local folder=$1 db=$2 tail

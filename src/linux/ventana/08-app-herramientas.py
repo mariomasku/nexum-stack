@@ -54,7 +54,7 @@ class AppHerramientas:
         sw.connect("notify::active", self.on_copies_files)
         row.add_suffix(sw)
         lb.add(row)
-        add_row(lb, "Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones "
+        add_row(lb, "Registros de instalaciones", "~/.nexum: logs de las instalaciones "
                 "y de la ventana", "Abrir", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))
         # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
         n, size = downloads_cache_size()

@@ -145,7 +145,7 @@ else:
 # (llavero de inicio de sesion), solo para webs (ssl) y solo ese certificado, no una CA: no vale para
 # ninguna otra web. El Mac pide tu contraseña en cada uno. Solo los que da por buenos TRUST_PY (los de
 # una tienda con dominio real, mientras este falseada en hosts), y los que ya no (U|) se quitan: para
-# eso se guarda una copia de cada uno en ~/.lvm-instalador/confianza.
+# eso se guarda una copia de cada uno en ~/.nexum/confianza.
 # --hosts (al cambiar hosts): solo quita los de las tiendas que ya no estan falseadas (y dice cuales
 # se pueden confiar). --quitar: solo quita
 function browser_trust() {
@@ -646,7 +646,7 @@ EOF
 
 # Dominio de produccion de cada WordPress para sus imagenes (media-proyecto): carpeta|dominio. Se
 # aplica al vhost de los proyectos (web.local) mientras ese proyecto este cargado (media_sync)
-MEDIA_PROJECTS_FILE="$HOME/.lvm-instalador/media-produccion"
+MEDIA_PROJECTS_FILE="$LOG_DIR/media-produccion"
 #@incluir comun/navegador-acepte-certificado-propio/media_saved.sh
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
 # dominio de produccion (media-proyecto) si es un WordPress que lo tiene, si no ninguna. Solo cambia

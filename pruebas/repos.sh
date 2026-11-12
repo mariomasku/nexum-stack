@@ -14,7 +14,7 @@ MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1
 DRY=0 HTDOCS_DIR=$W/htdocs GITHUB_CONF_FILE=$W/conf/github GITHUB_KEYRING_SERVICE=nexum-dev-stack
 GITHUB_DEFAULT_PREFIXES="wordpress- prestashop-" REPOS_CACHE_FILE=$W/conf/repos-github
-REPO_PROJECTS_FILE=$W/conf/montados GIT_KNOWN_HOSTS="github.com ssh-ed25519 AAAA"
+REPO_PROJECTS_FILE=$W/conf/montados LOG_DIR=$W/conf GIT_KNOWN_HOSTS="github.com ssh-ed25519 AAAA"
 mkdir -p "$HTDOCS_DIR"
 # El llavero falso: lo que le llega por la entrada y por la linea de ordenes, por separado
 secret-tool() { echo "ARGS $*" >> "$W/llavero.log"

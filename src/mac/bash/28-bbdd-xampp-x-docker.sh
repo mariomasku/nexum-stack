@@ -234,7 +234,7 @@ function docker_pass() {
         mkdir -p -m 700 "$COPIES_DIR" || return 1
         backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
     else
-        # (sin copia: un fichero solo tuyo en ~/.lvm-instalador, que se borra cuando ya esta cargada)
+        # (sin copia: un fichero solo tuyo en ~/.nexum, que se borra cuando ya esta cargada)
         mkdir -p -m 700 "$LOG_DIR" || return 1
         backup=$(mktemp "$LOG_DIR/pasar-$slug-XXXXXX") || return 1
         mv -f "$backup" "$backup.sql.gz" && backup=$backup.sql.gz || { rm -f "$backup"; return 1; }
@@ -393,6 +393,23 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.14 (11 nov 2026)
+- Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en
+  un desplegable (15 y 30 minutos, 1, 2, 3, 4, 6, 8 o 12 horas); en la
+  terminal, tunel-abrir --minutos 15-720 (--horas sigue valiendo).
+- Proyectos, menú ⋮ del proyecto cargado, «Exportar proyecto…»: un zip
+  en Descargas con su código (sin .git), su BBDD (sin el administrador
+  de pruebas, como «Descargar») y un LEEME-nexum.txt, con el nombre
+  <carpeta>_php<rama>_<fecha>_nexum.zip. Si tiene cambios sin commit
+  en git, no deja exportar y dice cuáles. Si falla o se cancela, no
+  queda nada a medias. En la terminal: nexum exportar-proyecto.
+- Los ajustes, registros y datos del programa pasan a ~/.nexum: la
+  primera vez que se abre se renombra la carpeta de antes (sin copiar
+  nada) y en su sitio se deja un enlace a ~/.nexum, para que lo que aún
+  la use (Docker sin root, sus contenedores, el temporizador, una
+  ventana abierta) siga funcionando. Si ya hay una ~/.nexum, no se toca
+  ninguna de las dos. Con --simular no se cambia nada.
 
 1.57.13 (11 nov 2026)
 - Dominios y hosts: arriba, a la izquierda, el recuadro con los dominios

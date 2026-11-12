@@ -122,7 +122,7 @@ class NvBandeja:
 
     def update_check_due(self):
         """¿Toca buscar una versión nueva al abrir? El primer arranque de cada día y, después, cada
-        UPDATE_EVERY arranques. Se lleva en ~/.lvm-instalador/actualizaciones-arranques: fecha y los
+        UPDATE_EVERY arranques. Se lleva en ~/.nexum/actualizaciones-arranques: fecha y los
         arranques desde la última vez que se buscó."""
         path = os.path.join(LOG_DIR, "actualizaciones-arranques")
         today = time.strftime("%Y-%m-%d")

@@ -140,6 +140,11 @@ struct GestorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var model = AppModel()
 
+    // (lo primero, antes de que nada lea o cree LOG_DIR: ~/.lvm-instalador pasa a ~/.nexum)
+    init() {
+        settingsMigrate()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

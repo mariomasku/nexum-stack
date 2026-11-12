@@ -13,7 +13,7 @@ import ast, os, re, sys, time
 tree = ast.parse(open(sys.argv[1], encoding="utf-8").read())
 code = [ast.unparse(n) for n in tree.body if (isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.name in ("usage_group", "UsageMeter"))
         or (isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "USAGE_GROUPS" for t in n.targets))]
-g = {"os": os, "re": re, "time": time, "LOG_DIR": "/home/x/.lvm-instalador"}
+g = {"os": os, "re": re, "time": time, "LOG_DIR": "/home/x/.nexum", "LOG_DIR_OLD": "/home/x/.lvm-instalador"}
 exec("\n".join(code), g)
 grp = g["usage_group"]
 uid = os.getuid()
@@ -28,7 +28,8 @@ say("Docker sin root: dockerd y cada contenedor (los de otro usuario, no)",
     and grp(5, ["mariadbd"], "0::/user.slice/user-9999.slice/user@9999.service/app.slice/docker.service", 1) is None)
 say("Mailpit, el túnel y la propia ventana", grp(5, ["/opt/config/mailpit/mailpit", "--smtp"], "", 1) == "mailpit"
     and grp(5, ["python3", "-I", "-c", "x", "nexum-tunel", "/p"], "", 1) == "tunel"
-    and grp(5, ["/home/x/.lvm-instalador/tunel/cloudflared", "tunnel"], "", 1) == "tunel" and grp(7, ["python3"], "", 7) == "ventana")
+    and grp(5, ["/home/x/.nexum/tunel/cloudflared", "tunnel"], "", 1) == "tunel" and grp(7, ["python3"], "", 7) == "ventana"
+    and grp(5, ["/home/x/.lvm-instalador/tunel/cloudflared", "tunnel"], "", 1) == "tunel")
 say("lo de otros programas no cuenta", grp(5, ["/usr/bin/firefox"], user + "/app.slice/app-firefox.scope", 1) is None
     and grp(5, ["/usr/sbin/mysqld"], "0::/system.slice/mysql.service", 1) is None)
 m = g["UsageMeter"]()

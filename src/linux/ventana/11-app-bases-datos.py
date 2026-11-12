@@ -595,7 +595,7 @@ class AppBasesDatos:
         return row.name if resp == Gtk.ResponseType.ACCEPT and row is not None else None
 
     def remember_project(self, db, folder, ver):
-        """Guarda en ~/.lvm-instalador/proyectos la carpeta elegida a mano para una base en una
+        """Guarda en ~/.nexum/proyectos la carpeta elegida a mano para una base en una
         versión."""
         if SIMULATE:
             return

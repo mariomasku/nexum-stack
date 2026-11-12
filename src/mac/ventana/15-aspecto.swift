@@ -4,6 +4,9 @@
 let ACCENT = hexColor(0x0A84FF)
 /// Tema de la ventana elegido en el menú: claro u oscuro (sin fichero, el del Mac)
 let THEME_FILE = LOG_DIR + "/ventana-tema"
+/// Lo que puede durar un túnel de Cloudflare: minutos y cómo se dice
+let TUNNEL_TIMES: [(Int, String)] = [(15, "15 minutos"), (30, "30 minutos"), (60, "1 hora"), (120, "2 horas"), (180, "3 horas"),
+                                     (240, "4 horas"), (360, "6 horas"), (480, "8 horas"), (720, "12 horas")]
 /// Los colores del icono de Nexum (el borde del aviso de abajo): azul, verde, amarillo, rojo y magenta
 let NEXUM_COLORS: [Color] = [hexColor(0x006CB7), hexColor(0x88BB1D), hexColor(0xFFB608), hexColor(0xFF0000), hexColor(0xF20093)]
 /// La última versión que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor

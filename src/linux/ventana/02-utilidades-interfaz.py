@@ -417,7 +417,7 @@ def updates_ignore(items):
     os.replace(IGNORED_UPDATES_FILE + ".nuevo", IGNORED_UPDATES_FILE)
 
 
-# Menú lateral: sus apartados (clave, texto e icono) y cómo se ven (Apariencia: ~/.lvm-instalador/apariencia)
+# Menú lateral: sus apartados (clave, texto e icono) y cómo se ven (Apariencia: ~/.nexum/apariencia)
 SIDEBAR = [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"), ("repos", "Repositorios", "logo:github"),
                         ("versiones", "Versiones de PHP", "logo:php"), ("bbdd", "Bases de datos", "logo:bbdd"),
                         ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node")]),

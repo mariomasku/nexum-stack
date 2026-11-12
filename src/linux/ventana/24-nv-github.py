@@ -511,7 +511,7 @@ class NvGithub:
         def fill(rc, out):
             info = next((f for f in parse_lines(out) if f[0] == "I" and len(f) >= 4), None)
             row = ActionRow("cloudflared", "Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)"
-                            if not info or info[1] != "1" else "Versión %s, en ~/.lvm-instalador/tunel" % info[2])
+                            if not info or info[1] != "1" else "Versión %s, en ~/.nexum/tunel" % info[2])
             if info and (info[1] != "1" or info[2] != info[3]):
                 b = Gtk.Button(label="Instalar" if info[1] != "1" else "Actualizar a la %s" % info[3],
                                valign=Gtk.Align.CENTER, sensitive=not self.busy)
@@ -762,12 +762,12 @@ class NvGithub:
         box.pack_start(label(text, "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)
         grid = Gtk.Grid(column_spacing=14, row_spacing=10, margin_top=4)
         grid.attach(label("Se cierra solo en", valign=Gtk.Align.CENTER), 0, 1, 1, 1)
-        hours = Gtk.Box(spacing=6)
-        spin = Gtk.SpinButton.new_with_range(1, 12, 1)
-        spin.set_value(2)
-        hours.pack_start(spin, False, False, 0)
-        hours.pack_start(label("horas", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
-        grid.attach(hours, 1, 1, 2, 1)
+        # (desde 15 minutos; de partida, 2 horas)
+        times = Gtk.ComboBoxText(halign=Gtk.Align.START, valign=Gtk.Align.CENTER)
+        for minutes, text in TUNNEL_TIMES:
+            times.append(str(minutes), text)
+        times.set_active_id("120")
+        grid.attach(times, 1, 1, 2, 1)
         grid.attach(label("Bloquear el panel de\nadministración", valign=Gtk.Align.CENTER), 0, 2, 1, 1)
         sw = Gtk.Switch(active=True, halign=Gtk.Align.START, valign=Gtk.Align.CENTER)
         grid.attach(sw, 1, 2, 1, 1)
@@ -788,11 +788,11 @@ class NvGithub:
         dlg.show_all()
         update()
         resp = run_dialog(dlg)
-        h, admin = str(spin.get_value_as_int()), "bloquear" if sw.get_active() else "permitir"
+        minutes, admin = times.get_active_id() or "120", "bloquear" if sw.get_active() else "permitir"
         dlg.destroy()
         if resp != Gtk.ResponseType.OK:
             return
-        args = ["tunel-abrir", url, folder, "--horas", h, "--admin", admin]
+        args = ["tunel-abrir", url, folder, "--minutos", minutes, "--admin", admin]
 
         def opened(ok_, *_):
             self.nv_tunnel_refresh()

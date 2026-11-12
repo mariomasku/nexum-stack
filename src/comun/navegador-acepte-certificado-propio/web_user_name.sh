@@ -10,7 +10,7 @@ function web_user_name() {
 }
 
 # Proyectos nuevos con dominio falseado (pestaña Hosts): dominio=carpeta, uno por linea
-CUSTOM_DOMAINS_FILE="$HOME/.lvm-instalador/dominios"
+CUSTOM_DOMAINS_FILE="$LOG_DIR/dominios"
 
 # Dominio personalizado de una carpeta (vacio si no tiene)
 function custom_domain() {

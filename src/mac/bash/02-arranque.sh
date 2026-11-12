@@ -426,9 +426,19 @@ function root_command() {
 }
 
 SELF=$(realpath_f "$0")
-LOG_DIR="$HOME/.lvm-instalador"
-# Hasta la 1.0.0 la carpeta era ~/.pvm-instalador: se renombra la primera vez
-[ -d "$HOME/.pvm-instalador" ] && [ ! -e "$LOG_DIR" ] && mv "$HOME/.pvm-instalador" "$LOG_DIR"
+# Ajustes, registros y lo que guarda el programa: ~/.nexum (hasta la 1.57.13, ~/.lvm-instalador:
+# settings_migrate la renombra al arrancar, lo antes posible y como copies_migrate, salvo con --simular,
+# en las pruebas, LVM_PRUEBA, o al pedir solo la version o las novedades)
+LOG_DIR="$HOME/.nexum"
+#@incluir comun/componentes/settings_migrate.sh
+case "${1:-}" in
+    --simular|version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;
+    *) [ -z "${LVM_PRUEBA:-}" ] && settings_migrate ;;
+esac
+# Hasta la 1.0.0 la carpeta era ~/.pvm-instalador: se renombra la primera vez (si no hay ninguna de las otras)
+[ -d "$HOME/.pvm-instalador" ] && [ ! -e "$SETTINGS_OLD_DIR" ] && [ ! -L "$SETTINGS_OLD_DIR" ] && [ ! -e "$LOG_DIR" ] \
+    && [ ! -L "$LOG_DIR" ] && mv "$HOME/.pvm-instalador" "$LOG_DIR"
+LOG_DIR=$(settings_dir)
 # Solo tuya: lleva registros, copias de los vhosts y configuraciones con contraseñas
 [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] && chmod 700 "$LOG_DIR" 2> /dev/null
 # Las copias de seguridad (BBDD de clientes, vhosts, /etc/hosts anteriores): solo las que se piden
@@ -1803,7 +1813,7 @@ DL_CACHE_DIR=$BASE_DIR/descargas
 # Proyectos y vhosts compartidos (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-$COMMON/htdocs}
 VHOSTS_FILE=${LVM_VHOSTS:-$COMMON/httpd-vhosts.conf}
-PROJECTS_FILE="$HOME/.lvm-instalador/proyectos"
+PROJECTS_FILE="$LOG_DIR/proyectos"
 # Vhost que se crea para cargar proyectos si no hay ninguno (LVM_HOSTS solo para pruebas)
 PROJECT_VHOST=web.local
 HOSTS_FILE=${LVM_HOSTS:-/etc/hosts}
@@ -1819,7 +1829,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.13"
+APP_VERSION="1.57.14"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan nexum-mac-<version>.zip (hasta la 1.57.10, lvm-instalador-mac-<version>.zip; la 1.57.11

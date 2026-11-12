@@ -119,7 +119,7 @@
 #       Apache y se recarga). Las carpetas, las BBDD y /etc/hosts no se tocan
 #
 #   nexum manual [<capitulo>]
-#       Abre el manual en el navegador (va dentro de este script; se saca a ~/.lvm-instalador/ayuda).
+#       Abre el manual en el navegador (va dentro de este script; se saca a ~/.nexum/ayuda).
 #       Con un capitulo (proyectos, bbdd, docker, configuracion, limpieza...), en ese. Con --ruta,
 #       solo dice que fichero abrir
 #
@@ -129,7 +129,7 @@
 #   nexum limpiar <clave>...
 #       Limpia esas cosas (pide la contraseña solo si alguna es de root). Claves: descargas (la cache
 #       de descargas), copias (~/nexum-backups), correo (los correos de Mailpit), registros (los del
-#       programa en ~/.lvm-instalador, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
+#       programa en ~/.nexum, no sus ajustes), registros-versiones (los de Apache, PHP-FPM,
 #       PHP y MariaDB de cada version: se vacian), caches-proyectos (la cache de todos los proyectos),
 #       temporales (los del programa con mas de un dia y que nada usa) y sesiones (las de PHP de cada
 #       version: se cierran las sesiones abiertas en las webs locales). Sin copias: no se recupera
@@ -201,12 +201,12 @@
 #   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
 #   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
 #   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
-#   nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]
+#   nexum tunel-abrir <direccion local> [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]
 #   nexum tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
 #       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
-#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice). La web no se toca: el
-#       dominio local se cambia por el del tunel al pasar
+#       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice; desde 15 minutos). La web no
+#       se toca: el dominio local se cambia por el del tunel al pasar
 #   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   nexum docker-php <nombre> <version de PHP>
 #   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
@@ -289,6 +289,13 @@
 #       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
 #       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
 #       y la BBDD de antes, en ~/nexum-backups
+#
+#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]
+#       Un zip del proyecto en la carpeta de descargas (xdg-user-dir, ~/Descargas o ~/Downloads):
+#       <carpeta>_php<rama>_<fecha>_nexum.zip, con su codigo (sin .git), su BBDD de la version activa
+#       (la vinculada o --bd; como exportar-bd, sin el administrador de pruebas) y un LEEME-nexum.txt.
+#       Si es un repositorio git con cambios sin commit, no se exporta. Si falla, no queda nada
+#
 #   nexum hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1) o deja de falsear el dominio de un vhost
 #
@@ -379,7 +386,16 @@ set -o pipefail
 export LC_COLLATE=C
 
 SELF=$(readlink -f "$0")
-LOG_DIR="$HOME/.lvm-instalador"
+# Ajustes, registros y lo que guarda el programa: ~/.nexum (hasta la 1.57.13, ~/.lvm-instalador:
+# settings_migrate la renombra al arrancar, lo antes posible y como copies_migrate, salvo con --simular,
+# en las pruebas, LVM_PRUEBA, o al pedir solo la version o las novedades)
+LOG_DIR="$HOME/.nexum"
+#@incluir comun/componentes/settings_migrate.sh
+case "${1:-}" in
+    --simular|version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;
+    *) [ -z "${LVM_PRUEBA:-}" ] && settings_migrate ;;
+esac
+LOG_DIR=$(settings_dir)
 # Solo tuya: lleva registros, copias de los vhosts y configuraciones con contraseñas
 [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] && chmod 700 "$LOG_DIR" 2> /dev/null
 # Las copias de seguridad (BBDD de clientes, vhosts, /etc/hosts anteriores): solo las que se piden
@@ -824,7 +840,7 @@ fi
 # Proyectos y vhosts compartidos por todas las versiones (LVM_HTDOCS/LVM_VHOSTS solo para pruebas)
 HTDOCS_DIR=${LVM_HTDOCS:-/opt/htdocs}
 VHOSTS_FILE=${LVM_VHOSTS:-/opt/config/httpd-vhosts.conf}
-PROJECTS_FILE="$HOME/.lvm-instalador/proyectos"
+PROJECTS_FILE="$LOG_DIR/proyectos"
 # Vhost que se crea para cargar proyectos si no hay ninguno (LVM_HOSTS solo para pruebas)
 PROJECT_VHOST=web.local
 HOSTS_FILE=${LVM_HOSTS:-/etc/hosts}
@@ -858,7 +874,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.13"
+APP_VERSION="1.57.14"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

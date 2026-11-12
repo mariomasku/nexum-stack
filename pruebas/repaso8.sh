@@ -156,7 +156,7 @@ check "MariaDB temporal: el dueño se mira siguiendo el enlace (-L)" 'grep -qE "
 extract "$SRC" db_client_wrapper db_client_wrapper_remove || exit 1
 SUDO="" DB_CLI_DIR="" DB_CLI=""
 db_client_wrapper "/opt/con espacio/mysql" "/opt/x/lib" "$W/s.sock"
-check "envoltorio: en /tmp/lvm-cliente-*, no en ~/.lvm-instalador" '[[ "$DB_CLI_DIR" == /tmp/lvm-cliente-* ]] && [ -x "$DB_CLI" ]'
+check "envoltorio: en /tmp/lvm-cliente-*, no en ~/.nexum" '[[ "$DB_CLI_DIR" == /tmp/lvm-cliente-* ]] && [ -x "$DB_CLI" ]'
 check "envoltorio: ruta con espacios bien escrita" 'grep -qF "/opt/con\\ espacio/mysql --no-defaults" "$DB_CLI"'
 check "envoltorio: sin escritura para otros" '[ "$(command stat -c %a "$DB_CLI")" = 755 ]'
 d=$DB_CLI_DIR

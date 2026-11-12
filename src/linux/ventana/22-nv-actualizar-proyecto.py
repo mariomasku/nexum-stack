@@ -263,7 +263,12 @@ class NvActualizarProyecto:
         return self.nv_menu_button(None, "view-more-symbolic", items)
 
     def nv_more_menu(self, x):
-        return self.nv_menu_button(None, "view-more-symbolic", self.nv_more_items(x))
+        items = self.nv_more_items(x)
+        loaded = self.loaded_project_folder()
+        if loaded is not None and os.path.basename(loaded) == x["name"]:
+            # (solo el cargado: se exporta con la versión de PHP donde está y su BBDD de esa versión)
+            items.insert(2, ("Exportar proyecto…", lambda: self.nv_export_project(x)))
+        return self.nv_menu_button(None, "view-more-symbolic", items)
 
     def nv_more_items(self, x):
         items = [("Opciones de la BBDD…", lambda: self.on_link_project(x)),
@@ -285,6 +290,130 @@ class NvActualizarProyecto:
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
+
+    # --- Exportar proyecto: un zip con su código y su BBDD (gui-exportar-proyecto y exportar-proyecto) ---
+
+    def nv_export_project(self, x):
+        """⋮, Exportar proyecto… (del cargado): primero se mira su código en git. Con cambios sin commit no se
+        deja exportar (se dice cuáles); si no, el diálogo con lo que se exporta."""
+        name = x["name"]
+
+        def got(_rc, out):
+            lines = parse_lines(out)
+            f = {ln[0]: ln for ln in lines}
+            g, v = f.get("G"), f.get("V")
+            if not g or len(g) < 6 or not v or len(v) < 5:
+                message(self.win, "No se puede exportar «%s»" % name,
+                        out.strip()[-400:] or "Sin respuesta del instalador.", Gtk.MessageType.ERROR)
+                return False
+            if not v[1]:
+                message(self.win, "No hay ninguna versión activa",
+                        "Para exportar un proyecto hace falta la versión de PHP donde está cargado.",
+                        Gtk.MessageType.ERROR)
+                return False
+            if g[1] == "2":
+                message(self.win, "No se puede comprobar el código de «%s»" % name,
+                        "git no ha podido leer la carpeta: %s\n\nArréglalo antes de exportar." % g[2],
+                        Gtk.MessageType.ERROR)
+                return False
+            n = int(g[3]) if g[3].isdigit() else 0
+            if g[1] == "1" and n:
+                shown = [ln[1] for ln in lines if ln[0] == "C" and len(ln) >= 2]
+                more = "\n  y %d más" % (n - len(shown)) if n > len(shown) else ""
+                message(self.win, "«%s» tiene cambios sin commit" % name,
+                        "Tiene %s sin commit en git:\n\n%s%s\n\nHaz commit antes de exportar (o descarta esos "
+                        "cambios): el zip tiene que llevar lo mismo que el repositorio."
+                        % (plural(n, "cambio", "cambios"), "\n".join("  " + c for c in shown), more),
+                        Gtk.MessageType.WARNING)
+                return False
+            self.nv_export_dialog(x, f)
+            return False
+        run_quick(["gui-exportar-proyecto", name], got)
+
+    def nv_export_dialog(self, x, f):
+        """«Exportar «carpeta»»: de qué versión de PHP, las casillas del código y de su BBDD (marcadas) y los
+        pasos, que cambian con ellas. Al aceptar, la tarea exportar-proyecto."""
+        name = x["name"]
+        g, v = f["G"], f["V"]
+        active = self.data.get("active") if self.data else None
+        # (la BBDD del proyecto cargado, como la ve la ventana; si no está en esta versión, la del script)
+        db = self.loaded_project_db()
+        if not db or db not in self.data["dbs"].get(active, []):
+            db = f.get("B", ["B", ""])[1]
+        dest = f.get("D", ["D", ""])[1] or os.path.expanduser("~")
+        zip_name = f.get("N", ["N", ""])[1] or "%s_php…_nexum.zip" % name
+        size = int(f["S"][1]) if "S" in f and f["S"][1].isdigit() else 0
+        ver_label = "%s · PHP %s" % (v[2], v[3] or "?")
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE, text="Exportar «%s»" % name)
+        ahead = int(g[4]) if g[4].isdigit() else 0
+        if g[1] == "1":
+            git = "El código está en git, sin cambios sin commit%s." % (" (rama %s)" % g[2] if g[2] else "")
+        else:
+            git = "No es un repositorio git: no se puede comprobar si tiene cambios sin commit."
+        dlg.format_secondary_text("Se exporta de la versión activa, donde está cargado: %s.\n%s" % (ver_label, git))
+        widen(dlg)
+        extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        code = Gtk.CheckButton(label="Código: %s/%s · %s (sin la carpeta .git)" % (HTDOCS, name, fmt_size(size)),
+                               active=True)
+        extra.pack_start(code, False, False, 0)
+        if db:
+            base = Gtk.CheckButton(label="Base de datos: %s (%s)" % (db, v[2]), active=True)
+        else:
+            base = Gtk.CheckButton(label="Base de datos: Sin BBDD vinculada", active=False, sensitive=False)
+        extra.pack_start(base, False, False, 0)
+        if ahead:
+            extra.pack_start(label("Tiene %s sin subir a su rama remota: el zip los lleva, pero el repositorio "
+                                   "remoto no." % plural(ahead, "commit", "commits"),
+                                   "aviso-rojo", wrap=True, max_width_chars=60, xalign=0), False, False, 0)
+        holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin_top=8)
+        extra.pack_start(holder, False, False, 0)
+        dlg.get_message_area().pack_start(extra, False, False, 0)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Exportar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+
+        def update(*_):
+            with_code, with_db = code.get_active(), base.get_active() and bool(db)
+            steps = []
+            if with_code:
+                steps.append("Se copia el código de %s/%s en %s/, sin .git (los enlaces que salen de la carpeta "
+                             "no van)." % (HTDOCS, name, name))
+            if with_db:
+                steps.append("Se descarga la BBDD %s de %s en %s.sql, como «Descargar»: sin el administrador de "
+                             "pruebas ni los cambios del correo de pruebas." % (db, v[2], db))
+            steps.append("Se escribe el zip en %s/%s, con un LEEME-nexum.txt. Si falla o lo cancelas, no queda "
+                         "nada." % (dest, zip_name))
+            for child in holder.get_children():
+                holder.remove(child)
+            holder.pack_start(steps_box(steps), False, False, 0)
+            holder.show_all()
+            ok.set_sensitive(with_code or with_db)
+        code.connect("toggled", update)
+        base.connect("toggled", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        with_code, with_db = code.get_active(), base.get_active() and bool(db)
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not (with_code or with_db):
+            return
+        args = ["exportar-proyecto", name, "--destino", dest] + ([] if with_code else ["--sin-codigo"]) + \
+            (["--bd", db] if with_db else ["--sin-bd"])
+
+        def done(success, task, _p):
+            if success:
+                task.offer("Mostrar en la carpeta", lambda: self.open_uri(GLib.filename_to_uri(dest)))
+
+        def start(_pwd=None):
+            self.run_task("Exportando %s" % name, args, progress=True, env=self.db_env() if with_db else None,
+                          on_done=done, done_text="«%s» exportado en %s" % (name, dest),
+                          cancel_text=("¿Cancelar la exportación?", "No se guarda nada: el zip a medias se borra.",
+                                       "Cancelar la exportación"))
+        if with_db:
+            self.check_db_access(start)
+        else:
+            start()
 
     def nv_images_button(self, x):
         """Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""

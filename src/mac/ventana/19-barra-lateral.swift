@@ -9,7 +9,7 @@ let NAV: [(String, [(String, String, String)])] = [
     ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("config", "Configuración", "gearshape")]),
 ]
 
-/// Apariencia (~/.lvm-instalador/apariencia, el mismo fichero que en Linux): iconos en color, Docker, Node
+/// Apariencia (~/.nexum/apariencia, el mismo fichero que en Linux): iconos en color, Docker, Node
 /// y PHP con su logotipo, y qué apartados no salen en el menú lateral (Proyectos y Configuración, siempre)
 let LOOK_FILE = LOG_DIR + "/apariencia"
 let NAV_FIXED: Set<String> = ["proyectos", "config"]

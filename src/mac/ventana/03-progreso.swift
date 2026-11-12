@@ -50,6 +50,23 @@ func showFolder(_ path: String) {
     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
 }
 
+/// El zip más reciente de Exportar proyecto en su carpeta (<carpeta>_php…_nexum.zip), señalado en el Finder; si
+/// no está, la carpeta
+func revealExport(_ dir: String, _ name: String) {
+    let fm = FileManager.default
+    var best: (path: String, when: Date)? = nil
+    for f in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where f.hasPrefix(name + "_php") && f.hasSuffix("_nexum.zip") {
+        let path = dir + "/" + f
+        let when: Date = ((try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date) ?? .distantPast
+        if best == nil || when > best!.when { best = (path: path, when: when) }
+    }
+    if let b = best {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: b.path)])
+    } else {
+        showFolder(dir)
+    }
+}
+
 /// Salida de un programa (vacía si falla o no termina bien)
 func captureOutput(_ path: String, _ args: [String]) -> String {
     let p = Process()

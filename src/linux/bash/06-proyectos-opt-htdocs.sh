@@ -155,6 +155,20 @@ function create_project_vhost() {
 
 #@incluir comun/proyectos-opt-htdocs/valid_project.sh
 #@incluir comun/proyectos-opt-htdocs/vhosts_orphans.sh
+# exportar-proyecto: la carpeta de descargas (la de xdg-user-dir o, si no la tiene, ~/Descargas o
+# ~/Downloads) y el nombre de una version (lampp-8.4)
+function export_downloads() {
+    local d=""
+    command -v xdg-user-dir > /dev/null && d=$(xdg-user-dir DOWNLOAD 2> /dev/null)
+    if [ -z "$d" ] || [ "$d" == "$HOME" ] || [ ! -d "$d" ]; then
+        d=$HOME
+        [ -d "$HOME/Downloads" ] && d=$HOME/Downloads
+        [ -d "$HOME/Descargas" ] && d=$HOME/Descargas
+    fi
+    echo "$d"
+}
+function export_version_label() { echo "lampp-$1"; }
+#@incluir comun/proyectos-opt-htdocs/project_export.sh
 # ¿Se puede escribir este fichero sin salirse de la carpeta del proyecto? Ni el fichero ni las
 # carpetas de su ruta pueden ser enlaces que lleven fuera: un repositorio podria traer wp-config.php
 # como enlace a un fichero del sistema, y con sudo se escribiria encima.

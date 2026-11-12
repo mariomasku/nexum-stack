@@ -217,7 +217,7 @@ function node_log() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
         # (el tunel y los repositorios, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
         tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|borrar-bd) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
@@ -316,6 +316,8 @@ case "$1" in
     vincular-bd) link_database "$2" "$3" "$4" ;;
     actualizar-proyecto) shift; project_update "$@" ;;
     gui-proyecto-git) gui_project_git "$2" ;;
+    exportar-proyecto) shift; project_export "$@" ;;
+    gui-exportar-proyecto) gui_project_export "$2" ;;
     cargar-proyecto) load_project "$2" "$3" "$4" ;;
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;

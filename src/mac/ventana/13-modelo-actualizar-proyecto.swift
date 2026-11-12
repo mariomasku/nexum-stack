@@ -318,6 +318,137 @@ extension AppModel {
         }
     }
 
+    /// ⋮, Exportar proyecto… (del cargado): primero se mira su código en git (gui-exportar-proyecto). Con cambios
+    /// sin commit no se deja exportar (se dice cuáles); si no, el diálogo con lo que se exporta
+    func exportProject(_ x: Project) {
+        let name = x.name
+        runQuick(["gui-exportar-proyecto", name]) { _, out in
+            let lines = parseLines(out)
+            var f: [String: [String]] = [:]
+            for l in lines where !l.isEmpty && f[l[0]] == nil { f[l[0]] = l }
+            guard let g = f["G"], g.count >= 6, let v = f["V"], v.count >= 5 else {
+                let text = out.trimmingCharacters(in: .whitespacesAndNewlines)
+                message("No se puede exportar «\(name)»", text.isEmpty ? "Sin respuesta del instalador." : String(text.suffix(400)),
+                        error: true)
+                return
+            }
+            if v[1].isEmpty {
+                message("No hay ninguna versión activa",
+                        "Para exportar un proyecto hace falta la versión de PHP donde está cargado.", error: true)
+                return
+            }
+            if g[1] == "2" {
+                message("No se puede comprobar el código de «\(name)»",
+                        "git no ha podido leer la carpeta: \(g[2])\n\nArréglalo antes de exportar.", error: true)
+                return
+            }
+            let changes = Int(g[3]) ?? 0
+            if g[1] == "1" && changes > 0 {
+                let shown: [String] = lines.filter { $0.count >= 2 && $0[0] == "C" }.map { "  " + $0[1] }
+                let more = changes > shown.count ? "\n  y \(changes - shown.count) más" : ""
+                message("«\(name)» tiene cambios sin commit",
+                        "Tiene \(plural(changes, "cambio", "cambios")) sin commit en git:\n\n\(shown.joined(separator: "\n"))\(more)\n\nHaz commit antes de exportar (o descarta esos cambios): el zip tiene que llevar lo mismo que el repositorio.",
+                        error: true)
+                return
+            }
+            self.exportDialog(name, f)
+        }
+    }
+
+    /// «Exportar «carpeta»»: de qué versión de PHP, las casillas del código y de su BBDD (marcadas) y los pasos,
+    /// que cambian con ellas. Al aceptar, la tarea exportar-proyecto
+    private func exportDialog(_ name: String, _ f: [String: [String]]) {
+        guard let g = f["G"], let v = f["V"] else { return }
+        let active: String = data?.active ?? ""
+        // (la BBDD del proyecto cargado, como la ve la ventana; si no está en esta versión, la del script)
+        let loaded: String = loadedProjectDb()
+        let db: String = loaded.isEmpty || !(data?.dbs[active] ?? []).contains(loaded) ? field(f["B"] ?? [], 1) : loaded
+        let downloads: String = field(f["D"] ?? [], 1)
+        let dest: String = downloads.isEmpty ? NSHomeDirectory() + "/Downloads" : downloads
+        let shownName: String = field(f["N"] ?? [], 1)
+        let zipName: String = shownName.isEmpty ? "\(name)_php…_nexum.zip" : shownName
+        let size: Int64 = Int64(field(f["S"] ?? [], 1)) ?? 0
+        let ahead: Int = Int(g[4]) ?? 0
+        let verLabel: String = v[2]
+        let git: String = g[1] == "1"
+            ? "El código está en git, sin cambios sin commit\(g[2].isEmpty ? "" : " (rama \(g[2]))")."
+            : "No es un repositorio git: no se puede comprobar si tiene cambios sin commit."
+
+        let alert = NSAlert()
+        alert.messageText = "Exportar «\(name)»"
+        alert.informativeText = "Se exporta de la versión activa, donde está cargado: \(verLabel) · PHP \(v[3].isEmpty ? "?" : v[3]).\n\(git)"
+        alert.alertStyle = .informational
+        let ok = alert.addButton(withTitle: "Exportar")
+        let cancel = alert.addButton(withTitle: "Cancelar")
+        cancel.keyEquivalent = "\u{1b}"
+        let validator = DialogValidator()
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        let code = NSButton(checkboxWithTitle: "Código: \(HTDOCS)/\(name) · \(fmtSize(size)) (sin la carpeta .git)",
+                            target: validator, action: #selector(DialogValidator.changed(_:)))
+        code.state = .on
+        stack.addArrangedSubview(code)
+        let base = NSButton(checkboxWithTitle: db.isEmpty ? "Base de datos: Sin BBDD vinculada" : "Base de datos: \(db) (\(verLabel))",
+                            target: validator, action: #selector(DialogValidator.changed(_:)))
+        base.state = db.isEmpty ? .off : .on
+        base.isEnabled = !db.isEmpty
+        stack.addArrangedSubview(base)
+        if ahead > 0 {
+            let w = NSTextField(wrappingLabelWithString: "Tiene \(plural(ahead, "commit", "commits")) sin subir a su rama remota: el zip los lleva, pero el repositorio remoto no.")
+            w.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+            w.textColor = .systemRed
+            w.preferredMaxLayoutWidth = DIALOG_WIDTH
+            stack.addArrangedSubview(w)
+        }
+        func steps(_ withCode: Bool, _ withDb: Bool) -> [String] {
+            var out: [String] = []
+            if withCode {
+                out.append("Se copia el código de \(HTDOCS)/\(name) en \(name)/, sin .git (los enlaces que salen de la carpeta no van).")
+            }
+            if withDb {
+                out.append("Se descarga la BBDD \(db) de \(verLabel) en \(db).sql, como «Descargar»: sin el administrador de pruebas ni los cambios del correo de pruebas.")
+            }
+            out.append("Se escribe el zip en \(dest)/\(zipName), con un LEEME-nexum.txt. Si falla o lo cancelas, no queda nada.")
+            return out
+        }
+        // (con todo marcado, el diálogo ya tiene su alto mayor: al desmarcar, los pasos solo se acortan)
+        let stepsLabel = dialogSteps(steps(true, !db.isEmpty))
+        stepsLabel.translatesAutoresizingMaskIntoConstraints = false
+        stepsLabel.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+        let spacer = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 4))
+        stack.addArrangedSubview(spacer)
+        stack.addArrangedSubview(stepsLabel)
+        validator.update = {
+            let withCode = code.state == .on
+            let withDb = base.state == .on && !db.isEmpty
+            stepsLabel.attributedStringValue = dialogSteps(steps(withCode, withDb)).attributedStringValue
+            ok.isEnabled = withCode || withDb
+        }
+        validator.update()
+        stack.layoutSubtreeIfNeeded()
+        stack.frame = NSRect(x: 0, y: 0, width: DIALOG_WIDTH, height: max(stack.fittingSize.height, 24))
+        alert.accessoryView = stack
+        // (el validador, vivo mientras se ve el diálogo: las casillas no lo retienen)
+        let resp = withExtendedLifetime(validator) { alert.runStyled() }
+        let withCode = code.state == .on
+        let withDb = base.state == .on && !db.isEmpty
+        guard resp == .alertFirstButtonReturn, withCode || withDb else { return }
+        var args: [String] = ["exportar-proyecto", name, "--destino", dest]
+        if !withCode { args.append("--sin-codigo") }
+        args += withDb ? ["--bd", db] : ["--sin-bd"]
+        let start = {
+            _ = self.runTask("Exportando \(name)", args, progress: true, doneText: "«\(name)» exportado en \(dest)",
+                             env: withDb ? self.dbEnv() : [:],
+                             cancelText: ("¿Cancelar la exportación?", "No se guarda nada: el zip a medias se borra.",
+                                          "Cancelar la exportación")) { done, task, _ in
+                if done { task.offer("Mostrar en Finder") { revealExport(dest, name) } }
+            }
+        }
+        if withDb { checkDbAccess(start) } else { start() }
+    }
+
     /// Dominio de producción para las imágenes que faltan: el campo con el que había o el propuesto;
     /// vacío (si ya había uno), deja de pedirlas. done(dominio o "" para quitar)
     private func askMedia(_ title: String, _ text: String, saved: String, value: String,
@@ -688,7 +819,7 @@ extension AppModel {
         if running { checkDbAccess(start) } else { start() }
     }
 
-    /// /etc/hosts es de root: se edita una copia en ~/.lvm-instalador y, al pulsar Aplicar, el script
+    /// /etc/hosts es de root: se edita una copia en ~/.nexum y, al pulsar Aplicar, el script
     /// la escribe encima con sudo (guardando antes el anterior en ~/nexum-backups, si está el ajuste)
     func editHosts() {
         let src = (data ?? AppData()).hosts
@@ -718,7 +849,7 @@ extension AppModel {
     }
 
     /// Los vhosts son del administrador (Apache los lee como root al arrancar): se edita una copia en
-    /// ~/.lvm-instalador y, al pulsar Aplicar, el script la comprueba, la escribe con sudo (guardando
+    /// ~/.nexum y, al pulsar Aplicar, el script la comprueba, la escribe con sudo (guardando
     /// antes la anterior en ~/nexum-backups, si está el ajuste) y recarga Apache. Si Apache no la acepta, se deja como estaba
     func editVhosts() {
         let path = (data ?? AppData()).vhosts

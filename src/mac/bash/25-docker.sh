@@ -17,7 +17,7 @@
 # (X-Nexum-Key), que pone el vhost con un Include de root y solo para root (DOCKER_KEYS_DIR), y con su
 # dominio. Hasta la 1.39.1 se publicaba PHP-FPM (FastCGI, sin clave): docker_migrate lo cambia.
 # (LVM_DOCKER y LVM_DOCKER_HOST solo para pruebas)
-DOCKER_DIR=${LVM_DOCKER_DIR:-$HOME/.lvm-instalador/docker}
+DOCKER_DIR=${LVM_DOCKER_DIR:-$LOG_DIR/docker}
 # Versiones que se ofrecen: imagenes oficiales php:<version>-apache y mariadb:<version> de Docker Hub
 DOCKER_PHP_VERSIONS="8.5 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2 7.1 7.0 5.6"
 DOCKER_MARIADB_VERSIONS="11.8 11.4 10.11 10.6 10.5 10.4"

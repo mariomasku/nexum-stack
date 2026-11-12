@@ -548,7 +548,7 @@ struct ToolsView: View {
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                         .disabled(model.busy)
                 }
-                Tile("Registros de instalaciones", "~/.lvm-instalador: logs de las instalaciones y de la ventana") {
+                Tile("Registros de instalaciones", "~/.nexum: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
                 }
                 // Caché de descargas de las pilas propias: lo que ocupa y vaciarla
@@ -590,7 +590,7 @@ struct ToolsView: View {
                     errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
                 }
             }
-            generalBlock("Registro de tareas", "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.lvm-instalador/tareas, solo para ti; las contraseñas y los tokens no se escriben.") {
+            generalBlock("Registro de tareas", "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.nexum/tareas, solo para ti; las contraseñas y los tokens no se escriben.") {
                 TaskLogsCard()
             }
             generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.") {
@@ -689,7 +689,7 @@ struct ToolsView: View {
         let log = TUNNEL_DIR + "/registro"
         return VStack(alignment: .leading, spacing: 12) {
           TileCard("Túnel de Cloudflare", "Para enseñar una web de este Mac a un cliente o a un compañero: una dirección https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto, y ahí se elige su contraseña, cuánto dura y si se bloquea el admin.") {
-            Tile("cloudflared", info == nil ? "…" : (info?[1] == "1" ? "Versión \(info?[2] ?? ""), en ~/.lvm-instalador/tunel"
+            Tile("cloudflared", info == nil ? "…" : (info?[1] == "1" ? "Versión \(info?[2] ?? ""), en ~/.nexum/tunel"
                                                      : "Aún no está: se descarga de GitHub la primera vez que compartes (unos 20 MB)"),
                 leading: { LogoShape(d: LOGO_PATHS["cloudflare"] ?? "").fill(brand("cloudflare")).frame(width: 20, height: 20) }) {
                 if let f = info, f[1] != "1" || f[2] != f[3] {
@@ -938,7 +938,7 @@ struct TaskLogsCard: View {
         let done = taskLogs().filter { $0.state != "run" }
         guard !done.isEmpty, confirm("¿Vaciar el registro de tareas?", "Las tareas en marcha se quedan. Lo borrado no se puede recuperar.",
                                      "Vaciar", destructive: true,
-                                     steps: ["Se borran los registros de \(plural(done.count, "tarea", "tareas")) de ~/.lvm-instalador/tareas."])
+                                     steps: ["Se borran los registros de \(plural(done.count, "tarea", "tareas")) de ~/.nexum/tareas."])
         else { return }
         // (en simulación no se borra nada: solo se dice lo que se haría)
         if SIMULATE {
@@ -986,8 +986,8 @@ let CLEAN_ITEMS: [CleanItem] = [
               desc: "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Configuración, Correo de pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la versión activa).",
               step: "se vacía la bandeja de Mailpit", on: false),
     CleanItem(key: "registros", title: "Registros del programa",
-              desc: "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones (y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node parados y el de la compilación de la ventana. Están en ~/.lvm-instalador. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un servidor en marcha: el programa y tus proyectos siguen igual.",
-              step: "se borran los registros de ~/.lvm-instalador (no sus ajustes ni lo que esté usando una tarea o un servidor de Node en marcha)", on: true),
+              desc: "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones (y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node parados y el de la compilación de la ventana. Están en ~/.nexum. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un servidor en marcha: el programa y tus proyectos siguen igual.",
+              step: "se borran los registros de ~/.nexum (no sus ajustes ni lo que esté usando una tarea o un servidor de Node en marcha)", on: true),
     CleanItem(key: "registros-versiones", title: "Registros de las versiones",
               desc: "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, los errores de PHP y MariaDB. Están en xamppfiles/logs de cada /Library/Nexum/XAMPP-<versión> (el de MariaDB, con sus datos). Sirven para buscar por qué falla una web (Configuración, General, Registro de errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
               step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión (siguen en marcha)", on: true),
@@ -995,7 +995,7 @@ let CLEAN_ITEMS: [CleanItem] = [
               desc: "Las páginas y plantillas que WordPress (wp-content/cache, la de sus plugins de caché) y PrestaShop (var/cache y las de Smarty) guardan ya preparadas para ir más deprisa, en cada proyecto de \(HTDOCS). Son solo una copia que se rehace sola: si se limpia, la primera visita a cada página va algo más lenta mientras se vuelve a crear. Nada más del proyecto se toca: ni sus ficheros, ni sus imágenes, ni su BBDD.",
               step: "se vacían las cachés de los proyectos de \(HTDOCS) (se rehacen solas)", on: true),
     CleanItem(key: "temporales", title: "Temporales",
-              desc: "Ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una descarga, el volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en /tmp y en ~/.lvm-instalador. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y no está usando ningún programa (un MariaDB temporal en marcha, por ejemplo, se deja). No afecta a ningún proyecto ni a ninguna versión.",
+              desc: "Ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una descarga, el volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en /tmp y en ~/.nexum. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y no está usando ningún programa (un MariaDB temporal en marcha, por ejemplo, se deja). No afecta a ningún proyecto ni a ninguna versión.",
               step: "se borran los temporales del programa de más de un día que nada usa", on: true),
     CleanItem(key: "sesiones", title: "Sesiones de PHP",
               desc: "Los ficheros con los que PHP recuerda quién ha entrado en una web local: tu sesión en phpMyAdmin y la de las webs o plugins que usan las sesiones de PHP (WordPress y PrestaShop guardan la suya en una cookie: esa no se cierra). Están en xamppfiles/temp de cada versión y en /tmp. Si se limpian, esas sesiones se cierran y hay que volver a entrar; las webs, sus ficheros y sus BBDD no cambian. Va sin marcar para no cerrarte nada sin querer.",

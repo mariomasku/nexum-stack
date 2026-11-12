@@ -4,7 +4,7 @@
 
 # La ventana es un programa en Python (GTK 3 y Python 3.8: funciona desde Ubuntu 20.04 sin instalar
 # nada) que va dentro de este archivo, en gui_source. "nexum ventana" lo escribe en
-# ~/.lvm-instalador/ventana.py y lo abre. La ventana no repite la logica del instalador: llama a
+# ~/.nexum/ventana.py y lo abre. La ventana no repite la logica del instalador: llama a
 # este script con los comandos gui-* (datos en lineas "TIPO|campo|...") y con los de siempre (use,
 # instalar, actualizar, desinstalar...) dentro de una pseudoterminal, para que sudo funcione igual
 # que en la terminal. La contraseña la pide la ventana.

@@ -6,7 +6,7 @@
 # cualquier programa que se ejecute con tu usuario (un plugin de una web, por ejemplo) podria
 # añadirles una orden que se ejecutaria como root (ErrorLog "|orden", LoadModule...). Se edita una
 # copia (VHOSTS_COPY) y vhosts --aplicar la comprueba y la escribe con sudo.
-VHOSTS_COPY="$HOME/.lvm-instalador/httpd-vhosts.conf"
+VHOSTS_COPY="$LOG_DIR/httpd-vhosts.conf"
 
 # Directivas que solo cambian como se sirve cada web. El resto (LoadModule, Include, Listen,
 # PidFile, User, RewriteMap, SSLPassPhraseDialog...) se aplicaria como root a todo Apache: no se

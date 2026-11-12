@@ -286,7 +286,7 @@ extension AppModel {
         }
     }
 
-    /// Guarda en ~/.lvm-instalador/proyectos la carpeta elegida a mano para una base en una versión
+    /// Guarda en ~/.nexum/proyectos la carpeta elegida a mano para una base en una versión
     func rememberProject(_ db: String, _ folder: String, _ version: String) {
         if SIMULATE { return }
         if let err = writeLinks([(db, version, folder)]) {

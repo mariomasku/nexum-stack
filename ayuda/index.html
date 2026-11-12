@@ -234,7 +234,7 @@
         <li>Pregunta a GitHub cuál es la última versión publicada
           (<code>curl -fsSL https://api.github.com/repos/…/releases/latest</code>).</li>
         <li>Si es más nueva, descarga su <code>.deb</code> y su firma <code>.sig</code> a
-          <code>~/.lvm-instalador/actualizaciones</code> y comprueba la firma con la clave de
+          <code>~/.nexum/actualizaciones</code> y comprueba la firma con la clave de
           <code>/opt/nexum/nexum-stack-firma.gpg</code>.</li>
         <li>Mira también en tu carpeta Descargas por si hay un <code>nexum_*_all.deb</code> más nuevo y firmado.</li>
         <li>Al aceptar, <code>pkexec</code> (la ventana del sistema que pide la contraseña) ejecuta el ayudante como administrador.
@@ -247,11 +247,11 @@
     </div>
     <div data-so="mac">
       <p>La orden del programa: <code>nexum gui-paquete</code> (buscar) y, al aceptar,
-        <code>nexum actualizar-gestor ~/.lvm-instalador/actualizaciones/nexum-mac-X.Y.Z.zip</code> (instalar).</p>
+        <code>nexum actualizar-gestor ~/.nexum/actualizaciones/nexum-mac-X.Y.Z.zip</code> (instalar).</p>
       <p>Lo que hace, paso a paso:</p>
       <ol>
         <li>Pregunta a GitHub por la última versión de Mac y descarga su <code>.zip</code> y su firma (<code>.zip.sig</code>) a
-          <code>~/.lvm-instalador/actualizaciones</code>.</li>
+          <code>~/.nexum/actualizaciones</code>.</li>
         <li>Comprueba que la firma es la de quien publica el programa y que la versión es más nueva que la tuya. Si no, no instala
           nada.</li>
         <li>Pide tu contraseña; el gestor de root copia el <code>.zip</code> a una carpeta suya, vuelve a comprobar la firma y pone la
@@ -573,7 +573,7 @@
             <code>DocumentRoot</code>.</li>
           <li>Si lleva a <code>…/htdocs/&lt;carpeta&gt;</code> y esa carpeta no existe, lo apunta, con sus <code>ServerName</code> y
             <code>ServerAlias</code>.</li>
-          <li>Con <code>quitar</code>: escribe una copia sin esos bloques en <code>~/.lvm-instalador</code> y la aplica como «Editar
+          <li>Con <code>quitar</code>: escribe una copia sin esos bloques en <code>~/.nexum</code> y la aplica como «Editar
             vhosts»: Apache la comprueba (<code>httpd -t</code>), se escribe con <code>sudo</code> (guardando antes la de ahora en
             <code>~/nexum-backups</code> si tienes encendidas las copias de los ficheros que cambia el programa) y se recarga Apache.</li>
         </ol>
@@ -702,7 +702,7 @@
     <li><b>«Abrir el panel en <span data-so="linux">la terminal</span><span data-so="mac">Terminal</span>»</b>: abre una terminal aparte con
       el panel de texto del programa (sus menús de siempre, sin ventana). <span data-so="linux">Si no encuentra ninguna terminal, te dice
       que abras una y escribas <code>nexum</code>.</span></li>
-    <li><b>«Carpeta de registros»</b>: abre <code>~/.lvm-instalador</code>, donde se guardan los registros de lo que hace el programa. El
+    <li><b>«Carpeta de registros»</b>: abre <code>~/.nexum</code>, donde se guardan los registros de lo que hace el programa. El
       signo <code>~</code> es tu carpeta personal; el punto delante del nombre hace que sea una carpeta oculta.</li>
     <li><b>«Ayuda»</b>: abre este manual en tu navegador, en el capítulo de la página en la que estás (en Configuración, en el de su
       apartado). Va dentro del programa: no necesita conexión.</li>
@@ -718,9 +718,9 @@
     <ol>
       <li>«Abrir el panel»: <code>nexum</code>, sin nada detrás, escrito en una terminal (con <code>LVM_UI=text
         nexum</code>, el panel en texto, sin ventanitas).</li>
-      <li>«Carpeta de registros»: <code data-so="linux">xdg-open ~/.lvm-instalador</code><code data-so="mac">open ~/.lvm-instalador</code>.</li>
+      <li>«Carpeta de registros»: <code data-so="linux">xdg-open ~/.nexum</code><code data-so="mac">open ~/.nexum</code>.</li>
       <li>«Ayuda»: <code>nexum manual</code> (o <code>nexum manual proyectos</code> para ir a un capítulo). Saca el
-        manual a <code>~/.lvm-instalador/ayuda</code> y lo abre en el navegador.</li>
+        manual a <code>~/.nexum/ayuda</code> y lo abre en el navegador.</li>
       <li>«Novedades»: <code>nexum novedades</code>. «Acerca de»: <code>nexum acerca</code>.</li>
       <li>«Volver a leer»: no hay orden; la ventana pide sus datos con <code>nexum gui-datos</code> y otras parecidas, que solo
         leen.</li>
@@ -732,7 +732,7 @@
   <p>Los dos ficheros son del administrador, así que no se editan directamente: el programa te abre una copia.</p>
   <ol class="pasos-tarea">
     <li><b>Menú ☰ → «Editar vhosts»</b> (o «Editar /etc/hosts»). Se abre una copia en el editor de textos (en
-      <code>~/.lvm-instalador</code>) y, en la ventana, un diálogo que lo explica.</li>
+      <code>~/.nexum</code>) y, en la ventana, un diálogo que lo explica.</li>
     <li><b>Haz los cambios en el editor y guárdalos.</b></li>
     <li><b>Pulsa «<span data-so="linux">Aplicar</span><span data-so="mac">Aplicar los cambios</span>»</b> en el diálogo («Cancelar» no
       cambia nada). Si no has guardado ningún cambio, te lo dice: «No has cambiado nada… (¿guardaste los cambios?)».</li>
@@ -748,8 +748,8 @@
       <code>nexum hosts</code>).</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum vhosts --aplicar ~/.lvm-instalador/httpd-vhosts.conf</code> y
-      <code>nexum hosts --aplicar ~/.lvm-instalador/hosts</code>. Sin <code>--aplicar</code>, <code>nexum vhosts</code>
+    <p>La orden del programa: <code>nexum vhosts --aplicar ~/.nexum/httpd-vhosts.conf</code> y
+      <code>nexum hosts --aplicar ~/.nexum/hosts</code>. Sin <code>--aplicar</code>, <code>nexum vhosts</code>
       te abre la copia en tu editor de la terminal (<code>nano</code>, si no tienes otro) y pregunta «¿Aplicar los cambios?»; y
       <code>nexum hosts</code> abre <code>/etc/hosts</code> con <code>sudo -e</code>.</p>
     <p>Lo que hace con los vhosts, paso a paso:</p>
@@ -810,9 +810,11 @@
     escrito. A su lado, arriba, la carpeta en la que empezó, y estos botones:</p>
   <ul>
     <li><b>«Vaciar DNS»</b>: el <b>DNS</b> es el sistema que traduce un nombre (<code>panaderia-luna.com</code>) en la dirección de un
-      equipo, y el tuyo recuerda las respuestas un rato. Este botón escribe por ti
-      <code data-so="linux">sudo resolvectl flush-caches</code><code data-so="mac">sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code>,
-      que borra lo recordado. Sirve cuando acabas de falsear o dejar de falsear un dominio y el navegador sigue yendo al sitio de antes. La
+      equipo, y el tuyo recuerda las respuestas un rato. Este botón escribe por ti la orden que borra lo recordado:
+      <span data-so="linux"><code>sudo resolvectl flush-caches</code> (Ubuntu 22.04 en adelante) o
+      <code>sudo systemd-resolve --flush-cache</code> (Ubuntu 20.04 y lo que va sobre ella, como Linux Mint 20): mira qué sistema tienes
+      y qué orden está instalada. Si no usa systemd-resolved, te lo dice y no escribe nada.</span><code data-so="mac">sudo dscacheutil
+      -flushcache; sudo killall -HUP mDNSResponder</code>. Sirve cuando acabas de falsear o dejar de falsear un dominio y el navegador sigue yendo al sitio de antes. La
       contraseña te la pide la propia terminal.</li>
     <li><b>«Proyecto cargado»</b>: escribe un <code>cd</code> (la orden para entrar en una carpeta) a la carpeta del proyecto cargado.</li>
     <li><b>↻</b> («Terminal nueva»): cierra la de ahora y abre otra.</li>
@@ -1077,10 +1079,10 @@
           <code>sudo ln -s /opt/lampp-8.4 /opt/lampp</code>, <code>sudo /opt/lampp/lampp start</code>). Si es la activa pero está
           parada, <code>sudo /opt/lampp/lampp start</code>. Si ya estaba en marcha, <code>sudo /opt/lampp/lampp reloadapache</code>, para
           que PHP no siga sirviendo el proyecto anterior.</li>
-        <li>Recuerda la base: escribe <code>wp_panaderia_luna@8.4=panaderia-luna</code> en <code>~/.lvm-instalador/proyectos</code>.</li>
+        <li>Recuerda la base: escribe <code>wp_panaderia_luna@8.4=panaderia-luna</code> en <code>~/.nexum/proyectos</code>.</li>
         <li>WordPress: comprueba que <code>wp-config.php</code> usa esa base, entra en el MariaDB local y lleva <code>WP_HOME</code> y
           <code>WP_SITEURL</code> en <code>http://web.local</code>; si no, lo rehace con la plantilla de este equipo
-          (<code>~/.lvm-instalador/wordpress/panaderia-luna.wp-config.php</code>). PrestaShop: <code>app/config/parameters.php</code>
+          (<code>~/.nexum/wordpress/panaderia-luna.wp-config.php</code>). PrestaShop: <code>app/config/parameters.php</code>
           pasa a usar la base local y, si su dominio es suyo, crea su vhost y su certificado.</li>
         <li><code>/etc/hosts</code>: falsea el dominio de la tienda (quita el <code>#</code> de su línea o añade
           <code>127.0.0.1 ferreteria-norte.com www.ferreteria-norte.com</code>) y pone <code>#</code> delante de los dominios falseados
@@ -1102,7 +1104,7 @@
         <li>La versión: si no es la activa, para la de ahora, cambia el enlace (<code>sudo ln -sh /Library/Nexum/XAMPP-8.4
           /Applications/XAMPP</code>) y la arranca (<code>sudo /Library/Nexum/XAMPP-8.4/xamppfiles/xampp start</code>). Si ya estaba
           en marcha, <code>sudo /Library/Nexum/XAMPP-8.4/xamppfiles/xampp reloadapache</code>.</li>
-        <li>Recuerda la base en <code>~/.lvm-instalador/proyectos</code> (<code>wp_panaderia_luna@8.4=panaderia-luna</code>).</li>
+        <li>Recuerda la base en <code>~/.nexum/proyectos</code> (<code>wp_panaderia_luna@8.4=panaderia-luna</code>).</li>
         <li>Ajusta <code>wp-config.php</code> o <code>app/config/parameters.php</code>, el vhost de la tienda y <code>/etc/hosts</code>,
           igual que en Linux, y pone al día el correo de pruebas y las imágenes de producción.</li>
       </ol>
@@ -1162,7 +1164,7 @@
     <li><b>Cada base es de un solo proyecto en cada versión</b>: si eliges una que era de otro, deja de ser suya.</li>
     <li>Con <b>«— Ninguna —»</b>, la carpeta deja de ir con esa versión. La base no se toca.</li>
     <li>Pulsa <b><span data-so="linux">«Guardar»</span><span data-so="mac">«Guardar los vínculos»</span></b>. No pide contraseña ni cambia ninguna base: solo apunta los vínculos en
-      <code>~/.lvm-instalador/proyectos</code>. Abajo sale «Vínculos de panaderia-luna guardados».</li>
+      <code>~/.nexum/proyectos</code>. Abajo sale «Vínculos de panaderia-luna guardados».</li>
   </ul>
   <p>Después, al cargar el proyecto se usa la base vinculada. Si tiene una en varias versiones, «Cargar» te pregunta cuál, y todas salen en
     la lista «Entorno» y en los números de versión de su fila.</p>
@@ -1173,10 +1175,10 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba que la base tiene un nombre válido, que la versión existe y que la carpeta es un proyecto.</li>
-      <li>En <code>~/.lvm-instalador/proyectos</code> quita la línea que hubiera para esa base en esa versión y añade
+      <li>En <code>~/.nexum/proyectos</code> quita la línea que hubiera para esa base en esa versión y añade
         <code>wp_panaderia_luna@8.4=panaderia-luna</code> (o <code>wp_panaderia_luna@8.4=</code>, sin carpeta, con «Ninguna»).</li>
     </ol>
-    <p>Para comprobarlo: <code>grep panaderia ~/.lvm-instalador/proyectos</code>.</p>
+    <p>Para comprobarlo: <code>grep panaderia ~/.nexum/proyectos</code>.</p>
   </details>
 
   <h3 id="replicar">Llevarlo a otra versión de PHP (Replicar)</h3>
@@ -1216,13 +1218,13 @@
       <li>Con <code>--sustituir --copia</code>, guarda antes la del destino en
         <code>~/nexum-backups/lampp-8.2-wp_panaderia_luna_8_2-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
       <li>Hace un <b>volcado</b> (un fichero <code>.sql</code> con todas las tablas y sus datos, que se puede volver a cargar) de la base
-        de origen con <code>mysqldump</code>, a un fichero temporal en <code>~/.lvm-instalador</code>. Si la versión de origen no está en
+        de origen con <code>mysqldump</code>, a un fichero temporal en <code>~/.nexum</code>. Si la versión de origen no está en
         marcha, arranca su MariaDB aparte, sin red, solo para eso.</li>
       <li>Lo carga en la de destino con la carga protegida de <code>importar-bd</code> (crea la base, la vacía si existía y carga el
         volcado con un usuario propio de la base, no como root). Si el destino no es la versión activa, arranca su MariaDB aparte
         (<code>sudo</code>), solo para la copia, y la para al acabar.</li>
       <li>Borra el fichero temporal y vincula la copia: <code>wp_panaderia_luna_8_2@8.2=panaderia-luna</code> en
-        <code>~/.lvm-instalador/proyectos</code>.</li>
+        <code>~/.nexum/proyectos</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum list-db</code> (sale en la versión de destino).</p>
   </details>
@@ -1270,8 +1272,8 @@
       web</a>.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --horas 2 --admin bloquear</code> (las
-      horas y si se bloquea el panel, como los elijas). Si cloudflared aún no está, antes <code>nexum tunel-instalar</code>.</p>
+    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (los
+      minutos que dura y si se bloquea el panel, como los elijas). Si cloudflared aún no está, antes <code>nexum tunel-instalar</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Cierra el túnel que hubiera abierto y crea una contraseña nueva al azar.</li>
@@ -1424,7 +1426,7 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba que no es una tienda PrestaShop y que el dominio es válido.</li>
-      <li>Apunta <code>panaderia-luna|panaderia-luna.com</code> en <code>~/.lvm-instalador/media-produccion</code> (o borra su línea, con
+      <li>Apunta <code>panaderia-luna|panaderia-luna.com</code> en <code>~/.nexum/media-produccion</code> (o borra su línea, con
         <code>quitar</code>).</li>
       <li>Si es el proyecto cargado, añade al vhost de <code>web.local</code> (en <code data-so="linux">/opt/config/httpd-vhosts.conf</code><code
         data-so="mac">/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>) un bloque que empieza por <code># nexum-media
@@ -1464,7 +1466,7 @@
         lista de imágenes que debería haber (<code>img/p/1/2/12.jpg</code>, <code>img/p/1/2/12-home_default.jpg</code>,
         <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta.</li>
       <li>Las descarga de ocho en ocho con <code>curl --doh-url https://cloudflare-dns.com/dns-query --proto =https --fail
-        --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.lvm-instalador</code>.</li>
+        --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.nexum</code>.</li>
       <li>Mueve a <code>img/</code> solo las que han llegado enteras. No usa <code>sudo</code>: va con tu usuario.</li>
     </ol>
     <p>Para comprobarlo: vuelve a lanzarla; dice «A ferreteria-norte no le falta ninguna imagen de productos, categorias ni marcas».</p>
@@ -1494,8 +1496,8 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Arranca lo común que use: su MariaDB de Docker (o el puente a la de LAMPP, si va «en vivo») y el Apache de Docker.</li>
-      <li>Pone al día su configuración de PHP y de WordPress dentro de <code>~/.lvm-instalador/docker/panaderia-luna</code>.</li>
-      <li>Arranca sus contenedores: <code>docker compose --project-directory ~/.lvm-instalador/docker/panaderia-luna up -d</code>, con el
+      <li>Pone al día su configuración de PHP y de WordPress dentro de <code>~/.nexum/docker/panaderia-luna</code>.</li>
+      <li>Arranca sus contenedores: <code>docker compose --project-directory ~/.nexum/docker/panaderia-luna up -d</code>, con el
         Docker sin root de tu usuario.</li>
     </ol>
     <p>Para comprobarlo: abre <code>https://panaderia-luna-php84.docker.local</code> o mira la página Docker.</p>
@@ -1520,7 +1522,7 @@
         <code>/etc/hosts</code>).</li>
       <li>Arranca la MariaDB común de esa rama en Docker (<code>nexum-mariadb-11-8</code>) y crea la base del proyecto con su propio
         usuario. Con una base de LAMPP, la copia allí (o, en vivo, la usa directamente desde la de LAMPP, sin copia).</li>
-      <li>Prepara la imagen de PHP (<code>nexum-php:8.4</code>) y escribe en <code>~/.lvm-instalador/docker/panaderia-luna</code> su
+      <li>Prepara la imagen de PHP (<code>nexum-php:8.4</code>) y escribe en <code>~/.nexum/docker/panaderia-luna</code> su
         <code>compose.yaml</code> (la receta de sus contenedores) y su <code>proyecto.conf</code>. La carpeta del proyecto se usa
         tal cual, sin copiarla.</li>
       <li>Le da su vhost en el Apache de Docker y su línea <code>127.0.0.1 panaderia-luna-php84.docker.local</code> en
@@ -1538,6 +1540,8 @@
   <ul>
     <li><b>«Opciones de la BBDD…»</b>: ver <a href="#vincular">Opciones de la BBDD</a>.</li>
     <li><b>«Abrir la carpeta»</b>: abre su carpeta en el gestor de archivos<span data-so="mac"> (el Finder)</span>. No cambia nada.</li>
+    <li><b>«Exportar proyecto…»</b>: solo en el proyecto cargado. Un zip con su código y su base de datos, para llevarlo a otro sitio
+      o guardarlo. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>.</li>
     <li><b>«Eliminar de Docker (PHP 8.4)…»</b>: solo si está en Docker, una por cada entorno de Docker, cada una con sus versiones de PHP.
       Pregunta «¿Borrar panaderia-luna de Docker?»: se borran sus contenedores, su copia de la base de datos en Docker y su vhost de Docker.
       <b>La carpeta y las bases de LAMPP no se tocan.</b> Con la casilla <b>«Guardar antes una copia en ~/nexum-backups»</b> (sin marcar:
@@ -1552,11 +1556,11 @@
         <code>~/nexum-backups/docker-panaderia-luna-wp_panaderia_luna-&lt;fecha&gt;.sql.gz</code>, con <code>mariadb-dump</code> dentro de su
         MariaDB de Docker. Si la copia falla, no se borra nada.</li>
       <li>Para y borra sus contenedores y sus volúmenes (los discos de datos de Docker): <code>docker compose --project-directory
-        ~/.lvm-instalador/docker/panaderia-luna down -v</code>.</li>
+        ~/.nexum/docker/panaderia-luna down -v</code>.</li>
       <li>Borra su base de la MariaDB común de Docker y su usuario (<code>DROP DATABASE</code>, <code>DROP USER</code>). Si iba en vivo
         con la de LAMPP, esa no se toca.</li>
       <li>Quita sus líneas de <code>/etc/hosts</code> y su vhost del Apache de Docker, y recarga ese Apache.</li>
-      <li>Borra <code>~/.lvm-instalador/docker/panaderia-luna</code>.</li>
+      <li>Borra <code>~/.nexum/docker/panaderia-luna</code>.</li>
     </ol>
     <p>Para comprobarlo: no sale en la página Docker ni en los números azules de su fila.</p>
   </details>
@@ -1588,7 +1592,8 @@
 
   <h3 id="menu-fila">El menú ⋮ de cada fila</h3>
   <p>Sale al pasar el ratón por una fila que no es la cargada, junto a «Cargar». Actúa sobre ese proyecto <b>sin cambiar el de arriba</b>.
-    Tiene tres opciones más, y después las mismas del <a href="#menu-mas">menú Más</a>:</p>
+    Tiene tres opciones más, y después las mismas del <a href="#menu-mas">menú Más</a> (menos «Exportar proyecto…», que es solo del
+    cargado):</p>
   <ul>
     <li><b>«Añadir entorno en otra versión de PHP…»</b>: <a href="#replicar">Replicar</a>, con ese proyecto ya elegido.</li>
     <li><b>«Añadir entorno en Docker…»</b>: ver <a href="#docker-desde-proyectos">Docker desde Proyectos</a>.</li>
@@ -1632,6 +1637,57 @@
     <p>Para comprobarlo: <code>nexum --simular limpiar-proyecto panaderia-luna</code> dice lo que queda (sin borrar nada).</p>
   </details>
 
+  <h3 id="proyectos-exportar">Exportar un proyecto</h3>
+  <p>«Exportar proyecto…», en el <a href="#menu-mas">menú ⋮</a> del proyecto cargado. Sirve para llevarte el proyecto entero (para
+    otro equipo, un hosting o una copia guardada): un solo zip con su código, su base de datos y un <code>LEEME-nexum.txt</code> que dice
+    qué lleva. No cambia nada del proyecto ni de su base.</p>
+  <ul>
+    <li><b>Primero, su código en git.</b> Si la carpeta es un repositorio git y tiene cambios sin commit (ficheros cambiados o nuevos que
+      no están en su <code>.gitignore</code>), no deja exportar: el aviso «panaderia-luna tiene cambios sin commit» dice cuáles (los
+      primeros, con «y 3 más» si hay más) y que hagas commit antes. Así el zip lleva lo mismo que el repositorio. Si tiene commits sin
+      subir a su rama remota, te deja seguir, pero lo avisa en rojo en el diálogo. Si no es un repositorio git, el diálogo lo dice («no se
+      puede comprobar si tiene cambios sin commit») y te deja seguir.</li>
+    <li><b>El diálogo «Exportar «panaderia-luna»».</b> Dice de qué versión se exporta: la activa, donde está cargado
+      (<span data-so="linux">«lampp-8.4 · PHP 8.4.27»</span><span data-so="mac">«XAMPP-8.4.27 · PHP 8.4.27»</span>). Tiene dos casillas,
+      marcadas: <b>«Código: <span data-so="linux">/opt/htdocs</span><span data-so="mac">…/htdocs</span>/panaderia-luna · 48,2 MB (sin la
+      carpeta .git)»</b> y <b>«Base de datos: wp_panaderia_luna (<span data-so="linux">lampp-8.4</span><span
+      data-so="mac">XAMPP-8.4.27</span>)»</b>, la que usa el proyecto en esa versión. Si no tiene ninguna, la casilla sale apagada con
+      «Sin BBDD vinculada». Desmarca lo que no quieras llevarte; con las dos desmarcadas, «Exportar» no se puede pulsar. Debajo, lo que
+      se va a hacer, numerado, con la carpeta y el nombre del zip.</li>
+    <li><b>El zip</b> va a tu carpeta de descargas (<span data-so="linux"><code>~/Descargas</code>, la de tu escritorio</span><span
+      data-so="mac"><code>~/Downloads</code>, «Descargas» en el Finder</span>) con el nombre
+      <code>panaderia-luna_php8.4_20261111-1030_nexum.zip</code>: la carpeta, la rama de PHP, la fecha y la hora y, al final,
+      <code>_nexum</code>. Dentro: <code>panaderia-luna/</code> con el código (sin <code>.git</code> y con sus permisos),
+      <code>wp_panaderia_luna.sql</code> con la base y <code>LEEME-nexum.txt</code> (el proyecto, la versión de PHP y de MariaDB, la
+      fecha y la versión de Nexum Dev Stack que lo ha exportado).</li>
+    <li>La base sale como en <a href="#bbdd-descargar">Descargar una copia</a>: <b>sin el administrador de pruebas</b> ni los cambios del
+      correo de pruebas. Se descarga del MariaDB de la versión activa, que tiene que estar en marcha (si root tiene contraseña, te la
+      pide). No pide la contraseña de administrador.</li>
+    <li>Los enlaces que salen de la carpeta del proyecto no se siguen: no van en el zip (te dice cuáles). Uno que apunta dentro de la
+      carpeta va como enlace. Si algún fichero no se puede leer (por ejemplo, uno que creó Apache solo para él), no va y te lo dice.</li>
+    <li>Va como una tarea, con su registro. Si la cancelas o algo falla, no queda ningún zip ni nada a medias. Al acabar, «Mostrar en
+      <span data-so="linux">la carpeta</span><span data-so="mac">Finder</span>» te lleva a él.</li>
+  </ul>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum exportar-proyecto panaderia-luna --bd wp_panaderia_luna</code>; sin la casilla del código,
+      con <code>--sin-codigo</code>, y sin la de la base, con <code>--sin-bd</code>. Sin <code>--bd</code>, usa la base vinculada al
+      proyecto en la versión activa; con <code>--destino &lt;carpeta&gt;</code>, el zip va a otra carpeta.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Con el código, mira la carpeta con <code>git status --porcelain</code> (solo lee: la ventana lo pregunta antes con
+        <code>nexum gui-exportar-proyecto panaderia-luna</code>, que tampoco cambia nada). Con cambios sin commit, lo dice y para: no se
+        exporta nada, aunque lo lances desde la terminal. Con commits sin subir, lo avisa y sigue.</li>
+      <li>Con la base, la descarga como <code>nexum exportar-bd wp_panaderia_luna</code> en una carpeta temporal solo tuya dentro de
+        <code>~/.nexum</code>.</li>
+      <li>Escribe el zip con otro nombre, <code>panaderia-luna_php8.4_20261111-1030_nexum.zip.parte</code>, solo para ti: el código en
+        <code>panaderia-luna/</code> sin <code>.git</code> y sin seguir enlaces, la base y el <code>LEEME-nexum.txt</code>.</li>
+      <li>Solo cuando ha acabado bien le pone su nombre. Si falla o se cancela, borra el <code>.parte</code> y la base temporal.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum --simular exportar-proyecto panaderia-luna</code> dice lo que haría (sin crear nada), y
+      <code>unzip -l ~/<span data-so="linux">Descargas</span><span data-so="mac">Downloads</span>/panaderia-luna_php8.4_*_nexum.zip</code>
+      enseña lo que lleva.</p>
+  </details>
+
   <h3 id="borrar-proyecto">Borrar un proyecto</h3>
   <p>«Borrar el proyecto…», en cualquiera de los dos menús ⋮. Es para cuando no vas a trabajar más en él y quieres quitarlo del todo
     de tu equipo.</p>
@@ -1662,7 +1718,7 @@
       <li>Quita de los vhosts los bloques <code>&lt;VirtualHost&gt;</code> cuyo <code>DocumentRoot</code> es su carpeta, comprueba que
         Apache los acepta y lo recarga.</li>
       <li>Quita de <code>/etc/hosts</code> los dominios de esos vhosts (<code>sudo tee /etc/hosts</code>).</li>
-      <li>Borra sus líneas de <code>~/.lvm-instalador/proyectos</code> y <code>~/.lvm-instalador/montados-de-repositorio</code>.</li>
+      <li>Borra sus líneas de <code>~/.nexum/proyectos</code> y <code>~/.nexum/montados-de-repositorio</code>.</li>
       <li>Borra la carpeta: <code data-so="linux">rm -rf --one-file-system /opt/htdocs/panaderia-luna</code><code
         data-so="mac">rm -rfx /Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code> (lo que creó Apache con otro usuario, con
         <code>sudo</code>).</li>
@@ -1687,7 +1743,7 @@
     <li><b>«Guardar»</b> lo aplica. «Cancelar» lo deja como estaba.</li>
   </ul>
   <p>Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) salen siempre. Falsear Host no se puede quitar.
-    <span data-so="linux">Lo que eliges se guarda en <code>~/.lvm-instalador/botones-visor</code>.</span></p>
+    <span data-so="linux">Lo que eliges se guarda en <code>~/.nexum/botones-visor</code>.</span></p>
 
   <!-- ------------------------------------------------------------------ lista -->
   <h3 id="lista">La lista de proyectos</h3>
@@ -1746,13 +1802,13 @@
       <li>Clona con tu usuario, sin submódulos ni ganchos: <code>git clone --no-recurse-submodules -- &lt;dirección&gt;
         /opt/htdocs/panaderia-luna</code>. Por SSH, solo acepta servidores cuya clave ya conoces o los de GitHub, GitLab y Bitbucket. Si por
         https no puede (privado), prueba la misma dirección por SSH.</li>
-      <li>Apunta la carpeta en <code>~/.lvm-instalador/montados-de-repositorio</code> (así el dominio de su base no se falsea solo).</li>
+      <li>Apunta la carpeta en <code>~/.nexum/montados-de-repositorio</code> (así el dominio de su base no se falsea solo).</li>
       <li>La carga: <code>nexum cargar-proyecto panaderia-luna 8.4 wp_panaderia_luna</code>.</li>
       <li>La base: con volcado, <code>nexum importar-bd &lt;volcado&gt; wp_panaderia_luna --crear</code>; sin él,
         <code>nexum crear-bd wp_panaderia_luna</code> (vacía, <code>utf8mb4_general_ci</code>). Con volcado, vuelve a ajustar
         su <code>wp-config.php</code> o la configuración de la tienda.</li>
       <li><code>nuevo-dominio</code>: crea el vhost http y https del dominio con su certificado, apunta
-        <code>panaderia-luna.com=panaderia-luna</code> en <code>~/.lvm-instalador/dominios</code> y lo falsea en <code>/etc/hosts</code>
+        <code>panaderia-luna.com=panaderia-luna</code> en <code>~/.nexum/dominios</code> y lo falsea en <code>/etc/hosts</code>
         (los demás dominios dejan de estarlo). Si ese dominio ya tiene un vhost, se para y te dice que uses su interruptor.</li>
     </ol>
     <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna log -1</code> (el último commit) y <code>readlink
@@ -1876,7 +1932,7 @@
       <li data-so="mac">Lo guarda en el Llavero, también por la entrada:
         <code>security -i</code> con <code>add-generic-password -U -a github -s nexum-dev-stack -l "Nexum Dev Stack (GitHub)" -w &lt;token&gt;</code>.
         Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
-      <li>Apunta de dónde sale el token (<code>ORIGEN=llavero</code> u <code>ORIGEN=gh</code>) en <code>~/.lvm-instalador/github</code>, un
+      <li>Apunta de dónde sale el token (<code>ORIGEN=llavero</code> u <code>ORIGEN=gh</code>) en <code>~/.nexum/github</code>, un
         fichero que solo puedes leer tú, y, si no había cuenta, <code>CUENTA=</code> con tu usuario de GitHub.</li>
       <li data-so="linux">Desconectar lo quita del llavero: <code>secret-tool clear service nexum-dev-stack account github</code>, y deja
         <code>ORIGEN=</code> vacío.</li>
@@ -1888,7 +1944,7 @@
         <code>CUENTA=</code> y <code>PREFIJOS=</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum github</code> (escribe <code>G|1|tu-usuario|llavero|mi-empresa|…</code>: el <code>1</code> es que
-      está conectado) y <code>cat ~/.lvm-instalador/github</code>.</p>
+      está conectado) y <code>cat ~/.nexum/github</code>.</p>
   </details>
 
   <h3 id="repositorios-lista">Cómo se lee la lista</h3>
@@ -1904,7 +1960,7 @@
       <li>Pide la lista, de 100 en 100 y las más recientes primero: de una organización,
         <code>https://api.github.com/orgs/mi-empresa/repos?type=all&amp;sort=pushed&amp;per_page=100</code>; de tu propia cuenta, también los
         privados, con <code>/user/repos?affiliation=owner</code>; de la cuenta de otra persona, solo los públicos, con <code>/users/&lt;cuenta&gt;/repos</code>.</li>
-      <li>Guarda lo que da GitHub en <code>~/.lvm-instalador/repos-github</code> (solo para ti).</li>
+      <li>Guarda lo que da GitHub en <code>~/.nexum/repos-github</code> (solo para ti).</li>
       <li>Mira qué carpetas de <code data-so="linux">/opt/htdocs</code><code data-so="mac">/Library/Nexum/XAMPP-compartido/htdocs</code> son ya
         clones de cada repositorio: lee la línea <code>url</code> de <code>[remote "origin"]</code> en su <code>.git/config</code>.</li>
       <li>Quita los archivados y, sin <code>--todos</code>, los que no empiezan por ningún prefijo, y escribe una línea por repositorio:
@@ -1935,7 +1991,7 @@
         No ejecuta los <i>hooks</i> del repositorio (programas que algunos repositorios lanzan solos) ni descarga sus submódulos ni
         ficheros grandes de Git LFS.</li>
       <li>Quita a los demás usuarios del equipo el permiso de cambiar sus ficheros: <code>chmod o-w</code> en lo que lo tuviera.</li>
-      <li>Apunta el nombre de la carpeta en <code>~/.lvm-instalador/montados-de-repositorio</code>: así, al cargarlo, no se falsea solo el
+      <li>Apunta el nombre de la carpeta en <code>~/.nexum/montados-de-repositorio</code>: así, al cargarlo, no se falsea solo el
         dominio de su base.</li>
     </ol>
     <p>Para comprobarlo: <code>git -C <span data-so="linux">/opt/htdocs</span><span data-so="mac">/Library/Nexum/XAMPP-compartido/htdocs</span>/panaderia-luna
@@ -2194,7 +2250,7 @@
       <li>Crea sus bases de datos, vacías, en <code>xamppfiles/var/mysql</code>. No la activa.</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum estado</code> y <code data-so="linux">/opt/lampp-8.3.36/bin/php -v</code><code data-so="mac">/Library/Nexum/XAMPP-8.3.36/xamppfiles/bin/php -v</code>.
-      Todo lo que ha salido en pantalla queda en <code>~/.lvm-instalador/instalacion-&lt;fecha&gt;.log</code>. Para ver qué haría sin cambiar
+      Todo lo que ha salido en pantalla queda en <code>~/.nexum/instalacion-&lt;fecha&gt;.log</code>. Para ver qué haría sin cambiar
       nada: <code>nexum --simular instalar --php 8.3 --si</code>.</p>
   </details>
 
@@ -2563,16 +2619,16 @@
         <code>readlink -f /opt/lampp-&lt;versión&gt;/var/mysql</code> dice cuál.</li>
       <li>El tamaño se pregunta al MariaDB de la versión activa en marcha:
         <code>/opt/lampp/bin/mysql -uroot -e "SELECT table_schema, SUM(data_length + index_length) FROM information_schema.tables GROUP BY table_schema"</code>,
-        y se guarda en <code>~/.lvm-instalador/cache/bbdd-tamanos</code> para enseñarlo también cuando esa versión no está activa.</li>
+        y se guarda en <code>~/.nexum/cache/bbdd-tamanos</code> para enseñarlo también cuando esa versión no está activa.</li>
       <li>La fecha de «Cambiada» es la de la carpeta de la base o, si la cargaste con el programa, la apuntada en
-        <code>~/.lvm-instalador/importaciones</code>.</li>
+        <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Lista las carpetas de datos de cada versión: <code>/Library/Nexum/XAMPP-&lt;versión&gt;/xamppfiles/var/mysql</code>, sin las del sistema.</li>
       <li>El tamaño, del MariaDB de la versión activa en marcha:
         <code>/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "SELECT table_schema, SUM(data_length + index_length) FROM information_schema.tables GROUP BY table_schema"</code>,
-        guardado en <code>~/.lvm-instalador/cache/bbdd-tamanos</code>.</li>
-      <li>Las fechas, como en Linux: la carpeta o <code>~/.lvm-instalador/importaciones</code>.</li>
+        guardado en <code>~/.nexum/cache/bbdd-tamanos</code>.</li>
+      <li>Las fechas, como en Linux: la carpeta o <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum list-db</code></p>
   </details>
@@ -2589,7 +2645,7 @@
       <code>nexum vaciar-cache moda-verde</code>).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Busca la carpeta de la tienda: la vinculada a esa base (en <code>~/.lvm-instalador/proyectos</code>), la única cuya configuración
+      <li>Busca la carpeta de la tienda: la vinculada a esa base (en <code>~/.nexum/proyectos</code>), la única cuya configuración
         usa esa base o la que se llama como el final del nombre de la base. Si no hay una sola, para y te lo dice.</li>
       <li>Comprueba que <code>var/cache</code> es una carpeta de verdad de la tienda (no un enlace a otro sitio).</li>
       <li>Borra todo lo de dentro, sin borrar la carpeta:
@@ -2649,7 +2705,7 @@
         hay ya una base con ese nombre.</li>
       <li>La crea:
         <code data-so="linux">/opt/lampp/bin/mysql -uroot -e "CREATE DATABASE `wp_panaderia_luna` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"</code><code data-so="mac">/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "CREATE DATABASE `wp_panaderia_luna` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"</code></li>
-      <li>Si tenía apuntada una fecha de carga con ese nombre en <code>~/.lvm-instalador/importaciones</code>, la quita.</li>
+      <li>Si tenía apuntada una fecha de carga con ese nombre en <code>~/.nexum/importaciones</code>, la quita.</li>
     </ol>
     <p>No usa <code>sudo</code>: solo habla con MariaDB.</p>
     <p>Para comprobarlo: <code data-so="linux">/opt/lampp/bin/mysql -uroot -e "SHOW DATABASES"</code><code data-so="mac">/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "SHOW DATABASES"</code></p>
@@ -2714,11 +2770,11 @@
         las vistas y rutinas «INVOKER» pasan a ejecutarse con el usuario de la base.</li>
       <li>Al acabar, corta las conexiones de ese usuario, borra los eventos del volcado (tareas programadas dentro de la base) y bloquea el
         usuario (<code>ACCOUNT LOCK</code>): ya no puede entrar, pero las vistas y disparadores siguen funcionando.</li>
-      <li>Apunta la fecha de la carga en <code>~/.lvm-instalador/importaciones</code> (la «· importada» de la lista).</li>
+      <li>Apunta la fecha de la carga en <code>~/.nexum/importaciones</code> (la «· importada» de la lista).</li>
       <li>Crea o deja al día el administrador de pruebas <code>local@local.test</code> (lo mismo que
         <code>nexum usuario-pruebas wp_panaderia_luna</code>) y pone la base en el correo de pruebas (lo mismo que
         <code>nexum correo bd wp_panaderia_luna</code>).</li>
-      <li>Con <code>--proyecto</code>: apunta la base como la de esa carpeta en <code>~/.lvm-instalador/proyectos</code> y, en un WordPress, rehace su
+      <li>Con <code>--proyecto</code>: apunta la base como la de esa carpeta en <code>~/.nexum/proyectos</code> y, en un WordPress, rehace su
         <code>/opt/htdocs/panaderia-luna/wp-config.php</code> con la plantilla de este equipo (lo mismo que
         <code>nexum wp-config panaderia-luna wp_panaderia_luna</code>); en PrestaShop, cambia la base en su
         <code>app/config/parameters.php</code> (o <code>config/settings.inc.php</code>) y vacía su <code>var/cache</code>.</li>
@@ -2765,7 +2821,7 @@
         tiene y no hay <code>--sustituir</code>, para sin tocar nada.</li>
       <li>Con <code>--sustituir --copia</code>, guarda antes la del destino en
         <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
-      <li>Descarga la de origen a un fichero temporal solo tuyo, <code>~/.lvm-instalador/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>, igual que
+      <li>Descarga la de origen a un fichero temporal solo tuyo, <code>~/.nexum/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>, igual que
         <a href="#bbdd-descargar">Descargar una copia</a> (con un MariaDB temporal si la de origen no está en marcha).</li>
       <li>Si el destino es la versión activa en marcha, lo carga en ella como <a href="#bbdd-cargar">Cargar una copia</a>
         (<code>importar-bd … --crear</code>).</li>
@@ -2774,17 +2830,17 @@
         <code>sudo /opt/lampp-8.4/mysql/bin/mariadbd --defaults-file=/opt/lampp-8.4/etc/my.cnf --datadir=/opt/lampp-8.4/var/mysql --user=&lt;dueño de los datos&gt; --skip-networking --socket=/tmp/lvm-mysql-XXXX/mysql.sock</code>
         (en una versión XAMPP, su <code>sbin/mysqld</code>), carga en él con su propio cliente (<code>/opt/lampp-8.4/mysql/bin/mariadb</code> o
         <code>bin/mysql</code>) y lo para al acabar.</li>
-      <li>Borra el fichero temporal y, con <code>--carpeta</code>, apunta en <code>~/.lvm-instalador/proyectos</code> la línea
+      <li>Borra el fichero temporal y, con <code>--carpeta</code>, apunta en <code>~/.nexum/proyectos</code> la línea
         <code>wp_panaderia_luna@8.4=panaderia-luna</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Las mismas comprobaciones que en Linux, con las versiones de <code>/Library/Nexum/XAMPP-&lt;versión&gt;</code>.</li>
       <li>Con <code>--sustituir --copia</code>: <code>~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
-      <li>La descarga temporal, en <code>~/.lvm-instalador/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>.</li>
+      <li>La descarga temporal, en <code>~/.nexum/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>.</li>
       <li>El MariaDB temporal del destino:
         <code>sudo /Library/Nexum/XAMPP-8.4.27/xamppfiles/mysql/bin/mariadbd --defaults-file=/Library/Nexum/XAMPP-8.4.27/xamppfiles/etc/my.cnf --user=&lt;tu usuario&gt; --skip-networking --socket=/tmp/lvm-mysql-XXXX/mysql.sock</code>,
         y la carga con <code>/Library/Nexum/XAMPP-8.4.27/xamppfiles/mysql/bin/mariadb</code>.</li>
-      <li>El vínculo, en <code>~/.lvm-instalador/proyectos</code>.</li>
+      <li>El vínculo, en <code>~/.nexum/proyectos</code>.</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum --simular copiar-bd wp_panaderia_luna 8.2 8.4</code> antes (te dice lo que haría) y
       <code>nexum list-db</code> después.</p>
@@ -2907,11 +2963,11 @@
     <ol>
       <li>Comprueba que el nombre de la base es válido, que la versión existe y que la carpeta es un proyecto de
         <span data-so="linux"><code>/opt/htdocs</code></span><span data-so="mac"><code>/Library/Nexum/XAMPP-compartido/htdocs</code></span>.</li>
-      <li>En <code>~/.lvm-instalador/proyectos</code> quita la línea que hubiera de esa base en esa versión y añade
+      <li>En <code>~/.nexum/proyectos</code> quita la línea que hubiera de esa base en esa versión y añade
         <code>wp_panaderia_luna@8.4=panaderia-luna</code> (con <code>-</code>, <code>wp_panaderia_luna@8.4=</code>, vacía).</li>
     </ol>
     <p>No usa <code>sudo</code> ni toca MariaDB.</p>
-    <p>Para comprobarlo: <code>grep wp_panaderia_luna ~/.lvm-instalador/proyectos</code></p>
+    <p>Para comprobarlo: <code>grep wp_panaderia_luna ~/.nexum/proyectos</code></p>
   </details>
 
   <h3 id="bbdd-borrar">Borrar una base de datos</h3>
@@ -2936,7 +2992,7 @@
         <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-20261110-103000.sql.gz</code> (la carpeta se crea solo para ti:
         <code>mkdir -p -m 700 ~/nexum-backups</code>). Si falla, no borra.</li>
       <li>La borra: <code>/opt/lampp/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`"</code></li>
-      <li>Quita su fecha de carga de <code>~/.lvm-instalador/importaciones</code>.</li>
+      <li>Quita su fecha de carga de <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Las mismas comprobaciones.</li>
@@ -2944,7 +3000,7 @@
         <code>/Applications/XAMPP/xamppfiles/bin/mysqldump -uroot --default-character-set=utf8mb4 --single-transaction --routines --triggers --events wp_panaderia_luna | gzip &gt; ~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-20261110-103000.sql.gz</code>.
         Si falla, no borra.</li>
       <li>La borra: <code>/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`"</code></li>
-      <li>Quita su fecha de carga de <code>~/.lvm-instalador/importaciones</code>.</li>
+      <li>Quita su fecha de carga de <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum list-db</code> (ya no sale) y <code>ls -l ~/nexum-backups</code> (la copia, si la pediste).</p>
   </details>
@@ -3068,7 +3124,7 @@
     <a href="#docker-config">Configuración → Docker</a>, pasan a acabar en <code>.docker.test</code>, como en la captura.</p>
 
   <div class="nota"><b>Dónde guarda Docker lo de cada proyecto</b>Todo lo que el programa escribe para Docker está en
-    <code>~/.lvm-instalador/docker</code> (<code>~</code> es tu carpeta personal), solo para tu usuario: una carpeta por proyecto con su
+    <code>~/.nexum/docker</code> (<code>~</code> es tu carpeta personal), solo para tu usuario: una carpeta por proyecto con su
     <code>proyecto.conf</code> (sus datos: carpeta, versiones de PHP, base de datos…), su <code>compose.yaml</code>, su <code>.env</code> (la
     contraseña de su base) y la configuración de cada versión de PHP (<code>config-84.php</code>…); <code>web/</code> para el Apache de Docker y
     phpMyAdmin; <code>mariadb-11.8/</code> y demás para cada MariaDB común, e <code>imagenes/</code> con las recetas (<code>Dockerfile</code>) de
@@ -3080,8 +3136,8 @@
       se hablan): <code>/run/user/&lt;tu número de usuario&gt;/docker.sock</code>. Para que tus órdenes <code>docker</code> vayan al mismo
       sitio, escribe antes en la terminal <code>export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock</code>.</span>
     <span data-so="mac">Las órdenes <code>docker</code> van a Docker Desktop, que tiene que estar abierto. No hace falta nada más.</span>
-    Las órdenes <code>docker compose</code> se lanzan desde la carpeta del proyecto en <code>~/.lvm-instalador/docker</code> (por ejemplo,
-    <code>cd ~/.lvm-instalador/docker/academia-flor</code>), donde está su <code>compose.yaml</code>.</div>
+    Las órdenes <code>docker compose</code> se lanzan desde la carpeta del proyecto en <code>~/.nexum/docker</code> (por ejemplo,
+    <code>cd ~/.nexum/docker/academia-flor</code>), donde está su <code>compose.yaml</code>.</div>
 
   <figure class="pantalla">
     <div class="barra">
@@ -3185,7 +3241,7 @@
         <li>Si Ubuntu limita los espacios de usuarios (<code>/proc/sys/kernel/apparmor_restrict_unprivileged_userns</code> vale 1), crea un perfil
           de AppArmor para rootlesskit en <code>/etc/apparmor.d/usr.bin.rootlesskit</code> y lo carga con
           <code>sudo apparmor_parser -r /etc/apparmor.d/usr.bin.rootlesskit</code>.</li>
-        <li>Ya con tu usuario, sin sudo: escribe el arrancador <code>~/.lvm-instalador/docker/bin/dockerd-rootless</code> y el servicio de tu
+        <li>Ya con tu usuario, sin sudo: escribe el arrancador <code>~/.nexum/docker/bin/dockerd-rootless</code> y el servicio de tu
           usuario <code>~/.config/systemd/user/docker.service</code>, y lo pone en marcha:
           <code>systemctl --user daemon-reload</code>, <code>systemctl --user enable docker.service</code> y
           <code>systemctl --user restart docker.service</code>.</li>
@@ -3283,18 +3339,18 @@
     <ol>
       <li>Comprueba que Docker puede usar sus puertos (si no, te manda a «Permitir»).</li>
       <li>Si no existe, crea un certificado propio para <code>*.docker.local</code> y <code>*.docker.test</code> en
-        <code>~/.lvm-instalador/docker/web/certs</code> (un <b>certificado</b> es lo que permite el <code>https://</code>; este no es de una
+        <code>~/.nexum/docker/web/certs</code> (un <b>certificado</b> es lo que permite el <code>https://</code>; este no es de una
         autoridad, así que no vale para ninguna otra web): <code>openssl req -x509 -nodes -newkey rsa:2048 … -keyout docker.local.key -out docker.local.crt</code>.</li>
-      <li>Rehace su configuración en <code>~/.lvm-instalador/docker/web/conf</code>: <code>httpd.conf</code>, <code>seguridad.conf</code> (las mismas
+      <li>Rehace su configuración en <code>~/.nexum/docker/web/conf</code>: <code>httpd.conf</code>, <code>seguridad.conf</code> (las mismas
         reglas que LAMPP: ficheros que no se sirven y la barrera entre webs) y un vhost por proyecto en <code>sitios/</code>; y su
         <code>compose.yaml</code>, con Apache en <code>127.0.0.2:80</code> y <code>127.0.0.2:443</code>, tu carpeta de proyectos de solo lectura,
         y phpMyAdmin.</li>
       <li>Crea la red interna si no existe: <code>docker network create nexum</code>.</li>
       <li>Pone <code>pma.docker.local</code> en <code>/etc/hosts</code> (con <code>sudo tee /etc/hosts</code>) si aún no está.</li>
-      <li>Lo arranca: <code>cd ~/.lvm-instalador/docker/web &amp;&amp; docker compose up -d</code>. Si ya estaba en marcha, recarga la
+      <li>Lo arranca: <code>cd ~/.nexum/docker/web &amp;&amp; docker compose up -d</code>. Si ya estaba en marcha, recarga la
         configuración sin cortar nada: <code>docker exec nexum-web httpd -k graceful …</code>.</li>
     </ol>
-    <p>Al parar: <code>cd ~/.lvm-instalador/docker/web &amp;&amp; docker compose stop</code> (para <code>nexum-web</code> y
+    <p>Al parar: <code>cd ~/.nexum/docker/web &amp;&amp; docker compose stop</code> (para <code>nexum-web</code> y
       <code>nexum-pma</code>).</p>
     <p>Para comprobarlo: <code>docker ps --filter name=nexum-web</code> y abre <code>https://pma.docker.local</code>.</p>
   </details>
@@ -3324,7 +3380,7 @@
     <p>La orden del programa: <code>nexum docker-usuario-pruebas academia-flor</code> (antes de abrir el panel).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee su base de datos en <code>~/.lvm-instalador/docker/academia-flor/proyecto.conf</code>.</li>
+      <li>Lee su base de datos en <code>~/.nexum/docker/academia-flor/proyecto.conf</code>.</li>
       <li>Entra como <code>root</code> en la MariaDB común, sin poner la contraseña en ninguna orden (la toma dentro del contenedor):
         <code>docker exec -i nexum-mariadb-11-8 sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD mariadb -uroot'</code>.</li>
       <li>Crea o pone al día el usuario <code>local@local.test</code> con la contraseña <code>local</code> en las tablas de usuarios de WordPress
@@ -3373,10 +3429,10 @@
     <ol>
       <li>Pone al día la configuración de cada versión de PHP (<code>config-84.php</code>: el <code>wp-config.php</code> con los datos de su base
         de Docker y su dominio).</li>
-      <li>Arranca su MariaDB común (<code>cd ~/.lvm-instalador/docker/mariadb-11.8 &amp;&amp; docker compose up -d</code>) y espera a que
+      <li>Arranca su MariaDB común (<code>cd ~/.nexum/docker/mariadb-11.8 &amp;&amp; docker compose up -d</code>) y espera a que
         responda; o, si usa en vivo la de LAMPP, arranca esa y su puente.</li>
       <li>Arranca el Apache de Docker (como en <a href="#docker-apache">su recuadro</a>).</li>
-      <li>Arranca sus PHP: <code>cd ~/.lvm-instalador/docker/academia-flor &amp;&amp; docker compose up -d php84 php83</code>.</li>
+      <li>Arranca sus PHP: <code>cd ~/.nexum/docker/academia-flor &amp;&amp; docker compose up -d php84 php83</code>.</li>
     </ol>
     <p>Al parar: <code>docker compose stop</code> en su carpeta; después, la MariaDB común que ya no use ningún proyecto en marcha
       (<code>docker stop nexum-mariadb-11-8</code>) y, si no queda ninguno, el Apache de Docker (<code>docker stop nexum-web nexum-pma</code>).
@@ -3392,11 +3448,11 @@
     <p>La orden del programa: <span data-so="linux">ninguna: la ventana lee el fichero directamente.</span><span data-so="mac"><code>nexum docker-clave academia-flor</code>.</span></p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee la línea <code>DB_ROOT_PASS=</code> del fichero <code>~/.lvm-instalador/docker/mariadb-11.8/.env</code> (el de la MariaDB común del
+      <li>Lee la línea <code>DB_ROOT_PASS=</code> del fichero <code>~/.nexum/docker/mariadb-11.8/.env</code> (el de la MariaDB común del
         proyecto; en un proyecto de antes, el <code>.env</code> de su propia carpeta).</li>
       <li>La copia al portapapeles.</li>
     </ol>
-    <p>Para comprobarlo (y verla tú): <code>grep DB_ROOT_PASS ~/.lvm-instalador/docker/mariadb-11.8/.env</code>.</p>
+    <p>Para comprobarlo (y verla tú): <code>grep DB_ROOT_PASS ~/.nexum/docker/mariadb-11.8/.env</code>.</p>
   </details>
 
   <h3 id="docker-comun">Lo común</h3>
@@ -3475,32 +3531,32 @@
     <ol>
       <li>Comprueba que la carpeta existe, que no está ya en Docker y que Docker responde y puede usar sus puertos. Pide la contraseña de
         administrador (para <code>/etc/hosts</code>) antes de cambiar nada.</li>
-      <li>Arranca la MariaDB común de esa versión. La primera vez la crea: escribe <code>~/.lvm-instalador/docker/mariadb-11.8/compose.yaml</code>
+      <li>Arranca la MariaDB común de esa versión. La primera vez la crea: escribe <code>~/.nexum/docker/mariadb-11.8/compose.yaml</code>
         (imagen <code>mariadb:11.8</code>, contenedor <code>nexum-mariadb-11-8</code>, volumen del mismo nombre) y un <code>.env</code> con una
         contraseña de root al azar; después <code>docker network create nexum</code> y <code>docker compose up -d</code> en esa carpeta.</li>
-      <li>Crea la carpeta del proyecto, <code>~/.lvm-instalador/docker/panaderia-luna</code>, con su <code>proyecto.conf</code>, su
+      <li>Crea la carpeta del proyecto, <code>~/.nexum/docker/panaderia-luna</code>, con su <code>proyecto.conf</code>, su
         <code>.env</code> (una contraseña al azar para su usuario de la base), la configuración de PHP-FPM, su <code>config-84.php</code> (una
         copia de tu <code>wp-config.php</code> con la base de Docker y su dominio) y su <code>compose.yaml</code>: un servicio <code>php84</code>
         con la imagen <code>nexum-php:8.4</code>, tu carpeta montada dentro y el <code>config-84.php</code> encima del <code>wp-config.php</code>,
         de solo lectura.</li>
-      <li>Prepara la imagen de PHP si no la tiene: escribe un <code>Dockerfile</code> en <code>~/.lvm-instalador/docker/imagenes/php-8.4</code>
+      <li>Prepara la imagen de PHP si no la tiene: escribe un <code>Dockerfile</code> en <code>~/.nexum/docker/imagenes/php-8.4</code>
         (sale de la oficial <span data-so="linux"><code>php:8.4-fpm</code></span><span data-so="mac"><code>php:8.4-apache</code></span>, con las
         extensiones que piden WordPress y PrestaShop y un <code>php.ini</code> de producción con los límites de seguridad) y
-        <code>docker build -t nexum-php:8.4 ~/.lvm-instalador/docker/imagenes/php-8.4</code>.</li>
+        <code>docker build -t nexum-php:8.4 ~/.nexum/docker/imagenes/php-8.4</code>.</li>
       <li>Crea la base y su usuario en la MariaDB común:
         <code>CREATE DATABASE `wp_panaderia_luna`</code>, <code>CREATE USER 'nx_wp_panaderia_luna'@'%' …</code> y
         <code>GRANT ALL PRIVILEGES ON `wp_panaderia_luna`.* …</code>, con <code>docker exec -i nexum-mariadb-11-8 mariadb -uroot</code>.</li>
       <li>Si se copia una base: hace un <b>volcado</b> (una copia de la base en un fichero de texto <code>.sql</code>, aquí comprimido en
-        <code>.sql.gz</code>) de <code>wp_panaderia_luna</code> desde LAMPP a un fichero temporal de <code>~/.lvm-instalador</code>, lo carga con
+        <code>.sql.gz</code>) de <code>wp_panaderia_luna</code> desde LAMPP a un fichero temporal de <code>~/.nexum</code>, lo carga con
         <code>gzip -dc … | docker exec -i nexum-mariadb-11-8 mariadb -uroot wp_panaderia_luna</code> y lo borra. En una tienda, cambia su dominio
         en la copia; y pone el administrador de pruebas.</li>
       <li>Añade su dominio a <code>/etc/hosts</code> (<code>127.0.0.2 panaderia-luna-php84.docker.local</code>, con <code>sudo tee /etc/hosts</code>),
         salvo con el DNS de Docker activado.</li>
       <li>Arranca el Apache de Docker con el vhost nuevo y su PHP: <code>docker compose up -d php84</code> en la carpeta del proyecto.</li>
       <li>Hace que el navegador acepte el certificado de <code>*.docker.local</code>:
-        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.lvm-instalador/docker/web/certs/docker.local.crt</code>
+        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>
           (y lo mismo en cada perfil de Firefox).</span>
-        <span data-so="mac"><code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.lvm-instalador/docker/web/certs/docker.local.crt</code>
+        <span data-so="mac"><code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.nexum/docker/web/certs/docker.local.crt</code>
           (el Mac te pide la contraseña en una ventana).</span></li>
     </ol>
     <p>Con <code>--en-vivo</code> no crea base en Docker: lee el usuario, la contraseña y la base de tu <code>wp-config.php</code>, arranca la
@@ -3577,7 +3633,7 @@
       <li>Arranca su contenedor de base de datos (<code>docker compose up -d db</code>) y hace un volcado de su base:
         <code>docker compose exec -T db mariadb-dump -uroot --single-transaction --routines --triggers --events &lt;base&gt; | gzip &gt; …sql.gz</code>.
         Con <code>--copia</code>, el fichero va a <code>~/nexum-backups</code> y se queda; sin ella, a uno temporal de
-        <code>~/.lvm-instalador</code>. Si el volcado sale vacío, para sin cambiar nada.</li>
+        <code>~/.nexum</code>. Si el volcado sale vacío, para sin cambiar nada.</li>
       <li>Quita el proyecto de antes, como «Eliminar» de los de antes: <code>docker compose down -v</code>, su bloque en los vhosts de LAMPP
         (<code>/opt/lampp/etc/extra/httpd-vhosts.conf</code>, con <code>sudo</code> y recargando Apache) y su línea de <code>/etc/hosts</code>.</li>
       <li>Lo monta en el Apache de Docker como <code>docker-nuevo</code>, cargando ese volcado (<code>--volcado</code>). Si la carpeta ya estaba en
@@ -3616,7 +3672,7 @@
     </ol>
     <p>Al volver a su copia: recupera en <code>proyecto.conf</code> y <code>.env</code> los datos de la copia, rehace su configuración, lo arranca
       de nuevo si estaba en marcha y quita el puente si ya no lo usa nadie (<code>docker rm -f nexum-lampp-bd-8-4</code>).</p>
-    <p>Para comprobarlo: <code>grep LAMPP_BD ~/.lvm-instalador/docker/academia-flor/proyecto.conf</code> (vacío: usa su copia).</p>
+    <p>Para comprobarlo: <code>grep LAMPP_BD ~/.nexum/docker/academia-flor/proyecto.conf</code> (vacío: usa su copia).</p>
   </details>
 
   <h3 id="docker-imagen">Actualizar la imagen de PHP</h3>
@@ -3629,7 +3685,7 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Por cada versión de PHP del proyecto, rehace su imagen descargando de nuevo la oficial y sin aprovechar nada de la anterior:
-        <code>docker build --pull --no-cache -t nexum-php:8.4 ~/.lvm-instalador/docker/imagenes/php-8.4</code>.</li>
+        <code>docker build --pull --no-cache -t nexum-php:8.4 ~/.nexum/docker/imagenes/php-8.4</code>.</li>
       <li>Vuelve a crear los contenedores de PHP que estaban en marcha, ya con la imagen nueva:
         <code>docker compose up -d --force-recreate php84</code> en su carpeta.</li>
       <li>Borra las imágenes viejas que ya no usa nadie: <code>docker image prune -f</code>.</li>
@@ -3655,13 +3711,13 @@
         <code>mariadb-dump --single-transaction --routines --triggers --events academia_flor</code> dentro de
         <code>nexum-mariadb-11-8</code> (en un proyecto de antes, dentro de su propio contenedor de MariaDB), comprimido con
         <code>gzip</code>.</li>
-      <li>Quita sus contenedores y sus volúmenes propios: <code>docker compose down -v</code> en <code>~/.lvm-instalador/docker/academia-flor</code>.</li>
+      <li>Quita sus contenedores y sus volúmenes propios: <code>docker compose down -v</code> en <code>~/.nexum/docker/academia-flor</code>.</li>
       <li>Si usaba en vivo la base de LAMPP, quita el puente si ya no lo usa nadie.</li>
       <li>Borra su base y su usuario de la MariaDB común (si usaba en vivo la de LAMPP, solo su copia de Docker, si tenía):
         <code>DROP DATABASE IF EXISTS `academia_flor`;</code> y <code>DROP USER IF EXISTS 'nx_academia_flor'@'%';</code>, con
         <code>docker exec -i nexum-mariadb-11-8 mariadb -uroot</code>.</li>
       <li>Quita sus dominios de <code>/etc/hosts</code> (con <code>sudo tee /etc/hosts</code>).</li>
-      <li>Borra su carpeta del programa: <code>rm -rf ~/.lvm-instalador/docker/academia-flor</code>. Tu carpeta del proyecto no se toca.</li>
+      <li>Borra su carpeta del programa: <code>rm -rf ~/.nexum/docker/academia-flor</code>. Tu carpeta del proyecto no se toca.</li>
       <li>Rehace la configuración del Apache de Docker sin sus vhosts y la recarga.</li>
     </ol>
     <p>En un proyecto de antes, en lugar de los pasos 4 y 7 quita su bloque de los vhosts de LAMPP. Para comprobarlo:
@@ -3702,7 +3758,7 @@
   <p>La versión de Node se lee de su <code>.nvmrc</code>, <code>.node-version</code> o del apartado <code>engines</code> de su
     <code>package.json</code>. Se usa la más nueva de esa versión que tengas: una descargada por el programa, una de <code>nvm</code> (otra
     herramienta para tener varias) o la del sistema. Si no tienes ninguna que valga, se descarga de nodejs.org, comprobada, a tu carpeta
-    <code>~/.lvm-instalador/node</code>. Si el proyecto no pide ninguna, se usa la más nueva que tengas o, si no tienes ninguna, se
+    <code>~/.nexum/node</code>. Si el proyecto no pide ninguna, se usa la más nueva que tengas o, si no tienes ninguna, se
     descarga Node 26.</p>
   <p>Arrancar, compilar, parar y ver el registro <b>no piden la contraseña de administrador</b>: todo va con tu usuario. El <b>«Túnel»</b>
     tampoco, como «Compartir» en las demás páginas. Si no hay ningún proyecto de Node, la página dice «Ningún proyecto de Node».</p>
@@ -3762,9 +3818,9 @@
     <ol>
       <li>Comprueba que no lo lanzas como administrador (los proyectos de Node van siempre con tu usuario) y que la carpeta es un proyecto
         de Node. En modo compilado, si no es Astro, Next, Nuxt, SvelteKit ni Vite, necesita un script <code>start</code>.</li>
-      <li>Busca un Node que valga en <code>~/.lvm-instalador/node</code>, en <code>~/.nvm/versions/node</code> o en el sistema. Si no hay,
+      <li>Busca un Node que valga en <code>~/.nexum/node</code>, en <code>~/.nvm/versions/node</code> o en el sistema. Si no hay,
         descarga el último de esa versión de nodejs.org (<code>https://nodejs.org/dist/latest-v26.x/</code>), lo comprueba con su lista de
-        sumas <code>SHASUMS256.txt</code> y lo descomprime en <code>~/.lvm-instalador/node/v26.…</code>.</li>
+        sumas <code>SHASUMS256.txt</code> y lo descomprime en <code>~/.nexum/node/v26.…</code>.</li>
       <li>Busca un puerto libre entre el 4321 y el 4399.</li>
       <li>Si faltan las dependencias (o el fichero de bloqueo es más nuevo que <code>node_modules</code>), las instala dentro del proyecto:
         <code>npm ci --no-audit --no-fund</code> si tiene <code>package-lock.json</code>; <code>npx --yes pnpm install --frozen-lockfile</code>
@@ -3772,12 +3828,12 @@
         ninguno, <code>npm install</code>. Los scripts de esas piezas se ejecutan con tu usuario.</li>
       <li>En modo compilado, lo compila: <code>npm run build</code> (en Astro, <code>npx astro build</code>).</li>
       <li>Arranca su servidor solo en tu equipo, en su propia sesión (para que siga si cierras la ventana) y con su salida en
-        <code>~/.lvm-instalador/node/proyectos/portfolio-estudio.log</code>. En desarrollo, por ejemplo,
+        <code>~/.nexum/node/proyectos/portfolio-estudio.log</code>. En desarrollo, por ejemplo,
         <code>npx astro dev --host 127.0.0.1 --port 4321</code>, <code>npx next dev -H 127.0.0.1 -p 4321</code> o
         <code>npx vite --host 127.0.0.1 --port 4321 --strictPort</code>; compilado, <code>npx next start -H 127.0.0.1 -p 4321</code>,
         <code>node .output/server/index.mjs</code> (Nuxt) o <code>npx vite preview …</code>. Si no es ninguno de esos, su <code>npm run dev</code>
         o su <code>npm start</code>.</li>
-      <li>Apunta su número de proceso, el puerto y el modo en <code>~/.lvm-instalador/node/proyectos/portfolio-estudio.conf</code> y espera a
+      <li>Apunta su número de proceso, el puerto y el modo en <code>~/.nexum/node/proyectos/portfolio-estudio.conf</code> y espera a
         que conteste en <code>http://127.0.0.1:4321/</code>, como mucho 3 minutos.</li>
     </ol>
     <p>Para comprobarlo: <code>curl -I http://127.0.0.1:4321/</code> y <code>nexum gui-node</code> (una línea por proyecto:
@@ -3793,10 +3849,10 @@
     <p>La orden del programa: <code>nexum node-registro portfolio-estudio</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee las últimas líneas de su fichero: <code>tail -300 ~/.lvm-instalador/node/proyectos/portfolio-estudio.log</code>. Si no existe,
+      <li>Lee las últimas líneas de su fichero: <code>tail -300 ~/.nexum/node/proyectos/portfolio-estudio.log</code>. Si no existe,
         dice que aún no ha arrancado desde aquí.</li>
     </ol>
-    <p>Para comprobarlo (y verlo según va escribiendo): <code>tail -f ~/.lvm-instalador/node/proyectos/portfolio-estudio.log</code>.</p>
+    <p>Para comprobarlo (y verlo según va escribiendo): <code>tail -f ~/.nexum/node/proyectos/portfolio-estudio.log</code>.</p>
   </details>
 
   <h3 id="node-parar">Parar un proyecto</h3>
@@ -3806,7 +3862,7 @@
     <p>La orden del programa: <code>nexum node-parar portfolio-estudio</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee su número de proceso de <code>~/.lvm-instalador/node/proyectos/portfolio-estudio.conf</code> y comprueba que sigue siendo el
+      <li>Lee su número de proceso de <code>~/.nexum/node/proyectos/portfolio-estudio.conf</code> y comprueba que sigue siendo el
         mismo proceso (por su hora de arranque). Si no, dice que no está en marcha.</li>
       <li>Si el túnel abierto lleva a su puerto, lo cierra (<code>nexum tunel-cerrar</code>).</li>
       <li>Para el servidor y todo lo que cuelga de él: <code>kill -TERM -- -&lt;número de proceso&gt;</code> (el <code>-</code> delante es el
@@ -3824,8 +3880,8 @@
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: si no está compilado, primero <code>nexum node-arrancar portfolio-estudio compilado</code>; después,
-      <code>nexum tunel-abrir http://127.0.0.1:4321 portfolio-estudio --horas 2 --admin bloquear</code> (la dirección en la que va,
-      las horas que dura, de 1 a 12, y si se bloquea el panel).</p>
+      <code>nexum tunel-abrir http://127.0.0.1:4321 portfolio-estudio --minutos 120 --admin bloquear</code> (la dirección en la que va,
+      los minutos que dura, de 15 a 720, y si se bloquea el panel).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Compila y arranca el proyecto como en «Compilar» (los pasos de arriba).</li>
@@ -3850,7 +3906,7 @@
       (lo instala con <code>npm install --no-save @astrojs/node</code> y deja su configuración en <code>node_modules/.nexum-astro.config.mjs</code>).
       Con <code>pnpm</code> o <code>yarn</code>, añade antes <code>@astrojs/node</code> a sus dependencias.</p></details>
   <details><summary>¿Dónde están los Node que descarga el programa?</summary>
-    <p>En <code>~/.lvm-instalador/node</code>, uno por carpeta (<code>v26.…</code>). No se instalan en el sistema ni cambian el
+    <p>En <code>~/.nexum/node</code>, uno por carpeta (<code>v26.…</code>). No se instalan en el sistema ni cambian el
       <code>node</code> que uses en la terminal.</p></details>
 </section>
 
@@ -3978,7 +4034,7 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Pide la contraseña de administrador.</li>
-      <li>Apunta el dominio (y su <code>www</code>) como apagado en <code>~/.lvm-instalador/locales-apagados</code>, o lo quita de esa lista al
+      <li>Apunta el dominio (y su <code>www</code>) como apagado en <code>~/.nexum/locales-apagados</code>, o lo quita de esa lista al
         encenderlo. Así no se vuelve a añadir solo al cargar otro proyecto.</li>
       <li>Cambia <code>/etc/hosts</code> como al falsear: comenta su línea (<code># 127.0.0.1 tienda-luna.local</code>) o se la vuelve a poner, con
         la copia previa y <code>sudo tee /etc/hosts</code>.</li>
@@ -4032,7 +4088,7 @@
         <span data-so="linux"><code>sudo tee -a /opt/config/httpd-vhosts.conf</code></span><span
         data-so="mac"><code>sudo tee -a /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code></span>.</li>
       <li data-so="linux">Hace que el navegador acepte su certificado (como <code>nexum confiar-certificados panaderia-luna.com</code>).</li>
-      <li>Apunta que ese dominio es de esa carpeta en <code>~/.lvm-instalador/dominios</code> (<code>panaderia-luna.com=panaderia-luna</code>).</li>
+      <li>Apunta que ese dominio es de esa carpeta en <code>~/.nexum/dominios</code> (<code>panaderia-luna.com=panaderia-luna</code>).</li>
       <li>Si has dicho una base: si no existe en la versión activa, la crea vacía (<code>CREATE DATABASE `wp_panaderia_luna`</code>), y la apunta
         como base de esa carpeta.</li>
       <li>Falsea el dominio y deja de falsear los demás, en <code>/etc/hosts</code> (como en <a href="#dominios-falsear">Falsear un dominio</a>).</li>
@@ -4193,7 +4249,7 @@
       <code>nexum</code> seguido de lo que hay que hacer (por ejemplo, <code>nexum barrera-web no</code>). Puedes
       escribirla tú igual. Con <code>--simular</code> delante de lo que hay que hacer (<code>nexum --simular barrera-web no</code>)
       solo dice lo que haría, sin cambiar nada.</li>
-    <li><b>Tu carpeta de ajustes.</b> El programa guarda sus ajustes y sus registros en <code>~/.lvm-instalador</code> (el símbolo
+    <li><b>Tu carpeta de ajustes.</b> El programa guarda sus ajustes y sus registros en <code>~/.nexum</code> (el símbolo
       <code>~</code> es tu carpeta personal; el punto delante del nombre la oculta en el explorador de archivos). Las copias de seguridad
       van en <code>~/nexum-backups</code>.</li>
   </ul>
@@ -4285,7 +4341,7 @@
       <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta».</span></li>
       <li data-x="70" data-y="33"><b>La lista</b><span>Se ven 4 tareas, la más nueva arriba. Si hay más, la lista se desplaza dentro de su recuadro, con su barra a la derecha: baja con la rueda del ratón para ver las anteriores.</span></li>
       <li data-x="82" data-y="47"><b>Vaciar el registro…</b><span>Te pregunta antes «¿Vaciar el registro de tareas?», con cuántas se borran, y pulsa «Vaciar», en rojo. Borra los registros de las tareas que ya han acabado; el de una tarea que sigue en marcha se queda. No toca nada más: ni tus proyectos, ni los demás registros. Apagado si no hay ninguna acabada. Es lo mismo que «Registros del programa» en <a href="#limpieza">Limpieza</a>, pero solo con el registro de tareas.</span></li>
-      <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.lvm-instalador/tareas</code>, donde está cada una en su fichero de texto.</span></li>
+      <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.nexum/tareas</code>, donde está cada una en su fichero de texto.</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
@@ -4301,7 +4357,7 @@
     </ul>
   </div>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: no hay. Lo escribe la propia ventana, sin contraseña, en <code>~/.lvm-instalador/tareas</code> (la carpeta,
+    <p>La orden del programa: no hay. Lo escribe la propia ventana, sin contraseña, en <code>~/.nexum/tareas</code> (la carpeta,
       con permisos 700; cada fichero, 600: solo tú puedes leerlos).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
@@ -4311,7 +4367,7 @@
         <code>Fecha:</code>, <code>Resultado:</code> («Terminada bien», «Ha fallado (código N)» o «Cancelada») y <code>Duración:</code>;
         debajo de una raya de <code>=</code>, toda la salida.</li>
     </ol>
-    <p>Para verlas: <code>ls ~/.lvm-instalador/tareas</code> y, la última, <code>cat "$(ls -d ~/.lvm-instalador/tareas/* | tail -1)"</code>.</p>
+    <p>Para verlas: <code>ls ~/.nexum/tareas</code> y, la última, <code>cat "$(ls -d ~/.nexum/tareas/* | tail -1)"</code>.</p>
   </details>
 
   <h3 id="parches">General › Parches nuevos</h3>
@@ -4440,7 +4496,7 @@
       <p>Lo que hace, paso a paso:</p>
       <ol>
         <li>Mira la última versión publicada en la página del programa en GitHub y, si es más nueva, la descarga a
-          <code>~/.lvm-instalador/actualizaciones</code>.</li>
+          <code>~/.nexum/actualizaciones</code>.</li>
         <li>Busca también paquetes <code>nexum_</code><i>versión</i><code>_all.deb</code> en esa carpeta y en tus Descargas.</li>
         <li>De cada uno comprueba que es del programa, que solo lleva ficheros normales y que está firmado. Uno sin firma no se instala desde la
           ventana: te dice que lo instales tú en la terminal.</li>
@@ -4480,11 +4536,11 @@
       menús</span> al cerrar» lo guarda la propia ventana, sin contraseña.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Escribe <code>si</code> o <code>no</code> en <code>~/.lvm-instalador/ventana-bandeja</code>. Si el fichero no existe, cuenta como
+      <li>Escribe <code>si</code> o <code>no</code> en <code>~/.nexum/ventana-bandeja</code>. Si el fichero no existe, cuenta como
         encendido.</li>
       <li>Pone o quita el icono junto al reloj al momento.</li>
     </ol>
-    <p>Para comprobarlo: <code>cat ~/.lvm-instalador/ventana-bandeja</code>.</p>
+    <p>Para comprobarlo: <code>cat ~/.nexum/ventana-bandeja</code>.</p>
   </details>
 
   <h3 id="vhosts">Vhosts y hosts</h3>
@@ -4516,7 +4572,7 @@
   </figure>
   <p><b>Cambiar uno de los dos ficheros</b></p>
   <ol class="pasos-tarea">
-    <li><b>Pulsa «Editar…»</b> en su fila. Se abre una copia en tu editor de textos (la copia va en <code>~/.lvm-instalador</code>, no en el
+    <li><b>Pulsa «Editar…»</b> en su fila. Se abre una copia en tu editor de textos (la copia va en <code>~/.nexum</code>, no en el
       fichero de verdad) y, en la ventana, el diálogo «Editar vhosts» o «Editar hosts», que lo explica.</li>
     <li><b>Haz los cambios en el editor y guárdalos.</b></li>
     <li><b>Pulsa «Aplicar»</b> en el diálogo (o «Cancelar» para dejarlo). Pide la contraseña de administrador.</li>
@@ -4536,13 +4592,13 @@
     </ul>
   </div>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum vhosts --aplicar ~/.lvm-instalador/httpd-vhosts.conf</code> (la de «Aplicar» en «Editar
+    <p>La orden del programa: <code>nexum vhosts --aplicar ~/.nexum/httpd-vhosts.conf</code> (la de «Aplicar» en «Editar
       vhosts»). Sin <code>--aplicar</code>, <code>nexum vhosts</code> hace todo seguido en la terminal: abre la copia en tu editor
       (<code>nano</code> si no tienes otro) y te pregunta «¿Aplicar los cambios?».</p>
     <p>Lo que hace, paso a paso:</p>
     <div data-so="linux">
       <ol>
-        <li>La copia: <code>cp /opt/config/httpd-vhosts.conf ~/.lvm-instalador/httpd-vhosts.conf</code>, y la abre en el editor.</li>
+        <li>La copia: <code>cp /opt/config/httpd-vhosts.conf ~/.nexum/httpd-vhosts.conf</code>, y la abre en el editor.</li>
         <li>Si la copia es igual que el fichero de verdad, no hace nada: «No hay cambios en los vhosts.»</li>
         <li>Pide la contraseña y lee la copia una sola vez a una carpeta temporal del administrador. Comprueba que solo lleva cosas de vhost
           y que los registros y certificados van en sus carpetas.</li>
@@ -4558,7 +4614,7 @@
     </div>
     <div data-so="mac">
       <ol>
-        <li>La copia: <code>cp /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf ~/.lvm-instalador/httpd-vhosts.conf</code>, y la abre en el
+        <li>La copia: <code>cp /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf ~/.nexum/httpd-vhosts.conf</code>, y la abre en el
           editor.</li>
         <li>Si la copia es igual que el fichero de verdad, no hace nada: «No hay cambios en los vhosts.»</li>
         <li>Pide la contraseña y lee la copia una sola vez a una carpeta temporal del administrador. Comprueba que solo lleva cosas de vhost
@@ -4573,12 +4629,12 @@
     </div>
   </details>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum hosts --aplicar ~/.lvm-instalador/hosts</code> (la de «Aplicar» en «Editar hosts»). Sin
+    <p>La orden del programa: <code>nexum hosts --aplicar ~/.nexum/hosts</code> (la de «Aplicar» en «Editar hosts»). Sin
       <code>--aplicar</code>, <code>nexum hosts</code> abre <code>/etc/hosts</code> directamente con <code>sudo -e</code> (el editor
       con permiso de administrador), sin las comprobaciones.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>La copia: <code>cp /etc/hosts ~/.lvm-instalador/hosts</code>, y la abre en el editor.</li>
+      <li>La copia: <code>cp /etc/hosts ~/.nexum/hosts</code>, y la abre en el editor.</li>
       <li>Pide la contraseña y lee la copia una sola vez a una carpeta temporal del administrador.</li>
       <li>Comprueba que sigue la línea de <code>localhost</code> (<code>127.0.0.1 localhost</code>), que no lleva caracteres de control y que
         las líneas nuevas solo llevan a este equipo (<code>127.x</code>, <code>::1</code> o <code>0.0.0.0</code>). Si no, no cambia nada y
@@ -4632,9 +4688,9 @@
     <div data-so="linux">
       <ol>
         <li>Pide la contraseña de administrador.</li>
-        <li>Al apagarla, crea el fichero vacío <code>~/.lvm-instalador/sin-barrera-entre-webs</code>
-          (<code>: &gt; ~/.lvm-instalador/sin-barrera-entre-webs</code>); al encenderla, lo borra
-          (<code>rm -f ~/.lvm-instalador/sin-barrera-entre-webs</code>). Ese fichero es el interruptor.</li>
+        <li>Al apagarla, crea el fichero vacío <code>~/.nexum/sin-barrera-entre-webs</code>
+          (<code>: &gt; ~/.nexum/sin-barrera-entre-webs</code>); al encenderla, lo borra
+          (<code>rm -f ~/.nexum/sin-barrera-entre-webs</code>). Ese fichero es el interruptor.</li>
         <li>Vuelve a escribir, en cada versión, <code>/opt/lampp-</code><i>versión</i><code>/etc/extra/lvm-dominio-desconocido.conf</code>
           con el bloque «barrera entre webs» o sin él. Ese bloque es una regla de Apache que mira dos datos que manda el navegador con cada
           petición: de qué web viene (<code>Sec-Fetch-Site</code>) y su origen (<code>Origin</code>). Si viene de otra web y no es abrir una
@@ -4642,7 +4698,7 @@
         <li>Si no se puede en alguna versión, deshace el cambio en todas: «No se ha podido cambiar en todas las versiones: se deja como
           estaba».</li>
         <li>Si Apache está en marcha: <code>sudo /opt/lampp/lampp reloadapache</code>.</li>
-        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
+        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.nexum/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code>, o
         <code>grep -c "barrera entre webs" /opt/lampp/etc/extra/lvm-dominio-desconocido.conf</code> (más de 0: encendida).</p>
@@ -4660,7 +4716,7 @@
           salvo abrir una página con un enlace.</li>
         <li>Si no se puede en alguna versión, deshace el cambio en todas.</li>
         <li>Si Apache está en marcha: <code>sudo /Applications/XAMPP/xamppfiles/xampp reloadapache</code>.</li>
-        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
+        <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.nexum/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code> («Barrera entre webs: puesta» o «apagada»).</p>
     </div>
@@ -4732,16 +4788,16 @@
     <ol>
       <li>Comprueba que la dirección es <code>127.x.x.x</code>, que los puertos son números distintos y que no son el 80 o el 443 en
         <code>127.0.0.1</code>.</li>
-      <li>Guarda la dirección y los puertos en <code>~/.lvm-instalador/docker/web.conf</code>, un fichero de texto con las líneas
+      <li>Guarda la dirección y los puertos en <code>~/.nexum/docker/web.conf</code>, un fichero de texto con las líneas
         <code>IP=</code>, <code>HTTP=</code>, <code>HTTPS=</code>, <code>TLD=</code> (el final de los dominios) y <code>DNS=</code>.</li>
       <li>Si el Apache de Docker ya existe, pide la contraseña de administrador. Con el DNS puesto, lo vuelve a instalar con la dirección
         nueva.</li>
       <li>Cambia en <code>/etc/hosts</code> las líneas de los dominios de Docker (<code>pma.docker.local</code> y los de cada proyecto) para
         que lleven a la dirección nueva.</li>
       <li>Rehace el Apache de Docker con la configuración nueva:
-        <code>docker compose --project-directory ~/.lvm-instalador/docker/web -f ~/.lvm-instalador/docker/web/compose.yaml up -d</code>.</li>
+        <code>docker compose --project-directory ~/.nexum/docker/web -f ~/.nexum/docker/web/compose.yaml up -d</code>.</li>
     </ol>
-    <p>Para comprobarlo: <code>cat ~/.lvm-instalador/docker/web.conf</code>, o <code>nexum docker-web estado</code> (la línea
+    <p>Para comprobarlo: <code>cat ~/.nexum/docker/web.conf</code>, o <code>nexum docker-web estado</code> (la línea
       <code>W|</code> con la dirección, los puertos y cómo está).</p>
   </details>
   <details class="terminal"><summary>En la terminal</summary>
@@ -4784,7 +4840,7 @@
         <li>Lo pone en marcha: <code>sudo systemctl daemon-reload</code>, <code>sudo systemctl enable nexum-dns.service</code>,
           <code>sudo systemctl restart nexum-dns.service</code> y <code>sudo systemctl restart systemd-resolved</code>.</li>
         <li>Comprueba que contesta. Si no, lo quita todo: «El DNS de *.docker.test no contesta: se quita y todo sigue como estaba».</li>
-        <li>Pone <code>TLD=docker.test</code> y <code>DNS=1</code> en <code>~/.lvm-instalador/docker/web.conf</code> y pasa cada proyecto de
+        <li>Pone <code>TLD=docker.test</code> y <code>DNS=1</code> en <code>~/.nexum/docker/web.conf</code> y pasa cada proyecto de
           Docker a <code>.docker.test</code>: su configuración, el dominio de las tiendas en su base de datos y sus contenedores, que se
           rehacen.</li>
         <li>Quita de <code>/etc/hosts</code> las líneas viejas de Docker, rehace el certificado con los dominios nuevos, lo da por bueno en el
@@ -4821,21 +4877,21 @@
     <p>Lo que hace, paso a paso:</p>
     <div data-so="linux">
       <ol>
-        <li>Busca el certificado del Apache de Docker: <code>~/.lvm-instalador/docker/web/certs/docker.local.crt</code>.</li>
+        <li>Busca el certificado del Apache de Docker: <code>~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
         <li>Lo añade a cada almacén de certificados de tus navegadores: el de Chrome (<code>~/.pki/nssdb</code>), el de Chromium instalado como
           snap y el de cada perfil de Firefox. Si ya estaba uno viejo, lo quita antes. Para cada uno:
-          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.lvm-instalador/docker/web/certs/docker.local.crt</code>.</li>
+          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>certutil -L -d sql:$HOME/.pki/nssdb | grep docker</code>.</p>
     </div>
     <div data-so="mac">
       <ol>
-        <li>Busca el certificado del Apache de Docker: <code>~/.lvm-instalador/docker/web/certs/docker.local.crt</code>.</li>
+        <li>Busca el certificado del Apache de Docker: <code>~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
         <li>Si el Mac ya lo acepta, no hace nada.</li>
         <li>Lo añade a tu llavero como de confianza para webs (el Mac te pide la contraseña en su ventana):
-          <code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.lvm-instalador/docker/web/certs/docker.local.crt</code>.</li>
+          <code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
       </ol>
-      <p>Para comprobarlo: <code>security verify-cert -c ~/.lvm-instalador/docker/web/certs/docker.local.crt -p ssl -s pma.docker.local</code>.</p>
+      <p>Para comprobarlo: <code>security verify-cert -c ~/.nexum/docker/web/certs/docker.local.crt -p ssl -s pma.docker.local</code>.</p>
     </div>
   </details>
   <details class="terminal"><summary>En la terminal</summary>
@@ -4843,7 +4899,7 @@
       <code>0</code> es «Nunca»).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Guarda las horas en <code>~/.lvm-instalador/docker/reposo</code>.</li>
+      <li>Guarda las horas en <code>~/.nexum/docker/reposo</code>.</li>
       <li data-so="linux">Con más de 0 horas, pone un <i>temporizador</i> de tu usuario (una tarea que el sistema repite sola) en
         <code>~/.config/systemd/user/nexum-reposo.timer</code> y <code>nexum-reposo.service</code>: diez minutos después de encender el equipo
         y luego cada 15 minutos lanza <code>nexum docker-reposo comprobar</code>. Lo activa con
@@ -4852,7 +4908,7 @@
         <code>nexum docker-reposo comprobar</code>.</li>
       <li>Con 0, quita el temporizador y borra sus ficheros: «Los proyectos de Docker ya no se paran solos».</li>
       <li>Cada comprobación para los proyectos que llevan esas horas sin visitas y lo común que ya no use nadie, y lo apunta en
-        <code>~/.lvm-instalador/docker-reposo.log</code>.</li>
+        <code>~/.nexum/docker-reposo.log</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum docker-reposo estado</code> (<code>Q|</code>horas<code>|</code>1 si el temporizador está
       puesto<code>|</code>lo último)<span data-so="linux">, o <code>systemctl --user list-timers nexum-reposo.timer</code></span>.</p>
@@ -4878,7 +4934,7 @@
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
-      <li><b>Dónde va:</b> cloudflared se guarda en tu carpeta personal, en <code>~/.lvm-instalador/tunel</code>, con tu usuario. Instalarlo o
+      <li><b>Dónde va:</b> cloudflared se guarda en tu carpeta personal, en <code>~/.nexum/tunel</code>, con tu usuario. Instalarlo o
         actualizarlo desde la ventana pide la contraseña de administrador, como todas sus tareas.</li>
       <li><b>Con un túnel abierto</b> sale la fila «Túnel abierto»: la dirección, a qué web lleva y hasta qué hora. «Ver» enseña su dirección y
         su contraseña; «Cerrar» (en rojo) lo cierra al momento, sin preguntar: «Túnel cerrado: la dirección ya no lleva a ningún sitio».</li>
@@ -4895,30 +4951,30 @@
       <li>Si ya tiene la versión que trae el programa, no hace nada.</li>
       <li data-so="linux">Descarga de la página de cloudflared en GitHub el que corresponde a tu procesador
         (<code>cloudflared-linux-amd64</code> o <code>cloudflared-linux-arm64</code>, unos 40 MB) a
-        <code>~/.lvm-instalador/tunel</code>.</li>
+        <code>~/.nexum/tunel</code>.</li>
       <li data-so="mac">Descarga de la página de cloudflared en GitHub el que corresponde a tu Mac
         (<code>cloudflared-darwin-amd64.tgz</code> o <code>cloudflared-darwin-arm64.tgz</code>, unos 20 MB) a
-        <code>~/.lvm-instalador/tunel</code> y lo descomprime.</li>
+        <code>~/.nexum/tunel</code> y lo descomprime.</li>
       <li>Comprueba su <i>huella SHA-256</i> (un código que sale de su contenido: si se cambiara un solo byte, saldría otro) contra la que trae
         el programa. Si no coincide, lo borra y no instala nada.</li>
-      <li>Lo deja en <code>~/.lvm-instalador/tunel/cloudflared</code>, ejecutable (<code>chmod 755</code>), y apunta su versión en
-        <code>~/.lvm-instalador/tunel/version</code>. No usa <code>sudo</code>.</li>
+      <li>Lo deja en <code>~/.nexum/tunel/cloudflared</code>, ejecutable (<code>chmod 755</code>), y apunta su versión en
+        <code>~/.nexum/tunel/version</code>. No usa <code>sudo</code>.</li>
     </ol>
-    <p>Para comprobarlo: <code>~/.lvm-instalador/tunel/cloudflared --version</code>, o <code>nexum tunel</code>
+    <p>Para comprobarlo: <code>~/.nexum/tunel/cloudflared --version</code>, o <code>nexum tunel</code>
       (<code>I|1|</code>la instalada<code>|</code>la que trae el programa).</p>
   </details>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum tunel-cerrar</code> (la de «Cerrar»).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee qué proceso es el del túnel en <code>~/.lvm-instalador/tunel/estado</code> (un pequeño fichero con su número de proceso, su
+      <li>Lee qué proceso es el del túnel en <code>~/.nexum/tunel/estado</code> (un pequeño fichero con su número de proceso, su
         dirección y hasta cuándo dura).</li>
       <li>Le pide que se cierre (<code>kill -TERM</code> <i>número</i>); si a los cinco segundos sigue, lo corta
         (<code>kill -KILL</code>).</li>
-      <li>Borra <code>~/.lvm-instalador/tunel/estado</code>.</li>
+      <li>Borra <code>~/.nexum/tunel/estado</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum tunel-cerrar</code> otra vez dice «No hay ningun tunel abierto». El registro se lee con
-      <code>tail -n 400 ~/.lvm-instalador/tunel/registro</code>.</p>
+      <code>tail -n 400 ~/.nexum/tunel/registro</code>.</p>
   </details>
 
   <h3 id="github-config">GitHub</h3>
@@ -4981,7 +5037,7 @@
         <code>secret-tool store --label="Nexum Dev Stack (GitHub)" service nexum-dev-stack account github</code> (el token, por la entrada).</li>
       <li data-so="mac">Lo guarda en el Llavero de macOS con la orden <code>security</code>, como contraseña del servicio
         <code>nexum-dev-stack</code> y la cuenta <code>github</code>.</li>
-      <li>Apunta en <code>~/.lvm-instalador/github</code> que la conexión es del llavero (<code>ORIGEN=llavero</code>; con <code>--gh</code>,
+      <li>Apunta en <code>~/.nexum/github</code> que la conexión es del llavero (<code>ORIGEN=llavero</code>; con <code>--gh</code>,
         <code>ORIGEN=gh</code>) y, si no había cuenta, pone la tuya (<code>CUENTA=</code>).</li>
     </ol>
     <p>«Desconectar» borra el token del llavero (<span data-so="linux"><code>secret-tool clear service nexum-dev-stack account github</code></span><span data-so="mac"><code>security delete-generic-password -s nexum-dev-stack -a github</code></span>)
@@ -4997,9 +5053,9 @@
       <li>La cuenta: le quita lo que sobra (<code>https://github.com/</code>, <code>@</code>), comprueba que es un nombre válido y, si estás
         conectado, que existe en GitHub (<code>https://api.github.com/users/mi-empresa</code>).</li>
       <li>Los prefijos: comprueba que cada uno lleva solo letras sin acentos, números, punto, <code>_</code> y <code>-</code>.</li>
-      <li>Lo guarda en <code>~/.lvm-instalador/github</code> (<code>CUENTA=</code> y <code>PREFIJOS=</code>).</li>
+      <li>Lo guarda en <code>~/.nexum/github</code> (<code>CUENTA=</code> y <code>PREFIJOS=</code>).</li>
     </ol>
-    <p>Para comprobarlo: <code>cat ~/.lvm-instalador/github</code>.</p>
+    <p>Para comprobarlo: <code>cat ~/.nexum/github</code>.</p>
   </details>
 
   <h3 id="apariencia">Apariencia</h3>
@@ -5042,13 +5098,13 @@
     <p>La orden del programa: no hay. La propia ventana guarda lo que eliges en dos ficheros de texto tuyos, sin contraseña.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Los interruptores del menú lateral, en <code>~/.lvm-instalador/apariencia</code>, por ejemplo:
+      <li>Los interruptores del menú lateral, en <code>~/.nexum/apariencia</code>, por ejemplo:
         <code>{"color": true, "marcas": false, "ocultos": ["node", "repos"]}</code> (<code>color</code>: iconos en color; <code>marcas</code>:
         logotipos; <code>ocultos</code>: las páginas apagadas).</li>
-      <li>Los botones del visor, en <code>~/.lvm-instalador/botones-visor</code>, por ejemplo:
+      <li>Los botones del visor, en <code>~/.nexum/botones-visor</code>, por ejemplo:
         <code>{"order": ["web", "vscode", "pma", …], "hidden": ["log"], "style": "icono", "size": 44}</code>.</li>
     </ol>
-    <p>Para comprobarlo: <code>cat ~/.lvm-instalador/apariencia ~/.lvm-instalador/botones-visor</code>. Si borras los dos ficheros, la ventana
+    <p>Para comprobarlo: <code>cat ~/.nexum/apariencia ~/.nexum/botones-visor</code>. Si borras los dos ficheros, la ventana
       vuelve a cómo viene de partida la próxima vez que la abras.</p>
   </details>
 
@@ -5094,7 +5150,7 @@
       activa). Viene desmarcado.</li>
     <li><b>Registros del programa</b>: lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las
       versiones (y lo que dejan las que fallan), el <a href="#tareas">registro de tareas</a>, los de los servidores de Node parados y el de
-      la ventana. Están en <code>~/.lvm-instalador</code>. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus
+      la ventana. Están en <code>~/.nexum</code>. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus
       ajustes no se tocan, ni lo que esté usando una tarea o un servidor en marcha.</li>
     <li><b>Registros de las versiones</b>: lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web),
       PHP-FPM, los errores de PHP y MariaDB. Están en la carpeta de registros de cada versión<span data-so="linux">
@@ -5108,7 +5164,7 @@
       lenta. Nada más del proyecto se toca: ni sus ficheros, ni sus imágenes, ni su BBDD.</li>
     <li><b>Temporales</b>: ficheros y carpetas de trabajo que dejan las tareas del programa cuando se cortan a medias (una descarga, el
       volcado de una BBDD que se iba a cargar, la lista de imágenes de una tienda…), en <code>/tmp</code> y en
-      <code>~/.lvm-instalador</code>. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y no está usando ningún
+      <code>~/.nexum</code>. Ya no sirven para nada. Solo se borra lo que lleva más de un día sin cambiar y no está usando ningún
       programa (un MariaDB temporal en marcha, por ejemplo, se deja).</li>
     <li><b>Sesiones de PHP</b>: los ficheros con los que PHP recuerda quién ha entrado en una web local: tu sesión en phpMyAdmin y la de las
       webs o plugins que usan las sesiones de PHP (WordPress y PrestaShop guardan la suya en una cookie: esa no se cierra). Están en la
@@ -5139,7 +5195,7 @@
         <code>sudo</code> solo para las copias que sean del administrador.</li>
       <li><code>correo</code>: le pide a Mailpit que vacíe su bandeja:
         <code>curl -X DELETE http://127.0.0.1:8025/api/v1/messages</code>.</li>
-      <li><code>registros</code>: borra en <code>~/.lvm-instalador</code> los <code>instalacion-*.log</code>, <code>install-db.log</code>,
+      <li><code>registros</code>: borra en <code>~/.nexum</code> los <code>instalacion-*.log</code>, <code>install-db.log</code>,
         <code>docker-reposo.log</code>, las carpetas <code>pila-</code><i>versión</i><code>-</code><i>fecha</i> que dejan las instalaciones
         que fallan, los <code>node/proyectos/*.log</code> de los servidores parados y el registro de tareas, <code>tareas/*.txt</code>;
         <code>ventana.log</code> se vacía. Lo que tenga abierto algún programa se deja.</li>
@@ -5151,7 +5207,7 @@
         <code>index.php</code> que trae PrestaShop se quedan).</li>
       <li><code>temporales</code>: borra lo que dejan las tareas, con nombre <code>lvm-</code>…, en la carpeta temporal
         (<span data-so="linux"><code>/tmp</code></span><span data-so="mac"><code>/private/tmp</code></span>) y los restos de tareas de
-        <code>~/.lvm-instalador</code>, solo si lleva más de un día sin cambiar y no está en uso.</li>
+        <code>~/.nexum</code>, solo si lleva más de un día sin cambiar y no está en uso.</li>
       <li><code>sesiones</code>: borra los <code>sess_*</code> de la carpeta <code>temp</code> de cada versión y los tuyos de la carpeta
         temporal.</li>
     </ol>
@@ -5162,6 +5218,9 @@
   <p>Las carpetas importantes del programa, a un clic. «Abrir» las abre en tu explorador de archivos; no cambia nada (es como
     <span data-so="linux"><code>xdg-open /opt/htdocs</code></span><span data-so="mac"><code>open /Library/Nexum/XAMPP-compartido/htdocs</code></span>
     en la terminal).</p>
+  <p>Los ajustes del programa, sus registros y lo que guarda de tus proyectos (los vínculos con sus BBDD, Docker, el túnel, el correo de
+    pruebas, la apariencia…) están en <code>~/.nexum</code>, una carpeta oculta de tu carpeta personal que solo puedes ver tú. Es la de
+    «Registros de instalaciones».</p>
   <figure class="pantalla">
     <div class="barra">
       <span class="tenue">Pulsa un número o empieza el recorrido</span>
@@ -5176,7 +5235,7 @@
       <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
       <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
       <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
-      <li data-x="40" data-y="40.7"><b>Registros de instalaciones</b><span><code>~/.lvm-instalador</code>: los registros de las instalaciones y de la ventana.</span></li>
+      <li data-x="40" data-y="40.7"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
       <li data-x="40" data-y="46.9"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span><span data-so="mac"> (<code>/Library/Nexum/descargas</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
       <li data-x="94" data-y="46.9"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
     </ol>
@@ -5209,8 +5268,8 @@
       <code>nexum copias-ficheros no</code> al apagarlo. Sin nada detrás, dice cómo está.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>El interruptor es un fichero vacío: <code>~/.lvm-instalador/copias-ficheros</code>. Encender lo crea
-        (<code>touch ~/.lvm-instalador/copias-ficheros</code>); apagar lo borra (<code>rm -f ~/.lvm-instalador/copias-ficheros</code>).</li>
+      <li>El interruptor es un fichero vacío: <code>~/.nexum/copias-ficheros</code>. Encender lo crea
+        (<code>touch ~/.nexum/copias-ficheros</code>); apagar lo borra (<code>rm -f ~/.nexum/copias-ficheros</code>).</li>
       <li>Desde entonces, cada vez que el programa vaya a cambiar el fichero de hosts, los vhosts o la configuración de un proyecto, mira si
         está ese fichero y, si está, guarda antes el de ahora en <code>~/nexum-backups</code> con la fecha en el nombre.</li>
     </ol>
@@ -5384,7 +5443,7 @@
       <code>nexum correo no</code> para apagarlo. <code>nexum correo</code>, sin nada más, te dice cómo está.</p>
     <p>Lo que hace, paso a paso:</p>
     <div data-so="linux"><ol>
-      <li>Pide la contraseña de administrador y apunta el estado: apagado es que existe el fichero <code>~/.lvm-instalador/correo-apagado</code>
+      <li>Pide la contraseña de administrador y apunta el estado: apagado es que existe el fichero <code>~/.nexum/correo-apagado</code>
         (<code>rm</code> para encender, <code>touch</code> para apagar).</li>
       <li>Cambia la configuración de PHP de <b>todas</b> las versiones, como root. Encendido, pone
         <code>sendmail_path = "/opt/config/mailpit/mailpit sendmail -S 127.0.0.1:1025"</code>: así el <code>mail()</code> de PHP (la función con la que
@@ -5399,14 +5458,14 @@
       <li>Si algo falla, vuelve a dejarlo como estaba.</li>
     </ol></div>
     <div data-so="mac"><ol>
-      <li>El estado, igual: <code>~/.lvm-instalador/correo-apagado</code>.</li>
+      <li>El estado, igual: <code>~/.nexum/correo-apagado</code>.</li>
       <li>En cada versión, <code>/Library/Nexum/XAMPP-&lt;versión&gt;/xamppfiles/php/etc/conf.d/99-lvm-correo.ini</code> con
         <code>sendmail_path = "/Library/Nexum/mailpit/mailpit sendmail -S 127.0.0.1:1025"</code> y, para WordPress,
         <code>auto_prepend_file</code> con su <code>etc/lvm-correo-wordpress.php</code>. Apagado, el fichero se queda sin esas líneas.</li>
       <li>Recarga Apache de la versión activa, arranca o para Mailpit y pone al día la base del proyecto cargado.</li>
     </ol></div>
     <p>Mailpit lo arranca el programa con tu usuario, solo para tu equipo:
-      <code data-so="linux">/opt/config/mailpit/mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --database ~/.lvm-instalador/mailpit/mailpit.db --max 500 --disable-version-check --block-remote-css-and-fonts</code><code data-so="mac">/Library/Nexum/mailpit/mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --database ~/.lvm-instalador/mailpit/mailpit.db --max 500 --disable-version-check --block-remote-css-and-fonts</code>
+      <code data-so="linux">/opt/config/mailpit/mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --database ~/.nexum/mailpit/mailpit.db --max 500 --disable-version-check --block-remote-css-and-fonts</code><code data-so="mac">/Library/Nexum/mailpit/mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --database ~/.nexum/mailpit/mailpit.db --max 500 --disable-version-check --block-remote-css-and-fonts</code>
       (guarda como mucho los 500 últimos correos). Se para con <code>kill</code> al parar la versión activa o al apagar el correo.</p>
     <p>Para comprobarlo: <code>nexum correo</code> y <code data-so="linux">grep sendmail_path /opt/lampp/php/etc/conf.d/99-lvm-correo.ini</code><code data-so="mac">grep sendmail_path /Applications/XAMPP/xamppfiles/php/etc/conf.d/99-lvm-correo.ini</code>.</p>
   </details>
@@ -5426,7 +5485,7 @@
     <p>La orden del programa: <code>nexum correo wordpress mailpit</code> (o <code>desactivar</code>, o <code>nada</code>).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Apunta el modo en <code>~/.lvm-instalador/correo-wordpress</code>.</li>
+      <li>Apunta el modo en <code>~/.nexum/correo-wordpress</code>.</li>
       <li>Vuelve a aplicar la configuración de PHP de todas las versiones, como al encender: con «a Mailpit», con la línea
         <code>auto_prepend_file</code>; con los otros dos, sin ella. Recarga Apache.</li>
       <li>En la base del proyecto cargado, cambia lo que toque (la opción <code>active_plugins</code> de WordPress, para desactivar plugins) y
@@ -5594,7 +5653,8 @@
     <li><b>Pulsa «Compartir»</b> en el visor del proyecto (en Proyectos, en Docker o, en Node, «Túnel»). Se abre el diálogo «Compartir …», que
       te recuerda que cualquiera con la dirección y la contraseña verá la web mientras el túnel esté abierto. Si ya hay otro abierto, te avisa
       de que se cierra.</li>
-    <li><b>Elige cuánto dura</b> en «Se cierra solo en» (de 1 a 12 horas; 2 de partida).</li>
+    <li><b>Elige cuánto dura</b> en «Se cierra solo en»: 15 minutos, 30 minutos, 1 hora, 2, 3, 4, 6, 8 o 12 horas (2 horas de partida).
+      Para enseñar algo un momento, mejor poco: cuanto menos dure, menos tiempo está tu web a la vista.</li>
     <li><b>Deja encendido «Bloquear el panel de administración»</b>: así nadie puede intentar entrar en el escritorio de WordPress o en el de
       PrestaShop por el túnel (tus bases llevan el administrador de pruebas, con una contraseña conocida). Si lo apagas, la nota de debajo te
       avisa en rojo.</li>
@@ -5604,23 +5664,23 @@
     <li><b>Cuando acabe</b>, se cierra solo a su hora, aunque cierres la ventana. Para cerrarlo antes: «Cerrar el túnel».</li>
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --horas 2 --admin bloquear</code> (la dirección local
-      de la web, su carpeta, las horas del desplegable y el interruptor: <code>--admin permitir</code> si lo apagas). En Docker la dirección es
+    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (la dirección local
+      de la web, su carpeta, los minutos del desplegable y el interruptor: <code>--admin permitir</code> si lo apagas). En Docker la dirección es
       la del contenedor (como <code>https://panaderia-luna-php84.docker.local</code>) y en Node, <code>http://127.0.0.1:&lt;puerto&gt;</code>.
       Si aún no está cloudflared, la ventana lanza antes <code>nexum tunel-instalar</code>.</p>
     <p>Lo que hace <code>tunel-instalar</code>:</p>
     <div data-so="linux"><ol>
-      <li>Descarga el programa oficial de GitHub a <code>~/.lvm-instalador/tunel</code>, sin root:
+      <li>Descarga el programa oficial de GitHub a <code>~/.nexum/tunel</code>, sin root:
         <code>curl -fsSL -o cloudflared https://github.com/cloudflare/cloudflared/releases/download/2026.10.0/cloudflared-linux-amd64</code>
         (<code>arm64</code> en los equipos ARM).</li>
       <li>Comprueba su huella con <code>sha256sum</code>: si no es la que lleva apuntada el programa, lo borra y no instala nada.</li>
-      <li>Lo deja en <code>~/.lvm-instalador/tunel/cloudflared</code> (<code>chmod 755</code>) y apunta su versión en
-        <code>~/.lvm-instalador/tunel/version</code>.</li>
+      <li>Lo deja en <code>~/.nexum/tunel/cloudflared</code> (<code>chmod 755</code>) y apunta su versión en
+        <code>~/.nexum/tunel/version</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Descarga <code>https://github.com/cloudflare/cloudflared/releases/download/2026.10.0/cloudflared-darwin-arm64.tgz</code>
         (<code>amd64</code> en los Mac con Intel), comprueba su sha256, lo descomprime con <code>tar -xzf</code> y deja el programa en
-        <code>~/.lvm-instalador/tunel/cloudflared</code>.</li>
+        <code>~/.nexum/tunel/cloudflared</code>.</li>
     </ol></div>
     <p>Lo que hace <code>tunel-abrir</code>, paso a paso:</p>
     <ol>
@@ -5634,11 +5694,11 @@
       <li>Arranca, aparte de la ventana (<span data-so="linux">con <code>setsid</code></span><span data-so="mac">con <code>nohup</code></span>, para
         que siga abierto aunque la cierres), el proxy de Nexum en
         <code>127.0.0.1</code>, en un puerto libre, y este arranca cloudflared:
-        <code>~/.lvm-instalador/tunel/cloudflared tunnel --no-autoupdate --config /dev/null --url http://127.0.0.1:&lt;puerto del proxy&gt;</code>.
+        <code>~/.nexum/tunel/cloudflared tunnel --no-autoupdate --config /dev/null --url http://127.0.0.1:&lt;puerto del proxy&gt;</code>.
         Es un «túnel rápido» de Cloudflare: sin cuenta y sin tu configuración de <code>~/.cloudflared</code>.</li>
       <li>Cuando cloudflared dice su dirección <code>https://….trycloudflare.com</code>, el proxy la guarda, con la contraseña y la hora de
-        cierre, en <code>~/.lvm-instalador/tunel/estado</code> (solo legible por ti). Lo que pasa se apunta en
-        <code>~/.lvm-instalador/tunel/registro</code>.</li>
+        cierre, en <code>~/.nexum/tunel/estado</code> (solo legible por ti). Lo que pasa se apunta en
+        <code>~/.nexum/tunel/registro</code>.</li>
       <li>El proxy, en cada petición: si no trae la contraseña, enseña la página «Web en pruebas»; con la buena, le da al navegador una
         <b>cookie</b> (un dato pequeño que el navegador guarda y devuelve en cada visita) para no volver a pedirla. Nunca deja pasar
         <code>/phpmyadmin</code>, <code>/server-status</code>, <code>/dashboard</code>, <code>/xampp</code>… ni los ficheros ocultos; con
@@ -5648,7 +5708,7 @@
     </ol>
     <p>No usa <code>sudo</code> para nada del túnel: todo va con tu usuario.</p>
     <p>Para comprobarlo: <code>nexum tunel</code> (con uno abierto, una línea <code>T|https://….trycloudflare.com|http://web.local|…</code>)
-      y <code>tail ~/.lvm-instalador/tunel/registro</code>.</p>
+      y <code>tail ~/.nexum/tunel/registro</code>.</p>
   </details>
 
   <h3>El diálogo del túnel abierto</h3>
@@ -5667,13 +5727,13 @@
       ninguna orden: copian al portapapeles o abren la dirección en el navegador.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Lee en <code>~/.lvm-instalador/tunel/estado</code> el número del proceso del túnel y comprueba que es el suyo
+      <li>Lee en <code>~/.nexum/tunel/estado</code> el número del proceso del túnel y comprueba que es el suyo
         (<code>nexum-tunel</code>). Si no hay ninguno, dice «No hay ningun tunel abierto».</li>
       <li>Le pide que se cierre: <code>kill -TERM &lt;proceso&gt;</code>. El proxy cierra cloudflared. Si a los 5 segundos sigue,
         <code>kill -KILL</code>.</li>
-      <li>Borra <code>~/.lvm-instalador/tunel/estado</code>.</li>
+      <li>Borra <code>~/.nexum/tunel/estado</code>.</li>
     </ol>
-    <p>Para ver la dirección y la contraseña del abierto, en la terminal: <code>cat ~/.lvm-instalador/tunel/estado</code> (los campos
+    <p>Para ver la dirección y la contraseña del abierto, en la terminal: <code>cat ~/.nexum/tunel/estado</code> (los campos
       <code>url</code> y <code>password</code>).</p>
     <p>Para comprobarlo: <code>nexum tunel</code> (sin línea <code>T|…</code>: no hay ninguno abierto).</p>
   </details>
@@ -5794,14 +5854,14 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Pide la contraseña de administrador.</li>
-      <li>Al apagarla, crea el fichero vacío <code>~/.lvm-instalador/sin-barrera-entre-webs</code>; al encenderla, lo borra. Ese fichero es lo que
+      <li>Al apagarla, crea el fichero vacío <code>~/.nexum/sin-barrera-entre-webs</code>; al encenderla, lo borra. Ese fichero es lo que
         recuerda cómo está.</li>
       <li>Rehace <code>etc/extra/lvm-dominio-desconocido.conf</code> de todas las versiones, con o sin el bloque de la barrera (las líneas entre
         <code># &gt;&gt;&gt; barrera entre webs</code> y <code># &lt;&lt;&lt; barrera entre webs</code>), como <code>asegurar --todas</code>. Si no
         puede en alguna, lo deja todo como estaba.</li>
       <li>Si Apache está en marcha, lo recarga:
         <span data-so="linux"><code>sudo /opt/lampp/lampp reloadapache</code></span><span data-so="mac"><code>sudo /Library/Nexum/XAMPP-8.4.27/xamppfiles/xampp reloadapache</code></span>.</li>
-      <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.lvm-instalador/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
+      <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.nexum/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum barrera-web</code> dice si está encendida o apagada.</p>
   </details>
@@ -5856,9 +5916,9 @@
     <li>La contraseña de administrador solo la escribes cuando el sistema la pide de verdad (<code>sudo</code>): la ventana no la guarda.</li>
     <li>El token de GitHub (la clave para leer tus repositorios) va en el llavero de tu sesión, no en un fichero:
       <span data-so="linux">con <code>secret-tool</code> (el del escritorio de Ubuntu)</span><span data-so="mac">en el llavero del Mac</span>.</li>
-    <li>Las contraseñas de las bases de Docker están en ficheros <code>.env</code> de <code>~/.lvm-instalador/docker</code>, que solo puede leer tu
+    <li>Las contraseñas de las bases de Docker están en ficheros <code>.env</code> de <code>~/.nexum/docker</code>, que solo puede leer tu
       usuario.</li>
-    <li><code>~/nexum-backups</code> y <code>~/.lvm-instalador</code> son solo tuyos: ningún otro usuario del equipo puede leerlos.</li>
+    <li><code>~/nexum-backups</code> y <code>~/.nexum</code> son solo tuyos: ningún otro usuario del equipo puede leerlos.</li>
   </ul>
 </section>
 
@@ -6051,6 +6111,12 @@
       si es el cargado, lo quita de Docker, borra su base de la versión activa si la dices (con <code>--copia</code>, antes un volcado),
       quita sus vhosts y sus líneas de <code>/etc/hosts</code>, y por último su carpeta. Si un paso falla, no sigue. Las bases de otras
       versiones no se tocan. Ejemplo: <code>nexum borrar-proyecto moda-verde --bd wp_moda_verde --copia</code>.</dd>
+    <dt><code>exportar-proyecto &lt;carpeta&gt; [--sin-codigo] [--sin-bd] [--bd &lt;base&gt;] [--destino &lt;carpeta&gt;]</code></dt>
+    <dd>Un zip del proyecto en tu carpeta de descargas, <code>&lt;carpeta&gt;_php&lt;rama&gt;_&lt;fecha&gt;_nexum.zip</code>: su código
+      (sin <code>.git</code>), su base de la versión activa (la vinculada, u otra con <code>--bd</code>; sin el administrador de pruebas)
+      y un <code>LEEME-nexum.txt</code>. Si es un repositorio git con cambios sin commit, no exporta nada. Si falla o se cancela, no queda
+      nada a medias. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>. Ejemplo: <code>nexum exportar-proyecto
+      panaderia-luna</code>.</dd>
     <dt><code>usuario-pruebas &lt;base&gt; [carpeta]</code></dt><dd>Crea o pone al día el administrador de pruebas del panel de WordPress o
       PrestaShop: usuario <code>local@local.test</code> con contraseña <code>local</code>. Se hace solo al cargar una base. Ejemplo:
       <code>nexum usuario-pruebas wp_panaderia_luna</code>.</dd>
@@ -6209,10 +6275,10 @@
       node-parar portfolio-estudio</code>.</dd>
     <dt><code>node-registro &lt;carpeta&gt;</code></dt><dd>Lo último que ha escrito su servidor (sus errores, por ejemplo). Ejemplo:
       <code>nexum node-registro portfolio-estudio</code>.</dd>
-    <dt><code>tunel-abrir &lt;dirección local&gt; [carpeta] [--horas 1-12] [--admin bloquear|permitir]</code></dt><dd>Enseña una web de tu
+    <dt><code>tunel-abrir &lt;dirección local&gt; [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]</code></dt><dd>Enseña una web de tu
       equipo a otra persona con una dirección <code>https://&lt;algo&gt;.trycloudflare.com</code> (un <b>túnel</b> de Cloudflare, sin
       cuenta). Lleva una contraseña nueva al azar, el panel de administración bloqueado y se cierra solo (a las 2 horas si no dices otra
-      cosa). Ejemplo: <code>nexum tunel-abrir https://web.local panaderia-luna --horas 1</code>.</dd>
+      cosa; desde 15 minutos). Ejemplo: <code>nexum tunel-abrir https://web.local panaderia-luna --minutos 30</code>.</dd>
     <dt><code>tunel</code> · <code>tunel-cerrar</code> · <code>tunel-instalar</code></dt><dd>Cómo está el túnel, cerrarlo, o instalar
       cloudflared (el programa del túnel). Ejemplo: <code>nexum tunel-cerrar</code>.</dd>
   </dl>
@@ -6255,7 +6321,7 @@
       <code>nexum vhosts-sin-carpeta</code>.</dd>
     <dt><code>manual [--ruta] [&lt;capítulo&gt;]</code></dt><dd>Abre este manual en el navegador, al principio o en ese capítulo
       (<code>proyectos</code>, <code>bbdd</code>, <code>docker</code>, <code>limpieza</code>…). Va dentro del programa: se saca a
-      <code>~/.lvm-instalador/ayuda</code>. Con <code>--ruta</code>, solo dice qué fichero abrir. Ejemplo: <code>nexum manual
+      <code>~/.nexum/ayuda</code>. Con <code>--ruta</code>, solo dice qué fichero abrir. Ejemplo: <code>nexum manual
       comandos</code>.</dd>
   </dl>
 
@@ -6268,7 +6334,7 @@
     <dt data-so="mac"><code>actualizar-gestor &lt;nexum-mac-X.Y.Z.zip&gt;</code></dt><dd data-so="mac">Instala esa versión del
       programa en <code>/Library/Nexum/gestor</code> si su firma (el <code>.zip.sig</code> de al lado) es la de quien lo publica y es más
       nueva. Es lo que hace «Buscar actualizaciones». Ejemplo: <code>nexum actualizar-gestor
-      ~/.lvm-instalador/actualizaciones/nexum-mac-1.57.11.zip</code>.</dd>
+      ~/.nexum/actualizaciones/nexum-mac-1.57.11.zip</code>.</dd>
     <dt data-so="mac"><code>instalar-gestor</code></dt><dd data-so="mac">Desde una copia del script (la del <code>.dmg</code>), lo instala en
       <code>/Library/Nexum/gestor</code>, sigue con <code>migrar</code> y abre la ventana. Ejemplo: <code>bash lvm-instalador.sh
       instalar-gestor</code>.</dd>
@@ -6306,7 +6372,7 @@
       <b>informe</b> que se puede copiar entero: el sistema, el paso que falló, sus errores y el final de su registro.</li>
     <li><b>Una tarea de hace un rato:</b> Configuración → General, <a href="#tareas">Registro de tareas</a>: cada una, entera, con su orden y
       todo lo que dijo.</li>
-    <li><b>Los registros de todo:</b> menú ☰ → «Carpeta de registros» (<code>~/.lvm-instalador</code>).</li>
+    <li><b>Los registros de todo:</b> menú ☰ → «Carpeta de registros» (<code>~/.nexum</code>).</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>Los mismos registros, sin la ventana. <code>tail -50 &lt;fichero&gt;</code> enseña sus 50 últimas líneas (lo más reciente);
@@ -6320,10 +6386,10 @@
         <li>MariaDB: <code>sudo tail -50 /opt/lampp/var/mysql/mysqld.err</code> (el <code>.err</code> de esa carpeta:
           <code>sudo ls /opt/lampp/var/mysql/*.err</code>).</li>
         <li>El informe de una instalación que ha fallado:
-          <code>ls -dt ~/.lvm-instalador/pila-* | head -1</code> dice la carpeta de la última, y dentro está
+          <code>ls -dt ~/.nexum/pila-* | head -1</code> dice la carpeta de la última, y dentro está
           <code>informe-error.txt</code>.</li>
-        <li>Lo que hace cada orden del programa: <code>ls -t ~/.lvm-instalador/instalacion-*.log | head</code>.</li>
-        <li>Los errores de la propia ventana: <code>cat ~/.lvm-instalador/ventana.log</code>.</li>
+        <li>Lo que hace cada orden del programa: <code>ls -t ~/.nexum/instalacion-*.log | head</code>.</li>
+        <li>Los errores de la propia ventana: <code>cat ~/.nexum/ventana.log</code>.</li>
       </ol>
     </div>
     <div data-so="mac">
@@ -6331,8 +6397,8 @@
         <li>Apache: <code>tail -50 /Applications/XAMPP/xamppfiles/logs/error_log</code> y el de cada vhost en esa misma carpeta.</li>
         <li>MariaDB: el <code>.err</code> de <code>/Applications/XAMPP/xamppfiles/var/mysql</code>
           (<code>sudo ls /Applications/XAMPP/xamppfiles/var/mysql/*.err</code>).</li>
-        <li>El informe de una instalación que ha fallado: en la carpeta más reciente de <code>~/.lvm-instalador</code>
-          (<code>ls -t ~/.lvm-instalador | head</code>).</li>
+        <li>El informe de una instalación que ha fallado: en la carpeta más reciente de <code>~/.nexum</code>
+          (<code>ls -t ~/.nexum | head</code>).</li>
       </ol>
     </div>
     <p>Para ver de un vistazo cómo está todo: <code>nexum estado</code>, <code>nexum procesos</code> y
@@ -6355,8 +6421,8 @@
   <details><summary>Una instalación falla compilando</summary>
     <p>No se queda nada a medias: lo ya descargado pasa a la caché y no se instala nada. Pulsa «Ver el log del error» y copia el informe:
       dice el paso que falló y sus últimas líneas.</p>
-    <p><b>En la terminal:</b> el informe está en <code>~/.lvm-instalador/pila-&lt;versión&gt;-&lt;fecha&gt;/informe-error.txt</code>
-      (<code>less "$(ls -dt ~/.lvm-instalador/pila-* | head -1)/informe-error.txt"</code>). Si habla de una librería que falta, vuelve a
+    <p><b>En la terminal:</b> el informe está en <code>~/.nexum/pila-&lt;versión&gt;-&lt;fecha&gt;/informe-error.txt</code>
+      (<code>less "$(ls -dt ~/.nexum/pila-* | head -1)/informe-error.txt"</code>). Si habla de una librería que falta, vuelve a
       lanzar la instalación: el programa instala lo que necesita para compilar<span data-so="linux"> (con <code>apt</code>)</span><span
       data-so="mac"> (con Homebrew)</span>.</p></details>
   <details><summary>No encuentra la versión nueva del programa</summary>
@@ -6448,8 +6514,9 @@
       sitio de antes.</p>
     <p><b>Compruébalo:</b> <code data-so="linux">getent hosts ferreteria-norte.com</code><code data-so="mac">dscacheutil -q host -a name ferreteria-norte.com</code>
       (falseado, dice <code>127.0.0.1</code>) y <code>grep ferreteria-norte /etc/hosts</code>. <b>Arréglalo:</b> vacía la caché de nombres
-      (<code data-so="linux">sudo resolvectl flush-caches</code><code data-so="mac">sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code>,
-      o «Vaciar DNS» en la terminal de abajo) y cierra y vuelve a abrir el navegador.</p></details>
+      (<span data-so="linux"><code>sudo resolvectl flush-caches</code>; en Ubuntu 20.04, <code>sudo systemd-resolve --flush-cache</code></span><code
+      data-so="mac">sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code>, o «Vaciar DNS» en la terminal de abajo, que elige la
+      de tu sistema) y cierra y vuelve a abrir el navegador.</p></details>
   <details><summary>Una pasarela de pago vuelve a la tienda con un error</summary>
     <p>La barrera entre webs no deja que otra web le mande formularios a tus proyectos, y la vuelta de una pasarela es justo eso.</p>
     <p><b>Arréglalo:</b> <code>nexum barrera-web no</code> mientras la pruebas y <code>nexum barrera-web si</code> al
@@ -6464,7 +6531,7 @@
   <details><summary>La ventana no se abre</summary>
     <p>Ábrela desde una terminal para ver qué dice: <code>nexum ventana</code>.<span data-so="linux"> Si falta GTK para Python, te
       dice cómo instalarlo (<code>sudo apt install python3-gi gir1.2-gtk-3.0</code>); los errores de cuando se abre desde el menú quedan en
-      <code>~/.lvm-instalador/ventana.log</code>.</span> Mientras tanto, todo se puede hacer desde el panel: <code>nexum</code>.</p></details>
+      <code>~/.nexum/ventana.log</code>.</span> Mientras tanto, todo se puede hacer desde el panel: <code>nexum</code>.</p></details>
   <details><summary>«Hay una tarea en marcha: espera a que acabe»</summary>
     <p>Solo va una tarea a la vez. Pulsa la flecha verde de arriba para ver la que está trabajando, y espera a que acabe o cancélala.</p></details>
   <details><summary>Una orden dice que MariaDB «no responde o root tiene contraseña»</summary>

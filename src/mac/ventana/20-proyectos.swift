@@ -386,6 +386,10 @@ struct ProjectsView: View {
         let db = model.projectBase(x)
         var items: [(String, () -> Void)] = [("Opciones de la BBDD…", { model.linkProject(x) }),
                                              ("Abrir la carpeta", { showFolder(HTDOCS + "/" + x.name) })]
+        if model.loadedEntry()?.name == x.name {
+            // (solo el cargado: se exporta con la versión de PHP donde está y su BBDD de esa versión)
+            items.append(("Exportar proyecto…", { model.exportProject(x) }))
+        }
         for dp in model.dockerOf(x.name) {
             // (uno por entorno de Docker: cada uno dice el suyo)
             items.append(("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…", { model.dockerDelete(dp) }))

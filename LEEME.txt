@@ -301,7 +301,7 @@ SI ALGO FALLA
 
 El instalador no deja nada a medias: si una instalación falla, la
 versión que tenías sigue funcionando. Los registros (logs) quedan en la
-carpeta oculta ~/.lvm-instalador. Envíalos junto con lo que salió en
+carpeta oculta ~/.nexum. Envíalos junto con lo que salió en
 pantalla a quien te pasó el instalador.
 
 SI phpMyAdmin DICE "phpMyAdmin esta en http://127.0.0.1/phpmyadmin/"

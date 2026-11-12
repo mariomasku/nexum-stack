@@ -19,7 +19,7 @@ else
     check "Linux: abajo del contenido (se cambia de alto arrastrando), escondida hasta que se pulsa" 'grep -q "self.term_paned.pack2(self.nv_term_panel(), False, False)" "$SRC" && grep -A3 "        box.show_all()" "$SRC" | grep -q "box.set_no_show_all(True)"'
     check "Linux: VTE con tu shell en la carpeta del proyecto cargado; sin VTE, dice como ponerla" 'grep -q "t.spawn_async(Vte.PtyFlags.DEFAULT, cwd, \[shell\]" "$SRC" && grep -q "sudo apt install gir1.2-vte-2.91" "$SRC"'
     check "Linux: copiar y pegar con Ctrl+Mayús+C/V, Ctrl/Mayús+Insert y el botón derecho" 'grep -q "t.connect(\"key-press-event\", self.nv_term_key)" "$SRC" && grep -q "t.connect(\"button-press-event\", self.nv_term_click)" "$SRC" && grep -q "self.term_sw.paste_clipboard()" "$SRC"'
-    check "Linux: el proyecto cargado (su nombre) se busca dentro de los proyectos; boton Vaciar DNS" 'grep -q "cur = os.path.join(HTDOCS, cur) if cur else" "$SRC" && grep -q "self.nv_term_type(\"sudo resolvectl flush-caches\")" "$SRC"'
+    check "Linux: el proyecto cargado (su nombre) se busca dentro de los proyectos; boton Vaciar DNS" 'grep -q "cur = os.path.join(HTDOCS, cur) if cur else" "$SRC" && grep -q "lambda \*_: self.nv_term_flush_dns(), flat=True)" "$SRC"'
     check "Linux: con el aspecto del visor, hundida (sombra por dentro)" 'grep -q "^.nv-terminal { background-color: shade(@theme_bg_color, 0.78)" "$SRC" && grep -q "box-shadow: inset 0 2px 7px" "$SRC"'
     check "Linux: ir al proyecto cargado escribe el cd, con la ruta entre comillas" 'grep -qF "self.nv_term_type(\"cd %s\" % shlex.quote(cwd))" "$SRC"'
     if python3 -c "import gi; gi.require_version('Vte','2.91')" 2> /dev/null; then

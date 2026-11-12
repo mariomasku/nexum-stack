@@ -59,7 +59,7 @@ EOF
 #   R|dueño/repo|nombre|privado (1/0)|ultimo cambio (AAAA-MM-DD)|rama|prefijo|web|descripcion|estado|carpeta
 #     estado: clonado (en la carpeta), ocupado (hay una carpeta con su nombre que no es ese repositorio) o nuevo
 #   E|lo que ha fallado
-REPOS_CACHE_FILE=$HOME/.lvm-instalador/repos-github
+REPOS_CACHE_FILE=$LOG_DIR/repos-github
 function repos_list() {
     local account kind login path all="" hdr page=1 url next clones show_all=0 cached=0 a
     for a in "$@"; do
@@ -220,7 +220,7 @@ function repo_fetch() {
     rm -f "$known"
     htdocs_close_world "$dir"
     # (como los de Montar nuevo proyecto: el dominio de su base no se falsea solo)
-    mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
+    mkdir -p "$LOG_DIR" && { grep -qxF -- "$name" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$name" >> "$REPO_PROJECTS_FILE"; }
     echo "Listo: $name está en Proyectos (cárgalo con su versión de PHP y su BBDD)"
 }
@@ -607,7 +607,7 @@ function project_update() {
             copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
             [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
         fi
-        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$HOME/.lvm-instalador/temporal" "$DRY"; then
+        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
         fi

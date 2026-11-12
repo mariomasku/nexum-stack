@@ -10,7 +10,9 @@ except OSError:
 P = json.load(open(params_path))
 os.remove(params_path)
 STATE, DIR = P["state"], P["dir"]
-EXPIRES = int(time.time() + int(P["hours"]) * 3600)
+# (los minutos que se han elegido; los de antes de la 1.57.14 venian en horas)
+MINUTES = int(P["minutes"]) if "minutes" in P else int(P["hours"]) * 60
+EXPIRES = int(time.time() + MINUTES * 60)
 PASSWORD = P["password"].encode()
 KEY = secrets.token_bytes(32)
 COOKIE = "nexum_tunel"
@@ -370,7 +372,7 @@ def write_state(url):
     with os.fdopen(fd, "w") as f:
         json.dump({"pid": os.getpid(), "url": url, "target": "%s://%s" % (P["scheme"], host_header(
             {"scheme": P["scheme"], "host": P["host"], "port": int(P["port"])})), "folder": P["folder"],
-            "expires": EXPIRES, "started": int(time.time()), "password": P["password"], "hours": int(P["hours"]),
+            "expires": EXPIRES, "started": int(time.time()), "password": P["password"], "minutes": MINUTES, "hours": max(1, MINUTES // 60),
             "admin": P["admin"]}, f)
     os.replace(tmp, STATE)
 

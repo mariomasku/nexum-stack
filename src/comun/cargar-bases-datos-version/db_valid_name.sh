@@ -15,7 +15,7 @@ function db_valid_name() {
 }
 
 # Importaciones hechas con nexum: carpeta real de datos de MariaDB|base|fecha (segundos)
-IMPORTS_FILE="$HOME/.lvm-instalador/importaciones"
+IMPORTS_FILE="$LOG_DIR/importaciones"
 
 # Bases de una carpeta de datos de MariaDB con su fecha: base|fecha|tipo. Tipo i: la de su ultima
 # importacion con nexum. Tipo c: la de su carpeta, que cambia al crear o borrar tablas (al

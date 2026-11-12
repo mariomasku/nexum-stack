@@ -172,7 +172,7 @@ function gui_php_dates() {
 #    peticiones del proxy como de 127.0.0.1
 #  - cambia el dominio local (web.local, el de la tienda...) por el del tunel en lo que devuelve la web:
 #    no se toca ni wp-config.php ni la BBDD, y al cerrarlo no hay nada que deshacer
-# Un tunel cada vez. cloudflared va en ~/.lvm-instalador/tunel, con tu usuario (sin root): version fijada
+# Un tunel cada vez. cloudflared va en ~/.nexum/tunel, con tu usuario (sin root): version fijada
 # y sha256 de cada .tgz de la publicacion en GitHub (sus digest, comprobados al descargarlos el
 # 27/10/2026; los de sus notas son de antes de firmarlos para el Mac y no coinciden)
 TUNNEL_VERSION="2026.10.0"
@@ -288,24 +288,36 @@ function tunnel_close() {
     echo "Tunel cerrado: la direccion ya no lleva a ningun sitio"
 }
 
-# tunel-abrir <direccion local> [carpeta del proyecto] [--horas 1-12] [--admin bloquear|permitir]: la
+# tunel-abrir <direccion local> [carpeta del proyecto] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]: la
 # direccion, de una web de este equipo (http://web.local, https://proyecto-php83.docker.local:8443...); la
 # carpeta, para saber que admin bloquear y el dominio de una tienda PrestaShop. Cada tunel con lo suyo: sus
-# horas (2 si no se dice), el admin (bloqueado si no se dice) y su contraseña, siempre una nueva al azar
+# minutos (120 si no se dice; desde 15), el admin (bloqueado si no se dice) y su contraseña, siempre una nueva al azar
 # (la de un tunel no vale para el siguiente). Cierra el que hubiera
+# La duracion de un tunel, para decirla: 15 min, 30 min, 1 h, 2 h, 1 h 30 min...
+function tunnel_duration_text() {
+    local m=$1
+    if [ "$m" -lt 60 ]; then echo "$m min"
+    elif [ $(( m % 60 )) -eq 0 ]; then echo "$(( m / 60 )) h"
+    else echo "$(( m / 60 )) h $(( m % 60 )) min"
+    fi
+}
+
 function tunnel_open() {
-    local url=$1 folder="" scheme host port ip clave horas=2 admin=bloquear params dir="" domains n url_t
+    local url=$1 folder="" scheme host port ip clave minutos=120 admin=bloquear params dir="" domains n url_t
     shift
     [ -n "$1" ] && [[ "$1" != --* ]] && { folder=${1%/}; shift; }
     while [ $# -gt 0 ]; do
         case $1 in
-            --horas) [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }; horas=$2; shift 2 ;;
+            --horas) [[ "$2" =~ ^([1-9]|1[0-2])$ ]] || { echo "Las horas van de 1 a 12"; return 1; }; minutos=$(( $2 * 60 )); shift 2 ;;
+            --minutos) [[ "$2" =~ ^[1-9][0-9]{1,2}$ ]] && [ "$2" -ge 15 ] && [ "$2" -le 720 ] \
+                    || { echo "Los minutos van de 15 a 720 (12 horas)"; return 1; }
+                minutos=$2; shift 2 ;;
             --admin) [[ "$2" =~ ^(bloquear|permitir)$ ]] || { echo "--admin bloquear o permitir"; return 1; }; admin=$2; shift 2 ;;
             *) echo "Opcion desconocida: $1"; return 1 ;;
         esac
     done
     if [ -z "$url" ]; then
-        echo "Uso: nexum tunel-abrir <direccion local> [carpeta] [--horas 1-12] [--admin bloquear|permitir]"
+        echo "Uso: nexum tunel-abrir <direccion local> [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]"
 
         return 1
     fi
@@ -347,7 +359,7 @@ print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])' "$host" 2
         valid_domain "$n" && domains+=" $n"
     fi
     echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
-    echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $horas h)"
+    echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $(tunnel_duration_text "$minutos"))"
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] cloudflared tunnel --url http://127.0.0.1:<puerto del proxy>"
 
@@ -358,12 +370,12 @@ print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])' "$host" 2
     # (lo que necesita el proxy, en un fichero solo tuyo que borra al leerlo: la contraseña no va en
     # la linea de ordenes)
     params=$(mktemp "$TUNNEL_DIR/abrir.XXXXXX") || return 1
-    T_SCHEME=$scheme T_HOST=$host T_PORT=$port T_DOMAINS=$domains T_FOLDER=$dir T_CLAVE=$clave T_HORAS=$horas \
+    T_SCHEME=$scheme T_HOST=$host T_PORT=$port T_DOMAINS=$domains T_FOLDER=$dir T_CLAVE=$clave T_MINUTOS=$minutos \
         T_ADMIN=$admin T_BIN=$TUNNEL_BIN T_STATE=$TUNNEL_STATE T_DIR=$TUNNEL_DIR T_ICON=$(tr -d ' \n' <<< "$ICON_PNG_B64") \
         python3 -I -c 'import json, os, sys
 e = os.environ
 json.dump({"scheme": e["T_SCHEME"], "host": e["T_HOST"], "port": int(e["T_PORT"]), "domains": e["T_DOMAINS"].split(),
-           "folder": e["T_FOLDER"], "password": e["T_CLAVE"], "hours": int(e["T_HORAS"]), "admin": e["T_ADMIN"],
+           "folder": e["T_FOLDER"], "password": e["T_CLAVE"], "minutes": int(e["T_MINUTOS"]), "admin": e["T_ADMIN"],
            "cloudflared": e["T_BIN"], "state": e["T_STATE"], "dir": e["T_DIR"], "icon": e["T_ICON"]}, open(sys.argv[1], "w"))' \
         "$params" || { rm -f "$params"; return 1; }
     rm -f "$TUNNEL_STATE"

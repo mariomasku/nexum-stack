@@ -8,7 +8,7 @@
 #   CUENTA=   la organizacion o cuenta cuyos repositorios se ven
 #   PREFIJOS= los prefijos de los nombres que se ven, separados por espacios (vacio: todos)
 #   ORIGEN=   llavero (el token guardado) o gh (la sesion de la herramienta de GitHub)
-GITHUB_CONF_FILE=$HOME/.lvm-instalador/github
+GITHUB_CONF_FILE=$LOG_DIR/github
 GITHUB_KEYRING_SERVICE=nexum-dev-stack
 GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
 
@@ -154,7 +154,7 @@ function mount_project() {
     htdocs_close_world "$dest"
     # Apuntada como montada desde un repositorio: el dominio de su base no se falsea solo (ver
     # load_project_domain)
-    mkdir -p "$HOME/.lvm-instalador" && { grep -qxF -- "$folder" "$REPO_PROJECTS_FILE" 2> /dev/null \
+    mkdir -p "$LOG_DIR" && { grep -qxF -- "$folder" "$REPO_PROJECTS_FILE" 2> /dev/null \
         || printf '%s\n' "$folder" >> "$REPO_PROJECTS_FILE"; }
 
     task_step

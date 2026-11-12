@@ -48,11 +48,20 @@ APP_ID = "dev.hexer.LamppVersionManager"
 # Parches de PHP sin soporte que se compilan con el arreglo de PHP2Shell (PHP2SHELL_BACKPORTS del script)
 PHP2SHELL_BACKPORTS = ("7.4.33", "8.0.30", "8.1.34")
 ICON = "nexum"
-LOG_DIR = os.path.expanduser("~/.lvm-instalador")
+# Ajustes y registros (LOG_DIR del script): ~/.nexum. Hasta la 1.57.13 eran ~/.lvm-instalador, que el script
+# renombra a ~/.nexum al arrancar (y deja un enlace en su sitio) antes de abrir la ventana. Si no se ha pasado
+# (con --simular o en las pruebas), la de antes, como el script: no se crea una ~/.nexum al lado
+LOG_DIR = os.path.expanduser("~/.nexum")
+LOG_DIR_OLD = os.path.expanduser("~/.lvm-instalador")
+if not os.path.lexists(LOG_DIR) and os.path.isdir(LOG_DIR_OLD) and not os.path.islink(LOG_DIR_OLD):
+    LOG_DIR = LOG_DIR_OLD
 # Copias de seguridad (COPIES_DIR del script): solo las que se piden, y las de los ficheros que cambia el
 # programa si está el ajuste COPIES_FILES_FLAG (nexum copias-ficheros si|no)
 COPIES_DIR = os.path.expanduser("~/nexum-backups")
 COPIES_FILES_FLAG = os.path.join(LOG_DIR, "copias-ficheros")
+# Lo que puede durar un túnel de Cloudflare: minutos y cómo se dice
+TUNNEL_TIMES = [(15, "15 minutos"), (30, "30 minutos"), (60, "1 hora"), (120, "2 horas"), (180, "3 horas"),
+                (240, "4 horas"), (360, "6 horas"), (480, "8 horas"), (720, "12 horas")]
 # La ultima version que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
 LAST_VERSION_FILE = os.path.join(LOG_DIR, "ultima-version")
 # El aviso de la casilla de copia al actualizar una versión en su carpeta (solo hace falta si MariaDB cambia de rama)
@@ -185,7 +194,7 @@ def name_match_project(db, folders):
 
 
 def guess_project(db, ver=None):
-    """Carpeta del proyecto de una base: la vinculada (~/.lvm-instalador/proyectos; la de la
+    """Carpeta del proyecto de una base: la vinculada (~/.nexum/proyectos; la de la
     versión, si se indica, manda sobre la de todas), la única cuya configuración la usa o la que se
     llama como la base. None si no se sabe o si en esa versión está desvinculada."""
     folders = project_folders()
@@ -259,7 +268,7 @@ def copy_name(db, php):
 
 def write_links(changes):
     """Guarda vínculos (base, versión, carpeta; carpeta vacía = ninguna) en
-    ~/.lvm-instalador/proyectos, como base@versión=carpeta. Devuelve el error o None."""
+    ~/.nexum/proyectos, como base@versión=carpeta. Devuelve el error o None."""
     keys = {"%s@%s" % (db, ver) for db, ver, _ in changes}
     lines = []
     try:

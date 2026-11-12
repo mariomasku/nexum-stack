@@ -5,6 +5,31 @@ BRAND_SVG["docker-letras"] = base64.b64encode(zlib.compress(zlib.decompress(base
 BRAND_RATIO["docker-letras"] = 865 / 210
 
 
+def dns_flush_command(os_release="/etc/os-release", which=None):
+    """La orden para vaciar la caché DNS de systemd-resolved en este sistema: en Ubuntu 20.04 y anteriores (y lo que
+    va sobre ellas, como Linux Mint 20), `systemd-resolve --flush-cache`; desde la 22.04, `resolvectl flush-caches`.
+    Si la que toca no está instalada, la otra; sin ninguna de las dos, None (no usa systemd-resolved)."""
+    info = {}
+    try:
+        with open(os_release, encoding="utf-8") as f:
+            for line in f:
+                k, sep, v = line.strip().partition("=")
+                if sep:
+                    info[k] = v.strip().strip('"')
+    except OSError:
+        pass
+    old = info.get("UBUNTU_CODENAME", info.get("VERSION_CODENAME", "")) in ("xenial", "bionic", "focal")
+    if not old and info.get("ID") == "ubuntu":
+        try:
+            old = tuple(int(x) for x in info.get("VERSION_ID", "").split(".")[:2]) < (22, 4)
+        except ValueError:
+            pass
+    which = which or shutil.which
+    new_cmd = "sudo resolvectl flush-caches" if which("resolvectl") else None
+    old_cmd = "sudo systemd-resolve --flush-cache" if which("systemd-resolve") else None
+    return (old_cmd or new_cmd) if old else (new_cmd or old_cmd)
+
+
 class NvTerminal:
     """La terminal de abajo de la ventana."""
 
@@ -29,7 +54,7 @@ class NvTerminal:
         head.pack_end(b, False, False, 0)
         head.pack_end(nv_button("edit-clear-all-symbolic", "Vaciar DNS",
                                 "Vaciar la caché DNS",
-                                lambda *_: self.nv_term_type("sudo resolvectl flush-caches"), flat=True),
+                                lambda *_: self.nv_term_flush_dns(), flat=True),
                       False, False, 0)
         box.pack_start(head, False, False, 0)
         self.term_slot = Gtk.Box()
@@ -181,6 +206,14 @@ class NvTerminal:
             return
         self.term_sw.feed_child((cmd + "\n").encode())
         self.term_sw.grab_focus()
+
+    def nv_term_flush_dns(self):
+        """«Vaciar DNS»: escribe la orden de este sistema (dns_flush_command) en la terminal."""
+        cmd = dns_flush_command()
+        if cmd is None:
+            self.toast("Este sistema no usa systemd-resolved: no hay caché DNS que vaciar con resolvectl")
+            return
+        self.nv_term_type(cmd)
 
     def nv_theme(self):
         """Claro u oscuro, solo en esta ventana (se recuerda). Con un tema que ya es oscuro de por si

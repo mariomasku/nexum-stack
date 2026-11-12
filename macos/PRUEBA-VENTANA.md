@@ -64,7 +64,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    - **Root ya no pasa por /Applications:** `mv /Applications/XAMPP-compartido /Applications/XAMPP-compartido.prueba` (es solo el enlace) y `nexum reiniciar`: tiene que arrancar y servir los proyectos igual. Después, `mv /Applications/XAMPP-compartido.prueba /Applications/XAMPP-compartido`.
    - **Una copia no ejecuta nada como root:** `cp /Library/Nexum/gestor/lvm-instalador.sh /tmp/x.sh && bash /tmp/x.sh version` dice la versión del gestor de root (abre el instalado, no la copia).
    - `nexum migrar` otra vez: no hace nada (ya no queda nada en `/Applications`).
-6. **Docker:** en Docker Desktop, **Settings › Resources › File sharing**, añade `/Library/Nexum/XAMPP-compartido/htdocs` y pulsa Apply. Arranca tus proyectos en Docker (apartado Docker, Arrancar): `grep htdocs ~/.lvm-instalador/docker/*/compose.yaml` tiene que enseñar la ruta nueva, y cada proyecto abre por `https://<carpeta>.docker.local` con sus datos. `sudo ls -l /Library/Nexum/XAMPP-compartido/docker-claves` → ficheros de root con `-rw-------`.
+6. **Docker:** en Docker Desktop, **Settings › Resources › File sharing**, añade `/Library/Nexum/XAMPP-compartido/htdocs` y pulsa Apply. Arranca tus proyectos en Docker (apartado Docker, Arrancar): `grep htdocs ~/.nexum/docker/*/compose.yaml` tiene que enseñar la ruta nueva, y cada proyecto abre por `https://<carpeta>.docker.local` con sus datos. `sudo ls -l /Library/Nexum/XAMPP-compartido/docker-claves` → ficheros de root con `-rw-------`.
 7. **Si algo falla:** pásame toda la salida de Terminal y la de `ls -la /Applications /Library/Nexum` y `sudo ls -la /Library/Nexum/.migracion` (si existe: es el diario para deshacer). Si se quedara a medias, `nexum migrar` primero deshace lo que quedó en el diario y vuelve a empezar. Después de pasar las versiones, la 1.39.2 ya no las ve (busca carpetas en `/Applications`): no vuelvas a ella sin avisarme.
 
 ## Paso 1: compilar la ventana
@@ -76,7 +76,7 @@ nexum ventana
 ```
 
 - Si compila, se abre la ventana nueva y la aplicación de `~/Applications` pasa a llamarse «Nexum Dev Stack» (la «Nexum Stack» de antes desaparece).
-- Si no compila, dice que la ventana no está disponible. **Pásame el archivo `~/.lvm-instalador/app/compilar.log`.** Hasta que se arregle, el panel de Terminal funciona como siempre.
+- Si no compila, dice que la ventana no está disponible. **Pásame el archivo `~/.nexum/app/compilar.log`.** Hasta que se arregle, el panel de Terminal funciona como siempre.
 
 ## Paso 2: mirar sin cambiar nada
 
@@ -105,7 +105,7 @@ Sin simulación, pulsa **Encendidos** (para y desactiva la versión) y después 
 ## Paso 4: un proyecto en Docker
 
 1. Instala y abre Docker Desktop. En **Settings › Resources › File sharing**, añade `/Library/Nexum/XAMPP-compartido/htdocs` y pulsa Apply (desde la 1.39.3; la de antes, `/Applications/XAMPP-compartido/htdocs`, ya no hace falta).
-2. **Los proyectos que ya tenías en Docker** (de la 1.39.1): en el apartado Docker sale un aviso rojo «PHP-FPM abierto en 127.0.0.1». Pulsa **Cerrarlo** (pide la contraseña): rehace la imagen de PHP (Apache con PHP), cambia su `compose.yaml` y su vhost y guarda lo de antes en `~/.lvm-instalador/docker/<nombre>/antes-esquema-2`. Después, cada proyecto tiene que abrirse igual por `https://<carpeta>.docker.local`, con sus datos.
+2. **Los proyectos que ya tenías en Docker** (de la 1.39.1): en el apartado Docker sale un aviso rojo «PHP-FPM abierto en 127.0.0.1». Pulsa **Cerrarlo** (pide la contraseña): rehace la imagen de PHP (Apache con PHP), cambia su `compose.yaml` y su vhost y guarda lo de antes en `~/.nexum/docker/<nombre>/antes-esquema-2`. Después, cada proyecto tiene que abrirse igual por `https://<carpeta>.docker.local`, con sus datos.
 3. En la ventana, **Docker → Proyecto en Docker…**: elige una carpeta de prueba, PHP 8.2, MariaDB 11.4, la BBDD que se copia (o ninguna) y pulsa **Crear en Docker**. La primera vez prepara la imagen de PHP (unos minutos).
 4. Abre `https://<carpeta>.docker.local`: el Apache de la versión activa le pasa la web entera al del contenedor. Comprueba con un `phpinfo()` que la versión es la 8.2, que `$_SERVER['HTTP_X_NEXUM_KEY']` **no** sale y que `expose_php` está en Off.
 5. **Sin la clave no responde** (lo que hay que comprobar en Docker Desktop, que no se ha podido probar desde Linux):
@@ -121,7 +121,7 @@ Sin simulación, pulsa **Encendidos** (para y desactiva la versión) y después 
 11. Pulsa **PHP 8.2** en su fila y cámbiala a 7.4 (sale «Vulnerable (PHP2Shell)» en rojo en el formulario); parar (rojo), arrancar (verde), registros y, al final, la papelera (quita también su clave de `docker-claves`).
 12. **Tabla de contenedores (1.39.4):** en la barra de la izquierda, la ballena de Docker sale de un color, como los demás iconos (azul solo si está elegida). En la tabla, la columna **ID** (12 cifras hexadecimales, como `docker ps`) va después de Nombre y ya no hay columna Estado: el punto verde junto al nombre dice si está en marcha, y junto al del proyecto si lo están todos. Los puertos salen enteros y las acciones, pegadas a la derecha; el primer botón del proyecto arranca (verde) o para (rojo) todos sus contenedores.
 
-Si algo falla, pasa la salida de la tarea («Ver registro») y la de `docker ps -a` y `cat ~/.lvm-instalador/docker/<nombre>/compose.yaml`.
+Si algo falla, pasa la salida de la tarea («Ver registro») y la de `docker ps -a` y `cat ~/.nexum/docker/<nombre>/compose.yaml`.
 
 ## Paso 5: PHP2Shell, la barrera entre webs y los diálogos (1.39.2)
 
@@ -159,7 +159,7 @@ Lo que mandan las webs (formularios, pedidos, contraseñas) tiene que llegar a M
    ```bash
    pgrep -lf '^/Library/Nexum/mailpit/mailpit --smtp'               # uno, con tu usuario (ps -o user= -p <pid>)
    lsof -nP -iTCP -sTCP:LISTEN | grep mailpit                       # solo 127.0.0.1:1025 y 127.0.0.1:8025
-   ls -ld ~/.lvm-instalador/mailpit                                 # drwx------
+   ls -ld ~/.nexum/mailpit                                 # drwx------
    curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: evil.com' http://127.0.0.1:8025/   # no 200 (Host no permitido)
    ```
 
@@ -174,7 +174,7 @@ Lo que mandan las webs (formularios, pedidos, contraseñas) tiene que llegar a M
 10. **Apagar** el interruptor «Correo de pruebas» (pide confirmación, en rojo, y la contraseña): el botón **Correo** de arriba desaparece, Mailpit se para y `99-lvm-correo.ini` se queda sin directivas; al cargar el proyecto, su BBDD vuelve a ser la de antes (sin `lvm_correo_original`). Vuelve a encenderlo.
 11. **Docker:** sus proyectos aún no mandan a Mailpit (queda para más adelante); su BBDD copiada lleva el correo de producción.
 
-Si algo falla, pasa la salida de la tarea, `nexum correo`, `cat ~/.lvm-instalador/mailpit/mailpit.log ~/.lvm-instalador/mailpit/salida.log` y `ps -axo user,pid,command | grep mailpit`.
+Si algo falla, pasa la salida de la tarea, `nexum correo`, `cat ~/.nexum/mailpit/mailpit.log ~/.nexum/mailpit/salida.log` y `ps -axo user,pid,command | grep mailpit`.
 
 ## Paso 8: imágenes de producción, borrar un proyecto y Docker (1.39.25)
 
@@ -217,7 +217,7 @@ El código Swift de estas pantallas **no se ha compilado** (en Linux no hay Swif
 
 ## Paso 10: Docker con su propio Apache, el túnel, los botones y el consumo (1.40.0)
 
-Si la ventana no compila (no se abre tras instalar), manda `~/.lvm-instalador/app/compilar.log` entero: esta versión cambia mucho la ventana y no se ha podido compilar fuera de un Mac.
+Si la ventana no compila (no se abre tras instalar), manda `~/.nexum/app/compilar.log` entero: esta versión cambia mucho la ventana y no se ha podido compilar fuera de un Mac.
 
 1. **Consumo, arriba:** en el recuadro de la versión sale «CPU x % · RAM y %». Al pasar el ratón, cada parte (la ventana, XAMPP-X, Docker Desktop, Mailpit y el túnel). Arranca y para XAMPP-X: los números cambian.
 2. **Apache de Docker:** en Docker sale la franja «La dirección 127.0.0.2 del Apache de Docker aún no está en este Mac» con **Permitir** (pide la contraseña). Después:
@@ -360,7 +360,7 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 4. **Túnel** abre el diálogo de compartir. Comprueba desde el móvil, sin Wi-Fi, que la web carga entera. El botón pasa a **Compartiendo** y enseña la dirección y la contraseña.
 5. **Parar**: el túnel se cierra también y la dirección deja de responder. `pgrep -fl node` no enseña nada de ese proyecto.
 6. **Arrancar** (desarrollo): cambia un fichero y se ve al momento. Pulsa **Túnel**: pregunta si compilarlo, lo compila y abre el diálogo de compartir.
-7. Si el proyecto pide una versión de Node que no tienes, se descarga en `~/.lvm-instalador/node`.
+7. Si el proyecto pide una versión de Node que no tienes, se descarga en `~/.nexum/node`.
 
 ## Paso 24: tareas en segundo plano (1.41.0)
 

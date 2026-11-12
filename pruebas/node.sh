@@ -9,7 +9,7 @@ W=$(mktemp -d "$TMPBASE/node.XXXXXX") || exit 1
 trap 'kill_all; rm -rf "${W:?}"' EXIT
 kill_all() {
     local f p
-    for f in "$W"/h/.lvm-instalador/node/proyectos/*.conf; do
+    for f in "$W"/h/.nexum/node/proyectos/*.conf; do
         [ -f "$f" ] || continue
         p=$(sed -n 's/^PID=//p' "$f")
         [[ "$p" =~ ^[0-9]+$ ]] && kill -KILL -- "-$p" 2> /dev/null
@@ -17,7 +17,7 @@ kill_all() {
 }
 extract "$SRC" node_lines gui_node node_find node_install node_pid node_free_port node_deps node_build_astro node_command node_start node_stop node_log
 eval "$(sed -n "/^NODE_LIST_PY='/,/^'$/p" "$SRC")"
-HOME=$W/h HTDOCS_DIR=$W/htdocs LOG_DIR=$HOME/.lvm-instalador NODE_DIR=$LOG_DIR/node NODE_RUN_DIR=$NODE_DIR/proyectos
+HOME=$W/h HTDOCS_DIR=$W/htdocs LOG_DIR=$HOME/.nexum NODE_DIR=$LOG_DIR/node NODE_RUN_DIR=$NODE_DIR/proyectos
 NODE_DEFAULT_MAJOR=26 NODE_PORT_FROM=47321 NODE_PORT_TO=47399 DRY=0 TEST_DIR=$W/prueba LVM_NODE_BASE=""
 TUNNEL_STATE=$W/tunel-estado NODE_CMD=()
 mkdir -p "$HOME" "$HTDOCS_DIR" "$TEST_DIR"

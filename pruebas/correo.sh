@@ -189,7 +189,7 @@ fi
 
 # --- Mailpit en marcha y parado con la version (con el falso)
 extract "$SRC" mail_on mail_wp_mode mailpit_installed mailpit_installed_version mail_secure_spec mailpit_pid mailpit_start mailpit_stop mailpit_sync || exit 1
-LOG_DIR=$W/home/.lvm-instalador DRY=0
+LOG_DIR=$W/home/.nexum DRY=0
 mkdir -p -m 700 "$LOG_DIR"
 MAILPIT_DIR=$W/bin MAILPIT_BIN=$FAKE MAILPIT_DATA=$LOG_DIR/mailpit MAIL_UI_URL="http://127.0.0.1:1/"
 MAIL_OFF_FILE=$LOG_DIR/correo-apagado MAIL_WP_FILE=$LOG_DIR/correo-wordpress
@@ -208,7 +208,7 @@ lampp_running() { true; }
 o=$(MP_SMTP_RELAY_ALL=true mailpit_sync)
 p=$(mailpit_pid)
 check "con la version en marcha arranca, con tu usuario y su .pid" '[ -n "$p" ] && [ "$(cat "$MAILPIT_DATA/mailpit.pid")" = "$p" ] && [ "$(stat -c %U "/proc/$p")" = "$(id -un)" ] && grep -q "en marcha" <<< "$o"'
-check "sus datos en ~/.lvm-instalador/mailpit (700) y como mucho $MAILPIT_MAX correos" '[ "$(stat -c %a "$MAILPIT_DATA")" = 700 ] && grep -q -- "--database $MAILPIT_DATA/mailpit.db --max $MAILPIT_MAX" "$W/bin/arranque"'
+check "sus datos en ~/.nexum/mailpit (700) y como mucho $MAILPIT_MAX correos" '[ "$(stat -c %a "$MAILPIT_DATA")" = 700 ] && grep -q -- "--database $MAILPIT_DATA/mailpit.db --max $MAILPIT_MAX" "$W/bin/arranque"'
 check "solo 127.0.0.1 (SMTP y web) y sin las variables MP_* de la sesion" 'grep -q -- "--smtp 127.0.0.1:$MAIL_SMTP_PORT --listen 127.0.0.1:$MAIL_UI_PORT" "$W/bin/arranque" && ! grep -q "^MP_" "$W/bin/entorno"'
 mailpit_sync > /dev/null
 check "otra vez: no arranca otro" '[ "$(pgrep -u "$(id -u)" -fc -- "$FAKE --smtp")" = 1 ]'
@@ -245,14 +245,14 @@ lvm() { env -u LVM_SIMULAR HOME="$W/home2" LVM_PRUEBA="$W/prueba" LVM_VHOSTS="$W
 o=$(lvm correo)
 check "correo estado: encendido por defecto, WordPress a Mailpit y Mailpit sin instalar" 'grep -q "^Correo de pruebas encendido" <<< "$o" && grep -q "siguen, con su correo a Mailpit" <<< "$o" && grep -q "no esta instalado" <<< "$o"'
 o=$(lvm correo no)
-check "correo no: apagado (con su fichero)" '[ -e "$W/home2/.lvm-instalador/correo-apagado" ] && grep -q "apagado" <<< "$o"'
+check "correo no: apagado (con su fichero)" '[ -e "$W/home2/.nexum/correo-apagado" ] && grep -q "apagado" <<< "$o"'
 o=$(lvm --simular correo si)
-check "--simular correo si no cambia nada" '[ -e "$W/home2/.lvm-instalador/correo-apagado" ] && grep -q simulacion <<< "$o"'
+check "--simular correo si no cambia nada" '[ -e "$W/home2/.nexum/correo-apagado" ] && grep -q simulacion <<< "$o"'
 o=$(LVM_MAILPIT_SHA=$(printf '0%.0s' {1..64}) lvm correo instalar)
 check "una descarga con otra sha256 no se instala" '[ ! -e "$W/config/mailpit/mailpit" ] && grep -q "no coincide con su suma sha256" <<< "$o"'
 o=$(LVM_MAILPIT_SHA=$SHA lvm correo instalar)
 check "con su sha256, instalado en la carpeta de la configuracion compartida (con su version y licencia)" '[ -x "$W/config/mailpit/mailpit" ] && cmp -s "$W/config/mailpit/mailpit" "$FAKE" && [ "$(cat "$W/config/mailpit/version")" = "$MAILPIT_VERSION" ] && [ -f "$W/config/mailpit/LICENSE" ] && grep -q "esta apagado" <<< "$o"'
-check "no queda nada de la descarga" '[ -z "$(ls -d "$W"/home2/.lvm-instalador/mailpit-descarga.* "$W"/prueba/lvm-mailpit.* 2> /dev/null)" ]'
+check "no queda nada de la descarga" '[ -z "$(ls -d "$W"/home2/.nexum/mailpit-descarga.* "$W"/prueba/lvm-mailpit.* 2> /dev/null)" ]'
 o=$(LVM_MAILPIT_SHA=$SHA lvm correo instalar)
 check "otra vez: ya esta instalado" 'grep -q "ya esta instalado" <<< "$o"'
 # Un paquete con el programa como ./mailpit y sin licencia (1.55.1: se abre entero y se busca)
@@ -267,9 +267,9 @@ check "paquete roto: no se instala, con el error de tar y la pagina de descarga"
 o=$(LVM_MAILPIT_SHA=$SHA lvm correo instalar)
 check "sin LVM_PRUEBA no se hace caso de LVM_MAILPIT_URL ni LVM_MAILPIT_SHA" 'grep -q "LVM_MAILPIT_URL" <<< "$(sed -n "/^if \[ -z \"\$TEST_DIR\" \]; then/,/^fi/p" "$SRC")" && grep -q "LVM_MAILPIT_SHA" <<< "$(sed -n "/^if \[ -z \"\$TEST_DIR\" \]; then/,/^fi/p" "$SRC")"'
 o=$(lvm correo wordpress desactivar)
-check "correo wordpress desactivar: se guarda" '[ "$(cat "$W/home2/.lvm-instalador/correo-wordpress")" = desactivar ] && grep -q "se desactivan en la copia local" <<< "$o"'
+check "correo wordpress desactivar: se guarda" '[ "$(cat "$W/home2/.nexum/correo-wordpress")" = desactivar ] && grep -q "se desactivan en la copia local" <<< "$o"'
 o=$(lvm correo wordpress todo)
-check "correo wordpress con un modo raro: uso, sin cambiar nada" '[ "$(cat "$W/home2/.lvm-instalador/correo-wordpress")" = desactivar ] && grep -q "^Uso" <<< "$o"'
+check "correo wordpress con un modo raro: uso, sin cambiar nada" '[ "$(cat "$W/home2/.nexum/correo-wordpress")" = desactivar ] && grep -q "^Uso" <<< "$o"'
 o=$(lvm correo raro)
 check "correo con una orden rara: uso" 'grep -q "^Uso: nexum correo" <<< "$o"'
 check "la ayuda y la ventana conocen la orden correo" 'grep -q "^#   nexum correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command" "$SRC" && grep -q "\[\"correo\", \"wordpress\", mode\]" "$SRC"'

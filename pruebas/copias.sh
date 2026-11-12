@@ -11,7 +11,7 @@ W=$(mktemp -d "$TMPBASE/w-copias.XXXX") || exit 1
 trap 'chmod -R u+w "$W" 2> /dev/null; rm -rf "$W"' EXIT
 
 # --- La carpeta: una sola variable, y la migracion de ~/lvm-copias ---
-check "COPIES_DIR=\$HOME/nexum-backups y el ajuste en ~/.lvm-instalador/copias-ficheros" 'grep -qx "COPIES_DIR=\"\$HOME/nexum-backups\"" "$SRC" && grep -qx "COPIES_FILES_FLAG=\"\$LOG_DIR/copias-ficheros\"" "$SRC"'
+check "COPIES_DIR=\$HOME/nexum-backups y el ajuste en ~/.nexum/copias-ficheros" 'grep -qx "COPIES_DIR=\"\$HOME/nexum-backups\"" "$SRC" && grep -qx "COPIES_FILES_FLAG=\"\$LOG_DIR/copias-ficheros\"" "$SRC"'
 check "la migracion, al arrancar: no con --simular, en las pruebas ni al pedir la version" 'grep -qx "    \*) \[ \"\$DRY\" -eq 0 \] && \[ -z \"\$TEST_DIR\" \] && copies_migrate ;;" "$SRC" && grep -qx "    version|--version|-v|acerca|about|novedades|-h|--help|--ayuda|construir-pila) ;;" "$SRC"'
 extract "$SRC" copies_migrate copies_size_text copies_need_root copies_command copies_files_command || exit 1
 H=$W/m1; mkdir -p "$H/lvm-copias/sub"; echo uno > "$H/lvm-copias/sub/a.sql.gz"; chmod 755 "$H/lvm-copias"
@@ -62,7 +62,7 @@ if [ $MAC -eq 0 ]; then
     H=$W/s2; mkdir -p "$H" "$W/bin"
     printf '#!/bin/sh\necho "$@" >> %s/sudo.log\nexit 1\n' "$W" > "$W/bin/sudo"; chmod +x "$W/bin/sudo"
     o=$(env -u LVM_PRUEBA -u LVM_SIMULAR PATH="$W/bin:$PATH" LVM_TAREA=1 HOME=$H bash "$SRC" copias-ficheros si 2>&1); rc=$?
-    check "el script, como tarea de la ventana: copias-ficheros si sin sudo" '[ $rc -eq 0 ] && [ -f "$H/.lvm-instalador/copias-ficheros" ] && [ ! -e "$W/sudo.log" ]'
+    check "el script, como tarea de la ventana: copias-ficheros si sin sudo" '[ $rc -eq 0 ] && [ -f "$H/.nexum/copias-ficheros" ] && [ ! -e "$W/sudo.log" ]'
     o=$(env -u LVM_PRUEBA -u LVM_SIMULAR PATH="$W/bin:$PATH" LVM_TAREA=1 HOME=$H bash "$SRC" copias 2>&1); rc=$?
     check "el script, como tarea de la ventana: copias sin sudo" '[ $rc -eq 0 ] && [ ! -e "$W/sudo.log" ] && grep -q "nexum-backups" <<< "$o"'
 fi

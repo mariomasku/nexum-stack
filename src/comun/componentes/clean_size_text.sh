@@ -136,7 +136,7 @@ function clean_rules() {
         temporales)
             # Los del programa que llevan un dia sin cambiar y no estan en uso (un MariaDB temporal en
             # marcha tiene su socket en /tmp/lvm-mysql-XXXX): las carpetas y ficheros lvm-* que crea en la
-            # carpeta temporal y, en ~/.lvm-instalador, temporal/ (actualizar proyecto), las listas y carpetas
+            # carpeta temporal y, en ~/.nexum, temporal/ (actualizar proyecto), las listas y carpetas
             # de ps-imagenes, los ficheros de mktemp de los vhosts, hosts, correo y BBDD de Docker, y las
             # descargas a medias de Mailpit, cloudflared y Node. No las copias de pasar a Docker
             # (pasar-*): si el paso falla a medias, son la unica copia de su BBDD. Ni lvm-copia.* (Mac): si

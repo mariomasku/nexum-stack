@@ -45,7 +45,7 @@ func usageGroup(_ pid: Int, _ cmd: String, _ own: Int) -> String? {
     if pid == own { return "ventana" }
     if cmd.contains("/xamppfiles/") { return "xampp" }
     if cmd.contains("/mailpit/mailpit") { return "mailpit" }
-    if cmd.contains("nexum-tunel") || cmd.contains("/.lvm-instalador/tunel/cloudflared") { return "tunel" }
+    if cmd.contains("nexum-tunel") || cmd.contains("/.nexum/tunel/cloudflared") || cmd.contains("/.lvm-instalador/tunel/cloudflared") { return "tunel" }
     if cmd.contains("/Applications/Docker.app/") || cmd.contains("com.apple.Virtualization.VirtualMachine") { return "docker" }
     return nil
 }
@@ -101,7 +101,7 @@ func sampleUsage() -> [String: UsagePart] {
 /// Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 let UPDATE_EVERY = 4
 
-/// ¿Toca buscar una versión nueva al abrir? Se lleva en ~/.lvm-instalador/actualizaciones-arranques:
+/// ¿Toca buscar una versión nueva al abrir? Se lleva en ~/.nexum/actualizaciones-arranques:
 /// la fecha y los arranques desde la última vez que se buscó (el mismo fichero que en Linux)
 func updateCheckDue() -> Bool {
     if SIMULATE { return true }

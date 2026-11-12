@@ -655,7 +655,7 @@ EOF
 
 # Dominio de produccion de cada WordPress para sus imagenes (media-proyecto): carpeta|dominio. Se
 # aplica al vhost de los proyectos (web.local) mientras ese proyecto este cargado (media_sync)
-MEDIA_PROJECTS_FILE="$HOME/.lvm-instalador/media-produccion"
+MEDIA_PROJECTS_FILE="$LOG_DIR/media-produccion"
 #@incluir comun/navegador-acepte-certificado-propio/media_saved.sh
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
 # dominio de produccion (media-proyecto) si es un WordPress que lo tiene, si no ninguna. Solo cambia

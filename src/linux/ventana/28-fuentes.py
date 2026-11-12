@@ -1,5 +1,5 @@
 def load_fonts():
-    """Fuente del nombre de la cabecera: se escribe en ~/.lvm-instalador/cache/fuentes y se añade
+    """Fuente del nombre de la cabecera: se escribe en ~/.nexum/cache/fuentes y se añade
     solo a esta ventana (fontconfig), sin instalarla en el sistema. Sin ella, la del tema."""
     import base64
     import ctypes

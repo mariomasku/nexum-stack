@@ -7,13 +7,13 @@
 # MariaDB local. Si no, se rehace con la plantilla: la copia del ultimo wp-config.php que funciono
 # en este equipo (WP_CONFIG_DIR/<carpeta>.wp-config.php) o, si no la hay, el propio fichero (o
 # wp-config-sample.php) con root y localhost. De la plantilla solo cambian la base y el prefijo.
-WP_CONFIG_DIR="$HOME/.lvm-instalador/wordpress"
+WP_CONFIG_DIR="$LOG_DIR/wordpress"
 
 function is_wordpress() {
     [ -f "$HTDOCS_DIR/$1/wp-config.php" ] || [ -d "$HTDOCS_DIR/$1/wp-includes" ]
 }
 
-# Vinculos entre las BBDD y las carpetas de los proyectos (~/.lvm-instalador/proyectos), uno por
+# Vinculos entre las BBDD y las carpetas de los proyectos (~/.nexum/proyectos), uno por
 # linea: base@version=carpeta (en esa version; sin carpeta, la base no es de ningun proyecto en esa
 # version) o base=carpeta (en todas las versiones, como se guardaban hasta la 1.50). El de la
 # version manda: asi la copia de una base en otra version puede ir con otra carpeta
