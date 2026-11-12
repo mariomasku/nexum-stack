@@ -7,7 +7,7 @@ name: Comprobar
 on:
   push:
     branches: [main]
-    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", "src/**", "construir.sh", "ruff.toml", ".github/workflows/comprobar.yml"]
+    paths: ["lvm-instalador.sh", "macos/lvm-instalador.sh", "macos/instalador.swift", "macos/empaquetar-dmg.sh", "src/**", "construir.sh", "ruff.toml", ".github/workflows/comprobar.yml"]
   pull_request:
   workflow_dispatch:
 
@@ -38,6 +38,24 @@ jobs:
           xcrun --sdk macosx swiftc --version
           xcrun --sdk macosx swiftc -O -parse-as-library -target arm64-apple-macos12.0 -o lvm-app main.swift 2>&1 | tee compilar.log
           test -x lvm-app
+      # El instalador del .dmg y el programa que dibuja su fondo, como los compila empaquetar-dmg.sh (no se
+      # crea el .dmg: el fondo se dibuja para ver que funciona)
+      - name: Compilar el instalador del .dmg (como empaquetar-dmg.sh)
+        run: |
+          mkdir -p instalador fondo
+          cp macos/instalador.swift instalador/main.swift
+          xcrun --sdk macosx swiftc -O -target arm64-apple-macos12.0 -o instalador/instalar instalador/main.swift -framework AppKit 2>&1 | tee compilar-instalador.log
+          test -x instalador/instalar
+      - name: Compilar y probar el fondo del .dmg (como empaquetar-dmg.sh)
+        run: |
+          sed -n "/^cat > \"\$BUILD\/fondo\/main.swift\" <<'EOF'$/,/^EOF$/p" macos/empaquetar-dmg.sh | sed '1d;$d' > fondo/main.swift
+          test -s fondo/main.swift
+          sed -n "/^ICON_PNG_B64='/,/^'$/p" macos/lvm-instalador.sh | sed '1s/^ICON_PNG_B64=.//; $d' | tr -d ' \n' | base64 --decode > fondo/logo.png
+          sed -n "/^FONT_GOLDMAN_B64='/,/^'$/p" macos/lvm-instalador.sh | sed '1s/^FONT_GOLDMAN_B64=.//; $d' | tr -d ' \n' | base64 --decode > fondo/Goldman-Regular.ttf
+          xcrun --sdk macosx swiftc -O -target arm64-apple-macos12.0 -o fondo/fondo fondo/main.swift -framework AppKit 2>&1 | tee compilar-fondo.log
+          fondo/fondo fondo/fondo.png fondo/fondo@2x.png 0.0.0 fondo/logo.png 640 400 fondo/Goldman-Regular.ttf
+          sips -g pixelWidth -g pixelHeight fondo/fondo.png fondo/fondo@2x.png
+          tiffutil -cathidpicheck fondo/fondo.png fondo/fondo@2x.png -out fondo/fondo.tiff
       - name: Guardar el registro si falla
         if: failure()
         uses: actions/upload-artifact@v5
@@ -46,6 +64,9 @@ jobs:
           path: |
             compilar.log
             main.swift
+            compilar-instalador.log
+            compilar-fondo.log
+            fondo/fondo.png
 
   linux:
     name: Linux (bash y Python de la ventana) y revisión

@@ -1131,6 +1131,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.15 (12 nov 2026)
+- Centro de aplicaciones de Ubuntu: Nexum Dev Stack sale con su
+  logotipo, su nombre, su descripción y su versión (el paquete lleva su
+  ficha AppStream). Esta versión se instala una vez a mano, en la
+  terminal: sudo apt install ./nexum_1.57.15_all.deb. Las siguientes
+  se vuelven a actualizar desde la ventana.
+
 1.57.14 (11 nov 2026)
 - Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en
   un desplegable (15 y 30 minutos, 1, 2, 3, 4, 6, 8 o 12 horas); en la

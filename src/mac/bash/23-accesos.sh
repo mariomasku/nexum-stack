@@ -2025,6 +2025,8 @@ function open_window() {
         return 1
     fi
 
+    # (desde el instalador del .dmg, la ventana la abre el instalador al acabar: su boton «Abrir»)
+    boot_installer && return 0
     if [ "$DRY" -eq 1 ]; then
         # open no pasa variables de entorno: en simulacion se lanza el ejecutable directamente
         LVM_SIMULAR=1 nohup "$APP_BUNDLE/Contents/MacOS/lvm-app" > /dev/null 2>&1 &

@@ -104,6 +104,16 @@ function boot_bash_ok() {
 # ¿Se puede pedir la contraseña? En Terminal o en una tarea de la ventana (que tiene su terminal)
 function boot_can_ask() { [ -t 0 ] && [ -t 1 ]; }
 
+# El instalador del .dmg (LVM_INSTALADOR=1) ejecuta instalar-gestor en su terminal, sin que se vea, y
+# enseña una barra: cada paso escribe «NEXUM-PASO|<porcentaje>|<texto>» (y las preguntas,
+# «NEXUM-PREGUNTA|<cual>|<texto>», con la respuesta s o n por la entrada). Sin la variable, nada.
+# (BOOT_NO_STEPS: el gestor, al volver a arrancar con su bash, no repite los pasos del principio)
+function boot_step() {
+    [ "${LVM_INSTALADOR:-}" == 1 ] && [ "${BOOT_NO_STEPS:-}" != 1 ] && echo "NEXUM-PASO|$1|$2"
+    return 0
+}
+function boot_installer() { [ "${LVM_INSTALADOR:-}" == 1 ]; }
+
 # Abre Terminal con este script y <argumentos> (desde la ventana o Finder no hay donde pedir la
 # contraseña). El .command, en una carpeta tuya nueva
 function boot_open_terminal() {
@@ -196,19 +206,25 @@ function boot_install_self() {
     mine=$(boot_version_of "$BOOT_ME") theirs=$(boot_version_of "$TRUSTED_SCRIPT")
     if [ -n "$theirs" ] && boot_version_gt "$theirs" "$mine"; then
         echo "Ya tienes la $theirs en $TRUSTED_SCRIPT, mas nueva que esta ($mine): no se cambia."
+        boot_step 75 "Ya estaba instalada la $theirs, más nueva que esta: no se cambia"
         return 0
     fi
     if [ "$theirs" == "$mine" ] && /usr/bin/cmp -s "$BOOT_ME" "$TRUSTED_SCRIPT" && boot_bash_ok; then
+        boot_step 75 "La $mine ya estaba instalada: se comprueba lo demás"
         return 0
     fi
     if [ "$BOOT_DRY" == 1 ]; then
+        boot_step 35 "[simulación] Se prepararía el bash del gestor"
         echo "  [simulacion] se instalaria la $mine en $TRUSTED_SCRIPT (de root) y su bash en $TRUSTED_BASH"
+        boot_step 75 "[simulación] Se copiaría a $TRUSTED_DIR"
+        boot_step 100 "Simulación terminada: no se ha cambiado nada"
         exit 0
     fi
     boot_can_ask || boot_without_terminal instalar-gestor
     echo "Nexum Dev Stack $mine se instala en $TRUSTED_DIR, una carpeta de root: lo que se ejecuta"
     echo "como administrador ya no sale de ficheros que pueda cambiar un programa de tu usuario."
     echo "Pide tu contraseña de administrador (una vez)."
+    boot_step 32 "Esperando la contraseña de administrador"
     /usr/bin/sudo -v || return 1
     if [ -L "$NEXUM_DIR" ] || [ -L "$TRUSTED_DIR" ]; then
         echo "$NEXUM_DIR o $TRUSTED_DIR es un enlace: no se instala nada. Revisalo a mano."
@@ -218,7 +234,11 @@ function boot_install_self() {
     /usr/bin/sudo /bin/chmod 755 "$NEXUM_DIR" "$TRUSTED_DIR" && /usr/bin/sudo /usr/sbin/chown root:wheel "$NEXUM_DIR" "$TRUSTED_DIR" \
         || return 1
     boot_root_owned "$TRUSTED_DIR" || { echo "$TRUSTED_DIR no ha quedado de root: no se instala nada."; return 1; }
-    boot_bash_ok || boot_build_bash || return 1
+    if ! boot_bash_ok; then
+        boot_step 35 "Preparando el bash del gestor (se compila: un minuto o dos)"
+        boot_build_bash || return 1
+    fi
+    boot_step 75 "Copiando Nexum Dev Stack $mine a $TRUSTED_DIR"
     # Se copia y se comprueba la copia (de root): la version y que bash la entiende entera
     /usr/bin/sudo /usr/bin/install -o root -g wheel -m 755 "$BOOT_ME" "$TRUSTED_SCRIPT.nuevo" || return 1
     # (sin la cuarentena de la descarga)
@@ -253,7 +273,12 @@ function boot_clean_exec() {
 }
 
 # Herramientas de Xcode, Homebrew (para las librerias con las que se compila) y whiptail (newt)
+# (en el instalador del .dmg, las herramientas de Xcode las instala y las espera el propio instalador
+# antes de empezar: aqui ya estan. Homebrew se pregunta en su ventana y se instala sin preguntas
+# (NONINTERACTIVE), con la contraseña ya pedida: su sudo la pide con SUDO_PROMPT, la marca del instalador)
 function boot_prereqs() {
+    local answer
+    boot_step 2 "Comprobando las herramientas de Xcode"
     if ! /usr/bin/xcode-select -p > /dev/null 2>&1; then
         echo "Hacen falta las herramientas de linea de comandos de Xcode (compilador, make, python3)."
         echo "Se abre la ventana para instalarlas. Cuando terminen, vuelve a abrir este instalador."
@@ -261,21 +286,35 @@ function boot_prereqs() {
         exit 1
     fi
 
+    boot_step 8 "Comprobando Homebrew"
     if [ ! -x "$BREW" ]; then
-        boot_can_ask || { echo "ERROR|Hace falta Homebrew: abre Terminal y escribe: nexum"; exit 1; }
-        echo "Hace falta Homebrew (https://brew.sh) para instalar las librerias con las que se compila."
-        echo "Homebrew no instala PHP: solo se usa para las librerias."
-        printf "¿Instalar Homebrew ahora? [s/N]: "
-        read answer
-        case "$answer" in s|S|y|Y) ;; *) exit 1 ;; esac
-        /bin/bash -c "$(/usr/bin/curl -q --proto =https --proto-redir =https -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || exit 1
+        if boot_installer; then
+            echo "NEXUM-PREGUNTA|homebrew|Hace falta Homebrew (brew.sh) para instalar las librerías con las que se compila PHP (Homebrew no instala PHP). ¿Instalarlo ahora? Tarda unos minutos y pide tu contraseña de administrador."
+            read -r answer
+            case "$answer" in s|S|y|Y) ;; *) echo "Sin Homebrew no se puede instalar Nexum Dev Stack."; exit 1 ;; esac
+            boot_step 10 "Esperando la contraseña de administrador (para Homebrew)"
+            /usr/bin/sudo -v || exit 1
+            boot_step 12 "Instalando Homebrew (unos minutos)"
+            NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -q --proto =https --proto-redir =https -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || exit 1
+            [ -x "$BREW" ] || { echo "Homebrew no ha quedado en $BREW."; exit 1; }
+        else
+            boot_can_ask || { echo "ERROR|Hace falta Homebrew: abre Terminal y escribe: nexum"; exit 1; }
+            echo "Hace falta Homebrew (https://brew.sh) para instalar las librerias con las que se compila."
+            echo "Homebrew no instala PHP: solo se usa para las librerias."
+            printf "¿Instalar Homebrew ahora? [s/N]: "
+            read answer
+            case "$answer" in s|S|y|Y) ;; *) exit 1 ;; esac
+            /bin/bash -c "$(/usr/bin/curl -q --proto =https --proto-redir =https -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || exit 1
+        fi
     fi
 
     # (sin whiptail, el panel va en texto)
     if [ ! -x /opt/homebrew/bin/whiptail ] && boot_can_ask; then
+        boot_step 26 "Instalando whiptail con Homebrew (ventanas del panel)"
         echo "Instalando con Homebrew whiptail (ventanas del panel)..."
         "$BREW" install --quiet newt || echo "No se ha podido instalar whiptail: el panel ira en texto."
     fi
+    boot_step 30 "Comprobando la versión instalada"
 }
 
 BOOT_ME=$(realpath_f "$0")
@@ -297,7 +336,7 @@ if [ -n "$LVM_PRUEBA" ]; then
     fi
 elif [ "$BOOT_ME" == "$TRUSTED_SCRIPT" ]; then
     if [ "$LVM_GESTOR" != 1 ] || [ "$BASH" != "$TRUSTED_BASH" ] || [ -z "${BASH_VERSINFO[0]}" ] || [ "${BASH_VERSINFO[0]}" -lt 5 ]; then
-        boot_prereqs
+        BOOT_NO_STEPS=1 boot_prereqs
         if ! boot_bash_ok; then
             [ "$BOOT_DRY" == 1 ] && { echo "  [simulacion] se prepararia el bash del gestor en $TRUSTED_BASH"; exit 0; }
             boot_can_ask || boot_without_terminal "$@"
@@ -321,6 +360,7 @@ else
     fi
     boot_install_self || exit 1
     if [ "$BOOT_CMD" == instalar-gestor ]; then
+        boot_step 80 "Comprobando las versiones de PHP"
         [ "$BOOT_DRY" == 1 ] && exec /bin/bash "$TRUSTED_SCRIPT" --simular migrar --ventana
         exec /bin/bash "$TRUSTED_SCRIPT" migrar --ventana
     fi
@@ -1829,7 +1869,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.14"
+APP_VERSION="1.57.15"
 
 # Actualizaciones: las publicaciones (Releases) del repositorio de GitHub. Las que traen la version
 # de Mac llevan nexum-mac-<version>.zip (hasta la 1.57.10, lvm-instalador-mac-<version>.zip; la 1.57.11

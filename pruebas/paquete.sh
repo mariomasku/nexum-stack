@@ -14,9 +14,23 @@ DEB=$(ls "$W"/out/*.deb)
 check "el paquete se llama nexum y su fichero nexum_<version>_all.deb" '[ "$(dpkg-deb -f "$DEB" Package)" == nexum ] && [ "$(basename "$DEB")" == "nexum_$(dpkg-deb -f "$DEB" Version)_all.deb" ]'
 check "quita el paquete de antes (Conflicts y Replaces: lvm-instalador)" '[ "$(dpkg-deb -f "$DEB" Conflicts)" == lvm-instalador ] && [ "$(dpkg-deb -f "$DEB" Replaces)" == lvm-instalador ]'
 dpkg-deb -c "$DEB" | awk '{ print $NF }' | sed 's#^\./##; s#/$##' | grep . | sort > "$W/lista"
-check "instala /opt/nexum (script, ayudante y clave), nexum.desktop, su icono y su polkit, sin hexer ni lvm" \
-    'diff -q "$W/lista" <(printf "%s\n" opt opt/nexum opt/nexum/nexum-actualizar opt/nexum/nexum-stack-firma.gpg opt/nexum/nexum.sh usr usr/share usr/share/applications usr/share/applications/nexum.desktop usr/share/icons usr/share/icons/hicolor usr/share/icons/hicolor/256x256 usr/share/icons/hicolor/256x256/apps usr/share/icons/hicolor/256x256/apps/nexum.png usr/share/polkit-1 usr/share/polkit-1/actions usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy | sort) > /dev/null'
+check "instala /opt/nexum (script, ayudante y clave), nexum.desktop, su icono, su ficha AppStream y su polkit, sin hexer ni lvm" \
+    'diff -q "$W/lista" <(printf "%s\n" opt opt/nexum opt/nexum/nexum-actualizar opt/nexum/nexum-stack-firma.gpg opt/nexum/nexum.sh usr usr/share usr/share/applications usr/share/applications/nexum.desktop usr/share/icons usr/share/icons/hicolor usr/share/icons/hicolor/256x256 usr/share/icons/hicolor/256x256/apps usr/share/icons/hicolor/256x256/apps/nexum.png usr/share/metainfo usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml usr/share/polkit-1 usr/share/polkit-1/actions usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy | sort) > /dev/null'
 dpkg-deb -x "$DEB" "$W/x" && dpkg-deb -e "$DEB" "$W/ctl" || exit 1
+MI=$W/x/usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml
+check "ficha AppStream: Nexum Dev Stack, su icono nexum, nexum.desktop y la version del paquete con su fecha" \
+    'python3 -I -c "
+import sys, xml.etree.ElementTree as ET
+r = ET.parse(sys.argv[1]).getroot()
+rel = r.find(\"releases/release\")
+assert r.findtext(\"id\") == \"io.github.mariomasku.nexum\" and r.findtext(\"name\") == \"Nexum Dev Stack\"
+assert r.findtext(\"icon\") == \"nexum\" and r.findtext(\"launchable\") == \"nexum.desktop\"
+assert rel.get(\"version\") == sys.argv[2] and len(rel.get(\"date\")) == 10
+assert \"hexer\" not in open(sys.argv[1]).read().lower()
+" "$MI" "$(dpkg-deb -f "$DEB" Version)"'
+if command -v appstreamcli > /dev/null; then
+    check "ficha AppStream valida (appstreamcli validate)" 'appstreamcli validate --no-net --pedantic "$MI" > /dev/null 2>&1 || appstreamcli validate --no-net "$MI" > /dev/null 2>&1'
+fi
 check "el icono del menu abre /opt/nexum/nexum.sh, con el icono nexum" 'grep -qx "Exec=/opt/nexum/nexum.sh ventana" "$W/x/usr/share/applications/nexum.desktop" && grep -qx "Icon=nexum" "$W/x/usr/share/applications/nexum.desktop"'
 check "polkit: nexum-actualizar, sin hexer" 'grep -q "<annotate key=\"org.freedesktop.policykit.exec.path\">/opt/nexum/nexum-actualizar</annotate>" "$W/x/usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy" && ! grep -qi hexer "$W/x/usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy"'
 check "nexum-actualizar solo acepta nexum_*.deb, del paquete nexum" 'grep -q "^    /\*/nexum_\*_all.deb) ;;" "$W/x/opt/nexum/nexum-actualizar" && grep -q "Package 2>/dev/null)\" != nexum ]" "$W/x/opt/nexum/nexum-actualizar" && grep -q "/var/lib/dpkg/info/nexum.\" + name" "$W/x/opt/nexum/nexum-actualizar"'

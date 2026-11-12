@@ -394,6 +394,15 @@ QUE HACE
 
 VERSIONES
 
+1.57.15 (12 nov 2026)
+- El .dmg abre una ventana de Finder con el logotipo y el instalador en
+  el centro. «Instalar Nexum Dev Stack» ya no abre Terminal: es una
+  ventana con una barra, el porcentaje y lo que hace en cada paso; pide
+  la contraseña en su panel, pregunta en un aviso si instalar Homebrew
+  y espera sola a las herramientas de Xcode. Al acabar, «Se ha
+  finalizado la instalación» y «Abrir Nexum Dev Stack»; si falla, «Ver
+  detalles» con todo lo que ha pasado. Queda en ~/Library/Logs/Nexum.
+
 1.57.14 (11 nov 2026)
 - Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en
   un desplegable (15 y 30 minutos, 1, 2, 3, 4, 6, 8 o 12 horas); en la

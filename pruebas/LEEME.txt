@@ -236,6 +236,14 @@ LOS FICHEROS
                       GitHub (JSON inventado), la firma con una clave de
                       prueba y actualizar-gestor (firma mala, versión vieja,
                       zip raro, simulación). Sin red.
+  mac-instalador.sh   El instalador del .dmg (1.57.15): las marcas de sus
+                      pasos (NEXUM-PASO) con LVM_INSTALADOR=1, instalar-gestor
+                      --simular de verdad en una copia con las herramientas
+                      de Apple, Homebrew y sudo de mentira (llega a 100 sin
+                      bajar; sin la variable, ninguna marca), la pregunta de
+                      Homebrew (no: no instala nada; sí: sudo -v antes y
+                      NONINTERACTIVE=1), migrar --ventana, y lo que llevan
+                      macos/instalador.swift y empaquetar-dmg.sh. Sin red.
 
   Aparte (no está en todas.sh):
   real-secure.sh      Qué cambiaría SECURE_PY en las versiones instaladas

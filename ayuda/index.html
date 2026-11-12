@@ -173,6 +173,8 @@
           (<code>/opt/nexum/nexum-stack-firma.gpg</code>).</li>
         <li>Pone el acceso del menú (<code>/usr/share/applications/nexum.desktop</code>) y su icono
           (<code>/usr/share/icons/hicolor/256x256/apps/nexum.png</code>).</li>
+        <li>Pone su ficha para el Centro de aplicaciones de Ubuntu, con el logotipo, el nombre, la descripción y la
+          versión (<code>/usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml</code>).</li>
         <li>Pone el mensaje en español de la ventana de la contraseña al actualizar
           (<code>/usr/share/polkit-1/actions/</code>).</li>
         <li>Crea el comando: <code>sudo ln -sfn /opt/nexum/nexum.sh /usr/local/bin/nexum</code>.</li>
@@ -189,14 +191,19 @@
       tu Mac puede ejecutar; por eso tarda.</p>
     <ol class="pasos-tarea">
       <li><b>Descarga</b> <code>nexum-mac-X.Y.Z.dmg</code> de la última versión publicada en GitHub y ábrelo. Un
-        <code>.dmg</code> es una imagen de disco: al abrirla aparece como si fuera un pendrive.</li>
+        <code>.dmg</code> es una imagen de disco: al abrirla aparece como si fuera un pendrive, en una ventana con el logotipo de
+        Nexum y el instalador en el centro.</li>
       <li><b>Abre «Instalar Nexum Dev Stack».</b> Como no está firmado por Apple, la primera vez macOS lo para: en macOS 14 o anterior,
         botón derecho → Abrir → Abrir; en macOS 15 o posterior, Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente».</li>
-      <li><b>Deja que prepare lo que falte.</b> Se abre Terminal: si faltan las herramientas de Xcode, abre su instalador (después vuelve a
-        abrir «Instalar»); si falta Homebrew, pregunta si instalarlo (solo se usa para las librerías con las que se compila).
-        <b>Homebrew</b> es un programa para instalar herramientas en el Mac desde la terminal.</li>
-      <li><b>Escribe tu contraseña.</b> El programa se instala en <code>/Library/Nexum/gestor</code>, crea la orden
-        <code>nexum</code>, deja la aplicación en tu carpeta Aplicaciones y abre la ventana.</li>
+      <li><b>Pulsa «Instalar» y deja que prepare lo que falte.</b> Una barra enseña el porcentaje y lo que se está haciendo. Si faltan
+        las herramientas de Xcode, sale la ventana de Apple para instalarlas y el instalador espera a que terminen; si falta Homebrew,
+        pregunta en un aviso si instalarlo (solo se usa para las librerías con las que se compila). <b>Homebrew</b> es un programa para
+        instalar herramientas en el Mac desde la terminal.</li>
+      <li><b>Escribe tu contraseña</b> en el panel que sale. El programa se instala en <code>/Library/Nexum/gestor</code>, crea la orden
+        <code>nexum</code> y deja la aplicación en tu carpeta Aplicaciones.</li>
+      <li><b>«Se ha finalizado la instalación».</b> Pulsa «Abrir Nexum Dev Stack» para abrir la ventana; ya puedes expulsar el disco.
+        Si algo falla, «Ver detalles» enseña todo lo que ha pasado, para copiarlo. Lo que escribe el instalador queda en
+        <code>~/Library/Logs/Nexum</code>.</li>
     </ol>
     <details class="terminal"><summary>En la terminal</summary>
       <p>La orden del programa: <code>bash lvm-instalador.sh instalar-gestor</code> (la que lanza «Instalar Nexum Dev Stack» con la
@@ -210,7 +217,8 @@
         <li>Sigue con <code>nexum migrar</code>: si tenías versiones de antes en <code>/Applications</code>, las pasa a
           <code>/Library/Nexum</code>.</li>
         <li>Crea la orden <code>nexum</code> en la carpeta de comandos de Homebrew
-          (<code>/opt/homebrew/bin</code>) y la aplicación en Aplicaciones, y abre la ventana.</li>
+          (<code>/opt/homebrew/bin</code>) y la aplicación en Aplicaciones, y abre la ventana (desde «Instalar Nexum Dev Stack», la
+          abre su botón «Abrir»).</li>
       </ol>
       <p>Para comprobarlo: <code>nexum version</code> y <code>ls -l /Library/Nexum/gestor</code>.</p>
     </details>

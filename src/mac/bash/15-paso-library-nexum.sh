@@ -620,25 +620,30 @@ function retire_old_copies() {
 
 # nexum migrar [--ventana] (lo lanza tambien instalar-gestor): lo que queda de antes de la
 # 1.39.3. Las versiones pasan a /Library/Nexum, la copia de antes se queda en un aviso, y los comandos
-# y la aplicacion apuntan a este gestor. Con --ventana, al final abre la ventana. Se puede repetir
+# y la aplicacion apuntan a este gestor. Con --ventana, al final abre la ventana (desde el instalador
+# del .dmg, LVM_INSTALADOR=1, la deja lista y la abre el instalador, con su boton). Se puede repetir
 function gestor_migrate() {
     local rc=0
     if [ -z "$TEST_DIR" ] && [ "$SELF" != "$TRUSTED_SCRIPT" ]; then
         echo "migrar lo hace el gestor de root ($TRUSTED_SCRIPT): bash $SELF instalar-gestor"
         return 1
     fi
+    boot_step 82 "Comprobando las versiones de PHP (las de antes de la 1.39.3 pasan a /Library/Nexum)"
     stacks_migrate || rc=1
+    boot_step 86 "Creando la orden nexum"
     if [ "$DRY" -eq 0 ]; then
         retire_old_copies
         point_commands
         migrate_old_app
     fi
+    boot_step 90 "Preparando la aplicación «$APP_NAME» (la primera vez se compila la ventana: un minuto)"
     if [ "$1" == --ventana ]; then
         open_window || rc=1
     elif [ -d "$APP_BUNDLE" ]; then
         update_app
     fi
     [ $rc -eq 0 ] && [ -n "$(legacy_dirs)" ] && rc=1
+    [ $rc -eq 0 ] && boot_step 100 "Se ha finalizado la instalación"
     return $rc
 }
 

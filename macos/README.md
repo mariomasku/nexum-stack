@@ -41,16 +41,20 @@ macOS trae bash 3.2 y no trae whiptail. La primera vez, el instalador instala co
 
 ## Instalar o actualizar con el .dmg
 
-La forma más fácil. Abre `nexum-mac-<versión>.dmg` y haz doble clic en **Instalar Nexum Dev Stack**. Se abre Terminal y el instalador:
+La forma más fácil. Abre `nexum-mac-<versión>.dmg`: sale una ventana de Finder con el logotipo y, en el centro, **Instalar Nexum Dev Stack**. Haz doble clic en él y pulsa **Instalar**. El instalador es una ventana pequeña con una barra de progreso, el porcentaje y lo que se está haciendo en cada momento (por detrás ejecuta `lvm-instalador.sh instalar-gestor` del disco, sin que se vea):
 
-- lo instala (o lo actualiza) en `/Library/Nexum/gestor`, una carpeta de root: pide tu contraseña de administrador (`lvm-instalador.sh instalar-gestor`). Si ya tienes una versión más nueva, no la cambia;
-- la primera vez instala lo que falte: las herramientas de Xcode (después hay que volver a abrir el instalador), Homebrew, `whiptail` y el bash del gestor (se compila en un minuto);
+- lo instala (o lo actualiza) en `/Library/Nexum/gestor`, una carpeta de root: pide tu contraseña de administrador en su propio panel, y solo la envía si es `sudo` quien la está esperando. Si ya tienes una versión más nueva, no la cambia;
+- la primera vez instala lo que falte: las herramientas de Xcode (sale la ventana de Apple y el instalador espera a que terminen; después sigue solo), Homebrew (antes pregunta en un aviso), `whiptail` y el bash del gestor (se compila en un minuto o dos);
 - si vienes de la 1.39.2 o anterior, pasa tus versiones de `/Applications` a `/Library/Nexum` ([ver abajo](#paso-a-librarynexum-1393)) y deja la copia de `~/lvm-instalador/lvm-instalador.sh` en un aviso que abre el gestor de root;
-- crea (o apunta al gestor) la orden `nexum` y abre la ventana, que queda en Launchpad y en `~/Applications`.
+- crea (o apunta al gestor) la orden `nexum` y prepara la aplicación, que queda en Launchpad y en `~/Applications`.
+
+Al terminar dice **Se ha finalizado la instalación**: **Abrir Nexum Dev Stack** abre la ventana, y ya se puede expulsar el disco. Si algo falla, dice la última línea útil y **Ver detalles** enseña toda la salida (para copiarla). Cerrar el instalador a medias pregunta antes. Lo que escribe queda en `~/Library/Logs/Nexum/instalador-<fecha>.log`.
+
+Para probarlo sin cambiar nada: en Terminal, `"/Volumes/Nexum Dev Stack <versión>/Instalar Nexum Dev Stack.app/Contents/MacOS/instalar" --simular` (ejecuta `lvm-instalador.sh --simular instalar-gestor`).
 
 El instalador no está firmado por Apple. La primera vez, macOS no deja abrirlo: en macOS 14 o anterior, botón derecho > **Abrir** > **Abrir**; en macOS 15 o posterior, **Ajustes del Sistema > Privacidad y seguridad > Abrir igualmente**. El `LEEME.txt` del disco lo explica, junto con otra forma de lanzarlo desde Terminal.
 
-**Crear el `.dmg`** (en un Mac, con las herramientas que trae macOS): en la carpeta donde están `lvm-instalador.sh` y `empaquetar-dmg.sh`, ejecuta `bash empaquetar-dmg.sh`. Deja `nexum-mac-<versión>.dmg` en Descargas, después de montarlo para comprobar que el instalador está bien. Desde Linux no se puede: un `.dmg` que macOS monte necesita `hdiutil`.
+**Crear el `.dmg`** (en un Mac, con las herramientas que trae macOS y `swiftc` de las herramientas de Xcode): en la carpeta donde están `lvm-instalador.sh`, `instalador.swift` y `empaquetar-dmg.sh`, ejecuta `bash empaquetar-dmg.sh`. Compila el instalador, dibuja el fondo de la ventana del disco y la prepara con Finder (si macOS no deja que Terminal controle Finder, el `.dmg` sale igual, sin esa presentación, y lo avisa). Deja `nexum-mac-<versión>.dmg` en Descargas, después de montarlo para comprobar que el instalador está bien. Desde Linux no se puede: un `.dmg` que macOS monte necesita `hdiutil`.
 
 ## Actualizar desde la ventana
 

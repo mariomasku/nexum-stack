@@ -30,6 +30,7 @@ files = {"opt/nexum/nexum.sh", "opt/nexum/nexum-actualizar",
          "opt/nexum/nexum-stack-firma.gpg",
          "usr/share/applications/nexum.desktop",
          "usr/share/icons/hicolor/256x256/apps/nexum.png",
+         "usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml",
          "usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy"}
 dirs = {""}
 for f in files:

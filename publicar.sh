@@ -121,7 +121,7 @@ if [ -n "$MAC_ZIP" ]; then
     rm -f "$MAC_ZIP" "$MAC_ZIP.sig"
     # Sin carpetas dentro: el Mac solo saca de el lvm-instalador.sh (actualizar-gestor; el fichero se
     # sigue llamando asi dentro del .zip y en /Library/Nexum/gestor)
-    python3 -I - "$MAC_ZIP" "$HERE/macos" lvm-instalador.sh README.md empaquetar-dmg.sh PRUEBA-VENTANA.md << 'EOF'
+    python3 -I - "$MAC_ZIP" "$HERE/macos" lvm-instalador.sh README.md empaquetar-dmg.sh instalador.swift PRUEBA-VENTANA.md << 'EOF'
 import os, sys, zipfile
 dst, src = sys.argv[1:3]
 with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:

@@ -9,6 +9,9 @@
 #   /opt/nexum/nexum.sh                                      el script
 #   /usr/share/applications/nexum.desktop                    icono del menu para todos los usuarios
 #   /usr/share/icons/hicolor/256x256/apps/nexum.png
+#   /usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml
+#                                    ficha AppStream: logotipo, nombre, descripcion y version en el
+#                                    Centro de aplicaciones
 #   /opt/nexum/nexum-actualizar                              instala un nexum_*.deb nuevo
 #   /opt/nexum/nexum-stack-firma.gpg                         clave publica de las firmas (.sig)
 #   /usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy
@@ -50,7 +53,7 @@ trap 'rm -rf "$BUILD"' EXIT
 ROOT=$BUILD/$PKG
 
 mkdir -p "$ROOT/DEBIAN" "$ROOT$DEST" "$ROOT/usr/share/applications" \
-    "$ROOT/usr/share/icons/hicolor/256x256/apps" "$ROOT/usr/share/polkit-1/actions"
+    "$ROOT/usr/share/icons/hicolor/256x256/apps" "$ROOT/usr/share/polkit-1/actions" "$ROOT/usr/share/metainfo"
 install -m 755 "$SRC" "$ROOT$DEST/nexum.sh"
 
 # Actualizar desde la ventana: pkexec ejecuta este programa (no «env apt-get», que sacaba el
@@ -147,6 +150,7 @@ files = {"opt/nexum/nexum.sh", "opt/nexum/nexum-actualizar",
          "opt/nexum/nexum-stack-firma.gpg",
          "usr/share/applications/nexum.desktop",
          "usr/share/icons/hicolor/256x256/apps/nexum.png",
+         "usr/share/metainfo/io.github.mariomasku.nexum.metainfo.xml",
          "usr/share/polkit-1/actions/io.github.mariomasku.nexum.policy"}
 same = {"opt/nexum/nexum-actualizar": "/opt/nexum/nexum-actualizar",
         "opt/nexum/nexum-stack-firma.gpg": "/opt/nexum/nexum-stack-firma.gpg",
@@ -273,6 +277,54 @@ Terminal=false
 StartupWMClass=dev.hexer.LamppVersionManager
 Icon=nexum
 Categories=Development;
+EOF
+
+# Ficha AppStream: con ella el Centro de aplicaciones muestra Nexum Dev Stack con su logotipo (el
+# icono nexum del tema hicolor), su descripcion y su version. La fecha de la version sale de su
+# entrada en las novedades («## 1.57.15 · 12 nov 2026»)
+RELEASE_DATE=$(sed -n "s/^## $VERSION · //p" <<< "$NOVEDADES" | head -1 | python3 -I -c '
+import sys
+months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+d, m, y = sys.stdin.read().split()[:3]
+print("%s-%02d-%02d" % (y, months.index(m[:3].lower()) + 1, int(d)))') \
+    || { echo "No se entiende la fecha de la $VERSION en las novedades"; exit 1; }
+cat > "$ROOT/usr/share/metainfo/$POLICY.metainfo.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>$POLICY</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>Nexum Dev Stack</name>
+  <summary>Varias versiones de PHP con su LAMPP, para desarrollar en local</summary>
+  <developer id="io.github.mariomasku">
+    <name>Nexum Dev Stack</name>
+  </developer>
+  <description>
+    <p>
+      Nexum Dev Stack instala y gestiona varias versiones de PHP, cada una con su propio LAMPP
+      (Apache, PHP-FPM, MariaDB, ProFTPD, Perl y phpMyAdmin) y sus propias bases de datos, sin
+      instalar PHP ni MariaDB en el sistema.
+    </p>
+    <ul>
+      <li>Cambia la versión de PHP activa sin tocar los proyectos ni los dominios.</li>
+      <li>Carga proyectos con su base de datos, su dominio local y su certificado.</li>
+      <li>Sube, descarga y copia bases de datos entre versiones.</li>
+      <li>Proyectos en Docker y de Node, correo de pruebas con Mailpit y túneles para compartir.</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">nexum.desktop</launchable>
+  <icon type="stock">nexum</icon>
+  <url type="homepage">https://github.com/mariomasku/nexum-stack</url>
+  <categories>
+    <category>Development</category>
+  </categories>
+  <provides>
+    <binary>nexum</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="$VERSION" date="$RELEASE_DATE"/>
+  </releases>
+</component>
 EOF
 
 cat > "$ROOT/DEBIAN/control" <<EOF
