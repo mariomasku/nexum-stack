@@ -383,6 +383,9 @@ class NvDocker:
                            lambda *_: self.open_in_vscode(folder), "nv-proyecto-btn")
             vs.set_sensitive(os.path.isdir(folder))
             btns["vscode"] = vs
+        repo = repo_button(folder, self.open_uri)
+        if repo is not None:
+            btns["repo"] = repo
         lg = nv_button(logo("log", 18), "Log", "Ver el log de errores" if php_c else "Arráncalo para ver su log",
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))

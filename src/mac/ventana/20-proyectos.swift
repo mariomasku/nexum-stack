@@ -346,6 +346,14 @@ struct ProjectsView: View {
                 openInVSCode(f)
             })
         }
+        // (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+        if let f = folder, let repo = projectRepoURL(f) {
+            let url = repo.0, host = repo.1
+            let github = host == "github.com" || host.hasSuffix(".github.com")
+            items["repo"] = AnyView(VisorButton(conf: c, name: github ? "GitHub" : "Repositorio",
+                                                icon: github ? .logo("github") : .symbol("globe", Color.blue),
+                                                tip: "Abrir el repositorio: \(url)") { openURL(url) })
+        }
         items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
                                            tip: db.isEmpty ? "Sin BBDD" : "Abrir \(db) en phpMyAdmin") {
             openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)")

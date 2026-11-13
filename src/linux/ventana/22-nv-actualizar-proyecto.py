@@ -382,8 +382,9 @@ class NvActualizarProyecto:
             if with_db:
                 steps.append("Se descarga la BBDD %s de %s en %s.sql, como «Descargar»: sin el administrador de "
                              "pruebas ni los cambios del correo de pruebas." % (db, v[2], db))
-            steps.append("Se escribe el zip en %s/%s, con un LEEME-nexum.txt. Si falla o lo cancelas, no queda "
-                         "nada." % (dest, zip_name))
+            steps.append("Se escribe el zip con un LEEME-nexum.txt donde elijas (al pulsar «Exportar», la ventana "
+                         "de guardar, en %s y con el nombre %s, que puedes cambiar). Si falla o lo cancelas, no "
+                         "queda nada." % (dest, zip_name))
             for child in holder.get_children():
                 holder.remove(child)
             holder.pack_start(steps_box(steps), False, False, 0)
@@ -398,22 +399,58 @@ class NvActualizarProyecto:
         dlg.destroy()
         if resp != Gtk.ResponseType.ACCEPT or not (with_code or with_db):
             return
-        args = ["exportar-proyecto", name, "--destino", dest] + ([] if with_code else ["--sin-codigo"]) + \
-            (["--bd", db] if with_db else ["--sin-bd"])
+        path, overwrite = self.nv_export_where(name, dest, zip_name)
+        if not path:
+            return
+        args = ["exportar-proyecto", name, "--zip", path] + (["--sobrescribir"] if overwrite else []) + \
+            ([] if with_code else ["--sin-codigo"]) + (["--bd", db] if with_db else ["--sin-bd"])
+        folder = os.path.dirname(path)
 
         def done(success, task, _p):
             if success:
-                task.offer("Mostrar en la carpeta", lambda: self.open_uri(GLib.filename_to_uri(dest)))
+                task.offer("Mostrar en la carpeta", lambda: self.open_uri(GLib.filename_to_uri(folder)))
 
         def start(_pwd=None):
             self.run_task("Exportando %s" % name, args, progress=True, env=self.db_env() if with_db else None,
-                          on_done=done, done_text="«%s» exportado en %s" % (name, dest),
+                          on_done=done, done_text="«%s» exportado en %s" % (name, path),
                           cancel_text=("¿Cancelar la exportación?", "No se guarda nada: el zip a medias se borra.",
                                        "Cancelar la exportación"))
         if with_db:
             self.check_db_access(start)
         else:
             start()
+
+    def nv_export_where(self, name, dest, zip_name):
+        """La ventana de guardar del sistema: dónde va el zip y con qué nombre (de partida, en descargas y con su
+        nombre de siempre). Devuelve (ruta, si se escribe encima de uno que ya existe) o (None, False)."""
+        dlg = Gtk.FileChooserDialog(title="Guardar el proyecto exportado «%s»" % name, transient_for=self.win,
+                                    action=Gtk.FileChooserAction.SAVE, do_overwrite_confirmation=True)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        zips = Gtk.FileFilter()
+        zips.set_name("Zip (*.zip)")
+        zips.add_pattern("*.zip")
+        zips.add_pattern("*.ZIP")
+        dlg.add_filter(zips)
+        dlg.set_current_folder(dest if os.path.isdir(dest) else os.path.expanduser("~"))
+        if zip_name and "…" not in zip_name:
+            dlg.set_current_name(zip_name)
+        else:
+            dlg.set_current_name("%s_nexum.zip" % name)
+        path = dlg.get_filename() if run_dialog(dlg) == Gtk.ResponseType.ACCEPT else None
+        dlg.destroy()
+        if not path:
+            return None, False
+        # (sin .zip, se le pone; si así ya existe, la ventana de guardar no lo ha preguntado: se pregunta aquí)
+        if not path.lower().endswith(".zip"):
+            path += ".zip"
+            if os.path.lexists(path) and not confirm(
+                    self.win, "¿Reemplazar «%s»?" % os.path.basename(path),
+                    "Ya existe en %s. Si lo reemplazas, se pierde lo que tenía." % os.path.dirname(path),
+                    "Reemplazar", destructive=True):
+                return None, False
+        return path, os.path.lexists(path)
 
     def nv_images_button(self, x):
         """Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""

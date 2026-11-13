@@ -105,6 +105,17 @@ def repo_query(text):
     return re.sub(r"(\.git)?/?$", "", q)
 
 
+def branch_name_ok(name):
+    """¿Nombre de rama nueva que vale? Las reglas de git check-ref-format --branch (sin espacios ni ~ ^ : ? * [ \\,
+    sin .., @{ ni //, ninguna parte que empiece por punto o acabe en .lock, sin / ni punto al final) y, como
+    rama-proyecto, sin - al principio ni |."""
+    if not name or name.startswith(("-", "/")) or name in ("HEAD", "@") or "|" in name:
+        return False
+    if re.search(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|@\{|//", name) or name.endswith(("/", ".")):
+        return False
+    return all(part and not part.startswith(".") and not part.endswith(".lock") for part in name.split("/"))
+
+
 def run_quick(args, callback, env=None, timeout=180):
     """Comando sin sudo ni preguntas, en segundo plano. callback(rc, salida) en la interfaz."""
     def work():
@@ -136,6 +147,7 @@ def run_quick_input(args, text, callback, timeout=60):
 # clave, nombre e icono. «Desmontar», ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar)
 # se ven siempre
 VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", ("vscode", "text-editor-symbolic")),
+                 ("repo", "Repositorio", ("logo", "github")),
                  ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
                  ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
@@ -186,7 +198,11 @@ def buttons_conf():
     if not isinstance(conf, dict):
         conf = {}
     order = [k for k in conf.get("order", []) if k in keys] if isinstance(conf.get("order"), list) else []
-    order += [k for k in keys if k not in order]
+    # (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS)
+    for i, k in enumerate(keys):
+        if k not in order:
+            before = [b for b in keys[:i] if b in order]
+            order.insert(order.index(before[-1]) + 1 if before else 0, k)
     hidden = {k for k in conf.get("hidden", []) if k in keys} if isinstance(conf.get("hidden"), list) else set()
     style = conf.get("style") if conf.get("style") in [k for k, _t in BUTTON_STYLES] else "nombre"
     size = conf.get("size")
@@ -205,6 +221,54 @@ def buttons_save(conf):
     with open(BUTTONS_FILE + ".nuevo", "w", encoding="utf-8") as fh:
         json.dump(data, fh)
     os.replace(BUTTONS_FILE + ".nuevo", BUTTONS_FILE)
+
+
+def project_repo_url(folder):
+    """La web del repositorio de la carpeta (su remote origin, de .git/config, sin ejecutar git): (dirección,
+    servidor) o None. Solo https o ssh, sin usuario ni contraseña en la dirección (nunca se enseña un token)."""
+    git = os.path.join(folder, ".git")
+    try:
+        if os.path.isfile(git):
+            # (un worktree o un submódulo: .git es un fichero con «gitdir: <carpeta>»)
+            with open(git, encoding="utf-8", errors="replace") as fh:
+                m = re.match(r"gitdir:\s*(.+)", fh.read(4096).strip())
+            if not m:
+                return None
+            git = os.path.join(folder, m.group(1).strip())
+        with open(os.path.join(git, "config"), encoding="utf-8", errors="replace") as fh:
+            text = fh.read(200000)
+    except OSError:
+        return None
+    url, inside = "", False
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            inside = re.fullmatch(r'\[\s*remote\s+"origin"\s*\]', line) is not None
+        elif inside:
+            m = re.fullmatch(r"url\s*=\s*(.+)", line)
+            if m:
+                url = m.group(1).strip().strip('"')
+                break
+    m = (re.fullmatch(r"(?:https?|ssh|git\+ssh)://(?:[^@/]*@)?([A-Za-z0-9.-]+)(?::\d+)?/(.+?)(?:\.git)?/?", url)
+         or re.fullmatch(r"(?:[A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+):(?!/)(.+?)(?:\.git)?/?", url))
+    if not m or not re.fullmatch(r"[A-Za-z0-9._~/-]+", m.group(2)) or ".." in m.group(2).split("/"):
+        return None
+    host = m.group(1).lower()
+    return "https://%s/%s" % (host, m.group(2)), host
+
+
+def repo_button(folder, opener, cls="nv-proyecto-btn"):
+    """Botón del visor que abre el repositorio del proyecto en el navegador, con opener (la ventana: open_uri).
+    None si no tiene repositorio: el botón ni sale."""
+    got = project_repo_url(folder)
+    if not got:
+        return None
+    url, host = got
+    github = host == "github.com" or host.endswith(".github.com")
+    b = nv_button(logo("github" if github else "globo", 18), "GitHub" if github else "Repositorio",
+                  "Abrir el repositorio: %s" % url, lambda *_: opener(url), cls)
+    b.nv_logo = "github" if github else "globo"
+    return b
 
 
 def button_icon(spec, size):
@@ -377,6 +441,46 @@ def project_admin(folder):
                 and any(os.path.isfile(os.path.join(d, f)) for f in ("ajax-tab.php", "get-file-admin.php")):
             return "ps", n
     return "", ""
+
+
+# Administrador de pruebas de los paneles (Configuración, nexum admin-pruebas): su correo, que es también el
+# usuario, y su contraseña, en ~/.nexum/admin-pruebas; sin ellos, local@local.test con la contraseña local. Lo
+# mismo que comprueba el script: un correo solo ASCII de hasta 60 caracteres y una contraseña de 4 a 64 de
+# TEST_ADMIN_PASS_CHARS (sin comillas, barra invertida, espacios, $ ni `)
+TEST_ADMIN_FILE = os.path.join(DEMO, "admin-pruebas") if DEMO else os.path.join(LOG_DIR, "admin-pruebas")
+TEST_ADMIN_MAIL_RX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.ASCII)
+TEST_ADMIN_PASS_RX = re.compile(r"[A-Za-z0-9._@%+=:,!#*?-]{4,64}", re.ASCII)
+TEST_ADMIN_PASS_CHARS = ". _ - @ % + = : , ! # * ?"
+
+
+def test_admin_mail_ok(mail):
+    return len(mail) <= 60 and TEST_ADMIN_MAIL_RX.fullmatch(mail) is not None
+
+
+def test_admin_pass_ok(password):
+    return TEST_ADMIN_PASS_RX.fullmatch(password) is not None
+
+
+def test_admin_conf():
+    """El administrador de pruebas de ahora: (correo, contraseña, si es uno propio). Solo del fichero si es
+    normal y tuyo (sin seguir enlaces) y si lo que lleva vale; si no, local@local.test con local."""
+    mail = password = ""
+    try:
+        fd = os.open(TEST_ADMIN_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, encoding="utf-8", errors="replace") as f:
+            st = os.fstat(f.fileno())
+            if stat.S_ISREG(st.st_mode) and st.st_uid == os.getuid():
+                for line in f.read(65536).splitlines():
+                    k, _, v = line.partition("=")
+                    if k == "correo":
+                        mail = v
+                    elif k == "clave":
+                        password = v
+    except OSError:
+        pass
+    if test_admin_mail_ok(mail) and test_admin_pass_ok(password):
+        return mail, password, True
+    return "local@local.test", "local", False
 
 
 def login_page(title, project, action, fields, panel):

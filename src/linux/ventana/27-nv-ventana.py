@@ -134,6 +134,10 @@ class App2(NvBandeja,
         for box in (self.db_box, self.vers_page):
             self.loading(box)
         self.win.show_all()
+        # (abierta al iniciar sesión y con el icono junto al reloj: se queda en él; se esconde antes de que
+        # la ventana llegue a pintarse)
+        if START_HIDDEN and self.tray is not None:
+            self.win.hide()
         self.toast_rev.set_reveal_child(False)
         self.reload(branches=True)
         GLib.timeout_add_seconds(20, self.on_tick)

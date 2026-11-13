@@ -347,7 +347,8 @@ let LOGO_COLORS: [String: Color] = [
 /// Los que se dibujan con trazo, no rellenos
 let LOGO_STROKED: Set<String> = ["imagenes"]
 
-func brand(_ name: String) -> Color { return LOGO_COLORS[name] ?? .gray }
+/// (el de GitHub, casi negro, con el color del texto: en el tema oscuro no se veía)
+func brand(_ name: String) -> Color { return name == "github" ? Color.primary : (LOGO_COLORS[name] ?? .gray) }
 
 /// Dibuja el trazo de un logotipo (solo M, L, C y Z) escalado a su marco
 struct LogoShape: Shape {

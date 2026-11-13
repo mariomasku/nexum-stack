@@ -9,6 +9,10 @@ let TASK_LOG_RX = try! NSRegularExpression(pattern: "^\\d{8}-\\d{6}-\\d+\\.txt$"
 /// El registro de una tarea muy larga, como mucho esto (en caracteres): se guarda el final
 let TASK_LOG_MAX = 8 * 1024 * 1024
 let TASK_LOG_SEP = String(repeating: "=", count: 72)
+/// Resultado de una tarea que no ha acabado: su registro se va guardando mientras tanto (cada
+/// TASK_LOG_LIVE segundos, con lo que lleva escrito la consola), para revisar qué está haciendo
+let TASK_RUNNING = "En marcha (o la ventana se cerró antes de que acabara)"
+let TASK_LOG_LIVE: TimeInterval = 3
 let HIDDEN = "••••••"
 // Nada de secretos en el registro: el valor de las variables de la tarea que lo parecen (MYSQL_PWD…), lo que
 // va detrás de «contraseña:», «token=»…, los tokens de GitHub y la contraseña de una dirección
@@ -152,10 +156,32 @@ func showTaskLog(_ path: String) {
     tv.autoresizingMask = [.width]
     scroll.documentView = tv
     alert.accessoryView = scroll
+    var shown = got.1
+    // Una tarea en marcha va guardando su salida: se vuelve a leer cada pocos segundos (abajo del todo si
+    // se estaba viendo el final) hasta que acaba o se cierra este aviso. (En .common también corre con el
+    // aviso abierto, que es modal)
+    var refresh: Timer? = nil
+    if (got.0["Resultado"] ?? "").hasPrefix("En marcha") {
+        let t = Timer(timeInterval: TASK_LOG_LIVE, repeats: true) { timer in
+            guard let now = taskLogRead(path) else { timer.invalidate(); return }
+            alert.informativeText = (now.0["Fecha"] ?? "") + "  ·  " + (now.0["Resultado"] ?? "")
+            if now.1 != shown {
+                let visible = scroll.contentView.documentVisibleRect
+                let atEnd = visible.maxY >= tv.bounds.height - 40
+                shown = now.1
+                tv.string = now.1
+                if atEnd { tv.scrollToEndOfDocument(nil) }
+            }
+            if !(now.0["Resultado"] ?? "").hasPrefix("En marcha") { timer.invalidate() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        refresh = t
+    }
     let r = alert.runStyled()
+    refresh?.invalidate()
     if r == .alertSecondButtonReturn {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(got.1, forType: .string)
+        NSPasteboard.general.setString(shown, forType: .string)
     } else if r == .alertThirdButtonReturn {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
@@ -211,6 +237,9 @@ final class TaskRunner: ObservableObject, Identifiable {
     private var seenPct: (Int, Int, Date)? = nil
     /// Su fichero del registro de tareas (TASKS_DIR)
     private var logPath: String? = nil
+    /// Cuándo se guardó el registro con la tarea en marcha y cuánto llevaba la consola
+    private var liveSaved = Date.distantPast
+    private var liveCount = 0
 
     init(title: String, args: [String], withProgress: Bool, doneText: String, autoClose: Bool,
          env: [String: String], cancelText: (String, String, String)?) {
@@ -290,7 +319,7 @@ final class TaskRunner: ObservableObject, Identifiable {
             let ms = Int(started.timeIntervalSince1970 * 1000) % 1000
             logPath = TASKS_DIR + "/" + fmt.string(from: started) + "-" + String(ProcessInfo.processInfo.processIdentifier)
                 + String(format: "%03d", ms) + ".txt"
-            saveLog("En marcha (o la ventana se cerró antes de que acabara)")
+            saveLog(TASK_RUNNING)
             taskLogPrune()
             model?.taskLogsChanged += 1
         }
@@ -463,6 +492,19 @@ final class TaskRunner: ObservableObject, Identifiable {
                    pctLine(s.1, timeLeft(Date().timeIntervalSince(s.2), s.1 - s.0, 100 - s.1)), "Tiempo: \(clock)")
         } else {
             update(nil, "Trabajando…", "", "Tiempo: \(clock)  ·  sin porcentaje: esta tarea no dice cuánto le queda")
+        }
+        saveLive()
+    }
+
+    /// Mientras la tarea sigue, su registro con lo que lleva la consola (cada TASK_LOG_LIVE s y solo si ha
+    /// cambiado): en Configuración se ve qué está haciendo sin esperar a que acabe
+    private func saveLive() {
+        guard logPath != nil, Date().timeIntervalSince(liveSaved) >= TASK_LOG_LIVE else { return }
+        liveSaved = Date()
+        let count = log.utf8.count
+        if count > 0 && count != liveCount {
+            liveCount = count
+            saveLog(TASK_RUNNING, log)
         }
     }
 

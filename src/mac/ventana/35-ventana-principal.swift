@@ -31,6 +31,8 @@ struct ContentView: View {
             TaskView(task: t).buttonStyle(PointerButtonStyle())
         }
         .onAppear { model.applyTheme() }
+        // (abierta al iniciar sesión con el icono puesto: se esconde nada más salir)
+        .background(StartHiddenWindow())
     }
 
     @ViewBuilder
@@ -113,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "ptrace") {
             _ = unsafeBitCast(sym, to: Ptrace.self)(31, 0, nil, 0)
         }
+        // Abierta al iniciar sesión (el LaunchAgent, con --al-iniciar): con el icono de la barra de menús
+        // puesto, sin ventana, solo el icono; sin él, la ventana de siempre
+        startHidden = CommandLine.arguments.contains(LOGIN_ARG) && trayWanted()
     }
     // Al cerrar la ventana (el boton rojo) la aplicacion se cierra del todo: sin procesos que sigan
     // gastando sin ventana. Con una tarea en marcha (instalar, cargar...) espera a que acabe y se cierra

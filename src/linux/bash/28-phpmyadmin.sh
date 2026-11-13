@@ -218,8 +218,10 @@ function node_log() {
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
         gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
-        # (el tunel y los repositorios, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|borrar-bd) ;;
+        # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        # (el administrador de pruebas: solo un ajuste de ~/.nexum)
+        admin-pruebas) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -264,7 +266,8 @@ case "$1" in
     status|estado) echo -e "$(status_text)" ;;
     disable) disable_lampp ;;
     remove|desinstalar) cli_remove "$2" "$3" ;;
-    ventana|gui|ventana-nueva) gui_open ;;
+    # (--al-iniciar: la abre el acceso de inicio de la sesion; con el icono junto al reloj, se queda en el)
+    ventana|gui|ventana-nueva) [ "$2" == --al-iniciar ] && export LVM_AL_INICIAR=1; gui_open ;;
     arrancar|start) control_lampp start ;;
     parar|stop) control_lampp stop ;;
     reiniciar|restart) control_lampp restart ;;
@@ -322,7 +325,10 @@ case "$1" in
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;
     usuario-pruebas) test_admin "$2" "$3" ;;
+    admin-pruebas) shift; test_admin_config "$@" ;;
     montar-proyecto) mount_project "$2" "$3" "$4" "$5" "$6" ;;
+    rama-proyecto) project_branch "$2" "$3" "$4" ;;
+    gui-ramas-proyecto) gui_project_branches "$2" ;;
     vaciar-cache)
         if [ "$2" == "--bd" ]; then ps_clear_cache_db "$3"; else ps_clear_cache "$2"; fi
         ;;

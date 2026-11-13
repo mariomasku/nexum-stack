@@ -103,6 +103,22 @@ out=$(run panaderia-luna --destino "$W/otro-destino" --bd otra); rc=$?
 check "--destino y --bd" '[ $rc -eq 0 ] && ls "$W/otro-destino" | grep -q "_nexum\.zip$" && names "$W/otro-destino/"*_nexum.zip | grep -qx "otra.sql"'
 out=$(run panaderia-luna --destino "$P/wp-content"); rc=$?
 check "el zip no puede ir dentro del propio proyecto" '[ $rc -ne 0 ] && [ -z "$(find "$P" -name "*_nexum.zip*")" ]'
+# --zip: el fichero elegido en la ventana de guardar (con su nombre, aunque lleve espacios; sin .zip, se le pone)
+mkdir -p "$W/elegida"
+out=$(run panaderia-luna --zip "$W/elegida/mi copia" --sin-bd); rc=$?
+check "--zip: justo en ese fichero, con .zip al final" '[ $rc -eq 0 ] && [ -f "$W/elegida/mi copia.zip" ] && grep -qF "Exportado: $W/elegida/mi copia.zip" <<< "$out" && names "$W/elegida/mi copia.zip" | grep -qx "panaderia-luna/index.php" && [ -z "$(ls "$W/elegida" | grep -v "^mi copia.zip$")" ]' || echo "$out" | tail -3
+echo viejo > "$W/elegida/ya.zip"
+out=$(run panaderia-luna --zip "$W/elegida/ya.zip" --sin-bd); rc=$?
+check "--zip de uno que ya existe: sin --sobrescribir, no lo toca" '[ $rc -ne 0 ] && [ "$(cat "$W/elegida/ya.zip")" == viejo ] && grep -q "Ya existe" <<< "$out" && [ -z "$(find "$W/elegida" -name "*.parte")" ]'
+out=$(run panaderia-luna --zip "$W/elegida/ya.zip" --sobrescribir --sin-bd); rc=$?
+check "... con --sobrescribir (aceptado en la ventana de guardar), lo cambia" '[ $rc -eq 0 ] && names "$W/elegida/ya.zip" | grep -qx "LEEME-nexum.txt"' || echo "$out" | tail -3
+echo mio > "$W/fuera/mio.zip"; ln -s "$W/fuera/mio.zip" "$W/elegida/enlace.zip"
+out=$(run panaderia-luna --zip "$W/elegida/enlace.zip" --sobrescribir --sin-bd); rc=$?
+check "... pero nunca encima de un enlace (ni de lo que apunta)" '[ $rc -ne 0 ] && [ -L "$W/elegida/enlace.zip" ] && [ "$(cat "$W/fuera/mio.zip")" == mio ]'
+out=$(run panaderia-luna --zip "$P/dentro.zip" --sin-bd); rc=$?
+check "--zip dentro del propio proyecto: no" '[ $rc -ne 0 ] && [ ! -e "$P/dentro.zip" ]'
+out=$(run panaderia-luna --zip "$W/no-existe/x.zip" --sin-bd); rc=$?
+check "--zip en una carpeta que no existe: no" '[ $rc -ne 0 ] && grep -q "No se puede escribir" <<< "$out"'
 
 # Enlaces: uno que sale de la carpeta no se sigue; uno de dentro va como enlace
 ln -s "$W/fuera" "$P/sale"
@@ -187,6 +203,11 @@ out=$(DRY=1 run panaderia-luna); rc=$?
 check "--simular: dice lo que haría y no crea nada" '[ $rc -eq 0 ] && grep -q "\[simulacion\]" <<< "$out" && [ "$(zips)" == 0 ] && [ "$(parts)" == 0 ] && [ ! -s "$W/bd.log" ] && [ -z "$(ls -A "$LOG_DIR" 2> /dev/null | grep exportar)" ]'
 
 # La orden, en la cabecera (--ayuda) y sin pedir la contraseña desde la ventana
-check "exportar-proyecto en la ayuda y en las órdenes" 'grep -q "^#   nexum exportar-proyecto <carpeta> \[--sin-codigo\] \[--sin-bd\] \[--bd <base>\] \[--destino <carpeta>\]" "$SRC" && grep -q "^    exportar-proyecto) shift; project_export" "$SRC" && grep -q "^    gui-exportar-proyecto) gui_project_export" "$SRC"'
+check "exportar-proyecto en la ayuda y en las órdenes" 'grep -q "^#   nexum exportar-proyecto <carpeta> \[--sin-codigo\] \[--sin-bd\] \[--bd <base>\]$" "$SRC" && grep -qF "[--destino <carpeta> | --zip <fichero> [--sobrescribir]]" "$SRC" && grep -q "^    exportar-proyecto) shift; project_export" "$SRC" && grep -q "^    gui-exportar-proyecto) gui_project_export" "$SRC"'
+if grep -q "def nv_export_dialog" "$SRC"; then
+    check "ventana (Linux): al aceptar, la de guardar del sistema (descargas y su nombre de partida) y --zip" 'grep -qF "path, overwrite = self.nv_export_where(name, dest, zip_name)" "$SRC" && grep -qF "action=Gtk.FileChooserAction.SAVE, do_overwrite_confirmation=True)" "$SRC" && grep -qF "args = [\"exportar-proyecto\", name, \"--zip\", path] + ([\"--sobrescribir\"] if overwrite else [])" "$SRC"'
+elif grep -q "private func exportDialog" "$SRC"; then
+    check "ventana (Mac): al aceptar, NSSavePanel (descargas y su nombre de partida) y --zip" 'grep -qF "panel.title = \"Guardar el proyecto exportado «\\(name)»\"" "$SRC" && grep -qF "var args: [String] = [\"exportar-proyecto\", name, \"--zip\", path]" "$SRC" && grep -qF "if FileManager.default.fileExists(atPath: path) { args.append(\"--sobrescribir\") }" "$SRC"'
+fi
 check "exportar-proyecto no pide la contraseña de administrador" 'grep -qE "^        gui-\*\|.*\|exportar-proyecto\|.*\) ;;$" "$SRC"'
 exit $fail

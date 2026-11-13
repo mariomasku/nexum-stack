@@ -1,14 +1,7 @@
 # ===========================================================================
 # Administrador de pruebas de los paneles (WordPress y PrestaShop)
 # ===========================================================================
-# Al cargar una BBDD (y al pulsar el boton del panel en Cargar proyecto) se le añade un administrador
-# de pruebas, el mismo en todos los equipos: el boton abre la pantalla de acceso con el usuario y la
-# contraseña ya escritos. Solo en las BBDD de este equipo (que nunca van a produccion)
-TEST_ADMIN_USER="local@local.test"
-TEST_ADMIN_PASS="local"
-# (huella bcrypt de «local», para PrestaShop 1.7 o posterior; la 1.6 usa md5 de su _COOKIE_KEY_ y
-# la contraseña, y WordPress acepta md5 y la cambia por la suya al entrar)
-TEST_ADMIN_BCRYPT='$2y$12$IqVkFsJq4UhjbzLfagfW9eU5V6iIauQCbfMJDY26MoM8ETz6ZKgxG'
+#@incluir comun/administrador-pruebas-paneles/test_admin.sh
 
 # Cliente de MariaDB como root para el administrador de pruebas (test_admin, wp_table_prefixes y
 # ps_table_prefix): el de XAMPP-X (DB_CLIENT) o, si DB_ROOT_CLIENT (un array) tiene algo, ese. Asi
@@ -20,109 +13,6 @@ function db_root_sql() {
     else
         "${DB_SAFE[@]}" "$DB_CLIENT" -uroot "$@"
     fi
-}
-
-# usuario-pruebas <base> [carpeta]: crea o deja al dia el administrador de pruebas en los WordPress y
-# la tienda PrestaShop de la base. Dice A|wp|usuario|contraseña y/o A|ps|... por cada uno (para la
-# ventana); sale con 1 si no hay ninguno. La carpeta (o la recordada para la base) solo hace falta en
-# PrestaShop 1.6, por su _COOKIE_KEY_
-function test_admin() {
-    local db=$1 folder=$2 p sql cols col exprs hash src key done_any=1
-    if ! [[ "$db" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]]; then
-        echo "Base no valida: $db"
-        return 1
-    fi
-    [ -z "$folder" ] && folder=$(linked_folder "$db" "${DB_TARGET_FOLDER:-}")
-    [[ "$folder" =~ ^[A-Za-z0-9_][A-Za-z0-9\ ._-]*$ ]] && [ -d "$HTDOCS_DIR/$folder" ] || folder=""
-    # (el cliente de root de XAMPP-X o, con DB_ROOT_CLIENT, otro: el de la MariaDB de un contenedor)
-    local mysql=(db_root_sql -N --default-character-set=utf8mb4)
-    if [ "$DRY" -eq 1 ]; then
-        echo "  [simulacion] administrador de pruebas $TEST_ADMIN_USER / $TEST_ADMIN_PASS en $db"
-        return 0
-    fi
-    # (solo tablas de verdad: una vista del volcado ejecutaria sus funciones como root)
-    function has_table() {
-        [ "$("${mysql[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$db' AND TABLE_NAME='$1' AND TABLE_TYPE='BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]
-    }
-
-    # WordPress (todos los de la base): usuario con rol de administrador
-    for p in $(wp_table_prefixes "$db"); do
-        has_table "${p}usermeta" || continue
-        sql=$(sed "s/@P@/$p/g" <<'SQL'
-SET @id := (SELECT ID FROM `@P@users` WHERE user_login = 'local@local.test' ORDER BY ID LIMIT 1);
-INSERT INTO `@P@users` (user_login, user_pass, user_nicename, user_email, user_url, user_registered, user_activation_key, user_status, display_name)
-    SELECT 'local@local.test', MD5('local'), 'local-pruebas', 'local@local.test', '', NOW(), '', 0, 'Local (pruebas)' FROM DUAL WHERE @id IS NULL;
-SET @id := IFNULL(@id, LAST_INSERT_ID());
-UPDATE `@P@users` SET user_pass = MD5('local'), user_activation_key = '' WHERE ID = @id;
-DELETE FROM `@P@usermeta` WHERE user_id = @id AND meta_key IN ('@P@capabilities', '@P@user_level');
-INSERT INTO `@P@usermeta` (user_id, meta_key, meta_value) SELECT @id, '@P@capabilities', 'a:1:{s:13:"administrator";b:1;}' FROM DUAL WHERE @id > 0;
-INSERT INTO `@P@usermeta` (user_id, meta_key, meta_value) SELECT @id, '@P@user_level', '10' FROM DUAL WHERE @id > 0;
-SELECT CAST(IFNULL(@id, 0) AS UNSIGNED);
-SQL
-)
-        if [ "$("${mysql[@]}" "$db" -e "$sql" < /dev/null 2> /dev/null | tail -1)" -gt 0 ] 2> /dev/null; then
-            echo "A|wp|$TEST_ADMIN_USER|$TEST_ADMIN_PASS"
-            done_any=0
-        fi
-    done
-
-    # PrestaShop: una copia del primer SuperAdmin (mismas columnas, sea cual sea la version) con el
-    # correo y la contraseña de pruebas, en todas las tiendas
-    p=$(ps_table_prefix "$db")
-    # (ps_table_prefix no da nada si la tienda no lleva prefijo)
-    if has_table "${p}employee" && has_table "${p}employee_shop" && has_table "${p}shop" && has_table "${p}shop_url"; then
-        src=$("${mysql[@]}" "$db" -e "SELECT passwd FROM \`${p}employee\` WHERE id_profile = 1 ORDER BY active DESC, id_employee LIMIT 1" < /dev/null 2> /dev/null)
-        if [[ "$src" == '$'* ]]; then
-            hash=$TEST_ADMIN_BCRYPT
-        elif [ -n "$src" ]; then
-            # PrestaShop 1.6: md5(_COOKIE_KEY_ + contraseña), con la clave de su settings.inc.php
-            key=""
-            [ -n "$folder" ] && key=$(python3 -I - "$HTDOCS_DIR/$folder/config/settings.inc.php" <<'EOF'
-import re, sys
-try:
-    text = open(sys.argv[1], errors="replace").read(1000000)
-except OSError:
-    sys.exit(0)
-m = re.search(r"""define\(\s*['"]_COOKIE_KEY_['"]\s*,\s*['"]([A-Za-z0-9]+)['"]""", text)
-print(m.group(1) if m else "")
-EOF
-)
-            [ -n "$key" ] && hash=$(python3 -I -c 'import hashlib, sys; print(hashlib.md5(sys.argv[1].encode()).hexdigest())' "$key$TEST_ADMIN_PASS")
-        fi
-        cols=$("${mysql[@]}" -e "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$db' AND TABLE_NAME='${p}employee' ORDER BY ORDINAL_POSITION" < /dev/null 2> /dev/null)
-        if [ -z "$hash" ]; then
-            [ -n "$src" ] && echo "Aviso: no se sabe la _COOKIE_KEY_ de la tienda (PrestaShop 1.6): sin administrador de pruebas. Cargala con su carpeta (Cargar proyecto)."
-        elif [ -n "$cols" ] && ! grep -qvE '^[A-Za-z0-9_]+$' <<< "$cols"; then
-            local list="" sel=""
-            for col in $cols; do
-                case $col in
-                    id_employee) continue ;;
-                    email) exprs="'local@local.test'" ;;
-                    passwd) exprs="'$hash'" ;;
-                    firstname) exprs="'Pruebas'" ;;
-                    lastname) exprs="'Local'" ;;
-                    active|id_profile) exprs=1 ;;
-                    last_passwd_gen) exprs="NOW()" ;;
-                    reset_password_token|reset_password_validity) exprs=NULL ;;
-                    *) exprs="\`$col\`" ;;
-                esac
-                list+="${list:+, }\`$col\`" sel+="${sel:+, }$exprs"
-            done
-            sql="SET @src := (SELECT id_employee FROM \`${p}employee\` WHERE id_profile = 1 ORDER BY active DESC, id_employee LIMIT 1);
-SET @id := (SELECT id_employee FROM \`${p}employee\` WHERE email = 'local@local.test' ORDER BY id_employee LIMIT 1);
-INSERT INTO \`${p}employee\` ($list) SELECT $sel FROM \`${p}employee\` WHERE id_employee = @src AND @id IS NULL;
-SET @id := IFNULL(@id, LAST_INSERT_ID());
-UPDATE \`${p}employee\` SET passwd = '$hash', active = 1, id_profile = 1 WHERE id_employee = @id AND @src IS NOT NULL;
-INSERT IGNORE INTO \`${p}employee_shop\` (id_employee, id_shop) SELECT @id, id_shop FROM \`${p}shop\` WHERE @id > 0 AND @src IS NOT NULL;
-SELECT CAST(IF(@src IS NULL, 0, @id) AS UNSIGNED);"
-            if [ "$("${mysql[@]}" "$db" -e "$sql" < /dev/null 2> /dev/null | tail -1)" -gt 0 ] 2> /dev/null; then
-                echo "A|ps|$TEST_ADMIN_USER|$TEST_ADMIN_PASS"
-                done_any=0
-            fi
-        fi
-    fi
-    unset -f has_table
-    return $done_any
 }
 
 #@incluir comun/administrador-pruebas-paneles/wp_table_prefixes.sh

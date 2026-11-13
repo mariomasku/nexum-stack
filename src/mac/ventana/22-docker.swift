@@ -490,6 +490,13 @@ struct DockerView: View {
                 openInVSCode(folder)
             })
         }
+        if let repo = projectRepoURL(folder) {
+            let url = repo.0, host = repo.1
+            let github = host == "github.com" || host.hasSuffix(".github.com")
+            items["repo"] = AnyView(VisorButton(conf: c, name: github ? "GitHub" : "Repositorio",
+                                                icon: github ? .logo("github") : .symbol("globe", Color.blue),
+                                                tip: "Abrir el repositorio: \(url)") { openURL(url) })
+        }
         items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
                                            tip: webC.map { _ in "Ver el log de errores" }
                                             ?? "Aún no tiene contenedor de la web: arráncalo") {

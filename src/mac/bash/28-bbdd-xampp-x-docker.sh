@@ -402,6 +402,49 @@ VERSIONES
   y espera sola a las herramientas de Xcode. Al acabar, «Se ha
   finalizado la instalación» y «Abrir Nexum Dev Stack»; si falla, «Ver
   detalles» con todo lo que ha pasado. Queda en ~/Library/Logs/Nexum.
+- Registro de tareas: una tarea en marcha (actualizar componentes,
+  instalar una versión...) guarda lo que va diciendo su consola cada 3
+  segundos, y al abrirla con «Ver» se actualiza sola hasta que acaba.
+- Configuración → General → Programa: «Abrir al iniciar sesión». Nexum
+  Dev Stack se abre al entrar en tu sesión (un LaunchAgent tuyo en
+  ~/Library/LaunchAgents); con el icono en la barra de menús, se queda
+  en él sin abrir la ventana. Al apagarlo se borra solo ese fichero.
+- Exportar proyecto: al pulsar «Exportar» se abre la ventana de
+  guardar del sistema, en Descargas y con el nombre de siempre, para
+  elegir dónde va el zip y cómo se llama. Si ya existe, pregunta si
+  reemplazarlo; con «Cancelar» no se crea nada. En la terminal:
+  exportar-proyecto --zip <fichero> [--sobrescribir].
+- Visor del proyecto (el cargado y los de Docker): botón «GitHub», que
+  abre su repositorio en el navegador (o «Repositorio», si es de otro
+  servidor). Solo sale si la carpeta tiene un remote origin. Se ordena o
+  se esconde como los demás, en Apariencia; si ya tenías tu orden,
+  sale detrás de VS Code.
+- Nuevo proyecto: en el paso de la BBDD, la casilla «Sin base de
+  datos». Marcada, el proyecto se clona y se carga sin ninguna BBDD
+  vinculada (sin nombre ni volcado). Si es un WordPress o una tienda
+  PrestaShop, el asistente avisa de que la web no funcionará hasta que
+  tenga su BBDD, sin impedirlo. En la terminal: montar-proyecto <url>
+  <carpeta> <version> --sin-bd.
+- Nuevo proyecto: al acabar de montarlo, «¿En qué rama empiezas a
+  trabajar?». Sale la rama en la que ha quedado el clon y las demás
+  del repositorio (locales y de origin): elige una o crea una nueva a
+  partir de la actual, y con «Abrir en Visual Studio Code» marcado
+  (si está instalado) se abre ya para trabajar. «Más tarde» lo deja en
+  la rama predeterminada. Con cambios sin commit no cambia de rama. En
+  la terminal: rama-proyecto <carpeta> <rama> [--nueva], sin
+  contraseña de administrador.
+- Configuración, apartado «Administrador de pruebas»: el correo (que
+  es también el usuario) y la contraseña de la cuenta con la que
+  «Panel» entra en WordPress y PrestaShop. Sin ponerlo, sigue siendo
+  local@local.test con la contraseña local. La contraseña se ve con el
+  ojo y no va a ningún registro. Si una BBDD ya tiene un usuario de
+  verdad con ese correo, no se toca (ni su contraseña ni su rol) y se
+  avisa. Las BBDD ya cargadas no cambian solas: el nuevo se crea al
+  cargar una BBDD o al pulsar «Panel». Las copias que se descargan o se
+  exportan no llevan ni el de ahora, ni local@local.test, ni los que
+  pusiste antes (solo los que tienen la marca de Nexum). En la
+  terminal: admin-pruebas [<correo> [-] | --clave | --quitar], sin
+  contraseña de administrador.
 
 1.57.14 (11 nov 2026)
 - Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en

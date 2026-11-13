@@ -102,6 +102,14 @@ class AppHerramientas:
         sw.connect("notify::active", self.nv_tray_toggle)
         row.add_suffix(sw)
         lb.add(row)
+        row = ActionRow("Abrir al iniciar sesión",
+                        "Nexum Dev Stack se abre al entrar en tu sesión; con el icono junto al reloj, se queda en "
+                        "él sin abrir la ventana")
+        row.set_tooltip_text(AUTOSTART_FILE)
+        sw = Gtk.Switch(active=autostart_on(), valign=Gtk.Align.CENTER)
+        sw.connect("notify::active", self.nv_autostart_toggle)
+        row.add_suffix(sw)
+        lb.add(row)
 
     def project_error_log(self, link=None):
         """Registro de errores del vhost de los proyectos (web.local) o del dominio que se diga,

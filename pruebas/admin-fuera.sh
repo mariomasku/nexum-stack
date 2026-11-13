@@ -23,9 +23,12 @@ trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [
 extract "$SRC" test_admin test_admin_filter wp_table_prefixes ps_table_prefix linked_folder || exit 1
 # (1.55.9 / Mac 1.39.19: el cliente de root, por db_root_sql, que tambien vale para un contenedor)
 grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || exit 1; DB_ROOT_CLIENT=(); }
+# (1.57.15: el administrador de pruebas de Configuracion, en LOG_DIR/admin-pruebas)
+grep -q '^function test_admin_load() {' "$SRC" && { extract "$SRC" test_admin_load test_admin_mail_ok test_admin_pass_ok \
+    test_admin_md5 test_admin_bcrypt test_admin_note test_admin_write test_admin_config || exit 1; }
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
-DRY=0 DB_SAFE=() HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos
+DRY=0 DB_SAFE=() HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos LOG_DIR=$MDB/nexum
 active_name() { echo 8.4; }
 m() { "$DB_CLIENT" -uroot -N "$@"; }
 m -e "CREATE DATABASE tienda"
@@ -69,6 +72,31 @@ check "la BBDD de trabajo no cambia (sigue con el de pruebas)" '[ "$(m tienda -e
 skip=() only=() wheres=()
 test_admin_filter copia
 check "una BBDD sin el administrador de pruebas: se descarga como siempre" '[ ${#only[@]} -eq 0 ] && [ ${#skip[@]} -eq 0 ]'
+# (1.57.15) Con un administrador de pruebas propio: la copia no lleva el de ahora ni los de antes (ni
+# local@local.test), solo los que tienen la marca de Nexum; uno de verdad con el mismo correo, si
+if declare -F test_admin_config > /dev/null; then
+    printf 'Prueba.2026\n' | test_admin_config ana@local.test - > /dev/null
+    out=$(test_admin tienda)
+    check "con el ajuste: ana@local.test en WordPress y PrestaShop (local@local.test sigue)" 'grep -q "^A|wp|ana@local.test|" <<< "$out" && grep -q "^A|ps|ana@local.test|" <<< "$out" && [ "$(m tienda -e "SELECT COUNT(*) FROM xy_users WHERE user_login IN ('"'"'local@local.test'"'"', '"'"'ana@local.test'"'"')")" = 2 ]'
+    # Cuentas de verdad (sin la marca) con el correo que se pone despues: no se tocan ni se quitan
+    m tienda -e "INSERT INTO xy_users (user_login, user_pass, user_nicename, user_email, display_name) VALUES ('bea@local.test', 'z', 'bea', 'bea@local.test', 'Bea');
+        INSERT INTO xy_usermeta (user_id, meta_key, meta_value) SELECT ID, 'xy_capabilities', 'a:1:{s:6:\"editor\";b:1;}' FROM xy_users WHERE user_login = 'bea@local.test';
+        INSERT INTO ps_employee (id_profile, id_lang, lastname, firstname, email, passwd, active) VALUES (2, 1, 'Real', 'Bea', 'bea@local.test', 'p', 1);
+        INSERT INTO ps_employee_shop SELECT id_employee, 1 FROM ps_employee WHERE email = 'bea@local.test';"
+    printf 'Prueba.2026\n' | test_admin_config bea@local.test - > /dev/null
+    out=$(test_admin tienda); rc=$?
+    check "bea@local.test de verdad: no se crea el de pruebas y se avisa" '[ $rc -ne 0 ] && grep -q "de verdad" <<< "$out" && [ "$(m tienda -e "SELECT CONCAT(user_pass, user_nicename) FROM xy_users WHERE user_login = '"'"'bea@local.test'"'"'")" = zbea ]'
+    skip=() only=() wheres=()
+    test_admin_filter tienda
+    { "${dump[@]}" --single-transaction --quick --triggers "${skip[@]}" tienda
+      for i in "${!only[@]}"; do "${dump[@]}" --single-transaction --quick --triggers --where="${wheres[$i]}" tienda "${only[$i]}"; done; } > "$MDB/copia2.sql" 2> "$MDB/dump2.err"
+    check "con el ajuste: el volcado se hace sin errores" '[ ! -s "$MDB/dump2.err" ]'
+    m -e "CREATE DATABASE copia2"; m copia2 < "$MDB/copia2.sql"
+    check "la copia no lleva ana@local.test (el de antes) ni local@local.test; bea@local.test, que es de verdad, si" '[ "$(m copia2 -e "SELECT GROUP_CONCAT(user_login ORDER BY ID) FROM xy_users")" == "admin,cliente,bea@local.test" ] && [ "$(m copia2 -e "SELECT COUNT(*) FROM xy_usermeta")" == 3 ]'
+    check "la copia: en PrestaShop, la jefa y bea@local.test (de verdad), en sus tiendas" '[ "$(m copia2 -e "SELECT GROUP_CONCAT(email ORDER BY id_employee) FROM ps_employee")" == "jefa@tienda.es,bea@local.test" ] && [ "$(m copia2 -e "SELECT COUNT(*) FROM ps_employee_shop")" == 2 ]'
+    check "el volcado no lleva ninguna fila de ana@local.test" '! grep -v "^-- WHERE: " "$MDB/copia2.sql" | grep -q "ana@local.test"'
+    test_admin_config --quitar > /dev/null
+fi
 check "export_database usa el filtro en las dos formas (MariaDB en marcha y temporal)" 'f=$(awk "/^function export_database\\(\\) \\{/,/^}/" "$SRC"); grep -q "test_admin_filter \"\$db\"" <<< "$f" && [ "$(grep -c "query=(" <<< "$f")" -ge 2 ]'
 # (1.55.4) Los volcados de las tablas aparte, sin su linea del modo sandbox (los MariaDB antiguos no la
 # entienden y la carga solo quitaba la primera); y la carga las quita todas

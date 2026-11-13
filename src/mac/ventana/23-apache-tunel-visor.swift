@@ -99,7 +99,8 @@ func clockTime(_ t: Int) -> String {
 
 /// Botones del visor de un proyecto (el cargado y los de Docker) que se pueden ocultar y ordenar: clave y
 /// nombre. Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre
-let VISOR_BUTTONS: [(String, String)] = [("web", "Abrir web"), ("vscode", "VS Code"), ("pma", "phpMyAdmin"),
+let VISOR_BUTTONS: [(String, String)] = [("web", "Abrir web"), ("vscode", "VS Code"), ("repo", "Repositorio"),
+                                         ("pma", "phpMyAdmin"),
                                          ("panel", "Panel"), ("docker", "Docker"), ("compartir", "Compartir"),
                                          ("log", "Log"), ("actualizar", "Actualizar"),
                                          ("imagenes", "Imágenes de producción")]
@@ -135,7 +136,16 @@ func loadVisorConf() -> VisorConf {
         seen.insert(k)
         order.append(k)
     }
-    c.order = order + keys.filter { !seen.contains($0) }
+    // (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS)
+    for (i, k) in keys.enumerated() where !seen.contains(k) {
+        if let before = keys[..<i].last(where: { order.contains($0) }), let at = order.firstIndex(of: before) {
+            order.insert(k, at: at + 1)
+        } else {
+            order.insert(k, at: 0)
+        }
+        seen.insert(k)
+    }
+    c.order = order
     c.hidden = Set((o["hidden"] as? [String] ?? []).filter { keys.contains($0) })
     if let s = o["style"] as? String, VISOR_STYLES.contains(where: { $0.0 == s }) { c.style = s }
     if let n = o["size"] as? Int, n >= VISOR_SIZE_MIN, n <= VISOR_SIZE_MAX {
@@ -156,6 +166,45 @@ func saveVisorConf(_ c: VisorConf) -> Bool {
     return FileManager.default.createFile(atPath: VISOR_FILE, contents: data)
 }
 
+/// La web del repositorio de una carpeta (su remote origin, de .git/config, sin ejecutar git): (dirección,
+/// servidor) o nil. Solo https o ssh, sin usuario ni contraseña en la dirección (nunca se enseña un token)
+func projectRepoURL(_ folder: String) -> (String, String)? {
+    func match(_ pattern: String, _ s: String) -> [String]? {
+        guard let rx = try? NSRegularExpression(pattern: "^(?:" + pattern + ")$"),
+              let m = rx.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) else { return nil }
+        return (0..<m.numberOfRanges).map { i in
+            Range(m.range(at: i), in: s).map { String(s[$0]) } ?? ""
+        }
+    }
+    var git = folder + "/.git"
+    var isDir: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: git, isDirectory: &isDir) else { return nil }
+    if !isDir.boolValue {
+        // (un worktree o un submódulo: .git es un fichero con «gitdir: <carpeta>»)
+        guard let t = try? String(contentsOfFile: git, encoding: .utf8),
+              let m = match("gitdir:\\s*(.+)", t.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        let dir = m[1].trimmingCharacters(in: .whitespaces)
+        git = dir.hasPrefix("/") ? dir : folder + "/" + dir
+    }
+    guard let data = FileManager.default.contents(atPath: git + "/config"), data.count < 200_000 else { return nil }
+    var url = ""
+    var inside = false
+    for raw in String(decoding: data, as: UTF8.self).components(separatedBy: "\n") {
+        let line = raw.trimmingCharacters(in: .whitespaces)
+        if line.hasPrefix("[") {
+            inside = match("\\[\\s*remote\\s+\"origin\"\\s*\\]", line) != nil
+        } else if inside, let m = match("url\\s*=\\s*(.+)", line) {
+            url = m[1].trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            break
+        }
+    }
+    guard let m = match("(?:https?|ssh|git\\+ssh)://(?:[^@/]*@)?([A-Za-z0-9.-]+)(?::\\d+)?/(.+?)(?:\\.git)?/?", url)
+            ?? match("(?:[A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+):(?!/)(.+?)(?:\\.git)?/?", url),
+          match("[A-Za-z0-9._~/-]+", m[2]) != nil, !m[2].split(separator: "/").contains("..") else { return nil }
+    let host = m[1].lowercased()
+    return ("https://\(host)/\(m[2])", host)
+}
+
 /// Icono de un botón del visor: un símbolo del sistema con su color, un logotipo o una imagen (VS Code)
 enum VisorIcon {
     case symbol(String, Color)
@@ -170,6 +219,7 @@ func visorIcon(_ key: String) -> VisorIcon {
     case "vscode":
         if let code = vscodeURL() { return .image(NSWorkspace.shared.icon(forFile: code.path)) }
         return .symbol("chevron.left.forwardslash.chevron.right", Color.primary)
+    case "repo": return .logo("github")
     case "pma": return .logo("phpmyadmin")
     case "panel": return .logo("wordpress")
     case "docker": return .logo("docker")

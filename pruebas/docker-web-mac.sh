@@ -81,6 +81,8 @@ edit_hosts() { echo hosts >> "$W/hecho.log"; cp "$2" "$HOSTS_FILE"; }
 export_database() { printf 'CREATE TABLE t (a INT);\n' | gzip > "$2"; }
 db_temp_stop() { :; }
 test_admin() { echo "A|wp|$TEST_ADMIN_USER|$TEST_ADMIN_PASS"; }
+# (1.57.15: la linea de la salida con el administrador de pruebas; sin ajuste en LOG_DIR, local@local.test)
+grep -q '^function test_admin_note() {' "$SRC" && { extract "$SRC" test_admin_note test_admin_load test_admin_mail_ok test_admin_pass_ok || exit 1; }
 lampp_running() { return 0; }
 run() { "$@"; }
 # (lo del sistema: ifconfig y launchctl, sin tocarlos)

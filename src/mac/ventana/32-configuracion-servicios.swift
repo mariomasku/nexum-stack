@@ -427,6 +427,7 @@ struct ToolsView: View {
         ("hosts", "Vhosts y hosts", "network"),
         ("seguridad", "Seguridad entre webs", "lock.shield"),
         ("correo", "Correo de pruebas", "envelope"),
+        ("admin", "Administrador de pruebas", "person.crop.circle"),
         ("docker", "Docker", "logo:docker"),
         ("tunel", "Túnel de Cloudflare", "cloud"),
         ("apariencia", "Apariencia", "paintpalette"),
@@ -517,6 +518,8 @@ struct ToolsView: View {
             .padding(.top, 10)
         case "correo":
             mailCard(d)
+        case "admin":
+            AdminTestCard()
         case "docker":
             dockerCard()
         case "tunel":
@@ -596,11 +599,16 @@ struct ToolsView: View {
             generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.") {
                 componentsCard()
             }
-            generalBlock("Programa", "El propio Nexum Dev Stack: lo que hace al cerrar la ventana.") {
+            generalBlock("Programa", "El propio Nexum Dev Stack: lo que hace al cerrar la ventana y al iniciar sesión.") {
                 TileCard(wide: true) {
                     Tile("Dejar en la barra de menús al cerrar",
                          "Icono junto al reloj: al cerrar la ventana, la aplicación sigue en él. Desde ahí se abre otra vez, se arranca o para la versión, se abre web.local o se sale.") {
                         Toggle("", isOn: Binding(get: { model.trayOn }, set: { model.setTray($0) }))
+                            .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                    }
+                    Tile("Abrir al iniciar sesión",
+                         "Nexum Dev Stack se abre al entrar en tu sesión; con el icono en la barra de menús, se queda en él sin abrir la ventana.") {
+                        Toggle("", isOn: Binding(get: { model.loginOn }, set: { model.setLoginItem($0) }))
                             .toggleStyle(SwitchToggleStyle()).labelsHidden()
                     }
                 }
@@ -889,6 +897,123 @@ struct ToolsView: View {
 
 /// Configuración, General, Registro de tareas (como en Linux): las tareas que ha lanzado la ventana (las
 /// TASKS_KEEP últimas de TASKS_DIR), cada una con su fecha y cómo acabó; con «Ver», entera
+/// Configuración, Administrador de pruebas (nexum admin-pruebas): la cuenta con la que el botón Panel entra en
+/// WordPress y PrestaShop. Su correo (que es también el usuario) y su contraseña, con un ojo para verla, se leen
+/// del ajuste (testAdminConf) y se guardan con la orden, con la contraseña por la entrada: así no sale en la línea
+/// de órdenes, ni en ps ni en el registro de tareas
+struct AdminTestCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var mail = ""
+    @State private var password = ""
+    @State private var show = false
+    @State private var own = false
+    @State private var saved = ("", "")
+    @State private var error = ""
+
+    /// Lo que no vale de lo escrito (vacío si vale)
+    var problem: String {
+        let m = mail.trimmingCharacters(in: .whitespaces)
+        if m.isEmpty && password.isEmpty { return "Escribe el correo y la contraseña" }
+        if !testAdminMailOK(m) {
+            return "El correo no vale: solo letras sin tildes, números y . _ % + - con forma de correo (ana@local.test), hasta 60 caracteres"
+        }
+        if m.lowercased() == "local@local.test" {
+            return "local@local.test es el de siempre: para volver a él, «Volver a local@local.test»"
+        }
+        if !testAdminPassOK(password) { return "La contraseña no vale: de 4 a 64 letras sin tildes, números o " + TEST_ADMIN_PASS_CHARS }
+        return ""
+    }
+
+    var body: some View {
+        let m = mail.trimmingCharacters(in: .whitespaces)
+        let typed = !m.isEmpty && !password.isEmpty
+        let shown = !error.isEmpty ? error : (typed ? problem : "")
+        return VStack(alignment: .leading, spacing: 12) {
+            TileCard("Administrador de pruebas", "La cuenta con la que el botón «Panel» entra en el panel de WordPress y en el de PrestaShop de tus proyectos. Nexum la crea, con rol de administrador, al cargar una BBDD, y nunca va en las copias que descargas ni en las que exportas.") {
+                Tile("Ahora", own ? "\(saved.0) (el tuyo)" : "local@local.test con la contraseña local (el de siempre: no has puesto otro)")
+                Tile("Correo (usuario)", "Mejor uno que no sea de verdad, como ana@local.test") {
+                    TextField("ana@local.test", text: $mail).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 220)
+                        .disableAutocorrection(true)
+                        .onChange(of: mail) { _ in error = "" }
+                }
+                Tile("Contraseña", "De 4 a 64 letras sin tildes, números o " + TEST_ADMIN_PASS_CHARS) {
+                    Group {
+                        if show {
+                            TextField("Contraseña", text: $password)
+                        } else {
+                            SecureField("Contraseña", text: $password)
+                        }
+                    }
+                    .textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 190)
+                    .disableAutocorrection(true)
+                    .onChange(of: password) { _ in error = "" }
+                    Button(action: { show.toggle() }) {
+                        Image(systemName: show ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                    .tip(show ? "Ocultar la contraseña" : "Mostrar la contraseña")
+                }
+                Tile("Guardar los cambios", "Sin espacios, comillas, \\, $ ni `. Las BBDD ya cargadas no cambian: se pone al cargar una BBDD o al pulsar «Panel» en el proyecto") {
+                    Button("Volver a local@local.test") { reset() }
+                        .disabled(!own || model.busy)
+                        .tip("Vuelve a local@local.test con la contraseña local (los correos de antes tampoco van en las copias)")
+                    Button("Guardar") { save() }
+                        .buttonStyle(OutlineButton(kind: "primary"))
+                        .disabled(!problem.isEmpty || model.busy || (m, password) == (own ? saved : ("", "")))
+                }
+            }
+            if !shown.isEmpty {
+                Text(shown).font(.caption).foregroundColor(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            TileCard("Cómo funciona", wide: true) {
+                Tile("Una cuenta de verdad no se toca", "Si una BBDD ya tiene un usuario de verdad con ese correo (sin la marca de Nexum), no se cambia ni su contraseña ni su rol: ahí no se crea el de pruebas y se avisa. Elige otro correo.",
+                     leading: { Image(systemName: "lock.shield").font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                     trailing: { EmptyView() })
+                Tile("Fuera de las copias", "Al descargar una BBDD o exportar un proyecto se quita el de ahora, local@local.test y los que hayas puesto antes, solo si llevan la marca de Nexum.",
+                     leading: { Image(systemName: "tray.and.arrow.down").font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                     trailing: { EmptyView() })
+            }
+            .padding(.top, 10)
+        }
+        .onAppear { fill() }
+    }
+
+    func fill() {
+        let c = testAdminConf()
+        own = c.own
+        saved = c.own ? (c.mail, c.password) : ("", "")
+        mail = saved.0
+        password = saved.1
+    }
+
+    func done(_ rc: Int32, _ out: String) {
+        let lines = out.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix("  [") }
+        if rc != 0 {
+            error = lines.last ?? "No se ha podido guardar"
+            return
+        }
+        model.toast(lines.first ?? "Guardado")
+        fill()
+    }
+
+    func save() {
+        guard problem.isEmpty else { return }
+        if SIMULATE {
+            model.toast("Simulación: no se guarda nada (el administrador de pruebas sigue igual)")
+            return
+        }
+        runQuick(["admin-pruebas", mail.trimmingCharacters(in: .whitespaces), "-"], input: password + "\n") { rc, out in done(rc, out) }
+    }
+
+    func reset() {
+        if SIMULATE {
+            model.toast("Simulación: no se guarda nada (el administrador de pruebas sigue igual)")
+            return
+        }
+        runQuick(["admin-pruebas", "--quitar"]) { rc, out in done(rc, out) }
+    }
+}
+
 struct TaskLogsCard: View {
     @EnvironmentObject var model: AppModel
     @State private var logs: [TaskLogEntry] = []

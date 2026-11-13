@@ -203,9 +203,22 @@
 #       carpeta
 #
 #   nexum montar-proyecto <url de git> <carpeta> <version> <base> [volcado]
+#   nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd
 #       Proyecto nuevo desde GitHub (u otro repositorio): lo clona en htdocs/<carpeta> con tu
 #       usuario (solo https o ssh, sin submodulos), lo carga en esa version, crea su base y,
-#       si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga protegida
+#       si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga protegida.
+#       Con --sin-bd, sin base: se clona y se carga sin BBDD vinculada (un WordPress o una
+#       tienda no abren hasta que tengan la suya: se sube en Bases de datos)
+#
+#   nexum rama-proyecto <carpeta> <rama> [--nueva]
+#       Cambia el proyecto a esa rama con git switch y con tu usuario (el dueño de la carpeta):
+#       una que solo esta en origin se crea en local siguiendo a la de origin; con --nueva, una
+#       rama nueva a partir de la actual. Con cambios sin commit no cambia nada. Ejemplo:
+#       nexum rama-proyecto panaderia-luna nueva-portada --nueva
+#
+#   nexum gui-ramas-proyecto <carpeta>
+#       Solo lee: la rama actual (A|rama), los cambios sin commit (N|n) y las ramas, locales y
+#       de origin (R|rama|local 1/0|origin 1/0), para el dialogo de la ventana
 #
 #   nexum desmontar-proyecto
 #       web.local deja de apuntar al proyecto cargado y enseña una pagina vacia; los dominios
@@ -217,8 +230,21 @@
 #       dominios de /etc/hosts y, lo ultimo, su carpeta. Si un paso falla, no se sigue
 #
 #   nexum usuario-pruebas <base> [carpeta]
-#       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop):
-#       local@local.test con contraseña local. Se hace solo al cargar una BBDD
+#       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop): el
+#       de admin-pruebas o, si no se ha puesto, local@local.test con contraseña local. Se hace
+#       solo al cargar una BBDD. Una cuenta de verdad con ese correo no se toca (se avisa)
+#
+#   nexum admin-pruebas [--clave]
+#   nexum admin-pruebas <correo> [<contraseña>|-]
+#   nexum admin-pruebas --quitar
+#       El administrador de pruebas de los paneles (Configuracion > Administrador de pruebas):
+#       sin nada, el de ahora (con --clave, tambien su contraseña); con un correo (que es el
+#       usuario; mejor uno que no sea de verdad, como ana@local.test), lo cambia: la contraseña,
+#       de 4 a 64 letras sin tildes, numeros o . _ - @ % + = : , ! # * ? (sin ella o con -, se
+#       pide o se lee de la entrada, para que no quede en el historial de la terminal); --quitar
+#       vuelve a local@local.test. Se guarda en ~/.nexum/admin-pruebas con los correos de antes,
+#       que tampoco van en las copias. Las BBDD ya cargadas no cambian: se pone al cargar una
+#       BBDD o con usuario-pruebas <base>
 #
 #   nexum wp-config <carpeta> [base]
 #       WordPress: comprueba que wp-config.php usa la base de la carpeta (la indicada o la
@@ -243,11 +269,14 @@
 #       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
 #       y la BBDD de antes, en ~/nexum-backups
 #
-#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]
+#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>]
+#                           [--destino <carpeta> | --zip <fichero> [--sobrescribir]]
 #       Un zip del proyecto en ~/Downloads:
 #       <carpeta>_php<rama>_<fecha>_nexum.zip, con su codigo (sin .git), su BBDD de la version activa
 #       (la vinculada o --bd; como exportar-bd, sin el administrador de pruebas) y un LEEME-nexum.txt.
-#       Si es un repositorio git con cambios sin commit, no se exporta. Si falla, no queda nada
+#       Si es un repositorio git con cambios sin commit, no se exporta. Con --zip, justo en ese fichero
+#       (el que se elige en la ventana de guardar); con --sobrescribir, encima del que ya hubiera. Si
+#       falla, no queda nada
 #
 #   nexum hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1 y ::1) o deja de falsear el dominio de un vhost. Un .local se mantiene
@@ -373,7 +402,7 @@
 #       Usuario y contraseña de su phpMyAdmin (ya no entra solo como root)
 #
 #   nexum docker-usuario-pruebas <nombre>
-#       El administrador de pruebas del Panel (local@local.test) en la BBDD de su contenedor
+#       El administrador de pruebas del Panel (el de admin-pruebas) en la BBDD de su contenedor
 #
 #   nexum docker-migrar <nombre> | --todos
 #       Los proyectos de antes de la 1.39.2 (PHP-FPM abierto en 127.0.0.1) pasan a la web del

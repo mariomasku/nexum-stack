@@ -70,8 +70,11 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
    y los desplegables; no los de cerrar, maximizar y minimizar). El principal, en azul */
 button { border-radius: 8px; }
 button:not(.titlebutton) { border-color: alpha(@theme_fg_color, 0.22); }
+/* (al pasar el raton, un relleno azul solido, mezclado con el fondo: con solo un 8 por ciento de azul
+   transparente se perdia el gris del boton y parecia desactivado) */
 button:not(.titlebutton):hover, button:not(.titlebutton):checked:hover {
-    border-color: %(b)s; background-image: none; background-color: alpha(%(b)s, 0.08); }
+    border-color: %(b)s; background-image: none; background-color: mix(@theme_bg_color, %(b)s, 0.22);
+    box-shadow: none; }
 button.flat:not(.titlebutton):hover { border: 1px solid %(b)s; }
 button.verde, button.suggested-action, .nv-azul { background-image: none; background-color: %(b)s; color: white; border-color: transparent; box-shadow: none; }
 button.verde:hover, .nv-azul:hover { background-color: shade(%(b)s, 1.12); border-color: shade(%(b)s, 1.35); }
@@ -230,6 +233,70 @@ def tray_lib():
             return getattr(__import__("gi.repository", fromlist=[name]), name)
         except (ValueError, ImportError, AttributeError):
             continue
+    return None
+
+
+# Abrir al iniciar sesión: el acceso de inicio de la sesión (el de «Aplicaciones al inicio» de Ubuntu), que
+# abre la ventana con --al-iniciar. Solo se toca si es nuestro (lleva AUTOSTART_MARK) y un fichero normal
+AUTOSTART_FILE = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"),
+                              "autostart", "nexum.desktop")
+AUTOSTART_MARK = "X-Nexum-Inicio=true"
+# Abierta al iniciar sesión: con el icono junto al reloj, se queda en él sin enseñar la ventana
+START_HIDDEN = os.environ.get("LVM_AL_INICIAR") == "1"
+
+
+def autostart_read():
+    """El acceso de inicio, si es un fichero normal (sin seguir enlaces); None si no está o no se puede leer."""
+    try:
+        fd = os.open(AUTOSTART_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return None
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            return None
+        return f.read(65536).decode("utf-8", "replace")
+
+
+def autostart_on():
+    """¿Se abre al iniciar sesión? Solo con nuestro acceso, y sin apagar a mano (Hidden o
+    X-GNOME-Autostart-enabled=false, que es lo que hace «Aplicaciones al inicio» al desmarcarlo)."""
+    text = autostart_read()
+    if text is None or AUTOSTART_MARK not in text.splitlines():
+        return False
+    lines = [ln.strip().lower() for ln in text.splitlines()]
+    return "hidden=true" not in lines and "x-gnome-autostart-enabled=false" not in lines
+
+
+def autostart_text(script):
+    """El acceso de inicio: abre la ventana de este script (con comillas si su ruta lleva espacios)."""
+    exe = script if re.fullmatch(r"[A-Za-z0-9/._+-]+", script) else '"%s"' % re.sub(r'(["`$\\])', r"\\\1", script)
+    return "\n".join(["[Desktop Entry]", "Type=Application", "Name=Nexum Dev Stack",
+                      "Comment=Abre Nexum Dev Stack al iniciar sesión (en Configuración, General)",
+                      "Exec=%s ventana --al-iniciar" % exe, "Icon=nexum", "Terminal=false",
+                      "X-GNOME-Autostart-enabled=true", "X-GNOME-Autostart-Delay=5", AUTOSTART_MARK, ""])
+
+
+def autostart_set(on, script):
+    """Enciende (escribe nuestro acceso, 644) o apaga (borra el nuestro; uno que no sea nuestro no se toca).
+    Devuelve un texto de error o None."""
+    text = autostart_read()
+    if os.path.lexists(AUTOSTART_FILE) and (text is None or AUTOSTART_MARK not in text.splitlines()):
+        return "%s no es de Nexum Dev Stack (o es un enlace): no se toca. Quítalo o cámbialo a mano." % AUTOSTART_FILE
+    try:
+        if not on:
+            if text is not None:
+                os.unlink(AUTOSTART_FILE)
+            return None
+        os.makedirs(os.path.dirname(AUTOSTART_FILE), mode=0o700, exist_ok=True)
+        tmp = AUTOSTART_FILE + ".nuevo"
+        if os.path.lexists(tmp):
+            os.unlink(tmp)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(autostart_text(script))
+        os.replace(tmp, AUTOSTART_FILE)
+    except OSError as exc:
+        return str(exc)
     return None
 
 

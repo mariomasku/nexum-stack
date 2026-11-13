@@ -41,8 +41,11 @@ open(g["BUTTONS_FILE"], "w").write("{roto")
 say("botones: un fichero roto no rompe nada", g["buttons_conf"]()["order"] == keys)
 json.dump({"order": ["log", "inventado", "web"], "hidden": ["pma", "otro"], "style": "raro"}, open(g["BUTTONS_FILE"], "w"))
 c = g["buttons_conf"]()
-say("botones: lo que no se conoce se ignora y los que faltan van al final",
-    c["order"][:2] == ["log", "web"] and sorted(c["order"]) == sorted(keys) and c["hidden"] == {"pma"} and c["style"] == "nombre")
+o = c["order"]
+say("botones: lo que no se conoce se ignora, lo guardado sigue en su orden y los que faltan van detrás del que les precede",
+    o.index("log") < o.index("web") and o.index("vscode") == o.index("web") + 1
+    and o.index("actualizar") == o.index("log") + 1 and sorted(o) == sorted(keys) and c["hidden"] == {"pma"}
+    and c["style"] == "nombre")
 g["buttons_save"]({"order": list(reversed(keys)), "hidden": {"vscode"}, "style": "grande", "size": 96})
 c = g["buttons_conf"]()
 say("botones: se guarda el orden, los ocultos y el estilo", c["order"] == list(reversed(keys)) and c["hidden"] == {"vscode"} and c["style"] == "grande")

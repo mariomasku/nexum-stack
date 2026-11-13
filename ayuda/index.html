@@ -1250,22 +1250,33 @@
       <code data-so="linux">xdg-open http://web.local/</code><code data-so="mac">open http://web.local/</code>.</li>
     <li><b>«VS Code»</b>: abre su carpeta en Visual Studio Code (el editor de código). Si ya estaba abierta, trae su ventana delante. Solo
       sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>.</li>
+    <li><b>«GitHub»</b>: abre su repositorio en el navegador, por ejemplo <code>https://github.com/ana/panaderia-luna</code>. Solo sale si
+      la carpeta es un repositorio git con un remote <code>origin</code>; si es de otro servidor (GitLab, Bitbucket…), se llama
+      «Repositorio». La dirección sale de <code>.git/config</code> y nunca lleva el usuario ni la contraseña (o el token) que tuviera. En la
+      terminal: <code>git -C /opt/htdocs/panaderia-luna remote get-url origin</code>.</li>
     <li><b>«phpMyAdmin»</b>: abre su base de datos en phpMyAdmin, la página web para ver y cambiar las tablas de MariaDB, en
       <code>http://127.0.0.1/phpmyadmin/</code> (el de la versión activa). Sale apagado si no se sabe qué base usa. No cambia nada.</li>
     <li><b>«Panel»</b>: el escritorio de WordPress (<code>wp-admin</code>) o el back office de PrestaShop (con su logotipo). Antes deja al
-      día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>) y abre la pantalla de acceso con
-      los dos ya escritos: solo hay que pulsar Entrar. Sale apagado si el proyecto no es un WordPress ni una tienda.</li>
+      día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>, o el que pongas en
+      Configuración, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Sale apagado si el
+      proyecto no es un WordPress ni una tienda. Si la base ya tiene un usuario de verdad con ese correo, no lo toca: te avisa y abre el
+      panel sin él.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum usuario-pruebas wp_panaderia_luna panaderia-luna</code> (la base y la carpeta).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Entra en el MariaDB de la versión activa como root.</li>
-      <li>WordPress (cada uno que haya en la base, por su prefijo de tablas, como <code>wp_</code>): busca el usuario
-        <code>local@local.test</code> en <code>wp_users</code>; si no está, lo crea; le pone la contraseña <code>MD5('local')</code> y, en
-        <code>wp_usermeta</code>, el rol de administrador (<code>wp_capabilities</code> y <code>wp_user_level</code> = 10).</li>
-      <li>PrestaShop: copia el primer SuperAdmin de <code>ps_employee</code> con el correo <code>local@local.test</code> y la contraseña
-        <code>local</code> (cifrada como la use esa versión de la tienda) y lo da de alta en todas sus tiendas.</li>
+      <li>Lee el administrador de pruebas de <code>~/.nexum/admin-pruebas</code> (si no hay, <code>local@local.test</code> con la
+        contraseña <code>local</code>). En estos ejemplos, el de siempre.</li>
+      <li>WordPress (cada uno que haya en la base, por su prefijo de tablas, como <code>wp_</code>): busca en <code>wp_users</code> el usuario
+        <code>local@local.test</code> con la marca de Nexum (<code>user_nicename</code> <code>local-pruebas</code> y nombre «Local
+        (pruebas)»); si no está, lo crea con esa marca; le pone la contraseña en <code>MD5</code> y, en <code>wp_usermeta</code>, el rol de
+        administrador (<code>wp_capabilities</code> y <code>wp_user_level</code> = 10). Con un correo tuyo, si ya hay un usuario sin la marca
+        con ese usuario o ese correo, es de verdad: no lo toca y avisa («ya tiene un usuario de verdad con ana@local.test»).</li>
+      <li>PrestaShop: copia el primer SuperAdmin de <code>ps_employee</code> con el correo <code>local@local.test</code>, la marca (nombre
+        «Pruebas», apellido «Local») y la contraseña (cifrada como la use esa versión de la tienda) y lo da de alta en todas sus tiendas. Un
+        empleado sin la marca con ese correo, igual: no se toca.</li>
       <li>Escribe <code>A|wp|local@local.test|local</code> (o <code>A|ps|…</code>). Con eso la ventana sirve un momento, en
         <code>http://127.0.0.1</code>, una página con el formulario de acceso ya relleno y la abre en el navegador.</li>
     </ol>
@@ -1661,11 +1672,14 @@
       carpeta .git)»</b> y <b>«Base de datos: wp_panaderia_luna (<span data-so="linux">lampp-8.4</span><span
       data-so="mac">XAMPP-8.4.27</span>)»</b>, la que usa el proyecto en esa versión. Si no tiene ninguna, la casilla sale apagada con
       «Sin BBDD vinculada». Desmarca lo que no quieras llevarte; con las dos desmarcadas, «Exportar» no se puede pulsar. Debajo, lo que
-      se va a hacer, numerado, con la carpeta y el nombre del zip.</li>
-    <li><b>El zip</b> va a tu carpeta de descargas (<span data-so="linux"><code>~/Descargas</code>, la de tu escritorio</span><span
-      data-so="mac"><code>~/Downloads</code>, «Descargas» en el Finder</span>) con el nombre
+      se va a hacer, numerado.</li>
+    <li><b>Dónde se guarda.</b> Al pulsar «Exportar» se abre la ventana de guardar del sistema, «Guardar el proyecto exportado», en tu
+      carpeta de descargas (<span data-so="linux"><code>~/Descargas</code>, la de tu escritorio</span><span
+      data-so="mac"><code>~/Downloads</code>, «Descargas» en el Finder</span>) y con el nombre
       <code>panaderia-luna_php8.4_20261111-1030_nexum.zip</code>: la carpeta, la rama de PHP, la fecha y la hora y, al final,
-      <code>_nexum</code>. Dentro: <code>panaderia-luna/</code> con el código (sin <code>.git</code> y con sus permisos),
+      <code>_nexum</code>. Ahí puedes cambiar la carpeta y el nombre (si le quitas el <code>.zip</code>, se le vuelve a poner). Si eliges
+      uno que ya existe, la propia ventana te pregunta si lo reemplazas. Con «Cancelar» no se exporta nada.</li>
+    <li><b>El zip</b> lleva dentro: <code>panaderia-luna/</code> con el código (sin <code>.git</code> y con sus permisos),
       <code>wp_panaderia_luna.sql</code> con la base y <code>LEEME-nexum.txt</code> (el proyecto, la versión de PHP y de MariaDB, la
       fecha y la versión de Nexum Dev Stack que lo ha exportado).</li>
     <li>La base sale como en <a href="#bbdd-descargar">Descargar una copia</a>: <b>sin el administrador de pruebas</b> ni los cambios del
@@ -1679,7 +1693,9 @@
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum exportar-proyecto panaderia-luna --bd wp_panaderia_luna</code>; sin la casilla del código,
       con <code>--sin-codigo</code>, y sin la de la base, con <code>--sin-bd</code>. Sin <code>--bd</code>, usa la base vinculada al
-      proyecto en la versión activa; con <code>--destino &lt;carpeta&gt;</code>, el zip va a otra carpeta.</p>
+      proyecto en la versión activa; con <code>--destino &lt;carpeta&gt;</code>, el zip va a otra carpeta con su nombre de siempre, y
+      con <code>--zip &lt;fichero&gt;</code>, justo a ese fichero (es lo que hace la ventana con el que eliges al guardar; con
+      <code>--sobrescribir</code>, encima del que ya hubiera, solo si es un fichero normal).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Con el código, mira la carpeta con <code>git status --porcelain</code> (solo lee: la ventana lo pregunta antes con
@@ -1740,7 +1756,7 @@
     botones del proyecto cargado y para los del visor de un proyecto de Docker. Solo cambia cómo se ve la ventana: no toca ningún
     proyecto.</p>
   <ul>
-    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
+    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
       dice si se ve («Verlo en el visor»), y las flechas <b>«Antes»</b> y <b>«Después»</b> lo mueven.</li>
     <li><b>Estilo</b>: <b>«Con su nombre»</b> (como vienen), <b>«Solo el icono (cuadrado)»</b> o <b>«Icono y nombre (cuadrado)»</b>. Con solo
       el icono, el nombre sale al dejar el ratón encima.</li>
@@ -1790,7 +1806,10 @@
     <li><b>Paso 2 de 4: versión de PHP.</b> Elige en cuál se crea. Viene marcada la activa.</li>
     <li><b>Paso 3 de 4: BBDD nueva.</b> Su nombre (se propone <code>wp_</code> y el de la carpeta, como <code>wp_panaderia_luna</code>) y, si
       quieres, el volcado que se le carga (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>). Sin volcado, se crea vacía. No puede
-      existir ya en esa versión.</li>
+      existir ya en esa versión. Si el proyecto no lleva base de datos (o aún no la tienes), marca <b>«Sin base de datos»</b>: el nombre y el
+      volcado se apagan, el paso pasa a llamarse «Paso 3 de 4: sin BBDD» y el proyecto se clona y se carga sin ninguna base vinculada. Si es
+      un WordPress o una tienda PrestaShop, el asistente avisa de que la web no funcionará hasta que tenga su base (te deja seguir): súbela
+      después en <a href="#bbdd">Bases de datos</a>, «Subir o actualizar una BBDD», eligiendo el proyecto, y queda vinculada.</li>
     <li><b>Paso 4 de 4: dominio de producción.</b> Enciende «¿Falsear su dominio de producción en este equipo?» y escribe el dominio (como
       <code>panaderia-luna.com</code>) para que el navegador abra tu copia local con su dirección de verdad. Lo necesitan las tiendas
       PrestaShop y los WordPress con el dominio en su base. Si no, se abre en <code>web.local</code>. Si el repositorio de GitHub tiene su
@@ -1798,11 +1817,31 @@
       dice en rojo y «Montar proyecto» no se puede pulsar: apágalo o cambia ese vhost. Si lleva a la carpeta del proyecto, se usa.</li>
   </ol>
   <p>Al pulsar <b>«Montar proyecto»</b>: clona el repositorio, lo carga en esa versión (pide la contraseña de administrador) y crea la base
-    o carga el volcado. Después, si lo has pedido, falsea el dominio. Al acabar, queda como proyecto cargado.</p>
+    o carga el volcado (con «Sin base de datos», ninguna de las dos). Después, si lo has pedido, falsea el dominio. Al acabar, queda como
+    proyecto cargado.</p>
+  <p id="nuevo-proyecto-rama">Al acabar bien, sale <b>«¿En qué rama empiezas a trabajar?»</b>, para dejarlo listo y abrirlo en Visual Studio
+    Code:</p>
+  <ul>
+    <li>Arriba, la rama en la que ha quedado el clon (la predeterminada del repositorio, como <code>main</code>).</li>
+    <li><b>«Una rama que ya existe»</b>: el desplegable con las ramas del repositorio, las tuyas y las de <code>origin</code> (el servidor
+      del que se ha clonado), cada una una sola vez. La actual va la primera; si eliges una que solo está en <code>origin</code>, se crea
+      en tu equipo siguiendo a la del servidor.</li>
+    <li><b>«Una rama nueva a partir de main»</b>: escribe su nombre (como <code>nueva-portada</code>). Si no vale para git (con espacios,
+      <code>..</code>, <code>~</code>, <code>:</code>…) o ya existe, lo dice en rojo y no deja seguir.</li>
+    <li><b>«Abrir en Visual Studio Code»</b>: marcada si lo tienes instalado; si no, apagada y con lo que falta.</li>
+    <li>Debajo, «Qué se va a realizar», que cambia con lo que elijas.</li>
+  </ul>
+  <p><b>«Empezar a trabajar»</b> cambia de rama (con tu usuario, sin contraseña de administrador) y luego abre la carpeta en VS Code.
+    <b>«Más tarde»</b> lo deja en la rama predeterminada y no hace nada más. Si no es un repositorio git, solo ofrece abrirlo en VS Code; si
+    no tiene más ramas que la actual, puedes crear una nueva. Si la carpeta tiene cambios sin commit (ficheros de git cambiados), no se
+    puede cambiar de rama: lo dice y se queda en la que está.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum montar-proyecto git@github.com:usuario/panaderia-luna.git panaderia-luna 8.4
       wp_panaderia_luna ~/Descargas/wp_panaderia_luna.sql.gz</code> (la dirección, la carpeta, la versión, la base y, si lo pones, el
-      volcado). Con el paso 4 encendido, después: <code>nexum nuevo-dominio panaderia-luna.com panaderia-luna</code>.</p>
+      volcado). Sin base de datos: <code>nexum montar-proyecto git@github.com:usuario/panaderia-luna.git panaderia-luna 8.4 --sin-bd</code>.
+      Con el paso 4 encendido, después: <code>nexum nuevo-dominio panaderia-luna.com panaderia-luna</code>. Y la rama de trabajo:
+      <code>nexum rama-proyecto panaderia-luna nueva-portada --nueva</code> (una nueva) o <code>nexum rama-proyecto panaderia-luna
+      desarrollo</code> (una que ya existe); la lista, <code>nexum gui-ramas-proyecto panaderia-luna</code>, que no cambia nada.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba la dirección (solo <code>https://</code> o SSH), que la carpeta no existe, que la versión existe y que la base no está
@@ -1814,12 +1853,18 @@
       <li>La carga: <code>nexum cargar-proyecto panaderia-luna 8.4 wp_panaderia_luna</code>.</li>
       <li>La base: con volcado, <code>nexum importar-bd &lt;volcado&gt; wp_panaderia_luna --crear</code>; sin él,
         <code>nexum crear-bd wp_panaderia_luna</code> (vacía, <code>utf8mb4_general_ci</code>). Con volcado, vuelve a ajustar
-        su <code>wp-config.php</code> o la configuración de la tienda.</li>
+        su <code>wp-config.php</code> o la configuración de la tienda. Con <code>--sin-bd</code> son dos pasos: lo carga con
+        <code>nexum cargar-proyecto panaderia-luna 8.4</code>, sin base, y no crea ni vincula ninguna.</li>
       <li><code>nuevo-dominio</code>: crea el vhost http y https del dominio con su certificado, apunta
         <code>panaderia-luna.com=panaderia-luna</code> en <code>~/.nexum/dominios</code> y lo falsea en <code>/etc/hosts</code>
         (los demás dominios dejan de estarlo). Si ese dominio ya tiene un vhost, se para y te dice que uses su interruptor.</li>
+      <li><code>rama-proyecto</code>: con tu usuario (el dueño de la carpeta; nunca como root) y sin ganchos, comprueba que no hay cambios
+        sin commit y que el nombre vale (<code>git check-ref-format --branch</code>), y cambia con <code>git switch nueva-portada</code>. Una
+        que solo está en <code>origin</code>: <code>git switch -c desarrollo --track origin/desarrollo</code>; una nueva (<code>--nueva</code>),
+        <code>git switch -c nueva-portada</code>, a partir de la actual.</li>
     </ol>
-    <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna log -1</code> (el último commit) y <code>readlink
+    <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna branch -vv</code> (la rama en la que está y a cuál sigue),
+      <code>git -C /opt/htdocs/panaderia-luna log -1</code> (el último commit) y <code>readlink
       /opt/htdocs/web.local</code>.</p>
   </details>
   <div class="nota"><b>Una tienda clonada no se falsea sola</b>La base y el nombre de la carpeta vienen con el repositorio, así que el
@@ -2744,7 +2789,7 @@
       cambia nada.</li>
     <li><b>El fichero se comprueba antes</b> de vaciar la base: si no es un <code>.zip</code> o <code>.gz</code> válido, no se toca nada.</li>
     <li><b>El administrador de pruebas</b>: en un WordPress o una tienda PrestaShop se crea o se deja al día el usuario
-      <code>local@local.test</code> con la contraseña <code>local</code>, para el botón «Panel».</li>
+      <code>local@local.test</code> con la contraseña <code>local</code> (o el de <a href="#admin-pruebas-config">Administrador de pruebas</a>), para el botón «Panel».</li>
     <li><b>El correo</b>: lo que mande la web va al correo de pruebas (Mailpit), no a gente de verdad.</li>
   </ul>
   <div class="nota cuidado"><b>Si cancelas la carga</b>Te pregunta «¿Cancelar la carga?»: la base se queda a medias, con lo que se haya cargado
@@ -2779,7 +2824,7 @@
       <li>Al acabar, corta las conexiones de ese usuario, borra los eventos del volcado (tareas programadas dentro de la base) y bloquea el
         usuario (<code>ACCOUNT LOCK</code>): ya no puede entrar, pero las vistas y disparadores siguen funcionando.</li>
       <li>Apunta la fecha de la carga en <code>~/.nexum/importaciones</code> (la «· importada» de la lista).</li>
-      <li>Crea o deja al día el administrador de pruebas <code>local@local.test</code> (lo mismo que
+      <li>Crea o deja al día el administrador de pruebas, <code>local@local.test</code> o el de Configuración (lo mismo que
         <code>nexum usuario-pruebas wp_panaderia_luna</code>) y pone la base en el correo de pruebas (lo mismo que
         <code>nexum correo bd wp_panaderia_luna</code>).</li>
       <li>Con <code>--proyecto</code>: apunta la base como la de esa carpeta en <code>~/.nexum/proyectos</code> y, en un WordPress, rehace su
@@ -2870,8 +2915,9 @@
       administrador. Si está en marcha, no la pide.</li>
     <li><b>Qué lleva</b>: las tablas, los datos, las funciones y los disparadores<span data-so="linux">, sin los eventos</span><span data-so="mac"> y
       los eventos</span>. Se puede volver a cargar aquí mismo.</li>
-    <li><b>Qué no lleva</b>: el administrador de pruebas (<code>local@local.test</code>) ni los cambios del correo de pruebas. La copia lleva el
-      correo como estaba antes.</li>
+    <li><b>Qué no lleva</b>: el administrador de pruebas (<code>local@local.test</code>, el de <a href="#admin-pruebas-config">Administrador de pruebas</a> y los que hayas puesto
+      antes, solo los que llevan la marca de Nexum) ni los cambios del correo de pruebas. Un usuario de verdad con el mismo correo sí va. La
+      copia lleva el correo como estaba antes.</li>
     <li><b>Si la cancelas</b> («¿Cancelar la descarga?»), no se guarda nada.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
@@ -2890,7 +2936,8 @@
         <code>/opt/lampp-8.4/mysql/bin/mariadb-dump --no-defaults -S /tmp/lvm-mysql-XXXX/mysql.sock -uroot …</code> (o su <code>bin/mysqldump</code>).
         <code>--single-transaction</code> saca una foto coherente sin parar la web.</li>
       <li>Deja fuera al administrador de pruebas: las tablas de usuarios (<code>wp_users</code>, <code>wp_usermeta</code>, <code>ps_employee</code>…)
-        se vuelcan aparte con <code>--where</code>, sin las filas de <code>local@local.test</code>.</li>
+        se vuelcan aparte con <code>--where</code>, sin las filas de <code>local@local.test</code> ni las que llevan la marca de Nexum con un
+        correo de <code>~/.nexum/admin-pruebas</code> (el de ahora y los de antes), con sus permisos y sus tiendas.</li>
       <li>Deja fuera lo que cambió el correo de pruebas: la tabla <code>lvm_correo_original</code> no va y, al final del volcado, se añade lo que
         había antes (los plugins de correo y la configuración de correo de la tienda como estaban).</li>
       <li>Escribe el resultado comprimido (<code>gzip -6</code> para <code>.sql.gz</code>, o un <code>.zip</code> con el <code>.sql</code> dentro) en
@@ -3102,8 +3149,8 @@
   <details><summary>¿Por qué una versión dice «usa las de lampp-…»?</summary>
     <p>Porque comparte las bases de datos de otra versión. Sus bases salen en la fila de esa otra versión.</p></details>
   <details><summary>¿Qué usuario y contraseña pongo en el panel de mi WordPress o mi tienda?</summary>
-    <p><code>local@local.test</code> con la contraseña <code>local</code>. Se crea solo al cargar una copia. El botón «Panel» del proyecto entra
-      con él sin que lo escribas.</p></details>
+    <p><code>local@local.test</code> con la contraseña <code>local</code>, o el que pongas en <a href="#admin-pruebas-config">Administrador de pruebas</a>. Se crea solo al cargar
+      una copia. El botón «Panel» del proyecto entra con él sin que lo escribas.</p></details>
 </section>
 
 <!-- =========================================================================================== DOCKER -->
@@ -3372,10 +3419,11 @@
     <li><b>«Compartir»</b>: abre un túnel de Cloudflare para que otra persona vea la web (ver <a href="#compartir">Compartir una web</a>). Si ya la
       estás compartiendo, dice «Compartiendo» y enseña la dirección y la contraseña.</li>
     <li><b>«Panel»</b>: abre el panel de WordPress o de PrestaShop <b>ya con la sesión iniciada</b>. Antes crea o deja al día en su base de datos
-      el administrador de pruebas, <code>local@local.test</code> con la contraseña <code>local</code>. Si el proyecto no tiene panel, no se
-      puede pulsar.</li>
+      el administrador de pruebas, <code>local@local.test</code> con la contraseña <code>local</code> (o el de <a href="#admin-pruebas-config">Administrador de pruebas</a>). Si el
+      proyecto no tiene panel, no se puede pulsar.</li>
     <li><b>«phpMyAdmin»</b>: copia la contraseña de <code>root</code> y abre phpMyAdmin. Pega la contraseña con el usuario <code>root</code>.</li>
     <li><b>«VS Code»</b>: abre la carpeta en Visual Studio Code (si lo tienes instalado).</li>
+    <li><b>«GitHub»</b>: abre su repositorio en el navegador (solo si la carpeta tiene un remote <code>origin</code>).</li>
     <li><b>«Log»</b>: los últimos errores de PHP de la web, en una ventana con <b>«Copiar todo»</b> y <b>«Actualizar»</b>. Solo con su
       contenedor de PHP en marcha.</li>
     <li><b>«Imágenes de producción»</b> (WordPress y PrestaShop): trae de producción las imágenes que falten. Ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
@@ -3391,8 +3439,9 @@
       <li>Lee su base de datos en <code>~/.nexum/docker/academia-flor/proyecto.conf</code>.</li>
       <li>Entra como <code>root</code> en la MariaDB común, sin poner la contraseña en ninguna orden (la toma dentro del contenedor):
         <code>docker exec -i nexum-mariadb-11-8 sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD mariadb -uroot'</code>.</li>
-      <li>Crea o pone al día el usuario <code>local@local.test</code> con la contraseña <code>local</code> en las tablas de usuarios de WordPress
-        (o de empleados de PrestaShop), como administrador.</li>
+      <li>Crea o pone al día el administrador de pruebas (<code>local@local.test</code> con la contraseña <code>local</code>, o el de
+        Configuración) en las tablas de usuarios de WordPress (o de empleados de PrestaShop), como administrador y con la marca de Nexum. Uno
+        de verdad con ese correo no se toca.</li>
     </ol>
     <p>Después la ventana abre el panel con la sesión ya iniciada. Para comprobarlo: entra en <code>https://academia-flor-php84.docker.local/wp-admin</code>
       con <code>local@local.test</code> y <code>local</code>.</p>
@@ -3746,7 +3795,8 @@
     <p>El usuario es <code>root</code>, y la contraseña la copia la llave del proyecto (o el botón «phpMyAdmin» de su visor, que además lo
       abre). En los del Apache de Docker es la de su MariaDB común.</p></details>
   <details><summary>¿Qué usuario y contraseña pongo en el panel de WordPress o de la tienda?</summary>
-    <p>No hace falta: el botón «Panel» del visor entra solo con <code>local@local.test</code> y la contraseña <code>local</code>.</p></details>
+    <p>No hace falta: el botón «Panel» del visor entra solo con <code>local@local.test</code> y la contraseña <code>local</code> (o con el de
+      <a href="#admin-pruebas-config">Administrador de pruebas</a>).</p></details>
   <details><summary>¿Por qué en la captura las direcciones acaban en .docker.test?</summary>
     <p>Porque ese equipo tiene activado el DNS de Docker en Configuración. De partida acaban en <code>.docker.local</code>.</p></details>
 </section>
@@ -4233,6 +4283,7 @@
     <li><a href="#vhosts">Vhosts y hosts</a></li>
     <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
     <li><a href="#correo">Correo de pruebas</a></li>
+    <li><a href="#admin-pruebas-config">Administrador de pruebas</a></li>
     <li><a href="#docker-config">Docker</a></li>
     <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
     <li><a href="#github-config">GitHub</a></li>
@@ -4346,7 +4397,7 @@
     </div>
     <ol class="puntos">
       <li data-x="45" data-y="23"><b>Cada tarea</b><span>Su título, la fecha y la hora en que empezó y cómo acabó: con el check verde, «Terminada bien»; con la señal roja, «Ha fallado (código N)»; también «Cancelada» o, mientras sigue, «En marcha». Deja el ratón encima para ver su orden.</span></li>
-      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta».</span></li>
+      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta». Una tarea en marcha guarda lo que va diciendo cada 3 segundos y su ventana se actualiza sola, como una consola: abajo del todo ves lo último que está haciendo, hasta que acaba.</span></li>
       <li data-x="70" data-y="33"><b>La lista</b><span>Se ven 4 tareas, la más nueva arriba. Si hay más, la lista se desplaza dentro de su recuadro, con su barra a la derecha: baja con la rueda del ratón para ver las anteriores.</span></li>
       <li data-x="82" data-y="47"><b>Vaciar el registro…</b><span>Te pregunta antes «¿Vaciar el registro de tareas?», con cuántas se borran, y pulsa «Vaciar», en rojo. Borra los registros de las tareas que ya han acabado; el de una tarea que sigue en marcha se queda. No toca nada más: ni tus proyectos, ni los demás registros. Apagado si no hay ninguna acabada. Es lo mismo que «Registros del programa» en <a href="#limpieza">Limpieza</a>, pero solo con el registro de tareas.</span></li>
       <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.nexum/tareas</code>, donde está cada una en su fichero de texto.</span></li>
@@ -4463,8 +4514,8 @@
   </details>
 
   <h3 id="programa">General › Programa</h3>
-  <p>El propio programa: sus actualizaciones, su icono y la bandeja. <span data-so="mac">En el Mac, aquí solo está «Dejar en la barra de
-    menús al cerrar»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
+  <p>El propio programa: sus actualizaciones, su icono, la bandeja y si se abre al iniciar sesión. <span data-so="mac">En el Mac, aquí
+    están «Dejar en la barra de menús al cerrar» y «Abrir al iniciar sesión»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
   <figure class="pantalla">
     <div class="barra">
       <span class="tenue">Pulsa un número o empieza el recorrido</span>
@@ -4480,6 +4531,10 @@
       <li data-x="41.5" data-y="93"><b>Dejar en la bandeja al cerrar</b><span>Encendido, cerrar la ventana la esconde en un icono junto al reloj, con lo básico: abrirla, arrancar o parar, web.local y salir.</span></li>
     </ol>
   </figure>
+  <p><b>Abrir al iniciar sesión.</b> Debajo de «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
+    menús</span> al cerrar», un interruptor: encendido, Nexum Dev Stack se abre solo cada vez que entras en tu sesión. Si también está
+    puesto el icono <span data-so="linux">junto al reloj</span><span data-so="mac">de la barra de menús</span>, arranca escondido en él,
+    sin abrir la ventana: la abres desde su menú cuando la necesites. Apagado, deja de abrirse.</p>
   <p><b>Si hay una versión nueva</b></p>
   <ol class="pasos-tarea">
     <li><b>Lee el aviso</b> «Hay una versión nueva de Nexum Dev Stack»: de qué versión a cuál, de dónde viene y su huella SHA-256 (el código
@@ -4493,7 +4548,8 @@
     terminal (<code>sudo apt install</code> con la ruta del paquete); después, abre de nuevo el programa.</div>
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
-      <li><b>De partida:</b> con el icono junto al reloj.</li>
+      <li><b>De partida:</b> con el icono junto al reloj, y sin abrirse al iniciar sesión.</li>
+      <li data-so="linux"><b>Si lo quitas en «Aplicaciones al inicio»</b> de Ubuntu, el interruptor sale apagado.</li>
       <li data-so="linux"><b>Si falta su componente</b>, el interruptor sale apagado y la fila dice cómo instalarlo: <code>sudo apt install gir1.2-ayatanaappindicator3-0.1</code>.</li>
     </ul>
   </div>
@@ -4549,6 +4605,20 @@
       <li>Pone o quita el icono junto al reloj al momento.</li>
     </ol>
     <p>Para comprobarlo: <code>cat ~/.nexum/ventana-bandeja</code>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. El interruptor «Abrir al iniciar sesión» lo guarda la propia ventana, sin contraseña.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li data-so="linux">Encendido, escribe el acceso de inicio de tu sesión, <code>~/.config/autostart/nexum.desktop</code> (el mismo sitio
+        que usa «Aplicaciones al inicio»), que abre la ventana con <code>nexum ventana --al-iniciar</code>.</li>
+      <li data-so="mac">Encendido, escribe <code>~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>, que abre la
+        aplicación con <code>--al-iniciar</code> al entrar en tu sesión.</li>
+      <li>Con <code>--al-iniciar</code> y el icono puesto, la ventana se queda escondida en él.</li>
+      <li>Apagado, borra ese fichero. Solo si es el de Nexum Dev Stack: uno tuyo con el mismo nombre (o un enlace) no se toca, y te lo dice.</li>
+    </ol>
+    <p>Para comprobarlo: <code data-so="linux">cat ~/.config/autostart/nexum.desktop</code><code data-so="mac">cat
+      ~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>.</p>
   </details>
 
   <h3 id="vhosts">Vhosts y hosts</h3>
@@ -4733,6 +4803,54 @@
   <h3>Correo de pruebas</h3>
   <p>Encenderlo o apagarlo, qué hacer con los plugins de correo de WordPress, instalar o actualizar Mailpit y la bandeja: en
     <a href="#correo">Correo de pruebas</a>.</p>
+
+  <h3 id="admin-pruebas-config">Administrador de pruebas</h3>
+  <p>La cuenta con la que el botón «Panel» entra en el panel de WordPress y en el back office de PrestaShop de tus proyectos, con rol de
+    administrador. Nexum la crea al cargar una BBDD (y la deja al día al pulsar «Panel»), solo en las bases de tu equipo, y nunca va en las
+    copias que descargas ni en las que exportas. Si no pones ninguna, es <code>local@local.test</code> con la contraseña <code>local</code>.</p>
+  <ul>
+    <li><b>Ahora</b>: el que se usa, el tuyo o el de siempre.</li>
+    <li><b>Correo (usuario)</b>: el correo es también el usuario (WordPress lo usa para entrar y como correo; PrestaShop, como correo). Mejor
+      uno que no sea de verdad, como <code>ana@local.test</code>. Solo letras sin tildes, números y <code>. _ % + -</code>, con forma de
+      correo y hasta 60 caracteres.</li>
+    <li><b>Contraseña</b>: de 4 a 64 letras sin tildes, números o <code>. _ - @ % + = : , ! # * ?</code>; sin espacios, comillas,
+      <code>\</code>, <code>$</code> ni <code>`</code>. El ojo la enseña mientras la escribes.</li>
+    <li><b>Guardar</b>: se enciende cuando el correo y la contraseña valen; si no, dice qué falla debajo. <b>Volver a
+      local@local.test</b>: deja el de siempre.</li>
+  </ul>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> <code>local@local.test</code> con la contraseña <code>local</code>.</li>
+      <li><b>Las BBDD ya cargadas no cambian solas:</b> el nuevo se crea la próxima vez que cargues una BBDD o al pulsar «Panel» en el
+        proyecto (lo crea en su base). El de antes se queda en esas bases, pero tampoco va en las copias.</li>
+      <li><b>Una cuenta de verdad no se toca:</b> Nexum solo crea, cambia o quita la cuenta que lleva su marca (en WordPress,
+        <code>local-pruebas</code> y «Local (pruebas)»; en PrestaShop, «Pruebas Local»). Si la base ya tiene un usuario de verdad con ese
+        correo (por ejemplo, porque has puesto el tuyo de producción), no le cambia ni la contraseña ni el rol, no crea el de pruebas ahí y te
+        avisa: elige otro correo.</li>
+      <li><b>Fuera de las copias:</b> al descargar una BBDD, copiarla a otra versión o exportar un proyecto se quitan
+        <code>local@local.test</code>, el de ahora y los que hayas puesto antes, solo si llevan la marca. Un usuario de verdad con el mismo
+        correo sí va.</li>
+      <li><b>La contraseña no va a ningún registro:</b> la ventana se la pasa a nexum por la entrada, no en la orden, así que no sale en el
+        registro de tareas ni en la lista de procesos. Se guarda en <code>~/.nexum/admin-pruebas</code>, solo para ti (600).</li>
+      <li><b>En simulación</b> (<code>--simular</code>) no se guarda nada: lo avisa.</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum admin-pruebas ana@local.test</code> (te pide la contraseña sin enseñarla) o
+      <code>printf '%s\n' 'Prueba.2026' | nexum admin-pruebas ana@local.test -</code>. Sin nada detrás, <code>nexum admin-pruebas</code> dice
+      cuál se usa (con <code>--clave</code>, también su contraseña); <code>nexum admin-pruebas --quitar</code> vuelve a
+      <code>local@local.test</code>. No pide la contraseña de administrador.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Comprueba el correo y la contraseña. Si no valen, no cambia nada («Correo no válido…», «Contraseña no válida…»).</li>
+      <li>Hace la huella bcrypt de la contraseña (la que usa PrestaShop 1.7 o posterior).</li>
+      <li>Escribe <code>~/.nexum/admin-pruebas</code> de nuevo, solo para ti (600): <code>correo=</code>, <code>clave=</code>,
+        <code>bcrypt=</code> y una línea <code>antes=</code> por cada correo que hayas puesto antes. Con <code>--quitar</code>, sin las tres
+        primeras.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum admin-pruebas</code> («Administrador de pruebas: ana@local.test») y, después de cargar una BBDD,
+      <code>http://web.local/wp-admin/</code> con <code>ana@local.test</code> y su contraseña.</p>
+  </details>
 
   <h3 id="docker-config">Docker</h3>
   <p>Cómo se sirven tus proyectos de Docker: en qué dirección, con qué dominios y cuándo se paran solos. Van con su propio Apache, en otra
@@ -5086,7 +5204,7 @@
   </figure>
   <p><b>El diálogo «Botones del proyecto»</b></p>
   <ul>
-    <li><b>La lista</b>: Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
+    <li><b>La lista</b>: Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
       oculta en el visor; las flechas «Antes» y «Después» lo mueven.</li>
     <li><b>«Estilo»</b>: «Con su nombre», «Solo el icono (cuadrado)» o «Icono y nombre (cuadrado)».</li>
     <li><b>«Tamaño»</b>: el lado del cuadrado, de 32 a 128 px, con su medida al lado. Con «Con su nombre» no se usa. De partida, 44 px solo con el
@@ -6108,6 +6226,17 @@
       desde un repositorio (GitHub u otro): lo clona (lo descarga con su historial) en esa carpeta con tu usuario, lo carga en esa versión,
       crea su base y, si le das un volcado, lo carga en ella. Solo direcciones https o ssh. Ejemplo: <code>nexum montar-proyecto
       git@github.com:mi-organizacion/portfolio-estudio.git portfolio-estudio 8.4 wp_portfolio_estudio</code>.</dd>
+    <dt><code>montar-proyecto &lt;url de git&gt; &lt;carpeta&gt; &lt;versión&gt; --sin-bd</code></dt><dd>Lo mismo, sin base de datos: lo
+      clona y lo carga sin ninguna base vinculada (un WordPress o una tienda no abren hasta que tengan la suya). Ejemplo: <code>nexum
+      montar-proyecto git@github.com:mi-organizacion/panaderia-luna.git panaderia-luna 8.4 --sin-bd</code>.</dd>
+    <dt><code>rama-proyecto &lt;carpeta&gt; &lt;rama&gt; [--nueva]</code></dt><dd>Cambia el proyecto a esa rama de git, con tu usuario (el
+      dueño de la carpeta) y sin contraseña de administrador. Una que solo está en <code>origin</code> se crea en tu equipo siguiendo a la
+      del servidor; con <code>--nueva</code>, una rama nueva a partir de la actual (no puede existir ya). Con cambios sin commit, o con un
+      nombre que no vale para git, no cambia nada. Es lo que hace «Empezar a trabajar» al montar un proyecto (ver <a
+      href="#nuevo-proyecto-rama">Nuevo proyecto</a>). Ejemplo: <code>nexum rama-proyecto panaderia-luna nueva-portada --nueva</code>.</dd>
+    <dt><code>gui-ramas-proyecto &lt;carpeta&gt;</code></dt><dd>Solo lee: la rama actual (<code>A|main</code>), los cambios sin commit
+      (<code>N|0</code>) y una línea por rama, con si está en tu equipo y en <code>origin</code> (<code>R|desarrollo|0|1</code>). Es lo que
+      pide la ventana para el diálogo de la rama. Ejemplo: <code>nexum gui-ramas-proyecto panaderia-luna</code>.</dd>
     <dt><code>actualizar-proyecto &lt;carpeta&gt; [--codigo &lt;zip, tar.gz o carpeta&gt;] [--modo fusionar|sobrescribir] [--pull] [--bd &lt;fichero&gt;] [--base &lt;base&gt;] [--copia]</code></dt>
     <dd>Trae lo de producción (la web de verdad, la publicada) al proyecto: <code>--pull</code> trae los cambios de git, <code>--codigo</code>
       pone encima el código de un fichero o carpeta (<code>fusionar</code> añade y cambia; <code>sobrescribir</code> además quita lo que no
@@ -6119,15 +6248,21 @@
       si es el cargado, lo quita de Docker, borra su base de la versión activa si la dices (con <code>--copia</code>, antes un volcado),
       quita sus vhosts y sus líneas de <code>/etc/hosts</code>, y por último su carpeta. Si un paso falla, no sigue. Las bases de otras
       versiones no se tocan. Ejemplo: <code>nexum borrar-proyecto moda-verde --bd wp_moda_verde --copia</code>.</dd>
-    <dt><code>exportar-proyecto &lt;carpeta&gt; [--sin-codigo] [--sin-bd] [--bd &lt;base&gt;] [--destino &lt;carpeta&gt;]</code></dt>
+    <dt><code>exportar-proyecto &lt;carpeta&gt; [--sin-codigo] [--sin-bd] [--bd &lt;base&gt;] [--destino &lt;carpeta&gt; | --zip &lt;fichero&gt; [--sobrescribir]]</code></dt>
     <dd>Un zip del proyecto en tu carpeta de descargas, <code>&lt;carpeta&gt;_php&lt;rama&gt;_&lt;fecha&gt;_nexum.zip</code>: su código
       (sin <code>.git</code>), su base de la versión activa (la vinculada, u otra con <code>--bd</code>; sin el administrador de pruebas)
-      y un <code>LEEME-nexum.txt</code>. Si es un repositorio git con cambios sin commit, no exporta nada. Si falla o se cancela, no queda
-      nada a medias. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>. Ejemplo: <code>nexum exportar-proyecto
+      y un <code>LEEME-nexum.txt</code>. Con <code>--zip</code>, en el fichero que digas. Si es un repositorio git con cambios sin commit,
+      no exporta nada. Si falla o se cancela, no queda nada a medias. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>. Ejemplo: <code>nexum exportar-proyecto
       panaderia-luna</code>.</dd>
     <dt><code>usuario-pruebas &lt;base&gt; [carpeta]</code></dt><dd>Crea o pone al día el administrador de pruebas del panel de WordPress o
-      PrestaShop: usuario <code>local@local.test</code> con contraseña <code>local</code>. Se hace solo al cargar una base. Ejemplo:
+      PrestaShop: el de <code>admin-pruebas</code> o, si no has puesto ninguno, usuario <code>local@local.test</code> con contraseña
+      <code>local</code>. Se hace solo al cargar una base. Un usuario de verdad con ese correo no se toca. Ejemplo:
       <code>nexum usuario-pruebas wp_panaderia_luna</code>.</dd>
+    <dt><code>admin-pruebas [--clave | &lt;correo&gt; [&lt;contraseña&gt;|-] | --quitar]</code></dt><dd>El administrador de pruebas de los
+      paneles (<a href="#admin-pruebas-config">Administrador de pruebas</a>), sin contraseña de administrador. Sin nada, el de ahora (con <code>--clave</code>, también su
+      contraseña); con un correo, lo cambia (sin contraseña o con <code>-</code>, te la pide o la lee de la entrada, para que no quede en el
+      historial de la terminal); <code>--quitar</code> vuelve a <code>local@local.test</code>. Las BBDD ya cargadas no cambian. Ejemplo:
+      <code>nexum admin-pruebas ana@local.test</code>.</dd>
     <dt><code>wp-config &lt;carpeta&gt; [base]</code></dt><dd>En un WordPress, comprueba que <code>wp-config.php</code> (su fichero de
       configuración) usa la base del proyecto y entra en el MariaDB de tu equipo. Si no (porque has pegado encima el de producción), lo
       rehace con la plantilla de este equipo y la dirección local. Cargar el proyecto lo hace solo. Ejemplo: <code>nexum wp-config
@@ -6257,7 +6392,7 @@
     <dt><code>docker-imagen &lt;nombre&gt;</code></dt><dd>Rehace su imagen de PHP con lo último de Docker Hub (con los parches de
       seguridad). Ejemplo: <code>nexum docker-imagen academia-flor</code>.</dd>
     <dt><code>docker-usuario-pruebas &lt;nombre&gt;</code></dt><dd>Pone el administrador de pruebas (<code>local@local.test</code>, contraseña
-      <code>local</code>) en la base de su contenedor. Ejemplo: <code>nexum docker-usuario-pruebas academia-flor</code>.</dd>
+      <code>local</code>, o el de <code>admin-pruebas</code>) en la base de su contenedor. Ejemplo: <code>nexum docker-usuario-pruebas academia-flor</code>.</dd>
     <dt><code>docker-contenedor arrancar|parar|reiniciar|registros|borrar &lt;contenedor&gt;</code></dt><dd>Un solo contenedor, por su nombre
       (lo ves en la página Docker). Ejemplo: <code>nexum docker-contenedor reiniciar nexum-web</code>.</dd>
     <dt data-so="mac"><code>docker-clave &lt;nombre&gt;</code></dt><dd data-so="mac">El usuario y la contraseña de su phpMyAdmin. Ejemplo:

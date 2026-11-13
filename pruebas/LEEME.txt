@@ -138,6 +138,18 @@ LOS FICHEROS
                       --bd y --destino; los enlaces que salen no se siguen;
                       si falla la base o se cancela no queda ningún zip ni
                       .parte; --simular no crea nada.
+  rama-proyecto.sh    Rama de trabajo de un proyecto nuevo (1.57.15):
+                      gui-ramas-proyecto y rama-proyecto con un «origin»
+                      bare local con varias ramas, clonado en un htdocs
+                      temporal: la actual, las locales y las de origin
+                      (sin HEAD ni repetidas); a una de origin (la local
+                      nueva, siguiéndola), --nueva; con un nombre que no
+                      vale, una que no existe, cambios sin commit, una
+                      carpeta de fuera de htdocs, sin git o de otro
+                      usuario no cambia nada; sin ganchos. Y
+                      montar-proyecto --sin-bd con funciones de mentira
+                      (sin BBDD, dos pasos, el aviso de un WordPress) y
+                      lo de las ventanas (casilla, diálogo, VS Code).
   carpeta-nexum.sh    La carpeta de los ajustes, ~/.nexum (1.57.14): la de
                       antes (~/.lvm-instalador) se renombra al arrancar
                       (la misma carpeta, con lo que tenía) y queda como
@@ -164,6 +176,15 @@ LOS FICHEROS
                       y 600), con la orden de nexum y sin secretos (ni
                       MYSQL_PWD, ni contraseñas, ni tokens); se quedan las
                       200 últimas y un enlace no se lee.
+  visor-repositorio.sh  El botón del repositorio en el visor: la web de su
+                      remote origin (de .git/config, sin ejecutar git),
+                      sin token; sin repositorio, no sale; un botón nuevo
+                      sale detrás del que le precede.
+  inicio-sesion.sh    Abrir al iniciar sesión (Linux): el acceso de
+                      ~/.config/autostart (644) abre la ventana con
+                      --al-iniciar; con el icono se queda en él; apagar
+                      solo borra el nuestro (ni uno ajeno ni un enlace);
+                      en simulación no escribe nada.
   web.sh              Reglas web en un Apache temporal: ficheros que no se
                       sirven (.env, .git, copias, claves...), CSRF contra
                       phpMyAdmin, phpMyAdmin solo en 127.0.0.1, TRACE.
@@ -188,9 +209,11 @@ LOS FICHEROS
                       ServerAdmin, importar-bd --proyecto, LC_COLLATE, .pid
                       del script lampp, versiones de php.net y, en el Mac,
                       Apartar sin root y rutas por /Applications/XAMPP.
-  admin-pruebas.sh    Administrador de pruebas (local@local.test / local) en
-                      WordPress y PrestaShop 1.7 y 1.6, con un MariaDB
-                      temporal: sin tocar a los de verdad ni duplicarse.
+  admin-pruebas.sh    Administrador de pruebas (local@local.test / local o el
+                      de admin-pruebas) en WordPress y PrestaShop 1.7 y 1.6,
+                      con un MariaDB temporal: sin tocar a los de verdad ni
+                      duplicarse; validación del correo y la contraseña
+                      (comillas, inyección SQL), --simular y la ventana.
   vinculos.sh         BBDD vinculadas a la carpeta de su proyecto en cada
                       versión (1.51.0 / Mac 1.38.0): vincular-bd, --unica,
                       gui-proyectos (V|), copiar-bd --como/--carpeta en

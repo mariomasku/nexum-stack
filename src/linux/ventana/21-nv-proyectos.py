@@ -645,6 +645,10 @@ class NvProyectos:
                 btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
                                            "Abrir en Visual Studio Code", lambda *_: self.open_in_vscode(),
                                            "nv-proyecto-btn")
+            # (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+            repo = repo_button(os.path.join(HTDOCS, x["name"]), self.open_uri)
+            if repo is not None:
+                btns["repo"] = repo
             pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
             pma.set_sensitive(bool(self.loaded_project_db()))
             btns["pma"] = pma

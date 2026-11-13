@@ -57,7 +57,8 @@ class AppAcerca:
     HELP_TABS = {"proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
                  "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"}
     HELP_SECTIONS = {"General": "general", "Configuración": "vhosts", "Seguridad entre webs": "seguridad-webs",
-                     "Correo de pruebas (Mailpit)": "correo", "Docker": "docker-config",
+                     "Correo de pruebas (Mailpit)": "correo", "Administrador de pruebas": "admin-pruebas-config",
+                     "Docker": "docker-config",
                      "Túnel de Cloudflare": "tunel-config", "GitHub (Repositorios)": "github-config",
                      "Apariencia": "apariencia", "Limpieza": "limpieza", "Carpetas": "carpetas",
                      "XAMPP sin registrar": "xampp-registrar", "Información": "informacion"}

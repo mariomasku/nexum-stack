@@ -5,11 +5,13 @@
 
 # El zip, sin salir nunca de la carpeta del proyecto:
 #   python3 -c "$PROJECT_EXPORT_PY" medir <carpeta>                 lo que ocupa, sin .git (en bytes)
-#   python3 -c "$PROJECT_EXPORT_PY" zip <carpeta> <nombre> <.parte> <zip> <sql o ""> <nombre del sql> <leeme>
+#   python3 -c "$PROJECT_EXPORT_PY" zip <carpeta> <nombre> <.parte> <zip> <sql o ""> <nombre del sql> <leeme> [1]
 # El codigo va en <nombre>/ con sus permisos (sin .git, en ninguna subcarpeta). Los enlaces no se siguen: uno
 # relativo que apunta dentro de la carpeta se guarda como enlace; uno que sale (o absoluto) no se guarda.
 # Los ficheros se abren sin seguir enlaces (O_NOFOLLOW) y solo si siguen siendo el mismo fichero normal. El zip
-# se escribe en <.parte> (nuevo, solo para ti) y solo al acabar bien pasa a <zip>; si falla, no queda nada
+# se escribe en <.parte> (nuevo, solo para ti) y solo al acabar bien pasa a <zip>; si falla, no queda nada.
+# Nunca encima de nada, salvo con el 1 del final (--sobrescribir: lo has aceptado en la ventana de guardar), y
+# aun asi solo encima de un fichero normal (no de un enlace ni de una carpeta)
 PROJECT_EXPORT_PY='
 import os, stat, sys, time, zipfile
 
@@ -90,9 +92,13 @@ def add_file(z, top, rel, st, arc):
     return now.st_size
 
 
-def make_zip(top, name, part, final, sql, sql_name, readme):
+def make_zip(top, name, part, final, sql, sql_name, readme, overwrite=""):
+    replace = overwrite == "1"
     if os.path.lexists(final):
-        raise SystemExit("Ya existe %s: no se escribe encima" % final)
+        if not replace:
+            raise SystemExit("Ya existe %s: no se escribe encima" % final)
+        if not stat.S_ISREG(os.lstat(final).st_mode):
+            raise SystemExit("%s no es un fichero normal (es un enlace o una carpeta): no se escribe encima" % final)
     fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
     out = os.fdopen(fd, "wb")
     links, skipped, unreadable = [], [], []
@@ -152,7 +158,13 @@ def make_zip(top, name, part, final, sql, sql_name, readme):
         out.flush()
         os.fsync(out.fileno())
         out.close()
-        # (sin escribir encima de nada: si ya hubiera uno con ese nombre, falla)
+        # (sin escribir encima de nada: si ya hubiera uno con ese nombre, falla; con overwrite, solo encima de
+        # un fichero normal, comprobado otra vez justo antes)
+        if replace and os.path.lexists(final):
+            if not stat.S_ISREG(os.lstat(final).st_mode):
+                raise SystemExit("%s ya no es un fichero normal: no se escribe encima" % final)
+            os.rename(part, final)
+            return
         try:
             os.link(part, final)
             os.unlink(part)
@@ -190,7 +202,7 @@ if sys.argv[1] == "medir":
     measure(sys.argv[2])
 else:
     try:
-        make_zip(*sys.argv[2:9])
+        make_zip(*sys.argv[2:10])
     except OSError as e:
         raise SystemExit("No se ha podido escribir el zip: %s" % e)
 '
@@ -282,8 +294,10 @@ function gui_project_export() {
     echo "N|$(project_export_name "$folder" "$(project_export_branch "$php")" "$dest")"
 }
 
-# exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]: el zip del proyecto
-# en la carpeta de descargas (o en --destino). Con el codigo, antes se comprueba en git: con cambios sin commit
+# exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta> | --zip <fichero>]
+# [--sobrescribir]: el zip del proyecto en la carpeta de descargas (o en --destino, con su nombre de siempre; o
+# justo en --zip, el que se ha elegido en la ventana de guardar; sin .zip al final, se le pone).
+# --sobrescribir: si ya existe ese fichero, se cambia (la ventana de guardar ya lo ha preguntado). Con el codigo, antes se comprueba en git: con cambios sin commit
 # no se exporta nada; con commits sin subir, se avisa. Sin --bd, la BBDD vinculada en la version activa (sin
 # ninguna, solo el codigo). Si se cancela o falla, no queda ningun zip ni nada a medias
 EXPORT_PART="" EXPORT_TMP=""
@@ -306,7 +320,7 @@ function project_export() {
 
 function project_export_run() {
     local folder=${1%/} code=1 bd=1 db="" dest="" dir active ver label php branch mariadb out state
-    local changes ahead name sql="" readme steps=() parent real_dir branch_or_err
+    local changes ahead name sql="" readme steps=() parent real_dir branch_or_err zip="" overwrite=""
     shift
     while [ $# -gt 0 ]; do
         case $1 in
@@ -314,12 +328,22 @@ function project_export_run() {
             --sin-bd) bd=0 ;;
             --bd) db=$2; shift ;;
             --destino) dest=$2; shift ;;
+            --zip) zip=$2; shift ;;
+            --sobrescribir) overwrite=1 ;;
             *) folder="" ;;
         esac
         shift
     done
-    if [ -z "$folder" ] || { [ $code -eq 0 ] && [ $bd -eq 0 ]; }; then
-        echo "Uso: nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]"
+    if [ -n "$zip" ]; then
+        # (el fichero elegido: su carpeta va como --destino y su nombre, tal cual, con .zip al final)
+        [[ "$zip" == */* ]] || zip=./$zip
+        dest=${zip%/*} name=${zip##*/}
+        [ -n "$dest" ] || dest=/
+        [[ "$name" == *.[zZ][iI][pP] ]] || name=$name.zip
+        [ "$name" == .zip ] && name=""
+    fi
+    if [ -z "$folder" ] || { [ $code -eq 0 ] && [ $bd -eq 0 ]; } || { [ -n "$zip" ] && [ -z "$name" ]; }; then
+        echo "Uso: nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta> | --zip <fichero>] [--sobrescribir]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -394,7 +418,21 @@ function project_export_run() {
         return 1
     fi
     dest=$parent
-    name=$(project_export_name "$folder" "$branch" "$dest")
+    if [ -z "$zip" ]; then
+        name=$(project_export_name "$folder" "$branch" "$dest")
+    elif [ -e "$dest/$name" ] || [ -L "$dest/$name" ]; then
+        if [ -z "$overwrite" ]; then
+            echo "Ya existe $dest/$name: no se escribe encima (con --sobrescribir, sí)"
+            return 1
+        elif [ -L "$dest/$name" ] || [ ! -f "$dest/$name" ]; then
+            echo "$dest/$name no es un fichero normal (es un enlace o una carpeta): no se escribe encima"
+            return 1
+        fi
+    fi
+    if [ -e "$dest/$name.parte" ] || [ -L "$dest/$name.parte" ]; then
+        echo "Ya hay una exportación a medias en $dest/$name.parte: espera a que acabe o bórrala"
+        return 1
+    fi
 
     [ $code -eq 1 ] && steps+=("Comprobar el código")
     [ $bd -eq 1 ] && steps+=("Descargar la BBDD $db")
@@ -445,7 +483,7 @@ Contenido:"
   LEEME-nexum.txt  este fichero
 "
     if ! python3 -I -c "$PROJECT_EXPORT_PY" zip "$([ $code -eq 1 ] && echo "$dir")" "$folder" "$EXPORT_PART" \
-        "$dest/$name" "$sql" "$db.sql" "$readme"; then
+        "$dest/$name" "$sql" "$db.sql" "$readme" "$overwrite"; then
         echo "No se ha exportado nada."
         return 1
     fi

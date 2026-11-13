@@ -227,8 +227,11 @@ class AppVersiones:
         p2.pack_start(w["versions"], False, False, 0)
         w["stack"].add_named(p2, "2")
 
-        # 3. BBDD nueva y volcado
+        # 3. BBDD nueva y volcado (o sin BBDD: se clona y se carga sin ninguna vinculada)
         p3 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        w["nodb"] = Gtk.CheckButton(label="Sin base de datos")
+        w["nodb"].connect("toggled", lambda *_: self.new_project_check())
+        p3.pack_start(w["nodb"], False, False, 0)
         p3.pack_start(label("Nombre de la BBDD nueva:"), False, False, 0)
         w["db"] = Gtk.Entry(placeholder_text="wp_proyecto")
         w["db"].connect("changed", lambda *_: self.new_project_check())
@@ -246,6 +249,8 @@ class AppVersiones:
         p3.pack_start(label("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga con "
                             "la carga protegida (con el usuario de la BBDD y sin DEFINER).",
                             "dim-label", wrap=True), False, False, 0)
+        w["nodb_note"] = label("", "aviso", wrap=True)
+        p3.pack_start(w["nodb_note"], False, False, 0)
         w["err3"] = label("", "aviso-rojo", wrap=True)
         p3.pack_start(w["err3"], False, False, 0)
         w["stack"].add_named(p3, "3")
@@ -297,6 +302,8 @@ class AppVersiones:
             self.new_project_repos()
             w["db"].set_text("")
             w["db_auto"] = True
+            w["nodb"].set_active(False)
+            w["kind"] = ""
             w["file"].unselect_all()
             w["version"] = None
             w["stack"].set_visible_child_name("1")
@@ -317,8 +324,10 @@ class AppVersiones:
         """Comprueba el paso en el que está el asistente: activa Siguiente y explica lo que falta."""
         w = self.np
         page = self.new_project_page()
+        nodb = w["nodb"].get_active()
         titles = {1: "Paso 1 de 4: el repositorio", 2: "Paso 2 de 4: versión de PHP",
-                  3: "Paso 3 de 4: BBDD nueva", 4: "Paso 4 de 4: dominio de producción"}
+                  3: "Paso 3 de 4: sin BBDD" if nodb else "Paso 3 de 4: BBDD nueva",
+                  4: "Paso 4 de 4: dominio de producción"}
         w["step"].set_label(titles[page])
         w["back"].set_visible(page > 1)
         w["next"].set_label("Montar proyecto" if page == 4 else "Siguiente")
@@ -345,7 +354,15 @@ class AppVersiones:
         else:
             db = w["db"].get_text().strip()
             have = self.data["dbs"].get(w.get("version") or "", []) if self.data else []
-            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db):
+            # Sin BBDD: ni nombre ni volcado. Un WordPress o una tienda se montan igual, pero no abren hasta
+            # tener la suya (se dice, sin impedirlo)
+            w["db"].set_sensitive(not nodb)
+            w["file"].set_sensitive(not nodb)
+            w["nodb_note"].set_label(self.new_project_nodb_note() if nodb else "")
+            w["nodb_note"].set_visible(nodb)
+            if nodb:
+                pass
+            elif not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db):
                 ok, err = False, ("El nombre de la BBDD solo puede llevar letras sin acentos, números, _ y -"
                                   if db else "")
             elif db.lower() in (d.lower() for d in have):
@@ -371,6 +388,21 @@ class AppVersiones:
             w["err4"].set_label(err)
             w["err4"].set_visible(bool(err))
         w["next"].set_sensitive(ok and not self.busy)
+
+    def new_project_nodb_note(self):
+        """Sin BBDD: lo que pasa con la web (si es de la lista de GitHub, se sabe si es un WordPress o una tienda;
+        si no, por el nombre del repositorio)."""
+        w = self.np
+        name = (w["url"].get_text().strip().lower() + " " + w["folder"].get_text().strip().lower())
+        kind = w.get("kind") or ("ps" if "prestashop" in name else "wp" if re.search(r"wordpress|\bwp[-_]", name) else "")
+        then = ("Súbela después en Bases de datos («Subir o actualizar una BBDD»), eligiendo este proyecto, y "
+                "se vincula sola.")
+        if kind == "wp":
+            return "Es un WordPress: se monta igual, pero la web no funcionará hasta que tenga su BBDD. " + then
+        if kind == "ps":
+            return "Es una tienda PrestaShop: se monta igual, pero la web no funcionará hasta que tenga su BBDD. " + then
+        return ("Se clona y se carga sin ninguna BBDD vinculada. Si es un WordPress o una tienda PrestaShop, la web "
+                "no funcionará hasta que tenga su BBDD. " + then)
 
     def new_project_go(self, step):
         w = self.np
@@ -401,7 +433,7 @@ class AppVersiones:
                 w["version"] = insts[0]["folder"]
                 first.set_active(True)
             w["versions"].show_all()
-        if page == 3 and w.get("db_auto", True) and not w["db"].get_text():
+        if page == 3 and w.get("db_auto", True) and not w["db"].get_text() and not w["nodb"].get_active():
             base = re.sub(r"[^a-z0-9_]", "_", w["folder"].get_text().strip().lower()).strip("_")[:40]
             w["db"].set_text(("wp_" + base) if base else "")
         w["stack"].set_visible_child_name(str(page))
@@ -412,7 +444,9 @@ class AppVersiones:
         url, folder = w["url"].get_text().strip(), w["folder"].get_text().strip()
         version, db = w["version"], w["db"].get_text().strip()
         dump = w["file"].get_filename() or ""
-        args = ["montar-proyecto", url, folder, version, db] + ([dump] if dump else [])
+        nodb = w["nodb"].get_active()
+        args = ["montar-proyecto", url, folder, version] + (["--sin-bd"] if nodb else [db] + ([dump] if dump else []))
+        with_db = "sin BBDD" if nodb else "con la BBDD %s" % db
         domain = w["domain"].get_text().strip().lower() if w["fake"].get_active() else ""
 
         def faked(ok, *_):
@@ -422,22 +456,185 @@ class AppVersiones:
         def done(ok, *_):
             if ok:
                 self.toggle_new_project(False)
-                self.toast("Proyecto nuevo montado: %s en lampp-%s con la BBDD %s" % (folder, version, db))
-                # (después, si se ha pedido, su dominio de producción falseado)
+                self.toast("Proyecto nuevo montado: %s en lampp-%s %s" % (folder, version, with_db))
+                # (después, si se ha pedido, su dominio de producción falseado; y la primera vez, en qué rama
+                # se empieza a trabajar)
                 if domain:
                     GLib.idle_add(lambda: self.run_task("Falseando %s para %s" % (domain, folder),
                                                         ["nuevo-dominio", domain, folder], auto_close=True,
                                                         done_text="%s falseado: se abre en local" % domain,
-                                                        on_done=faked) and False)
+                                                        on_done=lambda *a: (faked(*a), self.nv_branch_ask(folder)))
+                                  and False)
+                else:
+                    GLib.idle_add(lambda: self.nv_branch_ask(folder) and False)
         self.run_task("Montando el proyecto %s" % folder, args, progress=True,
-                      done_text="%s está clonado, cargado en lampp-%s y con su BBDD %s" % (folder, version, db),
+                      done_text="%s está clonado y cargado en lampp-%s %s" % (
+                          folder, version, "(sin BBDD)" if nodb else "y con su BBDD %s" % db),
                       on_done=done)
+
+    # --- La primera vez, al acabar de montarlo: en qué rama se empieza a trabajar (y abrirlo en VS Code) ---
+
+    def nv_branch_ask(self, folder):
+        """Proyecto recién montado: sus ramas (gui-ramas-proyecto, solo lee) y el diálogo «¿En qué rama empiezas a
+        trabajar?»."""
+        def got(_rc, out):
+            lines = parse_lines(out)
+            f = {ln[0]: ln for ln in lines}
+            branches = [ln for ln in lines if ln[0] == "R" and len(ln) >= 4 and ln[1]]
+            self.nv_branch_dialog(folder, f, branches)
+            return False
+        run_quick(["gui-ramas-proyecto", folder], got)
+
+    def nv_branch_dialog(self, folder, f, branches):
+        """La rama en la que ha quedado el clon (la predeterminada) y las demás, locales y de origin: elegir una que
+        ya existe o crear una nueva a partir de la actual, y la casilla de abrirlo en Visual Studio Code (marcada si
+        está instalado). «Empezar a trabajar»: rama-proyecto (con tu usuario) y, después, VS Code. «Más tarde»: se
+        queda en la predeterminada y no se hace nada más."""
+        path = os.path.join(HTDOCS, folder)
+        g = f.get("G", ["G", "2", "sin respuesta del instalador"])
+        is_git = len(g) >= 2 and g[1] == "1"
+        current = f.get("A", ["A", ""])[1] if "A" in f and len(f["A"]) >= 2 else ""
+        n = f.get("N", ["N", "0"])
+        changes = int(n[1]) if len(n) >= 2 and n[1].isdigit() else 0
+        has_code = vscode_app() is not None
+        names = [b[1] for b in branches]
+        if current and current not in names:
+            branches = [["R", current, "1", "0"]] + branches
+            names.insert(0, current)
+        # (la actual, la primera)
+        branches.sort(key=lambda b: b[1] != current)
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE, text="¿En qué rama empiezas a trabajar?")
+        if is_git:
+            dlg.format_secondary_text(
+                "«%s» está montado%s. Sigue en ella, elige otra del repositorio o crea una rama nueva a partir de "
+                "ella para empezar a trabajar." % (folder, " en la rama %s (la predeterminada del repositorio)"
+                                                   % current if current else ", sin ninguna rama elegida"))
+        else:
+            why = g[2] if len(g) >= 3 and g[2] and g[1] == "2" else ""
+            dlg.format_secondary_text("«%s» está montado, pero no es un repositorio git%s: no tiene ramas. Puedes "
+                                      "abrirlo ya en Visual Studio Code." % (folder, " (%s)" % why if why else ""))
+        widen(dlg)
+        extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        exist = new = combo = entry = None
+        err = label("", "aviso-rojo", wrap=True, max_width_chars=60)
+        err.set_no_show_all(True)
+        if is_git:
+            exist = Gtk.RadioButton.new_with_label_from_widget(None, "Una rama que ya existe:")
+            extra.pack_start(exist, False, False, 0)
+            combo = Gtk.ComboBoxText(margin_start=24)
+            for b in branches:
+                where = ("la actual" if b[1] == current else "de origin: se crea en local siguiendo a origin"
+                         if b[2] != "1" else "local" if b[3] != "1" else "local y en origin")
+                combo.append(b[1], "%s  (%s)" % (b[1], where))
+            if branches:
+                combo.set_active_id(current if current in names else branches[0][1])
+            extra.pack_start(narrow(combo, 40), False, False, 0)
+            new = Gtk.RadioButton.new_with_label_from_widget(
+                exist, "Una rama nueva a partir de %s:" % current if current else "Una rama nueva:")
+            extra.pack_start(new, False, False, 0)
+            entry = Gtk.Entry(placeholder_text="nombre-de-la-rama", margin_start=24)
+            extra.pack_start(entry, False, False, 0)
+            extra.pack_start(err, False, False, 0)
+            if not branches:
+                new.set_active(True)
+            if changes:
+                extra.pack_start(label("Tiene %s sin commit: no se puede cambiar de rama hasta hacer commit o "
+                                       "descartarlos (se queda en %s)." % (plural(changes, "cambio", "cambios"),
+                                                                           current or "la que está"),
+                                       "aviso-rojo", wrap=True, max_width_chars=60), False, False, 0)
+                for wdg in (exist, combo, new, entry):
+                    wdg.set_sensitive(False)
+        code = Gtk.CheckButton(label="Abrir en Visual Studio Code", active=has_code, sensitive=has_code, margin_top=6)
+        extra.pack_start(code, False, False, 0)
+        if not has_code:
+            extra.pack_start(label("Visual Studio Code no está instalado: instálalo desde code.visualstudio.com o "
+                                   "desde el Centro de aplicaciones.", "dim-label", wrap=True, max_width_chars=60,
+                                   margin_start=24), False, False, 0)
+        holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin_top=8)
+        extra.pack_start(holder, False, False, 0)
+        dlg.get_message_area().pack_start(extra, False, False, 0)
+        dlg.add_button("Más tarde", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Empezar a trabajar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        if entry is not None:
+            entry.set_activates_default(True)
+
+        def choice():
+            """(rama, es nueva, se puede): la rama a la que se cambia (None si se queda en la actual)."""
+            if not is_git or changes:
+                return None, False, True
+            if new.get_active():
+                name = entry.get_text().strip()
+                if not name:
+                    return None, True, False
+                if not branch_name_ok(name):
+                    return name, True, "«%s» no vale como nombre de rama: sin espacios ni ~ ^ : ? * [ \\, sin .. y " \
+                        "sin - ni / al principio ni / o punto al final" % name
+                if name in names:
+                    return name, True, "Ya hay una rama %s: elígela de la lista de arriba" % name
+                return name, True, True
+            chosen = combo.get_active_id()
+            return (None if not chosen or chosen == current else chosen), False, True
+
+        def update(*_):
+            branch, is_new, fine = choice()
+            if combo is not None:
+                combo.set_sensitive(not changes and exist.get_active())
+                entry.set_sensitive(not changes and new.get_active())
+            err.set_label(fine if isinstance(fine, str) else "")
+            err.set_visible(isinstance(fine, str))
+            steps = []
+            if branch and is_new:
+                steps.append("Se crea la rama %s a partir de %s y se cambia a ella (git switch -c, con tu usuario)."
+                             % (branch, current or "la actual"))
+            elif branch:
+                remote_only = any(b[1] == branch and b[2] != "1" for b in branches)
+                steps.append("Se cambia a la rama %s (git switch, con tu usuario)%s." % (
+                    branch, ": como solo está en origin, se crea en local siguiendo a origin/%s" % branch
+                    if remote_only else ""))
+            elif is_git:
+                steps.append("Se queda en la rama %s." % current if current else "Se queda como está.")
+            if code.get_active():
+                steps.append("Se abre %s en Visual Studio Code." % path)
+            for child in holder.get_children():
+                holder.remove(child)
+            holder.pack_start(steps_box(steps), False, False, 0)
+            holder.show_all()
+            ok.set_sensitive(fine is True and (bool(branch) or code.get_active()))
+        for wdg in (exist, new, code):
+            if wdg is not None:
+                wdg.connect("toggled", update)
+        if combo is not None:
+            combo.connect("changed", update)
+            entry.connect("changed", update)
+        dlg.show_all()
+        update()
+        resp = run_dialog(dlg)
+        branch, is_new, fine = choice()
+        open_code = code.get_active()
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or fine is not True:
+            return
+        if not branch:
+            if open_code:
+                self.open_in_vscode(path)
+            return
+
+        def done(success, *_):
+            if success and open_code:
+                self.open_in_vscode(path)
+        self.run_task("Rama de trabajo de %s: %s" % (folder, branch),
+                      ["rama-proyecto", folder, branch] + (["--nueva"] if is_new else []),
+                      auto_close=True, on_done=done,
+                      done_text="%s, en la rama %s%s" % (folder, branch, " (nueva)" if is_new else ""))
 
     def new_project_repo(self, full, web, kind):
         """Repositorio elegido de la lista de GitHub: su dirección SSH (con tu clave), su carpeta y, si su web
         es la de producción, su dominio para el paso 4 (y, en una tienda, falsearlo)."""
         w = self.np
         w["url"].set_text("git@github.com:%s.git" % full)
+        w["kind"] = kind or ""
         dom = re.sub(r"^https?://", "", (web or "").strip().lower()).split("/")[0].split(":")[0]
         if re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", dom):
             w["domain"].set_text(dom)
@@ -458,6 +655,7 @@ class AppVersiones:
         if w.get("repo_picked") and q != w["repo_picked"]:
             w["repo_picked"] = None
             w["url"].set_text("")
+            w["kind"] = ""
             self.np_repos_show()
         hits = w["repo_hits"]
         clear(hits)
@@ -675,8 +873,8 @@ class AppVersiones:
             self.proj_admin.set_tooltip_text(
                 ("Abrir el back office de PrestaShop (http://%s/%s/)" if kind == "ps"
                  else "Abrir el panel de WordPress (http://%s/%s/)") % (p["link"], admin)
-                + " con el administrador de pruebas ya escrito (local@local.test, contraseña local): "
-                  "solo hay que pulsar Entrar" if admin
+                + " con el administrador de pruebas ya escrito (%s): solo hay que pulsar Entrar"
+                % self.nv_admin_who() if admin
                 else "%s no es un WordPress ni una tienda PrestaShop con su carpeta de administración" % name)
             self.proj_code.set_tooltip_text(
                 "Abrir %s en Visual Studio Code (si ya está abierto, se trae su ventana delante)" % name)

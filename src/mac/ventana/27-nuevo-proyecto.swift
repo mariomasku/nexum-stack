@@ -15,13 +15,28 @@ func folderFromGitURL(_ url: String) -> String {
     return String(name.prefix(100))
 }
 
+/// ¿Nombre de rama nueva que vale? Las reglas de git check-ref-format --branch (sin espacios ni ~ ^ : ? * [ \\, sin
+/// .., @{ ni //, ninguna parte que empiece por punto o acabe en .lock, sin / ni punto al final) y, como rama-proyecto,
+/// sin - al principio ni |
+func branchNameOK(_ name: String) -> Bool {
+    if name.isEmpty || name.hasPrefix("-") || name.hasPrefix("/") || name == "HEAD" || name == "@" || name.contains("|") {
+        return false
+    }
+    if name.range(of: "[\\x00-\\x20\\x7f~^:?*\\[\\\\]|\\.\\.|@\\{|//", options: .regularExpression) != nil {
+        return false
+    }
+    if name.hasSuffix("/") || name.hasSuffix(".") { return false }
+    return name.components(separatedBy: "/").allSatisfy { !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(".lock") }
+}
+
 struct NewProjectWizard: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
         let check = model.npCheck()
         return VStack(alignment: .leading, spacing: 12) {
-            Text(["", "Paso 1 de 4: el repositorio", "Paso 2 de 4: versión de PHP", "Paso 3 de 4: BBDD nueva",
+            Text(["", "Paso 1 de 4: el repositorio", "Paso 2 de 4: versión de PHP",
+                  model.npNoDb ? "Paso 3 de 4: sin BBDD" : "Paso 3 de 4: BBDD nueva",
                   "Paso 4 de 4: dominio de producción"][model.npStep])
                 .font(.headline).frame(maxWidth: .infinity)
             Group {
@@ -140,10 +155,16 @@ struct NewProjectWizard: View {
 
     func stepDb() -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            // (sin BBDD: se clona y se carga sin ninguna vinculada; ni nombre ni volcado)
+            Toggle("Sin base de datos", isOn: $model.npNoDb)
+                .toggleStyle(CheckboxToggleStyle())
             Text("Nombre de la BBDD nueva:")
+                .foregroundColor(model.npNoDb ? .secondary : .primary)
             TextField("wp_proyecto", text: $model.npDb)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
+                .disabled(model.npNoDb)
             Text("Volcado que se sube a la BBDD (.sql, .sql.gz o .zip):")
+                .foregroundColor(model.npNoDb ? .secondary : .primary)
             HStack {
                 Button("Elegir…") { model.npPickDump() }
                 if let f = model.npFile {
@@ -157,9 +178,15 @@ struct NewProjectWizard: View {
                     Text("Ninguno").foregroundColor(.secondary)
                 }
             }
+            .disabled(model.npNoDb)
             Text("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga con la carga protegida (con el usuario de la BBDD y sin DEFINER).")
                 .font(.caption).foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if model.npNoDb {
+                Text(model.npNoDbNote())
+                    .font(.callout).foregroundColor(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

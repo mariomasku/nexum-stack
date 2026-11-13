@@ -91,6 +91,8 @@ final class AppModel: ObservableObject {
     @Published var npVersion = ""
     @Published var npDb = ""
     @Published var npFile: String? = nil
+    /// Asistente: sin BBDD (montar-proyecto --sin-bd: se clona y se carga sin ninguna vinculada)
+    @Published var npNoDb = false
     // Formulario «Nuevo proyecto con dominio falseado»
     @Published var newDomain = ""
     @Published var newFolder = ""
@@ -182,6 +184,21 @@ final class AppModel: ObservableObject {
         }
         trayOn = on
         TrayIcon.shared.show(on)
+    }
+
+    /// Abrir al iniciar sesión (Configuración, Programa): el LaunchAgent LOGIN_PLIST, puesto y nuestro
+    @Published var loginOn = loginItemOurs()
+
+    func setLoginItem(_ on: Bool) {
+        if SIMULATE {
+            toast(on ? "[simulación] no se escribe ~/Library/LaunchAgents/\(LOGIN_LABEL).plist"
+                     : "[simulación] no se borra ~/Library/LaunchAgents/\(LOGIN_LABEL).plist")
+            return
+        }
+        if let err = on ? loginItemWrite() : loginItemRemove() {
+            message(on ? "No se ha podido poner al iniciar sesión" : "No se ha podido quitar del inicio de sesión", err, error: true)
+        }
+        loginOn = loginItemOurs()
     }
 
     var termProject: String {

@@ -716,7 +716,7 @@ EOF
             local admin
             admin=$(docker_test_admin "$slug")
             grep -v '^A|' <<< "$admin" | grep .
-            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+            grep -q '^A|' <<< "$admin" && test_admin_note
         fi
     fi
     task_step

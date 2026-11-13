@@ -287,6 +287,10 @@ class AppPrograma:
         def done(rc, out):
             mine = [l.split("|") for l in out.splitlines() if l.startswith("A|%s|" % kind)]
             if rc != 0 or not mine or len(mine[0]) < 4:
+                # (ya hay un usuario de verdad con el correo del administrador de pruebas: no se ha tocado)
+                if any("de verdad con" in l for l in out.splitlines()):
+                    self.toast("Ya hay un usuario de verdad con %s: no se cambia. Elige otro correo en "
+                               "Configuración › Administrador de pruebas" % test_admin_conf()[0])
                 self.open_uri(base)
                 return False
             user, password = mine[0][2], mine[0][3]

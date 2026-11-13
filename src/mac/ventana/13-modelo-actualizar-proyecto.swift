@@ -167,6 +167,8 @@ extension AppModel {
             }
             return (true, "")
         default:
+            // (sin BBDD: ni nombre ni volcado)
+            if npNoDb { return (true, "") }
             let db = npDb.trimmingCharacters(in: .whitespaces)
             if db.isEmpty { return (false, "") }
             if cleanDbName(db).isEmpty {
@@ -188,7 +190,7 @@ extension AppModel {
         if next == 2 && !(data?.installs ?? []).contains(where: { $0.folder == npVersion }) {
             npVersion = data?.active ?? data?.installs.first?.folder ?? ""
         }
-        if next == 3 && npDb.isEmpty {
+        if next == 3 && npDb.isEmpty && !npNoDb {
             let base = npFolder.lowercased()
                 .replacingOccurrences(of: "[^a-z0-9_]", with: "_", options: .regularExpression)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
@@ -208,27 +210,230 @@ extension AppModel {
         if panel.runModal() == .OK, let url = panel.url { npFile = url.path }
     }
 
-    /// Clona el repositorio, lo carga en la versión elegida y le crea su BBDD (montar-proyecto)
+    /// Sin BBDD: lo que pasa con la web (por el nombre del repositorio y de la carpeta, si es un WordPress o una
+    /// tienda; si no se sabe, los dos casos)
+    func npNoDbNote() -> String {
+        let name = (npUrl + " " + npFolder).lowercased()
+        let then = "Súbela después en Bases de datos («Subir o actualizar una BBDD»), eligiendo este proyecto, y se vincula sola."
+        if name.contains("prestashop") {
+            return "Es una tienda PrestaShop: se monta igual, pero la web no funcionará hasta que tenga su BBDD. " + then
+        }
+        if name.contains("wordpress") || name.range(of: "(^|[^a-z0-9])wp[-_]", options: .regularExpression) != nil {
+            return "Es un WordPress: se monta igual, pero la web no funcionará hasta que tenga su BBDD. " + then
+        }
+        return "Se clona y se carga sin ninguna BBDD vinculada. Si es un WordPress o una tienda PrestaShop, la web no funcionará hasta que tenga su BBDD. " + then
+    }
+
+    /// Clona el repositorio, lo carga en la versión elegida y le crea su BBDD (montar-proyecto; sin BBDD,
+    /// --sin-bd). Al acabar, la primera vez, en qué rama se empieza a trabajar
     func mountProject() {
         let url = npUrl.trimmingCharacters(in: .whitespaces)
         let folder = npFolder.trimmingCharacters(in: .whitespaces)
         let db = npDb.trimmingCharacters(in: .whitespaces)
         let version = npVersion
-        var args = ["montar-proyecto", url, folder, version, db]
-        if let f = npFile { args.append(f) }
+        let noDb = npNoDb
+        var args = ["montar-proyecto", url, folder, version]
+        if noDb {
+            args.append("--sin-bd")
+        } else {
+            args.append(db)
+            if let f = npFile { args.append(f) }
+        }
+        let withDb: String = noDb ? "sin BBDD" : "con la BBDD \(db)"
         let domain = npFake ? npDomain.trimmingCharacters(in: .whitespaces).lowercased() : ""
         runTask("Montando el proyecto \(folder)", args, progress: true,
-                doneText: "\(folder) está clonado, cargado en XAMPP-\(version) y con su BBDD \(db)") { ok, _, _ in
+                doneText: noDb ? "\(folder) está clonado y cargado en XAMPP-\(version) (sin BBDD)"
+                    : "\(folder) está clonado, cargado en XAMPP-\(version) y con su BBDD \(db)") { ok, _, _ in
             guard ok else { return }
             self.npOpen = false
-            self.toast("Proyecto nuevo montado: \(folder) en XAMPP-\(version) con la BBDD \(db)")
-            // (después, si se ha pedido, su dominio de producción falseado)
+            self.toast("Proyecto nuevo montado: \(folder) en XAMPP-\(version) \(withDb)")
+            // (después, si se ha pedido, su dominio de producción falseado; y luego, en qué rama se empieza)
             if !domain.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     _ = self.runTask("Falseando \(domain) para \(folder)", ["nuevo-dominio", domain, folder],
-                                     doneText: "\(domain) falseado: se abre en local", autoClose: true)
+                                     doneText: "\(domain) falseado: se abre en local", autoClose: true) { _, _, _ in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.askBranch(folder) }
+                    }
                 }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.askBranch(folder) }
             }
+        }
+    }
+
+    /// Proyecto recién montado: sus ramas (gui-ramas-proyecto, solo lee) y el diálogo «¿En qué rama empiezas a
+    /// trabajar?»
+    func askBranch(_ folder: String) {
+        runQuick(["gui-ramas-proyecto", folder]) { _, out in
+            let lines = parseLines(out)
+            var f: [String: [String]] = [:]
+            for l in lines where !l.isEmpty && f[l[0]] == nil { f[l[0]] = l }
+            let found: [[String]] = lines.filter { $0.count >= 4 && $0[0] == "R" && !$0[1].isEmpty }
+            self.branchDialog(folder, f, found)
+        }
+    }
+
+    /// La rama en la que ha quedado el clon (la predeterminada) y las demás, locales y de origin: elegir una que ya
+    /// existe o crear una nueva a partir de la actual, y la casilla de abrirlo en Visual Studio Code (marcada si está
+    /// instalado). «Empezar a trabajar»: rama-proyecto (con tu usuario) y, después, VS Code. «Más tarde»: se queda en
+    /// la predeterminada y no se hace nada más
+    private func branchDialog(_ folder: String, _ f: [String: [String]], _ found: [[String]]) {
+        let path: String = HTDOCS + "/" + folder
+        let g: [String] = f["G"] ?? ["G", "2", "sin respuesta del instalador"]
+        let isGit: Bool = field(g, 1) == "1"
+        let current: String = field(f["A"] ?? [], 1)
+        let changes: Int = Int(field(f["N"] ?? [], 1)) ?? 0
+        let hasCode: Bool = vscodeURL() != nil
+        var all: [[String]] = found
+        if !current.isEmpty && !all.contains(where: { $0[1] == current }) {
+            all.insert(["R", current, "1", "0"], at: 0)
+        }
+        // (la actual, la primera)
+        let branches: [[String]] = all.filter { $0[1] == current } + all.filter { $0[1] != current }
+        let names: [String] = branches.map { $0[1] }
+
+        let alert = NSAlert()
+        alert.messageText = "¿En qué rama empiezas a trabajar?"
+        alert.alertStyle = .informational
+        let ok = alert.addButton(withTitle: "Empezar a trabajar")
+        let later = alert.addButton(withTitle: "Más tarde")
+        later.keyEquivalent = "\u{1b}"
+        let validator = DialogValidator()
+        let group = RadioGroup()
+        let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+        var views: [NSView] = []
+        if isGit {
+            let at: String = current.isEmpty ? ", sin ninguna rama elegida" : " en la rama \(current) (la predeterminada del repositorio)"
+            views.append(dialogLabel("«\(folder)» está montado\(at). Sigue en ella, elige otra del repositorio o crea una rama nueva a partir de ella para empezar a trabajar."))
+        } else {
+            let why: String = field(g, 1) == "2" ? field(g, 2) : ""
+            views.append(dialogLabel("«\(folder)» está montado, pero no es un repositorio git\(why.isEmpty ? "" : " (\(why))"): no tiene ramas. Puedes abrirlo ya en Visual Studio Code."))
+        }
+        let exist = NSButton(radioButtonWithTitle: "Una rama que ya existe:", target: group, action: #selector(RadioGroup.pick(_:)))
+        let new = NSButton(radioButtonWithTitle: current.isEmpty ? "Una rama nueva:" : "Una rama nueva a partir de \(current):",
+                           target: group, action: #selector(RadioGroup.pick(_:)))
+        group.buttons = [exist, new]
+        group.onPick = { _ in validator.update() }
+        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 26), pullsDown: false)
+        for b in branches {
+            let place: String = b[1] == current ? "la actual"
+                : field(b, 2) != "1" ? "de origin: se crea en local siguiendo a origin"
+                : field(b, 3) != "1" ? "local" : "local y en origin"
+            pop.addItem(withTitle: "\(b[1])  (\(place))")
+        }
+        if !branches.isEmpty { pop.selectItem(at: 0) }
+        pop.target = validator
+        pop.action = #selector(DialogValidator.changed(_:))
+        let entry = NSTextField(string: "")
+        entry.placeholderString = "nombre-de-la-rama"
+        entry.delegate = validator
+        entry.translatesAutoresizingMaskIntoConstraints = false
+        entry.widthAnchor.constraint(equalToConstant: 360).isActive = true
+        let err = NSTextField(wrappingLabelWithString: " ")
+        err.font = small
+        err.textColor = .systemRed
+        err.preferredMaxLayoutWidth = DIALOG_WIDTH - 40
+        func indented(_ v: NSView) -> NSView {
+            let row = NSStackView(views: [v])
+            row.orientation = .horizontal
+            row.edgeInsets = NSEdgeInsets(top: 0, left: 20, bottom: 0, right: 0)
+            return row
+        }
+        if isGit {
+            if branches.isEmpty {
+                exist.isEnabled = false
+                exist.state = .off
+                new.state = .on
+            } else {
+                exist.state = .on
+                new.state = .off
+            }
+            views.append(dialogOptions([exist, indented(pop), new, indented(entry), indented(err)], spacing: 8))
+            if changes > 0 {
+                let w = NSTextField(wrappingLabelWithString: "Tiene \(plural(changes, "cambio", "cambios")) sin commit: no se puede cambiar de rama hasta hacer commit o descartarlos (se queda en \(current.isEmpty ? "la que está" : current)).")
+                w.font = small
+                w.textColor = .systemRed
+                w.preferredMaxLayoutWidth = DIALOG_WIDTH
+                views.append(w)
+                let controls: [NSControl] = [exist, new, pop, entry]
+                for c in controls { c.isEnabled = false }
+            }
+        }
+        let vsc = NSButton(checkboxWithTitle: "Abrir en Visual Studio Code", target: validator, action: #selector(DialogValidator.changed(_:)))
+        vsc.state = hasCode ? .on : .off
+        vsc.isEnabled = hasCode
+        var codeViews: [NSView] = [vsc]
+        if !hasCode {
+            let n = NSTextField(wrappingLabelWithString: "Visual Studio Code no está instalado: descárgalo de code.visualstudio.com y muévelo a Aplicaciones.")
+            n.font = small
+            n.textColor = .secondaryLabelColor
+            n.preferredMaxLayoutWidth = DIALOG_WIDTH - 40
+            codeViews.append(indented(n))
+        }
+        views.append(dialogOptions(codeViews, spacing: 4))
+
+        /// (rama, es nueva, problema): la rama a la que se cambia (nil si se queda en la actual); el problema, nil si
+        /// se puede, "" si falta escribirla o lo que no vale
+        func choice() -> (String?, Bool, String?) {
+            if !isGit || changes > 0 { return (nil, false, nil) }
+            if new.state == .on {
+                let name: String = entry.stringValue.trimmingCharacters(in: .whitespaces)
+                if name.isEmpty { return (nil, true, "") }
+                if !branchNameOK(name) {
+                    return (name, true, "«\(name)» no vale como nombre de rama: sin espacios ni ~ ^ : ? * [ \\, sin .. y sin - ni / al principio ni / o punto al final")
+                }
+                if names.contains(name) { return (name, true, "Ya hay una rama \(name): elígela de la lista de arriba") }
+                return (name, true, nil)
+            }
+            let i: Int = pop.indexOfSelectedItem
+            let chosen: String = i >= 0 && i < names.count ? names[i] : ""
+            return (chosen.isEmpty || chosen == current ? nil : chosen, false, nil)
+        }
+        func steps(_ branch: String?, _ isNew: Bool, _ code: Bool) -> [String] {
+            var out: [String] = []
+            if let b = branch, isNew {
+                out.append("Se crea la rama \(b) a partir de \(current.isEmpty ? "la actual" : current) y se cambia a ella (git switch -c, con tu usuario).")
+            } else if let b = branch {
+                let remoteOnly: Bool = branches.contains { $0[1] == b && field($0, 2) != "1" }
+                out.append("Se cambia a la rama \(b) (git switch, con tu usuario)" + (remoteOnly ? ": como solo está en origin, se crea en local siguiendo a origin/\(b)." : "."))
+            } else if isGit {
+                out.append(current.isEmpty ? "Se queda como está." : "Se queda en la rama \(current).")
+            }
+            if code { out.append("Se abre \(path) en Visual Studio Code.") }
+            return out
+        }
+        // (con el paso más largo, el diálogo ya tiene su alto mayor: luego los pasos solo se acortan)
+        let stepsLabel = dialogSteps(steps("una-rama-de-origin-con-nombre-largo", false, true) + [" "])
+        stepsLabel.translatesAutoresizingMaskIntoConstraints = false
+        stepsLabel.widthAnchor.constraint(equalToConstant: DIALOG_WIDTH).isActive = true
+        views.append(stepsLabel)
+        validator.update = {
+            let (branch, isNew, problem) = choice()
+            if isGit && changes == 0 {
+                pop.isEnabled = exist.state == .on
+                entry.isEnabled = new.state == .on
+            }
+            err.stringValue = problem.map { $0.isEmpty ? " " : $0 } ?? " "
+            stepsLabel.attributedStringValue = dialogSteps(steps(branch, isNew, vsc.state == .on)).attributedStringValue
+            ok.isEnabled = problem == nil && (branch != nil || vsc.state == .on)
+        }
+        validator.update()
+        alert.accessoryView = dialogStack(views, spacing: 12)
+        // (el validador y el grupo, vivos mientras se ve el diálogo: los controles no los retienen)
+        let resp = withExtendedLifetime((validator, group)) { alert.runStyled() }
+        let (chosen, isNew, problem) = choice()
+        let code: Bool = vsc.state == .on
+        guard resp == .alertFirstButtonReturn, problem == nil else { return }
+        guard let branch = chosen else {
+            if code { openInVSCode(path) }
+            return
+        }
+        var args: [String] = ["rama-proyecto", folder, branch]
+        if isNew { args.append("--nueva") }
+        _ = runTask("Rama de trabajo de \(folder): \(branch)", args,
+                    doneText: "\(folder), en la rama \(branch)" + (isNew ? " (nueva)" : ""), autoClose: true) { done, _, _ in
+            guard done else { return }
+            if code { openInVSCode(path) }
         }
     }
 
@@ -410,7 +615,7 @@ extension AppModel {
             if withDb {
                 out.append("Se descarga la BBDD \(db) de \(verLabel) en \(db).sql, como «Descargar»: sin el administrador de pruebas ni los cambios del correo de pruebas.")
             }
-            out.append("Se escribe el zip en \(dest)/\(zipName), con un LEEME-nexum.txt. Si falla o lo cancelas, no queda nada.")
+            out.append("Se escribe el zip con un LEEME-nexum.txt donde elijas (al pulsar «Exportar», la ventana de guardar, en \(dest) y con el nombre \(zipName), que puedes cambiar). Si falla o lo cancelas, no queda nada.")
             return out
         }
         // (con todo marcado, el diálogo ya tiene su alto mayor: al desmarcar, los pasos solo se acortan)
@@ -435,15 +640,30 @@ extension AppModel {
         let withCode = code.state == .on
         let withDb = base.state == .on && !db.isEmpty
         guard resp == .alertFirstButtonReturn, withCode || withDb else { return }
-        var args: [String] = ["exportar-proyecto", name, "--destino", dest]
+        // La ventana de guardar del sistema: dónde va el zip y con qué nombre (de partida, en descargas y con su
+        // nombre de siempre). Con el tipo zip, el panel le pone .zip y pregunta si reemplazar uno que ya existe
+        let panel = NSSavePanel()
+        panel.title = "Guardar el proyecto exportado «\(name)»"
+        panel.prompt = "Guardar"
+        panel.allowedContentTypes = fileTypes(["zip"])
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = shownName.isEmpty ? "\(name)_nexum.zip" : shownName
+        panel.directoryURL = URL(fileURLWithPath: dest, isDirectory: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var path: String = url.path
+        if !path.lowercased().hasSuffix(".zip") { path += ".zip" }
+        let zipURL = URL(fileURLWithPath: path)
+        var args: [String] = ["exportar-proyecto", name, "--zip", path]
+        // (si ya existía, el panel ya ha preguntado si se reemplaza)
+        if FileManager.default.fileExists(atPath: path) { args.append("--sobrescribir") }
         if !withCode { args.append("--sin-codigo") }
         args += withDb ? ["--bd", db] : ["--sin-bd"]
         let start = {
-            _ = self.runTask("Exportando \(name)", args, progress: true, doneText: "«\(name)» exportado en \(dest)",
+            _ = self.runTask("Exportando \(name)", args, progress: true, doneText: "«\(name)» exportado en \(path)",
                              env: withDb ? self.dbEnv() : [:],
                              cancelText: ("¿Cancelar la exportación?", "No se guarda nada: el zip a medias se borra.",
                                           "Cancelar la exportación")) { done, task, _ in
-                if done { task.offer("Mostrar en Finder") { revealExport(dest, name) } }
+                if done { task.offer("Mostrar en Finder") { NSWorkspace.shared.activateFileViewerSelecting([zipURL]) } }
             }
         }
         if withDb { checkDbAccess(start) } else { start() }
@@ -892,7 +1112,7 @@ extension AppModel {
     func showHelp() {
         let tabs = ["proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
                     "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"]
-        let sections = ["general": "general", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo",
+        let sections = ["general": "general", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo", "admin": "admin-pruebas-config",
                         "docker": "docker-config", "tunel": "tunel-config", "apariencia": "apariencia",
                         "github": "github-config", "limpieza": "limpieza", "carpetas": "carpetas",
                         "oficial": "configuracion-xampp-oficial", "info": "informacion"]

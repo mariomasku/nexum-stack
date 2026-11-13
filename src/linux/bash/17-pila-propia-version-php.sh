@@ -2337,7 +2337,11 @@ running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2> /dev/null; }
 
 case "$1" in
     start)
-        running || env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin "$FPM" --fpm-config "$CONF"
+        # (sin la salida de quien lo arranca: PHP-FPM se queda en segundo plano con ella abierta, y
+        # si es una tuberia, como la de «| tee» al instalar, esta no se cerraria nunca y la
+        # instalacion se quedaria esperando. Sus avisos van a su log, php-fpm.log)
+        running || env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin "$FPM" --fpm-config "$CONF" \
+            < /dev/null >> @ROOT@/logs/php-fpm.log 2>&1
         ;;
     stop)
         running && kill -QUIT "$(cat "$PID")"
@@ -2477,6 +2481,15 @@ function build_user_ready() {
 }
 
 # Borra la carpeta de la compilacion (la de root con la de BUILD_USER dentro, o la tuya en las pruebas)
+# Los paquetes de la salida de «LC_ALL=C dpkg -S»: «paquete[:arq][, otro...]: /ruta». Las lineas
+# de los ficheros desviados («diversion by X from: ...», «diversion by X to: ...») no son paquetes
+function stack_dpkg_packages() {
+    awk '/^diversion by / { next }
+         { i = index($0, ": /"); if (i == 0) next
+           n = split(substr($0, 1, i - 1), p, ", ")
+           for (k = 1; k <= n; k++) { sub(/:.*/, "", p[k]); if (p[k] ~ /^[a-z0-9][a-z0-9.+-]+$/) print p[k] } }'
+}
+
 function stack_rm_build() {
     if [ -n "$build_top" ]; then
         [[ "$build_top" == /tmp/lvm-pila-* ]] && sudo rm -rf "$build_top"
@@ -2979,17 +2992,26 @@ function install_stack() {
         local pkgs=$(ldd "$target/php/sbin/php-fpm" "$target/apache2/bin/httpd" "$target/apache2/modules/"*.so \
             "$target/proftpd/sbin/proftpd" "$target/mysql/bin/mariadbd" 2> /dev/null | awk '/=> \//{print $3}' | sort -u \
             | while read -r lib; do
-                dpkg -S "$lib" 2> /dev/null || dpkg -S "${lib#/usr}" 2> /dev/null || dpkg -S "/usr$lib" 2> /dev/null
-            done | cut -d: -f1 | sort -u)
+                LC_ALL=C dpkg -S "$lib" 2> /dev/null || LC_ALL=C dpkg -S "${lib#/usr}" 2> /dev/null \
+                    || LC_ALL=C dpkg -S "/usr$lib" 2> /dev/null
+            done | stack_dpkg_packages | sort -u)
         [ -n "$pkgs" ] && sudo apt-mark manual $pkgs > /dev/null
     fi
 
     [ -n "$aside" ] && $SUDO rm -R --one-file-system "$aside"
     stack_cache_store
+    # (fuera de la carpeta de la compilacion antes de borrarla: si no, lo que viene despues se
+    # ejecuta en una carpeta que ya no existe y bash avisa con «getcwd: no se puede acceder...»)
+    cd / || true
     stack_rm_build
 
     if [ $was_running -eq 1 ]; then
-        $SUDO "$target/lampp" start
+        # La salida, por un fichero: los servicios que se quedan en segundo plano no se quedan con
+        # la tuberia de la instalacion (| tee), que si no no acabaria nunca
+        local started
+        started=$(mktemp) || started=/dev/null
+        $SUDO "$target/lampp" start < /dev/null > "$started" 2>&1
+        [ "$started" != /dev/null ] && { cat "$started"; rm -f "$started"; }
     fi
 
     echo ""

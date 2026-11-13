@@ -380,6 +380,44 @@ func openURL(_ s: String) {
     if let url = URL(string: s) { NSWorkspace.shared.open(url) }
 }
 
+/// Administrador de pruebas de los paneles (Configuración, nexum admin-pruebas): su correo, que es también el
+/// usuario, y su contraseña, en ~/.nexum/admin-pruebas; sin ellos, local@local.test con la contraseña local. Lo
+/// mismo que comprueba el script: un correo solo ASCII de hasta 60 caracteres y una contraseña de 4 a 64 de
+/// TEST_ADMIN_PASS_CHARS (sin comillas, barra invertida, espacios, $ ni `)
+let TEST_ADMIN_FILE = LOG_DIR + "/admin-pruebas"
+let TEST_ADMIN_PASS_CHARS = ". _ - @ % + = : , ! # * ?"
+
+func testAdminMailOK(_ mail: String) -> Bool {
+    return mail.count <= 60
+        && mail.range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
+}
+
+func testAdminPassOK(_ password: String) -> Bool {
+    return password.range(of: "^[A-Za-z0-9._@%+=:,!#*?-]{4,64}$", options: .regularExpression) != nil
+}
+
+/// El administrador de pruebas de ahora: (correo, contraseña, si es uno propio). Solo del fichero si es normal y
+/// tuyo (sin seguir enlaces) y si lo que lleva vale; si no, local@local.test con local
+func testAdminConf() -> (mail: String, password: String, own: Bool) {
+    var mail = "", password = ""
+    let fd = Darwin.open(TEST_ADMIN_FILE, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+    if fd >= 0 {
+        var st = stat()
+        if fstat(fd, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG && st.st_uid == getuid() {
+            let h = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
+            let text = String(decoding: h.readData(ofLength: 65536), as: UTF8.self)
+            for line in text.components(separatedBy: "\n") {
+                guard let eq = line.firstIndex(of: "=") else { continue }
+                let k = String(line[..<eq]), v = String(line[line.index(after: eq)...])
+                if k == "correo" { mail = v } else if k == "clave" { password = v }
+            }
+        }
+        Darwin.close(fd)
+    }
+    if testAdminMailOK(mail) && testAdminPassOK(password) { return (mail, password, true) }
+    return ("local@local.test", "local", false)
+}
+
 /// Panel de administración del proyecto cargado (tipo "wp" o "ps", carpeta del panel). Antes deja
 /// al día su administrador de pruebas (usuario-pruebas) y abre una página con el usuario y la
 /// contraseña ya escritos: basta con pulsar Entrar. Si no se puede, el panel como siempre.
@@ -399,7 +437,15 @@ func openAdminLogin(kind: String, admin: String, site: String, name: String, com
     runQuick(cmd) { rc, out in
         let mine = out.components(separatedBy: "\n").filter { $0.hasPrefix("A|\(kind)|") }
             .map { $0.components(separatedBy: "|") }
-        guard rc == 0, let f = mine.first, f.count >= 4 else { openURL(base); return }
+        guard rc == 0, let f = mine.first, f.count >= 4 else {
+            // (ya hay un usuario de verdad con el correo del administrador de pruebas: no se ha tocado)
+            if out.contains("de verdad con") {
+                message("Ya hay un usuario de verdad con \(testAdminConf().mail)",
+                        "No se cambia ni se crea el de pruebas en esa BBDD. Elige otro correo en Configuración › Administrador de pruebas. Se abre el panel sin él.")
+            }
+            openURL(base)
+            return
+        }
         let page: String
         if kind == "wp" {
             page = loginPage(title: "Panel de WordPress", project: name, action: "\(site)/wp-login.php",
