@@ -19,7 +19,7 @@ extension AppModel {
 
     func githubToken() {
         let r = runDialog(title: "Conectar con GitHub",
-                          text: "Solo para leer la lista de repositorios (también los privados): se clonan por SSH, con tu clave. Créalo en GitHub (Settings, Developer settings, Personal access tokens) con el permiso «repo» (y «read:org» para los de una organización) y pégalo aquí. Se guarda en el Llavero, no en un fichero.",
+            text: "Para listar y clonar repositorios (también los privados) por HTTPS. Créalo en GitHub (Settings, Developer settings, Personal access tokens) con el permiso «repo» (y «read:org» para los de una organización) y pégalo aquí. Se guarda en el Llavero, no en un fichero.",
                           okLabel: "Conectar", hasField: true, placeholder: "ghp_… o github_pat_…", secure: true,
                           validate: { _, t in (t.trimmingCharacters(in: .whitespaces).count >= 20, nil, false) })
         guard r.ok else { return }

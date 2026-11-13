@@ -4,6 +4,10 @@ Gestor e instalador de versiones de **LAMPP** (Linux, Apache, MySQL/MariaDB, PHP
 
 Incluye una versión para **macOS** con Apple Silicon en [`macos/`](macos/README.md).
 
+Preview para **Windows 11 con WSL2** en [`windows/`](windows/README.md): instalador,
+ventana GTK, motor Linux compartido e integración de hosts y certificados. Mantiene
+los proyectos y las bases dentro del disco Linux; la paridad completa sigue en validación.
+
 **Versión actual: 1.57.13** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe

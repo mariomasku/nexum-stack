@@ -522,7 +522,7 @@ def _read_progress(path):
 def item_folder(item):
     """Carpeta (lampp-<carpeta>) de un elemento del plan, como item_folder del script."""
     kind, _, name = item.partition(":")
-    return name.rsplit(".", 1)[0] if kind in ("php", "rehacer") else name
+    return name.rsplit(".", 1)[0] if kind == "rehacer" else name
 
 
 # Caché de descargas de las pilas propias (nexum descargas)

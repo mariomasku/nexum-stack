@@ -9,7 +9,7 @@ W=$(mktemp -d "$TMPBASE/w-repos.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
 grep -q '^function repos_list() {' "$SRC" || { echo "  ok    (sin la pestaña Repositorios)"; exit 0; }
 extract "$SRC" github_conf github_conf_set github_token gh_token github_api github_connect github_disconnect repo_pull \
-    github_command repo_clones repos_list repos_rows repo_fetch || exit 1
+    github_command repo_clones repos_list repos_rows repo_fetch repo_github_helper || exit 1
 MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1
 DRY=0 HTDOCS_DIR=$W/htdocs GITHUB_CONF_FILE=$W/conf/github GITHUB_KEYRING_SERVICE=nexum-dev-stack
@@ -90,7 +90,7 @@ PULL_RC=0
 no_tty() { echo "no_tty $*" >> "$W/git.log"; [ "$*" == *" merge "* ] && return 0; return $PULL_RC; }
 git() { case "$*" in *"symbolic-ref"*) echo master ;; *"remote.origin.url"*) sed -n 's/^\turl = //p' "${2}/.git/config" ;; *"branch.master.merge"*) echo refs/heads/master ;; *"merge --abort"*) echo abort >> "$W/git.log" ;; esac; }
 out=$(repo_fetch "empresa/wordpress-nuevo" 2>&1); rc=$?
-check "clonar: por SSH, en htdocs con su nombre, y apuntado como de repositorio" '[ $rc -eq 0 ] && grep -q "^clone git@github.com:empresa/wordpress-nuevo.git $HTDOCS_DIR/wordpress-nuevo " "$W/git.log" && grep -qx wordpress-nuevo "$REPO_PROJECTS_FILE"'
+check "clonar: con token por HTTPS, sin credenciales en URL, y apuntado como repositorio" '[ $rc -eq 0 ] && grep -q "^clone https://github.com/empresa/wordpress-nuevo.git $HTDOCS_DIR/wordpress-nuevo " "$W/git.log" && grep -qx wordpress-nuevo "$REPO_PROJECTS_FILE"'
 check "clonar: nombres raros, no" '! repo_fetch "empresa/../x" > /dev/null 2>&1 && ! repo_fetch "-x/y" > /dev/null 2>&1 && ! repo_fetch "solo" > /dev/null 2>&1'
 out=$(repo_fetch "empresa/wordpress-tres" 2>&1); rc=$?
 check "clonar: con una carpeta de su nombre que es otra cosa, no se toca" '[ $rc -ne 0 ] && grep -q "no es un clon" <<< "$out"'
@@ -98,10 +98,10 @@ out=$(repo_fetch "Empresa/wordpress-uno" 2>&1); rc=$?
 check "ya clonado: lo dice (EXISTE, para preguntar) y no hace nada" '[ $rc -eq 3 ] && grep -qx "EXISTE|uno-local" <<< "$out"'
 : > "$W/git.log"
 out=$(repo_fetch "empresa/wordpress-uno" --actualizar 2>&1); rc=$?
-check "traer los cambios: git pull en su carpeta (origin https: por SSH, su rama), sin ganchos ni preguntas" '[ $rc -eq 0 ] && grep -q "no_tty git -C $HTDOCS_DIR/uno-local -c core.hooksPath=/dev/null .* pull --no-rebase --no-edit git@github.com:empresa/wordpress-uno.git master" "$W/git.log"'
+check "traer los cambios: token por HTTPS, sin ganchos ni preguntas" '[ $rc -eq 0 ] && grep -q "no_tty git -C $HTDOCS_DIR/uno-local -c core.hooksPath=/dev/null .* pull --no-rebase --no-edit https://github.com/empresa/wordpress-uno.git master" "$W/git.log"'
 : > "$W/git.log"
 repo_fetch "empresa/prestashop-dos" --actualizar > /dev/null 2>&1
-check "traer los cambios: origin ya por SSH, git pull normal" 'grep -q "pull --no-rebase --no-edit$" "$W/git.log"'
+check "traer los cambios: origin SSH con token usa HTTPS sin cambiar origin" 'grep -q "pull --no-rebase --no-edit https://github.com/empresa/prestashop-dos.git master$" "$W/git.log"'
 PULL_RC=1; mkdir -p "$HTDOCS_DIR/dos/.git"; touch "$HTDOCS_DIR/dos/.git/MERGE_HEAD"
 out=$(repo_fetch "empresa/prestashop-dos" --actualizar 2>&1); rc=$?
 check "si choca con lo tuyo: se deshace, no se toca nada y se dice" '[ $rc -ne 0 ] && grep -q "No se ha tocado nada" <<< "$out" && grep -qx abort "$W/git.log"'

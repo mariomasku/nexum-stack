@@ -7,7 +7,7 @@ class NvGithub:
         cuenta y los prefijos de los repositorios que se ven en Repositorios."""
         box, lb = tile_group("GitHub (Repositorios)",
                              "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para "
-                             "clonarlos por SSH (con tu clave) en /opt/htdocs. La lista se lee con un token de GitHub, "
+                             "clonarlos por HTTPS en /opt/htdocs. Se usa tu token de GitHub, "
                              "que se guarda en el llavero de la sesión (no en un fichero), o con tu sesión de gh. "
                              "Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, "
                              "«Mostrar todos» enseña el resto).")
@@ -90,8 +90,8 @@ class NvGithub:
         head.pack_start(logo("github", 28), False, False, 0)
         head.pack_start(label("Token de GitHub", "nv-titulo"), False, False, 0)
         box.pack_start(head, False, False, 0)
-        box.pack_start(label("Solo para leer la lista de repositorios (también los privados): se clonan por SSH, con tu "
-                             "clave. Créalo en GitHub con el permiso «repo» (y «read:org» para los de una organización) "
+        box.pack_start(label("Para listar y clonar repositorios (también los privados) por HTTPS. "
+                             "Créalo en GitHub con el permiso «repo» (y «read:org» para los de una organización) "
                              "y pégalo aquí. Se guarda en el llavero de la sesión, no en un fichero.",
                              "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
         link = Gtk.LinkButton(uri="https://github.com/settings/tokens/new?scopes=repo,read:org&description=Nexum%20Dev%20Stack",
@@ -275,7 +275,7 @@ class NvGithub:
         r = self.repos or {}
         h = r.get("head")
         sub = ("%s en GitHub: %s de %s repositorios%s" % (h[2], h[5], h[4], "" if self.repos_all else " (los de sus prefijos)")
-               if h else "Los repositorios de tu organización en GitHub, para clonarlos por SSH en /opt/htdocs")
+                       if h else "Los repositorios de tu organización en GitHub, para clonarlos en /opt/htdocs")
         head.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
         box.pack_start(head, False, False, 0)
         if r.get("error") and not h:
@@ -335,7 +335,7 @@ class NvGithub:
                            tooltip_text="Ya hay una carpeta con ese nombre")
         else:
             b = css(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Clonar por SSH en /opt/htdocs"), "verde")
+                                               tooltip_text="Clonar en /opt/htdocs con tu conexión de GitHub"), "verde")
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
         row.add_suffix(b)
         # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así

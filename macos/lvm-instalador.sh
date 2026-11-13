@@ -5043,20 +5043,24 @@ for r, pre in shown:
 # git pull seguro de un clon: repo_pull <carpeta> <direccion SSH o nada> <fichero de servidores conocidos>.
 # Si no se puede (sin conexion, o choca con lo que no se ha subido o guardado), no se toca nada
 function repo_pull() {
-    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up
+    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up token="" auth=()
     branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
     origin=$(git -C "$dir" config --get remote.origin.url)
     # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
-    if [[ "$origin" == https://* ]] && [ -n "$ssh_url" ]; then
+    if { [[ "$origin" == https://* ]] && [ -n "$ssh_url" ]; } || [[ "$ssh_url" == https://github.com/* ]]; then
         up=$(git -C "$dir" config --get "branch.$branch.merge")
         from=("$ssh_url" "${up#refs/heads/}")
         [ -n "${from[1]}" ] || from[1]=$branch
     fi
+    if [[ "${from[0]:-$origin}" == https://github.com/* ]] && declare -F github_token > /dev/null; then
+        token=$(github_token)
+        [ -n "$token" ] && auth=(-c "credential.helper=$(repo_github_helper)")
+    fi
     # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
-    if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+    if ! NEXUM_GIT_TOKEN="$token" GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
             GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
             no_tty git -C "$dir" -c core.hooksPath=/dev/null -c credential.helper= -c protocol.allow=never \
-            -c protocol.ssh.allow=always -c protocol.https.allow=always pull --no-rebase --no-edit "${from[@]}"; then
+            -c protocol.ssh.allow=always -c protocol.https.allow=always "${auth[@]}" pull --no-rebase --no-edit "${from[@]}"; then
         [ -f "$dir/.git/MERGE_HEAD" ] && git -C "$dir" merge --abort 2> /dev/null
         echo "No se han podido traer los cambios: choca con lo que tienes sin subir o sin guardar en $dir, o no hay conexión."
         echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
@@ -5072,6 +5076,9 @@ function repo_fetch() {
     [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
     command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
     name=${full#*/} ssh_url="git@github.com:$full.git"
+    if [ -n "$(github_token)" ]; then
+        ssh_url="https://github.com/$full.git"
+    fi
     folder=$(repo_clones | awk -v r="${full,,}" '$1 == r { print $2; exit }')
     known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
     printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
@@ -5101,11 +5108,19 @@ function repo_fetch() {
         return 1
     fi
     [ -w "$HTDOCS_DIR" ] || { rm -f "$known"; echo "No puedes escribir en $HTDOCS_DIR: el proyecto se clona con tu usuario, sin sudo"; return 1; }
-    echo "Clonando $full por SSH en $dir..."
+    if [[ "$ssh_url" == https://* ]]; then
+        echo "Clonando $full por HTTPS con el token de GitHub en $dir..."
+    else
+        echo "Clonando $full por SSH en $dir..."
+    fi
     [ "$DRY" -eq 1 ] && { rm -f "$known"; echo "  [simulacion] git clone $ssh_url $dir"; return 0; }
     if ! repo_clone "$ssh_url" "$dir" "$known"; then
         rm -f "$known"
-        echo "No se ha podido clonar: hace falta tu clave SSH configurada en GitHub (ssh -T git@github.com lo comprueba)"
+        if [[ "$ssh_url" == https://* ]]; then
+            echo "No se ha podido clonar: comprueba acceso del token al repositorio y permiso Contents de lectura"
+        else
+            echo "No se ha podido clonar: hace falta tu clave SSH configurada en GitHub (ssh -T git@github.com lo comprueba)"
+        fi
         return 1
     fi
     rm -f "$known"
@@ -5537,12 +5552,22 @@ function git_url_ok() {
 # Clona un repositorio con tu usuario: repo_clone <direccion> <carpeta> <known_hosts de mas>. Sin
 # terminal (git y ssh leen tu configuracion: no pueden usar el permiso de sudo recordado ni quedarse
 # leyendola) y sin git-lfs (su .lfsconfig llevaria las descargas a otro servidor)
+function repo_github_helper() {
+    # Git passes protocol/host on stdin; return credentials only for GitHub HTTPS.
+    # The helper contains no token, and store/erase never persist credentials.
+    printf '%s\n' '!f() { [ "$1" = get ] || exit 0; protocol= host=; while IFS= read -r line; do case "$line" in protocol=*) protocol=${line#protocol=} ;; host=*) host=${line#host=} ;; esac; done; [ "$protocol/$host" = https/github.com ] || exit 0; printf "username=x-access-token\npassword=%s\n" "$NEXUM_GIT_TOKEN"; }; f'
+}
+
 function repo_clone() {
-    local url=$1 dest=$2 known=$3
-    GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
+    local url=$1 dest=$2 known=$3 token="" auth=()
+    if [[ "$url" == https://github.com/* ]] && declare -F github_token > /dev/null; then
+        token=$(github_token)
+        [ -n "$token" ] && auth=(-c "credential.helper=$(repo_github_helper)")
+    fi
+    NEXUM_GIT_TOKEN="$token" GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
         GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
         no_tty git -c protocol.allow=never -c protocol.https.allow=always -c protocol.ssh.allow=always \
-            -c core.hooksPath=/dev/null -c credential.helper= \
+            -c core.hooksPath=/dev/null -c credential.helper= "${auth[@]}" \
             -c filter.lfs.process= -c filter.lfs.smudge= -c filter.lfs.required=false \
             clone --no-recurse-submodules -- "$url" "$dest"
 }
@@ -21789,7 +21814,7 @@ extension AppModel {
 
     func githubToken() {
         let r = runDialog(title: "Conectar con GitHub",
-                          text: "Solo para leer la lista de repositorios (también los privados): se clonan por SSH, con tu clave. Créalo en GitHub (Settings, Developer settings, Personal access tokens) con el permiso «repo» (y «read:org» para los de una organización) y pégalo aquí. Se guarda en el Llavero, no en un fichero.",
+            text: "Para listar y clonar repositorios (también los privados) por HTTPS. Créalo en GitHub (Settings, Developer settings, Personal access tokens) con el permiso «repo» (y «read:org» para los de una organización) y pégalo aquí. Se guarda en el Llavero, no en un fichero.",
                           okLabel: "Conectar", hasField: true, placeholder: "ghp_… o github_pat_…", secure: true,
                           validate: { _, t in (t.trimmingCharacters(in: .whitespaces).count >= 20, nil, false) })
         guard r.ok else { return }
@@ -29548,7 +29573,7 @@ struct GitHubCard: View {
     var body: some View {
         let g = model.github
         let how = ["llavero": "con el token del Llavero", "gh": "con tu sesión de gh"][g?.source ?? ""] ?? ""
-        return TileCard("GitHub (Repositorios)", "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para clonarlos por SSH (con tu clave) en \(HTDOCS). La lista se lee con un token de GitHub, que se guarda en el Llavero (no en un fichero), o con tu sesión de gh. Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, «Mostrar todos» enseña el resto).") {
+        return TileCard("GitHub (Repositorios)", "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para clonarlos por HTTPS en \(HTDOCS). Se usa tu token de GitHub, que se guarda en el Llavero (no en un fichero), o tu sesión de gh. Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, «Mostrar todos» enseña el resto).") {
             Tile("Conexión", g == nil ? "Comprobando…" : g!.on ? "Conectado como \(g!.login), \(how)"
                  : !(g!.source.isEmpty) ? "⚠ El token ya no vale (¿caducado?): conéctalo de nuevo"
                  : "Sin conectar: hace falta para ver la lista de repositorios (también los privados)") {
@@ -29710,7 +29735,7 @@ struct ReposView: View {
             let h = r?.head ?? []
             PageTitle(title: "Repositorios",
                       sub: h.count >= 6 ? "\(h[2]) en GitHub: \(h[5]) de \(h[4]) repositorios" + (model.reposAll ? "" : " (los de sus prefijos)")
-                        : "Los repositorios de tu organización en GitHub, para clonarlos por SSH en \(HTDOCS)",
+                          : "Los repositorios de tu organización en GitHub, para clonarlos en \(HTDOCS)",
                       logo: "github")
             if let e = r?.error, h.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
@@ -29789,7 +29814,7 @@ struct ReposView: View {
                 Button("Clonar") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .disabled(model.busy)
-                    .tip("Clonar por SSH en htdocs")
+                                        .tip("Clonar en htdocs con tu conexión de GitHub")
             }
             // (para pegarlo en Nuevo proyecto)
             Button(action: {

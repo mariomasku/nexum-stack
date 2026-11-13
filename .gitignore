@@ -44,3 +44,8 @@ linux old/
 
 # --- Paquetes firmados que prepara publicar.sh --------------------------------------------
 dist/
+
+# Informes locales de instalacion y pruebas Windows
+windows/installation.json
+windows/verification.json
+ayuda/windows-audit/

@@ -1,0 +1,31 @@
+name: Windows WSL integration
+on:
+  push:
+    paths: ['windows/**', '.github/workflows/windows.yml', '.gitattributes']
+  pull_request:
+    paths: ['windows/**', '.github/workflows/windows.yml', '.gitattributes']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: ./windows/test.ps1 -SyntaxOnly
+  integration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Installer syntax and manifest behavior
+        run: |
+          bash -n windows/install.sh
+          python3 windows/test_integration.py
+          python3 pruebas/carpeta-plan.py
+          python3 pruebas/git-token.py
+          bash pruebas/repos.sh lvm-instalador.sh
+          bash pruebas/repos.sh macos/lvm-instalador.sh
+          bash pruebas/clonar-ssh.sh lvm-instalador.sh
+          bash pruebas/clonar-ssh.sh macos/lvm-instalador.sh

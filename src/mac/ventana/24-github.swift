@@ -100,7 +100,7 @@ struct GitHubCard: View {
     var body: some View {
         let g = model.github
         let how = ["llavero": "con el token del Llavero", "gh": "con tu sesión de gh"][g?.source ?? ""] ?? ""
-        return TileCard("GitHub (Repositorios)", "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para clonarlos por SSH (con tu clave) en \(HTDOCS). La lista se lee con un token de GitHub, que se guarda en el Llavero (no en un fichero), o con tu sesión de gh. Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, «Mostrar todos» enseña el resto).") {
+        return TileCard("GitHub (Repositorios)", "Para la pestaña Repositorios: la lista de una organización o cuenta de GitHub, para clonarlos por HTTPS en \(HTDOCS). Se usa tu token de GitHub, que se guarda en el Llavero (no en un fichero), o tu sesión de gh. Solo se ven los repositorios que empiezan por alguno de los prefijos (en la pestaña, «Mostrar todos» enseña el resto).") {
             Tile("Conexión", g == nil ? "Comprobando…" : g!.on ? "Conectado como \(g!.login), \(how)"
                  : !(g!.source.isEmpty) ? "⚠ El token ya no vale (¿caducado?): conéctalo de nuevo"
                  : "Sin conectar: hace falta para ver la lista de repositorios (también los privados)") {
@@ -262,7 +262,7 @@ struct ReposView: View {
             let h = r?.head ?? []
             PageTitle(title: "Repositorios",
                       sub: h.count >= 6 ? "\(h[2]) en GitHub: \(h[5]) de \(h[4]) repositorios" + (model.reposAll ? "" : " (los de sus prefijos)")
-                        : "Los repositorios de tu organización en GitHub, para clonarlos por SSH en \(HTDOCS)",
+                          : "Los repositorios de tu organización en GitHub, para clonarlos en \(HTDOCS)",
                       logo: "github")
             if let e = r?.error, h.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
@@ -341,7 +341,7 @@ struct ReposView: View {
                 Button("Clonar") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .disabled(model.busy)
-                    .tip("Clonar por SSH en htdocs")
+                                        .tip("Clonar en htdocs con tu conexión de GitHub")
             }
             // (para pegarlo en Nuevo proyecto)
             Button(action: {
