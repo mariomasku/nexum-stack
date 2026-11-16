@@ -244,7 +244,7 @@ EOF
 BACKGROUND=""
 FONT_ARG=()
 [ -s "$BUILD/Goldman-Regular.ttf" ] && FONT_ARG=("$BUILD/Goldman-Regular.ttf")
-if "$SWIFTC" -O -target arm64-apple-macos12.0 -o "$BUILD/fondo/fondo" "$BUILD/fondo/main.swift" -framework AppKit \
+if "$SWIFTC" -O -sdk "$SDK" -target arm64-apple-macos12.0 -o "$BUILD/fondo/fondo" "$BUILD/fondo/main.swift" -framework AppKit \
         > "$BUILD/fondo/compilar.log" 2>&1 \
         && "$BUILD/fondo/fondo" "$BUILD/fondo.png" "$BUILD/fondo@2x.png" "$VERSION" "$BUILD/logo.png" "$WIN_W" "$WIN_H" \
             "${FONT_ARG[@]}"; then
