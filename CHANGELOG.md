@@ -4,6 +4,27 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.15 · 12 nov 2026
+
+- **Centro de aplicaciones de Ubuntu:** Nexum Dev Stack sale con su logotipo, su nombre, su descripción y su versión (el paquete lleva su ficha AppStream). Esta versión se instala una vez a mano, en la terminal: sudo apt install `./nexum_1.57.15_all.deb`. Las siguientes se vuelven a actualizar desde la ventana.
+- **Registro de tareas:** una tarea en marcha (actualizar componentes, instalar una versión...) guarda lo que va diciendo su consola cada 3 segundos, y al abrirla con «Ver» se actualiza sola hasta que acaba.
+- Actualizar o rehacer una versión que estaba en marcha ya no se queda esperando al final: PHP-FPM, al volver a arrancar, se quedaba con la salida de la instalación. Tampoco salen los «E: No se ha podido localizar el paquete desviado» (ahora sí se marcan las librerías que usa cada versión para que apt autoremove no las quite) ni los avisos de «getcwd».
+- **Configuración, General, Programa:** «Abrir al iniciar sesión». Nexum Dev Stack se abre solo al entrar en tu sesión (con el icono junto al reloj, se queda en él sin abrir la ventana). Va en `~/.config/autostart/nexum.desktop`, como «Aplicaciones al inicio».
+- **Exportar proyecto:** al pulsar «Exportar» se abre la ventana de guardar del sistema, en Descargas y con el nombre de siempre, para elegir dónde va el zip y cómo se llama. Si ya existe, pregunta si reemplazarlo; con «Cancelar» no se crea nada. En la terminal: exportar-proyecto --zip <fichero> [--sobrescribir].
+- Visor del proyecto (el cargado y los de Docker): botón «GitHub», que abre su repositorio en el navegador (o «Repositorio», si es de otro servidor). Solo sale si la carpeta tiene un remote origin. Se ordena o se esconde como los demás, en Apariencia; si ya tenías tu orden, sale detrás de VS Code.
+- **Nuevo proyecto:** en el paso de la BBDD, la casilla «Sin base de datos». Marcada, el proyecto se clona y se carga sin ninguna BBDD vinculada (sin nombre ni volcado). Si es un WordPress o una tienda PrestaShop, el asistente avisa de que la web no funcionará hasta que tenga su BBDD, sin impedirlo. En la terminal: montar-proyecto <url> <carpeta> <version> --sin-bd.
+- **Nuevo proyecto:** al acabar de montarlo, «¿En qué rama empiezas a trabajar?». Sale la rama en la que ha quedado el clon y las demás del repositorio (locales y de origin): elige una o crea una nueva a partir de la actual, y con «Abrir en Visual Studio Code» marcado (si está instalado) se abre ya para trabajar. «Más tarde» lo deja en la rama predeterminada. Con cambios sin commit no cambia de rama. En la terminal: rama-proyecto <carpeta> <rama> [--nueva], sin contraseña de administrador.
+- Configuración, apartado «Administrador de pruebas»: el correo (que es también el usuario) y la contraseña de la cuenta con la que «Panel» entra en WordPress y PrestaShop. Sin ponerlo, sigue siendo local@local.test con la contraseña local. La contraseña se ve con el ojo y no va a ningún registro. Si una BBDD ya tiene un usuario de verdad con ese correo, no se toca (ni su contraseña ni su rol) y se avisa. Las BBDD ya cargadas no cambian solas: el nuevo se crea al cargar una BBDD o al pulsar «Panel». Las copias que se descargan o se exportan no llevan ni el de ahora, ni local@local.test, ni los que pusiste antes (solo los que tienen la marca de Nexum). En la terminal: admin-pruebas [<correo> [-] | --clave | --quitar], sin contraseña de administrador.
+- **Compartir con el túnel:** quien lo abre ve lo mismo que tú, también con el dominio real falseado. Sus enlaces, imágenes y redirecciones (el de la base de un WordPress o de una tienda y los de sus vhosts) ya no llevan a la web real, sino al túnel.
+- **Arrancar o reiniciar la versión activa:** el aviso dice cuál es, con su PHP.
+
+## 1.57.14 · 11 nov 2026
+
+- **Compartir (túnel de Cloudflare):** también 15 y 30 minutos. Se elige en un desplegable (15 y 30 minutos, 1, 2, 3, 4, 6, 8 o 12 horas); en la terminal, tunel-abrir --minutos 15-720 (--horas sigue valiendo).
+- Terminal, «Vaciar DNS»: en Ubuntu 20.04 (y Linux Mint 20) escribe sudo systemd-resolve --flush-cache, y desde la 22.04, sudo resolvectl flush-caches. Mira qué sistema es y qué orden está instalada.
+- Proyectos, menú ⋮ del proyecto cargado, «Exportar proyecto…»: un zip en Descargas con su código (sin .git), su BBDD (sin el administrador de pruebas, como «Descargar») y un LEEME-nexum.txt, con el nombre `<carpeta>_php<rama>_<fecha>_nexum.zip`. Si tiene cambios sin commit en git, no deja exportar y dice cuáles. Si falla o se cancela, no queda nada a medias. En la terminal: nexum exportar-proyecto.
+- Los ajustes, registros y datos del programa pasan a `~/.nexum`: la primera vez que se abre se renombra la carpeta de antes (sin copiar nada) y en su sitio se deja un enlace a `~/.nexum`, para que lo que aún la use (Docker sin root, sus contenedores, el temporizador, una ventana abierta) siga funcionando. Si ya hay una `~/.nexum`, no se toca ninguna de las dos. Con --simular no se cambia nada.
+
 ## 1.57.13 · 11 nov 2026
 
 - **Dominios y hosts:** arriba, a la izquierda, el recuadro con los dominios falseados (también los .local) y, a su derecha, el nuevo proyecto con dominio falseado; debajo, los dominios de los vhosts en dos columnas.
