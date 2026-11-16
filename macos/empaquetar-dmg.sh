@@ -51,6 +51,18 @@ if ! SWIFTC=$(xcrun --sdk macosx --find swiftc 2> /dev/null) || [ ! -x "$SWIFTC"
     echo "y vuelve a ejecutar este script."
     exit 1
 fi
+# Con tu usuario: con sudo, root no tiene el entorno de las herramientas de Xcode y el .dmg quedaria suyo
+if [ "$EUID" -eq 0 ]; then
+    echo "Ejecutalo sin sudo, con tu usuario: bash empaquetar-dmg.sh"
+    exit 1
+fi
+# El SDK de macOS, siempre explicito: swiftc llamado por su ruta (y no por el atajo /usr/bin/swiftc) no
+# lo busca solo y falla con «unable to load standard library for target arm64-apple-macos12.0»
+if ! SDK=$(xcrun --sdk macosx --show-sdk-path 2> /dev/null) || [ ! -d "$SDK" ]; then
+    echo "No se encuentra el SDK de macOS de las herramientas de Xcode. Vuelve a instalarlas:"
+    echo "  sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install"
+    exit 1
+fi
 VOLNAME="$NAME $VERSION"
 
 BUILD=$(mktemp -d)
@@ -88,10 +100,14 @@ EOF
 # El instalador (AppKit), para Apple Silicon y macOS 12 o posterior
 echo "Compilando el instalador..."
 cp "$SWIFT_SRC" "$BUILD/main.swift"
-if ! "$SWIFTC" -O -target arm64-apple-macos12.0 -o "$APP/Contents/MacOS/instalar" "$BUILD/main.swift" \
+if ! "$SWIFTC" -O -sdk "$SDK" -target arm64-apple-macos12.0 -o "$APP/Contents/MacOS/instalar" "$BUILD/main.swift" \
         -framework AppKit > "$BUILD/compilar.log" 2>&1; then
     cat "$BUILD/compilar.log"
     echo "No se ha podido compilar el instalador ($SWIFT_SRC)."
+    # (las herramientas de Xcode a medias, por ejemplo tras actualizar macOS)
+    grep -q "unable to load standard library" "$BUILD/compilar.log" \
+        && echo "Las herramientas de Xcode no casan con el SDK ($SDK). Vuelve a instalarlas:" \
+        && echo "  sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install"
     exit 1
 fi
 chmod 755 "$APP/Contents/MacOS/instalar"
