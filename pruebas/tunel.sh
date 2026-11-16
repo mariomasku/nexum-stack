@@ -9,7 +9,7 @@ UP=""
 trap '[ -n "$UP" ] && kill $UP 2> /dev/null; [ -n "$(tunnel_pid 2> /dev/null)" ] && tunnel_close > /dev/null; rm -rf "$W"' EXIT
 grep -q '^function tunnel_open() {' "$SRC" || { echo "  ok    (sin tunel de Cloudflare)"; exit 0; }
 extract "$SRC" tunnel_installed tunnel_installed_version tunnel_install tunnel_new_pass \
-    tunnel_pid tunnel_close tunnel_open tunnel_status || exit 1
+    tunnel_pid tunnel_close tunnel_open tunnel_status tunnel_domains || exit 1
 eval "$(sed -n "/^TUNNEL_PY=\$(cat <<'PYEOF'/,/^PYEOF/p" "$SRC"; echo ')')"
 [ -n "$TUNNEL_PY" ] || { echo "no esta TUNNEL_PY"; exit 1; }
 
@@ -23,6 +23,10 @@ touch "$HTDOCS_DIR/tienda/admin123abc/index.php" "$HTDOCS_DIR/tienda/admin123abc
 valid_domain() { [[ "$1" =~ ^[a-z0-9.-]+$ ]]; }
 is_prestashop() { [ "$1" == tienda ]; }
 ps_domain() { echo localhost; }
+# (los vhosts y el dominio de la base de un WordPress, de mentira; *.localhost lleva a 127.0.0.1 sin /etc/hosts)
+project_link() { return 1; }
+vhosts_info() { cat "$W/vhosts" 2> /dev/null; }
+gui_wp_prod() { [ "$1" == blog ] && echo "G|" && echo "D|Blog.localhost"; }
 
 # (el Mac: realpath_f y cloudflared en un .tgz)
 grep -q "function realpath_f() {" "$SRC" && realpath_f() { readlink -f "$1"; }
@@ -62,13 +66,17 @@ class H(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(n).decode() if n else ""
         port = self.server.server_address[1]
+        if self.path == "/ir-real":
+            self.send_response(301); self.send_header("Location", "http://blog.localhost:%d/real" % port)
+            self.send_header("Content-Length", "0"); self.end_headers(); return
         if self.path == "/ir":
             self.send_response(302); self.send_header("Location", "http://localhost:%d/destino" % port)
             self.send_header("Content-Length", "0"); self.end_headers(); return
         seen = json.dumps({"path": self.path, "host": self.headers["Host"], "cookie": self.headers.get("Cookie", ""),
                            "origin": self.headers.get("Origin", ""), "body": body, "cf": self.headers.get("Cf-Connecting-IP", "")})
         page = ('<a href="http://localhost:%d/pagina">x</a> <a href="//localhost:%d/b">y</a> "http:\\/\\/localhost:%d\\/c" '
-                'http%%3A%%2F%%2Flocalhost%%3A%d%%2Fd http://localhost.otro/e <pre>%s</pre>' % (port, port, port, port,
+                'http%%3A%%2F%%2Flocalhost%%3A%d%%2Fd http://localhost.otro/e <img src="https://blog.localhost/f.jpg"> '
+                'https://fuera.invalid/g <pre>%s</pre>' % (port, port, port, port,
                 base64.b64encode(seen.encode()).decode())).encode()
         self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Set-Cookie", "sesion=1; Domain=localhost; Path=/")
@@ -143,6 +151,21 @@ check "la contraseña del tunel de antes ya no vale" '[ "$(c -o /dev/null -w "%{
 IPN=4
 h=$(c -D - -o /dev/null -d "clave=$k3" $B/__nexum-tunel/entrar); CK=$(grep -oPi "Set-Cookie: \Knexum_tunel=[0-9a-f]+" <<< "$h")
 check "admin permitido: wp-admin pasa, phpMyAdmin sigue bloqueado" '[ "$(code /wp-admin/)" == 200 ] && [ "$(code /phpmyadmin/)" == 403 ]'
+# Un WordPress con su dominio real falseado: quien lo recibe ve lo mismo que tu, no la web real
+mkdir -p "$HTDOCS_DIR/blog" && touch "$HTDOCS_DIR/blog/wp-config.php"
+printf '443|blog|www.blog.localhost|blog.localhost fuera.invalid||\n80|otro|otro.localhost|||\n' > "$W/vhosts"
+check "dominios: el compartido y los falseados del proyecto (su base y sus vhosts), sin repetir" '[ "$(tunnel_domains localhost "$HTDOCS_DIR/blog" | tr "\n" " ")" == "localhost blog.localhost www.blog.localhost " ]'
+check "dominios: uno que no lleva a este equipo, ni los de otro proyecto, no" '! tunnel_domains localhost "$HTDOCS_DIR/blog" | grep -qx "fuera.invalid\|otro.localhost"'
+check "dominios: sin carpeta, solo el compartido" '[ "$(tunnel_domains localhost "")" == localhost ]'
+out=$(tunnel_open "http://localhost:$WP/" blog 2>&1)
+check "abrir: dice que dominios falseados ve tambien quien lo abra" 'grep -q "Quien lo abra vera tambien por el tunel (no la web real): blog.localhost www.blog.localhost" <<< "$out"'
+PX=$(grep -oP "127.0.0.1:\K[0-9]+" "$W/args") B=http://127.0.0.1:$PX IPN=5
+k4=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\"password\"])" "$TUNNEL_STATE")
+h=$(c -D - -o /dev/null -d "clave=$k4" $B/__nexum-tunel/entrar); CK=$(grep -oPi "Set-Cookie: \Knexum_tunel=[0-9a-f]+" <<< "$h")
+o=$(c -D "$W/h" -H "Cookie: $CK" $B/ir-real)
+check "falseado: la redireccion al dominio real se sigue aqui (en tu equipo), no en el de quien lo abre" 'grep -q "^HTTP/1.0 200" "$W/h" && seen "$o" | grep -q "\"host\": \"blog.localhost:$WP\"" && seen "$o" | grep -q "\"path\": \"/real\""'
+check "falseado: sus enlaces e imagenes llevan al tunel; un dominio de fuera, no" 'grep -qF "<img src=\"https://prueba-uno-dos.trycloudflare.com/f.jpg\">" <<< "$o" && grep -qF "https://fuera.invalid/g" <<< "$o"'
+rm -f "$W/vhosts"
 # Abrir otro cierra el de antes
 P1=$(tunnel_pid)
 tunnel_open "http://localhost:$WP/" > /dev/null 2>&1

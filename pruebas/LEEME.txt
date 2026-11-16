@@ -180,6 +180,8 @@ LOS FICHEROS
                       remote origin (de .git/config, sin ejecutar git),
                       sin token; sin repositorio, no sale; un botón nuevo
                       sale detrás del que le precede.
+  aviso-version.sh    Arrancar o reiniciar la versión activa: el aviso
+                      dice cuál, con su PHP (lampp-8.4 (PHP 8.4.14)).
   inicio-sesion.sh    Abrir al iniciar sesión (Linux): el acceso de
                       ~/.config/autostart (644) abre la ventana con
                       --al-iniciar; con el icono se queda en él; apagar

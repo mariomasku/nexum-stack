@@ -358,7 +358,7 @@
   <p>El botón redondo del recuadro de arriba es la forma más rápida de encender o apagar tu entorno.</p>
   <ul>
     <li><b>▶ con una versión activa y parada</b> la arranca: Apache y MariaDB se ponen en marcha y tus proyectos vuelven a abrirse en el
-      navegador. Sale una ventana de tarea que se cierra sola: «Versión activa arrancada».</li>
+      navegador. Sale una ventana de tarea que se cierra sola y un aviso que dice cuál es: «Versión activa arrancada: <span data-so="linux">lampp-8.4</span><span data-so="mac">XAMPP-8.4</span> (PHP 8.4.14)».</li>
     <li><b>■ con la versión en marcha</b> la para y la desactiva. Desactivar quiere decir quitar el enlace
       <code data-so="linux">/opt/lampp</code><code data-so="mac">/Applications/XAMPP</code>: hasta que actives otra, la orden
       <code>php</code> de la terminal deja de responder y ninguna web local se abre. El programa recuerda cuál era para ofrecértela la
@@ -1297,7 +1297,7 @@
     <ol>
       <li>Cierra el túnel que hubiera abierto y crea una contraseña nueva al azar.</li>
       <li>Pone delante de la web un pequeño intermediario en tu equipo que pide esa contraseña, bloquea el panel de administración y
-        cambia el dominio local por el del túnel al pasar (la web no se toca).</li>
+        cambia por el del túnel, al pasar, el dominio local y los dominios reales que tengas falseados (la web no se toca).</li>
       <li>Lanza <code>cloudflared tunnel --url http://127.0.0.1:&lt;puerto del intermediario&gt;</code> y apunta la dirección que le da
         Cloudflare. Se cierra solo a las horas que hayas dicho.</li>
     </ol>
@@ -5748,7 +5748,8 @@
     y una contraseña.</p>
   <p>Usa un <b>túnel de Cloudflare</b>: no hace falta cuenta ni abrir puertos en el router. La dirección
     (<code>https://….trycloudflare.com</code>) cambia cada vez y lleva una <b>contraseña nueva al azar</b>, de tres grupos de cuatro letras y
-    números (por ejemplo, <code>abcd-2345-wxyz</code>). La web no se toca: su dominio local se cambia por el del túnel al pasar. En Proyectos y
+    números (por ejemplo, <code>abcd-2345-wxyz</code>). La web no se toca: su dominio local, y el real si lo tienes falseado, se cambian por el del túnel al pasar. Así quien lo abre ve lo mismo
+    que tú, nunca la web real. En Proyectos y
     en Docker, lo que cambies en tu equipo se ve al momento; en Node se comparte la versión compilada. Solo se pueden compartir webs de tu
     equipo.</p>
   <p>Un <b>túnel</b> es una conexión que tu equipo abre hacia fuera, hacia Cloudflare (una empresa que da este servicio gratis y sin
@@ -5814,8 +5815,11 @@
         <code>/etc/hosts</code>). Si no, no comparte nada.</li>
       <li>Saca una contraseña nueva al azar, de 12 letras y números sin los que se confunden (sin <code>0</code>, <code>o</code>, <code>1</code>,
         <code>l</code>, <code>i</code>), en tres grupos: <code>abcd-2345-wxyz</code>.</li>
-      <li>En una tienda PrestaShop, añade su dominio de producción a los que se cambian por el del túnel (la tienda va con su dominio
-        falseado).</li>
+      <li>Añade a los dominios que se cambian por el del túnel los del proyecto que estén falseados en tu equipo (que lleven a
+        <code>127.x</code>): el de producción de su base (<code>home</code> o <code>siteurl</code> en WordPress, <code>shop_url</code> en
+        PrestaShop), los <code>ServerName</code> y <code>ServerAlias</code> de sus vhosts y, si es el proyecto cargado, los de
+        <code>web.local</code>. Así los enlaces, las imágenes y las redirecciones al dominio real llevan al túnel, y no a la web real. Uno que
+        no esté falseado no se cambia: el túnel nunca lleva a una web de fuera.</li>
       <li>Cierra el túnel que hubiera abierto.</li>
       <li>Arranca, aparte de la ventana (<span data-so="linux">con <code>setsid</code></span><span data-so="mac">con <code>nohup</code></span>, para
         que siga abierto aunque la cierres), el proxy de Nexum en

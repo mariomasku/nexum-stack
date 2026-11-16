@@ -206,7 +206,8 @@
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
 #       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
 #       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice; desde 15 minutos). La web no
-#       se toca: el dominio local se cambia por el del tunel al pasar
+#       se toca: el dominio local y los reales falseados del proyecto se cambian por el del tunel
+#       al pasar (quien lo abre ve lo mismo que tu, nunca la web real)
 #   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   nexum docker-php <nombre> <version de PHP>
 #   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>

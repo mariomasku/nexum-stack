@@ -1449,7 +1449,10 @@ class AppVersiones:
             self.run_task("Parando y desactivando lampp-%s" % folder, ["disable"],
                           done_text="lampp-%s parada y desactivada" % folder, auto_close=True)
             return
-        texts = {"arrancar": "Versión activa arrancada", "reiniciar": "Versión activa reiniciada"}
+        # (el aviso dice cuál: lampp-8.4 (PHP 8.4.14))
+        inst = next((i for i in self.installs() if i["folder"] == folder), None)
+        name = "lampp-%s" % folder + (" (PHP %s)" % inst["php"] if inst and inst.get("php") else "")
+        texts = {"arrancar": "Versión activa arrancada: %s" % name, "reiniciar": "Versión activa reiniciada: %s" % name}
         self.run_task("%s lampp-%s" % (what, folder), [cmd], done_text=texts[cmd], auto_close=True)
 
     def on_vhosts(self, *_):

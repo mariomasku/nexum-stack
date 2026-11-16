@@ -445,6 +445,12 @@ VERSIONES
   pusiste antes (solo los que tienen la marca de Nexum). En la
   terminal: admin-pruebas [<correo> [-] | --clave | --quitar], sin
   contraseña de administrador.
+- Compartir con el túnel: quien lo abre ve lo mismo que tú, también con
+  el dominio real falseado. Sus enlaces, imágenes y redirecciones (el
+  de la base de un WordPress o de una tienda y los de sus vhosts) ya no
+  llevan a la web real, sino al túnel.
+- Arrancar o reiniciar la versión activa: el aviso dice cuál es, con
+  su PHP.
 
 1.57.14 (11 nov 2026)
 - Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en

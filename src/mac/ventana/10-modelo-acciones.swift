@@ -35,7 +35,10 @@ extension AppModel {
                     doneText: "XAMPP-\(folder) parada y desactivada", autoClose: true)
             return
         }
-        let texts = ["arrancar": "Versión activa arrancada", "reiniciar": "Versión activa reiniciada"]
+        // (el aviso dice cuál: XAMPP-8.4 (PHP 8.4.14))
+        let php = data?.installs.first(where: { $0.folder == folder })?.php ?? ""
+        let name = "XAMPP-\(folder)" + (php.isEmpty ? "" : " (PHP \(php))")
+        let texts = ["arrancar": "Versión activa arrancada: \(name)", "reiniciar": "Versión activa reiniciada: \(name)"]
         runTask("\(what) XAMPP-\(folder)", [cmd], doneText: texts[cmd] ?? "Terminado", autoClose: true)
     }
 
