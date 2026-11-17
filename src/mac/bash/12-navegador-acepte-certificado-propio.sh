@@ -648,10 +648,20 @@ EOF
 # aplica al vhost de los proyectos (web.local) mientras ese proyecto este cargado (media_sync)
 MEDIA_PROJECTS_FILE="$LOG_DIR/media-produccion"
 #@incluir comun/navegador-acepte-certificado-propio/media_saved.sh
+#@incluir comun/navegador-acepte-certificado-propio/media_local.sh
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
 # dominio de produccion (media-proyecto) si es un WordPress que lo tiene, si no ninguna. Solo cambia
 # los vhosts si hace falta
 function media_sync() {
+    local rc=0
+    media_sync_link || rc=1
+    # (y las reglas del intermediario de imagenes, en los vhosts de cada proyecto que las tiene)
+    media_local_vhosts || rc=1
+    return $rc
+}
+
+# La regla de web.local (redireccion de media-produccion) del WordPress cargado
+function media_sync_link() {
     local link folder name want="" now
     link=$(project_link) || return 0
     folder=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null | sed 's:/*$::')

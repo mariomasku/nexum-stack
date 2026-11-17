@@ -1,9 +1,15 @@
-# Para la ventana: G|dominio guardado de un WordPress (media-proyecto) y D|el de su base (home o
-# siteurl de la tabla options, que el gestor no cambia: el local va en WP_HOME de wp-config.php)
+# Para la ventana: G|dominio guardado de un WordPress o de una tienda (media-proyecto) y D|el de su base
+# (en WordPress, home o siteurl de la tabla options, que el gestor no cambia: el local va en WP_HOME de
+# wp-config.php; en una tienda, el de su shop_url, el mismo que ps-imagenes)
 function gui_wp_prod() {
     local folder=$1 cfg db prefix url
     valid_project "$folder" > /dev/null || return 1
     echo "G|$(media_saved "$folder")"
+    if is_prestashop "$folder"; then
+        url=$(ps_domain "$folder" 2> /dev/null | tr 'A-Z' 'a-z')
+        valid_domain "$url" && [[ "$url" != *.local && "$url" != *.test && "$url" != localhost && "$url" != *.localhost ]] && echo "D|$url"
+        return 0
+    fi
     cfg=$(wp_config_read "$HTDOCS_DIR/$folder/wp-config.php") || return 0
     db=$(sed -n 1p <<< "$cfg") prefix=$(sed -n 4p <<< "$cfg")
     [[ "$db" =~ ^[A-Za-z0-9_-]+$ ]] && [[ "$prefix" =~ ^[A-Za-z0-9_]*$ ]] || return 0

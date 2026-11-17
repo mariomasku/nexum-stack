@@ -406,10 +406,11 @@ struct ProjectsView: View {
             items.append(("Vaciar la caché de la tienda", { model.clearCache(folder: x.name, db: db) }))
         }
         items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
+        if x.kind == "ps" || x.kind == "wp" {
+            items.append(("Imágenes de producción…", { model.wpMedia(x) }))
+        }
         if x.kind == "ps" {
             items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
-        } else if x.kind == "wp" {
-            items.append(("Imágenes de producción…", { model.wpMedia(x) }))
         }
         items.append(("Personalizar los botones…", { model.panel = .buttons }))
         items.append(("Borrar el proyecto…", { model.deleteProject(x) }))
@@ -567,10 +568,11 @@ struct ProjectsView: View {
                             Button("Vaciar la caché de la tienda") { model.clearCache(folder: x.name, db: model.projectBase(x)) }
                         }
                         Button("Limpiar proyecto…") { model.cleanProject(x) }
+                        if x.kind == "ps" || x.kind == "wp" {
+                            Button("Imágenes de producción…") { model.wpMedia(x) }
+                        }
                         if x.kind == "ps" {
                             Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
-                        } else if x.kind == "wp" {
-                            Button("Imágenes de producción…") { model.wpMedia(x) }
                         }
                         Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }

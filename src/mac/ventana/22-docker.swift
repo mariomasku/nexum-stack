@@ -505,7 +505,7 @@ struct DockerView: View {
         if let x = model.projects?.list.first(where: { $0.name == p.folder }), x.kind == "wp" || x.kind == "ps" {
             items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
                                                     tip: "Traer de producción las imágenes que falten") {
-                model.importImages(x)
+                model.importImages(x, docker: true)
             }.disabled(model.busy))
         }
         return items

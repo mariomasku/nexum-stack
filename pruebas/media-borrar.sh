@@ -129,9 +129,13 @@ check "borrar: sus dominios fuera de hosts (falseados y comentados); los de otro
 check "borrar: el gestor ya no lo recuerda (y al otro si)" \
     '[ "$(cat "$PROJECTS_FILE")" == "ps_otra=otra" ] && [ "$(cat "$REPO_PROJECTS_FILE")" == "otra" ]'
 
-# media-proyecto y media_sync: la regla de web.local sigue al WordPress cargado
+# media-proyecto y media_sync: la regla de web.local sigue al WordPress cargado (las del intermediario de
+# imagenes, media_local_vhosts, las comprueba imagenes-intermediario.sh)
 grep -q '^function media_project() {' "$SRC" || exit $fail
 extract "$SRC" media_project media_sync media_saved || exit 1
+grep -q '^function media_sync_link() {' "$SRC" && { extract "$SRC" media_sync_link || exit 1; }
+LOCAL_SYNC=0
+media_local_vhosts() { LOCAL_SYNC=$((LOCAL_SYNC + 1)); }
 MEDIA_PROJECTS_FILE=$LOG_DIR/media-produccion
 mkdir -p "$HTDOCS_DIR/blog" "$HTDOCS_DIR/blog2" "$HTDOCS_DIR/tienda2"
 printf '<VirtualHost *:80>\n    DocumentRoot "/opt/lampp/htdocs/web.local"\n    ServerName web.local\n</VirtualHost>\n' > "$ACTIVE_VHOSTS"
@@ -139,11 +143,17 @@ cp "$ACTIVE_VHOSTS" "$W/web.conf"
 vhosts_info() { echo "80|web.local|web.local||"; }
 is_prestashop() { [ "$1" == tienda2 ]; }
 ln -sfn blog "$HTDOCS_DIR/web.local"
-o=$(media_project tienda2 tienda.es)
-check "media-proyecto: una tienda PrestaShop no (dominio falseado: se descargan)" '[ $? -ne 0 ] && grep -q ps-imagenes <<< "$o" && [ ! -e "$MEDIA_PROJECTS_FILE" ]'
+if grep -q '^function media_local_vhosts() {' "$SRC"; then
+    media_project tienda2 tienda.es > "$W/o" 2>&1
+    check "media-proyecto: una tienda tambien (sus imagenes, por el intermediario), sin regla en web.local" '[ $? -eq 0 ] && grep -qx "tienda2|tienda.es" "$MEDIA_PROJECTS_FILE" && grep -q "las imagenes que le falten en img" "$W/o" && cmp -s "$ACTIVE_VHOSTS" "$W/web.conf" && [ $LOCAL_SYNC -ge 1 ]'
+    media_project tienda2 quitar > /dev/null
+else
+    o=$(media_project tienda2 tienda.es)
+    check "media-proyecto: una tienda PrestaShop no (dominio falseado: se descargan)" '[ $? -ne 0 ] && grep -q ps-imagenes <<< "$o" && [ ! -e "$MEDIA_PROJECTS_FILE" ]'
+fi
 o=$(media_project blog https://Blog.ES/)
 check "media-proyecto: se guarda y, si esta cargado, va en web.local" \
-    '[ "$(cat "$MEDIA_PROJECTS_FILE")" == "blog|blog.es" ] && grep -q "https://blog.es/\$1" "$ACTIVE_VHOSTS"'
+    '[ "$(grep -v "^tienda2|" "$MEDIA_PROJECTS_FILE")" == "blog|blog.es" ] && grep -q "https://blog.es/\$1" "$ACTIVE_VHOSTS"'
 o=$(media_project blog2 blog2.es)
 check "media-proyecto: el de otro proyecto se guarda sin tocar web.local" \
     'grep -qx "blog2|blog2.es" "$MEDIA_PROJECTS_FILE" && grep -q "https://blog.es/\$1" "$ACTIVE_VHOSTS"'
@@ -190,7 +200,7 @@ o=$(PATH=$W/bin:$PATH CURL_LOG=$W/agente python3 -I "$W/dl.py" "$W/ps" tienda.es
 check "ps-imagenes: solo pasan a img las que llegan enteras (200)" \
     '[ "$(cat "$W/ps/img/p/1/1.jpg")" == imagen ] && [ -f "$W/ps/img/p/1/1-home_default.jpg" ] && [ ! -e "$W/ps/img/p/no" ] && [ ! -e "$W/ps/img/p/mueve" ]'
 check "ps-imagenes: nada fuera de img (un enlace dentro que lleva a otra carpeta)" '[ -z "$(ls -A "$W/fuera")" ]'
-check "ps-imagenes: cuenta las que no estan y las que redirigen" 'grep -q "Descargadas 2 de 5 (2 no estan en produccion, 1 con redireccion)" <<< "$o"'
+check "ps-imagenes: cuenta las que no estan y las que redirigen" 'grep -q "Descargadas 2 de 5 (revisadas 5, 2 no estan en produccion, 1 con redireccion)" <<< "$o"'
 check "ps-imagenes: se presenta como el programa, no como un navegador" 'grep -q "^Nexum-Dev-Stack/9.9 " "$W/agente" && ! grep -qi mozilla "$W/agente"'
 check "ps-imagenes: sin restos en la carpeta temporal" '[ -z "$(ls -A "$W/dl")" ]'
 seq 1 400 | sed 's|^|img/p/bloqueada/|; s|$|.jpg|' > "$W/lista"

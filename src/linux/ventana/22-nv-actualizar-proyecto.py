@@ -283,10 +283,10 @@ class NvActualizarProyecto:
                 "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", x["name"]],
                 done_text="Caché vaciada", auto_close=True)))
         items.append(("Limpiar proyecto…", lambda: self.nv_clean_project(x)))
+        if x["kind"] in ("ps", "wp"):
+            items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
-        elif x["kind"] == "wp":
-            items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
@@ -453,17 +453,20 @@ class NvActualizarProyecto:
         return path, os.path.lexists(path)
 
     def nv_images_button(self, x):
-        """Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""
+        """Imágenes de producción: las que falten se traen de su web real al pedirlas la página (WordPress y tiendas)."""
         b = nv_button(logo("imagenes", 18), "Imágenes de producción",
                       "Traer de producción las imágenes que falten",
-                      lambda *_: self.nv_wp_media(x) if x["kind"] == "wp" else self.nv_ps_images(x), "nv-proyecto-btn")
+                      lambda *_: self.nv_wp_media(x), "nv-proyecto-btn")
         b.set_sensitive(not self.busy)
         return b
 
     def nv_wp_media(self, x):
-        """media-proyecto: lo que le falte a un WordPress de wp-content/uploads se pide a su web real
-        mientras esté cargado (por web.local). Se propone el dominio de su base (home o siteurl)."""
+        """media-proyecto: las imágenes que le falten a un WordPress (wp-content/uploads) o a una tienda (img) se
+        traen de su web real al pedirlas la página, por el intermediario de imágenes, y se quedan en su carpeta.
+        Se propone el dominio de su base (home o siteurl; en una tienda, su shop_url). En una tienda, además,
+        «Descargar todas…» (ps-imagenes)."""
         name = x["name"]
+        shop = x["kind"] == "ps"
 
         def got(rc, out):
             f = {l[0]: l[1] for l in parse_lines(out) if len(l) >= 2}
@@ -472,11 +475,17 @@ class NvActualizarProyecto:
             dlg.set_default_size(520, -1)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
             box.pack_start(label("Imágenes de producción de %s" % name, "nv-titulo", wrap=True), False, False, 0)
-            box.pack_start(label("Mientras esté cargado (y, si está en el Apache de Docker, también allí), lo que "
-                                 "falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web "
-                                 "real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde "
-                                 "aquí.", "nv-tenue", wrap=True,
-                                 max_width_chars=60), False, False, 0)
+            text = ("No se descarga nada por adelantado. Cuando la tienda pide una imagen que no está en su carpeta img, "
+                    "Nexum la trae en ese momento de su web real, te la enseña y la deja guardada en img: solo se trae "
+                    "lo que ves, y la siguiente vez ya sale de tu equipo. Funciona aunque su dominio esté falseado en "
+                    "este equipo (pregunta su dirección al DNS cifrado y comprueba su certificado real). Con LAMPP; en "
+                    "el Apache de Docker, no." if shop else
+                    "No se descarga nada por adelantado. Cuando la web pide una imagen de wp-content/uploads que no "
+                    "está en tu carpeta, Nexum la trae en ese momento de su web real, te la enseña y la deja guardada: "
+                    "solo se trae lo que ves, y la siguiente vez ya sale de tu equipo. Funciona aunque su dominio esté "
+                    "falseado en este equipo. Los vídeos y los PDF no se guardan: se piden a la web real con una "
+                    "redirección (mientras esté cargado y en el Apache de Docker, donde las imágenes también van así).")
+            box.pack_start(label(text, "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
             entry = Gtk.Entry(text=saved or guess, placeholder_text="ejemplo.com", max_length=80,
                               activates_default=True)
             box.pack_start(entry, False, False, 0)
@@ -486,6 +495,8 @@ class NvActualizarProyecto:
             dlg.get_content_area().add(box)
             if saved:
                 css(dlg.add_button("Quitar", Gtk.ResponseType.REJECT), "destructive-action")
+            if shop:
+                dlg.add_button("Descargar todas…", Gtk.ResponseType.APPLY)
             dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
             ok = css(dlg.add_button("Guardar", Gtk.ResponseType.OK), "nv-azul")
             dlg.set_default_response(Gtk.ResponseType.OK)
@@ -503,12 +514,14 @@ class NvActualizarProyecto:
             resp = run_dialog(dlg)
             prod = clean()
             dlg.destroy()
-            if resp == Gtk.ResponseType.REJECT:
+            if resp == Gtk.ResponseType.APPLY:
+                self.nv_ps_images(x)
+            elif resp == Gtk.ResponseType.REJECT:
                 self.run_task("Quitando las imágenes de producción de %s" % name, ["media-proyecto", name, "quitar"],
                               done_text="%s ya no pide nada a producción" % name, auto_close=True)
             elif resp == Gtk.ResponseType.OK:
                 self.run_task("Imágenes de producción de %s" % name, ["media-proyecto", name, prod],
-                              done_text="%s pide a %s las imágenes que le faltan" % (name, prod), auto_close=True)
+                              done_text="%s trae de %s las imágenes que le faltan" % (name, prod), auto_close=True)
             return False
         run_quick(["gui-wp-produccion", name], got, env=self.db_env())
 

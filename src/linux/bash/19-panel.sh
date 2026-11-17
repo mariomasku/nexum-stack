@@ -1131,6 +1131,20 @@ QUE HACE
 
 VERSIONES
 
+1.57.17 (17 nov 2026)
+- Imágenes de producción, también en las tiendas PrestaShop: las que
+  falten ya no hay que descargarlas antes. Cuando la página pide una
+  imagen que no está en tu carpeta (img en una tienda, wp-content/
+  uploads en WordPress), Nexum la trae en ese momento de su web real,
+  la enseña y la deja guardada en la carpeta: solo se trae lo que ves,
+  y la siguiente vez ya sale de tu equipo. Funciona aunque el dominio
+  real esté falseado (la dirección sale del DNS cifrado y se comprueba
+  su certificado). Se activa con el botón «Imágenes de producción» o
+  en el menú ⋮, y va con la versión activa. Los vídeos y los PDF de
+  WordPress siguen con la redirección, y en el Apache de Docker todo
+  sigue como antes. «Descargar de producción las imágenes que
+  faltan…» sigue estando para tener todas de una vez.
+
 1.57.16 (17 nov 2026)
 - Descargar de producción las imágenes que faltan (PrestaShop): ya no
   se queda en «Descargadas 0 de …» sin avanzar. El dominio se resuelve

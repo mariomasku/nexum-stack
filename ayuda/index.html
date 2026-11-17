@@ -1422,59 +1422,110 @@
 
   <!-- ------------------------------------------------------------------ imágenes -->
   <h3 id="imagenes-produccion">Imágenes de producción</h3>
-  <p>Las imágenes de una web (las de <code>wp-content/uploads</code> o <code>img</code>) no suelen ir en git, así que tu copia local se ve
-    sin fotos. El programa lo arregla de dos formas distintas, según el tipo de proyecto. En los dos casos se abre con el botón
-    <b>«Imágenes de producción»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
-
-  <p><b>WordPress: «Imágenes de producción…»</b>. No descarga nada: lo que falte se pide a la web real.</p>
+  <p>Las imágenes de una web (las de <code>wp-content/uploads</code> en WordPress, las de <code>img</code> en PrestaShop) no suelen ir en
+    git, así que tu copia local se ve sin fotos. El programa tiene dos formas de traerlas, y las dos sirven para WordPress y para
+    PrestaShop. Se abren con el botón <b>«Imágenes de producción»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
   <ul>
-    <li>Escribe el <b>dominio de producción</b> (solo el dominio, como <code>panaderia-luna.com</code>). El programa propone el de su base de
-      datos («Es el dominio de su BBDD: compruébalo antes de guardar.»). No vale un <code>.local</code> ni un <code>.test</code>.</li>
-    <li>Pulsa <b>«Guardar»</b>. Mientras el proyecto esté cargado (y también en el Apache de Docker, si está allí), cada imagen, vídeo o PDF
-      de <code>wp-content/uploads</code> que no esté en tu carpeta se pide a la web real con una <b>redirección</b> (Apache le dice al
-      navegador «esto búscalo en esta otra dirección»). Lo que ya tienes en local se sigue sirviendo desde aquí.</li>
-    <li>No cambia tu carpeta ni tu base de datos. Sí cambia el vhost de <code>web.local</code>: pide la contraseña de administrador, guarda
-      antes una copia de los vhosts en <code>~/nexum-backups</code> (si tienes encendidas las <a href="#carpetas">copias de los ficheros
-      que cambia el programa</a>) y recarga Apache.</li>
-    <li>Va con el proyecto: al cargar otro o desmontarlo, se quita sola, y vuelve al cargarlo otra vez.</li>
-    <li><b>Para quitarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (solo sale si hay un dominio guardado).</li>
+    <li><b>Al navegar</b> («Imágenes de producción…»): no se descarga nada por adelantado. Cuando la página pide una imagen que no está en
+      tu carpeta, el programa la trae en ese momento de la web real, te la enseña y <b>la guarda en la carpeta del proyecto</b>. Solo se
+      trae lo que ves: si abres la portada y dos productos, se traen esas imágenes y nada más. La siguiente vez ya salen de tu equipo.
+      Es lo más rápido para empezar a trabajar.</li>
+    <li><b>Todas de una vez</b> (solo PrestaShop: «Descargar de producción las imágenes que faltan…»): descarga ahora todas las que
+      faltan según la base de datos de la tienda, también las de productos que no vayas a abrir. Tarda más (en una tienda grande, más
+      de 100.000 ficheros entre originales y miniaturas), pero después la tienda está completa sin conexión.</li>
+  </ul>
+  <p>Las dos <b>funcionan aunque el dominio real esté falseado</b> en tu equipo (lo habitual en una tienda, que se ve con su dominio).
+    La dirección de la web real no se le pregunta al sistema, que con el dominio falseado contestaría «este mismo equipo», sino al
+    <b>DNS cifrado</b> de Cloudflare: el DNS es el servicio que traduce un nombre como <code>ferreteria-norte.com</code> a la dirección de
+    su servidor, y así se pregunta directamente por internet, sin mirar tu fichero de hosts. Si el DNS cifrado solo da direcciones de tu
+    equipo o de una red privada, no se trae nada. Siempre se comprueba el certificado real de la web. Lo que ya tienes en local no se
+    toca nunca.</p>
+
+  <p><b>«Imágenes de producción…»: traerlas al navegar</b></p>
+  <ul>
+    <li>Escribe el <b>dominio de producción</b> (solo el dominio, como <code>panaderia-luna.com</code>). El programa propone el de su base
+      de datos (en WordPress, <code>home</code> o <code>siteurl</code>; en una tienda, su <code>shop_url</code>): «Es el dominio de su
+      BBDD: compruébalo antes de guardar.». No vale un <code>.local</code> ni un <code>.test</code>.</li>
+    <li>Pulsa <b>«Guardar»</b>. Desde ese momento, en tu versión LAMPP activa, cada vez que la página pide una imagen (jpg, png, webp,
+      avif, gif, svg, ico, bmp) que no está en tu carpeta:
+      <ol>
+        <li>Apache no da un error 404: se la pasa al <b>intermediario de imágenes</b> del programa, un pequeño servidor que corre con tu
+          usuario y solo en tu equipo (<code>127.0.0.1</code>).</li>
+        <li>El intermediario la pide a la web real por https, a la dirección del DNS cifrado, con un nombre que dice quién es
+          (<code>Nexum-Dev-Stack/&lt;versión&gt; (imagenes que faltan en una copia local)</code>).</li>
+        <li>Si llega una imagen de verdad, se la da al navegador y la guarda en su sitio de la carpeta (<code>img/p/1/2/12-home_default.jpg</code>,
+          <code>wp-content/uploads/2026/03/foto.jpg</code>). Nunca fuera de <code>img</code> o de <code>wp-content/uploads</code>.</li>
+        <li>Si la web real no la tiene, el navegador recibe un 404, como si no existiera, y no se vuelve a preguntar por ella durante 5
+          minutos. Si lo que contesta no es una imagen (por ejemplo, una página de error), no se guarda nada.</li>
+      </ol>
+      La segunda vez que se pide, la imagen ya está en la carpeta y la sirve Apache directamente, sin el intermediario.</li>
+    <li>En una tienda también valen sus direcciones amigables (<code>/12-home_default/silla.jpg</code>): su <code>.htaccess</code> las traduce a
+      <code>img/p/1/2/12-home_default.jpg</code> y, si falta, se trae igual.</li>
+    <li>En WordPress, los <b>vídeos y los PDF</b> de <code>wp-content/uploads</code> no se guardan: mientras el proyecto esté cargado en
+      <code>web.local</code>, se piden a la web real con una <b>redirección</b> (Apache le dice al navegador «esto búscalo en esta otra
+      dirección»). Si el dominio real está falseado, esa redirección volvería a tu equipo: los vídeos y PDF que falten no se verán.</li>
+    <li>Las reglas van en los vhosts de la carpeta del proyecto (los suyos, con su dominio) y en el de <code>web.local</code> mientras sea el
+      proyecto cargado. Pide la contraseña de administrador, guarda antes una copia de los vhosts en <code>~/nexum-backups</code> (si tienes
+      encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>) y recarga Apache.</li>
+    <li>El intermediario arranca y se para con la versión activa, y solo si algún proyecto tiene sus imágenes de producción.</li>
+    <li><b>En el Apache de Docker</b>: un WordPress pide sus imágenes, vídeos y PDF a la web real con la redirección (no se guardan); una
+      tienda no pasa por el intermediario, así que ahí usa «Descargar de producción las imágenes que faltan…».</li>
+    <li>No cambia tu base de datos ni tus ficheros, salvo las imágenes que se van guardando.</li>
+    <li><b>Para quitarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (solo sale si hay un dominio guardado). Las imágenes que ya se
+      han guardado se quedan.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum media-proyecto panaderia-luna panaderia-luna.com</code> («Guardar») o
       <code>nexum media-proyecto panaderia-luna quitar</code> («Quitar»).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Comprueba que no es una tienda PrestaShop y que el dominio es válido.</li>
+      <li>Comprueba que el dominio es válido.</li>
       <li>Apunta <code>panaderia-luna|panaderia-luna.com</code> en <code>~/.nexum/media-produccion</code> (o borra su línea, con
         <code>quitar</code>).</li>
-      <li>Si es el proyecto cargado, añade al vhost de <code>web.local</code> (en <code data-so="linux">/opt/config/httpd-vhosts.conf</code><code
-        data-so="mac">/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>) un bloque que empieza por <code># nexum-media
-        panaderia-luna.com:</code> con una regla de Apache: si se pide por GET un fichero de <code>wp-content/uploads</code> o
-        <code>img</code> (jpg, png, webp, svg, mp4, pdf…) que no existe en la carpeta, <code>RewriteRule … https://panaderia-luna.com/$1
-        [R=302]</code>.</li>
+      <li>En cada vhost cuyo <code>DocumentRoot</code> es la carpeta del proyecto (y en el de <code>web.local</code>, si es el cargado),
+        dentro de <code data-so="linux">/opt/config/httpd-vhosts.conf</code><code data-so="mac">/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>,
+        pone al principio un bloque que empieza por <code># nexum-imagenes panaderia-luna panaderia-luna.com:</code>. Es una regla de Apache:
+        si se pide por GET o HEAD una imagen de <code>/wp-content/uploads/</code> (o de <code>/img/</code> en una tienda) que no existe en la
+        carpeta, <code>RewriteRule … http://127.0.0.1:47817/panaderia-luna/$1 [P]</code>, es decir, Apache se la pide al intermediario y
+        devuelve lo que este le dé. Lleva la cabecera <code>X-Nexum-Imagenes: 1</code>; el intermediario no atiende nada que no la traiga
+        ni que vaya a otro nombre que <code>127.0.0.1</code>.</li>
+      <li>En WordPress, si es el proyecto cargado, añade también al vhost de <code>web.local</code> un bloque <code># nexum-media
+        panaderia-luna.com:</code> con <code>RewriteRule … https://panaderia-luna.com/$1 [R=302]</code>, que es la redirección de los vídeos
+        y los PDF (las imágenes las atiende antes el bloque del intermediario).</li>
       <li>Aplica los vhosts: guarda el anterior en <code>~/nexum-backups</code> (con las copias de los ficheros encendidas), lo escribe con
         <code>sudo install</code>, comprueba que Apache lo acepta (<code>httpd -t</code>; si no, deja el de antes) y recarga Apache.</li>
+      <li>Arranca el intermediario si la versión activa está en marcha: <code>python3</code> con tu usuario, en
+        <code>127.0.0.1:47817</code>, con su registro en <code>~/.nexum/imagenes-intermediario.log</code>.</li>
       <li>Si el proyecto está en el Apache de Docker, rehace y recarga también sus vhosts.</li>
     </ol>
-    <p>Para comprobarlo: <code>grep -A6 nexum-media /opt/config/httpd-vhosts.conf</code> y <code>curl -I
-      http://web.local/wp-content/uploads/&lt;una que falte&gt;.jpg</code> (contesta <code>302</code> con la dirección real).</p>
+    <p>Lo que hace el intermediario con cada imagen que le llega:</p>
+    <ol>
+      <li>Pregunta la dirección de la web al DNS cifrado: <code>curl -H "accept: application/dns-json"
+        "https://cloudflare-dns.com/dns-query?name=panaderia-luna.com&amp;type=A"</code> (y <code>AAAA</code>, y lo mismo con
+        <code>www.</code>), y se queda con las públicas. Lo recuerda 10 minutos.</li>
+      <li>La pide con <code>curl --resolve panaderia-luna.com:443:&lt;dirección&gt; --proto =https --fail
+        https://panaderia-luna.com/wp-content/uploads/…</code>: <code>--resolve</code> hace que <code>curl</code> vaya a esa dirección sin
+        mirar tu fichero de hosts, y comprueba el certificado de <code>panaderia-luna.com</code>.</li>
+      <li>Si llega con <code>200</code> y es una imagen (<code>Content-Type: image/…</code>), la guarda en la carpeta y la devuelve. Si no
+        está (<code>404</code>, o <code>403</code>, que es lo que da PrestaShop cuando falta su carpeta), devuelve 404 y lo apunta en su
+        registro.</li>
+    </ol>
+    <p>Para comprobarlo: <code data-so="linux">grep -A10 nexum-imagenes /opt/config/httpd-vhosts.conf</code><code data-so="mac">grep -A10 nexum-imagenes /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>, abre una página con imágenes que no tengas y
+      mira que aparecen en la carpeta, y <code>tail ~/.nexum/imagenes-intermediario.log</code> para las que no están en producción.</p>
   </details>
 
-  <p><b>PrestaShop: «Descargar de producción las imágenes que faltan…»</b>. Una tienda se ve con su dominio real falseado, así que una
-    redirección volvería a tu equipo: aquí <b>sí se descargan</b>.</p>
+  <p><b>PrestaShop: «Descargar de producción las imágenes que faltan…»: todas de una vez</b></p>
   <ul>
     <li>No pide nada: el dominio sale de la base de datos de la tienda. Pregunta «¿Descargar las imágenes que le faltan a ferreteria-norte?»
-      y pulsas <b>«Descargar»</b>. Si el usuario root de MariaDB tiene contraseña, te la pide.</li>
+      y pulsas <b>«Descargar»</b>.<span data-so="linux"> También está el botón <b>«Descargar todas…»</b> del diálogo «Imágenes de
+      producción».</span> Si el usuario root de MariaDB tiene contraseña, te la pide.</li>
     <li>Mira en su base qué imágenes de productos, categorías y marcas (con sus miniaturas) faltan en su carpeta <code>img</code> y las
       descarga de la web real. La base es la de la versión activa o, si no está allí, la de su proyecto del Apache de Docker.</li>
-    <li>Como el dominio está falseado en tu equipo, se busca con <b>DNS cifrado</b> (Cloudflare): el DNS es el servicio que traduce un
-      nombre como <code>ferreteria-norte.com</code> a la dirección de su servidor, y así se pregunta directamente por internet, sin
-      mirar tu fichero de hosts. Se pregunta una sola vez y todas las descargas van a esa dirección, aunque el dominio siga falseado.
-      Si el DNS cifrado no contesta, o solo da direcciones de tu equipo o de una red privada, no se descarga nada y lo dice. Se
-      comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local
-      no se toca.</li>
-    <li>Con muchos productos puede tardar y ocupar bastante. Es una descarga de una vez: no hay nada que apagar, las imágenes se quedan en
-      <code>img</code> (la misma carpeta para LAMPP y Docker).</li>
+    <li>La dirección de la web se pregunta una sola vez al DNS cifrado y todas las descargas van a esa dirección, aunque el dominio siga
+      falseado. Si el DNS cifrado no contesta, o solo da direcciones de tu equipo o de una red privada, no se descarga nada y lo dice. Se
+      comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local no se toca.</li>
+    <li>Con muchos productos puede tardar y ocupar bastante: la tarea dice cuántas lleva descargadas y revisadas. Es una descarga de una
+      vez: no hay nada que apagar, las imágenes se quedan en <code>img</code> (la misma carpeta para LAMPP y Docker).</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum ps-imagenes ferreteria-norte</code> (puedes añadir el dominio detrás si no se puede
@@ -1609,8 +1660,8 @@
   <ul>
     <li><b>«Limpiar proyecto…»</b>: su caché, sus registros y, en WordPress, los restos de las actualizaciones. Ver
       <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</li>
-    <li><b>«Descargar de producción las imágenes que faltan…»</b> (PrestaShop) o <b>«Imágenes de producción…»</b> (WordPress): ver
-      <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
+    <li><b>«Imágenes de producción…»</b> (WordPress y PrestaShop) y <b>«Descargar de producción las imágenes que faltan…»</b>
+      (PrestaShop): ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
     <li><b>«Personalizar los botones…»</b>: ver <a href="#personalizar-botones">Personalizar los botones</a>.</li>
     <li><b>«Borrar el proyecto…»</b>: ver <a href="#borrar-proyecto">Borrar un proyecto</a>.</li>
   </ul>
@@ -6306,8 +6357,9 @@
       <code>.local</code>. Con <code>quitar</code>, deja de hacerlo. Ejemplo: <code>nexum media-produccion academia-flor.local
       academia-flor.com</code>.</dd>
     <dt><code>media-proyecto &lt;carpeta&gt; &lt;dominio de producción&gt;|quitar</code></dt><dd>Lo mismo para un WordPress que se abre en
-      <code>web.local</code>, mientras esté cargado. Ejemplo: <code>nexum media-proyecto panaderia-luna
-      panaderia-luna.com</code>.</dd>
+      <code>web.local</code>, mientras esté cargado, y para cualquier WordPress o tienda PrestaShop en sus propios vhosts: las imágenes que
+      le falten se traen de la web real al pedirlas la página, por el intermediario de imágenes, y se guardan en su carpeta (también con
+      el dominio real falseado). Ejemplo: <code>nexum media-proyecto panaderia-luna panaderia-luna.com</code>.</dd>
     <dt><code>vhosts</code></dt><dd>Edita los vhosts: abre una copia en tu editor de la terminal (<code>nano</code>, si no tienes otro
       configurado), pregunta «¿Aplicar los cambios?», la comprueba, la escribe con <code>sudo</code> y recarga Apache. Si Apache no la
       acepta, deja la de antes. Con <code>copias-ficheros si</code>, guarda antes la anterior en <code>~/nexum-backups</code>. Ejemplo:

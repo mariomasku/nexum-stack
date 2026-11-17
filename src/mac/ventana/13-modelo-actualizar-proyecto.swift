@@ -715,16 +715,19 @@ extension AppModel {
         }
     }
 
-    /// media-proyecto: lo que le falte a un WordPress de wp-content/uploads se pide a su web real
-    /// mientras esté cargado (por web.local). Se propone el dominio de su base (home o siteurl)
+    /// media-proyecto: las imágenes que le falten a un WordPress (wp-content/uploads) o a una tienda (img) se
+    /// traen de su web real al pedirlas la página, por el intermediario de imágenes, y se quedan en su carpeta.
+    /// Se propone el dominio de su base (home o siteurl; en una tienda, su shop_url)
     func wpMedia(_ x: Project) {
         if busy { return }
         runQuick(["gui-wp-produccion", x.name], env: dbEnv()) { _, out in
             var f: [String: String] = [:]
             for l in parseLines(out) where l.count >= 2 { f[l[0]] = l[1] }
             let saved = f["G"] ?? "", guess = f["D"] ?? ""
-            self.askMedia("Imágenes de producción de \(x.name)",
-                          "Mientras esté cargado (y, si está en el Apache de Docker, también allí), lo que falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde aquí."
+            let text = x.kind == "ps"
+                ? "No se descarga nada por adelantado. Cuando la tienda pide una imagen que no está en su carpeta img, Nexum la trae en ese momento de su web real, te la enseña y la deja guardada en img: solo se trae lo que ves, y la siguiente vez ya sale de tu Mac. Funciona aunque su dominio esté falseado en este Mac (pregunta su dirección al DNS cifrado y comprueba su certificado real). Con XAMPP; en el Apache de Docker, no. Para tenerlas todas de una vez: menú ⋮ → «Descargar de producción las imágenes que faltan…»."
+                : "No se descarga nada por adelantado. Cuando la web pide una imagen de wp-content/uploads que no está en tu carpeta, Nexum la trae en ese momento de su web real, te la enseña y la deja guardada: solo se trae lo que ves, y la siguiente vez ya sale de tu Mac. Funciona aunque su dominio esté falseado en este Mac. Los vídeos y los PDF no se guardan: se piden a la web real con una redirección (mientras esté cargado y en el Apache de Docker, donde las imágenes también van así)."
+            self.askMedia("Imágenes de producción de \(x.name)", text
                               + (saved.isEmpty && !guess.isEmpty ? "\n\n\(guess) es el dominio de su BBDD: compruébalo antes de guardar." : ""),
                           saved: saved, value: saved.isEmpty ? guess : saved) { prod in
                 if prod.isEmpty {
@@ -732,7 +735,7 @@ extension AppModel {
                                  doneText: "\(x.name) ya no pide nada a producción", autoClose: true)
                 } else {
                     self.runTask("Imágenes de producción de \(x.name)", ["media-proyecto", x.name, prod],
-                                 doneText: "\(x.name) pide a \(prod) las imágenes que le faltan", autoClose: true)
+                                 doneText: "\(x.name) trae de \(prod) las imágenes que le faltan", autoClose: true)
                 }
             }
         }
@@ -751,9 +754,10 @@ extension AppModel {
         }
     }
 
-    /// Importar imágenes de producción: un WordPress las pide a su web real; una tienda las descarga
-    func importImages(_ x: Project) {
-        if x.kind == "wp" { wpMedia(x) } else { psImages(x) }
+    /// Importar imágenes de producción: las que falten se traen al pedirlas la página (WordPress y tiendas con
+    /// XAMPP). Una tienda en el Apache de Docker, que no pasa por el intermediario, las descarga
+    func importImages(_ x: Project, docker: Bool = false) {
+        if docker && x.kind == "ps" { psImages(x) } else { wpMedia(x) }
     }
 
     /// borrar-proyecto: su carpeta, sus vhosts y dominios, lo de Docker y, si se quiere, su BBDD de la

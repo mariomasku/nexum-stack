@@ -2,9 +2,11 @@ function media_saved() {
     awk -F'|' -v f="$1" '$1 == f { d = $2 } END { if (d != "") print d }' "$MEDIA_PROJECTS_FILE" 2> /dev/null
 }
 
-# media-proyecto <carpeta> <dominio de produccion>|quitar: lo que le falte a un WordPress de
-# wp-content/uploads se pide a su web real mientras este cargado (por web.local, que es un .local:
-# sin bucles). Las tiendas PrestaShop se ven con su dominio real falseado: para ellas, ps-imagenes
+# media-proyecto <carpeta> <dominio de produccion>|quitar: las imagenes que le falten a un WordPress (de
+# wp-content/uploads) o a una tienda PrestaShop (de img) se traen de su web real al pedirlas la pagina,
+# por el intermediario de imagenes (media_local_vhosts), y se quedan en su carpeta: tambien con su
+# dominio real falseado. En un WordPress, los videos y los PDF se piden a su web real con una redireccion
+# mientras este cargado (por web.local, que es un .local: sin bucles) y en el Apache de Docker
 function media_project() {
     local folder=${1%/} prod=$(tr 'A-Z' 'a-z' <<< "$2") rest
     if [ -z "$folder" ] || [ -z "$prod" ]; then
@@ -13,12 +15,6 @@ function media_project() {
         return 1
     fi
     valid_project "$folder" || return 1
-    if is_prestashop "$folder"; then
-        echo "$folder es una tienda PrestaShop: se ve con su dominio real falseado y una redireccion volveria"
-        echo "a este equipo. Descarga las imagenes que faltan: nexum ps-imagenes $folder"
-
-        return 1
-    fi
     if [ "$prod" != quitar ]; then
         prod=${prod#https://}; prod=${prod#http://}; prod=${prod%/}
         if ! valid_domain "$prod" || [[ "$prod" == *.local || "$prod" == localhost || "$prod" == *.localhost ]]; then
@@ -37,9 +33,13 @@ function media_project() {
     fi
     if [ "$prod" == quitar ]; then
         echo "$folder ya no pide a produccion las imagenes que le faltan"
+    elif is_prestashop "$folder"; then
+        echo "$folder trae de https://$prod las imagenes que le falten en img al pedirlas la tienda (con LAMPP,"
+        echo "tambien con su dominio falseado) y las deja en su carpeta: solo las que se ven"
     else
-        echo "$folder pide a https://$prod las imagenes que le falten en wp-content/uploads (mientras este cargado"
-        echo "y, si esta en el Apache de Docker, tambien alli)"
+        echo "$folder trae de https://$prod las imagenes que le falten en wp-content/uploads al pedirlas la web"
+        echo "(con LAMPP, tambien con su dominio falseado) y las deja en su carpeta: solo las que se ven. Los"
+        echo "videos y los PDF se piden a su web real con una redireccion (mientras este cargado y en el Apache de Docker)"
     fi
     media_sync
     # (en el Apache de Docker, en sus vhosts: se rehacen y se recargan)
