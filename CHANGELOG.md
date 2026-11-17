@@ -4,6 +4,38 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.22 · 17 nov 2026
+
+- En Ubuntu 20.04, Chrome no abría web.local ni los proyectos con https: «La conexión no es privada», net::ERR_CERT_INVALID, sin dejar continuar. Su OpenSSL hacía los certificados con una extensión repetida, y Chrome los rechaza. Ahora salen bien en todas las versiones de Ubuntu. Los que ya estaban mal hechos los avisa Versiones, «Certificados que Chrome rechaza»: «Arreglarlos» les hace uno nuevo y el navegador lo acepta. También el de *.docker.local, que se rehace solo al montar un proyecto en Docker, y el de localhost de las versiones que se instalan desde ahora.
+
+## 1.57.21 · 17 nov 2026
+
+- **Conectar GitHub con un token:** si en el equipo falta secret-tool (el paquete libsecret-tools, con el que se guarda el token en el llavero), sale una ventana que lo explica, con «Instalarlo» (pide la contraseña de administrador y luego pide el token) y «Copiar la orden». Antes solo lo decía un aviso abajo que se iba enseguida.
+- Si GitHub no acepta el token o no se puede conectar, el motivo sale en una ventana que se queda hasta que la cierras.
+- Descargar las imágenes que faltan (PrestaShop): de cada categoría trae también su miniatura (img/c/<id>_thumb.jpg, la «imagen en miniatura» del back office). Muchos temas y módulos miran si está en la carpeta antes de pedirla y, sin ella, enseñaban la portada de la categoría: en la home salía otra imagen que en producción.
+
+## 1.57.20 · 17 nov 2026
+
+- La ventana avisa si Apache sigue con la configuración de antes: si se ha escrito su seguridad (por ejemplo, la barrera entre webs nueva) y Apache no se ha recargado, seguía con la vieja en memoria sin que nada lo dijera. Ahora lo mira en su registro y ofrece reiniciarlo (también en Versiones; en el Mac, en los avisos).
+
+## 1.57.19 · 17 nov 2026
+
+- Al actualizar Nexum, la ventana pregunta una vez si se aplica ya la seguridad nueva a las versiones de PHP (pide la contraseña). Antes seguían con la configuración de Apache de la versión anterior hasta pulsar «Protegerlas»: por eso, con la 1.57.18 instalada, la barrera entre webs seguía cortando la entrada al panel.
+- La página de acceso del botón «Panel» lleva el logo de Nexum encima del cuadro y el de WordPress o PrestaShop junto al título.
+
+## 1.57.18 · 17 nov 2026
+
+- **Barrera entre webs:** el botón «Panel» ya entra en el panel de WordPress o de PrestaShop con la barrera encendida. Antes salía «Otra web ha intentado mandar algo a esta» y había que apagarla. La página de acceso del botón no es del proyecto, y la barrera la cortaba. Ahora deja pasar ese envío del formulario de acceso y nada más; sin la contraseña no entra nadie.
+- «Panel»: al pulsar Entrar ya no vuelve a pedir los datos en el WordPress o en la tienda. La tienda con su dominio falseado salta a ese dominio al entrar y la sesión se quedaba en web.local; y con SSL activado (o un WordPress en https) la sesión solo se guarda por https. Ahora el acceso va directamente a esa dirección.
+
+## 1.57.17 · 17 nov 2026
+
+- Imágenes de producción, también en las tiendas PrestaShop: las que falten ya no hay que descargarlas antes. Cuando la página pide una imagen que no está en tu carpeta (img en una tienda, wp-content/ uploads en WordPress), Nexum la trae en ese momento de su web real, la enseña y la deja guardada en la carpeta: solo se trae lo que ves, y la siguiente vez ya sale de tu equipo. Funciona aunque el dominio real esté falseado (la dirección sale del DNS cifrado y se comprueba su certificado). Se activa con el botón «Imágenes de producción» o en el menú ⋮, y va con la versión activa. Los vídeos y los PDF de WordPress siguen con la redirección, y en el Apache de Docker todo sigue como antes. «Descargar de producción las imágenes que faltan…» sigue estando para tener todas de una vez.
+
+## 1.57.16 · 17 nov 2026
+
+- Descargar de producción las imágenes que faltan (PrestaShop): ya no se queda en «Descargadas 0 de …» sin avanzar. El dominio se resuelve una sola vez con DNS cifrado y la descarga va a esa dirección, aunque el dominio siga falseado en tu equipo (nunca a este mismo equipo), y más rápido. Si el DNS cifrado no contesta, o solo da direcciones de tu equipo o de una red privada, no descarga nada y lo dice. Si una tanda no avanza, se para y lo dice en lugar de seguir. Además dice cuántas lleva revisadas.
+
 ## 1.57.15 · 12 nov 2026
 
 - **Centro de aplicaciones de Ubuntu:** Nexum Dev Stack sale con su logotipo, su nombre, su descripción y su versión (el paquete lleva su ficha AppStream). Esta versión se instala una vez a mano, en la terminal: sudo apt install `./nexum_1.57.15_all.deb`. Las siguientes se vuelven a actualizar desde la ventana.
