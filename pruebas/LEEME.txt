@@ -182,6 +182,10 @@ LOS FICHEROS
                       sale detrás del que le precede.
   aviso-version.sh    Arrancar o reiniciar la versión activa: el aviso
                       dice cuál, con su PHP (lampp-8.4 (PHP 8.4.14)).
+  ps-imagenes.sh      Imágenes de PrestaShop: las direcciones, una vez del
+                      DNS cifrado (ni este equipo ni redes privadas) y
+                      curl con --resolve, sin --doh-url; si curl no
+                      devuelve nada de un lote, se para. Sin red.
   inicio-sesion.sh    Abrir al iniciar sesión (Linux): el acceso de
                       ~/.config/autostart (644) abre la ventana con
                       --al-iniciar; con el icono se queda en él; apagar

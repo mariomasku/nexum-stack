@@ -1469,7 +1469,9 @@
       descarga de la web real. La base es la de la versión activa o, si no está allí, la de su proyecto del Apache de Docker.</li>
     <li>Como el dominio está falseado en tu equipo, se busca con <b>DNS cifrado</b> (Cloudflare): el DNS es el servicio que traduce un
       nombre como <code>ferreteria-norte.com</code> a la dirección de su servidor, y así se pregunta directamente por internet, sin
-      mirar tu fichero de hosts. Se comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local
+      mirar tu fichero de hosts. Se pregunta una sola vez y todas las descargas van a esa dirección, aunque el dominio siga falseado.
+      Si el DNS cifrado no contesta, o solo da direcciones de tu equipo o de una red privada, no se descarga nada y lo dice. Se
+      comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local
       no se toca.</li>
     <li>Con muchos productos puede tardar y ocupar bastante. Es una descarga de una vez: no hay nada que apagar, las imágenes se quedan en
       <code>img</code> (la misma carpeta para LAMPP y Docker).</li>
@@ -1484,8 +1486,12 @@
       <li>Saca de las tablas <code>ps_image</code>, <code>ps_image_type</code>, <code>ps_category</code> y <code>ps_manufacturer</code> la
         lista de imágenes que debería haber (<code>img/p/1/2/12.jpg</code>, <code>img/p/1/2/12-home_default.jpg</code>,
         <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta.</li>
-      <li>Las descarga de ocho en ocho con <code>curl --doh-url https://cloudflare-dns.com/dns-query --proto =https --fail
-        --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.nexum</code>.</li>
+      <li>Pregunta la dirección de la tienda al DNS cifrado: <code>curl -H "accept: application/dns-json"
+        "https://cloudflare-dns.com/dns-query?name=ferreteria-norte.com&amp;type=A"</code> (y <code>type=AAAA</code>). Se queda con las
+        direcciones públicas.</li>
+      <li>Las descarga de ocho en ocho, en tandas de 300, con <code>curl --resolve ferreteria-norte.com:443:&lt;dirección&gt; --proto =https
+        --fail --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.nexum</code>. Tras cada
+        tanda dice cuántas lleva descargadas y revisadas. Si una tanda no devuelve nada, se para y lo dice.</li>
       <li>Mueve a <code>img/</code> solo las que han llegado enteras. No usa <code>sudo</code>: va con tu usuario.</li>
     </ol>
     <p>Para comprobarlo: vuelve a lanzarla; dice «A ferreteria-norte no le falta ninguna imagen de productos, categorias ni marcas».</p>

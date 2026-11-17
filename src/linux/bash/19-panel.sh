@@ -1131,6 +1131,16 @@ QUE HACE
 
 VERSIONES
 
+1.57.16 (17 nov 2026)
+- Descargar de producción las imágenes que faltan (PrestaShop): ya no
+  se queda en «Descargadas 0 de …» sin avanzar. El dominio se resuelve
+  una sola vez con DNS cifrado y la descarga va a esa dirección, aunque
+  el dominio siga falseado en tu equipo (nunca a este mismo equipo), y
+  más rápido. Si el DNS cifrado no contesta, o solo da direcciones de
+  tu equipo o de una red privada, no descarga nada y lo dice. Si una
+  tanda no avanza, se para y lo dice en lugar de seguir. Además dice
+  cuántas lleva revisadas.
+
 1.57.15 (12 nov 2026)
 - Centro de aplicaciones de Ubuntu: Nexum Dev Stack sale con su
   logotipo, su nombre, su descripción y su versión (el paquete lleva su
