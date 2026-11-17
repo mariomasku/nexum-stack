@@ -254,6 +254,10 @@ final class AppModel: ObservableObject {
     var dbPwd: [String: String] = [:]
     private var toastWork: DispatchWorkItem? = nil
     private var sized = false
+    /// (ya se ha mirado si falta aplicar la seguridad de esta version: secureAfterUpdate)
+    var secureAsked = false
+    /// (ya se ha preguntado en esta sesión si se reinicia el Apache con la configuración de antes)
+    var apacheOldAsked = false
     private var timer: Timer? = nil
 
     var busy: Bool { return task != nil }

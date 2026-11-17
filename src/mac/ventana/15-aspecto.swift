@@ -676,6 +676,7 @@ func warningCount(_ d: AppData) -> Int {
     if !d.dbsysVersion.isEmpty { n += 1 }
     if d.installs.contains(where: { pmaOutdated($0.php, $0.pma) }) { n += 1 }
     if !d.unsecured.isEmpty { n += 1 }
+    if !d.apacheOld.isEmpty { n += 1 }
     if !d.certs.isEmpty || !d.cas.isEmpty { n += 1 }
     if !d.untrusted.isEmpty { n += 1 }
     if !d.stale.isEmpty { n += 1 }

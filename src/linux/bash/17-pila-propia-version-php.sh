@@ -2015,9 +2015,11 @@ Alias /phpmyadmin "$target/phpmyadmin"
 </Directory>
 EOF
 
-    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=localhost" \
-        -addext "basicConstraints=critical,CA:FALSE" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+    # (las extensiones en un fichero propio y no con -addext: ver make_selfsigned)
+    printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = localhost\n[ext]\nbasicConstraints = critical,CA:FALSE\nsubjectAltName = DNS:localhost,IP:127.0.0.1\n' > "$S/tmp/server-cert.cnf"
+    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config "$S/tmp/server-cert.cnf" \
         -keyout "$S/etc/ssl.key/server.key" -out "$S/etc/ssl.crt/server.crt" > /dev/null 2>&1
+    rm -f "$S/tmp/server-cert.cnf"
 
     # --- PHP ---
     cat > "$S/php/etc/conf.d/99-lampp.ini" <<EOF

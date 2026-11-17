@@ -40,7 +40,11 @@ function docker_web_ports_ok() {
 function docker_web_cert() {
     local c=$DOCKER_WEB_DIR/certs
     if [ -s "$c/docker.local.crt" ] && [ -s "$c/docker.local.key" ]; then
-        openssl x509 -in "$c/docker.local.crt" -noout -text 2> /dev/null | grep -q 'DNS:\*\.docker\.test' && return 0
+        # (el hecho antes con -addext y el OpenSSL 1.1.1 de Ubuntu 20.04 tiene dos basicConstraints, y
+        # Chrome lo rechaza: se rehace)
+        openssl x509 -in "$c/docker.local.crt" -noout -text 2> /dev/null | grep -q 'DNS:\*\.docker\.test' \
+            && [ "$(openssl x509 -in "$c/docker.local.crt" -noout -text 2> /dev/null | grep -c 'X509v3 Basic Constraints')" -le 1 ] \
+            && return 0
         [ "$DRY" -eq 1 ] || rm -f "$c/docker.local.crt" "$c/docker.local.key"
     fi
     if [ "$DRY" -eq 1 ]; then
@@ -48,14 +52,16 @@ function docker_web_cert() {
         return 0
     fi
     mkdir -p -m 700 "$DOCKER_DIR" "$DOCKER_WEB_DIR" "$c" || return 1
-    if ! ( umask 077; openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=docker.local" \
-            -addext "basicConstraints=critical,CA:FALSE" -addext "extendedKeyUsage=serverAuth" \
-            -addext "subjectAltName=DNS:docker.local,DNS:*.docker.local,DNS:docker.test,DNS:*.docker.test" \
+    # (las extensiones en un fichero propio y no con -addext: ver make_selfsigned)
+    if ! ( umask 077
+            printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = docker.local\n[ext]\nbasicConstraints = critical,CA:FALSE\nextendedKeyUsage = serverAuth\nsubjectAltName = DNS:docker.local,DNS:*.docker.local,DNS:docker.test,DNS:*.docker.test\n' > "$c/docker.local.cnf" \
+            && openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config "$c/docker.local.cnf" \
             -keyout "$c/docker.local.key" -out "$c/docker.local.crt" > /dev/null 2>&1 ); then
-        rm -f "$c/docker.local.key" "$c/docker.local.crt"
+        rm -f "$c/docker.local.key" "$c/docker.local.crt" "$c/docker.local.cnf"
         echo "No se ha podido crear el certificado de *.docker.local"
         return 1
     fi
+    rm -f "$c/docker.local.cnf"
     echo "Certificado propio de *.docker.local y *.docker.test (solo vale para esos dominios)"
 }
 

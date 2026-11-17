@@ -137,6 +137,10 @@ class AppServicios:
         self.run_task("Protegiendo las versiones", ["asegurar", "--todas"],
                       done_text="Todas las versiones son solo para este equipo", auto_close=True)
 
+    def on_apache_reload(self, *_):
+        self.run_task("Reiniciando Apache", ["servicio", "apache", "reiniciar"],
+                      done_text="Apache ya usa su configuración de ahora", auto_close=True)
+
     def on_secure(self, *_):
         self.run_task("Cerrando a la red", ["asegurar"],
                       done_text="Solo se puede entrar desde este equipo", auto_close=True)

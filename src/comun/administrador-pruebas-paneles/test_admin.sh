@@ -270,11 +270,21 @@ function test_admin_config() {
 
 # usuario-pruebas <base> [carpeta]: crea o deja al dia el administrador de pruebas en los WordPress y
 # la tienda PrestaShop de la base. Dice A|wp|usuario|contraseña y/o A|ps|... por cada uno (para la
-# ventana); sale con 1 si no hay ninguno. La carpeta (o la recordada para la base) solo hace falta en
+# ventana), con algo mas detras si el acceso no puede ir a http://web.local: |https si su panel solo
+# funciona por https (la tienda con SSL activado, el WordPress con su direccion en https o
+# FORCE_SSL_ADMIN: sus cookies de sesion son secure y por http el navegador las tira) o, en una tienda
+# con su dominio falseado a este equipo, la direccion de la tienda (|https://mitienda.com), porque el
+# back office salta alli al entrar. Sale con 1 si no hay ninguno. La carpeta (o la recordada para la base) solo hace falta en
 # PrestaShop 1.6, por su _COOKIE_KEY_. Si en la base hay un usuario de verdad (sin la marca de Nexum)
 # con ese correo, no se toca: se avisa y ahi no hay administrador de pruebas
+# test_admin_local_domain <dominio>: si esta falseado a este equipo en /etc/hosts (127.0.0.1 o ::1)
+function test_admin_local_domain() {
+    awk -v d="$(tr 'A-Z' 'a-z' <<< "$1")" '{ sub(/#.*/, "") } $1 == "127.0.0.1" || $1 == "::1" {
+        for (i = 2; i <= NF; i++) if (tolower($i) == d) f = 1 } END { exit !f }' "${HOSTS_FILE:-/etc/hosts}" 2> /dev/null
+}
+
 function test_admin() {
-    local db=$1 folder=$2 p sql cols col exprs hash src key done_any=1 res any=0 md5
+    local db=$1 folder=$2 p sql cols col exprs hash src key done_any=1 res any=0 md5 https
     if ! [[ "$db" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$ ]]; then
         echo "Base no valida: $db"
         return 1
@@ -322,7 +332,10 @@ SQL
         if [ "${res#*|}" == 1 ]; then
             echo "Aviso: el WordPress de $db (tablas ${p}) ya tiene un usuario de verdad con $mail: no se cambia ni se crea el de pruebas. Elige otro correo en Configuracion > Administrador de pruebas."
         elif [ "${res%%|*}" -gt 0 ] 2> /dev/null; then
-            echo "A|wp|$mail|$pass"
+            https=""
+            has_table "${p}options" && [[ "$("${mysql[@]}" "$db" -e "SELECT option_value FROM \`${p}options\` WHERE option_name = 'siteurl' LIMIT 1" < /dev/null 2> /dev/null)" == [Hh][Tt][Tt][Pp][Ss]://* ]] && https="|https"
+            [ -n "$folder" ] && grep -qiE "define\([[:space:]]*['\"]FORCE_SSL_ADMIN['\"][[:space:]]*,[[:space:]]*true" "$HTDOCS_DIR/$folder/wp-config.php" 2> /dev/null && https="|https"
+            echo "A|wp|$mail|$pass$https"
             done_any=0
         fi
     done
@@ -385,7 +398,21 @@ SELECT CONCAT(CAST(IF(@src IS NULL, 0, IFNULL(@id, 0)) AS UNSIGNED), '|', @real 
             if [ "${res#*|}" == 1 ]; then
                 echo "Aviso: la tienda de $db ya tiene un empleado de verdad con $mail: no se cambia ni se crea el de pruebas. Elige otro correo en Configuracion > Administrador de pruebas."
             elif [ "${res%%|*}" -gt 0 ] 2> /dev/null; then
-                echo "A|ps|$mail|$pass"
+                # (el back office, al entrar, salta al dominio de la tienda (shop_url): con el dominio
+                # falseado a este equipo, el acceso va alli, o la sesion se queda en web.local y pide
+                # los datos otra vez; con SSL activado, por https)
+                local ssl shop dom uri
+                ssl=$("${mysql[@]}" "$db" -e "SELECT MAX(value) FROM \`${p}configuration\` WHERE name = 'PS_SSL_ENABLED'" < /dev/null 2> /dev/null)
+                shop=$("${mysql[@]}" "$db" -e "SELECT CONCAT(IF('$ssl' = '1', domain_ssl, domain), ' ', physical_uri) FROM \`${p}shop_url\` WHERE main = 1 ORDER BY id_shop = (SELECT value FROM \`${p}configuration\` WHERE name = 'PS_SHOP_DEFAULT' LIMIT 1) DESC, id_shop_url LIMIT 1" < /dev/null 2> /dev/null)
+                dom=${shop%% *} uri=${shop#* } https=""
+                [[ "$uri" =~ ^/[A-Za-z0-9._/-]*$ ]] || uri=/
+                uri=${uri%/}
+                if [[ "$dom" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] && test_admin_local_domain "$dom"; then
+                    https="|$([ "$ssl" == 1 ] && echo https || echo http)://$(tr 'A-Z' 'a-z' <<< "$dom")$uri"
+                elif [ "$ssl" == 1 ]; then
+                    https="|https"
+                fi
+                echo "A|ps|$mail|$pass$https"
                 done_any=0
             fi
         fi

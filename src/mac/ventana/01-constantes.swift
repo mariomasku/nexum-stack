@@ -446,17 +446,29 @@ func openAdminLogin(kind: String, admin: String, site: String, name: String, com
             openURL(base)
             return
         }
+        // (usuario-pruebas dice si el acceso no puede ir a http://web.local: https, porque sus cookies
+        // de sesión son secure y por http no se guardan, o la dirección de la tienda con su dominio
+        // falseado, porque su back office salta allí al entrar; en Docker, no)
+        var web = site
+        let extra = f.count > 4 ? f[4] : ""
+        if site.hasPrefix("http://"), extra == "https" {
+            web = "https://" + String(site.dropFirst("http://".count))
+        } else if site.hasPrefix("http://"),
+                  extra.range(of: "^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", options: .regularExpression) != nil {
+            web = extra.hasSuffix("/") ? String(extra.dropLast()) : extra
+        }
+        let panel = "\(web)/\(admin)/"
         let page: String
         if kind == "wp" {
-            page = loginPage(title: "Panel de WordPress", project: name, action: "\(site)/wp-login.php",
+            page = loginPage(title: "Panel de WordPress", project: name, action: "\(web)/wp-login.php",
                              fields: [("log", f[2], "Usuario o correo"), ("pwd", f[3], "Contraseña"),
-                                      ("rememberme", "forever", nil), ("redirect_to", base, nil)], panel: base)
+                                      ("rememberme", "forever", nil), ("redirect_to", panel, nil)], panel: panel, kind: kind)
         } else {
             page = loginPage(title: "Back office de PrestaShop", project: name,
-                             action: base + "index.php?controller=AdminLogin",
+                             action: panel + "index.php?controller=AdminLogin",
                              fields: [("email", f[2], "Correo"), ("passwd", f[3], "Contraseña"),
                                       ("stay_logged_in", "1", nil), ("submitLogin", "1", nil),
-                                      ("redirect", "AdminDashboard", nil)], panel: base)
+                                      ("redirect", "AdminDashboard", nil)], panel: panel, kind: kind)
         }
         // En la carpeta temporal de tu usuario (solo tuya), con un nombre al azar
         let file = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -467,7 +479,7 @@ func openAdminLogin(kind: String, admin: String, site: String, name: String, com
             // (se borra al rato: el navegador ya la ha leído)
             DispatchQueue.main.asyncAfter(deadline: .now() + 60) { try? FileManager.default.removeItem(at: file) }
         } catch {
-            openURL(base)
+            openURL(panel)
         }
     }
 }
@@ -480,8 +492,29 @@ func htmlEscape(_ s: String) -> String {
 
 /// Página de acceso al panel de un proyecto con el administrador de pruebas ya escrito: un
 /// formulario que va a la pantalla de acceso del proyecto; solo hay que pulsar Entrar.
-func loginPage(title: String, project: String, action: String, fields: [(String, String, String?)], panel: String) -> String {
+func loginPage(title: String, project: String, action: String, fields: [(String, String, String?)], panel: String,
+               kind: String = "") -> String {
     let e = htmlEscape
+    // El logo de Nexum encima del cuadro (el icono de la aplicación, en PNG) y el de WordPress o
+    // PrestaShop junto al título
+    var top = ""
+    if let icon = NSApp.applicationIconImage,
+       let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 144, pixelsHigh: 144, bitsPerSample: 8,
+                                  samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                  bytesPerRow: 0, bitsPerPixel: 0) {
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        icon.draw(in: NSRect(x: 0, y: 0, width: 144, height: 144))
+        NSGraphicsContext.restoreGraphicsState()
+        if let png = rep.representation(using: .png, properties: [:]) {
+            top = "<img class=\"nexum\" src=\"data:image/png;base64,\(png.base64EncodedString())\" alt=\"Nexum\">"
+        }
+    }
+    let brand = kind == "wp" ? "wordpress" : kind == "ps" ? "prestashop" : ""
+    var mark = ""
+    if let path = LOGO_PATHS[brand] {
+        mark = "<svg class=\"marca\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"\(brand == "wordpress" ? "#21759B" : "#DF0067")\" d=\"\(path)\"/></svg>"
+    }
     var rows = "", hidden = ""
     for (name, value, text) in fields {
         if let text = text {
@@ -494,8 +527,11 @@ func loginPage(title: String, project: String, action: String, fields: [(String,
     let style = """
     :root { color-scheme: light dark; --bg: #f4f4f6; --card: #fff; --line: #d8d8dc; --muted: #6b6b72; --accent: #2a7ae2; }
     @media (prefers-color-scheme: dark) { :root { --bg: #1e1e20; --card: #2a2a2d; --line: #444; --muted: #a0a0a6; } }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg);
-           font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           gap: 18px; padding: 16px; box-sizing: border-box; background: var(--bg); font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+    img.nexum { width: 72px; height: 72px; }
+    h1 { display: flex; align-items: center; gap: 9px; }
+    svg.marca { width: 24px; height: 24px; flex: none; }
     form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 32px;
            width: min(380px, calc(100vw - 32px)); box-sizing: border-box; }
     h1 { font-size: 19px; margin: 0 0 4px; } p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
@@ -510,7 +546,7 @@ func loginPage(title: String, project: String, action: String, fields: [(String,
     return [
         "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"referrer\" content=\"no-referrer\">",
         "<title>\(e(title)) · \(shownProject)</title><style>\(style)</style></head><body>",
-        "<form method=\"post\" action=\"\(e(action))\"><h1>\(e(title))</h1>",
+        top + "<form method=\"post\" action=\"\(e(action))\"><h1>\(mark)\(e(title))</h1>",
         "<p>\(shownProject) · administrador de pruebas de este Mac</p>",
         rows + hidden + "<button type=\"submit\" autofocus>Entrar</button>",
         "<small>Si no entra, el panel normal está en <a href=\"\(e(panel))\">\(e(panel))</a>.</small>",

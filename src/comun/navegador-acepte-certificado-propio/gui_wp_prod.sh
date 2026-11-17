@@ -155,8 +155,12 @@ for line in sys.stdin:
 for k, base in (("I", "img/p"), ("C", "img/c"), ("M", "img/m")):
     for i in sorted(set(ids[k])):
         d = base + "/" + "/".join(str(i)) if k == "I" else base
-        for t in [""] + types[k]:
-            rel = "%s/%d%s.jpg" % (d, i, "-" + t if t else "")
+        rels = ["%s/%d%s.jpg" % (d, i, "-" + t if t else "") for t in [""] + types[k]]
+        # (de las categorias, tambien su miniatura del back office, <id>_thumb.jpg: los temas y modulos
+        # la eligen mirando si esta en el disco, y sin ella enseñan la portada, que es otra imagen)
+        if k == "C":
+            rels.append("%s/%d_thumb.jpg" % (d, i))
+        for rel in rels:
             if not os.path.isfile(os.path.join(root, rel)):
                 print(rel)
 ' "$HTDOCS_DIR/$folder")

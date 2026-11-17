@@ -24,6 +24,8 @@ grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || ex
 # (la carpeta de la base: linked_folder desde la 1.51; antes, una linea de awk dentro de test_admin)
 grep -q "^function linked_folder" "$SRC" && { extract "$SRC" linked_folder || exit 1; active_name() { :; }; }
 # (1.57.15: el administrador de pruebas de Configuracion, en LOG_DIR/admin-pruebas)
+grep -q '^function test_admin_local_domain() {' "$SRC" && { extract "$SRC" test_admin_local_domain || exit 1; }
+HOSTS_FILE=$MDB/hosts; : > "$HOSTS_FILE"
 grep -q '^function test_admin_load() {' "$SRC" && { extract "$SRC" test_admin_load test_admin_mail_ok test_admin_pass_ok \
     test_admin_md5 test_admin_bcrypt test_admin_note test_admin_write test_admin_config || exit 1; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"
@@ -78,6 +80,34 @@ hash=$(cut -f8 <<< "$row")
 check "PrestaShop 1.7: la contraseña «local» vale (password_verify)" '[ "$(php -r "echo password_verify(\"local\", \$argv[1]) ? 1 : 0;" "$hash")" = 1 ]'
 check "PrestaShop 1.7: en las dos tiendas" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee_shop s JOIN ps_employee e USING (id_employee) WHERE e.email = '"'"'local@local.test'"'"'")" = 2 ]'
 check "PrestaShop 1.7: los de verdad no se tocan" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee WHERE passwd = '"'"'\$2y\$10\$hashdeverdad'"'"'")" = 2 ]'
+
+# (1.57.18) A donde va el acceso del boton Panel: el back office salta al dominio de la tienda
+# (shop_url) al entrar, y con SSL activado sus cookies son secure
+if grep -q '^function test_admin_local_domain() {' "$SRC"; then
+    m ps17 -e "CREATE TABLE ps_configuration (id_configuration INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, id_shop INT, name VARCHAR(254), value TEXT);
+ALTER TABLE ps_shop_url ADD domain_ssl VARCHAR(150), ADD physical_uri VARCHAR(64) DEFAULT '/', ADD main TINYINT DEFAULT 1;
+UPDATE ps_shop_url SET domain_ssl = 'Tienda.com';
+INSERT INTO ps_configuration (name, value) VALUES ('PS_SHOP_DEFAULT', '1'), ('PS_SSL_ENABLED', '0');"
+    check "panel: tienda sin SSL ni dominio falseado, nada mas (web.local)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local" ]'
+    m ps17 -e "UPDATE ps_configuration SET value = '1' WHERE name = 'PS_SSL_ENABLED'"
+    check "panel: con SSL activado, por https" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https" ]'
+    printf '127.0.0.1\tlocalhost\n# 127.0.0.1 tienda.com\n1.2.3.4 tienda.com\n' > "$HOSTS_FILE"
+    check "panel: con el dominio en /etc/hosts pero no a este equipo (o comentado), igual" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https" ]'
+    printf '127.0.0.1\tlocalhost\n127.0.0.1 www.tienda.com TIENDA.com # lvm\n' > "$HOSTS_FILE"
+    check "panel: con el dominio falseado a este equipo, la direccion de la tienda (https)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https://tienda.com" ]'
+    m ps17 -e "UPDATE ps_configuration SET value = '0' WHERE name = 'PS_SSL_ENABLED'; UPDATE ps_shop_url SET physical_uri = '/es/'"
+    check "panel: sin SSL, por http y con su carpeta (physical_uri)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|http://tienda.com/es" ]'
+    m ps17 -e "UPDATE ps_shop_url SET domain = 'tienda.com\" onload=x', physical_uri = '/'"
+    check "panel: un dominio raro en la base no sale" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local" ]'
+    m wp1 -e "INSERT INTO xy_options (option_name, option_value) VALUES ('siteurl', 'HTTPS://blog.es')"
+    check "panel: WordPress con su direccion en https, por https" '[ "$(test_admin wp1)" = "A|wp|local@local.test|local|https" ]'
+    m wp1 -e "UPDATE xy_options SET option_value = 'http://blog.es' WHERE option_name = 'siteurl'"
+    mkdir -p "$MDB/htdocs/blog" && printf "<?php\ndefine( 'FORCE_SSL_ADMIN', true );\n" > "$MDB/htdocs/blog/wp-config.php"
+    check "panel: WordPress con FORCE_SSL_ADMIN, por https; sin el, nada mas" '[ "$(test_admin wp1 blog)" = "A|wp|local@local.test|local|https" ] && [ "$(test_admin wp1)" = "A|wp|local@local.test|local" ]'
+    m wp1 -e "DELETE FROM xy_options WHERE option_name = 'siteurl'"
+    m ps17 -e "DROP TABLE ps_configuration; ALTER TABLE ps_shop_url DROP domain_ssl, DROP physical_uri, DROP main; UPDATE ps_shop_url SET domain = 'tienda.com'"
+    : > "$HOSTS_FILE"
+fi
 test_admin ps17 > /dev/null
 check "PrestaShop 1.7: otra vez, sin duplicar" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee WHERE email = '"'"'local@local.test'"'"'")" = 1 ]'
 

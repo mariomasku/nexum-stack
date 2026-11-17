@@ -96,6 +96,7 @@ PHP
 )
 
 #@incluir comun/correo-pruebas/mail_on.sh
+#@incluir comun/seguridad-apache/apache_stale.sh
 # Numero del proceso de Mailpit: el de su .pid si es tuyo y es el del gestor o, si se ha perdido, el
 # que este en marcha con su binario
 function mailpit_pid() {

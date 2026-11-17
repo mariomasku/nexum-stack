@@ -12,7 +12,13 @@ extension AppModel {
     /// Después de conectar o cambiar algo: lo dice, y la lista de antes ya no vale (otra cuenta o prefijos)
     func githubDone(_ rc: Int32, _ out: String) {
         let lines = out.split(separator: "\n").map(String.init).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        toast(lines.last ?? (rc == 0 ? "Hecho" : "No se ha podido"))
+        if rc == 0 {
+            toast(lines.last ?? "Hecho")
+        } else {
+            // (un error se queda en una ventana hasta que se cierra: en el aviso de abajo no da tiempo a leerlo)
+            let why = lines.suffix(6).joined(separator: "\n")
+            message("No se ha podido conectar con GitHub", why.isEmpty ? "No se ha podido" : why, error: true)
+        }
         repos = nil
         reloadGithub()
     }
@@ -214,6 +220,8 @@ extension AppModel {
                 d.exposed = f[1...].joined(separator: "|")
             case "U" where f.count >= 2:
                 d.unsecured = f[1].split(separator: " ").map(String.init)
+            case "K" where f.count >= 2:
+                d.apacheOld = f[1]
             case "Y" where f.count >= 3:
                 d.dbsysVersion = f[1]
                 d.dbsysLog = Int64(f[2]) ?? 0
@@ -263,6 +271,43 @@ extension AppModel {
         if !sized {
             sized = true
             DispatchQueue.main.async { self.fitWindow(installs: d.installs.count) }
+        }
+        if !secureAsked { DispatchQueue.main.async { self.secureAfterUpdate(d) } }
+        if !apacheOldAsked, !d.apacheOld.isEmpty, d.unsecured.isEmpty {
+            DispatchQueue.main.async { self.apacheOldCheck(d) }
+        }
+    }
+
+    /// Una vez por sesión de la ventana: si el Apache en marcha sigue con la configuración de antes (se ha
+    /// escrito y no se ha recargado), se pregunta si se reinicia. No a la vez que el aviso de aplicar la
+    /// seguridad: ese ya reinicia Apache
+    func apacheOldCheck(_ d: AppData) {
+        guard !SIMULATE, !apacheOldAsked, !d.apacheOld.isEmpty else { return }
+        apacheOldAsked = true
+        if confirm("Apache sigue con la configuración de antes",
+                   "La configuración de Apache de XAMPP-\(d.apacheOld) ha cambiado (la seguridad, la barrera entre webs...) y Apache no se ha recargado: hasta reiniciarlo, sigue con lo de antes. Reiniciarlo pide la contraseña de administrador. Si lo dejas para luego, está en los avisos.",
+                   "Reiniciar Apache") {
+            reloadApacheConfig()
+        }
+    }
+
+    /// Tras actualizar Nexum, una vez por versión: si a las versiones de PHP les falta lo que pone esta
+    /// (la barrera entre webs de ahora, las reglas de Apache...), se pregunta si se aplica ya. Al
+    /// actualizar no se toca su configuración (es de root y pide la contraseña); sin esto, seguirían con
+    /// lo de la versión de antes hasta pulsar Protegerlas
+    func secureAfterUpdate(_ d: AppData) {
+        guard !SIMULATE, !secureAsked, !d.version.isEmpty else { return }
+        secureAsked = true
+        let file = LOG_DIR + "/seguridad-aplicada"
+        let done = ((try? String(contentsOfFile: file, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if done == d.version { return }
+        try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? (d.version + "\n").write(toFile: file, atomically: true, encoding: .utf8)
+        if !d.unsecured.isEmpty, confirm("Aplicar la seguridad de la \(d.version)",
+                "Nexum se ha actualizado, pero las versiones de PHP siguen con la configuración de Apache de antes (\(d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "))): les falta lo de esta versión, como la barrera entre webs de ahora. Aplicarlo pide la contraseña de administrador y reinicia Apache si está en marcha. Si lo dejas para luego, está en Protegerlas, en los avisos.",
+                "Aplicar ahora") {
+            secureAll()
         }
     }
 

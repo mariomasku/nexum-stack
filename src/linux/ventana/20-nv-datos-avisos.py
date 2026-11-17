@@ -12,8 +12,60 @@ class NvDatosAvisos:
             self.nv_power_state()
             self.nv_projects_refresh()
             self.nv_mail_header()
+            GLib.idle_add(self.nv_secure_after_update)
+            GLib.idle_add(self.nv_apache_old_check)
         self.nv_tray_update()
         return res
+
+    def nv_secure_after_update(self):
+        """Tras actualizar Nexum, una vez por versión: si a las versiones de PHP les falta lo que pone esta
+        (la barrera entre webs de ahora, las reglas de Apache...), se pregunta si se aplica ya. Al
+        actualizar no se toca su configuración (es de root y pide la contraseña); sin esto, seguirían
+        con lo de la versión de antes hasta pulsar Protegerlas en Versiones."""
+        d = self.data or {}
+        version = d.get("version") or ""
+        if SIMULATE or not version or getattr(self, "_secure_asked", False):
+            return False
+        try:
+            with open(SECURED_FOR_FILE) as fh:
+                done = fh.read().strip()
+        except OSError:
+            done = ""
+        if done == version:
+            return False
+        self._secure_asked = True
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(SECURED_FOR_FILE, "w") as fh:
+                fh.write(version + "\n")
+        except OSError:
+            pass
+        # (la primera vez que se abre, sin versión anterior apuntada, también: es lo mismo)
+        if d.get("unsecured") and confirm(
+                self.win, "Aplicar la seguridad de la %s" % version,
+                "Nexum se ha actualizado, pero las versiones de PHP siguen con la configuración de Apache "
+                "de antes (%s): les falta lo de esta versión, como la barrera entre webs de ahora. "
+                "Aplicarlo pide la contraseña de administrador y reinicia Apache si está en marcha. Si lo "
+                "dejas para luego, está en Versiones › Protegerlas."
+                % ", ".join("lampp-%s" % v for v in d["unsecured"]), "Aplicar ahora"):
+            self.on_secure_all()
+        return False
+
+    def nv_apache_old_check(self):
+        """Una vez por sesión de la ventana: si el Apache en marcha sigue con la configuración de antes
+        (se ha escrito y no se ha recargado), se pregunta si se reinicia. No a la vez que el aviso de
+        aplicar la seguridad: ese ya reinicia Apache."""
+        d = self.data or {}
+        if SIMULATE or not d.get("apache_old") or d.get("unsecured") or getattr(self, "_apache_old_asked", False):
+            return False
+        self._apache_old_asked = True
+        if confirm(self.win, "Apache sigue con la configuración de antes",
+                   "La configuración de Apache de lampp-%s ha cambiado (la seguridad, la barrera entre webs...) "
+                   "y Apache no se ha recargado: hasta reiniciarlo, sigue con lo de antes. Reiniciarlo pide la "
+                   "contraseña de administrador. Si lo dejas para luego, está en Versiones." % d["apache_old"],
+                   "Reiniciar Apache"):
+            self.on_apache_reload()
+        return False
 
     def on_services_data(self, rc, out):
         res = super().on_services_data(rc, out)

@@ -136,8 +136,11 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
 # PUT o DELETE solo vale desde la propia web (su Origin). Una pasarela de pago que vuelve a la tienda
 # con un POST no pasa: se apaga en Configuracion (o nexum barrera-web no) mientras se prueba
 # (los navegadores mandan Sec-Fetch-Mode y Sec-Fetch-Dest con Sec-Fetch-Site: si faltan, cuenta como enlace)
+# Lo unico que pasa de otra web ademas: enviar el formulario de acceso (POST de pagina entera a
+# /wp-login.php o a index.php?controller=AdminLogin), que es lo que hace la pagina del boton Panel
+# (Origin null); sin la contraseña no entra nadie
 # >>> barrera entre webs
-<If "(%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
+<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/)))">
     Require all denied
     ErrorDocument 403 "Otra web ha intentado mandar algo a esta: no se ha hecho nada (barrera entre webs de lvm-instalador). Si es una pasarela de pago que vuelve a la tienda, apaga la barrera en Configuracion mientras la pruebas."
 </If>

@@ -11,6 +11,8 @@
 GITHUB_CONF_FILE=$LOG_DIR/github
 GITHUB_KEYRING_SERVICE=nexum-dev-stack
 GITHUB_DEFAULT_PREFIXES="dob-wordpress- dob-prestashop-"
+# (el paquete de Ubuntu con secret-tool, para guardar el token en el llavero)
+GITHUB_KEYRING_PACKAGE=libsecret-tools
 
 #@incluir comun/repositorios-github/github_conf.sh
 # El token con el que se lee la lista (nada si no hay)
@@ -42,7 +44,7 @@ function github_connect() {
     if [ "$1" == --gh ]; then
         github_conf_set ORIGEN gh || return 1
     else
-    command -v secret-tool > /dev/null || { echo "Hace falta secret-tool para guardar el token en el llavero: sudo apt install libsecret-tools"; return 1; }
+    command -v secret-tool > /dev/null || { echo "Hace falta secret-tool para guardar el token en el llavero: sudo apt install $GITHUB_KEYRING_PACKAGE"; return 1; }
     # (al llavero de la sesion por la entrada de secret-tool: en la linea de ordenes se veria con ps)
     printf '%s' "$token" | secret-tool store --label="Nexum Dev Stack (GitHub)" service "$GITHUB_KEYRING_SERVICE" account github \
         || { echo "No se ha podido guardar el token en el llavero de la sesion"; return 1; }
@@ -50,6 +52,19 @@ function github_connect() {
     fi
     [ -n "$(github_conf CUENTA)" ] || github_conf_set CUENTA "$login"
     echo "Conectado a GitHub como $login"
+}
+
+# github-llavero-instalar: instala (con sudo) el paquete de secret-tool, si falta. Siempre el mismo paquete
+function github_keyring_install() {
+    command -v secret-tool > /dev/null && { echo "secret-tool ya está instalado"; return 0; }
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] sudo apt-get install -y $GITHUB_KEYRING_PACKAGE"
+        return 0
+    fi
+    echo "Instalando $GITHUB_KEYRING_PACKAGE (secret-tool, para guardar el token de GitHub en el llavero)"
+    apt_install "$GITHUB_KEYRING_PACKAGE" || return 1
+    command -v secret-tool > /dev/null || { echo "Se ha instalado $GITHUB_KEYRING_PACKAGE, pero no aparece secret-tool"; return 1; }
+    echo "secret-tool instalado: ya se puede guardar el token en el llavero"
 }
 
 function github_disconnect() {

@@ -191,6 +191,10 @@ LOS FICHEROS
                       el intermediario (trae, sirve y guarda sin salirse
                       de img o uploads; ni HTML de una página de error).
                       Sin red.
+  apache-recargado.sh  Apache con la configuración de antes: avisa si
+                      httpd.conf o etc/extra/*.conf son más nuevos que su
+                      última carga (la última AH00489 de su error_log); sin
+                      registro, no dice nada.
   inicio-sesion.sh    Abrir al iniciar sesión (Linux): el acceso de
                       ~/.config/autostart (644) abre la ventana con
                       --al-iniciar; con el icono se queda en él; apagar

@@ -99,6 +99,7 @@ PHP
 )
 
 #@incluir comun/correo-pruebas/mail_on.sh
+#@incluir comun/seguridad-apache/apache_stale.sh
 # ¿Es <pid> un Mailpit del gestor tuyo? Sin /proc: su usuario y su orden, de ps, que empieza por el
 # binario y --smtp (el Python que lo arranca, antes de pasar a ser Mailpit, no vale)
 function mailpit_is() {

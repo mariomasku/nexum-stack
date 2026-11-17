@@ -27,6 +27,15 @@ check "resolver: una respuesta que no es JSON, falla" '! ps_images_resolve tiend
 unset -f curl
 check "ps-imagenes: sin direcciones del DNS cifrado no descarga nada y lo dice" 'grep -q "No se pregunta al DNS de este equipo" "$SRC" && grep -qF "if ! ips=\$(ps_images_resolve \"\$domain\"); then" "$SRC"'
 
+# --- La lista de las que faltan (1.57.21): de cada categoria, tambien su miniatura (<id>_thumb.jpg)
+awk '/^    } 2> \/dev\/null \| python3 -I -c .$/ {f=1; next} f && /^. "\$HTDOCS_DIR\/\$folder"\)$/ {exit} f' "$SRC" > "$W/lista.py"
+[ -s "$W/lista.py" ] || { echo "no esta el Python de la lista de ps_images"; exit 1; }
+mkdir -p "$W/tienda/img/c" && : > "$W/tienda/img/c/7.jpg"
+out=$(printf 'C\t7\nC\t8\nT\tcategory_default\t0\t1\t0\n' | python3 -I "$W/lista.py" "$W/tienda")
+check "lista: de las categorias, la portada, sus tamaños y su miniatura (_thumb), sin las que ya estan" '[ "$out" == "$(printf "img/c/7-category_default.jpg\nimg/c/7_thumb.jpg\nimg/c/8.jpg\nimg/c/8-category_default.jpg\nimg/c/8_thumb.jpg")" ]'
+out=$(printf 'I\t12\nM\t3\nT\thome_default\t1\t0\t0\n' | python3 -I "$W/lista.py" "$W/tienda")
+check "lista: de los productos y las marcas, sin _thumb" '[ "$out" == "$(printf "img/p/1/2/12.jpg\nimg/p/1/2/12-home_default.jpg\nimg/m/3.jpg")" ]'
+
 # --- La descarga (el Python de ps_images, con un curl de mentira)
 awk '/python3 -I - "\$HTDOCS_DIR\/\$folder" "\$domain" "\$ips"/ {f=1; next} f && /^EOF$/ {exit} f' "$SRC" > "$W/dl.py"
 [ -s "$W/dl.py" ] || { echo "no esta el Python de la descarga de ps_images"; exit 1; }

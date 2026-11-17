@@ -64,6 +64,8 @@ TUNNEL_TIMES = [(15, "15 minutos"), (30, "30 minutos"), (60, "1 hora"), (120, "2
                 (240, "4 horas"), (360, "6 horas"), (480, "8 horas"), (720, "12 horas")]
 # La ultima version que estuvo activa (al parar y desactivar): la primera que ofrece ▶ en el visor
 LAST_VERSION_FILE = os.path.join(LOG_DIR, "ultima-version")
+# Versión de Nexum con la que ya se ha preguntado si se aplica su seguridad a las versiones de PHP
+SECURED_FOR_FILE = os.path.join(LOG_DIR, "seguridad-aplicada")
 # El aviso de la casilla de copia al actualizar una versión en su carpeta (solo hace falta si MariaDB cambia de rama)
 UPDATE_COPY_WARN = "Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar."
 PROJECTS_FILE = os.path.join(LOG_DIR, "proyectos")

@@ -49,6 +49,12 @@ extension AppModel {
                 doneText: "El navegador ya no acepta esos certificados")
     }
 
+    /// Reinicia Apache para que use su configuración de ahora (la escrita después de su última carga)
+    func reloadApacheConfig() {
+        runTask("Reiniciando Apache", ["servicio", "apache", "reiniciar"],
+                doneText: "Apache ya usa su configuración de ahora", autoClose: true)
+    }
+
     /// Todas las versiones solo para este Mac (nexum asegurar --todas)
     func secureAll() {
         runTask("Protegiendo las versiones", ["asegurar", "--todas"],

@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.57.17)
+# Prueba de la ventana nueva en un Mac (versión 1.57.22)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `nexum exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.57.17** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.57.22** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/nexum-mac-1.57.17/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/nexum-mac-1.57.22/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/nexum /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   nexum version                                                         # Nexum Dev Stack 1.57.17
+   nexum version                                                         # Nexum Dev Stack 1.57.22
    ```
 
 5. **Comprueba las versiones:**
@@ -405,6 +405,11 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 2. El último de la rama dice «márcalo en la lista de arriba»; los ya instalados salen atenuados. Marca uno antiguo (por ejemplo, el penúltimo): arriba sale en «Marcados» (la ✕ lo quita) y el botón dice «Instalar 1 versión».
 3. Instálalo (20-40 min): va a /Library/Nexum/XAMPP-X.Y.Z. Al acabar, «Activar XAMPP-X.Y.Z» activa esa carpeta.
 4. En la terminal: `nexum instalar --php 8.3.10` instala ese parche; uno que no exista en php.net dice que se omite.
+
+## Paso 30: un token de GitHub que no vale (1.57.21)
+
+1. En **Configuración → GitHub**, pulsa «Conectar con un token…» y pega algo con forma de token que no sea bueno (por ejemplo, `ghp_` seguido de 36 letras).
+2. Sale una ventana «No se ha podido conectar con GitHub» con el motivo («GitHub no acepta ese token…»), y se queda hasta que pulsas Cerrar (antes era un aviso abajo que se iba solo).
 
 ## Qué apuntar
 

@@ -68,7 +68,15 @@ class NvGithub:
 
     def nv_github_done(self, rc, out):
         lines = [l for l in out.strip().splitlines() if l.strip()]
-        self.toast(lines[-1] if lines else ("Hecho" if rc == 0 else "No se ha podido"))
+        if rc == 0:
+            self.toast(lines[-1] if lines else "Hecho")
+        elif "secret-tool" in out:
+            # (falta el paquete del llavero: se ofrece instalarlo y, luego, pegar el token otra vez)
+            self.nv_github_keyring()
+        else:
+            # (un error se queda en una ventana hasta que se cierra: en el aviso de abajo no da tiempo a leerlo)
+            message(self.win, "No se ha podido conectar con GitHub",
+                    "\n".join(lines[-6:]) if lines else "No se ha podido", Gtk.MessageType.WARNING)
         # (la lista de antes puede ser de otra cuenta o con otros prefijos)
         self.repos, self.github_out = None, None
         self.build_tools()
@@ -82,7 +90,44 @@ class NvGithub:
             return False
         return self.nv_github_done(rc, out)
 
-    def nv_github_token(self):
+    def nv_github_keyring(self):
+        """Sin secret-tool no se puede guardar el token en el llavero: se explica en una ventana (que no se va
+        sola), con un botón para instalar su paquete (pide la contraseña de administrador) y, al acabar, se
+        vuelve a pedir el token."""
+        cmd = "sudo apt install libsecret-tools"
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.INFO,
+                                buttons=Gtk.ButtonsType.NONE,
+                                text="Hace falta secret-tool para guardar el token")
+        dlg.format_secondary_text(
+            "El token de GitHub se guarda en el llavero de la sesión (el almacén cifrado de contraseñas de "
+            "Ubuntu), no en un fichero. Para eso hace falta secret-tool, del paquete libsecret-tools, que "
+            "no viene instalado en este equipo.\n\n"
+            "«Instalarlo» lo instala ahora (pide la contraseña de administrador) y vuelve a pedir el token. "
+            "También puedes instalarlo tú en una terminal:\n\n%s" % cmd)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        dlg.add_button("Copiar la orden", 1)
+        css(dlg.add_button("Instalarlo", Gtk.ResponseType.OK), "verde")
+        dlg.set_default_response(Gtk.ResponseType.OK)
+        widen(dlg)
+        resp = run_dialog(dlg)
+        dlg.destroy()
+        if resp == 1:
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(cmd, -1)
+            self.toast("Orden copiada: pégala en la terminal")
+        elif resp == Gtk.ResponseType.OK:
+            def done(ok, *_):
+                # (en la simulación no se instala nada: se sigue igual, para ver el paso del token)
+                if ok and (SIMULATE or shutil.which("secret-tool")):
+                    GLib.idle_add(self.nv_github_token, True)
+            self.run_task("Instalando secret-tool (libsecret-tools)", ["github-llavero-instalar"],
+                          done_text="secret-tool instalado: ya puedes pegar el token", auto_close=True,
+                          on_done=done)
+
+    def nv_github_token(self, installed=False):
+        # (sin secret-tool no se podría guardar: se ofrece instalarlo antes de pedir el token)
+        if not installed and not shutil.which("secret-tool"):
+            self.nv_github_keyring()
+            return False
         dlg = Gtk.Dialog(title="Conectar con GitHub", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(520, -1)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
@@ -113,6 +158,7 @@ class NvGithub:
         if resp == Gtk.ResponseType.OK and token:
             self.toast("Comprobando el token con GitHub…")
             run_quick_input(["github-conectar"], token + "\n", self.nv_github_done)
+        return False
 
     def nv_node_load(self):
         """Pestaña Node: los proyectos de htdocs con su package.json y cómo están."""

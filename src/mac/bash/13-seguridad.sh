@@ -104,7 +104,10 @@ LimitRequestBody 67108864
 # HEAD de la pagina entera); un formulario, un fetch, un iframe o una imagen de otra web no llega.
 # Y un POST (o PUT, DELETE...) con el Origin de otra web, tampoco. Ojo: la vuelta de una pasarela de
 # pago que hace un POST desde su web se corta mientras este puesta
-<If "(%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
+# Lo unico que pasa de otra web ademas: enviar el formulario de acceso (POST de pagina entera a
+# /wp-login.php o a index.php?controller=AdminLogin), que es lo que hace la pagina del boton Panel
+# (un fichero: Origin null); sin la contraseña no entra nadie
+<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/)))">
     Require all denied
     ErrorDocument 403 "Otra web ha intentado mandar algo a este proyecto: no se ha hecho nada (barrera entre webs de lvm-instalador; se apaga en Configuracion)."
 </If>

@@ -643,6 +643,9 @@
       <a href="#carpetas">copias de los ficheros que cambia el programa</a>, y los certificados viejos se guardan en una carpeta
       <code>/etc/ssl/lvm-anteriores-…</code> que solo ve el administrador. Después, el navegador avisará una vez en cada proyecto: acepta el
       aviso.
+    <li><b>«Certificados que Chrome rechaza»</b>: el certificado de algún proyecto está mal hecho (lleva una extensión repetida) y Chrome no
+      abre la web: dice «La conexión no es privada» con <code>net::ERR_CERT_INVALID</code>, y no deja continuar. Les pasaba a los creados en
+      Ubuntu 20.04. <b>«Arreglarlos»</b> les hace uno nuevo, bien hecho, y el navegador lo acepta. Pide la contraseña de administrador.</li>
       <details class="terminal"><summary>En la terminal</summary>
         <p>La orden del programa: <code>nexum arreglar-certificados</code>.</p>
         <p>Lo que hace, paso a paso:</p>
@@ -1258,8 +1261,10 @@
       <code>http://127.0.0.1/phpmyadmin/</code> (el de la versión activa). Sale apagado si no se sabe qué base usa. No cambia nada.</li>
     <li><b>«Panel»</b>: el escritorio de WordPress (<code>wp-admin</code>) o el back office de PrestaShop (con su logotipo). Antes deja al
       día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>, o el que pongas en
-      Configuración, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Sale apagado si el
-      proyecto no es un WordPress ni una tienda. Si la base ya tiene un usuario de verdad con ese correo, no lo toca: te avisa y abre el
+      Configuración, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Entra por la dirección en la que el
+      panel guarda la sesión: en una tienda con su dominio falseado, por ese dominio (<code>https://tienda-luna.es/…</code>), porque su back
+      office salta allí al entrar; y por <code>https</code> si la tienda tiene SSL activado o el WordPress tiene su dirección en https, porque
+      entonces la sesión solo se guarda por https. Sale apagado si el proyecto no es un WordPress ni una tienda. Si la base ya tiene un usuario de verdad con ese correo, no lo toca: te avisa y abre el
       panel sin él.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
@@ -1536,7 +1541,9 @@
         <code>config/settings.inc.php</code>) y su dominio (de la base).</li>
       <li>Saca de las tablas <code>ps_image</code>, <code>ps_image_type</code>, <code>ps_category</code> y <code>ps_manufacturer</code> la
         lista de imágenes que debería haber (<code>img/p/1/2/12.jpg</code>, <code>img/p/1/2/12-home_default.jpg</code>,
-        <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta.</li>
+        <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta. De cada categoría trae también
+        su miniatura, <code>img/c/&lt;id&gt;_thumb.jpg</code> (la «imagen en miniatura» del back office): muchos temas y módulos
+        miran si está en el disco y, sin ella, enseñan la portada de la categoría, que es otra imagen.</li>
       <li>Pregunta la dirección de la tienda al DNS cifrado: <code>curl -H "accept: application/dns-json"
         "https://cloudflare-dns.com/dns-query?name=ferreteria-norte.com&amp;type=A"</code> (y <code>type=AAAA</code>). Se queda con las
         direcciones públicas.</li>
@@ -2014,12 +2021,16 @@
   <h3>Conectar GitHub (la primera vez)</h3>
   <ol class="pasos-tarea">
     <li><b>Ve a Configuración → GitHub</b> y pulsa <b>«Conectar con un token…»</b>. Si tienes instalada la herramienta <code>gh</code> y ya
-      has entrado con <code>gh auth login</code>, también tienes <b>«Usar la sesión de gh»</b>, que no necesita token.</li>
+      has entrado con <code>gh auth login</code>, también tienes <b>«Usar la sesión de gh»</b>, que no necesita token.<span data-so="linux">
+      Si en el equipo falta <code>secret-tool</code> (el paquete <code>libsecret-tools</code>, con el que se guarda el token en el llavero),
+      antes sale la ventana «Hace falta secret-tool para guardar el token»: <b>«Instalarlo»</b> lo instala (pide la contraseña de
+      administrador) y luego se abre el diálogo del token; <b>«Copiar la orden»</b> copia <code>sudo apt install libsecret-tools</code>
+      para pegarla en una terminal.</span></li>
     <li><b>Crea el token.</b> En el diálogo «Conectar con GitHub», el enlace <b>«Crear un token en GitHub»</b> abre GitHub con los permisos ya
       marcados: <code>repo</code> (para ver también los privados) y <code>read:org</code> (para los de una organización). Cópialo y pégalo en
       el campo (empieza por <code>ghp_…</code> o <code>github_pat_…</code>; mientras lo escribes no se ve).</li>
     <li><b>Pulsa «Conectar».</b> Se activa cuando el campo tiene al menos 20 caracteres. Abajo sale «Comprobando el token con GitHub…» y,
-      si vale, «Conectado a GitHub como …». El token se guarda en el <b>llavero</b> de tu sesión (el almacén cifrado de contraseñas
+      si vale, «Conectado a GitHub como …». Si no vale, el motivo sale en una ventana que se queda hasta que la cierras. El token se guarda en el <b>llavero</b> de tu sesión (el almacén cifrado de contraseñas
       del sistema<span data-so="linux">, el mismo que usa el navegador</span><span data-so="mac">: la app Acceso a Llaveros</span>), nunca en un fichero.</li>
     <li><b>Elige de quién ves los repositorios.</b> Si aún no habías puesto ninguna, se pone tu propia cuenta. Para otra, en «Organización o
       cuenta» escribe su nombre (por ejemplo, <code>mi-empresa</code>; también vale su dirección, <code>https://github.com/mi-empresa</code>)
@@ -2038,7 +2049,8 @@
         <code>curl -fsS -H "Authorization: Bearer &lt;token&gt;" https://api.github.com/user</code>. Si GitHub no lo acepta, no guarda nada.</li>
       <li data-so="linux">Lo guarda en el llavero de la sesión, también por la entrada:
         <code>secret-tool store --label="Nexum Dev Stack (GitHub)" service nexum-dev-stack account github</code> (hace falta el paquete
-        <code>libsecret-tools</code>). Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
+        <code>libsecret-tools</code>; lo instala <code>nexum github-llavero-instalar</code>, que hace
+        <code>sudo apt-get install -y libsecret-tools</code> si falta). Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
       <li data-so="mac">Lo guarda en el Llavero, también por la entrada:
         <code>security -i</code> con <code>add-generic-password -U -a github -s nexum-dev-stack -l "Nexum Dev Stack (GitHub)" -w &lt;token&gt;</code>.
         Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
@@ -4810,7 +4822,9 @@
     <ul>
       <li><b>De partida:</b> encendida.</li>
       <li><b>Qué bloquea:</b> desde otra web solo se puede abrir una página de tus proyectos con un enlace normal; un formulario o una petición
-        que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»).</li>
+        que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»). La única excepción es el
+        formulario de acceso al panel (la pantalla de entrada de WordPress o del back office de PrestaShop): es lo que envía la página del
+        botón «Panel», y sin la contraseña no deja entrar a nadie.</li>
       <li><b>Cuándo apagarla:</b> solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a tu tienda mandando un
         formulario desde su web. Enciéndela al acabar.</li>
       <li><b>Dónde vale:</b> en todas tus versiones: localhost, web.local, los dominios falseados y los vhosts de los proyectos.</li>
@@ -6030,11 +6044,21 @@
   <h3 id="seguridad-barrera">Barrera entre webs</h3>
   <p>Cuando tienes abierta una web cualquiera en el navegador, esa web podría intentar enviar algo a tus proyectos locales (un formulario o una
     petición a <code>https://tienda-luna.local/admin/…</code>), y el navegador lo mandaría con tus sesiones abiertas. La barrera lo impide: desde
-    otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. Va encendida de partida, en
+    otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. La excepción es el
+    formulario de acceso al panel (<code>wp-login.php</code> o <code>index.php?controller=AdminLogin</code>, enviado como página entera): es
+    lo que manda la página del botón «Panel», que no es del proyecto, y sin la contraseña no deja entrar a nadie. Va encendida de partida, en
     todas las versiones. El Apache de Docker la lleva también: al cambiarla, se rehace su configuración y, si está en marcha, se recarga
     al momento.</p>
   <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración
     → Seguridad entre webs</a>, con el interruptor «Barrera entre webs», y vuelve a encenderla al acabar. Pide la contraseña de administrador.</p>
+  <p>La barrera está en la configuración de Apache de cada versión de PHP, que es de root. Al actualizar Nexum no se toca: la
+    primera vez que abres la ventana tras actualizar, si a las versiones les falta lo de la nueva, te pregunta si se aplica ya (pide
+    la contraseña de administrador y reinicia Apache si está en marcha). Si lo dejas para luego, está en Versiones › «Protegerlas», o
+    en la terminal: <code>nexum asegurar --todas</code>.</p>
+  <p>Escribir la configuración no basta: Apache la lee al arrancar o al recargarse. Si su configuración es más nueva que la última vez
+    que la cargó (lo mira en su registro, <code>logs/error_log</code>, por la línea «resuming normal operations» que escribe en cada
+    arranque y recarga), la ventana avisa de que sigue con la de antes y ofrece reiniciarlo; el aviso queda también en Versiones (en el
+    Mac, en los avisos). En la terminal: <code>nexum servicio apache reiniciar</code>.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum barrera-web no</code> (apagar), <code>nexum barrera-web si</code> (encender) o
       <code>nexum barrera-web</code> (cómo está).</p>
@@ -6059,16 +6083,19 @@
     los proyectos (en <code>/etc/ssl/certs</code>, de CA o firmados por una CA local). Si el programa encuentra alguno, en <b>Versiones</b> sale
     «Certificados en los que confía todo el equipo», con el botón <b>«Arreglarlos»</b>. Después el navegador avisará una vez en cada proyecto:
     acepta el aviso (o pulsa «Confiar»; ver <a href="#dominios-certificados">Los certificados</a>). Pide la contraseña de administrador.</p>
+  <p>Con el mismo botón se arreglan los certificados <b>mal hechos</b>, los que llevan una extensión repetida: Chrome no abre esas webs
+    («La conexión no es privada», <code>net::ERR_CERT_INVALID</code>). Entonces el aviso se llama «Certificados que Chrome rechaza».</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum arreglar-certificados</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Revisa los certificados de los vhosts <code>https</code>: los que están en <code>/etc/ssl/certs</code>, los que son de CA, los firmados por
-        una CA local sin límite de dominios y los que faltan.</li>
+        una CA local sin límite de dominios, los que faltan y los que llevan una extensión repetida (por ejemplo, dos
+        <code>basicConstraints</code>).</li>
       <li>A cada uno de esos dominios le crea un certificado autofirmado propio, solo para él, en
         <span data-so="linux"><code>/opt/config/ssl/&lt;dominio&gt;-selfsigned.crt</code></span><span
-        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/&lt;dominio&gt;-selfsigned.crt</code></span> (con <code>openssl req -x509 …
-        -addext "basicConstraints=critical,CA:FALSE"</code>).</li>
+        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/&lt;dominio&gt;-selfsigned.crt</code></span> (con <code>openssl req -x509 … -config</code>
+        y un fichero de configuración propio que solo lleva <code>basicConstraints = critical,CA:FALSE</code> y los nombres del dominio).</li>
       <li>Cambia en una copia de los vhosts sus líneas <code>SSLCertificateFile</code> y <code>SSLCertificateKeyFile</code> para que usen los nuevos,
         y la aplica como siempre: comprobada, con copia en <code>~/nexum-backups</code> si tienes las copias encendidas, escrita con
         <code>sudo install</code>, <code>httpd -t</code> y recarga de Apache.</li>

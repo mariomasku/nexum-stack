@@ -87,6 +87,11 @@ if [ -x /opt/lampp-8.2.4/bin/httpd ] && [ -f /opt/lampp-8.2.4/etc/httpd.conf ]; 
             check "barrera: POST del propio proyecto (mismo Origin): pasa" '[ "$(c -X POST -H "Origin: http://web.local" -H "Sec-Fetch-Site: same-origin" -d x=1)" = 404 ]'
             check "barrera: escribiendo la direccion o sin navegador: pasa" '[ "$(c -H "Sec-Fetch-Site: none")" = 404 ] && [ "$(c -X POST -d x=1)" = 404 ]'
             check "barrera: POST cross-site con Mode navigate (formulario de otra web): 403" '[ "$(c -X POST -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Dest: document" -d x=1)" = 403 ]'
+            # (1.57.18) La pagina del boton Panel (un fichero, Origin null) envia el acceso: pasa; nada mas
+            pl() { curl -s -o /dev/null -w '%{http_code}' -H "Host: web.local" -X POST -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: ${2:-navigate}" -H "Sec-Fetch-Dest: ${3:-document}" -H "Origin: null" -d log=x "http://127.0.0.1:28471/$1"; }
+            check "barrera: acceso al panel desde la pagina del boton Panel (WordPress y PrestaShop): pasa" '[ "$(pl wp-login.php)" = 404 ] && [ "$(pl "admin123/index.php?controller=AdminLogin")" = 404 ]'
+            check "barrera: el acceso con fetch o en un iframe: 403" '[ "$(pl wp-login.php cors empty)" = 403 ] && [ "$(pl wp-login.php navigate iframe)" = 403 ]'
+            check "barrera: otras acciones de wp-login, otros controladores u otras paginas: 403" '[ "$(pl "wp-login.php?action=lostpassword")" = 403 ] && [ "$(pl "admin123/index.php?controller=AdminEmployees")" = 403 ] && [ "$(pl wp-admin/user-new.php)" = 403 ]'
         else
             echo "  ok    (no arranca el Apache de prueba: $(head -c 200 "$A/arranque.txt"))"
         fi

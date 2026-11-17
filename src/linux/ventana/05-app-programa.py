@@ -294,19 +294,28 @@ class AppPrograma:
                 self.open_uri(base)
                 return False
             user, password = mine[0][2], mine[0][3]
+            # (usuario-pruebas dice si el acceso no puede ir a http://web.local: https, porque sus
+            # cookies de sesión son secure y por http no se guardan, o la dirección de la tienda con
+            # su dominio falseado, porque su back office salta allí al entrar; en Docker, no)
+            web, extra = site, mine[0][4] if len(mine[0]) > 4 else ""
+            if site.startswith("http://") and extra == "https":
+                web = "https://" + site[len("http://"):]
+            elif site.startswith("http://") and re.match(r"^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", extra):
+                web = extra.rstrip("/")
+            panel = "%s/%s/" % (web, admin)
             if kind == "wp":
-                action = "%s/wp-login.php" % site
+                action = "%s/wp-login.php" % web
                 fields = [("log", user, "Usuario o correo"), ("pwd", password, "Contraseña"),
-                          ("rememberme", "forever", None), ("redirect_to", base, None)]
+                          ("rememberme", "forever", None), ("redirect_to", panel, None)]
                 title = "Panel de WordPress"
             else:
-                action = base + "index.php?controller=AdminLogin"
+                action = panel + "index.php?controller=AdminLogin"
                 fields = [("email", user, "Correo"), ("passwd", password, "Contraseña"),
                           ("stay_logged_in", "1", None), ("submitLogin", "1", None),
                           ("redirect", "AdminDashboard", None)]
                 title = "Back office de PrestaShop"
-            url = serve_once(login_page(title, name, action, fields, base))
-            self.open_uri(url) if url else self.open_uri(base)
+            url = serve_once(login_page(title, name, action, fields, panel, kind))
+            self.open_uri(url) if url else self.open_uri(panel)
             return False
         run_quick(cmd, done)
 
@@ -407,7 +416,7 @@ class AppPrograma:
              "unregistered": False, "native": True, "launcher": True,
              "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
-             "stray": "", "orphans": [], "exposed": "", "unsecured": [], "certs": [], "cas": [], "untrusted": [], "stale": [],
+             "stray": "", "orphans": [], "exposed": "", "unsecured": [], "apache_old": "", "certs": [], "cas": [], "untrusted": [], "stale": [],
              "dbsys": None, "php2shell": {},
              "mail": {"installed": False, "on": True, "wp": "mailpit", "running": False, "version": "",
                       "url": "http://127.0.0.1:8025/", "offer": ""}}
@@ -438,6 +447,9 @@ class AppPrograma:
                 d["exposed"] = "|".join(f[1:])
             elif f[0] == "U" and len(f) >= 2:
                 d["unsecured"] = f[1].split()
+            elif f[0] == "K" and len(f) >= 2:
+                # (su Apache sigue con la configuración de antes: escrita después de su última carga)
+                d["apache_old"] = f[1]
             elif f[0] == "Y" and len(f) >= 3:
                 d["dbsys"] = (f[1], int(f[2]) if f[2].isdigit() else 0)
             elif f[0] == "C" and len(f) >= 3:

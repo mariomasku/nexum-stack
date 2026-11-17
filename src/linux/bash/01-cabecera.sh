@@ -89,6 +89,9 @@
 #       prefijos, o --todos), leidos con un token (por la entrada; se guarda en el llavero) o con la
 #       sesion de gh. repo-traer lo clona por SSH en htdocs o, si ya esta, trae sus cambios (git pull)
 #
+#   nexum github-llavero-instalar
+#       Instala (con sudo) libsecret-tools, el paquete de secret-tool, para guardar el token en el llavero
+#
 #   nexum docker-reposo [estado] | horas <0-24> | comprobar
 #       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
@@ -904,7 +907,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.17"
+APP_VERSION="1.57.22"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

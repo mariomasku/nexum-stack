@@ -373,6 +373,7 @@ case "$1" in
     github) shift; github_command "$@" ;;
     github-conectar) github_connect "$2" ;;
     github-desconectar) github_disconnect ;;
+    github-llavero-instalar) github_keyring_install ;;
     repos) shift; repos_list "$@" ;;
     repo-traer) repo_fetch "$2" "$3" ;;
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;

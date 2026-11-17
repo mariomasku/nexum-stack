@@ -398,20 +398,32 @@ struct WarningsView: View {
                             })
                         }
                     }
-                    if !d.unsecured.isEmpty {
-                        Card("A algunas versiones les faltan protecciones",
-                             "Les falta algo de lo que pone el gestor: solo para este Mac, phpMyAdmin cerrado a otras webs, MariaDB sin acceso a los ficheros del Mac... (o su carpeta no es de root y no se arrancarían). Protegerlas lo pone, como en la activa; pide la contraseña de administrador.") {
-                            Row("Versiones sin proteger", d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "), trailing: {
-                                Button("Protegerlas") { model.secureAll() }
-                                    .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
-                            })
+                    Group {
+                        if !d.unsecured.isEmpty {
+                            Card("A algunas versiones les faltan protecciones",
+                                 "Les falta algo de lo que pone el gestor: solo para este Mac, phpMyAdmin cerrado a otras webs, MariaDB sin acceso a los ficheros del Mac... (o su carpeta no es de root y no se arrancarían). Protegerlas lo pone, como en la activa; pide la contraseña de administrador.") {
+                                Row("Versiones sin proteger", d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "), trailing: {
+                                    Button("Protegerlas") { model.secureAll() }
+                                        .buttonStyle(OutlineButton(kind: "primary"))
+                                        .disabled(model.busy)
+                                })
+                            }
+                        }
+                        if !d.apacheOld.isEmpty {
+                            Card("Apache sigue con la configuración de antes",
+                                 "Se ha cambiado su configuración (la seguridad, la barrera entre webs...) y Apache no se ha recargado: hasta reiniciarlo, sigue con lo de antes.") {
+                                Row("XAMPP-\(d.apacheOld)", "Reiniciar Apache para que la use", trailing: {
+                                    Button("Reiniciar Apache") { model.reloadApacheConfig() }
+                                        .buttonStyle(OutlineButton(kind: "primary"))
+                                        .disabled(model.busy)
+                                })
+                            }
                         }
                     }
                 }
                 Group {
                     if !d.certs.isEmpty || !d.cas.isEmpty {
-                        Card("Certificados en los que confía todo el Mac", certsText(d)) {
+                        Card(certsTitle(d), certsText(d)) {
                             Row("Proyectos con https", certsNames(d), trailing: {
                                 Button("Arreglarlos") { model.fixCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))

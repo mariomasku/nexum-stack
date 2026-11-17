@@ -1197,6 +1197,16 @@ class AppVersiones:
             row.add_suffix(b)
             lb.add(row)
             self.ver_box.pack_start(box, False, False, 0)
+        if d.get("apache_old"):
+            box, lb = group("Apache sigue con la configuración de antes",
+                            "Se ha cambiado su configuración (la seguridad, la barrera entre webs...) y Apache "
+                            "no se ha recargado: hasta reiniciarlo, sigue con lo de antes.")
+            row = ActionRow("lampp-%s" % d["apache_old"], "Reiniciar Apache para que la use")
+            b = css(Gtk.Button(label="Reiniciar Apache"), "verde")
+            b.connect("clicked", self.on_apache_reload)
+            row.add_suffix(b)
+            lb.add(row)
+            self.ver_box.pack_start(box, False, False, 0)
 
         if d["certs"] or d["cas"]:
             # Certificados de proyectos en los que confía todo el equipo (no solo el navegador para
@@ -1211,11 +1221,21 @@ class AppVersiones:
             if d["cas"]:
                 why.append("los firma una CA de confianza sin límite de dominios (%s) cuya clave puede "
                            "leer cualquier programa tuyo, como el PHP de una web" % ", ".join(d["cas"]))
-            box, lb = group("Certificados en los que confía todo el equipo",
-                            "Los certificados https de estos proyectos " + "; ".join(why) + ". "
-                            "Arreglarlos les pone uno propio, que solo vale para su dominio, y quita "
-                            "esa confianza. Después el navegador avisará una vez en cada proyecto: "
-                            "acepta el aviso. Pide la contraseña de administrador.")
+            # (doble: hechos con el OpenSSL 1.1.1 de Ubuntu 20.04, con una extensión repetida)
+            if any(r == "doble" for _, r in d["certs"]):
+                why.append("están mal hechos (tienen una extensión repetida) y Chrome no los abre: "
+                           "dice «La conexión no es privada» (ERR_CERT_INVALID)")
+            if d["cas"] or any(r != "doble" for _, r in d["certs"]):
+                box, lb = group("Certificados en los que confía todo el equipo",
+                                "Los certificados https de estos proyectos " + "; ".join(why) + ". "
+                                "Arreglarlos les pone uno propio, que solo vale para su dominio, y quita "
+                                "esa confianza. Después el navegador avisará una vez en cada proyecto: "
+                                "acepta el aviso. Pide la contraseña de administrador.")
+            else:
+                box, lb = group("Certificados que Chrome rechaza",
+                                "Los certificados https de estos proyectos " + "; ".join(why) + ". "
+                                "Arreglarlos les hace uno nuevo, bien hecho, y el navegador lo acepta. "
+                                "Pide la contraseña de administrador.")
             names = [dom for dom, _ in d["certs"]]
             row = ActionRow("Proyectos con https", ", ".join(names[:6]) + (" y %d más" % (len(names) - 6)
                                                                         if len(names) > 6 else "")

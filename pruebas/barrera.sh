@@ -64,6 +64,13 @@ check "web.local: Origin null (iframe sandbox): 403" '[ "$(wl -X POST -H "Origin
 check "web.local: enlace desde otra web (navegacion GET): pasa" '[ "$(wl -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Dest: document" "$U/no-existe.php?x=1")" = 404 ]'
 check "web.local: POST de la propia web: pasa" '[ "$(wl -X POST -H "Sec-Fetch-Site: same-origin" -H "Origin: http://web.local" -d x=1 "$U/no-existe.php")" = 404 ]'
 check "web.local: webhook de un servidor (sin Origin ni Sec-Fetch): pasa" '[ "$(wl -X POST -d x=1 "$U/no-existe.php")" = 404 ]'
+# (1.57.18) La pagina del boton Panel (127.0.0.1 o un fichero, Origin null) envia el acceso: pasa; nada mas
+pl() { wl -X POST -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: ${2:-navigate}" -H "Sec-Fetch-Dest: ${3:-document}" -H "Origin: null" -d log=x "$U/$1"; }
+check "panel: acceso de WordPress desde la pagina del boton Panel: pasa" '[ "$(pl wp-login.php)" = 404 ] && [ "$(pl blog/wp-login.php)" = 404 ]'
+check "panel: acceso de PrestaShop (controller=AdminLogin): pasa" '[ "$(pl "admin123/index.php?controller=AdminLogin")" = 404 ]'
+check "panel: el acceso con fetch o en un iframe: 403" '[ "$(pl wp-login.php cors empty)" = 403 ] && [ "$(pl wp-login.php navigate iframe)" = 403 ] && [ "$(pl "admin123/index.php?controller=AdminLogin" no-cors empty)" = 403 ]'
+check "panel: otras acciones de wp-login, otros controladores u otras paginas: 403" '[ "$(pl "wp-login.php?action=lostpassword")" = 403 ] && [ "$(pl "admin123/index.php?controller=AdminEmployees")" = 403 ] && [ "$(pl "admin123/index.php?controller=AdminLogin&x=1")" = 403 ] && [ "$(pl wp-admin/user-new.php)" = 403 ] && [ "$(pl wp-login.php.bak)" = 403 ]'
+check "panel: el acceso por GET desde otra web (un enlace), como siempre: pasa" '[ "$(wl -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Dest: document" "$U/wp-login.php")" = 404 ]'
 check "localhost: formulario desde otra web: 403" '[ "$(curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" -X POST -H "Sec-Fetch-Site: cross-site" -d x=1 "$U/no-existe.php")" = 403 ]'
 head -c 70000000 /dev/zero > "$W/grande"
 check "peticion de mas de 64 MB: 413" '[ "$(wl -X POST --data-binary @"$W/grande" "$U/no-existe.php")" = 413 ]'

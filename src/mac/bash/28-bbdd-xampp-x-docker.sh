@@ -394,6 +394,51 @@ QUE HACE
 
 VERSIONES
 
+1.57.22 (17 nov 2026)
+- Versiones: nuevo aviso «Certificados que Chrome rechaza», para un
+  certificado de proyecto mal hecho (con una extensión repetida), que
+  Chrome no abre (net::ERR_CERT_INVALID). «Arreglarlos» le hace uno
+  nuevo. Los que hace el programa en el Mac ya salían bien.
+
+1.57.21 (17 nov 2026)
+- Conectar GitHub: si GitHub no acepta el token o no se puede
+  conectar, el motivo sale en una ventana que se queda hasta que la
+  cierras. Antes solo lo decía un aviso abajo que se iba enseguida.
+- Descargar las imágenes que faltan (PrestaShop): de cada categoría
+  trae también su miniatura (img/c/<id>_thumb.jpg, la «imagen en
+  miniatura» del back office). Muchos temas y módulos miran si está en
+  la carpeta antes de pedirla y, sin ella, enseñaban la portada de la
+  categoría: en la home salía otra imagen que en producción.
+
+1.57.20 (17 nov 2026)
+- La ventana avisa si Apache sigue con la configuración de antes: si
+  se ha escrito su seguridad (por ejemplo, la barrera entre webs nueva)
+  y Apache no se ha recargado, seguía con la vieja en memoria sin que
+  nada lo dijera. Ahora lo mira en su registro y ofrece reiniciarlo
+  (también en Versiones; en el Mac, en los avisos).
+
+1.57.19 (17 nov 2026)
+- Al actualizar Nexum, la ventana pregunta una vez si se aplica ya la
+  seguridad nueva a las versiones de PHP (pide la contraseña). Antes
+  seguían con la configuración de Apache de la versión anterior hasta
+  pulsar «Protegerlas»: por eso, con la 1.57.18 instalada, la barrera
+  entre webs seguía cortando la entrada al panel.
+- La página de acceso del botón «Panel» lleva el logo de Nexum encima
+  del cuadro y el de WordPress o PrestaShop junto al título.
+
+1.57.18 (17 nov 2026)
+- Barrera entre webs: el botón «Panel» ya entra en el panel de
+  WordPress o de PrestaShop con la barrera encendida. Antes salía
+  «Otra web ha intentado mandar algo a esta» y había que apagarla. La
+  página de acceso del botón no es del proyecto, y la barrera la
+  cortaba. Ahora deja pasar ese envío del formulario de acceso y nada
+  más; sin la contraseña no entra nadie.
+- «Panel»: al pulsar Entrar ya no vuelve a pedir los datos en el
+  WordPress o en la tienda. La tienda con su dominio falseado salta a
+  ese dominio al entrar y la sesión se quedaba en web.local; y con SSL
+  activado (o un WordPress en https) la sesión solo se guarda por
+  https. Ahora el acceso va directamente a esa dirección.
+
 1.57.17 (17 nov 2026)
 - Imágenes de producción, también en las tiendas PrestaShop: las que
   falten ya no hay que descargarlas antes. Cuando la página pide una

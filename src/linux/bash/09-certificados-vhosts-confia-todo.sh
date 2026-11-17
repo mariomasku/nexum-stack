@@ -9,7 +9,9 @@ CERTS_PY='# Revisa los certificados de los vhosts https. Imprime:
 #                              sistema = esta en
 #                              /etc/ssl/certs, donde el sistema lo toma como de confianza; ca = es de
 #                              CA y su clave podria firmar cualquier web; firmado = lo firmo una CA
-#                              local sin limite de dominios)
+#                              local sin limite de dominios; doble = tiene una extension repetida,
+#                              como los hechos con -addext y el OpenSSL 1.1.1 de Ubuntu 20.04, y
+#                              Chrome lo rechaza con ERR_CERT_INVALID)
 #   A|nombre|sha256|sha1|donde una CA local de confianza, sin limite de dominios, que firma
 #                              certificados de los vhosts (donde: file:<ruta>, nss:<carpeta>:<nombre>
 #                              o llavero:<ruta>)
@@ -38,8 +40,10 @@ def info(pem):
         return None
     der = base64.b64decode("".join(l for l in pem.splitlines() if not l.startswith("-----")))
     cn = re.search(r"Subject:.*?CN\s*=\s*([^,/\n]+)", out)
+    exts = re.findall(r"(?m)^ {12}(\S[^\n]*?):(?: critical)? *$", out)
     return {"subj": lines[0].strip(), "iss": lines[1].strip(), "ca": "CA:TRUE" in out,
             "nc": "Name Constraints" in out, "cn": (cn.group(1).strip() if cn else "?"),
+            "dup": len(exts) != len(set(exts)),
             "sha256": hashlib.sha256(der).hexdigest(), "sha1": hashlib.sha1(der).hexdigest(), "pem": pem}
 def read(path):
     try:
@@ -135,6 +139,8 @@ for row in os.environ.get("LVM_INFO", "").splitlines():
             if ca["subj"] == i["iss"] and not ca["nc"] and signed_by(i, ca):
                 by = ca["sha256"]
                 cas.setdefault(by, (ca, set()))[1].add(where)
+    if not why and i["dup"]:
+        why = "doble"
     rows.append((dom, crt, key, why, by))
 # Las CAs que firman esos certificados solo son un peligro si su clave esta al alcance de un programa
 # tuyo (en tu carpeta personal): entonces se avisa y Arreglarlos las quita. Una CA de empresa cuya
@@ -165,7 +171,8 @@ if cas:
                 if pub in pubs:
                     keys.setdefault(pubs[pub], []).append(path)
 for dom, crt, key, why, by in rows:
-    if not why and by in keys:
+    # (firmado por una CA peligrosa pesa mas que una extension repetida: Arreglarlos rehace los dos)
+    if why in ("", "doble") and by in keys:
         why = "firmado"
     if why:
         print("C|%s|%s|%s|%s" % (dom, crt, key, why))
@@ -250,6 +257,7 @@ function fix_certs() {
             sistema) echo "$dom: su certificado esta en /etc/ssl/certs (el sistema lo da por bueno para todo)" ;;
             ca) echo "$dom: su certificado es de CA (con su clave se firmaria cualquier web)" ;;
             firmado) echo "$dom: su certificado lo firma una CA de confianza sin limite de dominios" ;;
+            doble) echo "$dom: su certificado tiene una extension repetida (Chrome lo rechaza con ERR_CERT_INVALID)" ;;
             falta) echo "$dom: su certificado ($crt) no existe" ;;
         esac
         echo "  -> certificado propio en $new_crt"

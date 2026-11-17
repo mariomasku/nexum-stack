@@ -483,10 +483,29 @@ def test_admin_conf():
     return "local@local.test", "local", False
 
 
-def login_page(title, project, action, fields, panel):
+def nexum_icon_uri():
+    """El icono de Nexum (el de tu carpeta o el del paquete) como data: para una página; "" sin él."""
+    for path in (os.path.expanduser("~/.local/share/icons/nexum.png"), "/usr/share/icons/hicolor/256x256/apps/nexum.png"):
+        try:
+            with open(path, "rb") as fh:
+                data = fh.read(2 * 1024 * 1024)
+        except OSError:
+            continue
+        if data.startswith(b"\x89PNG"):
+            return "data:image/png;base64," + base64.b64encode(data).decode()
+    return ""
+
+
+def login_page(title, project, action, fields, panel, kind=None):
     """Página de acceso al panel de un proyecto con el administrador de pruebas ya escrito: un
-    formulario que va a la pantalla de acceso del proyecto; solo hay que pulsar Entrar."""
+    formulario que va a la pantalla de acceso del proyecto; solo hay que pulsar Entrar. Con el logo
+    de Nexum encima del cuadro y el de WordPress o PrestaShop (kind wp o ps) junto al título."""
     e = html.escape
+    icon = nexum_icon_uri()
+    top = '<img class="nexum" src="%s" alt="Nexum">' % icon if icon else ""
+    brand = {"wp": "wordpress", "ps": "prestashop"}.get(kind)
+    mark = ('<svg class="marca" viewBox="0 0 24 24" aria-hidden="true"><path fill="%s" d="%s"/></svg>'
+            % (LOGO_COLORS[brand][0], LOGO_PATHS[brand])) if brand else ""
     rows, hidden = "", ""
     for name, value, text in fields:
         if text:
@@ -500,8 +519,11 @@ def login_page(title, project, action, fields, panel):
 <style>
 :root { color-scheme: light dark; --bg: #f4f4f6; --card: #fff; --line: #d8d8dc; --muted: #6b6b72; --accent: #2a7ae2; }
 @media (prefers-color-scheme: dark) { :root { --bg: #1e1e20; --card: #2a2a2d; --line: #444; --muted: #a0a0a6; } }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg);
-       font: 15px/1.45 system-ui, "Ubuntu", sans-serif; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+       gap: 18px; padding: 16px; box-sizing: border-box; background: var(--bg); font: 15px/1.45 system-ui, "Ubuntu", sans-serif; }
+img.nexum { width: 72px; height: 72px; }
+h1 { display: flex; align-items: center; gap: 9px; }
+svg.marca { width: 24px; height: 24px; flex: none; }
 form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 28px 32px;
        width: min(380px, calc(100vw - 32px)); box-sizing: border-box; }
 h1 { font-size: 19px; margin: 0 0 4px; } p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
@@ -512,12 +534,13 @@ button { width: 100%%; margin-top: 6px; padding: 10px; font: inherit; font-weigh
          background: var(--accent); border: 0; border-radius: 8px; cursor: pointer; }
 small { display: block; margin-top: 14px; color: var(--muted); font-size: 12px; }
 </style></head><body>
-<form method="post" action="%(action)s">
-<h1>%(title)s</h1><p>%(project)s · administrador de pruebas de este equipo</p>
+%(top)s<form method="post" action="%(action)s">
+<h1>%(mark)s%(title)s</h1><p>%(project)s · administrador de pruebas de este equipo</p>
 %(rows)s%(hidden)s<button type="submit" autofocus>Entrar</button>
 <small>Si no entra, el panel normal está en <a href="%(panel)s">%(panel)s</a>.</small>
 </form></body></html>""" % {"title": e(title), "project": e(project or "proyecto"), "action": e(action),
-                            "rows": rows, "hidden": hidden, "panel": e(panel)}
+                            "rows": rows, "hidden": hidden, "panel": e(panel),
+                            "top": top, "mark": mark}
 
 
 def serve_once(page, seconds=60):

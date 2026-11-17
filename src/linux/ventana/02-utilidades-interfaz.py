@@ -507,6 +507,7 @@ SECTION_ICONS = [
     ("Se puede entrar desde otros equipos", ("icono", "network-wired-symbolic", "aviso-suave")),
     ("phpMyAdmin antiguo", ("logo", "phpmyadmin")),
     ("Certificados en los que confía", ("icono", "channel-insecure-symbolic", "aviso-suave")),
+    ("Certificados que Chrome rechaza", ("icono", "channel-insecure-symbolic", "aviso-suave")),
     ("Servicios", ("icono", "network-server-symbolic", "")),
     ("Host falseado", ("icono", "security-high-symbolic", "")),
     ("Dominios de los vhosts", ("logo", "apache")),
