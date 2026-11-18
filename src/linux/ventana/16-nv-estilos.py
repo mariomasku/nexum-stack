@@ -60,6 +60,8 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
                box-shadow: inset 0 2px 7px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.15); margin: 12px 14px 12px 14px;
                padding: 10px 10px 10px 10px; }
 .nv-terminal-vte { border-radius: 8px; }
+/* Los botones del visor: en varias líneas si no caben (nv_button_flow), sin el relleno ni el resaltado de FlowBox */
+.nv-botonera flowboxchild { padding: 0; background: none; }
 .nv-sep { background-color: alpha(@theme_fg_color, 0.15); min-width: 1px; margin: 6px 2px; }
 .nv-verde { color: %(g)s; }
 .nv-gris { color: alpha(@theme_fg_color, 0.3); }
@@ -331,12 +333,39 @@ def new_page(width=860):
     sw.add(content)
 
     def fit(_w, alloc):
-        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        side = page_side(alloc.width, [content])
         if content.get_margin_start() != side:
             content.set_margin_start(side)
             content.set_margin_end(side)
     sw.connect("size-allocate", fit)
     return sw, content
+
+
+def page_side(width, boxes):
+    """Margen a cada lado de una página de ancho width: lo que sobra hasta PAGE_MAX, contando con lo que pide su
+    contenido (sin los márgenes de ahora). Si no se contara, un contenido más ancho que PAGE_MAX hacía crecer la
+    ventana, con ella el margen y con el margen otra vez la ventana, sin parar."""
+    need = PAGE_MAX
+    for box in boxes:
+        least = box.get_preferred_width()[0] - box.get_margin_start() - box.get_margin_end()
+        need = max(need, least)
+    return max(26, (width - need) // 2)
+
+
+def nv_button_flow():
+    """Caja de los botones del visor: en una línea si caben y, si no, en varias. Así nunca pide más ancho que el
+    de su botón más ancho (con los botones grandes, una fila pedía más que la pantalla)."""
+    f = css(Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=False, column_spacing=8, row_spacing=8,
+                        min_children_per_line=1, max_children_per_line=40, valign=Gtk.Align.CENTER, hexpand=True),
+            "nv-botonera")
+    return f
+
+
+def nv_flow_add(flow, w):
+    flow.add(w)
+    child = w.get_parent()
+    if child is not None:
+        child.set_can_focus(False)
 
 
 def new_split_page(width=860):
@@ -353,7 +382,7 @@ def new_split_page(width=860):
     page.pack_start(sw, True, True, 0)
 
     def fit(_w, alloc):
-        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        side = page_side(alloc.width, [top, bottom])
         for box in (top, bottom):
             if box.get_margin_start() != side:
                 box.set_margin_start(side)

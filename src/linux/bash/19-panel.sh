@@ -1131,6 +1131,18 @@ QUE HACE
 
 VERSIONES
 
+1.57.25 (18 nov 2026)
+- Con los botones del proyecto a su tamaño máximo, la ventana crecía a
+  lo ancho sin parar. Ahora los botones que no caben en una línea pasan
+  a la siguiente, y la ventana se queda en su ancho (también en el
+  visor de Docker).
+- phpMyAdmin, con su logotipo de siempre en color: las velas naranjas y
+  el casco azul (en morado no se distinguía).
+- Todos los logotipos con el mismo tamaño: cada uno ocupa lo mismo que
+  uno cuadrado que llena su recuadro (los apaisados, como el velero de
+  phpMyAdmin o la nube de Compartir, un poco más anchos). La bola del
+  mundo de «Abrir web» salía más pequeña que el círculo de WordPress.
+
 1.57.24 (18 nov 2026)
 - Terminal de abajo: botón «ping». Escribe ping -c 3 con el dominio del
   proyecto cargado (uno detrás de otro, si tiene varios): con

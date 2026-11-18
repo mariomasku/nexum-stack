@@ -600,7 +600,10 @@ class NvGithub:
                 b = btns[key]
                 self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else specs[key],
                                 dict((k, n) for k, n, _i in VISOR_BUTTONS)[key])
-                acts.pack_start(b, False, False, 0)
+                if isinstance(acts, Gtk.FlowBox):
+                    nv_flow_add(acts, b)
+                else:
+                    acts.pack_start(b, False, False, 0)
         for b, spec, name in fixed:
             self.nv_restyle(b, conf, spec, name)
 

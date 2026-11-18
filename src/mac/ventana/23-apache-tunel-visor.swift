@@ -236,14 +236,16 @@ struct VisorIconView: View {
     var body: some View {
         switch icon {
         case .symbol(let s, let c):
-            Image(systemName: s).font(.system(size: size * 0.8)).foregroundColor(c).frame(width: size, height: size)
+            // (casi todo el recuadro, como los logotipos, que llenan el suyo: más pequeño, la bola del mundo no
+            // tenía el tamaño del círculo de WordPress)
+            Image(systemName: s).font(.system(size: size * 0.92)).foregroundColor(c).frame(width: size, height: size)
         case .logo(let l):
             if LOGO_STROKED.contains(l) {
                 LogoShape(d: LOGO_PATHS[l] ?? "")
                     .stroke(brand(l), style: StrokeStyle(lineWidth: size * 1.5 / 24, lineCap: .round, lineJoin: .round))
                     .frame(width: size, height: size)
             } else {
-                LogoShape(d: LOGO_PATHS[l] ?? "").fill(brand(l)).frame(width: size, height: size)
+                BrandLogo(name: l, size: size)
             }
         case .image(let i):
             Image(nsImage: i).resizable().frame(width: size, height: size)

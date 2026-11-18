@@ -708,8 +708,11 @@ class NvProyectos:
                 btns["imagenes"] = self.nv_images_button(x)
             eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",
                               lambda *_: self.on_unload_project(), flat=True)
-            self.nv_place_buttons(acts, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
-            acts.pack_start(eject, False, False, 0)
+            # (en varias líneas si no caben: con los botones grandes, la fila pedía más que la ventana)
+            flow = nv_button_flow()
+            self.nv_place_buttons(flow, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
+            nv_flow_add(flow, eject)
+            acts.pack_start(flow, True, True, 0)
         else:
             acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
                                       lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)

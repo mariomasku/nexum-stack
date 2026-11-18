@@ -394,6 +394,15 @@ QUE HACE
 
 VERSIONES
 
+1.57.25 (18 nov 2026)
+- phpMyAdmin, con su logotipo de siempre en color: las velas naranjas y
+  el casco azul (en morado no se distinguía).
+- Todos los logotipos con el mismo tamaño: cada uno ocupa lo mismo que
+  uno cuadrado que llena su recuadro (los apaisados, como el velero de
+  phpMyAdmin, un poco más anchos; la base de datos o Node salían más
+  pequeños que el círculo de WordPress). Los símbolos de los botones, como la bola del
+  mundo de «Abrir web», también algo más grandes.
+
 1.57.24 (18 nov 2026)
 - Terminal de abajo: botón «ping». Escribe ping -c 3 con el dominio del
   proyecto cargado (uno detrás de otro, si tiene varios): con

@@ -392,7 +392,10 @@ class NvDocker:
         btns["log"] = lg
         if kind in ("wp", "ps"):
             btns["imagenes"] = self.nv_images_button({"name": p["folder"], "kind": kind})
-        self.nv_place_buttons(acts, btns)
+        # (en varias líneas si no caben, como en el del proyecto cargado)
+        flow = nv_button_flow()
+        acts.pack_start(flow, True, True, 0)
+        self.nv_place_buttons(flow, btns)
         if web:
             vb = nv_button("list-add-symbolic", "Versiones de PHP…", "Gestionar sus versiones de PHP",
                            lambda *_: self.nv_docker_versions(p), "nv-proyecto-btn")
@@ -403,7 +406,7 @@ class NvDocker:
         conf = buttons_conf()
         self.nv_restyle(vb, conf, ("icono", "list-add-symbolic" if web else "go-up-symbolic"),
                         "Versiones de PHP" if web else "Pasar")
-        acts.pack_start(vb, False, False, 0)
+        nv_flow_add(flow, vb)
         power = nv_button("media-playback-stop-symbolic" if up else "media-playback-start-symbolic",
                           "Parar" if up else "Arrancar",
                           "Parar sus contenedores" if up else "Arrancar sus contenedores",

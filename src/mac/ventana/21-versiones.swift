@@ -13,7 +13,7 @@ struct VersionsView: View {
                     Spacer(minLength: 8)
                     Button(action: { model.panel = .components("") }) {
                         HStack(spacing: 6) {
-                            LogoShape(d: LOGO_PATHS["apache"] ?? "").fill(brand("apache")).frame(width: 15, height: 15)
+                            BrandLogo(name: "apache", size: 15)
                             Text("Componentes")
                         }
                     }
@@ -185,7 +185,7 @@ struct ComponentsPanel: View {
                     HStack(spacing: 5) {
                         if h.1.hasPrefix("logo:") {
                             let n = String(h.1.dropFirst(5))
-                            LogoShape(d: LOGO_PATHS[n] ?? "").fill(brand(n)).frame(width: 14, height: 14)
+                            BrandLogo(name: n, size: 14)
                         } else {
                             Image(systemName: h.1).font(.system(size: 11)).foregroundColor(.orange)
                         }

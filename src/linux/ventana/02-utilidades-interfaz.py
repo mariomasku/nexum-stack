@@ -294,6 +294,18 @@ LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "n
                "globo": ("#1C71D8", "#62A0EA"), "docker": ("#2496ED", "#4FAEF2"),
                "mailpit": ("#00A87B", "#2FD3A4"), "cloudflare": ("#F38020", "#F6A35A"),
                "github": ("#181717", "#E6EDF3")}
+# Los que van en varios colores, por partes (trazo y color claro, oscuro): phpMyAdmin, con las velas naranjas y el
+# casco y las olas azules, como su logotipo (en un solo color, el morado, no se distinguía)
+LOGO_PARTS = {"phpmyadmin": [
+    ("M 5.463 3.476 C 6.69 5.225 7.497 7.399 7.68 9.798 C 7.822 11.577 7.593 13.366 7.008 15.052 C 7.752 14.164 8.822 13.615 9.977 13.529 C 10.027 13.525 10.076 13.523 10.125 13.521 C 10.205 13.03 10.595 10.071 9.148 6.841 C 8.08 4.455 6.148 3.681 5.463 3.476 Z M 7.24 3.513 C 7.24 3.513 9.646 4.579 10.566 9.06 C 11.173 12.015 10.615 13.896 10.164 14.833 C 11.392 13.669 12.983 12.965 14.67 12.839 C 15.53 12.774 16.365 12.859 17.152 13.072 C 17.052 12.331 16.559 9.658 14.42 7.152 C 11.157 3.329 7.24 3.512 7.24 3.512 Z", ("#F39C12", "#FBB040")),
+    ("M 22.057 13.214 L 4.137 16.263 C 5.09 16.593 5.714 17.509 5.672 18.517 C 5.664 18.724 5.629 18.929 5.566 19.127 C 5.621 19.1 8.255 17.852 11.908 17.093 C 15.146 16.42 17.631 16.733 18.193 16.82 C 18.908 15.122 20.314 13.81 22.057 13.214 Z M 15.844 17.292 C 13.526 17.292 11.203 17.787 9.23 18.458 C 6.362 19.434 6.279 19.806 3.68 19.501 C 1.844 19.286 0 18.386 0 18.386 C 0 18.386 2.406 20.356 4.914 20.513 C 6.9 20.638 8.419 19.691 10.229 19.099 C 12.89 18.228 14.74 18.129 16.482 18.124 C 19.361 18.116 24 19.353 24 19.353 C 24 19.353 21.89 18.309 18.967 17.633 C 17.942 17.402 16.895 17.288 15.844 17.293 Z", ("#6C78AF", "#9DA3DB")),
+]}
+# El contorno real de cada logotipo (x, y, ancho, alto) sobre su cuadrícula de 24, medido dibujándolos. Con él, todos
+# se ven del mismo tamaño: cada uno ocupa la misma superficie que uno cuadrado que llena su recuadro (la bola del
+# mundo dejaba 2 de margen por lado; el velero de phpMyAdmin, apaisado, se veía más pequeño). Los apaisados o
+# alargados se salen por su lado largo, como mucho LOGO_OVER. Uno sin medir, la cuadrícula entera
+LOGO_BOX = {"actualizar": (1.25, 1.25, 21.5, 21.5), "apache": (5.2, 0, 13.6, 24), "bbdd": (3.5, 4, 17, 16), "cloudflare": (0, 6.6, 24, 10.85), "descarga": (4, 3, 16, 18.6), "docker": (0, 3.4, 24, 17.25), "github": (0, 0.3, 24, 23.4), "globo": (2, 2, 20, 20), "imagenes": (1.25, 1.25, 21.5, 21.5), "log": (2, 1, 20, 22), "mailpit": (0, 0.95, 24, 22.1), "mariadb": (0.05, 4.25, 23.95, 15.5), "node": (3.35, 2.2, 17.35, 19.6), "perl": (2.65, 0, 18.7, 24), "php": (0, 5.7, 24, 12.65), "phpmyadmin": (0.05, 3.5, 23.9, 17.05), "prestashop": (0, 1.05, 24, 21.95), "wordpress": (0, 0, 24, 24), "xampp": (0.1, 0, 23.8, 24)}
+LOGO_OVER = 1.2
 # Los que se dibujan con trazo, no rellenos
 LOGO_STROKED = {"imagenes"}
 _logo_cache = {}
@@ -308,6 +320,18 @@ def dark_theme():
     return _logo_cache["dark"]
 
 
+def logo_frame(name, size):
+    """(ancho, alto) de la imagen de un logotipo de tamaño size y su viewBox: el lado corto, size; el largo, hasta
+    size * LOGO_OVER, para que todos ocupen la misma superficie (logotipos.LOGO_BOX)."""
+    x, y, w, h = LOGO_BOX.get(name, (0, 0, 24, 24))
+    extra = min(LOGO_OVER, (max(w, h) / max(0.1, min(w, h))) ** 0.5)
+    side = max(w, h) / extra
+    cx, cy = x + w / 2, y + h / 2
+    if w >= h:
+        return int(round(size * extra)), size, "%g %g %g %g" % (x, cy - side / 2, w, side)
+    return size, int(round(size * extra)), "%g %g %g %g" % (cx - side / 2, y, side, h)
+
+
 def logo_pixbuf(name, size, scale, color=None):
     """Imagen del logotipo de un paquete a esa escala, en su color o en el que se indique."""
     key = (name, size, scale, color)
@@ -315,8 +339,13 @@ def logo_pixbuf(name, size, scale, color=None):
         color = color or LOGO_COLORS[name][1 if dark_theme() else 0]
         paint = ('fill="none" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
                  if name in LOGO_STROKED else 'fill="%s"') % color
-        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="%d" height="%d">'
-               '<path %s d="%s"/></svg>' % (size * scale, size * scale, paint, LOGO_PATHS[name]))
+        paths = '<path %s d="%s"/>' % (paint, LOGO_PATHS[name])
+        # (en sus colores, por partes; con un color pedido, en ese, entero)
+        if key[3] is None and name in LOGO_PARTS:
+            paths = "".join('<path fill="%s" d="%s"/>' % (c[1 if dark_theme() else 0], d) for d, c in LOGO_PARTS[name])
+        w, h, box = logo_frame(name, size * scale)
+        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s" width="%d" height="%d">%s</svg>'
+               % (box, w, h, paths))
         loader = GdkPixbuf.PixbufLoader.new_with_type("svg")
         loader.write(svg.encode())
         loader.close()
@@ -465,7 +494,8 @@ class MonoLogo(Gtk.DrawingArea):
     def __init__(self, name, size=16, colored=False):
         super().__init__()
         self.name, self.size, self.colored = name, size, colored
-        self.set_size_request(size, size)
+        w, h, _box = logo_frame(name, size)
+        self.set_size_request(w, h)
         self.set_valign(Gtk.Align.CENTER)
 
     def do_draw(self, cr):
@@ -478,7 +508,8 @@ class MonoLogo(Gtk.DrawingArea):
         pix = logo_pixbuf(self.name, self.size, scale, color)
         cr.save()
         cr.scale(1.0 / scale, 1.0 / scale)
-        Gdk.cairo_set_source_pixbuf(cr, pix, 0, (self.get_allocated_height() * scale - pix.get_height()) / 2)
+        Gdk.cairo_set_source_pixbuf(cr, pix, (self.get_allocated_width() * scale - pix.get_width()) / 2,
+                                    (self.get_allocated_height() * scale - pix.get_height()) / 2)
         cr.paint_with_alpha(c.alpha)
         cr.restore()
         return False

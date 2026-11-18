@@ -37,7 +37,7 @@ struct DatabasesView: View {
             Spacer(minLength: 8)
             Button(action: { openURL("http://127.0.0.1/phpmyadmin/") }) {
                 HStack(spacing: 6) {
-                    LogoShape(d: LOGO_PATHS["phpmyadmin"] ?? "").fill(brand("phpmyadmin")).frame(width: 15, height: 15)
+                    BrandLogo(name: "phpmyadmin", size: 15)
                     Text("phpMyAdmin")
                 }
             }
@@ -165,9 +165,9 @@ struct DatabasesView: View {
                 Circle().fill(GREEN).frame(width: 7, height: 7).opacity(isUsed ? 1 : 0)
                     .tip(isUsed ? "La usa el proyecto cargado (\(loaded?.name ?? ""))" : "")
                 if isPsDb(db) {
-                    LogoShape(d: LOGO_PATHS["prestashop"] ?? "").fill(brand("prestashop")).frame(width: 13, height: 13)
+                    BrandLogo(name: "prestashop", size: 13)
                 } else if db.lowercased().hasPrefix("wp_") {
-                    LogoShape(d: LOGO_PATHS["wordpress"] ?? "").fill(brand("wordpress")).frame(width: 13, height: 13)
+                    BrandLogo(name: "wordpress", size: 13)
                 }
                 Text(db).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle).tip(db)
             }

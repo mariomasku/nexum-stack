@@ -286,7 +286,7 @@ struct DockerView: View {
             HStack(spacing: 8) {
                 Image(systemName: open ? "chevron.down" : "chevron.right")
                     .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary).frame(width: 10)
-                LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 16, height: 16)
+                BrandLogo(name: "docker", size: 16)
                 Text(g.title).font(.system(size: 13, weight: .semibold)).lineLimit(1).truncationMode(.middle)
                 if up { StatusDot(on: true, size: 7).tip("Todos sus contenedores en marcha") }
             }

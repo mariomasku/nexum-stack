@@ -699,7 +699,7 @@ struct ToolsView: View {
           TileCard("Túnel de Cloudflare", "Para enseñar una web de este Mac a un cliente o a un compañero: una dirección https://….trycloudflare.com (sin cuenta de Cloudflare; cambia cada vez) con contraseña, que se cierra sola. Sin abrir puertos del router. La web no se toca: su dominio local se cambia por el del túnel al pasar. Se abre con «Compartir» en el visor del proyecto, y ahí se elige su contraseña, cuánto dura y si se bloquea el admin.") {
             Tile("cloudflared", info == nil ? "…" : (info?[1] == "1" ? "Versión \(info?[2] ?? ""), en ~/.nexum/tunel"
                                                      : "Aún no está: se descarga de GitHub la primera vez que compartes (unos 20 MB)"),
-                leading: { LogoShape(d: LOGO_PATHS["cloudflare"] ?? "").fill(brand("cloudflare")).frame(width: 20, height: 20) }) {
+                leading: { BrandLogo(name: "cloudflare", size: 20) }) {
                 if let f = info, f[1] != "1" || f[2] != f[3] {
                     Button(f[1] != "1" ? "Instalar" : "Actualizar a la \(f[3])") {
                         model.runTask("Instalando cloudflared", ["tunel-instalar"], progress: true, doneText: "cloudflared instalado", autoClose: true) { _, _, _ in
@@ -770,7 +770,7 @@ struct ToolsView: View {
     func mailCard(_ d: AppData) -> some View {
         if let m = d.mail {
             TileCard("Correo de pruebas (Mailpit)", "Lo que mandan las webs de este Mac (formularios, pedidos, contraseñas) no llega a nadie: va a Mailpit, que lo enseña en su bandeja. PHP (mail()) en todas las versiones, PrestaShop por SMTP y WordPress según su opción. Lo que se cambia en las BBDD no va en las copias que descargas (exportar-bd, copiar-bd, Docker). Mailpit arranca y para con la versión activa y solo se ve desde este Mac.", tiles: true,
-                     lead: AnyView(LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 20, height: 20)),
+                     lead: AnyView(BrandLogo(name: "mailpit", size: 20)),
                      tail: AnyView(mailSwitch(m))) {
                 Tile("WordPress con plugins de SMTP o Brevo", mailWpText(m.wp)) {
                     SearchPicker(selection: Binding(get: { m.wp }, set: { model.setMailWp($0) }),

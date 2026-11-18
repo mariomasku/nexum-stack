@@ -535,7 +535,7 @@ struct ProjectsView: View {
                 if !dockers.isEmpty {
                     Button(action: { model.dockerForLoaded(x) }) {
                         HStack(spacing: 5) {
-                            LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 14, height: 14)
+                            BrandLogo(name: "docker", size: 14)
                             Text("Montar en Docker").lineLimit(1)
                         }
                     }

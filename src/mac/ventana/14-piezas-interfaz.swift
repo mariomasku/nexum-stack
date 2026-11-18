@@ -348,7 +348,63 @@ let LOGO_COLORS: [String: Color] = [
 let LOGO_STROKED: Set<String> = ["imagenes"]
 
 /// (el de GitHub, casi negro, con el color del texto: en el tema oscuro no se veía)
+/// Los logotipos en varios colores, por partes (trazo, color): phpMyAdmin, con las velas naranjas y el casco y las
+/// olas azules, como su logotipo (en un solo color, el morado, no se distinguía)
+let LOGO_PARTS: [String: [(String, Color)]] = [
+    "phpmyadmin": [("M 5.463 3.476 C 6.69 5.225 7.497 7.399 7.68 9.798 C 7.822 11.577 7.593 13.366 7.008 15.052 C 7.752 14.164 8.822 13.615 9.977 13.529 C 10.027 13.525 10.076 13.523 10.125 13.521 C 10.205 13.03 10.595 10.071 9.148 6.841 C 8.08 4.455 6.148 3.681 5.463 3.476 Z M 7.24 3.513 C 7.24 3.513 9.646 4.579 10.566 9.06 C 11.173 12.015 10.615 13.896 10.164 14.833 C 11.392 13.669 12.983 12.965 14.67 12.839 C 15.53 12.774 16.365 12.859 17.152 13.072 C 17.052 12.331 16.559 9.658 14.42 7.152 C 11.157 3.329 7.24 3.512 7.24 3.512 Z", hexColor(0xF39C12)), ("M 22.057 13.214 L 4.137 16.263 C 5.09 16.593 5.714 17.509 5.672 18.517 C 5.664 18.724 5.629 18.929 5.566 19.127 C 5.621 19.1 8.255 17.852 11.908 17.093 C 15.146 16.42 17.631 16.733 18.193 16.82 C 18.908 15.122 20.314 13.81 22.057 13.214 Z M 15.844 17.292 C 13.526 17.292 11.203 17.787 9.23 18.458 C 6.362 19.434 6.279 19.806 3.68 19.501 C 1.844 19.286 0 18.386 0 18.386 C 0 18.386 2.406 20.356 4.914 20.513 C 6.9 20.638 8.419 19.691 10.229 19.099 C 12.89 18.228 14.74 18.129 16.482 18.124 C 19.361 18.116 24 19.353 24 19.353 C 24 19.353 21.89 18.309 18.967 17.633 C 17.942 17.402 16.895 17.288 15.844 17.293 Z", hexColor(0x6C78AF))],
+]
+
+/// Un logotipo en sus colores (por partes, si las tiene), del tamaño dado
+struct BrandLogo: View {
+    let name: String
+    let size: CGFloat
+    var body: some View {
+        if let parts = LOGO_PARTS[name] {
+            ZStack {
+                ForEach(parts.indices, id: \.self) { i in LogoShape(d: parts[i].0).fill(parts[i].1) }
+            }
+            .frame(width: size, height: size)
+        } else {
+            LogoShape(d: LOGO_PATHS[name] ?? "").fill(brand(name)).frame(width: size, height: size)
+        }
+    }
+}
+
 func brand(_ name: String) -> Color { return name == "github" ? Color.primary : (LOGO_COLORS[name] ?? .gray) }
+
+/// El contorno real de cada logotipo (x, y, ancho, alto) sobre su cuadrícula de 24, medido dibujándolos. Con él,
+/// todos se ven del mismo tamaño: cada uno ocupa la misma superficie que uno cuadrado que llena su marco (el velero
+/// de phpMyAdmin, apaisado, se veía más pequeño). Los apaisados o alargados se salen por su lado largo, como mucho
+/// LOGO_OVER. Uno sin medir, la cuadrícula entera
+let LOGO_BOX: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
+    "actualizar": (1.25, 1.25, 21.5, 21.5),
+    "apache": (5.2, 0, 13.6, 24),
+    "bbdd": (3.5, 4, 17, 16),
+    "cloudflare": (0, 6.6, 24, 10.85),
+    "descarga": (4, 3, 16, 18.6),
+    "docker": (0, 3.4, 24, 17.25),
+    "github": (0, 0.3, 24, 23.4),
+    "imagenes": (1.25, 1.25, 21.5, 21.5),
+    "log": (2, 1, 20, 22),
+    "mailpit": (0, 0.95, 24, 22.1),
+    "mariadb": (0.05, 4.25, 23.95, 15.5),
+    "node": (3.35, 2.2, 17.35, 19.6),
+    "perl": (2.65, 0, 18.7, 24),
+    "php": (0, 5.7, 24, 12.65),
+    "phpmyadmin": (0.05, 3.5, 23.9, 17.05),
+    "prestashop": (0, 1.05, 24, 21.95),
+    "wordpress": (0, 0, 24, 24),
+    "xampp": (0.1, 0, 23.8, 24),
+]
+let LOGO_OVER: CGFloat = 1.2
+
+/// El recuadro de cada trazo (el de su logotipo; las partes de uno en varios colores, el del logotipo entero)
+let LOGO_BOX_FOR: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = {
+    var m: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = [:]
+    for (k, d) in LOGO_PATHS { if let b = LOGO_BOX[k] { m[d] = b } }
+    for (k, parts) in LOGO_PARTS { if let b = LOGO_BOX[k] { for p in parts { m[p.0] = b } } }
+    return m
+}()
 
 /// Dibuja el trazo de un logotipo (solo M, L, C y Z) escalado a su marco
 struct LogoShape: Shape {
@@ -377,10 +433,13 @@ struct LogoShape: Shape {
                 p.closeSubpath()
             }
         }
-        let k = min(rect.width, rect.height) / 24
-        let move = CGAffineTransform(translationX: rect.minX + (rect.width - 24 * k) / 2,
-                                     y: rect.minY + (rect.height - 24 * k) / 2)
-        return p.applying(move.scaledBy(x: k, y: k))
+        // (su contorno real, centrado: todos con la misma superficie; los apaisados se salen un poco por los lados)
+        let b = LOGO_BOX_FOR[d] ?? (0, 0, 24, 24)
+        let long = Swift.max(b.2, b.3), short = Swift.max(0.1, Swift.min(b.2, b.3))
+        let extra = Swift.min(LOGO_OVER, (long / short).squareRoot())
+        let k = Swift.min(rect.width, rect.height) * extra / long
+        let move = CGAffineTransform(translationX: rect.midX, y: rect.midY)
+        return p.applying(move.scaledBy(x: k, y: k).translatedBy(x: -(b.0 + b.2 / 2), y: -(b.1 + b.3 / 2)))
     }
 }
 

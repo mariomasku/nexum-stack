@@ -111,7 +111,7 @@ struct TopBar: View {
         let running = d?.running ?? false
         let svc = Dictionary((model.services ?? []).map { ($0.name, $0.running) }, uniquingKeysWith: { a, _ in a })
         return HStack(spacing: 9) {
-            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 22, height: 22)
+            BrandLogo(name: "php", size: 22)
             VStack(alignment: .leading, spacing: 0) {
                 // (siempre en una línea: el visor se ensancha antes que partir «XAMPP-8.5»)
                 Text(act.map { "PHP \($0.php)" } ?? "Ninguna versión activa").font(.system(size: 13, weight: .semibold))
@@ -191,7 +191,7 @@ struct TopBar: View {
                 ForEach(c.installs) { i in
                     Button(action: { powerOpen = false; model.activate(i.folder) }) {
                         HStack(spacing: 10) {
-                            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 16, height: 16)
+                            BrandLogo(name: "php", size: 16)
                             Text("PHP \(i.php)").font(.system(size: 13))
                             Text("XAMPP-\(i.folder)").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
                             Spacer(minLength: 12)
@@ -238,7 +238,7 @@ struct TopBar: View {
         if let m = model.data?.mail, m.on {
             Button(action: { model.openMail() }) {
                 HStack(spacing: 6) {
-                    LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 15, height: 15)
+                    BrandLogo(name: "mailpit", size: 15)
                     Text("Correo")
                     if let n = model.mailUnread, n > 0 {
                         Text(n > 99 ? "99+" : "\(n)")

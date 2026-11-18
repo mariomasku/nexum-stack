@@ -143,7 +143,7 @@ func iconAction(_ symbol: String, _ tip: String, kind: String = "", _ action: @e
 /// Botón de una tabla con el logotipo de un paquete
 func logoAction(_ logo: String, _ tip: String, _ action: @escaping () -> Void) -> some View {
     Button(action: action) {
-        LogoShape(d: LOGO_PATHS[logo] ?? "").fill(brand(logo)).frame(width: 14, height: 14)
+        BrandLogo(name: logo, size: 14)
     }
     .buttonStyle(OutlineButton(compact: true))
     .tip(tip)
@@ -206,7 +206,7 @@ struct Chip: View {
     var body: some View {
         HStack(spacing: 4) {
             if docker {
-                LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 11, height: 11)
+                BrandLogo(name: "docker", size: 11)
             }
             Text(text)
         }
@@ -239,7 +239,7 @@ struct KindIcon: View {
     var body: some View {
         if kind == "wp" || kind == "ps" {
             let name = kind == "wp" ? "wordpress" : "prestashop"
-            LogoShape(d: LOGO_PATHS[name] ?? "").fill(brand(name)).frame(width: size, height: size)
+            BrandLogo(name: name, size: size)
         } else {
             Image(systemName: "folder").font(.system(size: size * 0.8)).foregroundColor(.secondary)
                 .frame(width: size, height: size)
@@ -644,7 +644,7 @@ struct PageTitle: View {
             } else {
             HStack(spacing: 10) {
                 if let l = logo {
-                    LogoShape(d: LOGO_PATHS[l] ?? "").fill(brand(l)).frame(width: 30, height: 30)
+                    BrandLogo(name: l, size: 30)
                 } else if let sym = symbol {
                     Image(systemName: sym).font(.system(size: 22, weight: .medium)).frame(width: 30, height: 30)
                 }
