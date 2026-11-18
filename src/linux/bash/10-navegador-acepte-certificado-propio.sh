@@ -438,6 +438,13 @@ EOF
     if ! cmp -s "$copy" "$HOSTS_FILE"; then
         edit_hosts --aplicar "$copy" || { rm -f "$copy"; return 1; }
     fi
+    # Los WordPress con dominio propio, a la direccion que toca: la del dominio si esta falseado y la
+    # de web.local si no (en simulacion, con el hosts que quedaria)
+    if [ "$DRY" -eq 1 ]; then
+        HOSTS_FILE=$copy wp_urls_sync_all
+    else
+        wp_urls_sync_all
+    fi
     rm -f "$copy"
 }
 

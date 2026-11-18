@@ -651,9 +651,10 @@
         <p>Lo que hace, paso a paso:</p>
         <ol>
           <li>Busca en los vhosts los certificados que están en <code>/etc/ssl/certs</code> (donde el sistema los da por buenos para
-            cualquier web), los que son de una autoridad (CA) o los que faltan.</li>
-          <li>Crea para cada dominio uno propio que solo vale para él (<code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-            -subj "/CN=&lt;dominio&gt;" …</code>) y cambia su vhost para usarlo.</li>
+            cualquier web), los que son de una autoridad (CA), los que faltan o los que
+            llevan una extensión repetida.</li>
+          <li>Crea para cada dominio uno propio que solo vale para él (ver <a href="#dominios-certificados-como">Cómo se crea cada
+            certificado</a>) y cambia su vhost para usarlo.</li>
           <li>Guarda los certificados viejos en <code>/etc/ssl/lvm-anteriores-…</code> y deja de confiar en esa CA<span data-so="linux">
             (<code>sudo update-ca-certificates --fresh</code>)</span>.</li>
           <li>Comprueba la configuración de Apache y lo recarga.</li>
@@ -1092,7 +1093,8 @@
           que PHP no siga sirviendo el proyecto anterior.</li>
         <li>Recuerda la base: escribe <code>wp_panaderia_luna@8.4=panaderia-luna</code> en <code>~/.nexum/proyectos</code>.</li>
         <li>WordPress: comprueba que <code>wp-config.php</code> usa esa base, entra en el MariaDB local y lleva <code>WP_HOME</code> y
-          <code>WP_SITEURL</code> en <code>http://web.local</code>; si no, lo rehace con la plantilla de este equipo
+          <code>WP_SITEURL</code> en <code>https://web.local</code> (o en su dominio, si es suyo y está falseado: ver
+          <a href="#dominios-wordpress">Un WordPress con su dominio</a>); si no, lo rehace con la plantilla de este equipo
           (<code>~/.nexum/wordpress/panaderia-luna.wp-config.php</code>). PrestaShop: <code>app/config/parameters.php</code>
           pasa a usar la base local y, si su dominio es suyo, crea su vhost y su certificado.</li>
         <li><code>/etc/hosts</code>: falsea el dominio de la tienda (quita el <code>#</code> de su línea o añade
@@ -1331,6 +1333,10 @@
   <ul>
     <li><b>Encendido</b>: ese dominio lleva a tu equipo. El navegador abre tu copia local con la dirección de verdad.</li>
     <li><b>Apagado</b>: el dominio vuelve a llevar a la web real, en internet.</li>
+    <li>En un <b>WordPress</b>, cambia también adónde lleva la web: su <code>wp-config.php</code> tiene <code>WP_SITEURL</code> y
+      <code>WP_HOME</code> dos veces, con <code>https://web.local</code> y con el dominio, y solo una pareja sin comentar. Encendido, la del dominio;
+      apagado, la de <code>web.local</code>. Así, con el dominio sin falsear, tu copia local nunca te manda a la web de producción (ver
+      <a href="#dominios-wordpress">Un WordPress con su dominio</a>).</li>
     <li>No pregunta antes. Pide la contraseña de administrador y, con las <a href="#carpetas">copias de los ficheros que cambia el
       programa</a> encendidas, guarda una copia del fichero de hosts en <code>~/nexum-backups</code>.</li>
     <li>Al cargar otro proyecto, los dominios falseados de este vuelven a la web real. Lo mismo se hace en <a href="#dominios">Dominios y
@@ -3680,7 +3686,7 @@
         salvo con el DNS de Docker activado.</li>
       <li>Arranca el Apache de Docker con el vhost nuevo y su PHP: <code>docker compose up -d php84</code> en la carpeta del proyecto.</li>
       <li>Hace que el navegador acepte el certificado de <code>*.docker.local</code>:
-        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>
+        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>
           (y lo mismo en cada perfil de Firefox).</span>
         <span data-so="mac"><code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.nexum/docker/web/certs/docker.local.crt</code>
           (el Mac te pide la contraseña en una ventana).</span></li>
@@ -4141,9 +4147,54 @@
         deja de estarlo, a no aceptarse (ver <a href="#dominios-certificados">Los certificados</a>).</span><span data-so="mac">Deja de aceptar en
         el navegador el certificado de una tienda que deja de estar falseada; para aceptar el de una recién falseada, pulsa «Confiar» en
         Versiones (ver <a href="#dominios-certificados">Los certificados</a>).</span></li>
+      <li>En cada WordPress con dominio propio, deja sin comentar en su <code>wp-config.php</code> la pareja de <code>WP_SITEURL</code> y
+        <code>WP_HOME</code> que toca: la del dominio si está falseado y la de <code>web.local</code> si no (ver
+        <a href="#dominios-wordpress">Un WordPress con su dominio</a>).</li>
     </ol>
     <p>Para comprobarlo: <code>grep panaderia-luna /etc/hosts</code> (sin <code>#</code> delante: falseado) o <code>ping -c1 panaderia-luna.com</code>
       (falseado, contesta <code>127.0.0.1</code>).</p>
+  </details>
+
+  <h3 id="dominios-wordpress">Un WordPress con su dominio</h3>
+  <p>WordPress lleva siempre a la dirección de <code>WP_HOME</code>: si en tu copia local esa dirección es la del dominio y el dominio no
+    está falseado, al abrir <code>web.local</code> acabas en la web de <b>producción</b>, sin darte cuenta, y lo que cambies (entradas, ajustes,
+    pedidos) se cambia allí. Por eso el <code>wp-config.php</code> de un WordPress con dominio propio lleva las dos parejas, y solo una sin
+    comentar:</p>
+  <ul>
+    <li><b>Dominio falseado</b>: sin comentar, la del dominio. La web se abre con su dirección de verdad, en tu equipo.</li>
+    <li><b>Sin falsear</b>: sin comentar, la de <code>web.local</code>. El dominio es la web de producción, y la copia local no te lleva a él.</li>
+  </ul>
+  <p>Las cambia el programa cada vez que cambia el fichero de hosts: con el interruptor, al cargar un proyecto y al crear uno con su dominio.
+    Si en tu <code>wp-config.php</code> hay otra <code>WP_SITEURL</code> o <code>WP_HOME</code> sin comentar (por ejemplo, la de producción al
+    pegar su código encima), se cambia por estas: solo puede haber una de cada. Las comentadas con otra dirección no se tocan.</p>
+  <p>Además, nada de lo que tu copia local responde con un dominio real se queda guardado en el navegador: Apache le dice que no lo guarde
+    (<code>Cache-Control: no-store</code>). Si se guardara, por ejemplo una redirección a <code>web.local</code> de cuando estaba falseado, al
+    dejar de falsearlo el dominio seguiría abriendo <code>web.local</code> en lugar de la web de producción. Los <code>.local</code>, los
+    <code>.test</code> y <code>localhost</code> no llevan esa cabecera.</p>
+  <div class="nota cuidado"><b>Si un dominio sin falsear sigue abriendo web.local</b>El navegador guardó una redirección antes de tener esta
+    protección. Bórrala una vez: en Chrome, Configuración → Privacidad y seguridad → Borrar datos de navegación → «Archivos e imágenes
+    almacenados en caché». Comprueba también que has aplicado la seguridad nueva a las versiones de PHP (el aviso «Protegerlas» de
+    <a href="#versiones">Versiones</a>).</div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>No tiene orden propia: lo hace <code>nexum hosts-falsear</code> (y la carga de un proyecto) después de cambiar el fichero de hosts.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Busca los WordPress con dominio propio: el que guardaste en «Nuevo proyecto con dominio falseado» o el de un vhost que apunta a su
+        carpeta.</li>
+      <li>Mira si el dominio está falseado: una línea sin <code>#</code> en el fichero de hosts con <code>127.0.0.1</code> y el dominio.</li>
+      <li>Quita del <code>wp-config.php</code> las <code>WP_SITEURL</code> y <code>WP_HOME</code> sin comentar y las de las dos parejas, y pone en su
+        sitio (si no había, delante de los datos de la base) las cuatro líneas, con <code>// </code> delante de las que no tocan. Con
+        <code>panaderia-luna.com</code> sin falsear:
+        <pre><code>// nexum: WP_SITEURL y WP_HOME: la pareja sin comentar es la del dominio mientras esta falseado …
+define('WP_SITEURL', 'https://web.local');
+define('WP_HOME', 'https://web.local');
+// define('WP_SITEURL', 'https://panaderia-luna.com');
+// define('WP_HOME', 'https://panaderia-luna.com');</code></pre></li>
+      <li>Si cambia algo, lo escribe encima, sin tocar el resto del fichero (ni sus finales de línea), y dice adónde lleva ahora.</li>
+    </ol>
+    <p>Para comprobarlo: <code>grep -n "WP_HOME" <span data-so="linux">/opt/htdocs</span><span
+      data-so="mac">/Library/Nexum/XAMPP-compartido/htdocs</span>/panaderia-luna/wp-config.php</code>: la que no lleva <code>//</code> delante es la que
+      vale.</p>
   </details>
 
   <h3 id="dominios-local">Los dominios .local</h3>
@@ -4204,7 +4255,8 @@
         <code>sudo chown</code> a tu usuario si la carpeta de proyectos no es tuya)</span><span
         data-so="mac"><code>mkdir -p /Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code></span>.</li>
       <li>Si no tiene certificado, crea uno autofirmado para el dominio y su <code>www</code>, válido diez años y que no es de autoridad:
-        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=panaderia-luna.com" -addext "basicConstraints=critical,CA:FALSE" -addext "subjectAltName=DNS:panaderia-luna.com,DNS:www.panaderia-luna.com" -keyout … -out …</code>,
+        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config … -keyout … -out …</code> (ver
+        <a href="#dominios-certificados-como">Cómo se crea cada certificado</a>),
         y lo deja en <span data-so="linux"><code>/opt/config/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code> (como root:
         <code>sudo install -o 0 -g 0 -m 644 …</code>; la clave, con <code>-m 600</code>)</span><span
         data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code></span>.</li>
@@ -4249,16 +4301,69 @@
       <li>Lee los vhosts <code>https</code> y el fichero de hosts para saber qué certificados se pueden aceptar (los propios de cada proyecto, y los
         de un dominio real solo si está falseado) y cuáles ya no.</li>
       <li data-so="linux">Quita los que ya no se deben aceptar de los almacenes de certificados de Chrome (<code>~/.pki/nssdb</code>), del Chromium
-        de snap y de cada perfil de Firefox: <code>certutil -D -d sql:$HOME/.pki/nssdb -n "nexum panaderia-luna.com"</code>.</li>
+        de snap y de cada perfil de Firefox: <code>certutil -D -d sql:$HOME/.pki/nssdb -n "lvm-instalador panaderia-luna.com"</code>.</li>
       <li data-so="linux">Añade los que faltan, con confianza de servidor («P»), no de autoridad:
-        <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum panaderia-luna.com" -t "P,," -i /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code>.
+        <code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador panaderia-luna.com" -t "P,," -i /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code>.
         Si no tienes <code>certutil</code>, te dice que lo instales: <code>sudo apt install libnss3-tools</code>.</li>
       <li data-so="mac">Quita los que ya no se deben aceptar de tu llavero: <code>security delete-certificate -Z &lt;huella&gt; ~/Library/Keychains/login.keychain-db</code>.</li>
       <li data-so="mac">Añade los que faltan a tus ajustes de confianza, solo para webs (el Mac te pide la contraseña en una ventana):
         <code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db /Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code>.</li>
     </ol>
-    <p>Para comprobarlo: <span data-so="linux"><code>certutil -L -d sql:$HOME/.pki/nssdb</code> enseña los <code>nexum …</code></span><span
+    <p>Para comprobarlo: <span data-so="linux"><code>certutil -L -d sql:$HOME/.pki/nssdb</code> enseña los <code>lvm-instalador …</code></span><span
       data-so="mac">abre el proyecto en Safari o Chrome: no avisa</span>.</p>
+  </details>
+
+  <h3 id="dominios-certificados-como">Cómo se crea cada certificado</h3>
+  <p>El programa crea solo el certificado de cada dominio con <code>https</code>: el de <code>web.local</code> al cargar el primer proyecto, el
+    de un dominio al crear su vhost (en «Nuevo dominio» o al cargar una tienda) y uno nuevo al pulsar «Arreglarlos». No hay que hacerlo a mano.
+    Todos son <b>autofirmados</b> (no los firma ninguna autoridad), duran <b>diez años</b>, sirven para el dominio y su <code>www</code>, y
+    <b>no son de autoridad</b> (<code>CA:FALSE</code>): con su clave no se puede firmar el certificado de ninguna otra web.</p>
+  <p>El comando de siempre de los manuales de XAMPP,
+    <code>sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/dominio-selfsigned.key -out /etc/ssl/certs/dominio-selfsigned.crt</code>,
+    no se usa, porque da un certificado que no sirve o que es peligroso:</p>
+  <ul>
+    <li><b>Chrome lo rechaza.</b> No lleva el dominio en <code>subjectAltName</code>, y Chrome solo mira ahí (no se fía del nombre del
+      sujeto, el <code>CN</code>): avisa con «La conexión no es privada» aunque lo aceptes.</li>
+    <li><b>Es de autoridad.</b> Sin decir otra cosa, OpenSSL le pone las extensiones de autoridad de su configuración
+      (<code>CA:TRUE</code>). Si el equipo se fía de él, quien tenga su clave puede fabricar un certificado válido para cualquier web, también la
+      de tu banco.</li>
+    <li><b>El sistema lo da por bueno para cualquier web.</b> <code>/etc/ssl/certs</code> es la carpeta de las autoridades en las que confía
+      todo el equipo: lo que se deja ahí vale para todo, no solo para su dominio.</li>
+    <li>Caduca al año, y el navegador vuelve a avisar.</li>
+  </ul>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>Lo que hace, paso a paso (con <code>panaderia-luna.com</code>):</p>
+    <ol>
+      <li>Comprueba que el dominio es válido y que el certificado y la clave van en la carpeta de certificados del programa,
+        <span data-so="linux"><code>/opt/config/ssl</code></span><span data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl</code></span>, con un nombre
+        acabado en <code>.crt</code> y <code>.key</code>. En cualquier otro sitio no lo crea.</li>
+      <li>Escribe en una carpeta temporal<span data-so="linux"> (de root, si la carpeta de certificados es de root)</span> un fichero de configuración
+        propio con lo único que lleva el certificado:
+        <pre><code>[req]
+distinguished_name = dn
+x509_extensions = ext
+prompt = no
+[dn]
+CN = panaderia-luna.com
+[ext]
+basicConstraints = critical,CA:FALSE
+subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
+        Va en un fichero y no con <code>-addext</code>: con <code>-addext</code>, el OpenSSL de Ubuntu 20.04 le añade además las extensiones de su
+        configuración, el certificado sale con dos <code>basicConstraints</code> y Chrome no lo abre (<code>net::ERR_CERT_INVALID</code>).</li>
+      <li>Crea el certificado y su clave con ese fichero:
+        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config cnf -keyout key -out crt</code><span data-so="linux"> (como root, con
+        <code>sudo</code>, si la carpeta es de root)</span><span data-so="mac"> (con tu usuario y el OpenSSL de Homebrew, si lo tienes)</span>.</li>
+      <li>Los deja en su sitio, de root, el certificado que lo puede leer todo el mundo y la clave solo root:
+        <span data-so="linux"><code>sudo install -o 0 -g 0 -m 644 crt /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code> y
+        <code>sudo install -o 0 -g 0 -m 600 key /opt/config/ssl/panaderia-luna.com-selfsigned.key</code></span><span
+        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code> (644) y <code>.key</code> (600), de
+        <code>root:wheel</code></span>. El de <code>web.local</code> se llama <code>web.local.crt</code> y <code>web.local.key</code>.</li>
+      <li>Borra la carpeta temporal y le dice al navegador que acepte ese certificado para ese dominio (ver
+        <a href="#dominios-certificados">Los certificados</a>).</li>
+    </ol>
+    <p>Para comprobarlo:
+      <code>openssl x509 -in <span data-so="linux">/opt/config/ssl</span><span data-so="mac">/Library/Nexum/XAMPP-compartido/ssl</span>/panaderia-luna.com-selfsigned.crt -noout -ext basicConstraints,subjectAltName</code>
+      dice una sola vez <code>CA:FALSE</code> y los dos nombres.</p>
   </details>
 
   <h3 id="dominios-imagenes">Ver las imágenes de producción en un .local</h3>
@@ -5077,7 +5182,7 @@
         <li>Busca el certificado del Apache de Docker: <code>~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
         <li>Lo añade a cada almacén de certificados de tus navegadores: el de Chrome (<code>~/.pki/nssdb</code>), el de Chromium instalado como
           snap y el de cada perfil de Firefox. Si ya estaba uno viejo, lo quita antes. Para cada uno:
-          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
+          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>certutil -L -d sql:$HOME/.pki/nssdb | grep docker</code>.</p>
     </div>

@@ -185,6 +185,8 @@ details.terminal > summary::after { content: " ▸"; }
 details.terminal[open] > summary::after { content: " ▾"; }
 details.terminal[open] { background: var(--codigo); border-style: solid; }
 details.terminal code { background: var(--papel); }
+pre { margin: 8px 0; overflow-x: auto; }
+pre code { display: block; padding: 10px 12px; white-space: pre; line-height: 1.45; }
 details.terminal ol { padding-left: 22px; }
 details.terminal li { margin: 4px 0; }
 

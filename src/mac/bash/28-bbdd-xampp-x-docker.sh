@@ -394,6 +394,26 @@ QUE HACE
 
 VERSIONES
 
+1.57.23 (18 nov 2026)
+- WordPress con su dominio: al dejar de falsear el dominio, la copia
+  local ya no lleva a la web de producción. Su wp-config.php lleva
+  WP_SITEURL y WP_HOME dos veces, con https://web.local y con el
+  dominio, y solo una pareja sin comentar: la del dominio mientras está
+  falseado y la de web.local cuando no. Las cambia el interruptor del
+  dominio, y también cargar un proyecto o crearlo con su dominio. Antes
+  se quedaba la del dominio aunque ya no estuviera falseado: al abrir
+  web.local se acababa en producción sin darse cuenta.
+- Dominio real que, sin falsear, seguía abriendo web.local en vez de
+  la web de producción: era una redirección (301) de la copia local
+  guardada en el navegador mientras estaba falseado. Ahora tu Apache
+  le dice al navegador que no guarde nada de lo que recibe con un
+  dominio real (Cache-Control: no-store; los .local, .test y localhost
+  siguen como antes). Al actualizar, la ventana pide aplicar la
+  seguridad nueva a las versiones de PHP: hazlo. Si el navegador ya
+  tenía guardada una de esas redirecciones, bórrala una vez: en Chrome,
+  Configuración, Privacidad, Borrar datos de navegación, «Archivos e
+  imágenes almacenados en caché».
+
 1.57.22 (17 nov 2026)
 - Versiones: nuevo aviso «Certificados que Chrome rechaza», para un
   certificado de proyecto mal hecho (con una extensión repetida), que

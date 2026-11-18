@@ -129,6 +129,19 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
     </If>
 </IfModule>
 
+# Dominios reales (los que no son .local, .test ni localhost): sin falsear son la web de produccion.
+# Lo que el navegador reciba de tu copia con ese nombre mientras esta falseado (una redireccion 301 a
+# web.local, una pagina) no lo guarda: si no, al dejar de falsearlo seguiria yendo a tu copia (o a
+# web.local) en vez de a la web de verdad
+<IfModule headers_module>
+    <If "%{HTTP_HOST} !~ /(^|\.)(local|localhost|test)(:[0-9]+)?$/ && %{HTTP_HOST} !~ /^(127\.0\.0\.1|\[::1\])(:[0-9]+)?$/">
+        Header set Cache-Control "no-store"
+        Header always set Cache-Control "no-store"
+        Header unset Expires
+        Header always unset Expires
+    </If>
+</IfModule>
+
 # Barrera entre webs, en todas (localhost, web.local, los dominios falseados y los vhosts de los
 # proyectos): otra web abierta en el navegador no puede mandar nada a tus proyectos con tus sesiones
 # (un formulario o un fetch a https://tienda.local/admin/...). Desde otro sitio (Sec-Fetch-Site:
