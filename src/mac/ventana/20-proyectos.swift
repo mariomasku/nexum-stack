@@ -545,6 +545,8 @@ struct ProjectsView: View {
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
                 }
+                // (al lado de Cargar: VS Code, su repositorio y phpMyAdmin con su BBDD de la versión activa)
+                rowQuick(x, pairs).opacity(hover ? 1 : 0).allowsHitTesting(hover)
                 if isLoaded {
                     SmallTag(text: "Cargado", blue: true)
                 } else {
@@ -582,7 +584,40 @@ struct ProjectsView: View {
                     .allowsHitTesting(hover)
                 }
             }
-            .frame(width: anyDocker ? 270 : 130)
+            .frame(width: (anyDocker ? 270 : 130) + 110)
+        }
+    }
+
+    /// Los accesos directos de la fila de un proyecto, solo con su icono: VS Code (si está instalado), su
+    /// repositorio (si tiene remote origin) y phpMyAdmin con su BBDD (si tiene una en la versión activa)
+    func rowQuick(_ x: Project, _ pairs: [(Install, String)]) -> some View {
+        let folder = HTDOCS + "/" + x.name
+        let active = model.data?.active ?? ""
+        let db = cleanDbName(pairs.first(where: { $0.0.folder == active })?.1 ?? "")
+        let repo = projectRepoURL(folder)
+        let github = repo.map { $0.1 == "github.com" || $0.1.hasSuffix(".github.com") } ?? false
+        return HStack(spacing: 4) {
+            if let code = vscodeURL() {
+                Button(action: { openInVSCode(folder) }) {
+                    VisorIconView(icon: .image(NSWorkspace.shared.icon(forFile: code.path)), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir \(x.name) en Visual Studio Code")
+            }
+            if let r = repo {
+                Button(action: { openURL(r.0) }) {
+                    VisorIconView(icon: github ? .logo("github") : .symbol("globe", Color.blue), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir su repositorio: \(r.0)")
+            }
+            if !active.isEmpty && !db.isEmpty {
+                Button(action: { openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)") }) {
+                    VisorIconView(icon: .logo("phpmyadmin"), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir su BBDD (\(db)) en phpMyAdmin (XAMPP-\(active))")
+            }
         }
     }
 }

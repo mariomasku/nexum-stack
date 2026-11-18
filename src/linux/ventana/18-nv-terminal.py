@@ -49,21 +49,43 @@ class NvTerminal:
                       lambda *_: self.nv_term_cd(), flat=True)
         head.pack_end(nv_button("window-close-symbolic", None, "Esconder la terminal (sigue abierta)",
                                 lambda *_: self.term_btn.set_active(False), flat=True), False, False, 0)
-        head.pack_end(nv_button("view-refresh-symbolic", None, "Terminal nueva (cierra la de ahora)",
-                                lambda *_: self.nv_term_spawn(restart=True), flat=True), False, False, 0)
+        head.pack_end(nv_button("list-add-symbolic", None, "Otra pestaña de terminal (en la carpeta del proyecto cargado)",
+                                lambda *_: self.nv_term_spawn(new_tab=True), flat=True), False, False, 0)
         head.pack_end(b, False, False, 0)
+        head.pack_end(nv_button("network-transmit-receive-symbolic", "ping",
+                                "Hacer ping al dominio del proyecto cargado: 127.0.0.1 es que está falseado",
+                                lambda *_: self.nv_term_ping(), flat=True),
+                      False, False, 0)
         head.pack_end(nv_button("edit-clear-all-symbolic", "Vaciar DNS",
                                 "Vaciar la caché DNS",
                                 lambda *_: self.nv_term_flush_dns(), flat=True),
                       False, False, 0)
         box.pack_start(head, False, False, 0)
-        self.term_slot = Gtk.Box()
-        box.pack_start(self.term_slot, True, True, 0)
+        # (una pestaña por terminal: las pestañas solo se ven con más de una)
+        self.term_tabs = css(Gtk.Notebook(scrollable=True, show_border=False), "nv-terminal-pestanas")
+        self.term_tabs.set_show_tabs(False)
+        self.term_tabs.connect("switch-page", self.nv_term_switched)
+        box.pack_start(self.term_tabs, True, True, 0)
         box.show_all()
         box.set_no_show_all(True)
         box.hide()
-        self.term_panel, self.term = box, None
+        self.term_panel, self.term, self.term_sw, self.term_count = box, None, None, 0
         return box
+
+    def nv_term_switched(self, _nb, page, _num):
+        """Otra pestaña: los botones (cd, ping, Vaciar DNS, copiar y pegar) van a su terminal."""
+        self.term, self.term_sw = page, page.get_child()
+        self.term_where.set_label(getattr(page, "nv_cwd", ""))
+        GLib.idle_add(lambda: self.term_sw is not None and self.term_sw.grab_focus() and False)
+
+    def nv_term_tab_label(self, sw, n):
+        tab = Gtk.Box(spacing=4)
+        tab.pack_start(label("Terminal %d" % n, "nv-chico"), False, False, 0)
+        close = nv_button("window-close-symbolic", None, "Cerrar esta pestaña (y lo que tenga en marcha)",
+                          lambda *_: self.nv_term_exited(sw), flat=True)
+        tab.pack_start(close, False, False, 0)
+        tab.show_all()
+        return tab
 
     def nv_term_show(self, on):
         if on:
@@ -87,8 +109,9 @@ class NvTerminal:
         cur = os.path.join(HTDOCS, cur) if cur else ""
         return cur if cur and os.path.isdir(cur) else HTDOCS
 
-    def nv_term_spawn(self, restart=False):
-        """La terminal: tu shell, con tu usuario, en la carpeta del proyecto cargado (o de los proyectos)."""
+    def nv_term_spawn(self, new_tab=False):
+        """La terminal: tu shell, con tu usuario, en la carpeta del proyecto cargado (o de los proyectos). Con
+        new_tab, otra más, en su propia pestaña (las de antes siguen abiertas)."""
         try:
             gi.require_version("Vte", "2.91")
             from gi.repository import Pango, Vte
@@ -97,12 +120,9 @@ class NvTerminal:
                     "Para la terminal de la ventana hace falta su componente. En una terminal:\n\n"
                     "sudo apt install gir1.2-vte-2.91", Gtk.MessageType.INFO)
             return False
-        if self.term is not None:
-            if not restart:
-                return True
-            self.term_slot.remove(self.term)
-            self.term.destroy()
-            self.term = None
+        if self.term is not None and not new_tab:
+            return True
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         t = css(Vte.Terminal(), "nv-terminal-vte")
         t.set_scrollback_lines(10000)
         t.set_font(Pango.FontDescription("Monospace 10.5"))
@@ -119,8 +139,8 @@ class NvTerminal:
         t.set_colors(fg, bg, palette)
         t.set_hexpand(True)
         t.set_vexpand(True)
-        # (al terminar el shell, se esconde; al volver a enseñarla, otra nueva)
-        t.connect("child-exited", lambda *_: GLib.idle_add(self.nv_term_exited))
+        # (al terminar el shell, se cierra su pestaña; con la última, se esconde y al volver a enseñarla, otra nueva)
+        t.connect("child-exited", lambda *_: GLib.idle_add(self.nv_term_exited, sw))
         # (copiar y pegar como en la Terminal de GNOME: Ctrl+Mayús+C/V, Ctrl/Mayús+Insert y el botón derecho)
         t.connect("key-press-event", self.nv_term_key)
         t.connect("button-press-event", self.nv_term_click)
@@ -130,12 +150,18 @@ class NvTerminal:
         if not os.path.isabs(shell) or not os.access(shell, os.X_OK):
             shell = "/bin/bash"
         t.spawn_async(Vte.PtyFlags.DEFAULT, cwd, [shell], None, GLib.SpawnFlags.DEFAULT, None, None, -1, None, None)
-        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         sw.add(t)
-        self.term_slot.pack_start(sw, True, True, 0)
+        sw.nv_cwd = cwd
         sw.show_all()
+        self.term_count += 1
+        n = self.term_tabs.append_page(sw, self.nv_term_tab_label(sw, self.term_count))
+        self.term_tabs.set_tab_reorderable(sw, True)
+        self.term_tabs.set_show_tabs(self.term_tabs.get_n_pages() > 1)
         self.term, self.term_sw = sw, t
+        self.term_tabs.set_current_page(n)
         self.term_where.set_label(cwd)
+        if new_tab:
+            t.grab_focus()
         return True
 
     def nv_term_copy(self):
@@ -184,12 +210,18 @@ class NvTerminal:
         menu.popup_at_pointer(ev)
         return True
 
-    def nv_term_exited(self):
-        if self.term is not None:
-            self.term_slot.remove(self.term)
-            self.term.destroy()
-            self.term = None
-        self.term_btn.set_active(False)
+    def nv_term_exited(self, sw):
+        """Su shell ha terminado (o se cierra con su ×): fuera su pestaña. Con la última, la terminal se esconde."""
+        n = self.term_tabs.page_num(sw)
+        if n < 0:
+            return False
+        self.term_tabs.remove_page(n)
+        sw.destroy()
+        left = self.term_tabs.get_n_pages()
+        self.term_tabs.set_show_tabs(left > 1)
+        if left == 0:
+            self.term, self.term_sw, self.term_count = None, None, 0
+            self.term_btn.set_active(False)
         return False
 
     def nv_term_cd(self):
@@ -206,6 +238,24 @@ class NvTerminal:
             return
         self.term_sw.feed_child((cmd + "\n").encode())
         self.term_sw.grab_focus()
+
+    def nv_term_ping_domains(self):
+        """Los dominios del proyecto cargado que se pueden falsear (los de los vhosts de su carpeta, sin los .local)."""
+        cur = ((self.projects or {}).get("current") or "").rstrip("/")
+        return [h["name"] for h in self.project_hosts(os.path.basename(cur))] if cur else []
+
+    def nv_term_ping(self):
+        """«ping»: escribe en la terminal un ping (3 veces) a cada dominio del proyecto cargado. Con 127.0.0.1 está
+        falseado (lleva a este equipo); si no, sale la dirección de la web real."""
+        if self.term is None:
+            return
+        doms = self.nv_term_ping_domains()
+        if not doms:
+            cur = ((self.projects or {}).get("current") or "").rstrip("/")
+            self.toast("El proyecto cargado no tiene dominio propio (solo web.local)" if cur
+                       else "No hay ningún proyecto cargado")
+            return
+        self.nv_term_type("; ".join("ping -c 3 %s" % shlex.quote(d) for d in doms))
 
     def nv_term_flush_dns(self):
         """«Vaciar DNS»: escribe la orden de este sistema (dns_flush_command) en la terminal."""

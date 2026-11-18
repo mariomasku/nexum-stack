@@ -251,9 +251,10 @@ class AppPrograma:
         folder = self.loaded_project_folder()
         return project_admin(folder) if folder is not None else ("", "")
 
-    def open_project_pma(self):
-        """phpMyAdmin con la BBDD del proyecto cargado (en http://127.0.0.1/phpmyadmin/)."""
-        db = self.loaded_project_db()
+    def open_project_pma(self, db=None):
+        """phpMyAdmin con la BBDD del proyecto cargado, u otra de la versión activa (en http://127.0.0.1/phpmyadmin/)."""
+        db = db if db is not None and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db) else \
+            "" if db is not None else self.loaded_project_db()
         if not db:
             return
         act = next((i for i in self.installs() if i["folder"] == self.data.get("active")), None)

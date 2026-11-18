@@ -167,7 +167,11 @@ final class AppModel: ObservableObject {
     }
     @Published var termHeight: CGFloat = 260
     @Published var termCwd = ""
-    let term = TermSession()
+    /// Las pestañas de la terminal (una sesión cada una) y la que se ve
+    @Published var terms: [TermSession] = [TermSession()]
+    @Published var termIndex = 0
+    private var termCount = 1
+    var term: TermSession { return terms[Swift.max(0, Swift.min(termIndex, terms.count - 1))] }
 
     /// La carpeta del proyecto cargado (o la de los proyectos)
     /// Icono en la barra de menús (Configuración, Programa): con él, cerrar la ventana no cierra la aplicación
@@ -209,22 +213,66 @@ final class AppModel: ObservableObject {
         return !cur.isEmpty && FileManager.default.fileExists(atPath: cur, isDirectory: &dir) && dir.boolValue ? cur : HTDOCS
     }
 
-    func termStart(restart: Bool = false) {
-        let cwd = termProject
-        term.onExit = { [weak self] in self?.termOpen = false }
-        // (Terminal nueva: se cierra la de ahora y, cuando se ha cerrado, se abre la nueva aquí mismo)
-        if restart && term.running {
-            _ = term.restart(cwd: cwd)
-            termCwd = cwd
-            return
-        }
-        guard !term.running else { return }
-        if term.start(cwd: cwd) {
+    func termStart() {
+        let cwd = termProject, s = term
+        termWire(s)
+        guard !s.running else { return }
+        if s.start(cwd: cwd) {
+            s.cwd = cwd
             termCwd = cwd
         } else {
             termOpen = false
             message("No se ha podido abrir la terminal", "No se ha podido crear su pseudoterminal.", error: true)
         }
+    }
+
+    /// «+»: otra terminal, en su propia pestaña, en la carpeta del proyecto cargado (las de antes siguen abiertas)
+    func termNewTab() {
+        let cwd = termProject, s = TermSession()
+        termCount += 1
+        s.number = termCount
+        termWire(s)
+        guard s.start(cwd: cwd) else {
+            message("No se ha podido abrir la terminal", "No se ha podido crear su pseudoterminal.", error: true)
+            return
+        }
+        s.cwd = cwd
+        terms.append(s)
+        termIndex = terms.count - 1
+        termCwd = cwd
+    }
+
+    func termSelect(_ i: Int) {
+        guard terms.indices.contains(i) else { return }
+        termIndex = i
+        termCwd = terms[i].cwd
+    }
+
+    /// La × de una pestaña: se cierra su shell (y lo que tenga en marcha); al terminar, se quita su pestaña
+    func termClose(_ s: TermSession) {
+        if s.running { s.stop() } else { termRemove(s) }
+    }
+
+    /// Al terminar la shell de una pestaña, se quita; con la última, la terminal se esconde (al volver a
+    /// enseñarla, otra nueva)
+    private func termWire(_ s: TermSession) {
+        s.onExit = { [weak self, weak s] in
+            guard let self = self, let s = s else { return }
+            self.termRemove(s)
+        }
+    }
+
+    private func termRemove(_ s: TermSession) {
+        guard let i = terms.firstIndex(where: { $0 === s }) else { return }
+        if terms.count == 1 {
+            termCount = 1
+            s.number = 1
+            termOpen = false
+            return
+        }
+        terms.remove(at: i)
+        if i < termIndex || termIndex >= terms.count { termIndex = Swift.max(0, termIndex - 1) }
+        termCwd = term.cwd
     }
 
     /// cd a la carpeta del proyecto cargado (escrito en la terminal, como si lo tecleara)
@@ -233,6 +281,21 @@ final class AppModel: ObservableObject {
         let quoted = "'" + cwd.replacingOccurrences(of: "'", with: "'\\''") + "'"
         term.write(Data("cd \(quoted)\r".utf8))
         termCwd = cwd
+    }
+
+    /// «ping»: un ping (3 veces) a cada dominio del proyecto cargado, escrito en la terminal. Con 127.0.0.1 está
+    /// falseado (lleva a este Mac); si no, sale la dirección de la web real
+    func termPing() {
+        var cur = projects?.current ?? ""
+        while cur.hasSuffix("/") { cur.removeLast() }
+        let name = (cur as NSString).lastPathComponent
+        let doms = name.isEmpty ? [] : projectHosts(name).map { $0.name }
+        if doms.isEmpty {
+            toast(name.isEmpty ? "No hay ningún proyecto cargado" : "El proyecto cargado no tiene dominio propio (solo web.local)")
+            return
+        }
+        let cmd = doms.map { "ping -c 3 '" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }.joined(separator: "; ")
+        term.write(Data((cmd + "\r").utf8))
     }
 
     /// Vaciar la caché DNS del sistema (escrito en la terminal: la contraseña de sudo se pide ahí)

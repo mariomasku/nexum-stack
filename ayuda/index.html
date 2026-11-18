@@ -828,13 +828,19 @@
       y qué orden está instalada. Si no usa systemd-resolved, te lo dice y no escribe nada.</span><code data-so="mac">sudo dscacheutil
       -flushcache; sudo killall -HUP mDNSResponder</code>. Sirve cuando acabas de falsear o dejar de falsear un dominio y el navegador sigue yendo al sitio de antes. La
       contraseña te la pide la propia terminal.</li>
+    <li><b>«ping»</b>: escribe por ti <code>ping -c 3 panaderia-luna.com</code> con el dominio del proyecto cargado (uno detrás de otro, si
+      tiene varios), para saber de un vistazo adónde lleva: si contesta <code>127.0.0.1</code>, está falseado y va a tu copia; si sale otra
+      dirección, es la de la web real. Si el proyecto cargado no tiene dominio propio (solo <code>web.local</code>), o no hay ninguno cargado,
+      te lo dice y no escribe nada.</li>
     <li><b>«Proyecto cargado»</b>: escribe un <code>cd</code> (la orden para entrar en una carpeta) a la carpeta del proyecto cargado.</li>
-    <li><b>↻</b> («Terminal nueva»): cierra la de ahora y abre otra.</li>
-    <li><b>✕</b>: la esconde (sigue abierta).</li>
+    <li><b>+</b>: abre otra terminal en una pestaña nueva, en la carpeta del proyecto cargado. Las que ya tenías siguen abiertas, con lo que
+      estuvieran haciendo. Con más de una, sus pestañas («Terminal 1», «Terminal 2»…) salen debajo de los botones: pulsa una para verla
+      (los botones de arriba van a esa) y su <b>×</b> para cerrarla, con lo que tenga en marcha.</li>
+    <li><b>✕</b>: la esconde (siguen abiertas todas sus pestañas).</li>
   </ul>
   <p data-so="linux">Para copiar y pegar, como en la Terminal de GNOME: <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>C</kbd> y
     <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>V</kbd>, o el botón derecho («Copiar», «Pegar», «Seleccionar todo»). Si escribes
-    <code>exit</code>, se cierra y se esconde; la próxima vez se abre una nueva. Si falta su componente, el programa te dice cómo
+    <code>exit</code>, se cierra su pestaña; si era la última, la terminal se esconde y la próxima vez se abre una nueva. Si falta su componente, el programa te dice cómo
     instalarlo: <code>sudo apt install gir1.2-vte-2.91</code>.</p>
   <p data-so="mac">Para copiar y pegar, como en Terminal: <kbd>⌘</kbd>+<kbd>C</kbd> y <kbd>⌘</kbd>+<kbd>V</kbd>. Si escribes
     <code>exit</code>, se cierra; la próxima vez se abre una nueva.</p>
@@ -992,7 +998,8 @@
         si también está en Docker. Deja el ratón encima para ver la versión y la base de cada uno. Su tamaño en disco y el nombre de su base
         de datos van al lado.</span></li>
       <li data-x="91.3" data-y="76.1"><b>Cargar</b><span>Sale al pasar el ratón por una fila que no es la cargada. Carga ese proyecto; si tiene
-        base de datos en varias versiones, te pregunta cuál. Ver <a href="#cargar">Cargar un proyecto</a>.</span></li>
+        base de datos en varias versiones, te pregunta cuál. Ver <a href="#cargar">Cargar un proyecto</a>. A su izquierda, también al pasar el
+        ratón (y en la fila cargada), sus accesos directos con solo el icono: Visual Studio Code, su repositorio y phpMyAdmin.</span></li>
       <li data-x="96.0" data-y="76.1"><b>El ⋮ de la fila</b><span>También al pasar el ratón: llevar ese proyecto a otra versión o a Docker,
         importar su SQL y lo mismo que el menú Más, sin cambiar el proyecto de arriba. Ver <a href="#menu-fila">el menú de cada fila</a>.</span></li>
     </ol>
@@ -1850,7 +1857,14 @@
       los vínculos que hayas guardado.</li>
     <li><b>Versiones</b>: un número por cada versión de PHP donde tiene base (8.2, 8.4…) y, en azul, «Docker 8.2» si está en Docker. Son solo
       informativos: al dejar el ratón encima dicen la versión y la base, pero no se pueden pulsar.</li>
-    <li><b>Al pasar el ratón</b> salen sus botones: «Montar en Docker» (si ya está en Docker), «Cargar» y ⋮ (si no es la cargada).</li>
+    <li><b>Al pasar el ratón</b> salen sus botones: «Montar en Docker» (si ya está en Docker), sus accesos directos, «Cargar» y ⋮ (estos dos,
+      si no es la cargada). Los accesos directos llevan solo el icono, y cada uno sale si se puede usar:
+      <ul>
+        <li><b>Visual Studio Code</b>: abre su carpeta (si lo tienes instalado).</li>
+        <li><b>GitHub</b> (o un globo, si es de otro servidor): abre su repositorio en el navegador (si la carpeta tiene un
+          <code>remote origin</code>).</li>
+        <li><b>phpMyAdmin</b>: abre su base de datos, solo si tiene una en la versión de PHP que está activa.</li>
+      </ul></li>
     <li><b>El buscador</b> («Buscar proyecto») encuentra por el nombre de la carpeta <b>y por el de sus bases de datos</b>: «panaderia» encuentra
       el proyecto aunque solo su base se llame así.</li>
     <li><b>El filtro</b>: «Todos», «WordPress», «PrestaShop» u «Otros».</li>

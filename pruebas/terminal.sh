@@ -13,6 +13,7 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: se ve como texto (sin codigos de color ni de cursor) y sigue abierta al esconderla" 'grep -q "env\[\"TERM\"\] = \"dumb\"" "$SRC" && grep -q "Esconder la terminal (sigue abierta)" "$SRC" && grep -q "if termOpen { termStart() }" "$SRC"'
     check "Mac: copiar y pegar con ⌘C/⌘V (sin pasar por el menú Edición) y con el botón derecho" 'grep -q "override func performKeyEquivalent(with e: NSEvent) -> Bool {" "$SRC" && grep -q "case \"v\": paste(nil); return true" "$SRC" && grep -q "m.addItem(withTitle: \"Pegar\", action: #selector(paste(_:)), keyEquivalent: \"v\")" "$SRC"'
     check "Mac: el proyecto cargado (su nombre) se busca dentro de los proyectos; boton Vaciar DNS" 'grep -q "cur = (HTDOCS as NSString).appendingPathComponent(cur)" "$SRC" && grep -q "sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder" "$SRC" && grep -q "model.termFlushDns()" "$SRC"'
+    check "Mac: + abre otra pestaña sin cerrar las demas; su x o exit la cierran (1.57.24)" 'grep -q "Button(action: { model.termNewTab() }) { Image(systemName: \"plus\") }" "$SRC" && grep -q "func termClose(_ s: TermSession)" "$SRC" && grep -q "TermHost(session: model.term).id(ObjectIdentifier(model.term))" "$SRC" && ! grep -q "Terminal nueva (cierra la de ahora)" "$SRC"'
     check "Mac: pegada a la ventana, de lado a lado (1.41.1)" 'grep -q "^/// La terminal de abajo, pegada a la ventana" "$SRC" && sed -n "/^struct TermPanel: View {/,/^}/p" "$SRC" | grep -qF "TermHost(session: model.term)"'
 else
     check "Linux: Terminal en la cabecera en lugar de Localhost" 'grep -q "self.term_btn = Gtk.ToggleButton(" "$SRC" && ! grep -q "nv_button(\"web-browser-symbolic\", \"Localhost\"" "$SRC"'
@@ -21,6 +22,7 @@ else
     check "Linux: copiar y pegar con Ctrl+Mayús+C/V, Ctrl/Mayús+Insert y el botón derecho" 'grep -q "t.connect(\"key-press-event\", self.nv_term_key)" "$SRC" && grep -q "t.connect(\"button-press-event\", self.nv_term_click)" "$SRC" && grep -q "self.term_sw.paste_clipboard()" "$SRC"'
     check "Linux: el proyecto cargado (su nombre) se busca dentro de los proyectos; boton Vaciar DNS" 'grep -q "cur = os.path.join(HTDOCS, cur) if cur else" "$SRC" && grep -q "lambda \*_: self.nv_term_flush_dns(), flat=True)" "$SRC"'
     check "Linux: con el aspecto del visor, hundida (sombra por dentro)" 'grep -q "^.nv-terminal { background-color: shade(@theme_bg_color, 0.78)" "$SRC" && grep -q "box-shadow: inset 0 2px 7px" "$SRC"'
+    check "Linux: + abre otra pestaña sin cerrar las demas; su x o exit la cierran (1.57.24)" 'grep -q "lambda \*_: self.nv_term_spawn(new_tab=True), flat=True)" "$SRC" && grep -q "self.term_tabs.append_page(sw, self.nv_term_tab_label(sw, self.term_count))" "$SRC" && grep -q "GLib.idle_add(self.nv_term_exited, sw)" "$SRC" && ! grep -q "Terminal nueva (cierra la de ahora)" "$SRC"'
     check "Linux: ir al proyecto cargado escribe el cd, con la ruta entre comillas" 'grep -qF "self.nv_term_type(\"cd %s\" % shlex.quote(cwd))" "$SRC"'
     if python3 -c "import gi; gi.require_version('Vte','2.91')" 2> /dev/null; then
         S=$(mktemp -d "$TMPBASE/w-term.XXXX"); trap 'rm -rf "$S"' EXIT

@@ -512,8 +512,13 @@ class NvProyectos:
             dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
             dk.set_sensitive(not self.busy)
             hover.append(dk)
+        # (al lado de Cargar: VS Code, su repositorio y phpMyAdmin con su BBDD de la version activa)
+        quick = self.nv_row_quick(x, pairs)
         if is_loaded:
             box.pack_end(label("Cargado", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER, margin_end=6), False, False, 0)
+            for w in reversed(quick):
+                box.pack_end(w, False, False, 0)
+            hover += quick
         else:
             b = css(Gtk.Button(label="Cargar", sensitive=not self.busy), "nv-azul")
             b.connect("clicked", lambda *_: self.on_load_folder(x))
@@ -522,7 +527,9 @@ class NvProyectos:
             menu.set_sensitive(not self.busy)
             box.pack_end(menu, False, False, 0)
             box.pack_end(b, False, False, 0)
-            hover += [b, menu]
+            for w in reversed(quick):
+                box.pack_end(w, False, False, 0)
+            hover += quick + [b, menu]
         if dk is not None:
             box.pack_end(dk, False, False, 0)
         if not hover:
@@ -539,6 +546,33 @@ class NvProyectos:
         ev.add(box)
         row.add(ev)
         return row
+
+    def nv_row_quick(self, x, pairs):
+        """Los accesos directos de la fila de un proyecto, solo con su icono: VS Code (si está instalado), su
+        repositorio (si tiene remote origin) y phpMyAdmin con su BBDD (si tiene una en la versión de PHP activa)."""
+        out, folder = [], os.path.join(HTDOCS, x["name"])
+        code = vscode_app()
+        if code is not None:
+            img = None
+            if code.get_icon() is not None:
+                img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                img.set_pixel_size(16)
+            out.append(nv_button(img or "text-editor-symbolic", None, "Abrir %s en Visual Studio Code" % x["name"],
+                                 lambda *_: self.open_in_vscode(folder), flat=True))
+        got = project_repo_url(folder)
+        if got:
+            url, host = got
+            github = host == "github.com" or host.endswith(".github.com")
+            out.append(nv_button(logo("github" if github else "globo", 16), None,
+                                 "Abrir su repositorio: %s" % url, lambda *_: self.open_uri(url), flat=True))
+        active = (self.data or {}).get("active")
+        db = next((d for inst, d in pairs if inst["folder"] == active), "")
+        if active and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db or ""):
+            out.append(nv_button(logo("phpmyadmin", 16), None, "Abrir su BBDD (%s) en phpMyAdmin (lampp-%s)" % (db, active),
+                                 lambda *_: self.open_project_pma(db), flat=True))
+        for w in out:
+            w.set_valign(Gtk.Align.CENTER)
+        return out
 
     def nv_hero(self, x, loaded):
         clear(self.hero_box)

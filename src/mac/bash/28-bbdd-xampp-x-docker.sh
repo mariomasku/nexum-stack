@@ -394,6 +394,22 @@ QUE HACE
 
 VERSIONES
 
+1.57.24 (18 nov 2026)
+- Terminal de abajo: botón «ping». Escribe ping -c 3 con el dominio del
+  proyecto cargado (uno detrás de otro, si tiene varios): con
+  127.0.0.1 está falseado y lleva a tu copia; con otra dirección, a la
+  web real. Sin dominio propio, lo dice y no escribe nada.
+- Lista de proyectos: al lado de «Cargar», al pasar el ratón (también
+  en la fila cargada), los accesos directos de cada proyecto con solo
+  el icono: Visual Studio Code (si está instalado), su repositorio (si
+  tiene remote origin) y phpMyAdmin con su base, si tiene una en la
+  versión de PHP activa.
+- Terminal de abajo: el botón «+» abre otra terminal en una pestaña
+  nueva, en la carpeta del proyecto cargado, sin cerrar las que ya
+  tenías (antes, «Terminal nueva» cerraba la de ahora). Con más de una
+  salen sus pestañas: se pasa de una a otra pulsándolas, y cada una se
+  cierra con su × o con exit.
+
 1.57.23 (18 nov 2026)
 - WordPress con su dominio: al dejar de falsear el dominio, la copia
   local ya no lleva a la web de producción. Su wp-config.php lleva

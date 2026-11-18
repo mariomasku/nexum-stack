@@ -9,25 +9,17 @@ final class TermSession {
     private var source: DispatchSourceRead?
     var onExit: (() -> Void)?
     var running: Bool { return pid > 0 }
+    /// Su pestaña: el número («Terminal 2») y la carpeta en la que empezó
+    var number = 1
+    var cwd = ""
     /// Las columnas y filas que caben en la caja de la terminal (las que se le dicen a la pseudoterminal: con
     /// otras, zsh y ls cortan las líneas donde no es y el prompt sale fuera de su sitio)
     private var cols: UInt16 = 120
     private var rows: UInt16 = 20
-    /// «Terminal nueva»: la carpeta en la que abrir la nueva cuando se cierre la de ahora
-    private var restartIn: String? = nil
 
     init() {
         view.send = { [weak self] d in self?.write(d) }
         view.onSize = { [weak self] c, r in self?.resize(cols: c, rows: r) }
-    }
-
-    /// Cierra la de ahora y, cuando se ha cerrado, abre otra en cwd (sin esperar, la nueva no se abría:
-    /// la de ahora aún estaba en marcha)
-    func restart(cwd: String) -> Bool {
-        guard pid > 0 else { return start(cwd: cwd) }
-        restartIn = cwd
-        stop()
-        return true
     }
 
     /// El tamaño de la caja ha cambiado: se le dice a la pseudoterminal (y esta avisa a la shell con SIGWINCH)
@@ -122,10 +114,6 @@ final class TermSession {
         if master >= 0 { close(master) }
         master = -1
         pid = 0
-        if let cwd = restartIn {
-            restartIn = nil
-            if start(cwd: cwd) { return }
-        }
         onExit?()
     }
 }
@@ -618,16 +606,43 @@ struct TermPanel: View {
                 Button(action: { model.termFlushDns() }) { Label("Vaciar DNS", systemImage: "network") }
                     .buttonStyle(OutlineButton())
                     .tip("Vaciar la caché DNS")
-                Button(action: { model.termStart(restart: true) }) { Image(systemName: "arrow.clockwise") }
+                Button(action: { model.termPing() }) { Label("ping", systemImage: "antenna.radiowaves.left.and.right") }
                     .buttonStyle(OutlineButton())
-                    .tip("Terminal nueva (cierra la de ahora)")
+                    .tip("Hacer ping al dominio del proyecto cargado: 127.0.0.1 es que está falseado")
+                Button(action: { model.termNewTab() }) { Image(systemName: "plus") }
+                    .buttonStyle(OutlineButton())
+                    .tip("Otra pestaña de terminal (en la carpeta del proyecto cargado)")
                 Button(action: { model.termOpen = false }) { Image(systemName: "xmark") }
                     .buttonStyle(OutlineButton())
                     .tip("Esconder la terminal (sigue abierta)")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            TermHost(session: model.term)
+            // (una pestaña por terminal: solo se ven con más de una)
+            if model.terms.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(model.terms.enumerated()), id: \.element.number) { i, s in
+                            HStack(spacing: 5) {
+                                Text("Terminal \(s.number)").font(.caption)
+                                Button(action: { model.termClose(s) }) { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)) }
+                                    .buttonStyle(.plain)
+                                    .tip("Cerrar esta pestaña (y lo que tenga en marcha)")
+                            }
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(Rectangle()
+                                .fill(i == model.termIndex ? Color.primary.opacity(0.14) : Color.primary.opacity(0.04)))
+                            .contentShape(Rectangle())
+                            .onTapGesture { model.termSelect(i) }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                }
+                .padding(.bottom, 5)
+            }
+            // (al cambiar de pestaña, la vista de su sesión)
+            TermHost(session: model.term).id(ObjectIdentifier(model.term))
         }
         .frame(height: model.termHeight)
     }
