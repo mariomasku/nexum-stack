@@ -272,10 +272,10 @@ class AppPrograma:
         if not (admin and self.projects and self.projects["link"]):
             return
         db, folder = self.loaded_project_db(), self.loaded_project_folder()
-        self.open_admin_login(kind, admin, "http://%s" % self.projects["link"], os.path.basename(folder or ""),
-                              ["usuario-pruebas", db, os.path.basename(folder or "")] if db else None)
+        self.open_admin_login(kind, admin, self.project_web().rstrip("/"), os.path.basename(folder or ""),
+                              ["usuario-pruebas", db, os.path.basename(folder or "")] if db else None, local=True)
 
-    def open_admin_login(self, kind, admin, site, name, cmd):
+    def open_admin_login(self, kind, admin, site, name, cmd, local=False):
         """Panel (wp-admin o el de la tienda) de la web <site> (http://web.local, https://x.docker.local)
         con el administrador de pruebas: cmd lo deja al día (usuario-pruebas o docker-usuario-pruebas,
         que dicen A|tipo|usuario|contraseña) y se abre una página con el usuario y la contraseña ya
@@ -295,13 +295,13 @@ class AppPrograma:
                 self.open_uri(base)
                 return False
             user, password = mine[0][2], mine[0][3]
-            # (usuario-pruebas dice si el acceso no puede ir a http://web.local: https, porque sus
-            # cookies de sesión son secure y por http no se guardan, o la dirección de la tienda con
-            # su dominio falseado, porque su back office salta allí al entrar; en Docker, no)
+            # (en LAMPP, local, usuario-pruebas dice si el acceso no puede ir por http: https, porque
+            # sus cookies de sesión son secure y por http no se guardan, o la dirección de la tienda
+            # con su dominio falseado, porque su back office salta allí al entrar; en Docker, no)
             web, extra = site, mine[0][4] if len(mine[0]) > 4 else ""
-            if site.startswith("http://") and extra == "https":
+            if local and site.startswith("http://") and extra == "https":
                 web = "https://" + site[len("http://"):]
-            elif site.startswith("http://") and re.match(r"^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", extra):
+            elif local and re.match(r"^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", extra):
                 web = extra.rstrip("/")
             panel = "%s/%s/" % (web, admin)
             if kind == "wp":

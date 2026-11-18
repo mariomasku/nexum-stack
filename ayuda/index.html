@@ -906,7 +906,7 @@
   <p class="entrada">La página principal: arriba, el proyecto con el que estás trabajando y todo lo que puedes hacer con él; debajo, la
     lista de todos tus proyectos.</p>
   <p>Un <b>proyecto</b> es cada carpeta de <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>: un WordPress,
-    una tienda PrestaShop, una web en PHP o en HTML. <b>Cargarlo</b> hace que <code>http://web.local/</code> lo abra, con la versión
+    una tienda PrestaShop, una web en PHP o en HTML. <b>Cargarlo</b> hace que <code>https://web.local/</code> lo abra, con la versión
     de PHP y la base de datos que elijas. Solo hay uno cargado a la vez; los demás siguen en su carpeta, sin cambiar nada.</p>
   <p>Unas palabras que salen mucho en este capítulo:</p>
   <ul>
@@ -1021,7 +1021,7 @@
 
   <!-- ------------------------------------------------------------------ cargar -->
   <h3 id="cargar">Cargar un proyecto</h3>
-  <p><b>Para qué sirve:</b> para ver y trabajar en un proyecto en tu navegador. Mientras está cargado, <code>http://web.local/</code>
+  <p><b>Para qué sirve:</b> para ver y trabajar en un proyecto en tu navegador. Mientras está cargado, <code>https://web.local/</code>
     enseña ese proyecto, con su versión de PHP y su base de datos. Cuando quieras trabajar en otro, cargas el otro: no hace falta
     tocar ninguna configuración a mano.</p>
   <p><b>Cómo funciona por dentro:</b> <code>web.local</code> no es una carpeta de verdad, es un <b>enlace simbólico</b> (un acceso
@@ -1037,7 +1037,7 @@
     <li><b>Confirma, si hace falta.</b> Si hay que cambiar de versión de PHP, te lo dice antes. Puede pedirte la contraseña de
       administrador.</li>
     <li><b>Ábrelo.</b> El punto se pone verde («Proyecto cargado») y aparecen sus botones: pulsa <b>Abrir web</b> y lo verás en
-      <code>http://web.local/</code>. Abajo sale un aviso corto: «Proyecto cargado: web.local → panaderia-luna (PHP 8.4.27)».</li>
+      <code>https://web.local/</code>. Abajo sale un aviso corto: «Proyecto cargado: web.local → panaderia-luna (PHP 8.4.27)».</li>
   </ol>
   <div class="nota"><b>«Entorno» y «Cargar» no son lo mismo</b>Elegir otra versión en la lista «Entorno» <b>carga el proyecto en ese mismo
     momento</b>, con esa versión y su base de datos (lanza la misma orden que «Cargar»). El botón «Cargar», en cambio, no mira esa
@@ -1258,8 +1258,11 @@
   <p>Cuáles se ven, en qué orden y cómo se eligen en <a href="#personalizar-botones">Personalizar los botones</a>. Al dejar el ratón encima,
     cada uno dice lo que hace.</p>
   <ul>
-    <li><b>«Abrir web»</b>: abre <code>http://web.local/</code> en tu navegador. No cambia nada. En la terminal, lo mismo es
-      <code data-so="linux">xdg-open http://web.local/</code><code data-so="mac">open http://web.local/</code>.</li>
+    <li><b>«Abrir web»</b>: abre <code>https://web.local/</code> en tu navegador o, si el proyecto tiene su dominio falseado, ese
+      dominio: la misma dirección que lleva su <code>WP_HOME</code>. Va directo por https porque muchos <code>.htaccess</code> de
+      producción mandan lo que llega por http a la web real («lo que llegue por http, a https://panaderia-luna.com»). No cambia
+      nada. En la terminal, lo mismo es
+      <code data-so="linux">xdg-open https://web.local/</code><code data-so="mac">open https://web.local/</code>.</li>
     <li><b>«VS Code»</b>: abre su carpeta en Visual Studio Code (el editor de código). Si ya estaba abierta, trae su ventana delante. Solo
       sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>.</li>
     <li><b>«GitHub»</b>: abre su repositorio en el navegador, por ejemplo <code>https://github.com/ana/panaderia-luna</code>. Solo sale si
@@ -1295,7 +1298,7 @@
         <code>http://127.0.0.1</code>, una página con el formulario de acceso ya relleno y la abre en el navegador.</li>
     </ol>
     <p>Solo toca bases de este equipo, que nunca van a producción. Para comprobarlo: entra en
-      <code>http://web.local/wp-admin/</code> con <code>local@local.test</code> y <code>local</code>.</p>
+      <code>https://web.local/wp-admin/</code> con <code>local@local.test</code> y <code>local</code>.</p>
   </details>
   <ul>
     <li><b>«Docker»</b>: lo monta o lo arranca en Docker. Ver <a href="#docker-desde-proyectos">Docker desde Proyectos</a>.</li>
@@ -1305,7 +1308,7 @@
       web</a>.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (los
+    <p>La orden del programa: <code>nexum tunel-abrir https://web.local panaderia-luna --minutos 120 --admin bloquear</code> (los
       minutos que dura y si se bloquea el panel, como los elijas). Si cloudflared aún no está, antes <code>nexum tunel-instalar</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
@@ -1433,7 +1436,7 @@
       <li>Comprueba que la configuración ha quedado apuntando a este equipo.</li>
     </ol>
     <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna status</code> (lo que ha cambiado el código) y abre
-      <code>http://web.local/</code>.</p>
+      <code>https://web.local/</code>.</p>
   </details>
   <div class="nota cuidado"><b>El git pull no va solo</b>Solo se ofrece cuando también copias un paquete de código. Para traer cambios de
     GitHub sin más, usa la <a href="#repositorios">página Repositorios</a> o la terminal (<code>git -C /opt/htdocs/panaderia-luna pull</code>).</div>
@@ -1959,7 +1962,7 @@
   <!-- ------------------------------------------------------------------ preguntas -->
   <h3>Preguntas</h3>
   <details><summary>¿Por qué web.local?</summary>
-    <p>Es la dirección del proyecto cargado, y siempre es la misma: cargues el que cargues, lo abres en <code>http://web.local/</code>.
+    <p>Es la dirección del proyecto cargado, y siempre es la misma: cargues el que cargues, lo abres en <code>https://web.local/</code>.
       Así no hace falta crear un dominio para cada proyecto ni cambiar la configuración de ninguno.</p></details>
   <details><summary>He pulsado otro proyecto de la lista y arriba sigue el de antes</summary>
     <p>Es así a propósito: arriba se ve siempre el cargado. Para cambiar, pasa el ratón por la fila del otro y pulsa «Cargar».</p></details>
@@ -5040,7 +5043,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         primeras.</li>
     </ol>
     <p>Para comprobarlo: <code>nexum admin-pruebas</code> («Administrador de pruebas: ana@local.test») y, después de cargar una BBDD,
-      <code>http://web.local/wp-admin/</code> con <code>ana@local.test</code> y su contraseña.</p>
+      <code>https://web.local/wp-admin/</code> con <code>ana@local.test</code> y su contraseña.</p>
   </details>
 
   <h3 id="docker-config">Docker</h3>
@@ -5982,7 +5985,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <li><b>Cuando acabe</b>, se cierra solo a su hora, aunque cierres la ventana. Para cerrarlo antes: «Cerrar el túnel».</li>
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (la dirección local
+    <p>La orden del programa: <code>nexum tunel-abrir https://web.local panaderia-luna --minutos 120 --admin bloquear</code> (la dirección local
       de la web, su carpeta, los minutos del desplegable y el interruptor: <code>--admin permitir</code> si lo apagas). En Docker la dirección es
       la del contenedor (como <code>https://panaderia-luna-php84.docker.local</code>) y en Node, <code>http://127.0.0.1:&lt;puerto&gt;</code>.
       Si aún no está cloudflared, la ventana lanza antes <code>nexum tunel-instalar</code>.</p>
@@ -6028,7 +6031,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li>Pasada la hora, cierra cloudflared y borra el estado.</li>
     </ol>
     <p>No usa <code>sudo</code> para nada del túnel: todo va con tu usuario.</p>
-    <p>Para comprobarlo: <code>nexum tunel</code> (con uno abierto, una línea <code>T|https://….trycloudflare.com|http://web.local|…</code>)
+    <p>Para comprobarlo: <code>nexum tunel</code> (con uno abierto, una línea <code>T|https://….trycloudflare.com|https://web.local|…</code>)
       y <code>tail ~/.nexum/tunel/registro</code>.</p>
   </details>
 

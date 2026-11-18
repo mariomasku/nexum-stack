@@ -24,18 +24,23 @@ sys.exit(1)
 EOF
 }
 
-# Para la ventana: E|enlace|carpeta a la que apunta, P|carpeta|base de datos|.php-version|tipo por
-# cada proyecto (base leida de wp-config.php, PrestaShop o .env; tipo ps o wp) y R|base|carpeta
-# recordadas
+#@incluir comun/proyectos-opt-htdocs/project_web_url.sh
+
+# Para la ventana: E|enlace|carpeta a la que apunta, W|direccion con la que se abre el proyecto
+# cargado (project_web_url), P|carpeta|base de datos|.php-version|tipo por cada proyecto (base leida
+# de wp-config.php, PrestaShop o .env; tipo ps o wp) y R|base|carpeta recordadas
 function gui_projects() {
-    local link=$(project_link)
+    local link=$(project_link) cur url
 
     # Sin vhost: se creara web.local al cargar el primer proyecto (cuarto campo N)
     if [ -z "$link" ]; then
         echo "E|$PROJECT_VHOST||N"
     else
         # (sin proyecto cargado, el enlace apunta a la pagina vacia: carpeta vacia para la ventana)
-        echo "E|$link|$(readlink "$HTDOCS_DIR/$link" | sed 's:/*$::' | grep -vxF "$EMPTY_PROJECT")"
+        cur=$(readlink "$HTDOCS_DIR/$link" | sed 's:/*$::' | grep -vxF "$EMPTY_PROJECT")
+        echo "E|$link|$cur"
+        url=$([ -n "$cur" ] && project_web_url "${cur##*/}")
+        [ -n "$url" ] && echo "W|$url/"
     fi
     [ -d "$HTDOCS_DIR" ] || return 1
     python3 -I - "$HTDOCS_DIR" <<'EOF'

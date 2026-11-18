@@ -668,8 +668,9 @@ class NvProyectos:
             kind, admin = self.loaded_project_admin()
             # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
             # (los que se ven, su orden y su estilo, como se haya elegido: nv_place_buttons)
-            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir http://%s/" % p["link"],
-                                     lambda *_: self.open_uri("http://%s/" % p["link"]), "nv-proyecto-btn")}
+            web = self.project_web()
+            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir %s" % web,
+                                     lambda *_: self.open_uri(web), "nv-proyecto-btn")}
             code = vscode_app()
             if code is not None:
                 img = None
@@ -694,7 +695,7 @@ class NvProyectos:
             btns["panel"] = adm
             btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
                                        lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
-            btns["compartir"] = self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"])
+            btns["compartir"] = self.nv_share_button(web.rstrip("/"), os.path.join(HTDOCS, x["name"]), x["name"])
             # El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
             has_log = os.path.isfile(APACHE_ERROR_LOG)
             logb = nv_button(logo("log", 18), "Log", "Ver el log de Apache" if has_log else "Aún no hay log de Apache",

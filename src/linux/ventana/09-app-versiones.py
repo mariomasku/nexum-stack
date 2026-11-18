@@ -24,11 +24,13 @@ class AppVersiones:
 
     # ------------------------------------------------- cargar un proyecto (Versiones)
     def on_projects_data(self, rc, out):
-        p = {"link": "", "current": "", "create": False, "list": [], "saved": {}, "vlinks": {}}
+        p = {"link": "", "current": "", "create": False, "web": "", "list": [], "saved": {}, "vlinks": {}}
         for f in parse_lines(out):
             if f[0] == "E" and len(f) >= 3:
                 p["link"], p["current"] = f[1], f[2]
                 p["create"] = len(f) >= 4 and f[3] == "N"
+            elif f[0] == "W" and len(f) >= 2 and re.fullmatch(r"https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/", f[1]):
+                p["web"] = f[1]
             elif f[0] == "P" and len(f) >= 4:
                 p["list"].append({"name": f[1], "db": f[2], "php": f[3],
                                   "kind": f[4] if len(f) > 4 else ""})
@@ -81,8 +83,7 @@ class AppVersiones:
             b.set_always_show_image(True)
             b.connect("clicked", lambda *_: callback())
             return b
-        self.proj_open = icon_button(logo("globo", 20), lambda: self.projects and self.projects["link"]
-                                     and self.open_uri("http://%s/" % self.projects["link"]))
+        self.proj_open = icon_button(logo("globo", 20), lambda: self.project_web() and self.open_uri(self.project_web()))
         self.proj_pma = icon_button(logo("phpmyadmin", 20), self.open_project_pma)
         self.proj_admin = icon_button(logo("wordpress", 20), self.open_project_admin)
         # Desmontar: el vhost deja de apuntar al proyecto (enseña una página vacía)
@@ -797,6 +798,13 @@ class AppVersiones:
             return p["vlinks"][(db, ver)]
         return p.get("saved", {}).get(db)
 
+    def project_web(self):
+        """Dirección con la que se abre el proyecto cargado, con la barra del final: la W de
+        gui-proyectos (la misma que su WP_HOME: su dominio si está falseado y, si no, el vhost de los
+        proyectos con https). Sin ella, http://<enlace>/ como antes."""
+        p = self.projects or {}
+        return p.get("web") or ("http://%s/" % p["link"] if p.get("link") else "")
+
     def project_pairs(self, x):
         """(versión, BBDD) de un proyecto: las BBDD vinculadas a su carpeta en cada versión o, si no
         tiene ninguna, la de su configuración en las versiones donde no es de otro proyecto."""
@@ -862,7 +870,7 @@ class AppVersiones:
         self.proj_warn.set_visible(bool(warn))
         if now:
             name = os.path.basename(p["current"].rstrip("/"))
-            self.proj_open.set_tooltip_text("Abrir http://%s/ en el navegador" % p["link"])
+            self.proj_open.set_tooltip_text("Abrir %s en el navegador" % self.project_web())
             db = self.loaded_project_db()
             self.proj_pma.set_sensitive(bool(db))
             self.proj_pma.set_tooltip_text("Abrir la BBDD %s en phpMyAdmin" % db if db
@@ -871,8 +879,8 @@ class AppVersiones:
             self.proj_admin.set_image(logo("prestashop" if kind == "ps" else "wordpress", 16))
             self.proj_admin.set_sensitive(bool(admin))
             self.proj_admin.set_tooltip_text(
-                ("Abrir el back office de PrestaShop (http://%s/%s/)" if kind == "ps"
-                 else "Abrir el panel de WordPress (http://%s/%s/)") % (p["link"], admin)
+                ("Abrir el back office de PrestaShop (%s%s/)" if kind == "ps"
+                 else "Abrir el panel de WordPress (%s%s/)") % (self.project_web(), admin)
                 + " con el administrador de pruebas ya escrito (%s): solo hay que pulsar Entrar"
                 % self.nv_admin_who() if admin
                 else "%s no es un WordPress ni una tienda PrestaShop con su carpeta de administración" % name)

@@ -336,10 +336,10 @@ struct ProjectsView: View {
         let folder = loadedProjectFolder(p.current)
         let db = cleanDbName(model.loadedDb(x))
         let admin = folder.map { projectAdmin($0) } ?? ("", "")
-        let link = p.link
+        let web = p.webURL
         var items: [String: AnyView] = [:]
         items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
-                                           tip: "Abrir http://\(link)/") { openURL("http://\(link)/") })
+                                           tip: "Abrir \(web)") { openURL(web) })
         if let code = vscodeURL(), let f = folder {
             items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
                                                   tip: "Abrir en Visual Studio Code") {
@@ -361,14 +361,14 @@ struct ProjectsView: View {
         items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
                                              tip: admin.1.isEmpty ? "No tiene panel de administración"
                                                 : "Abrir el panel de administración") {
-            openProjectAdmin(kind: admin.0, admin: admin.1, link: link, db: db, folder: folder)
+            openProjectAdmin(kind: admin.0, admin: admin.1, site: String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), db: db, folder: folder)
         }.disabled(admin.1.isEmpty))
         items["docker"] = AnyView(VisorButton(conf: c, name: "Docker", icon: .logo("docker"),
                                               tip: model.dockerOf(x.name).isEmpty ? "Montar en Docker"
                                                 : "Arrancar en Docker") {
             model.dockerForLoaded(x)
         }.disabled(model.busy))
-        items["compartir"] = AnyView(model.shareButton("http://\(link)", folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
+        items["compartir"] = AnyView(model.shareButton(String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
             .disabled(model.busy))
         // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
         let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)

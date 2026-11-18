@@ -394,6 +394,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.26 (18 nov 2026)
+- «Abrir web» abre el proyecto cargado por la misma dirección que su
+  WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por
+  http://web.local, un .htaccess de producción («lo que llegue por http,
+  a https://midominio.es») se llevaba la visita a la web real. También
+  el menú de la barra, el panel de administración y Compartir.
+
 1.57.25 (18 nov 2026)
 - phpMyAdmin, con su logotipo de siempre en color: las velas naranjas y
   el casco azul (en morado no se distinguía).

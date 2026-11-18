@@ -1131,6 +1131,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.26 (18 nov 2026)
+- «Abrir web» abre el proyecto cargado por la misma dirección que su
+  WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por
+  http://web.local, un .htaccess de producción («lo que llegue por http,
+  a https://midominio.es») se llevaba la visita a la web real. También
+  la bandeja, el panel de administración y Compartir.
+
 1.57.25 (18 nov 2026)
 - Con los botones del proyecto a su tamaño máximo, la ventana crecía a
   lo ancho sin parar. Ahora los botones que no caben en una línea pasan

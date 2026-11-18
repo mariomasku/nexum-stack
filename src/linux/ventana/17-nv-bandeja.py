@@ -79,9 +79,8 @@ class NvBandeja:
         self.nv_power()
 
     def nv_tray_web(self):
-        link = (self.projects or {}).get("link")
-        if link:
-            self.open_uri("http://%s/" % link)
+        if self.project_web():
+            self.open_uri(self.project_web())
 
     def nv_tray_quit(self):
         self.nv_tray_remove()

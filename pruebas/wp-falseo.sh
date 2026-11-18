@@ -61,4 +61,21 @@ check "sin dominio propio: no se toca" '! grep -q WP_HOME "$HTDOCS_DIR/sin/wp-co
 DRY=1; printf '127.0.0.1 localhost web.local\n127.0.0.1 panaderia-luna.com\n' > "$HOSTS_FILE"; cp "$f" "$W/antes"
 out=$(wp_urls_sync tienda)
 check "en simulacion no escribe y dice lo que haria" 'cmp -s "$f" "$W/antes" && grep -q "simulacion.*https://panaderia-luna.com" <<< "$out"'
+
+# Abrir web (1.57.26): la direccion del proyecto cargado es la de su WP_HOME, nunca http://web.local
+# (un .htaccess de produccion manda lo que llega por el puerto 80 a la web real)
+extract "$SRC" project_web_url || exit 1
+DRY=0
+printf '127.0.0.1 localhost web.local\n#127.0.0.1 panaderia-luna.com\n' > "$HOSTS_FILE"
+check "abrir web: WordPress sin falsear, https://web.local" '[ "$(project_web_url tienda)" = https://web.local ]'
+printf '127.0.0.1 localhost web.local\n127.0.0.1 panaderia-luna.com\n' > "$HOSTS_FILE"
+check "abrir web: WordPress falseado, su dominio" '[ "$(project_web_url tienda)" = https://panaderia-luna.com ]'
+mkdir -p "$HTDOCS_DIR/shop"
+check "abrir web: lo que no es WordPress, el vhost con https" '[ "$(project_web_url shop)" = https://web.local ]'
+vhosts_info() { printf '80|web.local|web.local||||\n'; }
+check "abrir web: sin vhost https, http://web.local" '[ "$(project_web_url shop)" = http://web.local ]'
+vhosts_info() { printf '8443|web.local|web.local||/c/w.crt|/c/w.key\n'; }
+check "abrir web: con otro puerto, lo lleva" '[ "$(project_web_url shop)" = https://web.local:8443 ]'
+vhosts_info() { printf '443|web.local|web;rm -rf x||/c/w.crt|/c/w.key\n'; }
+check "abrir web: una direccion rara no sale" '[ -z "$(project_web_url shop)" ]'
 exit $fail

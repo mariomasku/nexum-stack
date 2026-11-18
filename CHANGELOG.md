@@ -4,6 +4,27 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.26 · 18 nov 2026
+
+- «Abrir web» abre el proyecto cargado por la misma dirección que su WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por http://web.local, un .htaccess de producción («lo que llegue por http, a https://midominio.es») se llevaba la visita a la web real. También la bandeja, el panel de administración y Compartir.
+
+## 1.57.25 · 18 nov 2026
+
+- Con los botones del proyecto a su tamaño máximo, la ventana crecía a lo ancho sin parar. Ahora los botones que no caben en una línea pasan a la siguiente, y la ventana se queda en su ancho (también en el visor de Docker).
+- phpMyAdmin, con su logotipo de siempre en color: las velas naranjas y el casco azul (en morado no se distinguía).
+- **Todos los logotipos con el mismo tamaño:** cada uno ocupa lo mismo que uno cuadrado que llena su recuadro (los apaisados, como el velero de phpMyAdmin o la nube de Compartir, un poco más anchos). La bola del mundo de «Abrir web» salía más pequeña que el círculo de WordPress.
+
+## 1.57.24 · 18 nov 2026
+
+- **Terminal de abajo:** botón «ping». Escribe ping -c 3 con el dominio del proyecto cargado (uno detrás de otro, si tiene varios): con 127.0.0.1 está falseado y lleva a tu copia; con otra dirección, a la web real. Sin dominio propio, lo dice y no escribe nada.
+- **Lista de proyectos:** al lado de «Cargar», al pasar el ratón (también en la fila cargada), los accesos directos de cada proyecto con solo el icono: Visual Studio Code (si está instalado), su repositorio (si tiene remote origin) y phpMyAdmin con su base, si tiene una en la versión de PHP activa.
+- **Terminal de abajo:** el botón «+» abre otra terminal en una pestaña nueva, en la carpeta del proyecto cargado, sin cerrar las que ya tenías (antes, «Terminal nueva» cerraba la de ahora). Con más de una salen sus pestañas: se pasa de una a otra pulsándolas, y cada una se cierra con su × o con exit.
+
+## 1.57.23 · 18 nov 2026
+
+- **WordPress con su dominio:** al dejar de falsear el dominio, la copia local ya no lleva a la web de producción. Su `wp-config.php` lleva WP_SITEURL y WP_HOME dos veces, con https://web.local y con el dominio, y solo una pareja sin comentar: la del dominio mientras está falseado y la de web.local cuando no. Las cambia el interruptor del dominio, y también cargar un proyecto o crearlo con su dominio. Antes se quedaba la del dominio aunque ya no estuviera falseado: al abrir web.local se acababa en producción sin darse cuenta.
+- Dominio real que, sin falsear, seguía abriendo web.local en vez de la web de producción: era una redirección (301) de la copia local guardada en el navegador mientras estaba falseado. Ahora tu Apache le dice al navegador que no guarde nada de lo que recibe con un dominio real (Cache-Control: no-store; los .local, .test y localhost siguen como antes). Al actualizar, la ventana pide aplicar la seguridad nueva a las versiones de PHP: hazlo. Si el navegador ya tenía guardada una de esas redirecciones, bórrala una vez: en Chrome, Configuración, Privacidad, Borrar datos de navegación, «Archivos e imágenes almacenados en caché».
+
 ## 1.57.22 · 17 nov 2026
 
 - En Ubuntu 20.04, Chrome no abría web.local ni los proyectos con https: «La conexión no es privada», net::ERR_CERT_INVALID, sin dejar continuar. Su OpenSSL hacía los certificados con una extensión repetida, y Chrome los rechaza. Ahora salen bien en todas las versiones de Ubuntu. Los que ya estaban mal hechos los avisa Versiones, «Certificados que Chrome rechaza»: «Arreglarlos» les hace uno nuevo y el navegador lo acepta. También el de *.docker.local, que se rehace solo al montar un proyecto en Docker, y el de localhost de las versiones que se instalan desde ahora.

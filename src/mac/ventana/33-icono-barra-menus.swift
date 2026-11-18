@@ -175,7 +175,7 @@ final class TrayIcon: NSObject, NSMenuDelegate {
     }
 
     @objc func openWeb() {
-        if let link = AppModel.current?.projects?.link, !link.isEmpty { openURL("http://\(link)/") }
+        if let web = AppModel.current?.projects?.webURL, !web.isEmpty { openURL(web) }
     }
 
     @objc func quit() {

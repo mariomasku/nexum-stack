@@ -421,17 +421,17 @@ func testAdminConf() -> (mail: String, password: String, own: Bool) {
 /// Panel de administración del proyecto cargado (tipo "wp" o "ps", carpeta del panel). Antes deja
 /// al día su administrador de pruebas (usuario-pruebas) y abre una página con el usuario y la
 /// contraseña ya escritos: basta con pulsar Entrar. Si no se puede, el panel como siempre.
-func openProjectAdmin(kind: String, admin: String, link: String, db: String, folder: String?) {
+func openProjectAdmin(kind: String, admin: String, site: String, db: String, folder: String?) {
     let name = folder.map { ($0 as NSString).lastPathComponent } ?? ""
-    openAdminLogin(kind: kind, admin: admin, site: "http://\(link)", name: name,
-                   command: db.isEmpty ? nil : ["usuario-pruebas", db, name])
+    openAdminLogin(kind: kind, admin: admin, site: site, name: name,
+                   command: db.isEmpty ? nil : ["usuario-pruebas", db, name], local: true)
 }
 
 /// Panel (wp-admin o el de la tienda) de la web site (http://web.local, https://x.docker.local) con el
 /// administrador de pruebas: command lo deja al día (usuario-pruebas o docker-usuario-pruebas, que dicen
 /// A|tipo|usuario|contraseña) y se abre una página con el usuario y la contraseña ya escritos. Sin
 /// command, o si no sale, el panel como siempre
-func openAdminLogin(kind: String, admin: String, site: String, name: String, command: [String]?) {
+func openAdminLogin(kind: String, admin: String, site: String, name: String, command: [String]?, local: Bool = false) {
     let base = "\(site)/\(admin)/"
     guard let cmd = command, !SIMULATE else { openURL(base); return }
     runQuick(cmd) { rc, out in
@@ -446,14 +446,14 @@ func openAdminLogin(kind: String, admin: String, site: String, name: String, com
             openURL(base)
             return
         }
-        // (usuario-pruebas dice si el acceso no puede ir a http://web.local: https, porque sus cookies
-        // de sesión son secure y por http no se guardan, o la dirección de la tienda con su dominio
-        // falseado, porque su back office salta allí al entrar; en Docker, no)
+        // (en XAMPP-X, local, usuario-pruebas dice si el acceso no puede ir por http: https, porque sus
+        // cookies de sesión son secure y por http no se guardan, o la dirección de la tienda con su
+        // dominio falseado, porque su back office salta allí al entrar; en Docker, no)
         var web = site
         let extra = f.count > 4 ? f[4] : ""
-        if site.hasPrefix("http://"), extra == "https" {
+        if local, site.hasPrefix("http://"), extra == "https" {
             web = "https://" + String(site.dropFirst("http://".count))
-        } else if site.hasPrefix("http://"),
+        } else if local,
                   extra.range(of: "^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", options: .regularExpression) != nil {
             web = extra.hasSuffix("/") ? String(extra.dropLast()) : extra
         }
