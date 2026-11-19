@@ -6,10 +6,9 @@ extension AppModel {
                  autoClose: Bool = false, env: [String: String] = [:],
                  cancelText: (String, String, String)? = nil, reloadBranches: Bool = false,
                  onDone: ((Bool, TaskRunner, InstallProgress?) -> Void)? = nil) -> TaskRunner {
-        // (otra tarea en segundo plano: no van dos a la vez, que tocarían lo mismo)
+        // (otra tarea en marcha: no van dos a la vez, que tocarían lo mismo)
         if let cur = task, !cur.finished {
-            taskHidden = false
-            toast("Hay una tarea en marcha: espera a que acabe")
+            refuseTask(cur)
             return cur
         }
         // (la ventana que hubiera encima de la página se cierra: la tarea va en su hoja)
@@ -25,6 +24,19 @@ extension AppModel {
         task = t
         t.start()
         return t
+    }
+
+    /// La tarea que sigue en marcha (en su hoja o en segundo plano), o nil
+    var runningTask: TaskRunner? {
+        if let cur = task, !cur.finished { return cur }
+        return nil
+    }
+
+    /// Lo dice nombrando la que sigue, para que se espere a que acabe, y la enseña
+    func refuseTask(_ cur: TaskRunner) {
+        message("Hay una tarea en marcha",
+                "«\(cur.title)» sigue en marcha. Espera a que acabe y vuelve a probar.")
+        taskHidden = false
     }
 
     func control(_ cmd: String, _ what: String) {

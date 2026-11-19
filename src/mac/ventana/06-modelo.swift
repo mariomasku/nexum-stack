@@ -336,6 +336,11 @@ final class AppModel: ObservableObject {
 
     init() {
         AppModel.current = self
+        TASK_GUARD = { [weak self] in
+            guard let self = self, let cur = self.runningTask else { return false }
+            self.refuseTask(cur)
+            return true
+        }
         reload(branches: true)
         // Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
         // vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub

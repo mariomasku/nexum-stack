@@ -1136,9 +1136,16 @@ def copy_check(warn="Sin copia, lo que se sustituya no se podrá recuperar."):
     return box
 
 
-def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=None):
+# TASK_GUARD[0](): con otra tarea en marcha, lo dice (nombrándola) y devuelve True; lo pone la ventana al abrirse
+TASK_GUARD = [None]
+
+
+def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=None, task=True):
     """Pregunta con Cancelar / ok_label. extra: widget opcional debajo del texto. steps: los
-    cambios que se van a hacer (numerados); text va entonces debajo, como nota."""
+    cambios que se van a hacer (numerados); text va entonces debajo, como nota. task: lo que se
+    confirma es una tarea; con otra en marcha no se pregunta (no van dos a la vez) y se dice cuál sigue."""
+    if task and TASK_GUARD[0] is not None and TASK_GUARD[0]():
+        return False
     dlg = Gtk.MessageDialog(transient_for=parent, modal=True,
                             message_type=Gtk.MessageType.QUESTION,
                             buttons=Gtk.ButtonsType.NONE, text=title)

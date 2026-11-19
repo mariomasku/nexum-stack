@@ -1131,6 +1131,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.33 (19 nov 2026)
+- Con una tarea en marcha (como actualizar los componentes), lo que
+  lanza otra avisa antes de preguntar nada: «Hay una tarea en marcha»,
+  con el nombre de la que sigue, y te la enseña para que esperes a que
+  acabe. En Linux, el aviso sale en la ventana que estás mirando (como
+  «Instalar versión», que tapaba el de abajo).
+
 1.57.32 (19 nov 2026)
 - Versiones de PHP: una versión con alguna pieza dañada ya no sale como
   «Actualizado»: lo dice en rojo («MariaDB dañado»), y su menú ⋮ trae

@@ -27,7 +27,8 @@ struct InstallSection: View {
                         model.install()
                     }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(model.selected.isEmpty || model.busy)
+                    // (con otra tarea en marcha se puede pulsar: lo dice, nombrándola)
+                    .disabled(model.selected.isEmpty)
                     Text("La versión activa no cambia. Las nuevas se activan en la tabla de Versiones de PHP.")
                         .font(.callout).foregroundColor(.secondary)
                 }

@@ -679,6 +679,6 @@ class Task:
                 "¿Cancelar la instalación?",
                 "Se pierde lo descargado y compilado. Las versiones instaladas no se tocan.",
                 "Cancelar la instalación")
-            if not confirm(self.dlg, title, text, ok, destructive=True):
+            if not confirm(self.dlg, title, text, ok, destructive=True, task=False):
                 return
         self.cancel()

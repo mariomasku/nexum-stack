@@ -866,8 +866,10 @@
   <p>Cada tarea guarda además su registro entero (la orden de <code>nexum</code> que se ha ejecutado, toda su salida y cómo acabó), sin
     contraseñas: lo tienes después, aunque hayas cerrado su ventana, en Configuración → General, <a href="#tareas">Registro de
     tareas</a>.</p>
-  <div class="nota"><b>Solo va una tarea a la vez</b>Si lanzas otra mientras una sigue en segundo plano, te dice «Hay una tarea en marcha:
-    espera a que acabe» y te enseña la que está trabajando.</div>
+  <div class="nota"><b>Solo va una tarea a la vez</b>Si pulsas algo que lanza otra mientras una sigue trabajando, antes de preguntarte
+    nada sale «Hay una tarea en marcha» con el nombre de la que sigue (por ejemplo, «Actualizando los componentes» sigue en marcha), en la
+    ventana que estás mirando, aunque sea «Instalar versión». Al cerrarlo te enseña la que está trabajando: espera a que acabe y vuelve a
+    probar.</div>
 
   <h3 id="ventana-contrasena">La contraseña de administrador</h3>
   <p>Cuando una tarea necesita permisos de administrador (lo que en la terminal se hace con <code>sudo</code> delante), se abre una ventana
@@ -6905,8 +6907,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Ábrela desde una terminal para ver qué dice: <code>nexum ventana</code>.<span data-so="linux"> Si falta GTK para Python, te
       dice cómo instalarlo (<code>sudo apt install python3-gi gir1.2-gtk-3.0</code>); los errores de cuando se abre desde el menú quedan en
       <code>~/.nexum/ventana.log</code>.</span> Mientras tanto, todo se puede hacer desde el panel: <code>nexum</code>.</p></details>
-  <details><summary>«Hay una tarea en marcha: espera a que acabe»</summary>
-    <p>Solo va una tarea a la vez. Pulsa la flecha verde de arriba para ver la que está trabajando, y espera a que acabe o cancélala.</p></details>
+  <details><summary>«Hay una tarea en marcha»: no me deja instalar ni crear nada</summary>
+    <p>Solo va una tarea a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los componentes y compilar otra versión de PHP). El
+      aviso dice cuál sigue en marcha. Pulsa la flecha verde de arriba para verla, y espera a que acabe o cancélala; luego vuelve a
+      pulsar.</p></details>
   <details><summary>Una orden dice que MariaDB «no responde o root tiene contraseña»</summary>
     <p>Las órdenes de bases de datos entran en MariaDB como <code>root</code> sin contraseña. Si se la has puesto, pásasela delante.</p>
     <p><b>En la terminal:</b> <code>MYSQL_PWD=tu_contraseña nexum list-db</code>. Si es que no está en marcha:

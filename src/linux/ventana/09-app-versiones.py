@@ -1453,12 +1453,24 @@ class AppVersiones:
             pass
 
     # acciones
+    def task_running(self):
+        """La tarea que sigue en marcha (en su ventana o en segundo plano), o None."""
+        cur = getattr(self, "cur_task", None)
+        return cur if self.busy and cur is not None and not cur.finished else None
+
+    def refuse_task(self):
+        """No van dos tareas a la vez, que tocarían lo mismo: lo dice nombrando la que sigue, en la ventana
+        que se está mirando (como «Instalar versión», que tapa la principal), y la enseña."""
+        cur = self.task_running()
+        top = next((w for w in Gtk.Window.list_toplevels() if w.is_active() and w.get_visible()), self.win)
+        message(top, "Hay una tarea en marcha",
+                "«%s» sigue en marcha. Espera a que acabe y vuelve a probar." % (cur.title if cur else "Otra tarea"))
+        if cur is not None:
+            cur.to_front()
+
     def run_task(self, title, args, **kw):
-        bg = getattr(self, "bg_task", None)
-        if self.busy and bg is not None and not bg.finished:
-            # (otra tarea en segundo plano: no van dos a la vez, que tocarían lo mismo)
-            self.toast("Hay una tarea en marcha: espera a que acabe")
-            bg.to_front()
+        if self.task_running():
+            self.refuse_task()
             return None
         self.busy = True
         user_done = kw.pop("on_done", None)
@@ -1469,7 +1481,8 @@ class AppVersiones:
                 user_done(ok, task, p)
             self.reload(branches=kw_reload)
         kw_reload = kw.pop("reload_branches", False)
-        return Task(self, title, args, on_done=done, **kw)
+        self.cur_task = Task(self, title, args, on_done=done, **kw)
+        return self.cur_task
 
     def on_control(self, _btn, cmd, what):
         folder = self.data["active"]
