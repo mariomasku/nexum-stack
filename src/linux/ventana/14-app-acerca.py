@@ -55,7 +55,7 @@ class AppAcerca:
 
     # El capítulo del manual de cada pestaña y de cada apartado de Configuración (los id de ayuda/index.html)
     HELP_TABS = {"proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
-                 "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"}
+                 "docker": "docker", "node": "node", "nginx": "nginx", "dominios": "dominios", "config": "configuracion"}
     HELP_SECTIONS = {"General": "general", "Configuración": "vhosts", "Seguridad entre webs": "seguridad-webs",
                      "Correo de pruebas (Mailpit)": "correo", "Administrador de pruebas": "admin-pruebas-config",
                      "Docker": "docker-config",

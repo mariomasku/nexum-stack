@@ -49,6 +49,11 @@ NODE = [
     ("agenda-citas", "Next", "marcha", "dev", "http://127.0.0.1:3000/", "22", "1", "dev build start"),
     ("blog-viajes", "Astro", "parado", "", "", "22", "1", "dev build"),
 ]
+# Proyectos de Nginx (carpeta, raíz, nombre, carpeta existe)
+NGINX = [
+    ("inventario-almacen", "public", "inventario-almacen.localhost", "1"),
+    ("portfolio-estudio", "", "portfolio-estudio.localhost", "1"),
+]
 # Proyectos de Docker: los de WordPress con su web (php, MariaDB, estado, versiones de PHP)
 DOCKER = [
     ("clinica-del-sol", "8.2", "11.8", "marcha", "wp_clinica_del_sol", "8.2 8.4"),
@@ -285,6 +290,8 @@ def main():
         "gui-bbdd-tamanos": z, "gui-proyectos-tamanos": t, "gui-docker": gui_docker(),
         "gui-docker-estadisticas": "T|12|16110338048\n",
         "gui-node": lines(("P",) + n for n in NODE),
+        "gui-nginx": "N|1|1.30.7|1.30.7|1|8080|8443|ok\n" + lines(("P",) + n for n in NGINX)
+                     + lines(("C", p[0]) for p in PROJECTS if p[0] not in [n[0] for n in NGINX]),
         "github": lines([("G", 1, GITHUB[0], "gh", GITHUB[1], "")]),
         "repos": repos(), "tunel": "I|1|2026.10.0|2026.10.0\n",
         "correo": "Correo de pruebas encendido: lo que mandan las webs va a Mailpit\n",

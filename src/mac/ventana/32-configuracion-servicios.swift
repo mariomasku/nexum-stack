@@ -429,6 +429,7 @@ struct ToolsView: View {
         ("correo", "Correo de pruebas", "envelope"),
         ("admin", "Administrador de pruebas", "person.crop.circle"),
         ("docker", "Docker", "logo:docker"),
+        ("nginx", "Nginx", "logo:nginx"),
         ("tunel", "Túnel de Cloudflare", "cloud"),
         ("apariencia", "Apariencia", "paintpalette"),
         ("github", "GitHub", "logo:github"),
@@ -522,6 +523,8 @@ struct ToolsView: View {
             AdminTestCard()
         case "docker":
             dockerCard()
+        case "nginx":
+            NginxCard()
         case "tunel":
             tunnelCard()
         case "apariencia":

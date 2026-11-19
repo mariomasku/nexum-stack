@@ -532,6 +532,8 @@ class NvTerminal:
             self.nv_broken_load()
         elif row.tab_name == "node":
             self.nv_node_load()
+        elif row.tab_name == "nginx":
+            self.nv_nginx_load()
 
     def on_tick(self):
         res = super().on_tick()

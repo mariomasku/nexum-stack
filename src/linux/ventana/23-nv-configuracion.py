@@ -80,6 +80,7 @@ class NvConfiguracion:
         self.nv_components_tools()
         self.nv_tasks_tools()
         self.nv_docker_tools()
+        self.nv_nginx_tools()
         self.nv_tunnel_tools()
         self.nv_mail_tools()
         self.nv_admin_tools()
@@ -99,6 +100,7 @@ class NvConfiguracion:
                       ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
                       ("Administrador de pruebas", "Administrador de pruebas", "avatar-default-symbolic"),
                       ("Docker", "Docker", "logo:docker"),
+                      ("Nginx", "Nginx", "logo:nginx"),
                       ("Túnel de Cloudflare", "Túnel de Cloudflare", "network-transmit-receive-symbolic"),
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
                       ("Apariencia", "Apariencia", "preferences-desktop-appearance-symbolic"),
@@ -807,15 +809,10 @@ class NvConfiguracion:
             box.nv_updates = True
             shown = res["items"][:6] + (["…y %d más" % (n - 6)] if n > 6 else [])
             row = ActionRow("Conviene ponerlos: son parches de seguridad",
-                            "\n".join("• " + i for i in shown) + "\nLo de ahora sigue funcionando mientras se actualiza "
+                            "\n".join("• " + i for i in shown) + "\n\nLo de ahora sigue funcionando mientras se actualiza "
                             "(se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta "
                             "que salga otro parche; siguen en Configuración, General, Parches nuevos.")
             row.add_prefix(icon("software-update-available-symbolic", 18))
-            # (entero, sin cortar: en el aviso hay sitio)
-            for lbl in (row.title, row.subtitle):
-                lbl.set_ellipsize(0)
-                lbl.set_line_wrap(True)
-                lbl.set_max_width_chars(46)
             later = Gtk.Button(label="Ahora no", valign=Gtk.Align.CENTER)
             later.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), updates_ignore(res["items"]),
                                                  self.nv_warn_refresh()))
@@ -826,6 +823,10 @@ class NvConfiguracion:
             lb.add(row)
             self.warn_box.pack_start(box, False, False, 0)
             self.warn_box.reorder_child(box, 0)
+        # (los de más de dos líneas, con sus botones debajo: al lado se quedaban en una columna estrecha)
+        for w in self.nv_walk(self.warn_box):
+            if isinstance(w, ActionRow) and w.suffix.get_children() and w.text_lines() > 2:
+                w.suffix_below()
         self.warn_box.show_all()
         n = len(self.warn_box.get_children())
         self.warn_num.set_label(str(n))

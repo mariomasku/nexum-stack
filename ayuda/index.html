@@ -37,6 +37,7 @@
     <li><a href="#bbdd">Bases de datos</a></li>
     <li><a href="#docker">Docker</a></li>
     <li><a href="#node">Node.js</a></li>
+    <li><a href="#nginx">Nginx</a></li>
     <li class="grupo">Sistema</li>
     <li><a href="#dominios">Dominios y hosts</a></li>
     <li class="con-sub"><a href="#configuracion">Configuración</a>
@@ -46,6 +47,7 @@
         <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
         <li><a href="#correo">Correo de pruebas</a></li>
         <li><a href="#docker-config">Docker</a></li>
+        <li><a href="#nginx-config">Nginx</a></li>
         <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
         <li><a href="#github-config">GitHub</a></li>
         <li><a href="#apariencia">Apariencia</a></li>
@@ -329,7 +331,7 @@
         en blanco<span data-so="mac">, y <kbd>⌘</kbd>+<kbd>K</kbd> borra lo de arriba y deja la línea en la que escribes</span>.</span></li>
       <li data-x="3.5" data-y="11"><b>Entorno</b><span>Lo de tu trabajo diario: <a href="#proyectos">Proyectos</a>,
         <a href="#repositorios">Repositorios</a>, <a href="#versiones">Versiones de PHP</a>, <a href="#bbdd">Bases de datos</a>,
-        <a href="#docker">Docker</a> y <a href="#node">Node</a>. En Configuración → Apariencia puedes ocultar las que no uses y, con
+        <a href="#docker">Docker</a>, <a href="#node">Node</a> y <a href="#nginx">Nginx</a>. En Configuración → Apariencia puedes ocultar las que no uses y, con
         «Logotipos de Docker, Node y PHP», Docker y Node llevan su icono y, al lado, su logotipo de letras en lugar del nombre.</span></li>
       <li data-x="3.5" data-y="48"><b>Sistema</b><span>Lo que se toca de vez en cuando: <a href="#dominios">Dominios y hosts</a> y
         <a href="#configuracion">Configuración</a>.</span></li>
@@ -4070,6 +4072,95 @@
       <code>node</code> que uses en la terminal.</p></details>
 </section>
 
+<section class="capitulo" id="nginx">
+  <div class="antetitulo">Entorno</div>
+  <h2>Nginx</h2>
+  <p class="entrada">Otro servidor web, aparte de Apache, para los proyectos que le añadas: cada uno por su nombre, con el PHP de la versión
+    activa.</p>
+  <p><b>Nginx</b> es un servidor web, como Apache: el programa que contesta al navegador. Muchos servidores de producción usan Nginx, sobre
+    todo con Laravel o Symfony. Con esta página tienes uno en tu equipo para ver tus proyectos como en producción, sin dejar de usar Apache:
+    un proyecto sigue abriéndose por Apache como siempre, y además por Nginx si se lo añades.</p>
+  <p>Hay un solo Nginx para todo el equipo. Se instala en <code>~/.nexum/nginx</code> y funciona con tu usuario: ni instalarlo ni arrancarlo
+    piden la contraseña de administrador (en Linux, solo la primera vez si faltan los paquetes para compilarlo). Solo contesta desde tu equipo,
+    nunca desde la red, en sus <b>puertos</b> (el número que distingue a cada programa que espera conexiones): el 8080 para http y el 8443
+    para https, que se cambian en <a href="#nginx-config">Configuración → Nginx</a>.</p>
+  <p>Cada proyecto se abre por su nombre: la carpeta <code>tienda-laravel</code>, en <code>http://tienda-laravel.localhost:8080</code> y
+    <code>https://tienda-laravel.localhost:8443</code>. El navegador lleva cualquier nombre que acabe en <code>.localhost</code> a tu
+    equipo, sin tocar <code>/etc/hosts</code>. PHP lo pone la <a href="#versiones">versión de PHP</a> activa (su PHP-FPM, el mismo que usa
+    Apache), con sus BBDD: si cambias de versión, Nginx usa la nueva. Con la versión activa parada, Nginx sirve los ficheros, pero no el PHP.</p>
+
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/pagina-nginx.png" data-linux="img/linux/pagina-nginx.png" data-mac="img/mac/pagina-nginx.png"
+           alt="La página Nginx, en marcha y con dos proyectos" width="1434" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="92.3" data-y="14.9"><b>Añadir proyecto</b><span>Elige una carpeta de tus proyectos y, si quieres, la subcarpeta que se sirve. Si
+        la dejas vacía, se elige sola: <code>public</code> si la tiene (Laravel, Symfony), <code>web</code> (Symfony antiguo) o la carpeta
+        entera. Hace su certificado para el https y lo deja aceptado en el navegador. En el Mac, «Añadir proyecto» está debajo de la lista.</span></li>
+      <li data-x="19.5" data-y="23.8"><b>En marcha o parado</b><span>Verde si Nginx está funcionando; gris si está parado.</span></li>
+      <li data-x="30" data-y="23.8"><b>Cómo está</b><span>Su versión, si está en marcha y en qué puertos. Si el PHP de la versión activa no está en
+        marcha, o la versión activa no tiene PHP-FPM (un XAMPP oficial), lo dice. Sin instalar, sale «Instalar»: lo descarga de nginx.org,
+        comprueba su huella y lo compila (menos de un minuto). Si el programa trae una versión nueva de Nginx, sale «Actualizar a la…».</span></li>
+      <li data-x="86.5" data-y="23.8"><b>Registro</b><span>Lo último que ha dicho Nginx: sus errores. Es el primer sitio donde mirar si un proyecto
+        no se abre.</span></li>
+      <li data-x="89.7" data-y="23.8"><b>Reiniciar</b><span>Solo en marcha: lo para y lo vuelve a arrancar.</span></li>
+      <li data-x="94.3" data-y="23.8"><b>Arrancar o Parar</b><span>Arranca Nginx en tu equipo o lo para. Apache no cambia. Si su puerto ya lo usa
+        otro programa, lo dice y no arranca: cámbialo en Configuración → Nginx.</span></li>
+      <li data-x="31" data-y="37.1"><b>Un proyecto</b><span>Su carpeta, su dirección (<code>https://…localhost:8443/</code>) y lo que sirve: una
+        subcarpeta (<code>public/</code>) o la carpeta entera. Si su carpeta ya no está, lo dice.</span></li>
+      <li data-x="79.5" data-y="37.1"><b>VS Code y su carpeta</b><span>«Abrir en Visual Studio Code» (solo si lo tienes instalado) y «Abrir su
+        carpeta» en el explorador de archivos.</span></li>
+      <li data-x="86.7" data-y="37.1"><b>Abrir web</b><span>Solo con Nginx en marcha: abre su dirección https en el navegador.</span></li>
+      <li data-x="94.1" data-y="37.1"><b>Quitar</b><span>Deja de servirlo con Nginx. Su carpeta y sus BBDD no se tocan, y Apache lo sigue sirviendo.</span></li>
+    </ol>
+  </figure>
+
+  <h3>Qué sirve y qué no</h3>
+  <ul>
+    <li><b>Las URL bonitas</b> de Laravel, Symfony o un PHP con un <code>index.php</code> que lo recibe todo funcionan: lo que no es un fichero
+      va a <code>index.php</code>.</li>
+    <li><b>El <code>.htaccess</code> no lo lee</b>: es de Apache. Las reglas propias que tengas ahí no valen en Nginx. Por eso conviene para
+      Laravel, Symfony y parecidos, y no para WordPress o PrestaShop, que siguen mejor con Apache.</li>
+    <li><b>Nunca sirve</b> los ficheros ocultos (<code>.env</code>, <code>.git</code>…) ni las carpetas <code>vendor</code> y
+      <code>node_modules</code>.</li>
+    <li>Lo que llega con otro nombre (un dominio real, la IP de tu equipo o un nombre que no es de un proyecto añadido) no recibe respuesta.</li>
+  </ul>
+
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>Las órdenes del programa:</p>
+    <ul>
+      <li><code>nexum nginx-instalar</code>: lo que hace falta para compilarlo (en Linux, <code>gcc make libpcre2-dev libssl-dev zlib1g-dev</code>
+        con apt; en el Mac, las herramientas de Xcode y <code>pcre2</code> y <code>openssl@3</code> de Homebrew) y Nginx, en
+        <code>~/.nexum/nginx/programa</code>.</li>
+      <li><code>nexum nginx-anadir tienda-laravel</code> (o <code>nexum nginx-anadir tienda-laravel public</code>, con la subcarpeta) y
+        <code>nexum nginx-quitar tienda-laravel</code>.</li>
+      <li><code>nexum nginx-arrancar</code>, <code>nexum nginx-parar</code> y <code>nexum nginx-reiniciar</code>.</li>
+      <li><code>nexum nginx-puertos 8080 8443</code>, <code>nexum nginx-registro</code> y <code>nexum nginx-confiar</code> (que el navegador
+        acepte el certificado de cada proyecto).</li>
+    </ul>
+    <p>La configuración la escribe el programa en <code>~/.nexum/nginx/conf/nginx.conf</code> cada vez que cambia algo, y Nginx la prueba
+      antes de usarla: si no la acepta, se queda la de antes. No se edita a mano. Para comprobar cómo está: <code>nexum gui-nginx</code>.</p>
+  </details>
+
+  <h3>Preguntas</h3>
+  <details><summary>Safari no abre <code>….localhost</code></summary>
+    <p>Chrome, Firefox y Edge llevan cualquier <code>….localhost</code> a tu equipo por su cuenta. Si tu navegador no lo hace, prueba con otro.</p></details>
+  <details><summary>El https dice que la conexión no es privada</summary>
+    <p>El certificado de cada proyecto se acepta en el navegador al añadirlo. Si lo has quitado, o usas otro navegador, pulsa «Confiar» en
+      Configuración → Nginx. Si Chrome estaba abierto, ciérralo y vuelve a abrirlo.</p></details>
+  <details><summary>Sale «502 Bad Gateway»</summary>
+    <p>El PHP de la versión activa no está en marcha. Arráncala en la barra de arriba o en <a href="#versiones">Versiones de PHP</a>.</p></details>
+  <details><summary>¿Sigue en marcha si cierro la ventana?</summary>
+    <p>Sí: va por su cuenta. Páralo desde aquí cuando acabes.</p></details>
+</section>
+
+
 <!-- =========================================================================================== DOMINIOS -->
 <section class="capitulo" id="dominios">
   <div class="antetitulo">Sistema</div>
@@ -5277,6 +5368,27 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <code>wp-config.php</code> del contenedor, el que apunta a su base de datos de Docker. Para comprobarlo:
       <code>docker image inspect --format '{{index .Config.Labels "nexum.wp-cli"}}' nexum-php:8.4</code> (sale <code>2.12.0</code>).</p>
   </details>
+
+  <h3 id="nginx-config">Nginx</h3>
+  <p>Los puertos del Nginx de la página <a href="#nginx">Nginx</a> y la confianza del navegador en sus certificados.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-nginx.png" data-linux="img/linux/config-nginx.png" data-mac="img/mac/config-nginx.png" alt="Configuración, Nginx" width="1434" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="92.4" data-y="26.2"><b>Puertos</b><span>HTTP y HTTPS: 8080 y 8443 de serie. De 1024 en adelante (los de abajo son de root) y
+        distintos entre sí y de los de Apache. «Guardar» los cambia; si Nginx está en marcha, los usa al momento. Si un puerto ya lo usa otro
+        programa, lo dice y no cambia nada.</span></li>
+      <li data-x="61.8" data-y="46"><b>Certificados</b><span>«Confiar» hace que el navegador acepte sin aviso el https de cada proyecto. Se hace
+        solo al añadirlo: esto es para cuando lo has quitado o usas otro navegador. <span data-so="mac">El Mac te pide la contraseña para
+        cambiar la confianza del llavero.</span></span></li>
+    </ol>
+  </figure>
 
   <h3 id="tunel-config">Túnel de Cloudflare</h3>
   <p>El programa que abre los túneles para compartir tus webs, el túnel que haya abierto y su registro. Un <i>túnel</i> es una dirección

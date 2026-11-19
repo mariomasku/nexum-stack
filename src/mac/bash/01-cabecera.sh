@@ -380,6 +380,13 @@
 #   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
 #   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
 #   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
+#   nexum nginx-instalar              Nginx (pestaña Nginx), compilado con tu usuario en ~/.nexum/nginx
+#   nexum nginx-anadir <carpeta> [subcarpeta]   lo sirve en http://<carpeta>.localhost:8080 y https://...:8443
+#   nexum nginx-quitar <carpeta>      deja de servirlo
+#   nexum nginx-arrancar|nginx-parar|nginx-reiniciar   Nginx, solo en este equipo, con el PHP de la version activa
+#   nexum nginx-puertos <http> <https>   sus puertos (8080 y 8443 de serie)
+#   nexum nginx-registro              lo ultimo que ha dicho (sus errores)
+#   nexum nginx-confiar               que el navegador acepte sin aviso el certificado de cada proyecto
 #   nexum tunel-abrir <direccion local> [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]
 #   nexum tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una

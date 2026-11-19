@@ -308,6 +308,8 @@ final class AppModel: ObservableObject {
     @Published var repos: ReposData? = nil
     /// Proyectos de Node (pestaña Node)
     @Published var nodeItems: [NodeItem]? = nil
+    /// Nginx (pestaña Nginx y Configuración, Nginx)
+    @Published var nginx: NginxInfo? = nil
     @Published var reposAll = false
     @Published var reposLoading = false
     @Published var github: GitHubState? = nil

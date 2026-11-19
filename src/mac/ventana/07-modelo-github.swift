@@ -52,6 +52,47 @@ extension AppModel {
         }
     }
 
+    // MARK: Nginx (pestaña Nginx)
+    func reloadNginx() {
+        runQuick(["gui-nginx"]) { _, out in
+            let n = parseNginx(out)
+            if n != self.nginx { self.nginx = n }
+        }
+    }
+
+    func nginxDo(_ cmd: String, _ title: String, _ done: String) {
+        runTask(title, [cmd], doneText: done, autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxInstall() {
+        runTask("Instalando Nginx \(nginx?.latest ?? "")", ["nginx-instalar"], progress: true, doneText: "Nginx instalado",
+                autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxAdd(_ folder: String, _ sub: String) {
+        runTask("Añadiendo \(folder) a Nginx", ["nginx-anadir", folder] + (sub.isEmpty ? [] : [sub]),
+                doneText: "\(folder) en Nginx", autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxRemove(_ p: NginxProject) {
+        guard confirm("¿Quitar \(p.folder) de Nginx?",
+                      "Deja de servirse en \(p.host). Su carpeta y sus BBDD no se tocan, y Apache lo sigue sirviendo.",
+                      "Quitar", destructive: true) else { return }
+        runTask("Quitando \(p.folder) de Nginx", ["nginx-quitar", p.folder], doneText: "\(p.folder) ya no está en Nginx",
+                autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxPorts(_ http: String, _ https: String) {
+        let h = http.trimmingCharacters(in: .whitespaces), s = https.trimmingCharacters(in: .whitespaces)
+        guard let a = Int(h), let b = Int(s), (1024...65535).contains(a), (1024...65535).contains(b), a != b else {
+            message("Puertos no válidos", "Dos números distintos, de 1024 a 65535 (como 8080 y 8443).", error: true)
+            return
+        }
+        runTask("Puertos de Nginx", ["nginx-puertos", h, s], doneText: "Nginx en los puertos \(h) y \(s)", autoClose: true) { _, _, _ in
+            self.reloadNginx()
+        }
+    }
+
     func startNode(_ p: NodeItem, mode: String) {
         runTask("Arrancando \(p.folder)", ["node-arrancar", p.folder, mode], progress: true,
                 doneText: "\(p.folder) en marcha", autoClose: true) { _, _, _ in self.reloadNode() }

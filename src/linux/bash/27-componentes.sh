@@ -4,11 +4,11 @@
 # Lo que tiene un parche nuevo publicado: cada version de PHP (su PHP, Apache, MariaDB, ProFTPD, Perl y
 # phpMyAdmin, frente a lo ultimo de su rama), las imagenes de Docker que se usan (las MariaDB comunes,
 # phpMyAdmin y la base de cada imagen de PHP, frente a su huella en Docker Hub: sin descargar nada), y
-# Mailpit y cloudflared (frente a los que pone esta version del gestor). componentes [--sin-docker]:
+# Mailpit, cloudflared y Nginx (frente a los que pone esta version del gestor). componentes [--sin-docker]:
 #   L|carpeta|componente|instalada|nueva   una version de PHP: se rehace entera con lo ultimo de su rama
 #   F|carpeta|motivo                       una version que no se pone al dia sola (parche concreto, XAMPP)
 #   K|imagen|para que                      una imagen de Docker con una version nueva en Docker Hub
-#   X|programa|instalada|nueva             Mailpit o cloudflared
+#   X|programa|instalada|nueva             Mailpit, cloudflared o Nginx
 #   E|lo que no se ha podido consultar
 #   S|cuantos componentes tienen parche nuevo
 function components_check() {
@@ -69,6 +69,10 @@ function components_check() {
     fi
     if tunnel_installed && [ "$(tunnel_installed_version)" != "$TUNNEL_VERSION" ]; then
         echo "X|cloudflared|$(tunnel_installed_version)|$TUNNEL_VERSION"
+        n=$((n + 1))
+    fi
+    if nginx_installed && [ "$(nginx_installed_version)" != "$NGINX_VERSION" ]; then
+        echo "X|Nginx|$(nginx_installed_version)|$NGINX_VERSION"
         n=$((n + 1))
     fi
     echo "S|$n"
@@ -158,6 +162,8 @@ function components_update() {
     [ -n "$imgs" ] && dk image prune -f > /dev/null 2>&1
     [[ " $progs " == *" Mailpit "* ]] && { task_step; mailpit_install || fail=1; }
     [[ " $progs " == *" cloudflared "* ]] && { task_step; tunnel_install || fail=1; }
+    # (Nginx: se compila otra vez, con tu usuario, y si estaba en marcha sigue con el nuevo)
+    [[ " $progs " == *" Nginx "* ]] && { task_step; nginx_build_deps && nginx_build || fail=1; }
     for v in $folders; do
         task_step
         echo "lampp-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"

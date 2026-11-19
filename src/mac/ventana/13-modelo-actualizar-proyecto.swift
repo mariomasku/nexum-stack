@@ -1115,7 +1115,7 @@ extension AppModel {
     /// (en Configuración, el de su apartado). Los capítulos son los id de ayuda/index.html
     func showHelp() {
         let tabs = ["proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
-                    "docker": "docker", "node": "node", "dominios": "dominios", "config": "configuracion"]
+                    "docker": "docker", "node": "node", "nginx": "nginx", "dominios": "dominios", "config": "configuracion"]
         let sections = ["general": "general", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo", "admin": "admin-pruebas-config",
                         "docker": "docker-config", "tunel": "tunel-config", "apariencia": "apariencia",
                         "github": "github-config", "limpieza": "limpieza", "carpetas": "carpetas",

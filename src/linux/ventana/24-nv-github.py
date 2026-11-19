@@ -275,6 +275,226 @@ class NvGithub:
         self.run_task("Parando %s" % p["folder"], ["node-parar", p["folder"]], auto_close=True,
                       done_text="%s parado" % p["folder"], on_done=done)
 
+    # ------------------------------------------------------------------ Nginx
+    def nv_nginx_load(self):
+        """Pestaña Nginx: cómo está y los proyectos que sirve (gui-nginx)."""
+        def got(_rc, out):
+            self.nv_nginx_parse(out)
+            self.nv_nginx_render()
+            return False
+        run_quick(["gui-nginx"], got)
+
+    def nv_nginx_parse(self, out):
+        lines = parse_lines(out)
+        n = next((f for f in lines if f[0] == "N" and len(f) >= 8), None)
+        self.nginx_data = {
+            "installed": bool(n) and n[1] == "1", "version": n[2] if n else "", "latest": n[3] if n else "",
+            "running": bool(n) and n[4] == "1", "http": n[5] if n else "8080", "https": n[6] if n else "8443",
+            "php": n[7] if n else "",
+            "projects": [{"folder": f[1], "root": f[2], "host": f[3], "exists": f[4] == "1"}
+                         for f in lines if f[0] == "P" and len(f) >= 5],
+            "candidates": [f[1] for f in lines if f[0] == "C" and len(f) >= 2]}
+
+    def nv_nginx_url(self, p, secure=True):
+        d = self.nginx_data
+        return "%s://%s:%s/" % ("https" if secure else "http", p["host"], d["https"] if secure else d["http"])
+
+    def nv_nginx_render(self):
+        d = self.nginx_data
+        if d is None:
+            return
+        box = self.nginx_page
+        clear(box)
+        head = Gtk.Box(spacing=12)
+        t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        tl = Gtk.Box(spacing=10)
+        tl.pack_start(logo("nginx", 34), False, False, 0)
+        tl.pack_start(label("Nginx", "nv-titulo-grande"), False, False, 0)
+        t.pack_start(tl, False, False, 0)
+        t.pack_start(label("Otro servidor web, aparte de Apache, para los proyectos de %s que le añadas (Laravel, Symfony, "
+                           "PHP...). Solo en este equipo y con tu usuario: cada uno por su nombre, con el PHP de la versión "
+                           "activa y sus BBDD." % ("/opt/htdocs" if DEMO else HTDOCS), "nv-chico", "nv-tenue", wrap=True, xalign=0),
+                     False, False, 0)
+        head.pack_start(t, True, True, 0)
+        if d["installed"]:
+            add = nv_button("list-add-symbolic", "Añadir proyecto…", None, lambda *_: self.nv_nginx_add_dialog(), "nv-azul")
+            head.pack_end(busy_guard(add, self.busy), False, False, 0)
+        box.pack_start(head, False, False, 0)
+        # Cómo está: instalado, en marcha, sus puertos y el PHP de la versión activa
+        lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        if not d["installed"]:
+            row = ActionRow("Nginx %s" % d["latest"], "Aún no está instalado: se compila de su código, con tu usuario, en "
+                            "~/.nexum/nginx (menos de un minuto)")
+            row.add_prefix(label("●", "punto-gris"))
+            b = css(busy_guard(Gtk.Button(label="Instalar", valign=Gtk.Align.CENTER), self.busy), "verde")
+            b.connect("clicked", lambda *_: self.nv_nginx_install())
+            row.add_suffix(b)
+        else:
+            if d["running"]:
+                text = "En marcha en este equipo: puertos %s (http) y %s (https)" % (d["http"], d["https"])
+            else:
+                text = "Parado. Puertos %s (http) y %s (https), en Configuración, Nginx" % (d["http"], d["https"])
+            text += {"parado": ". El PHP de la versión activa no está en marcha: arráncala para que sirva PHP",
+                     "sin-fpm": ". La versión activa no tiene PHP-FPM (un XAMPP oficial): solo sirve ficheros"}.get(d["php"], "")
+            row = ActionRow("Nginx %s" % d["version"], text)
+            row.add_prefix(label("●", "punto-verde" if d["running"] else "punto-gris"))
+
+            def act(image, text, tip, cb, *classes):
+                b = busy_guard(nv_button(image, text, tip, lambda *_: cb(), "nv-proyecto-btn", *classes), self.busy)
+                row.add_suffix(b)
+            if d["version"] != d["latest"]:
+                act("software-update-available-symbolic", "Actualizar a la %s" % d["latest"], "Compilar la versión de este gestor",
+                    self.nv_nginx_install)
+            act(logo("log", 18), None, "Registro: sus errores", lambda: self.run_task("Registro de Nginx", ["nginx-registro"]))
+            if d["running"]:
+                act("view-refresh-symbolic", None, "Reiniciar Nginx", lambda: self.nv_nginx_do("nginx-reiniciar", "Reiniciando Nginx",
+                                                                                              "Nginx en marcha"))
+                act("media-playback-stop-symbolic", "Parar", "Parar Nginx (Apache sigue igual)",
+                    lambda: self.nv_nginx_do("nginx-parar", "Parando Nginx", "Nginx parado"))
+            else:
+                act("media-playback-start-symbolic", "Arrancar", "Arrancar Nginx en este equipo",
+                    lambda: self.nv_nginx_do("nginx-arrancar", "Arrancando Nginx", "Nginx en marcha"))
+        lb.add(row)
+        box.pack_start(lb, False, False, 0)
+        if d["installed"]:
+            box.pack_start(label("Proyectos", "nv-apartado-titulo", xalign=0, margin_top=8), False, False, 0)
+            lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+            for p in d["projects"]:
+                lb.add(self.nv_nginx_row(p))
+            if not d["projects"]:
+                lb.add(ActionRow("Ningún proyecto en Nginx", "Añade uno: se sirve en http://<carpeta>.localhost:%s y "
+                                 "https://<carpeta>.localhost:%s" % (d["http"], d["https"])))
+            box.pack_start(lb, False, False, 0)
+        box.show_all()
+
+    def nv_nginx_row(self, p):
+        d = self.nginx_data
+        if not p["exists"]:
+            text = "Su carpeta ya no está en %s" % HTDOCS
+        else:
+            text = "%s · sirve %s" % (self.nv_nginx_url(p), (p["root"] + "/") if p["root"] else "la carpeta entera")
+        row = ActionRow(p["folder"], text)
+        row.add_prefix(label("●", "punto-verde" if d["running"] and p["exists"] else "punto-gris"))
+        path = os.path.join(HTDOCS, p["folder"])
+
+        def add(image, text, tip, cb, *classes, task=True):
+            b = nv_button(image, text, tip, lambda *_: cb(), "nv-proyecto-btn", *classes)
+            if task:
+                busy_guard(b, self.busy)
+            row.add_suffix(b)
+        if p["exists"]:
+            code = vscode_app()
+            if code is not None:
+                img = None
+                if code.get_icon() is not None:
+                    img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                    img.set_pixel_size(18)
+                add(img or "text-editor-symbolic", None, "Abrir en Visual Studio Code", lambda: self.open_in_vscode(path), task=False)
+            add("folder-open-symbolic", None, "Abrir su carpeta", lambda: self.open_uri(GLib.filename_to_uri(path, None)), task=False)
+            if d["running"]:
+                add(logo("globo", 18), "Abrir web", "Abrir %s" % self.nv_nginx_url(p), lambda: self.open_uri(self.nv_nginx_url(p)),
+                    task=False)
+        add("list-remove-symbolic", "Quitar", "Dejar de servirlo con Nginx (su carpeta no se toca)", lambda: self.nv_nginx_remove(p))
+        return row
+
+    def nv_nginx_do(self, cmd, title, done):
+        self.run_task(title, [cmd], auto_close=True, done_text=done, on_done=lambda *_: self.nv_nginx_load())
+
+    def nv_nginx_install(self):
+        d = self.nginx_data or {}
+        self.run_task("Instalando Nginx %s" % d.get("latest", ""), ["nginx-instalar"], progress=True, auto_close=True,
+                      done_text="Nginx instalado", on_done=lambda *_: self.nv_nginx_load())
+
+    def nv_nginx_add_dialog(self):
+        d = self.nginx_data
+        if not d["candidates"]:
+            message(self.win, "No hay más proyectos que añadir", "Todas las carpetas de %s ya están en Nginx." % HTDOCS)
+            return
+        extra = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=6)
+        extra.pack_start(label("Proyecto", "nv-chico", "nv-tenue"), False, False, 0)
+        combo = Gtk.ComboBoxText()
+        for c in d["candidates"]:
+            combo.append_text(c)
+        combo.set_active(0)
+        extra.pack_start(combo, False, False, 0)
+        extra.pack_start(label("Subcarpeta que se sirve (vacía: public si la tiene, web o la carpeta entera)",
+                               "nv-chico", "nv-tenue", margin_top=6), False, False, 0)
+        root = Gtk.Entry(placeholder_text="public", max_length=120)
+        extra.pack_start(root, False, False, 0)
+        if not confirm(self.win, "¿Añadir un proyecto a Nginx?",
+                       "Se sirve en http://<carpeta>.localhost:%s y https://<carpeta>.localhost:%s, con el PHP de la versión "
+                       "activa. Apache lo sigue sirviendo como siempre." % (d["http"], d["https"]), "Añadir", extra=extra):
+            return
+        folder = combo.get_active_text()
+        sub = root.get_text().strip().strip("/")
+        if not folder:
+            return
+        self.run_task("Añadiendo %s a Nginx" % folder, ["nginx-anadir", folder] + ([sub] if sub else []), auto_close=True,
+                      done_text="%s en Nginx" % folder, on_done=lambda *_: self.nv_nginx_load())
+
+    def nv_nginx_remove(self, p):
+        if not confirm(self.win, "¿Quitar %s de Nginx?" % p["folder"],
+                       "Deja de servirse en %s. Su carpeta y sus BBDD no se tocan, y Apache lo sigue sirviendo." % p["host"],
+                       "Quitar", destructive=True):
+            return
+        self.run_task("Quitando %s de Nginx" % p["folder"], ["nginx-quitar", p["folder"]], auto_close=True,
+                      done_text="%s ya no está en Nginx" % p["folder"], on_done=lambda *_: self.nv_nginx_load())
+
+    def nv_nginx_tools(self):
+        """Configuración, Nginx: sus puertos (8080 y 8443 de serie) y que el navegador acepte sus certificados."""
+        w = {"HTTP": "8080", "HTTPS": "8443"}
+        try:
+            for line in open(os.path.join(LOG_DIR, "nginx", "ajustes"), encoding="utf-8", errors="replace"):
+                k, _, v = line.strip().partition("=")
+                if k in w and re.fullmatch(r"[1-9][0-9]{3,4}", v):
+                    w[k] = v
+        except OSError:
+            pass
+        box, lb = tile_group("Nginx", "El servidor web de la pestaña Nginx: solo en este equipo, con tu usuario y aparte de "
+                             "Apache. Sus proyectos, en http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.",
+                             tiles=True)
+        row = ActionRow("Puertos", "De 1024 en adelante (los de abajo son de root), distintos de los de Apache. Si está en "
+                        "marcha, los usa al momento.")
+        row.wide = True
+        form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, valign=Gtk.Align.CENTER)
+        fields = Gtk.Box(spacing=8)
+        form.pack_start(fields, False, False, 0)
+        entries = {}
+        for key in ("HTTP", "HTTPS"):
+            field = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+            field.pack_start(label(key, "nv-chico", "nv-tenue"), False, False, 0)
+            e = Gtk.Entry(text=w[key], width_chars=5, max_length=5)
+            field.pack_start(e, False, False, 0)
+            fields.pack_start(field, False, False, 0)
+            entries[key] = e
+
+        def save(*_):
+            http, https = (entries[k].get_text().strip() for k in ("HTTP", "HTTPS"))
+            if not (http.isdigit() and https.isdigit() and 1024 <= int(http) <= 65535 and 1024 <= int(https) <= 65535) \
+                    or http == https:
+                message(self.win, "Puertos no válidos", "Dos números distintos, de 1024 a 65535 (como 8080 y 8443).",
+                        Gtk.MessageType.WARNING)
+                return
+            self.run_task("Puertos de Nginx", ["nginx-puertos", http, https], auto_close=True,
+                          done_text="Nginx en los puertos %s y %s" % (http, https),
+                          on_done=lambda *a: (self.build_tools(), self.nv_nginx_load()))
+        buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+        b = css(busy_guard(Gtk.Button(label="Guardar"), self.busy), "verde")
+        b.connect("clicked", save)
+        buttons.pack_start(b, False, False, 0)
+        form.pack_start(buttons, False, False, 0)
+        row.add_suffix(form)
+        lb.add(row)
+        row = ActionRow("Certificados", "Que el navegador acepte sin aviso el https de cada proyecto (se hace solo al "
+                        "añadirlo: esto, si lo has quitado o has cambiado de navegador)")
+        b = busy_guard(Gtk.Button(label="Confiar", valign=Gtk.Align.CENTER), self.busy)
+        b.connect("clicked", lambda *_: self.run_task("Certificados de Nginx", ["nginx-confiar"], auto_close=True,
+                                                     done_text="Certificados de Nginx"))
+        row.add_suffix(b)
+        lb.add(row)
+        self.tools_box.pack_start(box, False, False, 0)
+        box.show_all()
+
     def nv_repos_open(self):
         """Al entrar en Repositorios: la lista de la última vez, al momento, y luego la de GitHub."""
         if self.repos is None:

@@ -117,10 +117,12 @@ class App2(NvBandeja,
         self.repos, self.repos_all, self.github = None, False, None
         self.page_node, self.node_page = new_page(940)
         self.node_rows = None
+        self.page_nginx, self.nginx_page = new_page(940)
+        self.nginx_data = None
         self.page_vers, self.vers_page = new_page(900)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
-                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node),
+                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node), ("nginx", self.page_nginx),
                         ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
             self.stack.add_named(w, name)
         body = Gtk.Box()
@@ -168,7 +170,7 @@ class App2(NvBandeja,
         # (primero un paso sin captura: la ventana se termina de dibujar; la primera salía en blanco)
         steps = [(lambda: self.show_tab("versiones"), None)]
         steps += [(lambda n=n: self.show_tab(n), "pagina-" + n)
-                  for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
+                  for n in ("proyectos", "versiones", "bbdd", "docker", "node", "nginx", "repos", "dominios") if n in self.tabs]
         # (y cada bloque de General, con él arriba)
         for title in [t for t, _name, _ic in self.TOOLS_SECTIONS] + self.GENERAL_PARTS:
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")

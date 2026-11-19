@@ -396,6 +396,19 @@ QUE HACE
 
 VERSIONES
 
+1.57.38 (19 nov 2026)
+- Pestaña Nginx, nueva: otro servidor web, aparte de Apache, para los
+  proyectos que le añadas (Laravel, Symfony, PHP...). Uno para todo el
+  Mac, con tu usuario y solo en este Mac, en los puertos 8080 y 8443 (en
+  Configuración > Nginx). Cada proyecto, por su nombre:
+  http://<carpeta>.localhost:8080 y https://<carpeta>.localhost:8443, con
+  el PHP de la versión activa y sus BBDD. Se compila de su código (Nginx
+  1.30.7, comprobado por su huella, con pcre2 y openssl@3 de Homebrew) al
+  pulsar «Instalar», en menos de un minuto. Apache sigue igual. En la
+  terminal, nexum nginx-instalar, nginx-anadir <carpeta>, nginx-arrancar...
+- Avisos: el de los parches nuevos enseña la lista entera (se cortaba en
+  dos líneas), con sus botones debajo, a la derecha.
+
 1.57.37 (19 nov 2026)
 - Docker: «WP-CLI en los contenedores de PHP», en Configuración >
   Docker, apagado de serie. Puesto, las imágenes de PHP traen wp (2.12.0,

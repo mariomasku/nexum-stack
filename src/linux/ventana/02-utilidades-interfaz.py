@@ -46,6 +46,8 @@ LOGO_PATHS = {
     # (bases de datos: discos apilados; Node: su hexágono)
     "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
     "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
+    # (Nginx: su hexágono con la N recortada, como su logotipo)
+    "nginx": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z M 8.2 16.5 L 9.9 16.5 L 9.9 10.8 L 14.1 16.5 L 15.8 16.5 L 15.8 7.5 L 14.1 7.5 L 14.1 13.2 L 9.9 7.5 L 8.2 7.5 Z",
     # (flecha de descarga: la tarea en segundo plano)
     "descarga": "M 10.6 3 L 13.4 3 L 13.4 11.6 L 17.2 7.8 L 19.2 9.8 L 12 17 L 4.8 9.8 L 6.8 7.8 L 10.6 11.6 Z M 4 19 L 20 19 L 20 21.6 L 4 21.6 Z",
     "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
@@ -287,7 +289,7 @@ LOGO_PATHS = {
 }
 
 # Color de cada logotipo: el de la marca y, con el tema oscuro, uno algo más claro para que se vea
-LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "node": ("#5FA04E", "#6CC24A"), "descarga": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
+LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "node": ("#5FA04E", "#6CC24A"), "nginx": ("#009639", "#3FBF6F"), "descarga": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
@@ -304,7 +306,7 @@ LOGO_PARTS = {"phpmyadmin": [
 # se ven del mismo tamaño: cada uno ocupa la misma superficie que uno cuadrado que llena su recuadro (la bola del
 # mundo dejaba 2 de margen por lado; el velero de phpMyAdmin, apaisado, se veía más pequeño). Los apaisados o
 # alargados se salen por su lado largo, como mucho LOGO_OVER. Uno sin medir, la cuadrícula entera
-LOGO_BOX = {"actualizar": (1.25, 1.25, 21.5, 21.5), "apache": (5.2, 0, 13.6, 24), "bbdd": (3.5, 4, 17, 16), "cloudflare": (0, 6.6, 24, 10.85), "descarga": (4, 3, 16, 18.6), "docker": (0, 3.4, 24, 17.25), "github": (0, 0.3, 24, 23.4), "globo": (2, 2, 20, 20), "imagenes": (1.25, 1.25, 21.5, 21.5), "log": (2, 1, 20, 22), "mailpit": (0, 0.95, 24, 22.1), "mariadb": (0.05, 4.25, 23.95, 15.5), "node": (3.35, 2.2, 17.35, 19.6), "perl": (2.65, 0, 18.7, 24), "php": (0, 5.7, 24, 12.65), "phpmyadmin": (0.05, 3.5, 23.9, 17.05), "prestashop": (0, 1.05, 24, 21.95), "wordpress": (0, 0, 24, 24), "xampp": (0.1, 0, 23.8, 24)}
+LOGO_BOX = {"actualizar": (1.25, 1.25, 21.5, 21.5), "apache": (5.2, 0, 13.6, 24), "bbdd": (3.5, 4, 17, 16), "cloudflare": (0, 6.6, 24, 10.85), "descarga": (4, 3, 16, 18.6), "docker": (0, 3.4, 24, 17.25), "github": (0, 0.3, 24, 23.4), "globo": (2, 2, 20, 20), "imagenes": (1.25, 1.25, 21.5, 21.5), "log": (2, 1, 20, 22), "mailpit": (0, 0.95, 24, 22.1), "mariadb": (0.05, 4.25, 23.95, 15.5), "node": (3.35, 2.2, 17.35, 19.6), "nginx": (3.35, 2.2, 17.35, 19.6), "perl": (2.65, 0, 18.7, 24), "php": (0, 5.7, 24, 12.65), "phpmyadmin": (0.05, 3.5, 23.9, 17.05), "prestashop": (0, 1.05, 24, 21.95), "wordpress": (0, 0, 24, 24), "xampp": (0.1, 0, 23.8, 24)}
 LOGO_OVER = 1.2
 # Los que se dibujan con trazo, no rellenos
 LOGO_STROKED = {"imagenes"}
@@ -449,7 +451,8 @@ def updates_ignore(items):
 # Menú lateral: sus apartados (clave, texto e icono) y cómo se ven (Apariencia: ~/.nexum/apariencia)
 SIDEBAR = [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"), ("repos", "Repositorios", "logo:github"),
                         ("versiones", "Versiones de PHP", "logo:php"), ("bbdd", "Bases de datos", "logo:bbdd"),
-                        ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node")]),
+                        ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node"),
+                        ("nginx", "Nginx", "logo:nginx")]),
            ("SISTEMA", [("dominios", "Dominios y hosts", "network-workgroup-symbolic"),
                         ("config", "Configuración", "emblem-system-symbolic")])]
 # (siempre se ven: sin Configuración no se podrían volver a enseñar)
@@ -768,6 +771,29 @@ class ActionRow(Gtk.ListBoxRow):
     def add_suffix(self, w):
         w.set_valign(Gtk.Align.CENTER)
         self.suffix.pack_start(w, False, False, 0)
+
+    def text_lines(self, chars=60):
+        """Cuántas líneas ocupan su título y su subtítulo con los botones al lado (unos 60 caracteres)."""
+        sub = self.subtitle.get_text() if self.subtitle.get_visible() or self.subtitle.get_text() else ""
+        return sum(max(1, -(-len(t) // chars)) for t in [self.title.get_text()] + (sub.split("\n") if sub else []))
+
+    def suffix_below(self, chars=72):
+        """Los botones de la derecha, debajo del texto (a su derecha), y el texto con todo el ancho: para
+        una fila de más de dos líneas, que con los botones al lado se quedaba en una columna estrecha."""
+        if self.suffix.get_parent() is not self.header:
+            return
+        self.header.remove(self.suffix)
+        self.suffix.set_halign(Gtk.Align.END)
+        self.suffix.set_margin_top(8)
+        self.texts.pack_start(self.suffix, False, False, 0)
+        self.prefix.set_valign(Gtk.Align.START)
+        self.prefix.set_margin_top(2)
+        for w in self.prefix.get_children():
+            w.set_valign(Gtk.Align.START)
+        for lbl in (self.title, self.subtitle):
+            lbl.set_ellipsize(0)
+            lbl.set_line_wrap(True)
+            lbl.set_max_width_chars(chars)
 
 
 class ExpanderRow(ActionRow):

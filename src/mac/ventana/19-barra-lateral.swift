@@ -5,7 +5,7 @@ let NAV: [(String, [(String, String, String)])] = [
     ("ENTORNO", [("proyectos", "Proyectos", "folder"), ("repos", "Repositorios", "logo:github"),
                  ("versiones", "Versiones de PHP", "logo:php"),
                  ("bbdd", "Bases de datos", "logo:bbdd"), ("docker", "Docker", "logo:docker"),
-                 ("node", "Node", "logo:node")]),
+                 ("node", "Node", "logo:node"), ("nginx", "Nginx", "logo:nginx")]),
     ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("config", "Configuración", "gearshape")]),
 ]
 

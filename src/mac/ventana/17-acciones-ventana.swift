@@ -16,6 +16,7 @@ extension AppModel {
         dkOpen = []
         if key == "docker" { reloadDocker(stats: true) }
         if key == "node" { reloadNode() }
+        if key == "nginx" { reloadNginx() }
         if key == "repos" {
             if repos == nil { reloadRepos(cache: true) }
             reloadRepos()

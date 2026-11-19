@@ -49,6 +49,7 @@ struct ContentView: View {
         case "docker": DockerView()
         case "repos": ReposView()
         case "node": NodeView()
+        case "nginx": NginxView()
         case "dominios": HostsView()
         case "config": ToolsView()
         default: ProjectsView()

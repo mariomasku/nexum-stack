@@ -289,6 +289,238 @@ struct NodeView: View {
     }
 }
 
+/// Nginx (gui-nginx): N|instalado|versión|la de este gestor|en marcha|http|https|PHP (ok, parado, sin-fpm),
+/// P|carpeta|raíz|nombre|carpeta existe y C|carpeta (las de htdocs que aún no están)
+struct NginxProject: Equatable, Identifiable {
+    var id: String { folder }
+    let folder, root, host: String
+    let exists: Bool
+}
+
+struct NginxInfo: Equatable {
+    var installed = false, running = false
+    var version = "", latest = "", http = "8080", https = "8443", php = ""
+    var projects: [NginxProject] = []
+    var candidates: [String] = []
+    func url(_ p: NginxProject) -> String { "https://\(p.host):\(https)/" }
+}
+
+func parseNginx(_ out: String) -> NginxInfo {
+    var n = NginxInfo()
+    for f in parseLines(out) {
+        if f.first == "N", f.count >= 8 {
+            n.installed = f[1] == "1"
+            n.version = f[2]
+            n.latest = f[3]
+            n.running = f[4] == "1"
+            n.http = f[5]
+            n.https = f[6]
+            n.php = f[7]
+        } else if f.first == "P", f.count >= 5 {
+            n.projects.append(NginxProject(folder: f[1], root: f[2], host: f[3], exists: f[4] == "1"))
+        } else if f.first == "C", f.count >= 2 {
+            n.candidates.append(f[1])
+        }
+    }
+    return n
+}
+
+/// Pestaña Nginx: otro servidor web, aparte de Apache, para los proyectos que se le añaden. Solo en este Mac
+/// y con tu usuario: cada uno por su nombre (<carpeta>.localhost), con el PHP de la versión activa
+struct NginxView: View {
+    @EnvironmentObject var model: AppModel
+    @State private var pick = ""
+    @State private var sub = ""
+
+    var body: some View {
+        WidePage {
+            PageTitle(title: "Nginx",
+                      sub: "Otro servidor web, aparte de Apache, para los proyectos de \(HTDOCS) que le añadas (Laravel, Symfony, PHP...). Solo en este Mac y con tu usuario: cada uno por su nombre, con el PHP de la versión activa y sus BBDD.",
+                      logo: "nginx")
+            if let n = model.nginx {
+                Card { status(n) }
+                if n.installed {
+                    Text("Proyectos").font(.system(size: 13, weight: .semibold)).padding(.top, 8)
+                    Card {
+                        if n.projects.isEmpty {
+                            Text("Ningún proyecto en Nginx: añade uno abajo. Se sirve en http://<carpeta>.localhost:\(n.http) y https://<carpeta>.localhost:\(n.https)")
+                                .foregroundColor(.secondary).padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        LazyVStack(spacing: 0) {
+                            ForEach(n.projects) { p in
+                                row(p, n)
+                                if p != n.projects.last { Divider().padding(.leading, 34) }
+                            }
+                        }
+                    }
+                    if !n.candidates.isEmpty { Card { addRow(n) } }
+                }
+            } else {
+                Card { Text("Cargando…").foregroundColor(.secondary).padding(14).frame(maxWidth: .infinity, alignment: .leading) }
+            }
+        }
+    }
+
+    func status(_ n: NginxInfo) -> some View {
+        var text: String
+        if !n.installed {
+            text = "Aún no está instalado: se compila de su código, con tu usuario, en ~/.nexum/nginx (menos de un minuto; con pcre2 y openssl@3 de Homebrew)"
+        } else if n.running {
+            text = "En marcha en este Mac: puertos \(n.http) (http) y \(n.https) (https)"
+        } else {
+            text = "Parado. Puertos \(n.http) (http) y \(n.https) (https), en Configuración, Nginx"
+        }
+        if n.installed && n.php == "parado" { text += ". El PHP de la versión activa no está en marcha: arráncala para que sirva PHP" }
+        if n.installed && n.php == "sin-fpm" { text += ". La versión activa no tiene PHP-FPM (un XAMPP oficial): solo sirve ficheros" }
+        let c = VisorConf()
+        return HStack(spacing: 8) {
+            Circle().fill(n.running ? Color.green : Color.secondary.opacity(0.4)).frame(width: 9, height: 9).padding(.trailing, 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nginx \(n.installed ? n.version : n.latest)").font(.system(size: 13, weight: .medium))
+                Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if !n.installed {
+                Button("Instalar") { model.nginxInstall() }
+                    .buttonStyle(OutlineButton(kind: "primary"))
+                    .busyGuard(model.busy)
+            } else {
+                if n.version != n.latest {
+                    Button("Actualizar a la \(n.latest)") { model.nginxInstall() }.busyGuard(model.busy)
+                }
+                Button(action: { model.runTask("Registro de Nginx", ["nginx-registro"]) }) { VisorIconView(icon: .logo("log"), size: 16) }
+                    .buttonStyle(OutlineButton()).tip("Registro: sus errores").busyGuard(model.busy)
+                if n.running {
+                    Button(action: { model.nginxDo("nginx-reiniciar", "Reiniciando Nginx", "Nginx en marcha") }) {
+                        VisorIconView(icon: .symbol("arrow.clockwise", Color.primary), size: 16)
+                    }
+                    .buttonStyle(OutlineButton()).tip("Reiniciar Nginx").busyGuard(model.busy)
+                    VisorButton(conf: c, name: "Parar", icon: .symbol("stop.fill", Color.red), tip: "Parar Nginx (Apache sigue igual)") {
+                        model.nginxDo("nginx-parar", "Parando Nginx", "Nginx parado")
+                    }
+                    .busyGuard(model.busy)
+                } else {
+                    VisorButton(conf: c, name: "Arrancar", icon: .symbol("play.fill", Color.green), tip: "Arrancar Nginx en este Mac") {
+                        model.nginxDo("nginx-arrancar", "Arrancando Nginx", "Nginx en marcha")
+                    }
+                    .busyGuard(model.busy)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    func row(_ p: NginxProject, _ n: NginxInfo) -> some View {
+        let path = HTDOCS + "/" + p.folder
+        let text = p.exists ? "\(n.url(p)) · sirve \(p.root.isEmpty ? "la carpeta entera" : p.root + "/")" : "Su carpeta ya no está en \(HTDOCS)"
+        let c = VisorConf()
+        return HStack(spacing: 8) {
+            Circle().fill(n.running && p.exists ? Color.green : Color.secondary.opacity(0.4)).frame(width: 9, height: 9)
+                .padding(.trailing, 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(p.folder).font(.system(size: 13, weight: .medium))
+                Text(text).font(.caption).foregroundColor(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if p.exists {
+                if let code = vscodeURL() {
+                    Button(action: { openInVSCode(path) }) { VisorIconView(icon: .image(NSWorkspace.shared.icon(forFile: code.path)), size: 16) }
+                        .buttonStyle(OutlineButton()).tip("Abrir en Visual Studio Code")
+                }
+                Button(action: { showFolder(path) }) { VisorIconView(icon: .symbol("folder", Color.primary), size: 16) }
+                    .buttonStyle(OutlineButton()).tip("Abrir su carpeta")
+                if n.running {
+                    VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue), tip: "Abrir \(n.url(p))") { openURL(n.url(p)) }
+                }
+            }
+            VisorButton(conf: c, name: "Quitar", icon: .symbol("minus", Color.primary), tip: "Dejar de servirlo con Nginx (su carpeta no se toca)") {
+                model.nginxRemove(p)
+            }
+            .busyGuard(model.busy)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    /// Añadir: el proyecto (de los de htdocs que aún no están) y la subcarpeta que se sirve (vacía: public si
+    /// la tiene, web o la carpeta entera)
+    func addRow(_ n: NginxInfo) -> some View {
+        HStack(spacing: 10) {
+            Text("Añadir proyecto").font(.system(size: 13, weight: .medium))
+            SearchPicker(selection: $pick, items: n.candidates.map { ($0, $0) }, width: 260)
+            TextField("subcarpeta (vacía: la que parezca)", text: $sub)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(maxWidth: 220)
+            Spacer(minLength: 8)
+            Button("Añadir") {
+                let folder = n.candidates.contains(pick) ? pick : (n.candidates.first ?? "")
+                guard !folder.isEmpty else { return }
+                model.nginxAdd(folder, sub.trimmingCharacters(in: CharacterSet(charactersIn: " /")))
+                sub = ""
+            }
+            .buttonStyle(OutlineButton(kind: "primary"))
+            .busyGuard(model.busy)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .onAppear { if !n.candidates.contains(pick) { pick = n.candidates.first ?? "" } }
+    }
+}
+
+/// Configuración, Nginx: sus puertos (8080 y 8443 de serie) y que el navegador acepte sus certificados
+struct NginxCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var http = ""
+    @State private var https = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TileCard("Nginx", "El servidor web de la pestaña Nginx: solo en este Mac, con tu usuario y aparte de Apache. Sus proyectos, en http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.", wide: true, tiles: true) {
+                Tile("Puertos", "De 1024 en adelante (los de abajo son de root), distintos de los de Apache. Si está en marcha, los usa al momento.") {
+                    VStack(alignment: .trailing, spacing: 10) {
+                        HStack(spacing: 8) {
+                            portField("HTTP", $http)
+                            portField("HTTPS", $https)
+                        }
+                        Button("Guardar") { model.nginxPorts(http, https) }
+                            .buttonStyle(OutlineButton(kind: "primary"))
+                            .busyGuard(model.busy)
+                    }
+                }
+            }
+            TileCard(tiles: true) {
+                Tile("Certificados", "Que el navegador acepte sin aviso el https de cada proyecto (se hace solo al añadirlo: esto, si lo has quitado)") {
+                    Button("Confiar") { model.runTask("Certificados de Nginx", ["nginx-confiar"], doneText: "Certificados de Nginx", autoClose: true) }
+                        .busyGuard(model.busy)
+                }
+            }
+        }
+        .onAppear {
+            if model.nginx == nil { model.reloadNginx() }
+            fill()
+        }
+        .onChange(of: model.nginx) { _ in fill() }
+    }
+
+    func fill() {
+        guard let n = model.nginx else { return }
+        if http.isEmpty { http = n.http }
+        if https.isEmpty { https = n.https }
+    }
+
+    func portField(_ title: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption).foregroundColor(.secondary)
+            TextField("", text: text).textFieldStyle(PlainTextFieldStyle())
+                .padding(.horizontal, 8)
+                .frame(width: 60, height: 28)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.textBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+        }
+    }
+}
+
 struct ReposView: View {
     @EnvironmentObject var model: AppModel
     @State private var query = ""
