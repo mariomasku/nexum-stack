@@ -222,6 +222,8 @@ if [ "${LVM_TAREA:-}" == 1 ]; then
         tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
         # (el administrador de pruebas: solo un ajuste de ~/.nexum)
         admin-pruebas) ;;
+        # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker sin root)
+        docker-wp-cli) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -299,6 +301,7 @@ case "$1" in
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
+    docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
     docker-volumen-borrar) docker_volume_remove "$2" ;;

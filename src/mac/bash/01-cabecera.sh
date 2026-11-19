@@ -412,6 +412,10 @@
 #   nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>
 #       Uno solo de los contenedores de un proyecto en Docker
 #
+#   nexum docker-wp-cli si|no [--rehacer]
+#       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
+#       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
+#
 #   nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
 #   nexum docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de Docker Desktop: borrar una que no use ningun contenedor,

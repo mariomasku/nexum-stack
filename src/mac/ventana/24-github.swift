@@ -89,6 +89,43 @@ struct IdleStopCard: View {
     }
 }
 
+/// Configuración, Docker: WP-CLI en los contenedores de PHP (docker-wp-cli), apagado de serie. La imagen de una
+/// versión de PHP es la de todos sus proyectos: al cambiarlo pregunta si se rehacen ya las que hay
+struct WpCliCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var on = false
+
+    var body: some View {
+        TileCard(wide: true) {
+            Tile("WP-CLI en los contenedores de PHP",
+                 on ? "Puesto: wp dentro de los contenedores, con la base de datos de Docker (docker exec <contenedor> wp …). Vale para todos los proyectos de Docker"
+                    : "Apagado: los contenedores de PHP no traen wp. Al ponerlo, vale para todos los proyectos de Docker") {
+                Toggle("", isOn: Binding(get: { on }, set: { v in if v != on { change(v) } }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                    .busyGuard(model.busy)
+            }
+        }
+        .onAppear { read() }
+    }
+
+    func read() {
+        on = FileManager.default.fileExists(atPath: LOG_DIR + "/docker/wp-cli")
+    }
+
+    func change(_ v: Bool) {
+        if let guardTask = TASK_GUARD, guardTask() { return }
+        let r = runDialog(title: v ? "¿Poner WP-CLI en los contenedores de PHP?" : "¿Quitar WP-CLI de los contenedores de PHP?",
+                          text: v ? "Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."
+                                  : "Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian.",
+                          okLabel: v ? "Poner" : "Quitar", style: .informational, destructive: false,
+                          checkbox: "Rehacer ya las imágenes de PHP que tienes (unos minutos cada una)", checked: true)
+        guard r.ok else { return }
+        _ = model.runTask(v ? "Poniendo WP-CLI en Docker" : "Quitando WP-CLI de Docker",
+                          ["docker-wp-cli", v ? "si" : "no"] + (r.checked ? ["--rehacer"] : []),
+                          doneText: "WP-CLI en Docker " + (v ? "puesto" : "quitado"), autoClose: !r.checked) { _, _, _ in read() }
+    }
+}
+
 /// Configuración, GitHub: la conexión (un token en el Llavero o la sesión de gh), la organización o cuenta
 /// y los prefijos de los repositorios que se ven en Repositorios
 struct GitHubCard: View {

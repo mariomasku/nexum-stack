@@ -5076,7 +5076,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="26"><b>Dirección y puertos</b><span>Dónde escucha el Apache de Docker: 127.0.0.2, con 80 y 443, de partida. Cambia los campos «Dirección», «HTTP» y «HTTPS» y pulsa «Guardar». Con 80 y 443, las direcciones van sin puerto; con otro HTTPS, lo llevan (<code>https://…:8443</code>). HTTP lleva siempre a https.</span></li>
@@ -5084,6 +5084,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li data-x="77" data-y="38"><b>Certificado de Docker</b><span>«Confiar» hace que el navegador acepte los <code>https://</code> de Docker sin aviso. Solo vale para esos dominios: no es de una autoridad de certificación. <span data-so="linux">No pide la contraseña de administrador: va a los navegadores de tu usuario.</span><span data-so="mac">El Mac te pide tu contraseña en su propio aviso (va a tu llavero).</span></span></li>
       <li data-x="42" data-y="55"><b>Parar los proyectos sin visitas</b><span>Cuántas horas sin visitas tiene que estar un proyecto para pararse solo, con lo común que no use nadie (su MariaDB, el Apache de Docker). Debajo, «Lo último: …» dice qué pasó la última vez.</span></li>
       <li data-x="91" data-y="58"><b>Cuándo</b><span>«Nunca», «A la hora sin visitas», o «A las 2, 3, 4, 6, 8, 12 o 24 h sin visitas». Se aplica al momento, sin contraseña.</span></li>
+      <li data-x="40" data-y="69"><b>WP-CLI en los contenedores de PHP</b><span>Apagado de serie. Puesto, los contenedores de PHP de Docker traen <code>wp</code>, que trabaja con la base de datos de Docker del proyecto. Vale para todos los proyectos de Docker, porque la imagen de una versión de PHP es la misma para todos.</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
@@ -5114,6 +5115,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         abrirlo.</li>
       <li data-so="mac"><b>«Confiar»</b> lo añade a tu llavero de macOS; el Mac te pide tu contraseña en su propia ventana. Vale para Safari y
         Chrome (y Firefox, si usa los certificados del Mac).</li>
+      <li><b>WP-CLI</b> (la herramienta de WordPress para la terminal: <code>wp plugin list</code>, <code>wp search-replace</code>…) te pregunta
+        antes «¿Poner WP-CLI en los contenedores de PHP?» o «¿Quitar WP-CLI de los contenedores de PHP?». La casilla «Rehacer ya las imágenes
+        de PHP que tienes» viene marcada: las rehace al momento (unos minutos cada una) y vuelve a crear los proyectos en marcha; sus bases de
+        datos y su configuración no cambian. Sin marcarla, cada imagen cambia la próxima vez que se rehaga (Componentes o «Actualizar la
+        imagen»). No pide la contraseña de administrador. Si lo quitas, las imágenes que ya lo traen lo pierden al rehacerse.</li>
       <li><b>Sin visitas:</b> 3 horas de partida. Se mira cada 15 minutos, también con la ventana cerrada, y las visitas por el túnel cuentan.
         Al entrar en uno parado, la web lo dice: se arranca en la página Docker.</li>
     </ul>
@@ -5249,6 +5255,27 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     </ol>
     <p>Para comprobarlo: <code>nexum docker-reposo estado</code> (<code>Q|</code>horas<code>|</code>1 si el temporizador está
       puesto<code>|</code>lo último)<span data-so="linux">, o <code>systemctl --user list-timers nexum-reposo.timer</code></span>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum docker-wp-cli si --rehacer</code> (la del interruptor, con la casilla marcada; sin marcarla, sin
+      <code>--rehacer</code>; para quitarlo, <code>no</code>).</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Puesto, crea el fichero vacío <code>~/.nexum/docker/wp-cli</code>; quitado, lo borra.</li>
+      <li>Desde entonces, el <code>Dockerfile</code> de cada imagen de PHP (<code>~/.nexum/docker/imagenes/php-8.4</code>) lleva estas
+        líneas: descarga WP-CLI de su publicación en GitHub, comprueba su huella (si alguien cambiara ese fichero, la imagen no se construye) y
+        pone la orden <code>wp</code>:
+        <code>RUN curl -fsSL -o /usr/local/lib/wp-cli.phar https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar &amp;&amp; echo "ce34dd…  /usr/local/lib/wp-cli.phar" | sha256sum -c -</code>.
+        La imagen lleva la etiqueta <code>nexum.wp-cli="2.12.0"</code>.</li>
+      <li>Con <code>--rehacer</code>, rehace las imágenes de PHP que tienes y que aún no están así, con lo que ya tienen descargado (solo cambia
+        WP-CLI): <code>docker build -t nexum-php:8.4 ~/.nexum/docker/imagenes/php-8.4</code>.</li>
+      <li>Vuelve a crear los contenedores en marcha de los proyectos que las usan: <code>docker compose up -d php84</code> en su carpeta, y
+        borra las imágenes viejas: <code>docker image prune -f</code>.</li>
+    </ol>
+    <p>Para usarlo, con el nombre del contenedor de PHP del proyecto (lo ves en la página Docker, en sus contenedores):
+      <code>docker exec nexum-academia-flor-php84 wp plugin list --path=<span data-so="linux">/opt/lampp/htdocs</span><span data-so="mac">/Applications/XAMPP/xamppfiles/htdocs</span>/academia-flor</code>. Lee el
+      <code>wp-config.php</code> del contenedor, el que apunta a su base de datos de Docker. Para comprobarlo:
+      <code>docker image inspect --format '{{index .Config.Labels "nexum.wp-cli"}}' nexum-php:8.4</code> (sale <code>2.12.0</code>).</p>
   </details>
 
   <h3 id="tunel-config">Túnel de Cloudflare</h3>

@@ -663,6 +663,7 @@ struct ToolsView: View {
             }
           }
           IdleStopCard()
+          WpCliCard()
         }
         .onAppear {
             if model.docker == nil { model.reloadDocker() }

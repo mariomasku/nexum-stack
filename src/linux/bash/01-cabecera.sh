@@ -223,6 +223,9 @@
 #       docker-usuario-pruebas pone el administrador de pruebas en la BBDD de su contenedor
 #   nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>
 #       Uno solo de los contenedores de un proyecto en Docker
+#   nexum docker-wp-cli si|no [--rehacer]
+#       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
+#       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
 #   nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
 #   nexum docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
@@ -907,7 +910,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.36"
+APP_VERSION="1.57.37"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

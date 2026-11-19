@@ -55,7 +55,12 @@ function components_check() {
         for v in $DOCKER_PHP_VERSIONS; do
             dk image inspect "nexum-php:$v" > /dev/null 2>&1 || continue
             img=php:$v-fpm
-            docker_image_outdated "$img" && { echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1)); }
+            # (o, con WP-CLI puesto en Configuracion > Docker, sin el: al rehacerla lo trae)
+            if docker_php_needs_wp_cli "$v"; then
+                echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v), para que traiga WP-CLI"; n=$((n + 1))
+            elif docker_image_outdated "$img"; then
+                echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1))
+            fi
         done
     fi
     if mailpit_installed && [ "$(mailpit_installed_version)" != "$MAILPIT_VERSION" ]; then

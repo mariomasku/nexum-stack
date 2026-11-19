@@ -4,6 +4,10 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.37 · 19 nov 2026
+
+- **Docker:** «WP-CLI en los contenedores de PHP», en Configuración > Docker, apagado de serie. Puesto, las imágenes de PHP traen wp (2.12.0, comprobado por su huella) para trabajar con la base de datos de Docker de cada proyecto: docker exec <contenedor> wp ... Como la imagen es la de todos los proyectos de esa versión, vale para todos. Al cambiarlo pregunta si rehacer ya las imágenes; en la terminal, nexum docker-wp-cli si|no [--rehacer].
+
 ## 1.57.36 · 19 nov 2026
 
 - **Cristal:** la cabecera del visor ya no es translúcida. Queda sólida, azul oscuro con el tema oscuro y blanca con el claro; el fondo difuminado sigue en el resto de la ventana.

@@ -555,6 +555,17 @@ class NvGithub:
             lambda rc, out: (self.toast((out.strip().splitlines() or ["Hecho"])[-1]), self.build_tools(), False)[2]))
         row.add_suffix(combo)
         lb.add(row)
+        # WP-CLI en las imágenes de PHP (docker-wp-cli): apagado de serie, la imagen es la de todos los proyectos
+        wp_on = os.path.exists(os.path.join(LOG_DIR, "docker", "wp-cli"))
+        row = ActionRow("WP-CLI en los contenedores de PHP",
+                        "Puesto: wp dentro de los contenedores, con la base de datos de Docker (docker exec <contenedor> wp …). "
+                        "Vale para todos los proyectos de Docker" if wp_on else
+                        "Apagado: los contenedores de PHP no traen wp. Al ponerlo, vale para todos los proyectos de Docker")
+        row.wide = True
+        sw = busy_guard(Gtk.Switch(active=wp_on, valign=Gtk.Align.CENTER), self.busy)
+        sw.connect("notify::active", lambda s, _p: s.get_active() != wp_on and self.nv_docker_wp_cli(s.get_active()))
+        row.add_suffix(sw)
+        lb.add(row)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 2)
         box.show_all()
@@ -953,6 +964,24 @@ class NvGithub:
                 fn()
             except Exception:  # noqa: BLE001 - una pestaña aún sin datos
                 pass
+
+    def nv_docker_wp_cli(self, on):
+        """docker-wp-cli si|no [--rehacer]: pregunta si se rehacen ya las imágenes de PHP que hay."""
+        now = Gtk.CheckButton(label="Rehacer ya las imágenes de PHP que tienes (unos minutos cada una)", active=True)
+        if not confirm(self.win, "¿Poner WP-CLI en los contenedores de PHP?" if on else "¿Quitar WP-CLI de los contenedores de PHP?",
+                       ("Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, "
+                        "con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que "
+                        "vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y "
+                        "su configuración no cambian.") if on else
+                       ("Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en "
+                        "marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."),
+                       "Poner" if on else "Quitar", extra=now):
+            self.build_tools()
+            return
+        args = ["docker-wp-cli", "si" if on else "no"] + (["--rehacer"] if now.get_active() else [])
+        self.run_task("Poniendo WP-CLI en Docker" if on else "Quitando WP-CLI de Docker", args,
+                      done_text="WP-CLI en Docker " + ("puesto" if on else "quitado"), auto_close=not now.get_active(),
+                      on_done=lambda *a: self.build_tools())
 
     def nv_docker_dns(self, on):
         """docker-web dns activar|quitar"""
