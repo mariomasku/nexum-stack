@@ -4,10 +4,14 @@
 /// SISTEMA); a la derecha, el elegido
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         VStack(spacing: 0) {
             TopBar()
+                // (con el cristal, la barra del visor sólida: azul oscuro con el tema oscuro y blanca con el claro)
+                .background(model.look.cristal ? (scheme == .dark ? Color(red: 0.078, green: 0.129, blue: 0.239)
+                                                                  : Color.white) : Color.clear)
             Divider()
             HStack(spacing: 0) {
                 Sidebar()

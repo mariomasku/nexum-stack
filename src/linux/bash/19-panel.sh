@@ -1131,6 +1131,11 @@ QUE HACE
 
 VERSIONES
 
+1.57.36 (19 nov 2026)
+- Cristal: la cabecera del visor ya no es translúcida. Queda sólida,
+  azul oscuro con el tema oscuro y blanca con el claro; el fondo
+  difuminado sigue en el resto de la ventana.
+
 1.57.35 (19 nov 2026)
 - Apariencia: «Tamaño de la ventana», al 80, 90, 100 o 110 %, para ver
   todo más pequeño (o más grande): letras, márgenes y botones, al

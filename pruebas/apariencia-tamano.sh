@@ -7,6 +7,7 @@ if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: zoom y cristal en el fichero de Apariencia (se leen y se guardan)" 'grep -qF "let LOOK_ZOOMS = [80, 90, 100, 110]" "$SRC" && grep -qF "if let z = o[\"zoom\"] as? Int, LOOK_ZOOMS.contains(z) { c.zoom = z }" "$SRC" && grep -qF "\"zoom\": c.zoom, \"cristal\": c.cristal]" "$SRC"'
     check "Mac: la ventana entera a escala, y al 100 % tal cual" 'grep -qF ".scaleEffect(zoom, anchor: .topLeading)" "$SRC" && grep -qF "ZoomBox(zoom: CGFloat(model.look.zoom) / 100) {" "$SRC" && grep -qF "        if zoom == 1 {" "$SRC"'
     check "Mac: cristal con el material de macOS y la ventana sin opacar" 'grep -qF "v.blendingMode = .behindWindow" "$SRC" && grep -qF "w.isOpaque = !on" "$SRC" && grep -qF ".background(GlassBackground(on: model.look.cristal))" "$SRC"'
+    check "Mac: con el cristal, la barra del visor sólida (azul oscuro o blanca)" 'grep -qF ".background(model.look.cristal ? (scheme == .dark ? Color(red: 0.078, green: 0.129, blue: 0.239)" "$SRC"'
     check "Mac: en Apariencia, el tamaño y el cristal" 'grep -qF "Tile(\"Tamaño de la ventana\"" "$SRC" && grep -qF "Tile(\"Cristal\"" "$SRC"'
     exit $fail
 fi
@@ -79,5 +80,6 @@ if grep -q "^css|" <<< "$res"; then
     check "Linux: la hoja de estilos se carga a todos los tamaños, y el fondo del cristal es una imagen" 'grep -qx "css|0|fondo-claro.png,fondo-oscuro.png|True" <<< "$res"'
     check "Linux: el cristal no encarece el pintado (sin degradados que se recalculen)" 'grep -qx "coste|1" <<< "$res" && ! grep -q "radial-gradient" "$SRC"'
 fi
+check "Linux: con el cristal, la cabecera del visor sólida (azul oscuro con el tema oscuro, blanca con el claro)" 'grep -qF ".nv-cristal headerbar.nv-cabecera, .nv-cristal headerbar.nv-cabecera:backdrop { background-image: none;" "$SRC" && grep -qF "    background-color: #14213d; border-bottom" "$SRC" && grep -qF "    background-color: #ffffff; border-bottom: 1px solid alpha(black, 0.10); }" "$SRC" && ! grep -qF "headerbar.nv-cabecera { background-image: none; background-color: alpha(" "$SRC"'
 check "Linux: en Apariencia, el tamaño y el cristal, y se aplican al momento" 'grep -qF "row = ActionRow(\"Tamaño de la ventana\"" "$SRC" && grep -qF "switch(lb, \"Cristal\"" "$SRC" && grep -qF "        if key in (\"zoom\", \"cristal\"):" "$SRC" && grep -qF "s.set_property(\"gtk-xft-dpi\", want)" "$SRC"'
 exit $fail
