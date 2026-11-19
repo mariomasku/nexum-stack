@@ -1366,6 +1366,8 @@ function reload_apache() {
 
 function start_mysql() {
     running "$MYSQL_PID" && { echo "MariaDB ya estaba arrancado."; return 0; }
+    # (sin su servidor no hay nada que esperar: se dice al momento, en vez de 60 s esperando)
+    [ -x "$ROOT/mysql/bin/mariadbd-safe" ] || { echo "MariaDB no esta instalada en esta version (falta mysql/bin/mariadbd-safe): actualizala en Componentes"; return 1; }
 
     # mariadbd-safe busca sus herramientas desde la carpeta de MariaDB
     (cd "$ROOT/mysql" && as_web /usr/bin/nohup ./bin/mariadbd-safe --defaults-file="$ROOT/etc/my.cnf" < /dev/null > /dev/null 2>&1 &)

@@ -293,7 +293,9 @@ function gui_up_to_date() {
 
     if [ -z "$full" ]; then
         echo "error"
-    elif [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] && ! php2shell_missing "$dir" "$full"; then
+    elif [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] && ! php2shell_missing "$dir" "$full" \
+            && [ -z "$(stack_broken "$dir/xamppfiles")" ]; then
+        # (con alguna pieza dañada no esta al dia: stack_broken)
         echo "si|$full"
     else
         echo "no|$full"
@@ -393,6 +395,19 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.31 (19 nov 2026)
+- Componentes mira también que cada pieza de una versión esté entera
+  (que estén los programas de PHP, Apache, MariaDB, ProFTPD y Perl, y
+  phpMyAdmin). Una que falta sale como «MariaDB dañado → 11.8.10»
+  aunque ya esté en lo último de su rama, y al actualizar se rehace la
+  versión con sus bases de datos.
+- Si una versión no tiene servidor de MariaDB, al arrancarla lo dice al
+  momento, en vez de esperar 60 segundos.
+- Protegerlas: la ventana enseña sus pasos (proteger cada versión,
+  revisar los permisos de htdocs, dominios y vhosts, reiniciar la
+  activa) y avisa antes de revisar htdocs, que con muchos proyectos
+  tarda un minuto. Parecía congelada.
 
 1.57.30 (19 nov 2026)
 - Al instalar o actualizar una versión de PHP, el registro de la tarea

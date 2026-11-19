@@ -1131,6 +1131,21 @@ QUE HACE
 
 VERSIONES
 
+1.57.31 (19 nov 2026)
+- Componentes mira también que cada pieza de una versión esté entera
+  (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin): que estén sus
+  programas y que respondan. Una dañada sale como «MariaDB dañado →
+  11.8.10» aunque ya esté en lo último de su rama, y al actualizar se
+  rehace la versión con sus bases de datos. La versión que se quedó sin
+  servidor de MariaDB salía en la lista, pero al actualizarla decía que
+  ya estaba al día y no la rehacía.
+- Si una versión no tiene servidor de MariaDB, al arrancarla lo dice al
+  momento: esperaba 60 segundos antes de rendirse.
+- Protegerlas: la ventana enseña sus pasos (proteger cada versión,
+  revisar los permisos de /opt/htdocs, dominios y vhosts, reiniciar la
+  activa) y avisa antes de revisar htdocs, que con muchos proyectos
+  tarda un minuto. Parecía congelada.
+
 1.57.30 (19 nov 2026)
 - Al instalar o actualizar una versión de PHP, el registro de la tarea
   escribe cada 30 segundos por dónde va la compilación («[ 41%]

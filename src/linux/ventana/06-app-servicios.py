@@ -134,7 +134,8 @@ class AppServicios:
                       done_text="phpMyAdmin actualizado", auto_close=True)
 
     def on_secure_all(self, *_):
-        self.run_task("Protegiendo las versiones", ["asegurar", "--todas"],
+        # (con sus pasos: revisar todo htdocs tarda, y sin ellos parecía congelada)
+        self.run_task("Protegiendo las versiones", ["asegurar", "--todas"], progress=True,
                       done_text="Todas las versiones son solo para este equipo", auto_close=True)
 
     def on_apache_reload(self, *_):

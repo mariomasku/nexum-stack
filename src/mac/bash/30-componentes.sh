@@ -13,7 +13,7 @@
 #   S|cuantos componentes tienen parche nuevo
 function components_check() {
     local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
-    local a b
+    local a b broken
     releases=$(php_releases)
     [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
     local pinned
@@ -32,7 +32,18 @@ function components_check() {
         new=$(stack_versions "$full")
         IFS='|' read -r -a a <<< "$cur"
         IFS='|' read -r -a b <<< "$new"
+        # (las piezas dañadas, aunque esten en lo ultimo de su rama: la version se rehace con ellas bien)
+        broken=" $(stack_broken "$dir/xamppfiles") "
         for i in 0 1 2 3 4 5; do
+            if [[ "$broken" == *" ${names[$i]} "* ]]; then
+                if [ $pinned -eq 1 ]; then
+                    echo "F|$name|${names[$i]} dañado: instala la versión de nuevo a su lado (Instalar versión) y pásale las BBDD"
+                else
+                    echo "L|$name|${names[$i]}|dañado|$( [ -n "${b[$i]}" ] && [[ "${b[$i]}" != *.x ]] && echo "${b[$i]}" || echo "${a[$i]}")"
+                fi
+                n=$((n + 1))
+                continue
+            fi
             # (lo que no se ha podido consultar sale como su rama seguida de .x: no cuenta)
             [ -z "${b[$i]}" ] || [[ "${b[$i]}" == *.x ]] && continue
             if [ "${a[$i]}" != "${b[$i]}" ] && [ "$(printf '%s\n%s\n' "${a[$i]}" "${b[$i]}" | sort -V | tail -1)" == "${b[$i]}" ]; then
@@ -72,6 +83,7 @@ function components_check() {
 }
 
 #@incluir comun/componentes/docker_image_outdated.sh
+#@incluir comun/componentes/stack_broken.sh
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD

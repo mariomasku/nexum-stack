@@ -4661,6 +4661,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
       <li data-so="mac">Para cada <code>/Library/Nexum/XAMPP-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y
         escribe una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
+      <li>Mira también que cada pieza de la versión esté entera: que estén los programas de PHP, PHP-FPM, Apache, MariaDB (su servidor
+        y su cliente), ProFTPD y Perl, y el <code>index.php</code> de phpMyAdmin<span data-so="linux">, y que respondan
+        (<code>--version</code>)</span>. Una que falta<span data-so="linux"> o no responde</span> sale como dañada aunque esté en lo último
+        de su rama, <code>L|8.4|MariaDB|dañado|11.8.10</code> («<span data-so="linux">lampp</span><span data-so="mac">XAMPP</span>-8.4: MariaDB dañado → 11.8.10»), y al actualizar se rehace la
+        versión entera (sus piezas se compilan juntas) conservando sus bases de datos.</li>
       <li>Si Docker está en marcha, compara cada imagen que usas (<code>mariadb:</code><i>versión</i>, la de phpMyAdmin y la base de cada
         imagen de PHP, <code>php:</code><i>versión</i><code>-fpm</code>) con Docker Hub: <code>K|mariadb:11.4|…</code>.</li>
       <li>Compara Mailpit y cloudflared con los que trae el programa: <code>X|Mailpit|1.21.0|1.22.0</code>.</li>

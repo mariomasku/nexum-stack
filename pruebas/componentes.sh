@@ -28,6 +28,8 @@ else
     # (ninguna es de una pila propia: su MariaDB no se mira; las de este equipo no cuentan)
     is_stack_install() { false; }
 fi
+# (sus piezas, bien: las dañadas se prueban aparte, al final)
+stack_broken() { :; }
 # Docker: la MariaDB 11.8 y la imagen de PHP 8.4 tienen una nueva en Docker Hub
 docker_ready() { true; }
 docker_maria_versions() { echo 11.8; }
@@ -50,11 +52,30 @@ check "Docker: las imagenes con una nueva en Docker Hub (solo las que estan)" 'g
 check "Mailpit con una version nueva; cloudflared al dia" 'grep -qx "X|Mailpit|1.32.0|1.33.0" <<< "$out" && ! grep -q "^X|cloudflared" <<< "$out"'
 check "el total" 'grep -qx "S|5" <<< "$out"'
 check "sin Docker: no se pregunta a Docker" ': > "$W/dk.log"; components_check --sin-docker | grep -qx "S|3" && [ ! -s "$W/dk.log" ]'
+# (1.57.31) Una pieza dañada (su programa no esta o no responde), aunque este en lo ultimo de su rama: se rehace
+stack_broken() { [[ "$1" == */8.3* || "$1" == */lampp-8.3 || "$1" == */XAMPP-8.3/xamppfiles ]] && echo "MariaDB Perl"; }
+[ $MAC -eq 0 ] && is_stack_install() { [ "$1" == /opt/lampp-8.3 ]; }
+out=$(components_check --sin-docker)
+check "pieza dañada: sale como dañado con lo ultimo de su rama, aunque su version ya sea esa" 'grep -qx "L|8.3|MariaDB|dañado|11.4.13" <<< "$out" && grep -qx "L|8.3|Perl|dañado|5.40.5" <<< "$out"'
+check "pieza dañada: las demas de esa version, como siempre" '! grep -q "^L|8.3|PHP\|^L|8.3|Apache" <<< "$out"'
+stack_broken() { :; }
+[ $MAC -eq 0 ] && is_stack_install() { false; }
+# stack_broken de verdad, con una version falsa: cada programa responde o no
+extract "$SRC" stack_broken || exit 1
+V=$W/pila; mkdir -p "$V/php/bin" "$V/php/sbin" "$V/apache2/bin" "$V/mysql/bin" "$V/proftpd/sbin" "$V/perl/bin" "$V/phpmyadmin"
+for f in php/bin/php php/sbin/php-fpm apache2/bin/httpd mysql/bin/mariadbd mysql/bin/mariadb mysql/bin/mariadbd-safe proftpd/sbin/proftpd perl/bin/perl; do
+    printf '#!/bin/sh\nexit 0\n' > "$V/$f"; chmod +x "$V/$f"
+done
+: > "$V/phpmyadmin/index.php"
+check "stack_broken: todo bien, nada" '[ -z "$(OSTYPE=linux-gnu stack_broken "$V")" ]'
+rm "$V/mysql/bin/mariadbd"; printf '#!/bin/sh\nexit 1\n' > "$V/perl/bin/perl"
+check "stack_broken: lo que falta y lo que no responde" '[ "$(OSTYPE=linux-gnu stack_broken "$V")" == "MariaDB Perl" ]'
+check "stack_broken: en el Mac solo que esten (Perl esta, aunque no responda)" '[ "$(OSTYPE=darwin24 stack_broken "$V")" == "MariaDB" ]'
+rm "$V/phpmyadmin/index.php" "$V/apache2/bin/httpd"
+check "stack_broken: phpMyAdmin sin su index.php y Apache sin su programa" '[ "$(OSTYPE=linux-gnu stack_broken "$V")" == "Apache MariaDB Perl phpMyAdmin" ]'
+check "stack_broken: lo usan Componentes, actualizar y la ventana" '[ "$(grep -c "stack_broken \"\$dir" "$SRC")" -ge 3 ]'
+stack_broken() { :; }
 if [ $MAC -eq 0 ]; then
-    # (1.57.29) Una pila propia con su MariaDB sin el servidor (la que trajo uno de sus plugins): se rehace
-    is_stack_install() { [ "$1" == /opt/lampp-8.3 ]; }
-    check "pila propia sin bin/mariadbd: su MariaDB sale como ? y la version se rehace" 'components_check --sin-docker | grep -qx "L|8.3|MariaDB|?|11.4.13"'
-    is_stack_install() { false; }
     # mariadb_release: de lo que publica MariaDB, solo su binario (con el mismo final van sus plugins)
     extract "$SRC" mariadb_release || exit 1
     native_binaries() { true; }

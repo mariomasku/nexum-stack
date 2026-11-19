@@ -57,7 +57,8 @@ extension AppModel {
 
     /// Todas las versiones solo para este Mac (nexum asegurar --todas)
     func secureAll() {
-        runTask("Protegiendo las versiones", ["asegurar", "--todas"],
+        // (con sus pasos: revisar todo htdocs tarda, y sin ellos parecía congelada)
+        runTask("Protegiendo las versiones", ["asegurar", "--todas"], progress: true,
                 doneText: "Todas las versiones son solo para este Mac", autoClose: true)
     }
 

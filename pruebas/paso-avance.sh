@@ -37,4 +37,9 @@ g=$(cat "$W/grupo" 2> /dev/null) h=$(cat "$W/hijo" 2> /dev/null)
 sleep 0.5
 check "al cancelar la tarea, el paso tambien se para" '[ -n "$h" ] && ! kill -0 "$h" 2> /dev/null'
 check "los dos step lo usan (Linux y Mac)" 'grep -q "if ! step_watch .* \"\$lines\" \"\$desc\" \"\$log\" /usr/bin/python3 -I -c \"\$NO_TTY_PY\" \"\$@\"; then" "$SRC"'
+# (1.57.31) Protegerlas dice sus pasos (la ventana los enseña) y avisa antes de revisar todo htdocs; sin
+# el servidor de MariaDB, el lampp de la version lo dice al momento en vez de esperar 60 s
+check "Protegerlas: sus cuatro pasos y el aviso antes de revisar htdocs" 'grep -q "task_plan \"Protegiendo las versiones\" \"Proteger cada versión\" \"Revisar los permisos de \$HTDOCS_DIR\"" "$SRC" && grep -q "Revisando los permisos de todo \$HTDOCS_DIR (con muchos proyectos, puede tardar un minuto)" "$SRC"'
+check "Protegerlas: la ventana la lanza con su progreso" 'grep -q "\"asegurar\", \"--todas\"\], progress" "$SRC"'
+check "lampp: sin el servidor de MariaDB, lo dice al momento" 'grep -q "\[ -x \"\$ROOT/mysql/bin/mariadbd-safe\" \] || { echo \"MariaDB no esta instalada en esta version" "$SRC"'
 exit $fail
