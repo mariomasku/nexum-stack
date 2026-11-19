@@ -25,6 +25,8 @@ if [ $MAC -eq 1 ]; then
 else
     lampp_dirs() { echo /opt/lampp-7.4.33 /opt/lampp-8.1 /opt/lampp-8.3 /opt/lampp-8.4; }
     is_fpm_install() { [ "$1" != /opt/lampp-8.1 ]; }
+    # (ninguna es de una pila propia: su MariaDB no se mira; las de este equipo no cuentan)
+    is_stack_install() { false; }
 fi
 # Docker: la MariaDB 11.8 y la imagen de PHP 8.4 tienen una nueva en Docker Hub
 docker_ready() { true; }
@@ -48,6 +50,26 @@ check "Docker: las imagenes con una nueva en Docker Hub (solo las que estan)" 'g
 check "Mailpit con una version nueva; cloudflared al dia" 'grep -qx "X|Mailpit|1.32.0|1.33.0" <<< "$out" && ! grep -q "^X|cloudflared" <<< "$out"'
 check "el total" 'grep -qx "S|5" <<< "$out"'
 check "sin Docker: no se pregunta a Docker" ': > "$W/dk.log"; components_check --sin-docker | grep -qx "S|3" && [ ! -s "$W/dk.log" ]'
+if [ $MAC -eq 0 ]; then
+    # (1.57.29) Una pila propia con su MariaDB sin el servidor (la que trajo uno de sus plugins): se rehace
+    is_stack_install() { [ "$1" == /opt/lampp-8.3 ]; }
+    check "pila propia sin bin/mariadbd: su MariaDB sale como ? y la version se rehace" 'components_check --sin-docker | grep -qx "L|8.3|MariaDB|?|11.4.13"'
+    is_stack_install() { false; }
+    # mariadb_release: de lo que publica MariaDB, solo su binario (con el mismo final van sus plugins)
+    extract "$SRC" mariadb_release || exit 1
+    native_binaries() { true; }
+    fetch() { printf '%s' '{"releases":{"11.8.10":{"files":[
+      {"file_name":"mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/p.tar.gz","checksum":{"sha256sum":"'"$(printf 'a%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10-linux-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/b.tar.gz","checksum":{"sha256sum":"'"$(printf 'c%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10-linux-systemd-x86_64.tar.gz","file_download_url":"http://downloads.mariadb.org/m.tar.gz","checksum":{"sha256sum":"'"$(printf 'b%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10.tar.gz","file_download_url":"https://downloads.mariadb.org/s.tar.gz","checksum":{"sha256sum":"'"$(printf 'd%.0s' $(seq 64))"'"}}]}}}'; }
+    check "mariadb_release: el binario de MariaDB (con systemd), no uno de sus plugins" '[ "$(mariadb_release 11.8 | cut -d"|" -f1,2)" == "11.8.10|https://downloads.mariadb.org/m.tar.gz" ]'
+    native_binaries() { false; }
+    check "mariadb_release: sin binarios, su codigo fuente" '[ "$(mariadb_release 11.8 | cut -d"|" -f2)" == "https://downloads.mariadb.org/s.tar.gz" ]'
+    fetch() { printf '%s' '{"releases":{"11.8.10":{"files":[{"file_name":"mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/p.tar.gz","checksum":{"sha256sum":"'"$(printf 'a%.0s' $(seq 64))"'"}}]}}}'; }
+    native_binaries() { true; }
+    check "mariadb_release: si solo hay plugins, nada (no se instala uno de ellos como MariaDB)" '[ -z "$(mariadb_release 11.8)" ]'
+fi
 
 # Ponerlo al dia: cada cosa con lo suyo
 mkdir -p "$DOCKER_DIR/mariadb-11.8"

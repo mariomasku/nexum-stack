@@ -27,6 +27,9 @@ function components_check() {
         new=$(stack_versions "$full")
         IFS='|' read -r -a a <<< "$cur"
         IFS='|' read -r -a b <<< "$new"
+        # (una MariaDB propia sin su servidor no cuenta como instalada, y la version se rehace: pasaba con la
+        # que trajo uno de sus plugins en lugar de MariaDB, hasta la 1.57.28)
+        is_stack_install "$dir" && [ ! -x "$dir/mysql/bin/mariadbd" ] && a[2]=""
         for i in 0 1 2 3 4 5; do
             # (lo que no se ha podido consultar sale como su rama seguida de .x: no cuenta)
             [ -z "${b[$i]}" ] || [[ "${b[$i]}" == *.x ]] && continue

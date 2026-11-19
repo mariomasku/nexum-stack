@@ -129,6 +129,10 @@ if [ $MAC -eq 0 ]; then
     q openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=real.com" -keyout "$W/v/r2.key" -out "$W/v/r2.crt"
     q openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=mio" -keyout "$W/v/o.key" -out "$W/v/o.crt"
     check "dos con el mismo nombre: se quitan los dos" 'hosts_con "127.0.0.1 real.com www.real.com"; HOME=$W/casa browser_trust real.com > /dev/null 2>&1; certutil -A -d "sql:$W/casa/.pki/nssdb" -n "lvm-instalador real.com" -t "P,," -i "$W/v/r2.crt"; [ "$(nicks "$W/casa/.pki/nssdb" real.com)" -eq 2 ] && hosts_con; HOME=$W/casa browser_trust real.com > /dev/null 2>&1; [ "$(nicks "$W/casa/.pki/nssdb" real.com)" -eq 0 ]'
+    # (1.57.28) El de Docker (lvm-instalador docker.local) lo pone docker_web_trust: al cargar un proyecto
+    # (browser_trust) se quitaba, y las webs de Docker volvian a avisar
+    q openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=docker.local" -keyout "$W/v/d.key" -out "$W/v/d.crt"
+    check "el de Docker (docker.local) no se toca al cargar un proyecto ni con --quitar" 'certutil -A -d "sql:$W/casa/.pki/nssdb" -n "lvm-instalador docker.local" -t "P,," -i "$W/v/d.crt" && ! HOME=$W/casa trust | grep -q "^U|docker.local" && HOME=$W/casa browser_trust --quitar > /dev/null 2>&1 && [ "$(nicks "$W/casa/.pki/nssdb" docker.local)" -eq 1 ]'
     check "uno de otro (sin nuestro nombre): no se toca" 'certutil -A -d "sql:$W/casa/.pki/nssdb" -n "mio real.com" -t "P,," -i "$W/v/o.crt"; HOME=$W/casa browser_trust --quitar > /dev/null 2>&1; certutil -L -d "sql:$W/casa/.pki/nssdb" | grep -q "^mio real.com "'
     check "sin certutil, --hosts y --quitar no fallan" 'PATH=$W/bin browser_trust --hosts && PATH=$W/bin browser_trust --quitar'
     check "al cambiar hosts (editar o falsear) se llama a --hosts" '[ "$(grep -c "^        browser_trust --hosts || true$\|^    browser_trust --hosts || true$" "$SRC")" -eq 2 ]'

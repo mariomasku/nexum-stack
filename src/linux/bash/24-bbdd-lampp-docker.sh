@@ -563,8 +563,10 @@ function gui_up_to_date() {
     if [ -z "$full" ]; then
         echo "error"
     elif is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] \
-            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; }; then
-        # (7.4.33, 8.0.30 y 8.1.34 sin el parche de seguridad no estan al dia: se vuelven a compilar)
+            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; } \
+            && [ -x "$dir/mysql/bin/mariadbd" ]; then
+        # (7.4.33, 8.0.30 y 8.1.34 sin el parche de seguridad no estan al dia: se vuelven a compilar. Tampoco
+        # una con su MariaDB sin el servidor, como la que trajo uno de sus plugins hasta la 1.57.28)
         echo "si|$full"
     else
         echo "no|$full"

@@ -150,5 +150,8 @@ else
     check "ventana: si no se conecta, el motivo en una ventana (no en el aviso de abajo)" 'grep -q "message(self.win, \"No se ha podido conectar con GitHub\"" "$SRC"'
     check "ventana: el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "gh.add(MonoLogo(\"github\", 18))" "$SRC" && grep -q "self.open_uri(\"https://github.com/%s\" % repo\[\"full\"\])" "$SRC"'
     check "ventana: ya clonado, se pregunta antes de traer los cambios (git pull)" 'grep -q "if not confirm(self.win, \"¿Traer los cambios de GitHub a" "$SRC" && grep -q "\[\"repo-traer\", repo\[\"full\"\], \"--actualizar\"\]" "$SRC"'
+    # (1.57.27) La lista de GitHub llega unos segundos después de la guardada y la página se rehace: lo escrito
+    # en el buscador, el cursor y por dónde iba la lista se quedan
+    check "ventana: al rehacer Repositorios se quedan lo escrito, el cursor y la posición de la lista" 'grep -q "search.set_text(getattr(self, \"repos_query\", \"\"))" "$SRC" && grep -q "search.connect(\"changed\", lambda e: setattr(self, \"repos_query\", e.get_text()))" "$SRC" && grep -q "search.grab_focus_without_selecting()" "$SRC" && grep -q "vadj.set_value(min(scroll," "$SRC"'
 fi
 exit $fail

@@ -100,8 +100,10 @@ for version, release in json.load(sys.stdin)["releases"].items():
     if sys.argv[1] == "fuente":
         files = [f for f in release["files"] if f["file_name"] == "mariadb-%s.tar.gz" % version]
     else:
-        files = [f for f in release["files"] if f["file_name"].endswith("-x86_64.tar.gz")
-                 and "linux" in f["file_name"] and "debug" not in f["file_name"]]
+        # (solo el de MariaDB: con el mismo final van tambien sus plugins, como
+        # mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz, de 1 MB y sin servidor)
+        name = re.compile(r"mariadb-%s-linux(-systemd)?-x86_64[.]tar[.]gz" % re.escape(version))
+        files = [f for f in release["files"] if name.fullmatch(f["file_name"])]
     files.sort(key=lambda f: "systemd" not in f["file_name"])
     if files:
         url = files[0]["file_download_url"].replace("http://", "https://", 1)
@@ -2701,6 +2703,14 @@ function stack_build_phase() {
         mkdir -p "$S/mysql"
         step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
             --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
+    fi
+    # (el servidor y el cliente tienen que estar: un fichero que no es MariaDB, como uno de sus plugins,
+    # pasa su comprobacion y no lleva ninguno. Fuera de la cache, para no volver a usarlo)
+    if [ ! -x "$S/mysql/bin/mariadbd" ] || [ ! -x "$S/mysql/bin/mariadb" ]; then
+        echo "  La descarga de MariaDB $mariadb no trae su servidor (bin/mariadbd): no es MariaDB. Se cancela."
+        [ -f "$DL_CACHE_DIR/$mariadb_name" ] && $SUDO rm -f "$DL_CACHE_DIR/$mariadb_name" "$DL_CACHE_DIR/$mariadb_name.sha256" \
+            && echo "  Se quita de la cache de descargas: la proxima vez se descarga de nuevo."
+        stack_fail
     fi
     # Sin simbolos de depuracion ocupa unos 600 MB menos
     find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \

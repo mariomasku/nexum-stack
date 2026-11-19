@@ -75,6 +75,8 @@ if [ -x /opt/lampp-8.2.4/bin/httpd ] && [ -f /opt/lampp-8.2.4/etc/httpd.conf ]; 
     A=$W/apache; mkdir -p "$A"
     printf '%s' "$VH" | sed 's#<VirtualHost \*:80>#<VirtualHost *:28471 *:28472>#' > "$A/unk.conf"
     if python3 -I "$HERE/apache-temporal.py" /opt/lampp-8.2.4/etc/httpd.conf "$A" "$A/unk.conf" > /dev/null 2>&1; then
+        # (y una copia en Docker, con la misma carpeta que web.local)
+        printf '<VirtualHost *:28471>\n    ServerName copia-php85.docker.test\n    DocumentRoot "%s/web.local"\n    <Directory "%s/web.local">\n        Require all granted\n    </Directory>\n</VirtualHost>\n' "$A" "$A" >> "$A/httpd.conf"
         if env LD_LIBRARY_PATH=/opt/lampp-8.2.4/lib /opt/lampp-8.2.4/bin/httpd -f "$A/httpd.conf" -k start 2> "$A/arranque.txt"; then
             trap 'env LD_LIBRARY_PATH=/opt/lampp-8.2.4/lib /opt/lampp-8.2.4/bin/httpd -f "$A/httpd.conf" -k stop 2> /dev/null; sleep 1; rm -rf "$W"' EXIT
             for i in $(seq 30); do curl -s -o /dev/null http://127.0.0.1:28471/ && break; sleep 0.2; done
@@ -92,6 +94,14 @@ if [ -x /opt/lampp-8.2.4/bin/httpd ] && [ -f /opt/lampp-8.2.4/etc/httpd.conf ]; 
             check "barrera: acceso al panel desde la pagina del boton Panel (WordPress y PrestaShop): pasa" '[ "$(pl wp-login.php)" = 404 ] && [ "$(pl "admin123/index.php?controller=AdminLogin")" = 404 ]'
             check "barrera: el acceso con fetch o en un iframe: 403" '[ "$(pl wp-login.php cors empty)" = 403 ] && [ "$(pl wp-login.php navigate iframe)" = 403 ]'
             check "barrera: otras acciones de wp-login, otros controladores u otras paginas: 403" '[ "$(pl "wp-login.php?action=lostpassword")" = 403 ] && [ "$(pl "admin123/index.php?controller=AdminEmployees")" = 403 ] && [ "$(pl wp-admin/user-new.php)" = 403 ]'
+            # (1.57.28) Un proyecto y su copia en Docker se piden tipografias, imagenes y CSS, con CORS en las tipografias
+            printf 'x' > "$A/web.local/f.woff2"; printf 'x' > "$A/web.local/i.png"; printf 'x' > "$A/web.local/p.php"
+            sb() { curl -s -o /dev/null -w '%{http_code}' -H "Host: ${DKH:-web.local}" -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: ${3:-no-cors}" -H "Sec-Fetch-Dest: $2" "${@:4}" "http://127.0.0.1:28471/$1"; }
+            hd() { curl -s -D - -o /dev/null -H "Host: ${DKH:-web.local}" -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: cors" -H "Sec-Fetch-Dest: font" -H "Origin: $1" "http://127.0.0.1:28471/f.woff2"; }
+            DK=https://copia-php85.docker.test
+            check "barrera: tipografia e imagen para la copia en Docker: pasan, la tipografia con CORS" '[ "$(sb f.woff2 font cors -H "Origin: $DK")" = 200 ] && hd "$DK" | grep -qi "^Access-Control-Allow-Origin: $DK" && [ "$(sb i.png image no-cors -H "Referer: $DK/css/post-90.css")" = 200 ]'
+            check "barrera: al reves, la copia en Docker da sus tipografias a web.local (con CORS)" '[ "$(DKH=copia-php85.docker.test sb f.woff2 font cors -H "Origin: https://web.local")" = 200 ] && DKH=copia-php85.docker.test hd https://web.local | grep -qi "^Access-Control-Allow-Origin: https://web.local"'
+            check "barrera: lo mismo desde otra web, o desde Docker un fetch, un PHP o un POST: 403" '[ "$(sb f.woff2 font cors -H "Origin: https://evil.example")" = 403 ] && [ "$(sb f.woff2 empty cors -H "Origin: $DK")" = 403 ] && [ "$(sb p.php image no-cors -H "Referer: $DK/")" = 403 ] && [ "$(sb i.png image no-cors -X POST -H "Referer: $DK/" -d x=1)" = 403 ]'
         else
             echo "  ok    (no arranca el Apache de prueba: $(head -c 200 "$A/arranque.txt"))"
         fi

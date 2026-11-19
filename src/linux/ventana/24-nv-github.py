@@ -312,6 +312,14 @@ class NvGithub:
 
     def nv_repos_render(self, loading=False):
         box = self.repos_page
+        # (se rehace entera al llegar la lista de GitHub, unos segundos después de la guardada: lo
+        # escrito en el buscador, el cursor si se estaba escribiendo y por dónde iba la lista se quedan)
+        old = getattr(self, "repos_search", None)
+        typing = old is not None and old.is_focus()
+        pos = old.get_position() if typing else -1
+        vadj = self.page_repos.get_vadjustment()
+        scroll = vadj.get_value()
+        self.repos_search = None
         clear(box)
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tl = Gtk.Box(spacing=10)
@@ -335,6 +343,8 @@ class NvGithub:
             return
         bar = Gtk.Box(spacing=10)
         search = Gtk.SearchEntry(placeholder_text="Buscar por nombre, descripción o web", width_chars=36)
+        search.set_text(getattr(self, "repos_query", ""))
+        self.repos_search = search
         bar.pack_start(search, False, False, 0)
         bar.pack_start(label("Mostrar todos", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
         sw = Gtk.Switch(active=self.repos_all, valign=Gtk.Align.CENTER,
@@ -361,9 +371,14 @@ class NvGithub:
             q = search.get_text().strip().lower()
             return not q or q in getattr(row, "haystack", "")
         lb.set_filter_func(match)
+        search.connect("changed", lambda e: setattr(self, "repos_query", e.get_text()))
         search.connect("search-changed", lambda *_: lb.invalidate_filter())
         box.pack_start(lb, False, False, 0)
         box.show_all()
+        if typing:
+            search.grab_focus_without_selecting()
+            search.set_position(pos)
+        GLib.idle_add(lambda: (vadj.set_value(min(scroll, vadj.get_upper() - vadj.get_page_size())), False)[1])
 
     def nv_repo_row(self, repo):
         bits = [b for b in (("clonado en %s" % repo["folder"]) if repo["state"] == "clonado" else "", repo["desc"], repo["web"],

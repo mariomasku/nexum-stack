@@ -119,7 +119,9 @@ for row in os.environ.get("LVM_INFO", "").splitlines():
     print("T|%s|%s|%s|%d|%d" % (dom, crt, s, s in trusted, real))
 # Los nuestros que acepta el navegador y en los que ya no se puede confiar (una tienda que ya no esta
 # falseada, un vhost que ya no esta...). Linux: por su nombre (lvm-instalador <dominio>) en cada
-# almacen. Mac: por las copias que se guardan al confiar (<dominio>.<sha1>.crt)
+# almacen. Mac: por las copias que se guardan al confiar (<dominio>.<sha1>.crt). El de Docker
+# (lvm-instalador docker.local, el de *.docker.local y *.docker.test) no es de ningun vhost de LAMPP:
+# lo pone y lo cambia docker_web_trust, y aqui no se toca (se quitaba al cargar cualquier proyecto)
 if osname == "linux":
     gone = set()
     for db in [os.path.join(HOME, ".pki/nssdb"), os.path.join(HOME, "snap/chromium/current/.pki/nssdb")] \
@@ -128,7 +130,7 @@ if osname == "linux":
             continue
         for line in run(["certutil", "-L", "-d", "sql:" + db]).splitlines()[4:]:
             m = re.match(r"^lvm-instalador ([a-z0-9.-]+)\s+[CcTtPpu]*,[CcTtPpu]*,[CcTtPpu]*\s*$", line)
-            if m and m.group(1) not in good and (not only or m.group(1) == only):
+            if m and m.group(1) not in good and m.group(1) != "docker.local" and (not only or m.group(1) == only):
                 gone.add(m.group(1))
     for d in sorted(gone):
         print("U|" + d)

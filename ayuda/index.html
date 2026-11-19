@@ -4948,6 +4948,9 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»). La única excepción es el
         formulario de acceso al panel (la pantalla de entrada de WordPress o del back office de PrestaShop): es lo que envía la página del
         botón «Panel», y sin la contraseña no deja entrar a nadie.</li>
+      <li><b>Con Docker:</b> un proyecto y su copia en Docker se pueden pedir entre sí tipografías, imágenes y CSS, y nada más. Elementor
+        guarda en sus CSS la dirección de la web que los generó, y la copia de Docker usa la misma carpeta: así las dos webs se ven con sus
+        tipografías y sus imágenes de fondo.</li>
       <li><b>Cuándo apagarla:</b> solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a tu tienda mandando un
         formulario desde su web. Enciéndela al acabar.</li>
       <li><b>Dónde vale:</b> en todas tus versiones: localhost, web.local, los dominios falseados y los vhosts de los proyectos.</li>
@@ -6169,7 +6172,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     petición a <code>https://tienda-luna.local/admin/…</code>), y el navegador lo mandaría con tus sesiones abiertas. La barrera lo impide: desde
     otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. La excepción es el
     formulario de acceso al panel (<code>wp-login.php</code> o <code>index.php?controller=AdminLogin</code>, enviado como página entera): es
-    lo que manda la página del botón «Panel», que no es del proyecto, y sin la contraseña no deja entrar a nadie. Va encendida de partida, en
+    lo que manda la página del botón «Panel», que no es del proyecto, y sin la contraseña no deja entrar a nadie. Tampoco frena lo que se
+    piden un proyecto y su copia en Docker (<code>*.docker.test</code> o <code>*.docker.local</code>): tipografías, imágenes y CSS, por GET y
+    solo si el navegador los pide como tales. Las tipografías llevan además la cabecera <code>Access-Control-Allow-Origin</code>, sin la
+    que el navegador no las usa desde otra web. Un formulario, una petición o un PHP siguen sin pasar. Va encendida de partida, en
     todas las versiones. El Apache de Docker la lleva también: al cambiarla, se rehace su configuración y, si está en marcha, se recarga
     al momento.</p>
   <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración

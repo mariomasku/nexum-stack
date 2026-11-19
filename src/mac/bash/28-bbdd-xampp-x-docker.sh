@@ -394,6 +394,24 @@ QUE HACE
 
 VERSIONES
 
+1.57.29 (19 nov 2026)
+- Mismo número que la de Linux, que arregla la descarga de MariaDB (en
+  Linux ponía uno de sus plugins en lugar de MariaDB). En el Mac se
+  compila desde su código fuente: aquí no pasaba y no cambia nada.
+
+1.57.28 (18 nov 2026)
+- Barrera entre webs: un proyecto y su copia en Docker se pueden pedir
+  entre sí tipografías, imágenes y CSS (las tipografías, con su
+  cabecera CORS). Elementor guarda en sus CSS la dirección de la web
+  que los generó: la copia de Docker salía sin sus tipografías ni sus
+  imágenes de fondo. Lo demás que llega de otra web sigue frenado.
+  Tras actualizar, la ventana pregunta si se aplica a las versiones.
+
+1.57.27 (18 nov 2026)
+- Mismo número que la de Linux, que arregla el buscador de Repositorios
+  (se borraba al llegar la lista de GitHub). En el Mac no pasaba: aquí
+  no cambia nada.
+
 1.57.26 (18 nov 2026)
 - «Abrir web» abre el proyecto cargado por la misma dirección que su
   WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por

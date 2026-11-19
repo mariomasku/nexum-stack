@@ -4,6 +4,20 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.29 · 19 nov 2026
+
+- Instalar o actualizar una versión de PHP con MariaDB 11.8.10 (o 12.3.4) ponía uno de sus plugins (TidesDB, de 1 MB) en lugar de MariaDB: la versión se quedaba sin servidor de bases de datos («MariaDB no ha arrancado») y sin su cliente (bin/mysql). Ahora se descarga MariaDB, y si lo descargado no trae su servidor, se cancela y se quita de la caché de descargas.
+- Una versión que se quedó así sale en Componentes con su MariaDB pendiente: al actualizarla se rehace con la buena y conserva sus bases de datos.
+
+## 1.57.28 · 18 nov 2026
+
+- **Docker:** las webs de Docker volvían a avisar de que la conexión no es privada (y salían sin estilos) después de cargar cualquier proyecto. Al cargarlo se quitaba del navegador el certificado de *.docker.test y *.docker.local, como si sobrara. Ya no se toca.
+- **Barrera entre webs:** un proyecto y su copia en Docker se pueden pedir entre sí tipografías, imágenes y CSS (las tipografías, con su cabecera CORS). Elementor guarda en sus CSS la dirección de la web que los generó: la copia de Docker salía sin sus tipografías ni sus imágenes de fondo. Lo demás que llega de otra web sigue frenado. Tras actualizar, la ventana pregunta si se aplica a las versiones.
+
+## 1.57.27 · 18 nov 2026
+
+- **Repositorios:** lo que escribías en el buscador se borraba a los pocos segundos de entrar. La lista se enseña al momento con la de la última vez y, al llegar la de GitHub, se rehacía la página entera. Ahora se quedan lo escrito, el cursor y por dónde ibas en la lista.
+
 ## 1.57.26 · 18 nov 2026
 
 - «Abrir web» abre el proyecto cargado por la misma dirección que su WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por http://web.local, un .htaccess de producción («lo que llegue por http, a https://midominio.es») se llevaba la visita a la web real. También la bandeja, el panel de administración y Compartir.
