@@ -4,6 +4,10 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.32 · 19 nov 2026
+
+- **Versiones de PHP:** una versión con alguna pieza dañada ya no sale como «Actualizado»: lo dice en rojo («MariaDB dañado»), y su menú ⋮ trae «Reparar», que la rehace con sus bases de datos. En «Componentes…» la pieza dañada sale en rojo. Hasta ahora solo se veía en Configuración, Parches nuevos.
+
 ## 1.57.31 · 19 nov 2026
 
 - Componentes mira también que cada pieza de una versión esté entera (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin): que estén sus programas y que respondan. Una dañada sale como «MariaDB dañado → 11.8.10» aunque ya esté en lo último de su rama, y al actualizar se rehace la versión con sus bases de datos. La versión que se quedó sin servidor de MariaDB salía en la lista, pero al actualizarla decía que ya estaba al día y no la rehacía.

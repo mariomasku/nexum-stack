@@ -1131,6 +1131,13 @@ QUE HACE
 
 VERSIONES
 
+1.57.32 (19 nov 2026)
+- Versiones de PHP: una versión con alguna pieza dañada ya no sale como
+  «Actualizado»: lo dice en rojo («MariaDB dañado»), y su menú ⋮ trae
+  «Reparar», que la rehace con sus bases de datos. En «Componentes…» la
+  pieza dañada sale en rojo. Hasta ahora solo se veía en Configuración,
+  Parches nuevos.
+
 1.57.31 (19 nov 2026)
 - Componentes mira también que cada pieza de una versión esté entera
   (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin): que estén sus

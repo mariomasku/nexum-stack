@@ -384,6 +384,7 @@ case "$1" in
     docker-reposo) shift; docker_idle_command "$@" ;;
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     componentes) components_check "$2" ;;
+    piezas-danadas) gui_broken ;;
     componentes-actualizar) components_update "$2" ;;
     descargas) downloads_command "$2" ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;

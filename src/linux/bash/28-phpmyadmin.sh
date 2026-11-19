@@ -379,6 +379,7 @@ case "$1" in
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     docker-reposo) shift; docker_idle_command "$@" ;;
     componentes) components_check "$2" ;;
+    piezas-danadas) gui_broken ;;
     componentes-actualizar) components_update "$2" ;;
     actualizar-a) upgrade_to "$2" "$3" "$4" ;;
     descargas) downloads_command "$2" ;;

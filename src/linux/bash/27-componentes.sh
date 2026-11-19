@@ -76,6 +76,18 @@ function components_check() {
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
 # y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
 # version que se rehace (como actualizar --copia)
+# piezas-danadas: para la ventana (Versiones de PHP), D|version|piezas por cada version de pila propia con
+# alguna dañada (stack_broken). Sin consultar nada de fuera: cerca de un segundo
+function gui_broken() {
+    local dir b
+    for dir in $(lampp_dirs); do
+        is_stack_install "$dir" || continue
+        b=$(stack_broken "$dir")
+        [ -n "$b" ] && echo "D|${dir#/opt/lampp-}|$b"
+    done
+    return 0
+}
+
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
     [ "$1" == "--copia" ] && STACK_DB_COPY=1

@@ -168,6 +168,18 @@ extension AppModel {
         }
     }
 
+    /// Las piezas dañadas de cada versión (piezas-danadas: D|versión|piezas). Al entrar en Versiones y al
+    /// acabar de actualizar una
+    func loadBroken() {
+        runQuick(["piezas-danadas"]) { _, out in
+            var b: [String: [String]] = [:]
+            for f in parseLines(out) where f.count >= 3 && f[0] == "D" && !f[2].isEmpty {
+                b[f[1]] = f[2].split(separator: " ").map(String.init)
+            }
+            if b != self.broken { self.broken = b }
+        }
+    }
+
     func update(_ folder: String) {
         toast("Comprobando si hay una versión más nueva…")
         runQuick(["gui-al-dia", folder]) { _, out in
@@ -193,7 +205,7 @@ extension AppModel {
                                     patch ? "Poner el parche" : "Actualizar a PHP \(field(res, 1))", warning: warning)
                 if !c.ok { return }
                 self.runTask("Actualizando XAMPP-\(folder)", ["actualizar", folder] + (c.copy ? ["--copia"] : []), progress: true,
-                             doneText: "XAMPP-\(folder) actualizada", reloadBranches: true)
+                             doneText: "XAMPP-\(folder) actualizada", reloadBranches: true) { _, _, _ in self.loadBroken() }
             default:
                 message("No se ha podido comprobar", "No se ha podido consultar php.net. Comprueba la conexión a internet.", error: true)
             }

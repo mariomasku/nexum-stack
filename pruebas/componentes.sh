@@ -74,6 +74,19 @@ check "stack_broken: en el Mac solo que esten (Perl esta, aunque no responda)" '
 rm "$V/phpmyadmin/index.php" "$V/apache2/bin/httpd"
 check "stack_broken: phpMyAdmin sin su index.php y Apache sin su programa" '[ "$(OSTYPE=linux-gnu stack_broken "$V")" == "Apache MariaDB Perl phpMyAdmin" ]'
 check "stack_broken: lo usan Componentes, actualizar y la ventana" '[ "$(grep -c "stack_broken \"\$dir" "$SRC")" -ge 3 ]'
+# piezas-danadas (1.57.32): para la ventana, D|version|piezas de las pilas propias con alguna dañada
+extract "$SRC" gui_broken || exit 1
+stack_broken() { [[ "$1" == */lampp-8.4 || "$1" == */XAMPP-8.4/xamppfiles ]] && echo "MariaDB"; }
+[ $MAC -eq 0 ] && is_stack_install() { [ "$1" != /opt/lampp-8.1 ]; }
+check "piezas-danadas: solo las versiones con alguna dañada" '[ "$(gui_broken)" == "D|8.4|MariaDB" ]'
+check "piezas-danadas: es una orden de nexum" 'grep -q "^    piezas-danadas) gui_broken ;;" "$SRC"'
+if [ $MAC -eq 1 ]; then
+    check "ventana (Mac): Versiones en rojo, Reparar en su menú y Componentes, con piezas-danadas" 'grep -q "runQuick(\[\"piezas-danadas\"\])" "$SRC" && grep -q "Button(\"Reparar (" "$SRC" && grep -q "joined(separator: \", \") + \" dañado\")" "$SRC" && grep -q "\.onAppear { model.loadBroken() }" "$SRC"'
+else
+    check "ventana: Versiones en rojo, Reparar en su menú y Componentes, con piezas-danadas" 'grep -q "run_quick(\[\"piezas-danadas\"\], got)" "$SRC" && grep -q "(\"Reparar (%s dañado)\" %" "$SRC" && grep -q "dmg = label(\"%s dañado\" %" "$SRC" && grep -q "cells\[n\].set_text(cells\[n\].get_text() + \" · dañado\")" "$SRC" && grep -q "elif row.tab_name == \"versiones\":" "$SRC"'
+fi
+stack_broken() { :; }
+[ $MAC -eq 0 ] && is_stack_install() { false; }
 stack_broken() { :; }
 if [ $MAC -eq 0 ]; then
     # mariadb_release: de lo que publica MariaDB, solo su binario (con el mismo final van sus plugins)

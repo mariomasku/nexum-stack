@@ -89,6 +89,18 @@ function components_check() {
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
 # y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
 # version que se rehace (como actualizar --copia)
+# piezas-danadas: para la ventana (Versiones de PHP), D|version|piezas por cada version de pila propia con
+# alguna dañada (stack_broken, que en el Mac solo mira que esten). Sin consultar nada de fuera
+function gui_broken() {
+    local dir b
+    while IFS= read -r dir; do
+        [ -n "$dir" ] && [ -f "$dir/xamppfiles/etc/pvm-stack" ] || continue
+        b=$(stack_broken "$dir/xamppfiles")
+        [ -n "$b" ] && echo "D|$(version_name "$dir")|$b"
+    done < <(version_dirs)
+    return 0
+}
+
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
     [ "$1" == "--copia" ] && STACK_DB_COPY=1

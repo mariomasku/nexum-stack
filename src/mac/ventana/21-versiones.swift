@@ -46,6 +46,8 @@ struct VersionsView: View {
                 Loading()
             }
         }
+        // (las piezas dañadas de cada versión: se miran al entrar)
+        .onAppear { model.loadBroken() }
     }
 
     func versionRow(_ inst: Install, _ d: AppData) -> some View {
@@ -115,7 +117,13 @@ struct VersionsView: View {
     @ViewBuilder
     func patchCell(_ inst: Install, _ b: Branch?, _ newer: String?) -> some View {
         let st = model.data?.php2shell[inst.folder] ?? "ok"
+        let bad = model.broken[inst.folder] ?? []
         VStack(alignment: .leading, spacing: 1) {
+            // (una pieza dañada, en rojo, como PHP2Shell: se repara en su menú ⋯)
+            if !bad.isEmpty {
+                Text(bad.joined(separator: ", ") + " dañado").font(.caption.weight(.bold)).foregroundColor(RED)
+                    .tip("Su programa no está: repárala en el menú ⋯")
+            }
             if php2shellVulnerable(st) {
                 Text("Vulnerable (PHP2Shell)").font(.caption.weight(.bold)).foregroundColor(RED)
                     .tip(php2shellText(st, inst.php).isEmpty ? "" : "Vulnerable a PHP2Shell")
@@ -123,8 +131,8 @@ struct VersionsView: View {
             if let b = b, b.latest == inst.php {
                 if st == "parcheable" {
                     Text("Parche de seguridad disponible").font(.caption).foregroundColor(ACCENT)
-                } else if !php2shellVulnerable(st) {
-                    // (vulnerable no está «Actualizado», aunque tenga el último parche de su rama)
+                } else if !php2shellVulnerable(st) && bad.isEmpty {
+                    // (vulnerable o dañada no está «Actualizado», aunque tenga el último parche de su rama)
                     Text("Actualizado").font(.caption.weight(.semibold)).foregroundColor(GREEN)
                 }
                 if st == "parche" {
@@ -151,6 +159,10 @@ struct VersionsView: View {
         let st = model.data?.php2shell[inst.folder] ?? "ok"
         return OutlineMenu(nil, symbol: "ellipsis", bordered: false) {
             Button("Componentes…") { model.panel = .components(inst.folder) }
+            // (una pieza dañada: se rehace la versión entera, con sus BBDD)
+            if let bad = model.broken[inst.folder], !bad.isEmpty, updatable {
+                Button("Reparar (\(bad.joined(separator: ", ")) dañado)…") { model.update(inst.folder) }
+            }
             if st == "parcheable" && newer == nil {
                 Button("Poner el parche de seguridad (PHP2Shell)…") { model.update(inst.folder) }
             } else if updatable && (newer != nil || model.branch(inst.php) == nil) {
@@ -201,13 +213,20 @@ struct ComponentsPanel: View {
                 Divider()
                 HStack(spacing: 12) {
                     Text("XAMPP-\(inst.folder)").font(.system(size: 12, design: .monospaced)).col(150)
-                    ForEach(Array([inst.php, inst.apache, inst.mariadb, inst.ftp, inst.perl].enumerated()), id: \.offset) { _, v in
-                        Text(v).font(.system(size: 11.5, design: .monospaced)).col(78)
+                    let bad = model.broken[inst.folder] ?? []
+                    ForEach(Array([(inst.php, "PHP"), (inst.apache, "Apache"), (inst.mariadb, "MariaDB"), (inst.ftp, "ProFTPD"),
+                                   (inst.perl, "Perl")].enumerated()), id: \.offset) { _, v in
+                        // (las dañadas, en rojo y con «dañado»: se reparan en el menú ⋯ de la versión)
+                        Text(bad.contains(v.1) ? v.0 + " · dañado" : v.0).font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(bad.contains(v.1) ? RED : Color.primary)
+                            .col(78)
+                            .tip(bad.contains(v.1) ? "Su programa no está: repárala en el menú ⋯ de la versión" : "")
                     }
-                    Text(inst.pma).font(.system(size: 11.5, design: .monospaced))
-                        .foregroundColor(pmaOutdated(inst.php, inst.pma) ? RED : Color.primary)
+                    Text(bad.contains("phpMyAdmin") ? inst.pma + " · dañado" : inst.pma).font(.system(size: 11.5, design: .monospaced))
+                        .foregroundColor(pmaOutdated(inst.php, inst.pma) || bad.contains("phpMyAdmin") ? RED : Color.primary)
                         .col(78)
-                        .tip(pmaOutdated(inst.php, inst.pma) ? "phpMyAdmin antiguo: actualízalo en ⋯" : "")
+                        .tip(bad.contains("phpMyAdmin") ? "Le falta su index.php: repárala en el menú ⋯ de la versión"
+                             : pmaOutdated(inst.php, inst.pma) ? "phpMyAdmin antiguo: actualízalo en ⋯" : "")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)

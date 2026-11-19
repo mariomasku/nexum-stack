@@ -3,6 +3,8 @@ final class AppModel: ObservableObject {
     @Published var loadError: String? = nil
     @Published var branches: [Branch]? = nil
     @Published var branchesError: String? = nil
+    /// Versión -> sus piezas dañadas (piezas-danadas: D|versión|piezas), para Versiones y Componentes
+    @Published var broken: [String: [String]] = [:]
     /// Versión -> [php, fecha de publicación en php.net] (gui-fechas: llega después)
     @Published var phpDates: [String: [String]] = [:]
     /// Lo que se va a instalar: ramas (8.4, su último parche) y parches concretos (8.3.10)

@@ -490,6 +490,8 @@ class NvTerminal:
             run_quick(["gui-bbdd-tamanos"], self.on_db_sizes)
         elif row.tab_name == "repos":
             self.nv_repos_open()
+        elif row.tab_name == "versiones":
+            self.nv_broken_load()
         elif row.tab_name == "node":
             self.nv_node_load()
 

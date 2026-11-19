@@ -197,7 +197,37 @@ class NvDatosAvisos:
             self.nv_build_versions()
         return res
 
+    def nv_broken_load(self):
+        """Las piezas dañadas de cada versión (piezas-danadas: D|versión|piezas), para la tabla, su menú ⋮ y
+        Componentes. Se piden al abrir, al entrar en Versiones de PHP y al acabar de reparar una."""
+        def got(_rc, out):
+            new = {f[1]: f[2].split() for f in parse_lines(out) if f[0] == "D" and len(f) >= 3 and f[2].strip()}
+            if new != getattr(self, "broken", {}):
+                self.broken = new
+                if self.data:
+                    self.nv_build_versions()
+            return False
+        run_quick(["piezas-danadas"], got)
+
+    def nv_repair(self, inst, bad):
+        """Reparar una versión con alguna pieza dañada: se rehace entera (sus piezas se compilan juntas),
+        con sus BBDD si su MariaDB sigue en la misma rama, como Actualizar."""
+        folder = inst["folder"]
+        extra = copy_check(UPDATE_COPY_WARN)
+        if not confirm(self.win, "¿Reparar lampp-%s?" % folder,
+                       "Está dañado: %s (su programa no está o no responde). Se vuelve a compilar la versión entera "
+                       "con lo último de su rama, conservando sus BBDD. La de ahora sigue como está mientras se compila "
+                       "(varios minutos)." % ", ".join(bad), "Reparar", extra=extra):
+            return
+        self.run_task("Reparando lampp-%s" % folder, ["actualizar", folder] + (["--copia"] if extra.wanted else []),
+                      progress=True, reload_branches=True, done_text="lampp-%s reparada" % folder,
+                      on_done=lambda *_: self.nv_broken_load())
+
     def nv_build_versions(self):
+        # (las piezas dañadas, la primera vez: luego, al entrar en la pestaña)
+        if not getattr(self, "_broken_asked", False):
+            self._broken_asked = True
+            self.nv_broken_load()
         clear(self.vers_page)
         d = self.data
         head = Gtk.Box(spacing=12)
@@ -296,6 +326,17 @@ class NvDatosAvisos:
                 for w in patch.get_children():
                     if isinstance(w, Gtk.Label) and w.get_text() == "Actualizado":
                         patch.remove(w)
+            # Piezas dañadas (piezas-danadas): en rojo, como PHP2Shell, y se reparan en su menú ⋮
+            bad = getattr(self, "broken", {}).get(folder)
+            if bad:
+                dmg = label("%s dañado" % ", ".join(bad), "nv-chico", "error")
+                dmg.set_halign(Gtk.Align.START)
+                dmg.set_tooltip_text("Su programa no está o no responde: repárala en el menú ⋮")
+                patch.pack_start(dmg, False, False, 0)
+                patch.reorder_child(dmg, 0)
+                for w in patch.get_children():
+                    if isinstance(w, Gtk.Label) and w.get_text() == "Actualizado":
+                        patch.remove(w)
             php_cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
             php_cell.pack_start(label(inst["php"], "nv-mono"), False, False, 0)
             if p2s == "parche":
@@ -330,6 +371,9 @@ class NvDatosAvisos:
         pop = Gtk.Popover(relative_to=m)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=4)
         items = [("Componentes…", lambda: self.nv_components_dialog(inst))]
+        bad = getattr(self, "broken", {}).get(folder)
+        if bad:
+            items.append(("Reparar (%s dañado)" % ", ".join(bad), lambda: self.nv_repair(inst, bad)))
         # Actualizar solo si hay un parche mas nuevo y la version se pone al dia en su carpeta (las
         # lampp-X.Y de antes); sin datos de php.net, se comprueba al pulsar
         updatable = inst["kind"] != "XAMPP" and inst["php"].rsplit(".", 1)[0] == folder
@@ -470,9 +514,17 @@ class NvDatosAvisos:
             if pma_outdated(inst["php"], inst["pma"]):
                 pma.get_style_context().add_class("error")
                 pma.set_tooltip_text("phpMyAdmin antiguo: actualízalo en ⋮")
-            row([label("lampp-%s" % inst["folder"], "nv-mono"), label(inst["php"], "nv-mono"),
-                 label(inst["apache"], "nv-mono", "nv-chico"), label(inst["mariadb"], "nv-mono", "nv-chico"),
-                 label(inst["ftp"], "nv-mono", "nv-chico"), label(inst["perl"], "nv-mono", "nv-chico"), pma])
+            cells = [label(inst["php"], "nv-mono"), label(inst["apache"], "nv-mono", "nv-chico"),
+                     label(inst["mariadb"], "nv-mono", "nv-chico"), label(inst["ftp"], "nv-mono", "nv-chico"),
+                     label(inst["perl"], "nv-mono", "nv-chico"), pma]
+            # (las dañadas, en rojo y con «dañado»: se reparan en el menú ⋮ de la versión)
+            bad = getattr(self, "broken", {}).get(inst["folder"], [])
+            for n, part in enumerate(("PHP", "Apache", "MariaDB", "ProFTPD", "Perl", "phpMyAdmin")):
+                if part in bad:
+                    cells[n].set_text(cells[n].get_text() + " · dañado")
+                    cells[n].get_style_context().add_class("error")
+                    cells[n].set_tooltip_text("Su programa no está o no responde: repárala en el menú ⋮ de la versión")
+            row([label("lampp-%s" % inst["folder"], "nv-mono")] + cells)
         box.pack_start(lb, False, False, 0)
         dlg.add_button("Cerrar", Gtk.ResponseType.CLOSE)
         box.show_all()

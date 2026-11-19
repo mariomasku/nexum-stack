@@ -2236,7 +2236,8 @@
         fallo grave y no lleva el arreglo. Debajo, en azul, <b>«PHP x.y.z disponible»</b> y su fecha, si su rama tiene un parche más nuevo.
         Las dos se arreglan desde el menú ⋮.</span></li>
       <li data-x="69.5" data-y="39"><b>Último parche</b><span><b>Actualizado</b> si tiene el último parche de su rama. Una versión vulnerable
-        nunca sale como actualizada.</span></li>
+        nunca sale como actualizada, y tampoco una con alguna pieza dañada: sale en rojo, como <b>«MariaDB dañado»</b> (su programa no
+        está<span data-so="linux"> o no responde</span>), y se repara desde el menú ⋮.</span></li>
       <li data-x="82" data-y="39"><b>Bases de datos</b><span>Cuántas bases de datos tiene esa versión. Si una versión antigua usa las de otra,
         pone «→ lampp-…» con la versión dueña.</span></li>
       <li data-x="91" data-y="45"><b>Activa / Activar</b><span>En la activa pone «Activa». En las demás, al pasar el ratón por la fila aparece
@@ -2576,7 +2577,11 @@
 
   <h3>El resto del menú ⋮</h3>
   <ul>
-    <li><b>«Componentes…»</b>: la tabla de componentes, solo de esa versión.</li>
+    <li><b>«Componentes…»</b>: la tabla de componentes, solo de esa versión. Una pieza dañada sale en rojo, con «· dañado».</li>
+    <li><b>«Reparar (… dañado)»</b>: solo sale si alguna pieza de la versión está dañada. Vuelve a compilar la versión entera con lo último
+      de su rama (sus piezas se compilan juntas) y conserva sus bases de datos; la de ahora sigue como está mientras tanto, varios minutos.
+      Pide la contraseña. En la terminal, <code>nexum actualizar 8.4</code> (dice «dañado MariaDB… se rehace»), y
+      <code>nexum piezas-danadas</code> dice cuáles lo están.</li>
     <li><b>«Actualizar phpMyAdmin»</b>: solo sale si su phpMyAdmin (la web para ver y tocar las bases de datos) tiene fallos de seguridad ya
       corregidos. No pregunta: descarga el más nuevo que admite su PHP (comprobando su firma), conserva la configuración y deja el anterior
       en la carpeta <code>phpmyadmin.anterior</code> de la versión. Pide la contraseña.</li>
