@@ -8,7 +8,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-nginx.XXXX") || exit 1
 trap 'kill $(cat "$W/ajustes/nginx/run/nginx.pid" 2> /dev/null) $BUSY 2> /dev/null; rm -rf "$W"' EXIT
-extract "$SRC" nginx_get nginx_installed nginx_installed_version nginx_host nginx_projects nginx_root_guess nginx_running \
+extract "$SRC" nginx_get nginx_used nginx_use nginx_installed nginx_installed_version nginx_host nginx_projects nginx_root_guess nginx_running \
     nginx_php_state nginx_port_free nginx_build nginx_install nginx_cert nginx_write_conf nginx_apply nginx_start nginx_stop \
     nginx_add nginx_remove nginx_ports nginx_log nginx_trust_all gui_nginx nginx_command nginx_deps_missing nginx_build_deps \
     nginx_build_flags nginx_trust valid_project || exit 1
@@ -76,7 +76,7 @@ else
     check "Linux: el PHP-FPM de la versión activa (/opt/lampp)" '[ "$NGINX_PHP_SOCK" == "$LAMPP_LINK/var/run/php-fpm.sock" ] && [ "$NGINX_BUILD_DEPS" == "gcc make libpcre2-dev libssl-dev zlib1g-dev" ]'
     check "Linux: pide la contraseña solo si falta un paquete para compilarlo" 'grep -qxF "        nginx-instalar) nginx_deps_missing && { sudo_first || exit 130; } ;;" "$SRC"'
 fi
-check "lo demás de Nginx, sin contraseña" 'grep -qF "|copias-ficheros|manual|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;" "$SRC" && grep -qxF "    gui-nginx) gui_nginx ;;" "$SRC" && grep -qxF "    nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command \"\$@\" ;;" "$SRC"'
+check "lo demás de Nginx, sin contraseña" 'grep -qF "|copias-ficheros|manual|nginx-usar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;" "$SRC" && grep -qxF "    gui-nginx) gui_nginx ;;" "$SRC" && grep -qxF "    nginx-usar|nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command \"\$@\" ;;" "$SRC"'
 check "nunca sudo ni root en lo común de Nginx" '! sed -n "/^function nginx_get() {/,/^function nginx_command() {/p" "$SRC" | grep -vE "^ *#" | grep -qE "(^|[^_])sudo |\\\$SUDO"'
 
 # Puertos
@@ -86,6 +86,11 @@ P1=$(free_port) P2=$(free_port)
 [ "$P1" == "$P2" ] && P2=$((P1 + 1))
 o=$(nginx_ports "$P1" "$P2"); check "puertos: se guardan (solo tuyos) y valen" '[ "$(nginx_get HTTP)" == "$P1" ] && [ "$(nginx_get HTTPS)" == "$P2" ] && [ "$(stat -c %a "$NGINX_SETTINGS" 2> /dev/null || stat -f %Lp "$NGINX_SETTINGS")" == 600 ]'
 
+# Apagado de serie: ni se instala ni arranca hasta encenderlo
+check "apagado de serie" '! nginx_used && [[ "$(gui_nginx | head -1)" == *"|0" ]]'
+o=$(nginx_install 2>&1); check "apagado, no se instala" '[[ "$o" == *"Nginx está apagado"* ]] && ! nginx_installed'
+o=$(nginx_use quizas); check "nginx-usar: otra cosa, su uso" '[[ "$o" == "Uso: nexum nginx-usar si|no" ]]'
+o=$(nginx_use si); check "nginx-usar si: encendido (sale su pestaña)" 'nginx_used && [[ "$o" == *"su pestaña ya sale"* ]] && [[ "$(gui_nginx | head -1)" == *"|1" ]]'
 # Instalar: la huella manda
 o=$(LVM_NGINX_SHA=$(printf '0%.0s' $(seq 64)) nginx_build 2>&1)
 check "instalar: si la huella no coincide, no se instala" '[[ "$o" == *"no coincide"* ]] && ! nginx_installed && [ -z "$(ls -d "$NGINX_DIR"/compilar.* 2> /dev/null)" ]'
@@ -133,12 +138,17 @@ o=$(gui_nginx)
 check "gui-nginx: cómo está, sus proyectos y los que se pueden añadir (sin enlaces)" '[[ "$o" == *"N|1|$NGINX_VERSION|$NGINX_VERSION|1|$P1|$P2|ok"* ]] && [[ "$o" == *"P|tienda-laravel|public|tienda-laravel.localhost|1"* ]] && [[ "$o" == *"C|mi web 2"* ]] && [[ "$o" != *"C|enlace"* ]] && [[ "$o" != *"C|tienda-laravel"* ]]'
 o=$(nginx_remove antiguo); check "quitar: deja de servirlo, sin su certificado (su carpeta sigue)" '! grep -q "^antiguo|" "$NGINX_LIST" && [ ! -f "$NGINX_DIR/certs/antiguo.localhost.crt" ] && [ -d "$HTDOCS_DIR/antiguo" ] && ! grep -qF "server_name antiguo.localhost;" "$C"'
 o=$(nginx_stop); check "parar" '! nginx_running && [[ "$o" == *"Nginx parado"* ]]'
+o=$(nginx_start); o=$(nginx_use no); check "nginx-usar no: lo para y lo apaga, sin borrar sus proyectos ni sus ajustes" '! nginx_running && ! nginx_used && grep -q "^tienda-laravel|public" "$NGINX_LIST" && [ "$(nginx_get HTTP)" == "$P1" ] && nginx_installed'
+o=$(nginx_start); check "apagado, no arranca" '[[ "$o" == *"Nginx está apagado"* ]] && ! nginx_running'
+nginx_use si > /dev/null
 DRY=1; o=$(nginx_add "mi web 2"; nginx_ports 9100 9101; nginx_start); DRY=0
 check "en simulación no cambia nada" '[[ "$o" == *"[simulacion]"* ]] && [ "$(nginx_get HTTP)" == "$P1" ] && ! nginx_running'
 check "Componentes: avisa de otra versión de Nginx y la compila al actualizar" 'grep -qF "    if nginx_installed && [ \"\$(nginx_installed_version)\" != \"\$NGINX_VERSION\" ]; then" "$SRC" && grep -qF "echo \"X|Nginx|\$(nginx_installed_version)|\$NGINX_VERSION\"" "$SRC" && grep -qF "[[ \" \$progs \" == *\" Nginx \"* ]] && { task_step; nginx_build_deps && nginx_build || fail=1; }" "$SRC"'
 if [ $MAC -eq 1 ]; then
+    check "Mac: su pestaña, solo encendido (y en Apariencia)" '[ "$(grep -cF "(\$0.0 != \"nginx\" || model.nginxUsed)" "$SRC")" -ge 3 ] && grep -qF "Tile(\"Usar Nginx\"" "$SRC" && grep -qF "[\"nginx-usar\", on ? \"si\" : \"no\"]" "$SRC"'
     check "Mac: la pestaña Nginx y su apartado de Configuración" 'grep -qF "        case \"nginx\": NginxView()" "$SRC" && grep -qF "        if key == \"nginx\" { reloadNginx() }" "$SRC" && grep -qF "(\"nginx\", \"Nginx\", \"logo:nginx\")" "$SRC" && grep -qF "            NginxCard()" "$SRC" && grep -qF "runQuick([\"gui-nginx\"])" "$SRC"'
 else
+    check "Linux: su pestaña, solo encendido (y en Apariencia)" 'grep -qF "and (it[0] != \"nginx\" or nginx_used())]" "$SRC" && grep -qF "and (name != \"nginx\" or nginx_used())]" "$SRC" && grep -qF "row = ActionRow(\"Usar Nginx\"" "$SRC"'
     check "Linux: la pestaña Nginx y su apartado de Configuración" 'grep -qF "(\"nginx\", self.page_nginx)" "$SRC" && grep -qF "        elif row.tab_name == \"nginx\":" "$SRC" && grep -qF "(\"nginx\", \"Nginx\", \"logo:nginx\")" "$SRC" && grep -qF "        self.nv_nginx_tools()" "$SRC" && grep -qF "run_quick([\"gui-nginx\"], got)" "$SRC"'
 fi
 exit $fail

@@ -457,6 +457,11 @@ SIDEBAR = [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"), ("repos",
                         ("config", "Configuración", "emblem-system-symbolic")])]
 # (siempre se ven: sin Configuración no se podrían volver a enseñar)
 SIDEBAR_FIXED = ("proyectos", "config")
+
+
+def nginx_used():
+    """Nginx, apagado de serie: su pestaña solo sale encendido (Configuración, Nginx: nginx-usar si)."""
+    return os.path.exists(os.path.join(LOG_DIR, "nginx", "usar"))
 LOOK_FILE = os.path.join(LOG_DIR, "apariencia")
 _look_sim = {}
 

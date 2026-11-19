@@ -14,6 +14,8 @@ trap 'rm -rf "${W:?}"' EXIT
 
 python3 -I "$HERE/demo-linux.py" "$W/demo" > /dev/null
 mkdir -p "$W/home" "$W/capturas"
+# (con Nginx encendido, para que salga su pestaña: apagado de serie)
+mkdir -p "$W/home/.nexum/nginx" && : > "$W/home/.nexum/nginx/usar"
 
 # Correo de pruebas: un Mailpit solo para la demostración (otros puertos y su base en la carpeta temporal: el
 # tuyo, en el 8025, no se toca), con unos correos inventados. Sin Mailpit instalado, la bandeja sale vacía

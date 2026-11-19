@@ -290,6 +290,10 @@ def main():
         "gui-bbdd-tamanos": z, "gui-proyectos-tamanos": t, "gui-docker": gui_docker(),
         "gui-docker-estadisticas": "T|12|16110338048\n",
         "gui-node": lines(("P",) + n for n in NODE),
+        "docker-postgres": "G|18|marcha|54318|nexum-postgres-18\nO|18 17 16\n",
+        "docker-nginx": "X|marcha|127.0.0.2|8081|8444\n" + lines(("Y", d[0], "1" if d[0] == "clinica-del-sol" else "0",
+                                                                      " ".join("https://%s-php%s.docker.local:8444" % (d[0], v.replace(".", ""))
+                                                                               for v in d[5].split())) for d in DOCKER),
         "gui-nginx": "N|1|1.30.7|1.30.7|1|8080|8443|ok\n" + lines(("P",) + n for n in NGINX)
                      + lines(("C", p[0]) for p in PROJECTS if p[0] not in [n[0] for n in NGINX]),
         "github": lines([("G", 1, GITHUB[0], "gh", GITHUB[1], "")]),

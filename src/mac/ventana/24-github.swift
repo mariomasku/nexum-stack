@@ -91,6 +91,178 @@ struct IdleStopCard: View {
 
 /// Configuración, Docker: WP-CLI en los contenedores de PHP (docker-wp-cli), apagado de serie. La imagen de una
 /// versión de PHP es la de todos sus proyectos: al cambiarlo pregunta si se rehacen ya las que hay
+/// Configuración, Docker: la PostgreSQL común de Docker (docker-postgres: G|versión|estado|puerto|contenedor, O|las que se ofrecen)
+struct PgCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var have: [[String]] = []
+    @State private var offer: [String] = []
+    @State private var pick = ""
+
+    var body: some View {
+        TileCard(wide: true) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("PostgreSQL de Docker").font(.system(size: 13, weight: .semibold))
+                Text("Una común por versión, como las MariaDB, para todos los proyectos de Docker: desde sus PHP, nexum-postgres-<versión>, puerto 5432; desde este Mac (tus herramientas de BBDD), 127.0.0.1 y su puerto. Usuario postgres. Con alguna, las imágenes de PHP de Docker traen pgsql y pdo_pgsql." + (have.isEmpty ? " Aún no hay ninguna." : ""))
+                    .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                ForEach(have, id: \.self) { f in
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        Text("PostgreSQL \(f[1]) · \(f[2] == "marcha" ? "en marcha" : f[2] == "parado" ? "parada" : f[2]) · 127.0.0.1:\(f[3])").font(.caption)
+                        Button("Copiar contraseña") { copyPass(f[1]) }
+                        Button(f[2] == "marcha" ? "Parar" : "Arrancar") {
+                            let act = f[2] == "marcha" ? "parar" : "arrancar"
+                            _ = model.runTask("PostgreSQL \(f[1]) de Docker", ["docker-postgres", act, f[1]], progress: act == "arrancar",
+                                              doneText: "PostgreSQL \(f[1]) " + (act == "parar" ? "parada" : "en marcha"), autoClose: true) { _, _, _ in load() }
+                        }
+                        .busyGuard(model.busy)
+                        Button("Borrar") {
+                            guard confirm("¿Borrar la PostgreSQL \(f[1]) de Docker?", "Se borran su contenedor y todas sus BBDD. No se puede deshacer.",
+                                          "Borrar", destructive: true) else { return }
+                            _ = model.runTask("Borrando la PostgreSQL \(f[1]) de Docker", ["docker-postgres", "borrar", f[1]],
+                                              doneText: "PostgreSQL \(f[1]) borrada", autoClose: true) { _, _, _ in load() }
+                        }
+                        .busyGuard(model.busy)
+                    }
+                }
+                let free = offer.filter { v in !have.contains { $0[1] == v } }
+                if !free.isEmpty {
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        SearchPicker(selection: $pick, items: free.map { ($0, $0) }, width: 80)
+                        Button("Crear") { create(free.contains(pick) ? pick : free[0]) }
+                            .buttonStyle(OutlineButton(kind: "primary"))
+                            .busyGuard(model.busy)
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .onAppear { load() }
+    }
+
+    func load() {
+        runQuick(["docker-postgres"]) { _, out in
+            let lines = parseLines(out)
+            have = lines.filter { $0.first == "G" && $0.count >= 5 }
+            offer = lines.first { $0.first == "O" && $0.count >= 2 }?[1].split(separator: " ").map(String.init) ?? []
+            if pick.isEmpty || have.contains(where: { $0[1] == pick }) { pick = offer.first { v in !have.contains { $0[1] == v } } ?? "" }
+        }
+    }
+
+    func create(_ v: String) {
+        guard confirm("¿Crear la PostgreSQL \(v) de Docker?",
+                      "Una común para todos los proyectos de Docker, con el usuario postgres y una contraseña al azar («Copiar contraseña»). Se descarga su imagen oficial y, si tienes imágenes de PHP de Docker, se rehacen con pgsql y pdo_pgsql (unos minutos cada una).",
+                      "Crear") else { return }
+        _ = model.runTask("Creando la PostgreSQL \(v) de Docker", ["docker-postgres", "arrancar", v], progress: true,
+                          doneText: "PostgreSQL \(v) en marcha", autoClose: true) { _, _, _ in load() }
+    }
+
+    /// La contraseña del usuario postgres, al portapapeles (de su .env, solo tuyo)
+    func copyPass(_ v: String) {
+        let text = (try? String(contentsOfFile: LOG_DIR + "/docker/postgres-\(v)/.env", encoding: .utf8)) ?? ""
+        guard let line = text.split(separator: "\n").first(where: { $0.hasPrefix("PG_PASS=") }) else {
+            model.toast("No se ha podido leer su contraseña")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(String(line.dropFirst(8)), forType: .string)
+        model.toast("Contraseña de postgres copiada")
+    }
+}
+
+/// Configuración, Docker: el Nginx común de Docker (docker-nginx: X|estado|dirección|http|https, Y|proyecto|1 si va por Nginx|direcciones)
+struct DockerNginxCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var x: [String] = []
+    @State private var projects: [[String]] = []
+    @State private var http = ""
+    @State private var https = ""
+
+    var body: some View {
+        TileCard(wide: true) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Nginx de Docker").font(.system(size: 13, weight: .semibold))
+                Text(desc()).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                if x.count >= 5 && x[1] != "?" {
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        port("HTTP", $http)
+                        port("HTTPS", $https)
+                        Button("Guardar puertos") { save() }.busyGuard(model.busy)
+                        Button(x[1] == "marcha" ? "Parar" : "Arrancar") {
+                            let act = x[1] == "marcha" ? "parar" : "arrancar"
+                            _ = model.runTask("Nginx de Docker", ["docker-nginx", act], progress: act == "arrancar",
+                                              doneText: "Nginx de Docker " + (act == "parar" ? "parado" : "en marcha"), autoClose: true) { _, _, _ in load() }
+                        }
+                        .buttonStyle(OutlineButton(kind: x[1] == "marcha" ? "" : "primary"))
+                        .busyGuard(model.busy)
+                    }
+                    Divider().padding(.vertical, 4)
+                    Text("Proyectos en el Nginx de Docker").font(.system(size: 13, weight: .semibold))
+                    Text(projects.isEmpty ? "Aún no hay proyectos de Docker: créalos en la pestaña Docker"
+                                          : "Marca los que van también por el Nginx de Docker (con el Apache de Docker siguen igual)")
+                        .font(.caption).foregroundColor(.secondary)
+                    ForEach(projects, id: \.self) { f in
+                        Toggle(isOn: Binding(get: { f[2] == "1" }, set: { v in
+                            _ = model.runTask("Nginx de Docker: \(f[1])", ["docker-nginx", v ? "anadir" : "quitar", f[1]],
+                                              doneText: "\(f[1]) " + (v ? "en el Nginx de Docker" : "fuera del Nginx de Docker"), autoClose: true) { _, _, _ in load() }
+                        })) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(f[1])
+                                if f[2] == "1" && !f[3].isEmpty { Text(f[3]).font(.caption).foregroundColor(.secondary) }
+                            }
+                        }
+                        .toggleStyle(CheckboxToggleStyle())
+                        .busyGuard(model.busy)
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .onAppear { load() }
+    }
+
+    func desc() -> String {
+        guard x.count >= 5 else { return "Consultando…" }
+        if x[1] == "?" { return "Docker no está en marcha: arráncalo en la pestaña Docker" }
+        let st = ["marcha": "En marcha.", "parado": "Parado.", "nuevo": "Aún no se ha creado: «Arrancar» lo crea (imagen oficial de Nginx)."][x[1]] ?? ""
+        return "Uno común, al lado del Apache de Docker, para los proyectos de Docker que le añadas: en \(x[2]), con los mismos dominios, en los puertos \(x[3]) (http) y \(x[4]) (https). Delante del Apache del contenedor de PHP de cada proyecto (en el Mac, las imágenes de PHP de Docker llevan Apache). \(st)"
+    }
+
+    func load() {
+        runQuick(["docker-nginx"]) { _, out in
+            let lines = parseLines(out)
+            x = lines.first { $0.first == "X" && $0.count >= 5 } ?? []
+            projects = lines.filter { $0.first == "Y" && $0.count >= 4 }
+            if x.count >= 5 {
+                if http.isEmpty { http = x[3] }
+                if https.isEmpty { https = x[4] }
+            }
+        }
+    }
+
+    func save() {
+        let h = http.trimmingCharacters(in: .whitespaces), s = https.trimmingCharacters(in: .whitespaces)
+        guard let a = Int(h), let b = Int(s), (1024...65535).contains(a), (1024...65535).contains(b), a != b else {
+            message("Puertos no válidos", "Dos números distintos, de 1024 a 65535 (como 8081 y 8444).", error: true)
+            return
+        }
+        _ = model.runTask("Puertos del Nginx de Docker", ["docker-nginx", "puertos", h, s], doneText: "Nginx de Docker en los puertos \(h) y \(s)",
+                          autoClose: true) { _, _, _ in load() }
+    }
+
+    func port(_ title: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption).foregroundColor(.secondary)
+            TextField("", text: text).textFieldStyle(PlainTextFieldStyle())
+                .padding(.horizontal, 8)
+                .frame(width: 60, height: 28)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.textBackgroundColor)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.2), lineWidth: 1))
+        }
+    }
+}
+
 struct WpCliCard: View {
     @EnvironmentObject var model: AppModel
     @State private var on = false
@@ -476,7 +648,15 @@ struct NginxCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TileCard("Nginx", "El servidor web de la pestaña Nginx: solo en este Mac, con tu usuario y aparte de Apache. Sus proyectos, en http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.", wide: true, tiles: true) {
+            TileCard("Nginx", "Otro servidor web, aparte de Apache: solo en este Mac y con tu usuario. Apagado de serie; encendido, sale su pestaña y desde ella se instala y se le añaden proyectos, en http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.", wide: true, tiles: true) {
+                Tile("Usar Nginx", model.nginxUsed ? "Encendido: su pestaña sale en el menú lateral" : "Apagado: su pestaña no sale. Apagarlo lo para, sin borrar sus proyectos ni sus ajustes") {
+                    Toggle("", isOn: Binding(get: { model.nginxUsed }, set: { v in if v != model.nginxUsed { model.nginxUse(v) } }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                        .busyGuard(model.busy)
+                }
+            }
+            if model.nginxUsed {
+            TileCard(tiles: true) {
                 Tile("Puertos", "De 1024 en adelante (los de abajo son de root), distintos de los de Apache. Si está en marcha, los usa al momento.") {
                     VStack(alignment: .trailing, spacing: 10) {
                         HStack(spacing: 8) {
@@ -494,6 +674,7 @@ struct NginxCard: View {
                     Button("Confiar") { model.runTask("Certificados de Nginx", ["nginx-confiar"], doneText: "Certificados de Nginx", autoClose: true) }
                         .busyGuard(model.busy)
                 }
+            }
             }
         }
         .onAppear {

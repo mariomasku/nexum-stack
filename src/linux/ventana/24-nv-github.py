@@ -293,7 +293,7 @@ class NvGithub:
             "php": n[7] if n else "",
             "projects": [{"folder": f[1], "root": f[2], "host": f[3], "exists": f[4] == "1"}
                          for f in lines if f[0] == "P" and len(f) >= 5],
-            "candidates": [f[1] for f in lines if f[0] == "C" and len(f) >= 2]}
+            "candidates": [f[1] for f in lines if f[0] == "C" and len(f) >= 2], "used": bool(n) and len(n) > 8 and n[8] == "1"}
 
     def nv_nginx_url(self, p, secure=True):
         d = self.nginx_data
@@ -450,9 +450,29 @@ class NvGithub:
                     w[k] = v
         except OSError:
             pass
-        box, lb = tile_group("Nginx", "El servidor web de la pestaña Nginx: solo en este equipo, con tu usuario y aparte de "
-                             "Apache. Sus proyectos, en http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.",
-                             tiles=True)
+        box, lb = tile_group("Nginx", "Otro servidor web, aparte de Apache: solo en este equipo y con tu usuario. Apagado de "
+                             "serie; encendido, sale su pestaña y desde ella se instala y se le añaden proyectos, en "
+                             "http://<carpeta>.localhost y https://<carpeta>.localhost con estos puertos.", tiles=True)
+        used = nginx_used()
+        row = ActionRow("Usar Nginx", "Encendido: su pestaña sale en el menú lateral" if used else
+                        "Apagado: su pestaña no sale. Apagarlo lo para, sin borrar sus proyectos ni sus ajustes")
+        row.wide = True
+        sw = busy_guard(Gtk.Switch(active=used, valign=Gtk.Align.CENTER), self.busy)
+
+        def toggled(w, _p):
+            on = w.get_active()
+            if on == nginx_used():
+                return
+            self.run_task("Nginx: %s" % ("encendiendo" if on else "apagando"), ["nginx-usar", "si" if on else "no"],
+                          auto_close=True, done_text="Nginx %s" % ("encendido" if on else "apagado"),
+                          on_done=lambda *_: (self.nv_sidebar_fill(), self.build_tools()))
+        sw.connect("notify::active", toggled)
+        row.add_suffix(sw)
+        lb.add(row)
+        if not used:
+            self.tools_box.pack_start(box, False, False, 0)
+            box.show_all()
+            return
         row = ActionRow("Puertos", "De 1024 en adelante (los de abajo son de root), distintos de los de Apache. Si está en "
                         "marcha, los usa al momento.")
         row.wide = True
@@ -786,9 +806,177 @@ class NvGithub:
         sw.connect("notify::active", lambda s, _p: s.get_active() != wp_on and self.nv_docker_wp_cli(s.get_active()))
         row.add_suffix(sw)
         lb.add(row)
+        self.nv_docker_extras(lb)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 2)
         box.show_all()
+
+    def nv_docker_extras(self, lb):
+        """Configuración, Docker: la PostgreSQL común (docker-postgres) y el Nginx común (docker-nginx), con lo
+        que diga su estado al llegar."""
+        pg = ActionRow("PostgreSQL de Docker", "Consultando…")
+        pg.wide = True
+        lb.add(pg)
+        ng = ActionRow("Nginx de Docker", "Consultando…")
+        ng.wide = True
+        lb.add(ng)
+        ngp = ActionRow("Proyectos en el Nginx de Docker", "Consultando…")
+        ngp.wide = True
+        lb.add(ngp)
+        sub = lambda r, t: (r.subtitle.set_label(t), r.subtitle.set_ellipsize(0), r.subtitle.set_line_wrap(True))
+        # (lo de cada una, debajo de su texto y a la derecha: al lado, el texto se quedaba en una columna estrecha)
+        def below(r, w):
+            w.set_halign(Gtk.Align.END)
+            w.set_margin_top(8)
+            r.texts.pack_start(w, False, False, 0)
+            r.texts.show_all()
+        # (Configuración pone en la ventana solo el apartado elegido: sin ventana aún, la fila vale; destruida, no)
+        gone = set()
+        for r in (pg, ng, ngp):
+            r.connect("destroy", lambda w: gone.add(id(w)))
+        done = lambda *_: self.build_tools()
+
+        def pg_got(_rc, out):
+            if id(pg) in gone:
+                return False
+            lines = parse_lines(out)
+            have = [f for f in lines if f[0] == "G" and len(f) >= 5]
+            offer = next((f[1].split() for f in lines if f[0] == "O" and len(f) >= 2), [])
+            sub(pg, "Una común por versión, como las MariaDB, para todos los proyectos de Docker: desde sus PHP, "
+                "nexum-postgres-<versión>, puerto 5432; desde este equipo (tus herramientas de BBDD), 127.0.0.1 y su puerto. "
+                "Usuario postgres. Con alguna, las imágenes de PHP de Docker traen pgsql y pdo_pgsql." +
+                ("" if have else " Aún no hay ninguna."))
+            form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, valign=Gtk.Align.CENTER)
+            for f in have:
+                v, st, port = f[1], f[2], f[3]
+                line = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+                line.pack_start(label("PostgreSQL %s · %s · 127.0.0.1:%s" % (v, {"marcha": "en marcha", "parado": "parada"}.get(st, st), port),
+                                      "nv-chico", valign=Gtk.Align.CENTER), False, False, 0)
+                b = busy_guard(Gtk.Button(label="Copiar contraseña"), self.busy)
+                b.connect("clicked", lambda *_x, v=v: self.nv_pg_copy(v))
+                line.pack_start(b, False, False, 0)
+                act = "parar" if st == "marcha" else "arrancar"
+                b = busy_guard(Gtk.Button(label="Parar" if st == "marcha" else "Arrancar"), self.busy)
+                b.connect("clicked", lambda *_x, v=v, act=act: self.run_task(
+                    "PostgreSQL %s de Docker" % v, ["docker-postgres", act, v], auto_close=True, progress=act == "arrancar",
+                    done_text="PostgreSQL %s %s" % (v, "parada" if act == "parar" else "en marcha"), on_done=done))
+                line.pack_start(b, False, False, 0)
+                b = css(busy_guard(Gtk.Button(label="Borrar"), self.busy), "destructive-action")
+                b.connect("clicked", lambda *_x, v=v: self.nv_pg_delete(v))
+                line.pack_start(b, False, False, 0)
+                form.pack_start(line, False, False, 0)
+            free = [v for v in offer if v not in [f[1] for f in have]]
+            if free:
+                line = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+                combo = Gtk.ComboBoxText()
+                for v in free:
+                    combo.append_text(v)
+                combo.set_active(0)
+                line.pack_start(combo, False, False, 0)
+                b = css(busy_guard(Gtk.Button(label="Crear"), self.busy), "verde")
+                b.connect("clicked", lambda *_x: self.nv_pg_create(combo.get_active_text()))
+                line.pack_start(b, False, False, 0)
+                form.pack_start(line, False, False, 0)
+            below(pg, form)
+            return False
+
+        def ng_got(_rc, out):
+            if id(ng) in gone:
+                return False
+            lines = parse_lines(out)
+            x = next((f for f in lines if f[0] == "X" and len(f) >= 5), None)
+            projects = [f for f in lines if f[0] == "Y" and len(f) >= 4]
+            if x is None or x[1] == "?":
+                sub(ng, "Docker no está en marcha: arráncalo en la pestaña Docker")
+                sub(ngp, "—")
+                return False
+            st, ip, http, https = x[1], x[2], x[3], x[4]
+            sub(ng, "Uno común, al lado del Apache de Docker, para los proyectos de Docker que le añadas: en %s, con los mismos "
+                "dominios, en los puertos %s (http) y %s (https). %s" % (ip, http, https,
+                {"marcha": "En marcha.", "parado": "Parado.", "nuevo": "Aún no se ha creado: «Arrancar» lo crea (imagen oficial de Nginx)."}.get(st, "")))
+            form = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, valign=Gtk.Align.CENTER)
+            fields = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+            entries = {}
+            for key, val in (("HTTP", http), ("HTTPS", https)):
+                fb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+                fb.pack_start(label(key, "nv-chico", "nv-tenue"), False, False, 0)
+                e = Gtk.Entry(text=val, width_chars=5, max_length=5)
+                fb.pack_start(e, False, False, 0)
+                fields.pack_start(fb, False, False, 0)
+                entries[key] = e
+            form.pack_start(fields, False, False, 0)
+            buttons = Gtk.Box(spacing=8, halign=Gtk.Align.END)
+
+            def save(*_):
+                h, hs = entries["HTTP"].get_text().strip(), entries["HTTPS"].get_text().strip()
+                if not (h.isdigit() and hs.isdigit() and 1024 <= int(h) <= 65535 and 1024 <= int(hs) <= 65535) or h == hs:
+                    message(self.win, "Puertos no válidos", "Dos números distintos, de 1024 a 65535 (como 8081 y 8444).",
+                            Gtk.MessageType.WARNING)
+                    return
+                self.run_task("Puertos del Nginx de Docker", ["docker-nginx", "puertos", h, hs], auto_close=True,
+                              done_text="Nginx de Docker en los puertos %s y %s" % (h, hs), on_done=done)
+            b = busy_guard(Gtk.Button(label="Guardar puertos"), self.busy)
+            b.connect("clicked", save)
+            buttons.pack_start(b, False, False, 0)
+            act = "parar" if st == "marcha" else "arrancar"
+            b = busy_guard(Gtk.Button(label="Parar" if st == "marcha" else "Arrancar"), self.busy)
+            if st != "marcha":
+                css(b, "verde")
+            b.connect("clicked", lambda *_x: self.run_task("Nginx de Docker", ["docker-nginx", act], auto_close=True,
+                                                          progress=act == "arrancar", on_done=done,
+                                                          done_text="Nginx de Docker %s" % ("parado" if act == "parar" else "en marcha")))
+            buttons.pack_start(b, False, False, 0)
+            form.pack_start(buttons, False, False, 0)
+            below(ng, form)
+            # Los proyectos: los del Apache de Docker, cada uno con su casilla
+            if not projects:
+                sub(ngp, "Aún no hay proyectos de Docker: créalos en la pestaña Docker")
+            else:
+                sub(ngp, "Marca los que van también por el Nginx de Docker (con el Apache de Docker siguen igual). Al pasar el "
+                    "ratón, sus direcciones")
+                grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, min_children_per_line=2, max_children_per_line=4, column_spacing=12,
+                                   valign=Gtk.Align.CENTER)
+                for f in projects:
+                    cb = busy_guard(Gtk.CheckButton(label=f[1], active=f[2] == "1"), self.busy)
+                    cb.set_tooltip_text("\n".join(f[3].split()) or f[1])
+                    cb.connect("toggled", lambda w, slug=f[1]: self.run_task(
+                        "Nginx de Docker: %s" % slug, ["docker-nginx", "anadir" if w.get_active() else "quitar", slug],
+                        auto_close=True, done_text="%s %s" % (slug, "en el Nginx de Docker" if w.get_active() else "fuera del Nginx de Docker"),
+                        on_done=done))
+                    grid.add(cb)
+                below(ngp, grid)
+                grid.set_halign(Gtk.Align.FILL)
+            return False
+        run_quick(["docker-postgres"], pg_got)
+        run_quick(["docker-nginx"], ng_got)
+
+    def nv_pg_create(self, v):
+        if not v or not confirm(self.win, "¿Crear la PostgreSQL %s de Docker?" % v,
+                                "Una común para todos los proyectos de Docker, con el usuario postgres y una contraseña al azar "
+                                "(«Copiar contraseña»). Se descarga su imagen oficial y, si tienes imágenes de PHP de Docker, se "
+                                "rehacen con pgsql y pdo_pgsql (unos minutos cada una).", "Crear"):
+            return
+        self.run_task("Creando la PostgreSQL %s de Docker" % v, ["docker-postgres", "arrancar", v], progress=True,
+                      auto_close=True, done_text="PostgreSQL %s en marcha" % v, on_done=lambda *_: self.build_tools())
+
+    def nv_pg_delete(self, v):
+        if not confirm(self.win, "¿Borrar la PostgreSQL %s de Docker?" % v,
+                       "Se borran su contenedor y todas sus BBDD. No se puede deshacer.", "Borrar", destructive=True):
+            return
+        self.run_task("Borrando la PostgreSQL %s de Docker" % v, ["docker-postgres", "borrar", v], auto_close=True,
+                      done_text="PostgreSQL %s borrada" % v, on_done=lambda *_: self.build_tools())
+
+    def nv_pg_copy(self, v):
+        """La contraseña del usuario postgres, al portapapeles (de su .env, solo tuyo)."""
+        try:
+            for line in open(os.path.join(LOG_DIR, "docker", "postgres-%s" % v, ".env"), encoding="utf-8"):
+                if line.startswith("PG_PASS="):
+                    Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(line.strip()[8:], -1)
+                    self.toast("Contraseña de postgres copiada")
+                    return
+        except OSError:
+            pass
+        self.toast("No se ha podido leer su contraseña")
 
     def nv_tunnel_tools(self):
         """Configuración, Túnel de Cloudflare: cloudflared, el túnel abierto (con Cerrar) y su registro. La

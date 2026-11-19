@@ -31,6 +31,29 @@ function nginx_get() {
     fi
 }
 
+# ¿Se usa Nginx? Apagado de serie: se enciende en Configuración, Nginx (nginx-usar si), y entonces sale su
+# pestaña. Apagarlo lo para y oculta la pestaña, sin borrar nada
+function nginx_used() {
+    [ -f "$NGINX_DIR/usar" ]
+}
+
+# nginx-usar si|no
+function nginx_use() {
+    case $1 in
+        si|no) ;;
+        *) echo "Uso: nexum nginx-usar si|no"; return 1 ;;
+    esac
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] Nginx: $1"; return 0; }
+    if [ "$1" == si ]; then
+        mkdir -p -m 700 "$NGINX_DIR" && : > "$NGINX_DIR/usar" || return 1
+        echo "Nginx encendido: su pestaña ya sale en el menú lateral$(nginx_installed || echo " (instálalo desde ella)")"
+    else
+        nginx_running && nginx_stop
+        rm -f "$NGINX_DIR/usar" || return 1
+        echo "Nginx apagado: su pestaña ya no sale (sus proyectos y ajustes se quedan para cuando lo vuelvas a encender)"
+    fi
+}
+
 function nginx_installed() {
     [ -x "$NGINX_BIN" ] && [ ! -L "$NGINX_BIN" ]
 }
@@ -173,6 +196,7 @@ function nginx_build() {
 
 # nginx-instalar: lo que hace falta para compilarlo y Nginx
 function nginx_install() {
+    nginx_used || { echo "Nginx está apagado: enciéndelo en Configuración, Nginx (nginx-usar si)"; return 1; }
     task_plan "Instalando Nginx $NGINX_VERSION" "Lo que hace falta para compilarlo" "Nginx $NGINX_VERSION"
     task_step
     nginx_build_deps || return 1
@@ -296,6 +320,7 @@ function nginx_apply() {
 function nginx_start() {
     local http https p i
     [ "$EUID" -eq 0 ] && { echo "Nginx corre con tu usuario, no como root"; return 1; }
+    nginx_used || { echo "Nginx está apagado: enciéndelo en Configuración, Nginx (nginx-usar si)"; return 1; }
     nginx_installed || { echo "Nginx no está instalado: instálalo en la pestaña Nginx (nginx-instalar)"; return 1; }
     if nginx_running; then
         nginx_apply || return 1
@@ -430,13 +455,13 @@ function nginx_trust_all() {
 }
 
 # Para la ventana (gui-nginx):
-#   N|instalado 1/0|versión instalada|la de este gestor|en marcha 1/0|http|https|PHP (ok, parado, sin-fpm)
+#   N|instalado 1/0|versión instalada|la de este gestor|en marcha 1/0|http|https|PHP (ok, parado, sin-fpm)|encendido 1/0
 #   P|carpeta|raíz|nombre|carpeta existe 1/0
 #   C|carpeta          una de htdocs que aún no está en Nginx (para añadirla)
 function gui_nginx() {
     local folder root d added=""
-    printf 'N|%s|%s|%s|%s|%s|%s|%s\n' "$(nginx_installed && echo 1 || echo 0)" "$(nginx_installed_version)" "$NGINX_VERSION" \
-        "$(nginx_running && echo 1 || echo 0)" "$(nginx_get HTTP)" "$(nginx_get HTTPS)" "$(nginx_php_state)"
+    printf 'N|%s|%s|%s|%s|%s|%s|%s|%s\n' "$(nginx_installed && echo 1 || echo 0)" "$(nginx_installed_version)" "$NGINX_VERSION" \
+        "$(nginx_running && echo 1 || echo 0)" "$(nginx_get HTTP)" "$(nginx_get HTTPS)" "$(nginx_php_state)" "$(nginx_used && echo 1 || echo 0)"
     while IFS='|' read -r folder root; do
         printf 'P|%s|%s|%s|%s\n' "$folder" "$root" "$(nginx_host "$folder")" "$([ -d "$HTDOCS_DIR/$folder" ] && echo 1 || echo 0)"
         added+="|$folder|"
@@ -455,6 +480,7 @@ function gui_nginx() {
 # nginx <orden> ...: las de la pestaña Nginx
 function nginx_command() {
     case "$1" in
+        nginx-usar) nginx_use "$2" ;;
         nginx-instalar) nginx_install ;;
         nginx-arrancar) nginx_start ;;
         nginx-parar) nginx_stop ;;
@@ -464,6 +490,6 @@ function nginx_command() {
         nginx-puertos) nginx_ports "$2" "$3" ;;
         nginx-registro) nginx_log ;;
         nginx-confiar) nginx_trust_all ;;
-        *) echo "Uso: nexum nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir <carpeta> [subcarpeta]|nginx-quitar <carpeta>|nginx-puertos <http> <https>|nginx-registro|nginx-confiar"; return 1 ;;
+        *) echo "Uso: nexum nginx-usar si|no|nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir <carpeta> [subcarpeta]|nginx-quitar <carpeta>|nginx-puertos <http> <https>|nginx-registro|nginx-confiar"; return 1 ;;
     esac
 }

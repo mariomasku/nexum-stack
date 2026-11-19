@@ -257,6 +257,9 @@ function docker_web_up() {
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_reload.sh
+# Nginx de Docker (en el Mac, el PHP de cada proyecto va con su Apache: Nginx lo tiene delante)
+DOCKER_NGINX_FASTCGI=0
+#@incluir comun/docker-su-propio-apache/docker_nginx_get.sh
 # docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
 function docker_web_command() {

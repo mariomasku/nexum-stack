@@ -520,8 +520,8 @@ function docker_php_image() {
     if [ "$2" == "--nueva" ]; then
         fresh=(--pull --no-cache)
     elif [ "$2" != --rehacer ] && [ "$DRY" -eq 0 ] && dk image inspect "nexum-php:$php" > /dev/null 2>&1 \
-            && ! docker_php_needs_wp_cli "$php"; then
-        # (con WP-CLI puesto, la que no lo trae se rehace)
+            && ! docker_php_needs_wp_cli "$php" && ! docker_php_needs_pgsql "$php"; then
+        # (con WP-CLI puesto, la que no lo trae se rehace; con alguna PostgreSQL, la que no trae pgsql)
         return 0
     fi
     mkdir -p -m 700 "$dir" || return 1
@@ -530,8 +530,9 @@ function docker_php_image() {
     ini=${ini//$'\n'/\\n}
     {
         printf 'FROM php:%s-fpm\nCOPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\nRUN install-php-extensions %s\n' \
-            "$php" "$DOCKER_EXT_INSTALLER" "$DOCKER_PHP_EXT"
+            "$php" "$DOCKER_EXT_INSTALLER" "$(docker_php_ext)"
         docker_wp_cli_dockerfile
+        docker_pg_dockerfile
         cat << EOF
 RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \\
  && printf '[global]\\nerror_log = /proc/self/fd/2\\ndaemonize = no\\n[www]\\nuser = root\\ngroup = root\\nlisten = /run/nexum/php.sock\\nlisten.mode = 0660\\nclear_env = no\\ncatch_workers_output = yes\\npm.max_requests = 50\\n' > /usr/local/etc/php-fpm.d/zz-nexum.conf \\
@@ -822,6 +823,7 @@ function docker_test_admin() {
 
 #@incluir comun/docker/docker_db_backup.sh
 #@incluir comun/docker/docker_wp_cli.sh
+#@incluir comun/docker/docker_pg_name.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

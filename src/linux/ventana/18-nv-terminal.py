@@ -363,7 +363,8 @@ class NvTerminal:
                 w.destroy()
         self.tabs, self.tab_lists = {}, []
         for group_name, items in SIDEBAR:
-            items = [it for it in items if it[0] in SIDEBAR_FIXED or it[0] not in look["ocultos"]]
+            items = [it for it in items if (it[0] in SIDEBAR_FIXED or it[0] not in look["ocultos"])
+                     and (it[0] != "nginx" or nginx_used())]
             if not items:
                 continue
             box.pack_start(label(group_name, "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2), False, False, 0)
@@ -485,7 +486,8 @@ class NvTerminal:
         b.remove(lb)
         cols = Gtk.Box(spacing=12, homogeneous=True, margin_top=8)
         b.pack_start(cols, False, False, 0)
-        names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED]
+        names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED
+                 and (name != "nginx" or nginx_used())]
         half = (len(names) + 1) // 2
         for chunk in (names[:half], names[half:]):
             col = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")

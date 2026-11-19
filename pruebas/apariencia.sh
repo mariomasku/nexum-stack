@@ -36,7 +36,7 @@ PY
     check "Mac: Bases de datos y Node con su icono" 'grep -qF "(\"bbdd\", \"Bases de datos\", \"logo:bbdd\")" "$SRC" && grep -qF "(\"node\", \"Node\", \"logo:node\")" "$SRC"'
     check "Mac: se guarda al cambiar y, si se oculta el apartado abierto, a Proyectos" 'grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "saveLook(look)" && grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "if look.ocultos.contains(tab) { openTab(\"proyectos\") }"'
     check "Mac: en la simulacion no se guarda" 'sed -n "/^func saveLook/,/^}/p" "$SRC" | grep -qF "if SIMULATE { return }"'
-    check "Mac: Proyectos y Configuracion, siempre" 'grep -qF "let NAV_FIXED: Set<String> = [\"proyectos\", \"config\"]" "$SRC" && grep -qF "group.1.filter { NAV_FIXED.contains(\$0.0) || !model.look.ocultos.contains(\$0.0) }" "$SRC"'
+    check "Mac: Proyectos y Configuracion, siempre" 'grep -qF "let NAV_FIXED: Set<String> = [\"proyectos\", \"config\"]" "$SRC" && grep -qF "group.1.filter { NAV_FIXED.contains(\$0.0) || (!model.look.ocultos.contains(\$0.0) && (\$0.0 != \"nginx\" || model.nginxUsed)) }" "$SRC"'
     check "Mac: Docker y Node con su logotipo, PHP en color" 'grep -qF "if look.marcas && (key == \"docker\" || key == \"node\") {" "$SRC" && grep -qF "if look.marcas && look.color && key == \"versiones\" {" "$SRC"'
     check "Mac: apartado Apariencia" 'grep -qF "(\"apariencia\", \"Apariencia\", \"paintpalette\")" "$SRC" && grep -qF "case \"apariencia\":" "$SRC" && grep -q "^struct AppearanceCard: View {" "$SRC"'
     check "Mac: las imagenes se leen una vez" 'grep -A2 "^func brandImage" "$SRC" | grep -qF "if let i = brandImages[key] { return i }"'

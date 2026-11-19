@@ -60,6 +60,16 @@ extension AppModel {
         }
     }
 
+    /// Encender o apagar Nginx: su pestaña sale o se oculta (apagarlo lo para, sin borrar nada)
+    func nginxUse(_ on: Bool) {
+        runTask("Nginx: \(on ? "encendiendo" : "apagando")", ["nginx-usar", on ? "si" : "no"],
+                doneText: "Nginx \(on ? "encendido" : "apagado")", autoClose: true) { _, _, _ in
+            self.nginxUsed = FileManager.default.fileExists(atPath: LOG_DIR + "/nginx/usar")
+            if !self.nginxUsed && self.tab == "nginx" { self.openTab("config") }
+            self.reloadNginx()
+        }
+    }
+
     func nginxDo(_ cmd: String, _ title: String, _ done: String) {
         runTask(title, [cmd], doneText: done, autoClose: true) { _, _, _ in self.reloadNginx() }
     }

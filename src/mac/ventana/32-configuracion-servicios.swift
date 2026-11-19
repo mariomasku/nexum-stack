@@ -667,6 +667,8 @@ struct ToolsView: View {
           }
           IdleStopCard()
           WpCliCard()
+          PgCard()
+          DockerNginxCard()
         }
         .onAppear {
             if model.docker == nil { model.reloadDocker() }

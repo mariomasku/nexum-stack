@@ -142,7 +142,7 @@ struct AppearanceCard: View {
                 }
             }
             // (en dos columnas: la primera mitad a la izquierda y el resto a la derecha)
-            let items = NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) }
+            let items = NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) && ($0.0 != "nginx" || model.nginxUsed) }
             let half = (items.count + 1) / 2
             VStack(alignment: .leading, spacing: 2) {
                 Text("Apartados del menú lateral").font(.system(size: 13.5, weight: .semibold))
@@ -226,14 +226,14 @@ struct Sidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(NAV.filter { g in g.1.contains { NAV_FIXED.contains($0.0) || !model.look.ocultos.contains($0.0) } }, id: \.0) { group in
+            ForEach(NAV.filter { g in g.1.contains { NAV_FIXED.contains($0.0) || (!model.look.ocultos.contains($0.0) && ($0.0 != "nginx" || model.nginxUsed)) } }, id: \.0) { group in
                 Text(group.0)
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundColor(.secondary)
                     .padding(.leading, 12)
                     .padding(.top, 14)
                     .padding(.bottom, 3)
-                ForEach(group.1.filter { NAV_FIXED.contains($0.0) || !model.look.ocultos.contains($0.0) }, id: \.0) { item in
+                ForEach(group.1.filter { NAV_FIXED.contains($0.0) || (!model.look.ocultos.contains($0.0) && ($0.0 != "nginx" || model.nginxUsed)) }, id: \.0) { item in
                     NavRow(key: item.0, text: item.1, icon: item.2)
                 }
             }

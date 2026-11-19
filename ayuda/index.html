@@ -4080,6 +4080,10 @@
   <p><b>Nginx</b> es un servidor web, como Apache: el programa que contesta al navegador. Muchos servidores de producción usan Nginx, sobre
     todo con Laravel o Symfony. Con esta página tienes uno en tu equipo para ver tus proyectos como en producción, sin dejar de usar Apache:
     un proyecto sigue abriéndose por Apache como siempre, y además por Nginx si se lo añades.</p>
+  <p><b>Viene apagado</b>: esta página no sale en el menú lateral hasta que enciendes «Usar Nginx» en
+    <a href="#nginx-config">Configuración → Nginx</a>. Si no lo necesitas, no tienes que hacer nada. Apagarlo de nuevo lo para y vuelve a
+    ocultar la página, sin borrar sus proyectos ni sus ajustes. Para tener Nginx en Docker, mira
+    <a href="#docker-nginx">el Nginx de Docker</a>.</p>
   <p>Hay un solo Nginx para todo el equipo. Se instala en <code>~/.nexum/nginx</code> y funciona con tu usuario: ni instalarlo ni arrancarlo
     piden la contraseña de administrador (en Linux, solo la primera vez si faltan los paquetes para compilarlo). Solo contesta desde tu equipo,
     nunca desde la red, en sus <b>puertos</b> (el número que distingue a cada programa que espera conexiones): el 8080 para http y el 8443
@@ -4135,6 +4139,8 @@
   <details class="terminal"><summary>En la terminal</summary>
     <p>Las órdenes del programa:</p>
     <ul>
+      <li><code>nexum nginx-usar si</code> (o <code>no</code>): lo enciende o lo apaga (el fichero vacío
+        <code>~/.nexum/nginx/usar</code>, que dice si sale esta página).</li>
       <li><code>nexum nginx-instalar</code>: lo que hace falta para compilarlo (en Linux, <code>gcc make libpcre2-dev libssl-dev zlib1g-dev</code>
         con apt; en el Mac, las herramientas de Xcode y <code>pcre2</code> y <code>openssl@3</code> de Homebrew) y Nginx, en
         <code>~/.nexum/nginx/programa</code>.</li>
@@ -5369,8 +5375,46 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <code>docker image inspect --format '{{index .Config.Labels "nexum.wp-cli"}}' nexum-php:8.4</code> (sale <code>2.12.0</code>).</p>
   </details>
 
+  <h4 id="docker-postgres">PostgreSQL de Docker</h4>
+  <p>Una base de datos <b>PostgreSQL</b> común por versión (la 18, la 17 o la 16), como las MariaDB comunes, para todos los proyectos de
+    Docker. Se crea al final de Configuración → Docker, eligiendo la versión y pulsando «Crear», que descarga su imagen oficial.</p>
+  <ul>
+    <li><b>Desde los proyectos de Docker</b>, su servidor es <code>nexum-postgres-18</code>, puerto <code>5432</code>.</li>
+    <li><b>Desde tu equipo</b>, para tus herramientas de BBDD (DBeaver, pgAdmin, <code>psql</code>…): <code>127.0.0.1</code> y el puerto
+      54300 más la versión (el <code>54318</code> en la 18). Nunca desde la red.</li>
+    <li>El usuario es <code>postgres</code>, con una contraseña al azar que «Copiar contraseña» deja en el portapapeles.</li>
+    <li>Mientras haya alguna, las imágenes de PHP de Docker traen <code>pgsql</code> y <code>pdo_pgsql</code>. Al crear la primera, se
+      rehacen las que tienes (unos minutos cada una) y los contenedores en marcha se vuelven a crear.</li>
+    <li>«Parar» y «Arrancar» no tocan sus datos. <b>«Borrar» la quita con todas sus BBDD</b>, y no se puede deshacer.</li>
+  </ul>
+  <h4 id="docker-nginx">Nginx de Docker</h4>
+  <p>Un <b>Nginx</b> común en Docker, al lado del Apache de Docker, para los proyectos de Docker que le añadas. Usa la misma dirección y los
+    mismos dominios que el Apache de Docker, en sus puertos: el 8081 y el 8444 de serie, que se cambian aquí. Por ejemplo,
+    <code>https://academia-flor-php84.docker.local:8444</code>. El Apache de Docker los sigue sirviendo igual.</p>
+  <ul>
+    <li>«Arrancar» lo crea la primera vez (con la imagen oficial de Nginx) y «Parar» lo para.</li>
+    <li>En «Proyectos en el Nginx de Docker», marca los que van también por él. Al pasar el ratón por encima salen sus direcciones.</li>
+    <li data-so="linux">Habla con el PHP-FPM del contenedor de PHP de cada versión del proyecto, como el Apache de Docker. El
+      <code>.htaccess</code> no lo lee.</li>
+    <li data-so="mac">En el Mac, las imágenes de PHP de Docker llevan Apache: Nginx va delante de él, así que el <code>.htaccess</code>
+      se sigue leyendo.</li>
+    <li>Con el PHP del proyecto parado, lo dice en lugar de dar un error.</li>
+  </ul>
+  <details class="terminal"><summary>En la terminal</summary>
+    <ul>
+      <li><code>nexum docker-postgres arrancar 18</code> (la crea si no está), <code>nexum docker-postgres parar 18</code>,
+        <code>nexum docker-postgres borrar 18</code> y <code>nexum docker-postgres</code> (cómo están:
+        <code>G|18|marcha|54318|nexum-postgres-18</code>). Sus ficheros, en <code>~/.nexum/docker/postgres-18</code>: su
+        <code>compose.yaml</code> y su contraseña en <code>.env</code>, solo tuyos.</li>
+      <li><code>nexum docker-nginx arrancar</code>, <code>nexum docker-nginx parar</code>,
+        <code>nexum docker-nginx anadir academia-flor</code> (o <code>quitar</code>), <code>nexum docker-nginx puertos 8081 8444</code> y
+        <code>nexum docker-nginx</code> (cómo está). Su configuración, en <code>~/.nexum/docker/nginx/conf/nginx.conf</code>: la escribe el
+        programa cada vez que cambia algo y la prueba antes de usarla.</li>
+    </ul>
+  </details>
+
   <h3 id="nginx-config">Nginx</h3>
-  <p>Los puertos del Nginx de la página <a href="#nginx">Nginx</a> y la confianza del navegador en sus certificados.</p>
+  <p>Si se usa el Nginx de la página <a href="#nginx">Nginx</a>, sus puertos y la confianza del navegador en sus certificados.</p>
   <figure class="pantalla">
     <div class="barra">
       <span class="tenue">Pulsa un número o empieza el recorrido</span>
@@ -5381,10 +5425,12 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <img src="img/linux/config-nginx.png" data-linux="img/linux/config-nginx.png" data-mac="img/mac/config-nginx.png" alt="Configuración, Nginx" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
-      <li data-x="92.4" data-y="26.2"><b>Puertos</b><span>HTTP y HTTPS: 8080 y 8443 de serie. De 1024 en adelante (los de abajo son de root) y
+      <li data-x="95.1" data-y="24.2"><b>Usar Nginx</b><span>Apagado de serie. Encendido, sale la página <a href="#nginx">Nginx</a> en el menú
+        lateral y, debajo, los puertos y los certificados. Apagarlo lo para y oculta la página, sin borrar sus proyectos ni sus ajustes.</span></li>
+      <li data-x="92.4" data-y="34.6"><b>Puertos</b><span>HTTP y HTTPS: 8080 y 8443 de serie. De 1024 en adelante (los de abajo son de root) y
         distintos entre sí y de los de Apache. «Guardar» los cambia; si Nginx está en marcha, los usa al momento. Si un puerto ya lo usa otro
         programa, lo dice y no cambia nada.</span></li>
-      <li data-x="61.8" data-y="46"><b>Certificados</b><span>«Confiar» hace que el navegador acepte sin aviso el https de cada proyecto. Se hace
+      <li data-x="61.8" data-y="54.4"><b>Certificados</b><span>«Confiar» hace que el navegador acepte sin aviso el https de cada proyecto. Se hace
         solo al añadirlo: esto es para cuando lo has quitado o usas otro navegador. <span data-so="mac">El Mac te pide la contraseña para
         cambiar la confianza del llavero.</span></span></li>
     </ol>

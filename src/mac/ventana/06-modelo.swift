@@ -310,6 +310,8 @@ final class AppModel: ObservableObject {
     @Published var nodeItems: [NodeItem]? = nil
     /// Nginx (pestaña Nginx y Configuración, Nginx)
     @Published var nginx: NginxInfo? = nil
+    /// Nginx, apagado de serie: su pestaña solo sale encendido (Configuración, Nginx)
+    @Published var nginxUsed = FileManager.default.fileExists(atPath: LOG_DIR + "/nginx/usar")
     @Published var reposAll = false
     @Published var reposLoading = false
     @Published var github: GitHubState? = nil

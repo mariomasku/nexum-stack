@@ -271,7 +271,7 @@ function nginx_trust() {
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual|nginx-usar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;
         # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
         tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
         # (el administrador de pruebas: solo un ajuste de ~/.nexum)
@@ -280,6 +280,9 @@ if [ "${LVM_TAREA:-}" == 1 ]; then
         nginx-instalar) nginx_deps_missing && { sudo_first || exit 130; } ;;
         # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker sin root)
         docker-wp-cli) ;;
+        # (PostgreSQL y Nginx de Docker: Docker sin root y ficheros de ~/.nexum)
+        docker-postgres) ;;
+        docker-nginx) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -355,11 +358,13 @@ case "$1" in
     node-registro) node_log "$2" ;;
     gui-node) gui_node ;;
     gui-nginx) gui_nginx ;;
-    nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command "$@" ;;
+    nginx-usar|nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command "$@" ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
     docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
+    docker-postgres) shift; docker_pg_command "$@" ;;
+    docker-nginx) shift; docker_nginx_command "$@" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
     docker-volumen-borrar) docker_volume_remove "$2" ;;

@@ -268,6 +268,9 @@ function docker_web_up() {
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_reload.sh
+# Nginx de Docker (en Linux, el PHP de cada proyecto es PHP-FPM, en su puerto 9000)
+DOCKER_NGINX_FASTCGI=1
+#@incluir comun/docker-su-propio-apache/docker_nginx_get.sh
 # docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
 function docker_web_command() {

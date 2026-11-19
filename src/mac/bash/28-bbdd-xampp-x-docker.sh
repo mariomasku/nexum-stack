@@ -396,6 +396,21 @@ QUE HACE
 
 VERSIONES
 
+1.57.39 (19 nov 2026)
+- Nginx (pestaña Nginx), apagado de serie: su pestaña no sale hasta que
+  enciendes «Usar Nginx» en Configuración > Nginx. Apagarlo lo para y la
+  oculta, sin borrar sus proyectos ni sus ajustes (nexum nginx-usar si|no).
+- Docker: PostgreSQL común, como las MariaDB (Configuración > Docker, la
+  18, la 17 o la 16). Desde los PHP de Docker, nexum-postgres-18:5432;
+  desde este Mac, 127.0.0.1:54318, con el usuario postgres y su
+  contraseña al azar («Copiar contraseña»). Con alguna, las imágenes de
+  PHP de Docker traen pgsql y pdo_pgsql. En la terminal, nexum
+  docker-postgres arrancar|parar|borrar <versión>.
+- Docker: Nginx común, al lado del Apache de Docker, para los proyectos de
+  Docker que marques (Configuración > Docker): con sus mismos dominios, en
+  los puertos 8081 y 8444, delante del Apache del PHP de cada versión (en
+  el Mac, las imágenes de PHP de Docker llevan Apache). En la terminal, nexum docker-nginx arrancar|parar|anadir|quitar|puertos.
+
 1.57.38 (19 nov 2026)
 - Pestaña Nginx, nueva: otro servidor web, aparte de Apache, para los
   proyectos que le añadas (Laravel, Symfony, PHP...). Uno para todo el

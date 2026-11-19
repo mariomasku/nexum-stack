@@ -57,6 +57,9 @@ function components_check() {
         done
     done < <(version_dirs)
     if [ "$1" != --sin-docker ] && docker_ready > /dev/null 2>&1; then
+        for v in $(docker_pg_versions); do
+            docker_image_outdated "postgres:$v" && { echo "K|postgres:$v|la PostgreSQL $v de Docker"; n=$((n + 1)); }
+        done
         for v in $(docker_maria_versions); do
             img=mariadb:$v
             docker_image_outdated "$img" && { echo "K|$img|la MariaDB $v común de Docker"; n=$((n + 1)); }
@@ -69,7 +72,9 @@ function components_check() {
             dk image inspect "nexum-php:$v" > /dev/null 2>&1 || continue
             img=php:$v-apache
             # (o, con WP-CLI puesto en Configuracion > Docker, sin el: al rehacerla lo trae)
-            if docker_php_needs_wp_cli "$v"; then
+            if docker_php_needs_pgsql "$v"; then
+                echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v), para que traiga pgsql"; n=$((n + 1))
+            elif docker_php_needs_wp_cli "$v"; then
                 echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v), para que traiga WP-CLI"; n=$((n + 1))
             elif docker_image_outdated "$img"; then
                 echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1))
@@ -135,6 +140,7 @@ function components_update() {
     for v in $imgs; do
         case $v in
             mariadb:*) steps+=("MariaDB ${v#mariadb:} de Docker") ;;
+            postgres:*) steps+=("PostgreSQL ${v#postgres:} de Docker") ;;
             "$DOCKER_PMA_IMAGE") steps+=("phpMyAdmin de Docker") ;;
             php:*) v=${v#php:}; steps+=("Imagen de PHP ${v%-*}") ;;
             *) steps+=("$v") ;;
@@ -146,6 +152,14 @@ function components_update() {
     for v in $imgs; do
         task_step
         case $v in
+            postgres:*)
+                v=${v#postgres:}
+                echo "PostgreSQL $v de Docker: la imagen nueva y su contenedor de nuevo (sus BBDD no cambian)"
+                if dk pull "postgres:$v"; then
+                    [ "$(docker_pg_state "$v")" == marcha ] && { docker_pg_up "$v" > /dev/null || fail=1; }
+                else
+                    fail=1
+                fi ;;
             mariadb:*)
                 v=${v#mariadb:}
                 echo "MariaDB $v común de Docker: la imagen nueva y su contenedor de nuevo (sus BBDD no cambian)"

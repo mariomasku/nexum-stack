@@ -380,6 +380,7 @@
 #   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
 #   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
 #   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
+#   nexum nginx-usar si|no            Nginx (pestaña Nginx): apagado de serie; encendido, sale su pestaña
 #   nexum nginx-instalar              Nginx (pestaña Nginx), compilado con tu usuario en ~/.nexum/nginx
 #   nexum nginx-anadir <carpeta> [subcarpeta]   lo sirve en http://<carpeta>.localhost:8080 y https://...:8443
 #   nexum nginx-quitar <carpeta>      deja de servirlo
@@ -420,6 +421,8 @@
 #       Uno solo de los contenedores de un proyecto en Docker
 #
 #   nexum docker-wp-cli si|no [--rehacer]
+#   nexum docker-postgres [estado] | arrancar|parar|borrar <18|17|16>   PostgreSQL comun de Docker
+#   nexum docker-nginx [estado] | arrancar | parar | anadir|quitar <proyecto> | puertos <http> <https>   Nginx comun de Docker
 #       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
 #       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
 #
