@@ -459,7 +459,8 @@ _look_sim = {}
 
 
 def look_conf():
-    """color (iconos en color), marcas (Docker, Node y PHP con su logotipo) y ocultos (apartados que no se ven)."""
+    """color (iconos en color), marcas (Docker, Node y PHP con su logotipo), ocultos (apartados que no se ven),
+    zoom (el tamaño de la ventana, en %) y cristal (paneles translúcidos sobre un fondo de color)."""
     conf = dict(_look_sim)
     if not conf:
         try:
@@ -472,11 +473,17 @@ def look_conf():
     keys = {k for _g, items in SIDEBAR for k, _t, _i in items} - set(SIDEBAR_FIXED)
     hidden = conf.get("ocultos")
     return {"color": conf.get("color") is True, "marcas": conf.get("marcas") is True,
-            "ocultos": {k for k in hidden if k in keys} if isinstance(hidden, list) else set()}
+            "ocultos": {k for k in hidden if k in keys} if isinstance(hidden, list) else set(),
+            "zoom": conf.get("zoom") if conf.get("zoom") in LOOK_ZOOMS else 100, "cristal": conf.get("cristal") is True}
+
+
+# Tamaño de la ventana (Apariencia): en tanto por ciento
+LOOK_ZOOMS = (80, 90, 100, 110)
 
 
 def look_save(conf):
-    data = {"color": conf["color"], "marcas": conf["marcas"], "ocultos": sorted(conf["ocultos"])}
+    data = {"color": conf["color"], "marcas": conf["marcas"], "ocultos": sorted(conf["ocultos"]),
+            "zoom": conf.get("zoom", 100), "cristal": conf.get("cristal") is True}
     if SIMULATE:
         _look_sim.clear()
         _look_sim.update(data)
@@ -485,6 +492,55 @@ def look_save(conf):
     with open(LOOK_FILE + ".nuevo", "w", encoding="utf-8") as fh:
         json.dump(data, fh)
     os.replace(LOOK_FILE + ".nuevo", LOOK_FILE)
+
+
+def css_zoom(text, zoom):
+    """La hoja de estilos a otro tamaño: cada medida en px por zoom (las de 1 px, las rayas, se quedan igual).
+    Las letras no van aquí: crecen o menguan con la resolución (gtk-xft-dpi), y con ellas las medidas en em."""
+    if zoom == 100:
+        return text
+
+    def one(m):
+        v = float(m.group(1))
+        return m.group(0) if v <= 1 else "%gpx" % max(1, round(v * zoom / 100.0))
+    return re.sub(r"(?<![\w.#-])(\d+(?:\.\d+)?)px", one, text)
+
+
+GLASS_DIR = os.path.join(LOG_DIR, "cache", "cristal")
+
+
+def glass_css():
+    """El fondo del cristal: tres manchas difuminadas (azul, violeta y verde, los colores de Nexum) pintadas una
+    sola vez en una imagen pequeña (~/.nexum/cache/cristal), que GTK estira a la ventana. Con degradados de CSS,
+    GTK los volvía a calcular entero cada vez que se redibujaba algo (unos 28 ms; estirando la imagen, menos de 1)."""
+    import cairo
+    w, h = 256, 176
+    out = []
+    for name, sel, base, alpha in (("oscuro", "window.background.nv-cristal", (0.15, 0.16, 0.18), 1.0),
+                                   ("claro", "window.background.nv-cristal.nv-claro", (0.95, 0.95, 0.96), 0.6)):
+        path = os.path.join(GLASS_DIR, "fondo-%s.png" % name)
+        if not os.path.isfile(path):
+            try:
+                os.makedirs(GLASS_DIR, mode=0o700, exist_ok=True)
+                surf = cairo.ImageSurface(cairo.FORMAT_RGB24, w, h)
+                cr = cairo.Context(surf)
+                cr.set_source_rgb(*base)
+                cr.paint()
+                for cx, cy, r, rgb, a in ((0.08 * w, 0, 0.9, (0.11, 0.39, 0.93), 0.38),
+                                          (w, h, 0.9, (0.49, 0.44, 0.85), 0.34),
+                                          (0.62 * w, 0.3 * h, 0.6, (0.11, 0.61, 0.42), 0.16)):
+                    g = cairo.RadialGradient(cx, cy, 0, cx, cy, r * max(w, h))
+                    g.add_color_stop_rgba(0, rgb[0], rgb[1], rgb[2], a * alpha)
+                    g.add_color_stop_rgba(1, rgb[0], rgb[1], rgb[2], 0)
+                    cr.set_source(g)
+                    cr.paint()
+                surf.write_to_png(path + ".nuevo")
+                os.replace(path + ".nuevo", path)
+            except (OSError, MemoryError, cairo.Error):
+                continue
+        out.append('%s { background-color: rgb(%d, %d, %d); background-image: url("%s"); background-size: 100%% 100%%; }'
+                   % (sel, base[0] * 255, base[1] * 255, base[2] * 255, GLib.filename_to_uri(path, None)))
+    return "\n".join(out)
 
 
 class MonoLogo(Gtk.DrawingArea):

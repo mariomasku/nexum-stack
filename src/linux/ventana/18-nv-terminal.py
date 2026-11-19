@@ -406,7 +406,34 @@ class NvTerminal:
         else:
             conf[key] = value
         look_save(conf)
+        if key in ("zoom", "cristal"):
+            self.nv_apply_look()
+            return
         self.nv_sidebar_fill()
+
+    def nv_apply_look(self):
+        """Apariencia, tamaño y cristal, al momento. El tamaño: las letras con la resolución (gtk-xft-dpi, la de
+        este equipo por el tanto por ciento) y las medidas de la hoja de estilos a escala. El cristal: la clase
+        .nv-cristal en la ventana (el fondo de color y los paneles translúcidos los pinta la hoja de estilos)."""
+        look = look_conf()
+        s = Gtk.Settings.get_default()
+        if getattr(self, "nv_base_dpi", None) is None:
+            dpi = s.get_property("gtk-xft-dpi")
+            self.nv_base_dpi = dpi if dpi and dpi > 0 else 96 * 1024
+        want = int(self.nv_base_dpi * look["zoom"] / 100)
+        if s.get_property("gtk-xft-dpi") != want:
+            s.set_property("gtk-xft-dpi", want)
+        if getattr(self, "nv_zoom_loaded", 100) != look["zoom"]:
+            for text, prov in getattr(self, "nv_css", []):
+                prov.load_from_data(css_zoom(text, look["zoom"]).encode())
+        self.nv_zoom_loaded = look["zoom"]
+        if look["cristal"] and getattr(self, "nv_glass_prov", None) is None:
+            self.nv_glass_prov = Gtk.CssProvider()
+            self.nv_glass_prov.load_from_data(glass_css().encode())
+            Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), self.nv_glass_prov,
+                                                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        ctx = self.win.get_style_context()
+        (ctx.add_class if look["cristal"] else ctx.remove_class)("nv-cristal")
 
     def nv_look_tools(self):
         """Configuración, Apariencia: en tres bloques, cada uno con su título, porque hacen cosas distintas:
@@ -440,6 +467,17 @@ class NvTerminal:
                "color", look["color"])
         switch(lb, "Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre",
                "marcas", look["marcas"])
+        lb = block("Tamaño y aspecto", "Más pequeña para que quepa más, y el aspecto de cristal")
+        row = ActionRow("Tamaño de la ventana", "Letras, márgenes y botones. 100 %: el de siempre")
+        zoom = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        for z in LOOK_ZOOMS:
+            zoom.append(str(z), "%d %%" % z)
+        zoom.set_active_id(str(look["zoom"]))
+        zoom.connect("changed", lambda w: w.get_active_id() and self.nv_look_set("zoom", int(w.get_active_id())))
+        row.add_suffix(zoom)
+        lb.add(row)
+        switch(lb, "Cristal", "Paneles translúcidos sobre un fondo de color. Gasta algo más al redibujar la ventana, "
+               "nada mientras no cambia", "cristal", look["cristal"])
         lb = block("Apartados del menú lateral",
                    "Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)")
         # (en dos columnas: la primera mitad a la izquierda y el resto a la derecha)

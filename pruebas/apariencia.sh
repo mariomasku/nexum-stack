@@ -52,12 +52,12 @@ code = t[start:t.index("\nclass MonoLogo(Gtk.DrawingArea):", start)]
 g = {"os": os, "json": json, "LOG_DIR": w, "SIMULATE": False}
 exec(code, g)
 c = g["look_conf"]()
-print("%d|sin fichero: de un color, sin logotipos y todo a la vista" % (c == {"color": False, "marcas": False, "ocultos": set()}))
+print("%d|sin fichero: de un color, sin logotipos y todo a la vista" % (c == {"color": False, "marcas": False, "ocultos": set(), "zoom": 100, "cristal": False}))
 open(g["LOOK_FILE"], "w").write("no es json")
 print("%d|un fichero roto no rompe nada" % (g["look_conf"]()["ocultos"] == set()))
 json.dump({"color": True, "marcas": "si", "ocultos": ["node", "proyectos", "config", "inventado", 3]}, open(g["LOOK_FILE"], "w"))
 c = g["look_conf"]()
-print("%d|solo lo que vale: Proyectos, Configuracion y lo desconocido no se ocultan" % (c == {"color": True, "marcas": False, "ocultos": {"node"}}))
+print("%d|solo lo que vale: Proyectos, Configuracion y lo desconocido no se ocultan" % (c == {"color": True, "marcas": False, "ocultos": {"node"}, "zoom": 100, "cristal": False}))
 c["marcas"] = True; c["ocultos"] = {"docker", "repos"}
 g["look_save"](c)
 print("%d|se guarda y se vuelve a leer igual" % (g["look_conf"]() == c and not os.path.exists(g["LOOK_FILE"] + ".nuevo")))

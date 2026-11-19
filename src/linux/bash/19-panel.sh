@@ -1131,6 +1131,15 @@ QUE HACE
 
 VERSIONES
 
+1.57.35 (19 nov 2026)
+- Apariencia: «Tamaño de la ventana», al 80, 90, 100 o 110 %, para ver
+  todo más pequeño (o más grande): letras, márgenes y botones, al
+  momento. Y «Cristal»: en Linux, paneles translúcidos sobre un fondo de
+  color difuminado; en el Mac, la ventana translúcida con el escritorio
+  desenfocado detrás. Apagado de serie. En Linux, el fondo se pinta una
+  sola vez, así que pintar la ventana con cristal cuesta unos 2,6 ms frente
+  a 0,9 ms sin él, y nada mientras no cambia.
+
 1.57.34 (19 nov 2026)
 - Con una tarea en marcha, los botones que lanzarían otra ya no se
   apagan: se ven atenuados y se pueden pulsar, y en vez de hacer lo suyo

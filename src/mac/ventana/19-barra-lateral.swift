@@ -20,7 +20,13 @@ struct LookConf: Equatable {
     var color = false
     var marcas = false
     var ocultos: Set<String> = []
+    /// Tamaño de la ventana, en tanto por ciento (LOOK_ZOOMS), y el cristal (translúcida, con el escritorio
+    /// desenfocado detrás: lo hace macOS)
+    var zoom = 100
+    var cristal = false
 }
+
+let LOOK_ZOOMS = [80, 90, 100, 110]
 
 func loadLook() -> LookConf {
     var c = LookConf()
@@ -30,12 +36,15 @@ func loadLook() -> LookConf {
     c.color = o["color"] as? Bool ?? false
     c.marcas = o["marcas"] as? Bool ?? false
     c.ocultos = Set((o["ocultos"] as? [String] ?? []).filter { keys.contains($0) })
+    if let z = o["zoom"] as? Int, LOOK_ZOOMS.contains(z) { c.zoom = z }
+    c.cristal = o["cristal"] as? Bool ?? false
     return c
 }
 
 func saveLook(_ c: LookConf) {
     if SIMULATE { return }
-    let o: [String: Any] = ["color": c.color, "marcas": c.marcas, "ocultos": c.ocultos.sorted()]
+    let o: [String: Any] = ["color": c.color, "marcas": c.marcas, "ocultos": c.ocultos.sorted(),
+                            "zoom": c.zoom, "cristal": c.cristal]
     guard let data = try? JSONSerialization.data(withJSONObject: o) else { return }
     try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
                                              attributes: [.posixPermissions: 0o700])
@@ -117,6 +126,18 @@ struct AppearanceCard: View {
                 }
                 Tile("Logotipos de Docker, Node y PHP", "Con su logotipo y su tipografía en lugar del nombre") {
                     Toggle("", isOn: Binding(get: { model.look.marcas }, set: { model.look.marcas = $0 }))
+                        .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                }
+            }
+            block("Tamaño y aspecto", "Más pequeña para que quepa más, y el aspecto de cristal") {
+                Tile("Tamaño de la ventana", "Letras, márgenes y botones. 100 %: el de siempre") {
+                    Picker("", selection: Binding(get: { model.look.zoom }, set: { model.look.zoom = $0 })) {
+                        ForEach(LOOK_ZOOMS, id: \.self) { Text("\($0) %").tag($0) }
+                    }
+                    .labelsHidden().frame(width: 90)
+                }
+                Tile("Cristal", "Translúcida, con el escritorio desenfocado detrás. Lo pinta macOS con la tarjeta gráfica: la ventana casi no gasta más") {
+                    Toggle("", isOn: Binding(get: { model.look.cristal }, set: { model.look.cristal = $0 }))
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                 }
             }

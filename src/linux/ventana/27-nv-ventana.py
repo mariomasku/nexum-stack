@@ -52,11 +52,14 @@ class App2(NvBandeja,
                 widget.connect("notify::popup-shown", popup_shown)
             return True
         GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
+        # (las dos hojas se guardan con su texto: el tamaño de Apariencia las vuelve a cargar a escala)
+        self.nv_css = []
         for text in (CSS, NEW_CSS):
             prov = Gtk.CssProvider()
-            prov.load_from_data(text.encode())
+            prov.load_from_data(css_zoom(text, look_conf()["zoom"]).encode())
             Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov,
                                                      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self.nv_css.append((text, prov))
         theme = Gtk.IconTheme.get_default()
         self.icon = ICON if theme.lookup_icon(ICON, 24, 0) else "utilities-terminal"
         Gtk.Window.set_default_icon_name(self.icon)
@@ -78,6 +81,7 @@ class App2(NvBandeja,
         self.tray, self.tray_items, self.tray_ticks = None, {}, 0
         self.nv_tray_setup()
         self.win.set_default_size(1240, 840)
+        self.nv_apply_look()
         self.win.set_titlebar(self.nv_header())
         try:
             with open(THEME_FILE, encoding="utf-8") as f:

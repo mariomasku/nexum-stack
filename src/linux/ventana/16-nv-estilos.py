@@ -219,6 +219,21 @@ button.pildora { border-radius: 8px; padding: 6px 20px; }
 .nv-consola-marco { border-radius: 10px; background-color: #1d2228; border: 1px solid alpha(black, 0.25); }
 textview.nv-consola, textview.nv-consola text { background-color: #1d2228; color: #d7dee6; font-size: 9.5pt; }
 expander title > arrow { min-width: 14px; }
+/* Apariencia, cristal (.nv-cristal en la ventana): encima del fondo de color difuminado (glass_css), la cabecera,
+   las columnas y los paneles translúcidos, con un borde claro y un brillo arriba, como un cristal. Mientras no
+   cambia nada no gasta; al redibujar, poco más que sin él (la sombra de los paneles, corta) */
+.nv-cristal headerbar.nv-cabecera { background-image: none; background-color: alpha(@theme_bg_color, 0.50);
+    border-bottom: 1px solid alpha(white, 0.10); box-shadow: inset 0 -1px alpha(black, 0.10); }
+.nv-cristal .nv-lateral { background-color: alpha(@theme_bg_color, 0.42); border-right: 1px solid alpha(white, 0.10); }
+.nv-cristal .nv-subnav-lateral { background-color: alpha(@theme_bg_color, 0.30); border-right: 1px solid alpha(white, 0.08); }
+.nv-cristal list.caja, .nv-cristal .nv-grupo, .nv-cristal .nv-tarjeta, .nv-cristal .nv-mosaico, .nv-cristal .nv-stat,
+.nv-cristal .nv-subnav-caja, .nv-cristal .nv-hundido, .nv-cristal .nv-pastilla, .nv-cristal .nv-selectores {
+    background-color: alpha(@theme_base_color, 0.42); border: 1px solid alpha(white, 0.13);
+    box-shadow: inset 0 1px alpha(white, 0.10), 0 2px 8px alpha(black, 0.14); }
+.nv-cristal.nv-claro list.caja, .nv-cristal.nv-claro .nv-grupo, .nv-cristal.nv-claro .nv-tarjeta,
+.nv-cristal.nv-claro .nv-mosaico, .nv-cristal.nv-claro .nv-stat, .nv-cristal.nv-claro .nv-subnav-caja {
+    background-color: alpha(white, 0.55); border: 1px solid alpha(white, 0.75);
+    box-shadow: inset 0 1px alpha(white, 0.9), 0 2px 8px alpha(black, 0.08); }
 """ % {"b": BLUE, "g": NEW_GREEN}
 
 KIND_TEXT = {"wp": "WordPress", "ps": "PrestaShop"}
