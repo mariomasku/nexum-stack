@@ -1131,6 +1131,12 @@ QUE HACE
 
 VERSIONES
 
+1.57.30 (19 nov 2026)
+- Al instalar o actualizar una versión de PHP, el registro de la tarea
+  escribe cada 30 segundos por dónde va la compilación («[ 41%]
+  Compilando... sigue (2 min 30 s)»). Se quedaba minutos en la misma
+  línea y parecía congelado.
+
 1.57.29 (19 nov 2026)
 - Instalar o actualizar una versión de PHP con MariaDB 11.8.10 (o
   12.3.4) ponía uno de sus plugins (TidesDB, de 1 MB) en lugar de

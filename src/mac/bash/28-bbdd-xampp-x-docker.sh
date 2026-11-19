@@ -394,6 +394,12 @@ QUE HACE
 
 VERSIONES
 
+1.57.30 (19 nov 2026)
+- Al instalar o actualizar una versión de PHP, el registro de la tarea
+  escribe cada 30 segundos por dónde va la compilación («[ 41%]
+  Compilando... sigue (2 min 30 s)»). Se quedaba minutos en la misma
+  línea y parecía congelado.
+
 1.57.29 (19 nov 2026)
 - Mismo número que la de Linux, que arregla la descarga de MariaDB (en
   Linux ponía uno de sus plugins en lugar de MariaDB). En el Mac se

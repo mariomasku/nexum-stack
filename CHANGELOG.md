@@ -4,6 +4,10 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.30 · 19 nov 2026
+
+- Al instalar o actualizar una versión de PHP, el registro de la tarea escribe cada 30 segundos por dónde va la compilación («[ 41%] Compilando... sigue (2 min 30 s)»). Se quedaba minutos en la misma línea y parecía congelado.
+
 ## 1.57.29 · 19 nov 2026
 
 - Instalar o actualizar una versión de PHP con MariaDB 11.8.10 (o 12.3.4) ponía uno de sus plugins (TidesDB, de 1 MB) en lugar de MariaDB: la versión se quedaba sin servidor de bases de datos («MariaDB no ha arrancado») y sin su cliente (bin/mysql). Ahora se descarga MariaDB, y si lo descargado no trae su servidor, se cancela y se quita de la caché de descargas.

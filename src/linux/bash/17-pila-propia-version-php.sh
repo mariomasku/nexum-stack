@@ -1803,6 +1803,8 @@ function no_tty() {
     ( set -o pipefail; /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" < /dev/null 2>&1 | cat )
 }
 
+#@incluir comun/pila-propia-version-php/step_watch.sh
+
 function step() {
     local part=$1 from=$2 to=$3 lines=$4 desc=$5 log=$6
     shift 6
@@ -1816,7 +1818,8 @@ function step() {
     # Sin terminal (en su propia sesion): lo que se compila esta en una carpeta tuya y lo puede cambiar
     # cualquier programa tuyo; con la terminal de la tarea podria usar el permiso de sudo que ya se ha
     # dado (sudo -n). Sin ella, sudo le pediria la contraseña y falla
-    if ! /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" > "$log" 2>&1 < /dev/null; then
+    # (mientras dura, por donde va: step_watch)
+    if ! step_watch "$(bar_pct "$from" "$part")" "$(bar_pct "$to" "$part")" "$lines" "$desc" "$log" /usr/bin/python3 -I -c "$NO_TTY_PY" "$@"; then
         echo "  ERROR: $desc. Ultimas lineas de $(basename "$log"):"
         tail -25 "$log" | sed 's/^/    /'
         # Compilando en paralelo, el error real queda lejos del final (tapado por avisos de otros
