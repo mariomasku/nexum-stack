@@ -348,7 +348,7 @@ class NvDatosAvisos:
                 b = css(Gtk.Button(label="Activa", sensitive=False), "nv-activa")
             else:
                 # (como «Cargar» en Proyectos: solo en la version con el raton encima)
-                b = css(Gtk.Button(label="Activar", sensitive=not self.busy), "nv-azul")
+                b = css(busy_guard(Gtk.Button(label="Activar"), self.busy), "nv-azul")
                 b.connect("clicked", self.on_activate_version, folder)
                 b.set_opacity(0)
             b.set_size_request(96, -1)

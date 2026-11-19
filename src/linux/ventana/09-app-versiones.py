@@ -388,7 +388,7 @@ class AppVersiones:
                                      else "una carpeta de fuera de /opt/htdocs"))
             w["err4"].set_label(err)
             w["err4"].set_visible(bool(err))
-        w["next"].set_sensitive(ok and not self.busy)
+        busy_guard(w["next"], self.busy).set_sensitive(ok)
 
     def new_project_nodb_note(self):
         """Sin BBDD: lo que pasa con la web (si es de la lista de GitHub, se sabe si es un WordPress o una tienda;
@@ -939,12 +939,12 @@ class AppVersiones:
         current = self.projects and os.path.basename(self.projects["current"].rstrip("/")) == name
         if current:
             row.add_title_tag(label("Cargado", "texto-activa", "subtitulo"))
-        lk = Gtk.Button(tooltip_text="Opciones de la BBDD de %s…"
-                        % name, relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy and bool(self.data))
+        lk = busy_guard(Gtk.Button(tooltip_text="Opciones de la BBDD de %s…"
+                        % name, relief=Gtk.ReliefStyle.NONE, sensitive=bool(self.data)), self.busy)
         lk.add(icon("insert-link-symbolic"))
         lk.connect("clicked", lambda *_: self.on_link_project(x))
         row.add_suffix(lk)
-        b = Gtk.Button(label="Cargar", sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(label="Cargar"), self.busy)
         b.connect("clicked", lambda *_: self.on_load_folder(x))
         row.add_suffix(b)
         return row

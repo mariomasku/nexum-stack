@@ -279,13 +279,13 @@ class NvProyectos:
             row = ActionRow("PHP %s" % v, (self.dk_url(p["domain"]) + ("  ·  la elegida" if on else ""))
                             if ps else self.dk_url(docker_web_domain(p, v)))
             if ps and not on:
-                b = Gtk.Button(label="Elegir", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b = busy_guard(Gtk.Button(label="Elegir", valign=Gtk.Align.CENTER), self.busy)
                 b.connect("clicked", lambda *_, v=v: act(["docker-php-elegir", p["slug"], v], "%s con PHP %s" % (p["folder"], v),
                                                           "%s ya va con PHP %s" % (p["folder"], v)))
                 row.add_suffix(b)
             if len(p["versions"]) > 1:
-                b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Quitar PHP %s" % v)
+                b = busy_guard(Gtk.Button(valign=Gtk.Align.CENTER,
+                               tooltip_text="Quitar PHP %s" % v), self.busy)
                 b.add(icon("user-trash-symbolic"))
                 b.connect("clicked", lambda *_, v=v: act(["docker-php-quitar", p["slug"], v], "Quitando PHP %s de %s" % (v, p["folder"]),
                                                           "PHP %s quitado de %s" % (v, p["folder"])))
@@ -299,7 +299,7 @@ class NvProyectos:
                 c.append(v, "PHP %s" % v)
             c.set_active(0)
             row.add_suffix(c)
-            b = css(Gtk.Button(label="Añadir", valign=Gtk.Align.CENTER, sensitive=not self.busy), "nv-azul")
+            b = css(busy_guard(Gtk.Button(label="Añadir", valign=Gtk.Align.CENTER), self.busy), "nv-azul")
             b.connect("clicked", lambda *_: c.get_active_id() and act(
                 ["docker-php-añadir", p["slug"], c.get_active_id()], "Añadiendo PHP %s a %s" % (c.get_active_id(), p["folder"]),
                 "%s con PHP %s" % (p["folder"], c.get_active_id())))
@@ -510,7 +510,7 @@ class NvProyectos:
         hover, dk = [], None
         if self.nv_docker_of(x["name"]):
             dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
-            dk.set_sensitive(not self.busy)
+            busy_guard(dk, self.busy).set_sensitive(True)
             hover.append(dk)
         # (al lado de Cargar: VS Code, su repositorio y phpMyAdmin con su BBDD de la version activa)
         quick = self.nv_row_quick(x, pairs)
@@ -520,11 +520,11 @@ class NvProyectos:
                 box.pack_end(w, False, False, 0)
             hover += quick
         else:
-            b = css(Gtk.Button(label="Cargar", sensitive=not self.busy), "nv-azul")
+            b = css(busy_guard(Gtk.Button(label="Cargar"), self.busy), "nv-azul")
             b.connect("clicked", lambda *_: self.on_load_folder(x))
             menu = self.nv_row_menu(x)
             menu.set_valign(Gtk.Align.CENTER)
-            menu.set_sensitive(not self.busy)
+            busy_guard(menu, self.busy).set_sensitive(True)
             box.pack_end(menu, False, False, 0)
             box.pack_end(b, False, False, 0)
             for w in reversed(quick):
@@ -631,7 +631,7 @@ class NvProyectos:
             env.append_text("Sin entornos")
         current = next((n for n, (k, o, _d) in enumerate(envs) if k == "lampp" and o["folder"] == self.data["active"]), 0)
         env.set_active(current if is_loaded else 0)
-        env.set_sensitive(bool(envs) and not self.busy)
+        busy_guard(env, self.busy).set_sensitive(bool(envs))
         dbl = label("", "nv-mono", valign=Gtk.Align.CENTER)
         dbl.set_size_request(180, -1)
 
@@ -704,7 +704,7 @@ class NvProyectos:
             btns["log"] = logb
             btns["actualizar"] = nv_button(logo("actualizar", 18), "Actualizar", "Actualizar proyecto",
                                            lambda *_: self.nv_update_project(x), "nv-proyecto-btn")
-            btns["actualizar"].set_sensitive(not self.busy)
+            busy_guard(btns["actualizar"], self.busy).set_sensitive(True)
             if x["kind"] in ("wp", "ps"):
                 btns["imagenes"] = self.nv_images_button(x)
             eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",

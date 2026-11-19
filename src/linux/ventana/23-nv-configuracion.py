@@ -59,7 +59,7 @@ class NvConfiguracion:
         on = not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))
         row = ActionRow("Barrera entre webs", "Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos"
                         if on else "Apagada: enciéndela cuando acabes de probar los pagos")
-        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw = busy_guard(Gtk.Switch(active=on, valign=Gtk.Align.CENTER), self.busy)
         sw.connect("notify::active", self.on_cross_site)
         row.add_suffix(sw)
         lb.add(row)
@@ -339,7 +339,7 @@ class NvConfiguracion:
             bad = problem() if (m or pw) else ""
             warn.set_label(bad)
             warn.set_visible(bool(bad) and bool(m and pw))
-            save.set_sensitive(not bad and not self.busy and (m, pw) != ((mail, password) if own else ("", "")))
+            busy_guard(save, self.busy).set_sensitive(not bad and (m, pw) != ((mail, password) if own else ("", "")))
         entry_mail.connect("changed", changed)
         entry_pass.connect("changed", changed)
 
@@ -458,7 +458,7 @@ class NvConfiguracion:
 
         def update():
             keys = picked()
-            btn.set_sensitive(bool(keys) and not self.busy)
+            busy_guard(btn, self.busy).set_sensitive(bool(keys))
             if sizes:
                 all_b = sum(b for b, n in sizes.values() if n)
                 sel = sum(sizes[k][0] for k in keys)
@@ -495,7 +495,7 @@ class NvConfiguracion:
             for key, (size, chk) in rows.items():
                 b, n = sizes.get(key, (0, 0))
                 size.set_label("%s · %s" % (fmt_size(b), plural(n, "fichero", "ficheros")) if n else "Vacío")
-                chk.set_sensitive(n > 0 and not self.busy)
+                busy_guard(chk, self.busy).set_sensitive(n > 0)
             if not sizes:
                 total.subtitle.set_label("No se ha podido medir: %s" % (out.strip().splitlines() or ["sin respuesta"])[-1])
             update()
@@ -756,12 +756,11 @@ class NvConfiguracion:
         row.subtitle.set_label(text)
         for ch in row.suffix.get_children():
             row.suffix.remove(ch)
-        b = Gtk.Button(label="Buscar de nuevo", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(label="Buscar de nuevo", valign=Gtk.Align.CENTER), self.busy)
         b.connect("clicked", lambda *_: (setattr(self, "components", None), self.build_tools()))
         row.add_suffix(b)
         if res["items"]:
-            b = css(Gtk.Button(label="Actualizar todo (%d)" % len(res["items"]), valign=Gtk.Align.CENTER,
-                               sensitive=not self.busy), "verde")
+            b = css(busy_guard(Gtk.Button(label="Actualizar todo (%d)" % len(res["items"]), valign=Gtk.Align.CENTER), self.busy), "verde")
             b.connect("clicked", lambda *_: self.nv_components_update(res))
             row.add_suffix(b)
         row.suffix.show_all()
@@ -821,7 +820,7 @@ class NvConfiguracion:
             later.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), updates_ignore(res["items"]),
                                                  self.nv_warn_refresh()))
             row.add_suffix(later)
-            go = css(Gtk.Button(label="Actualizar todo", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            go = css(busy_guard(Gtk.Button(label="Actualizar todo", valign=Gtk.Align.CENTER), self.busy), "verde")
             go.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), self.nv_components_update(res)))
             row.add_suffix(go)
             lb.add(row)

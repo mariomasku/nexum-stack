@@ -33,7 +33,7 @@ class NvBasesDatos:
         t.pack_start(label("Cada versión con su MariaDB y sus BBDD (sin las del sistema)", "nv-chico", "nv-tenue"), False, False, 0)
         head.pack_start(t, True, True, 0)
         new = nv_button("list-add-symbolic", "Nueva BBDD…", "Crear una BBDD vacía", self.on_create_db, "nv-azul")
-        new.set_sensitive(bool(act) and not self.busy)
+        busy_guard(new, self.busy).set_sensitive(bool(act))
         head.pack_end(new, False, False, 0)
         pma = nv_button(logo("phpmyadmin", 16), "phpMyAdmin", "phpMyAdmin de la versión activa",
                         lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/"))
@@ -324,7 +324,7 @@ class NvBasesDatos:
                 b.set_sensitive(d["running"])
                 grp_acts.append(b)
                 b = nv_button("list-add-symbolic", None, "Crear una BBDD vacía aquí", self.on_create_db, flat=True)
-                b.set_sensitive(not self.busy)
+                busy_guard(b, self.busy).set_sensitive(True)
                 grp_acts.append(b)
             total = sum(self.db_sizes.get((inst["owner"], db), (0, 0))[0] for db in d["dbs"].get(inst["owner"], []))
             row([name, label(sub, "nv-chico", "nv-tenue"),
@@ -363,11 +363,11 @@ class NvBasesDatos:
                 acts.append(self.download_button(db, folder))
                 ld = nv_button("folder-open-symbolic", None, "Cargar su proyecto (en lampp-%s)" % folder,
                                lambda *_, db=db, inst=inst: self.on_load_project(db, inst), flat=True)
-                ld.set_sensitive(not self.busy)
+                busy_guard(ld, self.busy).set_sensitive(True)
                 acts.append(ld)
                 if active:
                     rm = nv_button("user-trash-symbolic", None, "Borrar la BBDD %s" % db, lambda *_, db=db: self.on_drop_db(db), flat=True)
-                    rm.set_sensitive(not self.busy)
+                    busy_guard(rm, self.busy).set_sensitive(True)
                     acts.append(rm)
                 row([n, pl, size_label(inst["owner"], db), ch, actions(acts)], indent=26)
         if not shown:

@@ -35,7 +35,7 @@ struct UpdateProjectSheet: View {
 
     var body: some View {
         let dbOk = validDbName(model.upDb.trimmingCharacters(in: .whitespaces))
-        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk) && !model.busy
+        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk)
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Actualizar proyecto").font(.headline)
@@ -77,7 +77,7 @@ struct UpdateProjectSheet: View {
                 Button("Cancelar") { model.upShown = false }.buttonStyle(OutlineButton(big: true))
                 Button("Actualizar…") { model.upAsk() }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(!can)
+                    .disabled(!can).busyGuard(model.busy)
             }
         }
         .padding(22)
@@ -248,13 +248,13 @@ struct ProjectsView: View {
                 Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
                 Button("En Docker…") { model.openDockerForm(folder: x.name) }
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             .tip("Añadir entorno")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
                 SearchPicker(selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) }),
                              items: envs.isEmpty ? [("", "Sin entornos")] as [(String, String)] : envs.map { ($0.0, $0.1) })
-                .disabled(envs.isEmpty || model.busy)
+                .disabled(envs.isEmpty).busyGuard(model.busy)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("BBDD").font(.caption).foregroundColor(.secondary)
@@ -265,7 +265,7 @@ struct ProjectsView: View {
             }
             Button(action: { model.linkProject(x) }) { Image(systemName: "link") }
                 .buttonStyle(LinkHoverButton())
-                .disabled(model.busy || model.data == nil)
+                .disabled(model.data == nil).busyGuard(model.busy)
                 .tip("Opciones de la BBDD…")
           }
         }
@@ -281,7 +281,7 @@ struct ProjectsView: View {
             } else {
                 Button(action: { model.loadFolder(x) }) { Label("Cargar", systemImage: "play.fill") }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Cargar \(x.name)")
             }
             Spacer(minLength: 8)
@@ -297,7 +297,7 @@ struct ProjectsView: View {
                         }
                         Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
                             .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
-                            .disabled(model.busy)
+                            .busyGuard(model.busy)
                     }
                     .padding(.trailing, 6)
                     .tip(h.fake ? "Host falseado" : "Falsear Host")
@@ -322,11 +322,11 @@ struct ProjectsView: View {
                         tip: "Desmontar el proyecto") {
                 model.unloadProject()
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
         } else {
             Button(action: { model.unloadProject() }) { Image(systemName: "eject.fill") }
                 .buttonStyle(LinkHoverButton())
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip("Desmontar el proyecto")
         }
     }
@@ -367,9 +367,9 @@ struct ProjectsView: View {
                                               tip: model.dockerOf(x.name).isEmpty ? "Montar en Docker"
                                                 : "Arrancar en Docker") {
             model.dockerForLoaded(x)
-        }.disabled(model.busy))
+        }.busyGuard(model.busy))
         items["compartir"] = AnyView(model.shareButton(String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
-            .disabled(model.busy))
+            .busyGuard(model.busy))
         // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
         let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)
         items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
@@ -379,12 +379,12 @@ struct ProjectsView: View {
         items["actualizar"] = AnyView(VisorButton(conf: c, name: "Actualizar", icon: .logo("actualizar"),
                                                   tip: "Actualizar proyecto") {
             model.upOpen(x)
-        }.disabled(model.busy))
+        }.busyGuard(model.busy))
         if x.kind == "wp" || x.kind == "ps" {
             items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
                                                     tip: "Traer de producción las imágenes que falten") {
                 model.importImages(x)
-            }.disabled(model.busy))
+            }.busyGuard(model.busy))
         }
         return items
     }
@@ -428,14 +428,14 @@ struct ProjectsView: View {
             VisorButton(conf: model.visorConf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: moreTip) {
                 popMenu(items)
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
         } else {
             OutlineMenu(nil, symbol: "ellipsis") {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                     Button(it.0) { it.1() }
                 }
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             .tip(moreTip)
         }
     }
@@ -465,7 +465,7 @@ struct ProjectsView: View {
             // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
             Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip("Clonar y montar un repositorio")
         }
         .padding(.top, 10)
@@ -540,7 +540,7 @@ struct ProjectsView: View {
                         }
                     }
                     .buttonStyle(OutlineButton(compact: true))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Arrancar \(x.name) en Docker")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
@@ -553,7 +553,7 @@ struct ProjectsView: View {
                     // «Cargar» solo al pasar el ratón por el proyecto (el hueco se guarda: la fila no salta)
                     Button("Cargar") { model.loadFolder(x) }
                         .buttonStyle(OutlineButton(kind: "primary", compact: true))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .opacity(hover ? 1 : 0)
                         .allowsHitTesting(hover)
                     // (lo que antes solo se hacía arriba con el proyecto elegido, sin cambiar el de arriba)
@@ -578,7 +578,7 @@ struct ProjectsView: View {
                         }
                         Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip(hover ? moreTip : "")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)

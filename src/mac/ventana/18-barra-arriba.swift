@@ -358,7 +358,7 @@ struct WarningsView: View {
                             Button("Ahora no") { model.ignoreUpdates(c) }
                             Button("Actualizar todo") { model.updateComponents(c) }
                                 .buttonStyle(OutlineButton(kind: "primary"))
-                                .disabled(model.busy)
+                                .busyGuard(model.busy)
                         })
                 }
             }
@@ -370,7 +370,7 @@ struct WarningsView: View {
                     Card("Hay un XAMPP oficial en /Applications/XAMPP",
                          "Este gestor necesita que /Applications/XAMPP sea un enlace a la versión activa. Al apartarlo se copian sus BBDD, sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>, sin borrar nada.") {
                         Row("XAMPP oficial") {
-                            Button("Apartar…") { model.setAside() }.disabled(model.busy)
+                            Button("Apartar…") { model.setAside() }.busyGuard(model.busy)
                         }
                     }
                 }
@@ -382,7 +382,7 @@ struct WarningsView: View {
                             Row("MariaDB de XAMPP-\(d.dbsysVersion)", "Registro de errores: \(fmtSize(d.dbsysLog))", trailing: {
                                 Button("Repararlas") { model.repairDbSystem() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -394,7 +394,7 @@ struct WarningsView: View {
                                 oldPma.map { "XAMPP-\($0.folder) (\($0.pma))" }.joined(separator: ", "), trailing: {
                                 Button("Actualizarlos") { model.updatePma("--todas") }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -405,7 +405,7 @@ struct WarningsView: View {
                                 Row("Versiones sin proteger", d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "), trailing: {
                                     Button("Protegerlas") { model.secureAll() }
                                         .buttonStyle(OutlineButton(kind: "primary"))
-                                        .disabled(model.busy)
+                                        .busyGuard(model.busy)
                                 })
                             }
                         }
@@ -415,7 +415,7 @@ struct WarningsView: View {
                                 Row("XAMPP-\(d.apacheOld)", "Reiniciar Apache para que la use", trailing: {
                                     Button("Reiniciar Apache") { model.reloadApacheConfig() }
                                         .buttonStyle(OutlineButton(kind: "primary"))
-                                        .disabled(model.busy)
+                                        .busyGuard(model.busy)
                                 })
                             }
                         }
@@ -427,7 +427,7 @@ struct WarningsView: View {
                             Row("Proyectos con https", certsNames(d), trailing: {
                                 Button("Arreglarlos") { model.fixCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -441,7 +441,7 @@ struct WarningsView: View {
                                 trailing: {
                                 Button("Confiar") { model.trustCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -455,7 +455,7 @@ struct WarningsView: View {
                                 trailing: {
                                 Button("Quitar") { model.untrustCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -474,7 +474,7 @@ struct WarningsView: View {
                         Card("Hay procesos de otras versiones en memoria",
                              "Solo debería estar en memoria la versión montada\(d.active.isEmpty ? "" : " (XAMPP-\(d.active))"). Ocupan memoria y pueden bloquear los puertos 80, 443 y 3306.") {
                             Row("Procesos que sobran", d.stray) {
-                                Button("Cerrarlos") { model.closeStray() }.disabled(model.busy)
+                                Button("Cerrarlos") { model.closeStray() }.busyGuard(model.busy)
                             }
                         }
                     }
@@ -485,7 +485,7 @@ struct WarningsView: View {
                                 Row(o.folder, o.domains.isEmpty ? "sin dominio" : o.domains)
                             }
                             Row("Quitar sus vhosts", "Pide la contraseña de administrador") {
-                                Button("Quitarlos") { model.removeOrphanVhosts() }.disabled(model.busy)
+                                Button("Quitarlos") { model.removeOrphanVhosts() }.busyGuard(model.busy)
                             }
                         }
                     }

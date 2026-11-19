@@ -74,7 +74,7 @@ struct IdleStopCard: View {
                 }), items: (choices + (choices.contains(hours) ? [] : [hours])).map { h in
                     (h, h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas")
                 }, width: 210)
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .onAppear { read() }
@@ -106,26 +106,26 @@ struct GitHubCard: View {
                  : "Sin conectar: hace falta para ver la lista de repositorios (también los privados)") {
                 Button("Conectar con un token…") { model.githubToken() }
                     .buttonStyle(OutlineButton(kind: g?.on == true ? "" : "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 if g?.source != "gh" && ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].contains(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
                     Button("Usar la sesión de gh") { runQuick(["github-conectar", "--gh"]) { rc, out in model.githubDone(rc, out) } }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .tip("Usar la sesión de gh auth login")
                 }
                 if !(g?.source ?? "").isEmpty {
                     Button("Desconectar") { runQuick(["github-desconectar"]) { rc, out in model.githubDone(rc, out) } }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
             }
             Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)") {
                 TextField("", text: $account).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 170)
                 Button("Guardar") { model.githubSet("cuenta", account.trimmingCharacters(in: .whitespaces)) }
-                    .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "") || model.busy)
+                    .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "")).busyGuard(model.busy)
             }
             Tile("Prefijos de los repositorios", "Separados por espacios (wordpress- tienda- …); vacío: todos") {
                 TextField("", text: $prefixes).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 240)
                 Button("Guardar") { model.githubSet("prefijos", prefixes.trimmingCharacters(in: .whitespaces)) }
-                    .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "") || model.busy)
+                    .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "")).busyGuard(model.busy)
             }
         }
         .onAppear { if model.github == nil { model.reloadGithub() } else { fill() } }
@@ -206,22 +206,22 @@ struct NodeView: View {
             iconButton(.logo("log"), "Registro: lo último que ha dicho su servidor") {
                 model.runTask("Registro de \(p.folder)", ["node-registro", p.folder])
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             if p.running {
                 iconButton(.symbol("arrow.clockwise", Color.primary), p.mode == "compilado" ? "Volver a compilar y arrancar" : "Reiniciar su servidor") {
                     model.startNode(p, mode: p.mode)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue), tip: "Abrir \(p.url)") { openURL(p.url) }
             } else {
                 VisorButton(conf: c, name: "Arrancar", icon: .symbol("play.fill", Color.green), tip: "En desarrollo: los cambios se ven al momento") {
                     model.startNode(p, mode: "desarrollo")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 VisorButton(conf: c, name: "Compilar", icon: .symbol("hammer.fill", Color.primary), tip: "Compilar y arrancar, como en producción") {
                     model.startNode(p, mode: "compilado")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
             if sharing {
                 VisorButton(conf: c, name: "Compartiendo", icon: .logo("cloudflare"), tip: "Ver dirección y contraseña del túnel", kind: "compartiendo") {
@@ -232,13 +232,13 @@ struct NodeView: View {
                             tip: p.running && p.mode == "compilado" ? "Compartir con un túnel de Cloudflare" : "Compilar, arrancar y compartir con un túnel de Cloudflare") {
                     model.shareNode(p)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
             if p.running {
                 VisorButton(conf: c, name: "Parar", icon: .symbol("stop.fill", Color.red), tip: "Parar su servidor (y su túnel, si se está compartiendo)") {
                     model.stopNode(p)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .padding(.horizontal, 14)
@@ -330,7 +330,7 @@ struct ReposView: View {
             if item.state == "clonado" {
                 Button("Traer cambios") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton())
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Actualizar con git pull")
             } else if item.state == "ocupado" {
                 Button("Clonar") {}
@@ -340,7 +340,7 @@ struct ReposView: View {
             } else {
                 Button("Clonar") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Clonar por SSH en htdocs")
             }
             // (para pegarlo en Nuevo proyecto)

@@ -55,7 +55,7 @@ class NvBandeja:
         else:
             it["state"].set_label("● lampp-%s en marcha" % act if d.get("running") else "○ lampp-%s parada" % act)
             it["power"].set_label("Parar y desactivar" if d.get("running") else "Arrancar lampp-%s" % act)
-        it["power"].set_sensitive(bool(d) and not self.busy)
+        busy_guard(it["power"], self.busy).set_sensitive(bool(d))
         link = (self.projects or {}).get("link") or ""
         it["web"].set_label("Abrir %s" % (link or "web.local"))
         it["web"].set_sensitive(bool(link) and bool(d.get("running")))

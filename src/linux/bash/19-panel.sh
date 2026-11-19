@@ -1131,6 +1131,12 @@ QUE HACE
 
 VERSIONES
 
+1.57.34 (19 nov 2026)
+- Con una tarea en marcha, los botones que lanzarían otra ya no se
+  apagan: se ven atenuados y se pueden pulsar, y en vez de hacer lo suyo
+  dicen qué tarea sigue en marcha. Vale para botones, interruptores y
+  desplegables de todas las páginas.
+
 1.57.33 (19 nov 2026)
 - Con una tarea en marcha (como actualizar los componentes), lo que
   lanza otra avisa antes de preguntar nada: «Hay una tarea en marcha»,

@@ -435,7 +435,7 @@ struct DockerNewPanel: View {
                 Button("Cancelar") { model.panel = nil }.buttonStyle(OutlineButton())
                 Button("Crear en Docker") { model.dockerCreate() }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(folders.isEmpty || model.dkForm.folder.isEmpty || model.busy)
+                    .disabled(folders.isEmpty || model.dkForm.folder.isEmpty).busyGuard(model.busy)
             }
         }
         .onAppear { model.fillDockerForm(folders) }

@@ -211,9 +211,9 @@ class NvCorreo:
         if not m:
             return
         on = m["on"]
-        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy,
+        sw = busy_guard(Gtk.Switch(active=on, valign=Gtk.Align.CENTER,
                         tooltip_text="Encendido: el correo de las webs va a Mailpit" if on else
-                        "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
+                        "Apagado: lo que manden las webs puede llegar de verdad a los clientes"), self.busy)
         sw.connect("notify::active", self.on_mail_switch)
         tail = Gtk.Box(spacing=8)
         tail.pack_start(sw, False, False, 0)
@@ -240,7 +240,7 @@ class NvCorreo:
             combo.append(key, text)
         combo.set_active_id(m["wp"])
         combo.set_tooltip_text("Qué hacer con sus plugins de correo")
-        combo.set_sensitive(on and not self.busy)
+        busy_guard(combo, self.busy).set_sensitive(on)
         combo.connect("changed", self.on_mail_wp)
         row.add_suffix(combo)
         lb.add(row)
@@ -252,10 +252,10 @@ class NvCorreo:
             if m["offer"] and m["version"] and ver_tuple(m["offer"]) > ver_tuple(m["version"]):
                 b = css(Gtk.Button(label="Actualizar a %s" % m["offer"], valign=Gtk.Align.CENTER), "verde")
                 b.connect("clicked", lambda *_: self.on_mail_install())
-                b.set_sensitive(not self.busy)
+                busy_guard(b, self.busy).set_sensitive(True)
                 row.add_suffix(b)
-            b = Gtk.Button(label="Vaciar", tooltip_text="Vaciar la bandeja", valign=Gtk.Align.CENTER,
-                           sensitive=m["running"] and not self.busy)
+            b = busy_guard(Gtk.Button(label="Vaciar", tooltip_text="Vaciar la bandeja", valign=Gtk.Align.CENTER,
+                           sensitive=m["running"]), self.busy)
             b.connect("clicked", lambda *_: self.on_mail_clear())
             row.add_suffix(b)
         else:
@@ -264,7 +264,7 @@ class NvCorreo:
                             "comprueba antes de instalarlo" % (m["offer"] or ""))
             row.subtitle.set_line_wrap(True)
             row.subtitle.set_ellipsize(0)
-            b = css(Gtk.Button(label="Instalar Mailpit", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            b = css(busy_guard(Gtk.Button(label="Instalar Mailpit", valign=Gtk.Align.CENTER), self.busy), "verde")
             b.connect("clicked", lambda *_: self.on_mail_install())
             row.add_suffix(b)
         lb.add(row)

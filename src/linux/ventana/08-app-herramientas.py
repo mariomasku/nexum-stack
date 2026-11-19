@@ -43,14 +43,14 @@ class AppHerramientas:
         b.connect("clicked", lambda *_: (os.makedirs(COPIES_DIR, mode=0o700, exist_ok=True),
                                          self.open_uri(GLib.filename_to_uri(COPIES_DIR))))
         row.add_suffix(b)
-        b = Gtk.Button(label="Borrar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
+        b = busy_guard(Gtk.Button(label="Borrar…", valign=Gtk.Align.CENTER, sensitive=n > 0), self.busy)
         b.connect("clicked", lambda *_: self.on_clear_copies(n, size))
         row.add_suffix(b)
         lb.add(row)
         # Copias de los ficheros que cambia el programa por su cuenta (nexum copias-ficheros si|no)
         row = ActionRow("Copias de los ficheros que cambia el programa",
                         "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos")
-        sw = Gtk.Switch(active=os.path.exists(COPIES_FILES_FLAG), valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw = busy_guard(Gtk.Switch(active=os.path.exists(COPIES_FILES_FLAG), valign=Gtk.Align.CENTER), self.busy)
         sw.connect("notify::active", self.on_copies_files)
         row.add_suffix(sw)
         lb.add(row)
@@ -63,7 +63,7 @@ class AppHerramientas:
                             fmt_size(size), plural(n, "fichero", "ficheros")) if n else "vacía"))
         row.set_tooltip_text("El código de los componentes ya comprobado: no se descarga otra vez al reintentar, "
                              "y se usa si su web no responde.")
-        b = Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0 and not self.busy)
+        b = busy_guard(Gtk.Button(label="Vaciar…", valign=Gtk.Align.CENTER, sensitive=n > 0), self.busy)
         b.connect("clicked", lambda *_: self.on_clear_downloads(size))
         row.add_suffix(b)
         lb.add(row)

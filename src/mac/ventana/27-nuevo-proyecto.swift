@@ -62,7 +62,7 @@ struct NewProjectWizard: View {
                 }
                 Button(model.npStep == 4 ? "Montar proyecto" : "Siguiente") { model.npGo(1) }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(!check.0 || model.busy)
+                    .disabled(!check.0).busyGuard(model.busy)
             }
         }
         .padding(16)

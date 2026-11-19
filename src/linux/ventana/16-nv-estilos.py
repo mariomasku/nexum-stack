@@ -39,6 +39,8 @@ NEW_CSS = """
 headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
 /* El aviso de abajo (toast): grande, con el logotipo de Nexum. La píldora (el fondo y el borde con los colores
    de su icono) la pinta toast_paint: aquí, solo sus márgenes */
+/* Lo que lanza una tarea, con otra en marcha: atenuado, pero se puede pulsar (dice cuál sigue) */
+.nv-espera { opacity: 0.5; }
 .nv-toast { padding: 15px 40px 15px 34px; }
 .nv-toast-texto { font-size: 1.15em; font-weight: 600; }
 .nv-pastilla { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;

@@ -41,7 +41,7 @@ struct ServicesView: View {
                     if services.contains(where: { $0.open }) {
                         Card("Se puede entrar desde otros equipos de la red") {
                             Row("Abierto a la red", d.exposed.isEmpty ? "Algún servicio escucha en toda la red" : d.exposed, trailing: {
-                                Button("Cerrar a la red") { model.secure() }.disabled(model.busy)
+                                Button("Cerrar a la red") { model.secure() }.busyGuard(model.busy)
                             })
                         }
                     }
@@ -64,11 +64,11 @@ struct ServicesView: View {
             Spacer(minLength: 8)
             // Arrancar o parar la versión entera: lo que hacía el botón Encendidos del visor
             if d.running {
-                Button("Parar y desactivar") { close(); model.power() }.disabled(model.busy)
+                Button("Parar y desactivar") { close(); model.power() }.busyGuard(model.busy)
             } else {
                 Button("Arrancar XAMPP-\(d.active)") { close(); model.power() }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
             }
             if exposed {
                 Badge(text: "Abierto a la red", symbol: "exclamationmark.triangle.fill", color: RED)
@@ -128,17 +128,17 @@ struct ServicesView: View {
                 Button(action: { model.service(sv.name, "reiniciar", title) }) {
                     Label("Reiniciar", systemImage: "arrow.clockwise")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 Button(action: { model.service(sv.name, "parar", title) }) {
                     Label("Parar", systemImage: "stop.fill")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             } else {
                 Button(action: { model.service(sv.name, "arrancar", title) }) {
                     Label("Arrancar", systemImage: "play.fill")
                 }
                 .buttonStyle(OutlineButton(kind: "primary"))
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .padding(16)
@@ -224,7 +224,7 @@ struct HostsView: View {
                         Row("\(f[0]) → \(f[1].isEmpty ? "sin línea en /etc/hosts" : f[1])", "Tiene que ir a 127.0.0.1, donde escucha Apache", trailing: {
                             Button("Arreglarlo") { model.fixHostsLink() }
                                 .buttonStyle(OutlineButton(kind: "primary"))
-                                .disabled(model.busy)
+                                .busyGuard(model.busy)
                         })
                     }
                 }
@@ -271,7 +271,7 @@ struct HostsView: View {
         let folderChoices = folders + (model.newFolder.isEmpty || folders.contains(model.newFolder) ? [] : [model.newFolder])
         let dbChoices = dbs + (model.newDb.isEmpty || dbs.contains(model.newDb) ? [] : [model.newDb])
         let domain = cleanDomain(model.newDomain)
-        let canCreate = matches(DOMAIN_RX, domain) && !model.newFolder.isEmpty && !model.busy
+        let canCreate = matches(DOMAIN_RX, domain) && !model.newFolder.isEmpty
         // (junto al botón, lo que falta para poder crearlo: sin eso no se puede pulsar)
         let why = domain.isEmpty ? "Escribe el dominio de producción"
             : !matches(DOMAIN_RX, domain) ? "«\(domain)» no es un dominio (por ejemplo: mitienda.com)"
@@ -289,7 +289,7 @@ struct HostsView: View {
                              items: (model.newFolder.isEmpty ? [("", "Elige una carpeta")] : [] as [(String, String)])
                                  + folderChoices.map { f in (f, folders.contains(f) ? f : "\(f) (nueva)") })
                 IconButton(symbol: "plus", help: "Crear una carpeta nueva") { model.askNewDomainName(db: false) }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
             }
             Divider()
             Row("BBDD", active.isEmpty ? "No hay ninguna versión activa" : "En XAMPP-\(active)") {
@@ -297,7 +297,7 @@ struct HostsView: View {
                              items: [("", "Sin BBDD")] + dbChoices.map { db in (db, dbs.contains(db) ? db : "\(db) (nueva)") })
                 .disabled(active.isEmpty)
                 IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.askNewDomainName(db: true) }
-                    .disabled(model.busy || active.isEmpty)
+                    .disabled(active.isEmpty).busyGuard(model.busy)
             }
             Divider()
             HStack {
@@ -305,7 +305,7 @@ struct HostsView: View {
                 Spacer()
                 Button("Crear y falsear") { model.createNewDomain() }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(!canCreate)
+                    .disabled(!canCreate).busyGuard(model.busy)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -391,13 +391,13 @@ struct HostsView: View {
             }
             if h.name.lowercased().hasSuffix(".local") {
                 Button(action: { model.mediaProxy(h) }) { Image(systemName: "photo") }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Imágenes de producción"
                          + (h.media.isEmpty ? "" : ": \(h.media)"))
             }
             Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
                 .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip(h.name.lowercased().hasSuffix(".local")
                      ? (h.fake ? "Apagar este .local" : "Encender este .local")
                      : (h.fake ? "Host falseado" : "Falsear Host"))
@@ -492,10 +492,10 @@ struct ToolsView: View {
         case "hosts":
             TileCard("Vhosts y hosts", "Al aplicar los vhosts se comprueban y, si la versión activa está en marcha, se recarga Apache.") {
                 Tile("Virtual hosts", d.vhosts) {
-                    Button("Editar…") { model.editVhosts() }.disabled(model.busy)
+                    Button("Editar…") { model.editVhosts() }.busyGuard(model.busy)
                 }
                 Tile("Hosts del sistema", d.hosts) {
-                    Button("Editar…") { model.editHosts() }.disabled(model.busy)
+                    Button("Editar…") { model.editHosts() }.busyGuard(model.busy)
                 }
             }
         case "seguridad":
@@ -505,7 +505,7 @@ struct ToolsView: View {
                      : "Apagada: enciéndela cuando acabes de probar los pagos") {
                     Toggle("", isOn: Binding(get: { d.barrier }, set: { model.setBarrier($0) }))
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                        .disabled(model.busy || d.installs.isEmpty)
+                        .disabled(d.installs.isEmpty).busyGuard(model.busy)
                 }
             }
             // Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
@@ -541,7 +541,7 @@ struct ToolsView: View {
                                                                  attributes: [.posixPermissions: 0o700])
                         openFolder(COPIES_DIR)
                     }
-                    Button("Borrar…") { model.clearCopies(Int(bk[1]), bk[0]) }.disabled(model.busy || bk[1] == 0)
+                    Button("Borrar…") { model.clearCopies(Int(bk[1]), bk[0]) }.disabled(bk[1] == 0).busyGuard(model.busy)
                 }
                 .onAppear { model.refreshBackups() }
                 // Copias de los ficheros que cambia el programa por su cuenta (nexum copias-ficheros si|no)
@@ -549,7 +549,7 @@ struct ToolsView: View {
                      "El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos") {
                     Toggle("", isOn: Binding(get: { model.copiesFiles }, set: { model.setCopiesFiles($0) }))
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
                 Tile("Registros de instalaciones", "~/.nexum: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
@@ -558,7 +558,7 @@ struct ToolsView: View {
                 let cache = downloadsCacheSize()
                 Tile("Caché de descargas", "\(DL_CACHE_DIR): lo ya descargado de PHP, Apache, MariaDB… · "
                      + (cache.files > 0 ? "\(fmtSize(cache.size)), \(cache.files) \(cache.files == 1 ? "fichero" : "ficheros")" : "vacía")) {
-                    Button("Vaciar…") { model.clearDownloads(cache.size) }.disabled(model.busy || cache.files == 0)
+                    Button("Vaciar…") { model.clearDownloads(cache.size) }.disabled(cache.files == 0).busyGuard(model.busy)
                 }
             }
         case "oficial":
@@ -644,11 +644,11 @@ struct ToolsView: View {
                     }
                     HStack(spacing: 8) {
                         if !w.ok {
-                            Button("Permitir") { model.dockerWebCommand("permitir") }.disabled(model.busy)
+                            Button("Permitir") { model.dockerWebCommand("permitir") }.busyGuard(model.busy)
                         }
                         Button("Guardar") { model.dockerWebPorts(dkIP, dkHTTP, dkHTTPS) }
                             .buttonStyle(OutlineButton(kind: "primary"))
-                            .disabled(model.busy)
+                            .busyGuard(model.busy)
                     }
                 }
             }
@@ -656,10 +656,10 @@ struct ToolsView: View {
           TileCard(tiles: true) {
             Tile("DNS de *.docker.test", w.dns ? "Puesto: los dominios de Docker (<proyecto>-php83.docker.test) no van en /etc/hosts ni piden la contraseña"
                 : "Los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts: sin contraseña al añadir proyectos o versiones. web.local, los proyectos de siempre y las tiendas falseadas, igual") {
-                Button(w.dns ? "Quitar" : "Activar") { model.dockerDNS(!w.dns) }.disabled(model.busy)
+                Button(w.dns ? "Quitar" : "Activar") { model.dockerDNS(!w.dns) }.busyGuard(model.busy)
             }
             Tile("Certificado de *.docker.local y *.docker.test", "Safari y Chrome lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)") {
-                Button("Confiar") { model.dockerWebCommand("confiar") }.disabled(model.busy)
+                Button("Confiar") { model.dockerWebCommand("confiar") }.busyGuard(model.busy)
             }
           }
           IdleStopCard()
@@ -706,7 +706,7 @@ struct ToolsView: View {
                             model.reloadTunnelInfo()
                         }
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 }
             }
             if FileManager.default.fileExists(atPath: log) {
@@ -740,11 +740,11 @@ struct ToolsView: View {
         }
         return TileCard(wide: true) {
             Tile("Componentes", text) {
-                Button("Buscar de nuevo") { model.components = nil; model.reloadComponents() }.disabled(model.busy || c == nil)
+                Button("Buscar de nuevo") { model.components = nil; model.reloadComponents() }.disabled(c == nil).busyGuard(model.busy)
                 if let c = c, !c.items.isEmpty {
                     Button("Actualizar todo (\(c.items.count))") { model.updateComponents(c) }
                         .buttonStyle(OutlineButton(kind: "primary"))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
             }
         }
@@ -756,7 +756,7 @@ struct ToolsView: View {
         HStack(spacing: 8) {
             Toggle("", isOn: Binding(get: { m.on }, set: { model.setMail($0) }))
                 .toggleStyle(SwitchToggleStyle()).labelsHidden()
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip(m.on ? "Encendido: el correo de las webs va a Mailpit" : "Apagado: lo que manden las webs puede llegar de verdad a los clientes")
             if !m.on {
                 Text("Apagado: lo que manden las webs puede llegar de verdad a los clientes")
@@ -776,7 +776,7 @@ struct ToolsView: View {
                     SearchPicker(selection: Binding(get: { m.wp }, set: { model.setMailWp($0) }),
                                  items: [("mailpit", "Llevarlos a Mailpit"), ("desactivar", "Desactivarlos en la copia local"),
                                          ("nada", "No tocarlos")], width: 250)
-                    .disabled(!m.on || model.busy)
+                    .disabled(!m.on).busyGuard(model.busy)
                     .tip("Qué hacer con sus plugins de correo")
                 }
                 if m.installed {
@@ -784,16 +784,16 @@ struct ToolsView: View {
                         if !m.version.isEmpty && !m.offer.isEmpty && verParts(m.version).lexicographicallyPrecedes(verParts(m.offer)) {
                             Button("Actualizar a \(m.offer)") { model.installMail() }
                                 .buttonStyle(OutlineButton(kind: "primary"))
-                                .disabled(model.busy)
+                                .busyGuard(model.busy)
                         }
-                        Button("Vaciar") { model.clearMail() }.disabled(!m.running || model.busy)
+                        Button("Vaciar") { model.clearMail() }.disabled(!m.running).busyGuard(model.busy)
                     }
                 } else {
                     Tile("Mailpit no está instalado",
                         "Sin él, el correo de las webs no sale ni se ve. Se descarga de GitHub (Mailpit \(m.offer)) y se comprueba antes de instalarlo") {
                         Button("Instalar Mailpit") { model.installMail() }
                             .buttonStyle(OutlineButton(kind: "primary"))
-                            .disabled(model.busy)
+                            .busyGuard(model.busy)
                     }
                 }
             }
@@ -872,7 +872,7 @@ struct ToolsView: View {
              "Si este Mac tenía un XAMPP oficial en /Applications/XAMPP: al apartarlo se copian sus BBDD, sus proyectos y sus vhosts, sin borrar nada.", wide: true) {
             if d.official {
                 Tile("Hay un XAMPP oficial en /Applications/XAMPP", "Hay que apartarlo para activar las versiones del gestor") {
-                    Button("Apartar…") { model.setAside() }.disabled(model.busy)
+                    Button("Apartar…") { model.setAside() }.busyGuard(model.busy)
                 }
             } else if d.asides.isEmpty && d.copies.isEmpty {
                 Tile("No hay ningún XAMPP oficial apartado")
@@ -882,13 +882,13 @@ struct ToolsView: View {
                     "\(plural(d.copies[folder] ?? 0, "copia", "copias")) en ~/nexum-backups. Las que ya existan en la versión activa no se tocan.") {
                     Button("Carpeta") { showFolder(folder) }
                     Button(d.active.isEmpty ? "Cargar" : "Cargar en XAMPP-\(d.active)") { model.importBackups(folder) }
-                        .disabled(model.busy || d.active.isEmpty || !d.running)
+                        .disabled(d.active.isEmpty || !d.running).busyGuard(model.busy)
                         .tip(d.active.isEmpty || !d.running ? "Activa y arranca antes una versión" : "Carga estas BBDD en la versión activa")
                 }
             }
             ForEach(d.asides, id: \.self) { a in
                 Tile((a as NSString).lastPathComponent, "Si algo no va: se desactiva la versión del gestor y vuelve a /Applications/XAMPP") {
-                    Button("Volver al XAMPP oficial…") { model.restoreOfficial(a) }.disabled(model.busy || d.official)
+                    Button("Volver al XAMPP oficial…") { model.restoreOfficial(a) }.disabled(d.official).busyGuard(model.busy)
                 }
             }
         }
@@ -955,11 +955,11 @@ struct AdminTestCard: View {
                 }
                 Tile("Guardar los cambios", "Sin espacios, comillas, \\, $ ni `. Las BBDD ya cargadas no cambian: se pone al cargar una BBDD o al pulsar «Panel» en el proyecto") {
                     Button("Volver a local@local.test") { reset() }
-                        .disabled(!own || model.busy)
+                        .disabled(!own).busyGuard(model.busy)
                         .tip("Vuelve a local@local.test con la contraseña local (los correos de antes tampoco van en las copias)")
                     Button("Guardar") { save() }
                         .buttonStyle(OutlineButton(kind: "primary"))
-                        .disabled(!problem.isEmpty || model.busy || (m, password) == (own ? saved : ("", "")))
+                        .disabled(!problem.isEmpty || (m, password) == (own ? saved : ("", ""))).busyGuard(model.busy)
                 }
             }
             if !shown.isEmpty {
@@ -1033,7 +1033,7 @@ struct TaskLogsCard: View {
                 Spacer(minLength: 0)
                 Button("Vaciar el registro…") { empty() }
                     .buttonStyle(OutlineButton(kind: "stop"))
-                    .disabled(model.busy || !logs.contains(where: { $0.state != "run" }))
+                    .disabled(!logs.contains(where: { $0.state != "run" })).busyGuard(model.busy)
                 Button("Abrir la carpeta") {
                     _ = taskLogDir()
                     NSWorkspace.shared.open(URL(fileURLWithPath: TASKS_DIR))
@@ -1177,7 +1177,7 @@ struct CleanCard: View {
                             .frame(minWidth: 150, alignment: .trailing)
                         Toggle("", isOn: Binding(get: { marked(it) }, set: { model.cleanMarks[it.key] = $0 }))
                             .toggleStyle(CheckboxToggleStyle()).labelsHidden()
-                            .disabled(model.busy || v.files == 0)
+                            .disabled(v.files == 0).busyGuard(model.busy)
                     }
                 }
             }
@@ -1185,7 +1185,7 @@ struct CleanCard: View {
                 Spacer(minLength: 0)
                 Button("Limpiar lo marcado…") { model.cleanRun(picked, s) { measure() } }
                     .buttonStyle(OutlineButton(kind: "stop"))
-                    .disabled(model.busy || picked.isEmpty)
+                    .disabled(picked.isEmpty).busyGuard(model.busy)
             }
         }
         .onAppear { measure() }

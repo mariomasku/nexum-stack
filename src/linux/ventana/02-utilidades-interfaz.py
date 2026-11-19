@@ -1140,6 +1140,36 @@ def copy_check(warn="Sin copia, lo que se sustituya no se podrá recuperar."):
 TASK_GUARD = [None]
 
 
+def busy_guard(w, dim):
+    """Un botón (o interruptor, o desplegable) que lanza una tarea: con otra en marcha se puede pulsar igual, pero
+    en vez de hacer lo suyo dice cuál sigue (TASK_GUARD). dim: si se pinta atenuado ahora (hay una en marcha).
+    Se puede llamar cada vez que se redibuja: la guarda se pone una sola vez y mira si hay tarea al pulsar."""
+    w.get_style_context().add_class("nv-espera") if dim else w.get_style_context().remove_class("nv-espera")
+    if getattr(w, "nv_guard", None) is None:
+        def busy():
+            return TASK_GUARD[0] is not None and TASK_GUARD[0](check=True)
+
+        def pressed(gesture, *_):
+            if busy():
+                gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+                GLib.idle_add(lambda: TASK_GUARD[0]() and False)
+            else:
+                gesture.set_state(Gtk.EventSequenceState.DENIED)
+
+        def key(_w, ev):
+            if ev.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space) and busy():
+                GLib.idle_add(lambda: TASK_GUARD[0]() and False)
+                return True
+            return False
+        # (en la fase de captura: antes que el propio botón, y también para lo de dentro de un desplegable)
+        g = Gtk.GestureMultiPress(widget=w)
+        g.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        g.connect("pressed", pressed)
+        w.nv_guard = g
+        w.connect("key-press-event", key)
+    return w
+
+
 def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=None, task=True):
     """Pregunta con Cancelar / ok_label. extra: widget opcional debajo del texto. steps: los
     cambios que se van a hacer (numerados); text va entonces debajo, como nota. task: lo que se

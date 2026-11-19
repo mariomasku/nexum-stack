@@ -143,7 +143,7 @@ class AppSubirBajarBD:
             hint = "Elige el fichero SQL."
         elif not db:
             hint = "Elige la BBDD de destino o crea una con +."
-        self.imp_btn.set_sensitive(not hint and not self.busy)
+        busy_guard(self.imp_btn, self.busy).set_sensitive(not hint)
         self.imp_hint.set_label(hint)
         self.imp_hint.set_visible(bool(hint))
 

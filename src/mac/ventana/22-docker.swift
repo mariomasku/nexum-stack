@@ -38,12 +38,12 @@ struct DockerView: View {
                     }
                 }
                 .buttonStyle(OutlineButton())
-                .disabled(running == 0 || model.busy)
+                .disabled(running == 0).busyGuard(model.busy)
                 .tip(running > 0 ? "Parar \(running) contenedores de Nexum"
                      : "No hay ningún contenedor de Nexum en marcha")
                 Button(action: { model.openDockerForm(folder: nil) }) { Label("Proyecto en Docker…", systemImage: "plus") }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
             }
         }
     }
@@ -67,7 +67,7 @@ struct DockerView: View {
                         leading: { StatusDot(on: false) }, trailing: {
                         Button("Abrir Docker Desktop") { model.dockerInstall() }
                             .buttonStyle(OutlineButton(kind: "primary"))
-                            .disabled(model.busy)
+                            .busyGuard(model.busy)
                         Button("Comprobar") { model.reloadDocker(stats: true) }
                             .buttonStyle(OutlineButton())
                     })
@@ -93,7 +93,7 @@ struct DockerView: View {
                         Text("Los proyectos en Docker de antes se abren por su Apache (los del Apache de Docker, no).").font(.caption).foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button("Arrancarla") { model.power() }.buttonStyle(OutlineButton()).disabled(model.busy)
+                    Button("Arrancarla") { model.power() }.buttonStyle(OutlineButton()).busyGuard(model.busy)
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color.orange.opacity(0.08)))
@@ -109,7 +109,7 @@ struct DockerView: View {
                             .font(.caption).foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button("Cerrarlo") { model.dockerMigrateAll() }.buttonStyle(OutlineButton(kind: "primary")).disabled(model.busy)
+                    Button("Cerrarlo") { model.dockerMigrateAll() }.buttonStyle(OutlineButton(kind: "primary")).busyGuard(model.busy)
                 }
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 12).fill(RED.opacity(0.08)))
@@ -152,14 +152,14 @@ struct DockerView: View {
                 Spacer()
                 if !w.ok {
                     Button("Permitir") { model.dockerWebCommand("permitir") }
-                        .buttonStyle(OutlineButton(kind: "primary")).disabled(model.busy)
+                        .buttonStyle(OutlineButton(kind: "primary")).busyGuard(model.busy)
                 } else if w.state == "marcha" {
                     Button("Parar") {
                         if model.stopSharedOK(["nexum-web"], "el Apache de Docker") { model.dockerWebCommand("parar") }
                     }
-                    .buttonStyle(OutlineButton()).disabled(model.busy)
+                    .buttonStyle(OutlineButton()).busyGuard(model.busy)
                 } else {
-                    Button("Arrancar") { model.dockerWebCommand("arrancar") }.buttonStyle(OutlineButton()).disabled(model.busy)
+                    Button("Arrancar") { model.dockerWebCommand("arrancar") }.buttonStyle(OutlineButton()).busyGuard(model.busy)
                 }
             }
             .padding(12)
@@ -296,12 +296,12 @@ struct DockerView: View {
                 if let p = g.project, p.isWeb {
                     Button("PHP " + p.versions.joined(separator: " · ")) { model.dockerVersions(p) }
                         .buttonStyle(OutlineButton(compact: true))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .tip("Gestionar sus versiones de PHP")
                 } else if let p = g.project {
                     Button("PHP \(p.php)") { model.dockerSetPhp(p) }
                         .buttonStyle(OutlineButton(compact: true))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .tip("Cambiar la versión de PHP")
                 } else {
                     Text(plural(g.items.count, "contenedor", "contenedores")).font(.caption).foregroundColor(.secondary)
@@ -316,7 +316,7 @@ struct DockerView: View {
                     // (primero: arrancar o parar todos sus servicios a la vez)
                     iconAction(up ? "stop.fill" : "play.fill", up ? "Parar todos sus contenedores" : "Arrancar todos sus contenedores",
                                kind: up ? "stop" : "play") { model.dockerAction(p, start: !up) }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                     iconAction("globe", "Abrir \(model.dockerSite(p))") { openURL(model.dockerSite(p) + "/") }
                         .disabled(!up)
                     logoAction("phpmyadmin", p.isWeb ? "Abrir phpMyAdmin (\(model.dockerPmaURL)): usuario root; la contraseña se copia al pulsar"
@@ -328,19 +328,19 @@ struct DockerView: View {
                                : "Actualizar la imagen de PHP " + (p.isWeb ? p.versions.joined(separator: ", ") : p.php) + " (la descarga otra vez, con sus últimos parches)") {
                         model.dockerUpdateImage(p)
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     iconAction("doc.text", "Ver los registros de sus contenedores") { model.dockerLogs(p) }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                     if p.isWeb && p.kind == "wp" {
                         iconAction("arrow.left.arrow.right", "BBDD: la de XAMPP-X en vivo (la misma que web.local) o su copia de Docker") {
                             model.dockerDbMode(p)
                         }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                     }
                     iconAction("trash", "Eliminar el proyecto de Docker: sus contenedores y la copia de su BBDD (la carpeta y la BBDD de XAMPP-X no se tocan)") {
                         model.dockerDelete(p)
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 } else if g.id == "nexum-web" {
                     iconAction(up ? "stop.fill" : "play.fill", up ? "Parar el Apache de Docker y su phpMyAdmin (los proyectos del Apache de Docker dejan de verse)"
                                : "Arrancar el Apache de Docker y su phpMyAdmin", kind: up ? "stop" : "play") {
@@ -348,7 +348,7 @@ struct DockerView: View {
                             model.dockerWebCommand(up ? "parar" : "arrancar")
                         }
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 } else if g.id.hasPrefix("nexum-lampp-bd-"), g.items.count == 1, let c = g.items.first {
                     // (el puente de los proyectos que usan en vivo la BBDD de esa versión XAMPP-X)
                     let users = model.sharedUsers(c.name)
@@ -356,13 +356,13 @@ struct DockerView: View {
                                : "Arrancar el puente", kind: up ? "stop" : "play") {
                         model.containerAction(c, up ? "parar" : "arrancar")
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 } else if g.id.hasPrefix("nexum-mariadb-"), g.items.count == 1, let c = g.items.first {
                     iconAction(up ? "stop.fill" : "play.fill", up ? "Parar \(g.title) (los proyectos que van con ella se quedan sin BBDD)"
                                : "Arrancar \(g.title)", kind: up ? "stop" : "play") {
                         model.containerAction(c, up ? "parar" : "arrancar")
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 }
             }
             .col(DK_ACTIONS_WIDTH, align: .trailing)
@@ -415,20 +415,20 @@ struct DockerView: View {
                                 tip: "Gestionar sus versiones de PHP") {
                         model.dockerVersions(p)
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 } else {
                     VisorButton(conf: c, name: "Pasar al Apache de Docker", icon: .symbol("arrow.up.circle", Color.primary),
                                 tip: "Varias versiones de PHP a la vez") {
                         model.dockerPass(p)
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 }
                 Spacer(minLength: 8)
                 VisorButton(conf: c, name: up ? "Parar" : "Arrancar", icon: .symbol(up ? "stop.fill" : "play.fill", up ? RED : GREEN),
                             tip: up ? "Parar sus contenedores" : "Arrancar sus contenedores") {
                     model.dockerAction(p, start: !up)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .padding(.horizontal, 18)
@@ -465,14 +465,14 @@ struct DockerView: View {
         }.disabled(!up))
         let mine = targets.first { model.tunnel?.target == $0.1 }
         if let m = mine {
-            items["compartir"] = AnyView(model.shareButton(m.1, folder: folder, name: p.folder, conf: c).disabled(model.busy))
+            items["compartir"] = AnyView(model.shareButton(m.1, folder: folder, name: p.folder, conf: c).busyGuard(model.busy))
         } else if targets.count > 1 {
             items["compartir"] = AnyView(VisorButton(conf: c, name: "Compartir", icon: .logo("cloudflare"),
                                                      tip: up ? "Compartir con un túnel de Cloudflare" : stopped) {
                 popMenu(targets.map { t in ("PHP \(t.0)  ·  \(t.1)", { model.share(t.1, folder: folder, name: p.folder) }) })
-            }.disabled(!up || model.busy))
+            }.disabled(!up).busyGuard(model.busy))
         } else {
-            items["compartir"] = AnyView(model.shareButton(site, folder: folder, name: p.folder, conf: c).disabled(!up || model.busy))
+            items["compartir"] = AnyView(model.shareButton(site, folder: folder, name: p.folder, conf: c).disabled(!up).busyGuard(model.busy))
         }
         items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
                                              tip: !up ? stopped : (admin.1.isEmpty
@@ -506,7 +506,7 @@ struct DockerView: View {
             items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
                                                     tip: "Traer de producción las imágenes que falten") {
                 model.importImages(x, docker: true)
-            }.disabled(model.busy))
+            }.busyGuard(model.busy))
         }
         return items
     }
@@ -540,13 +540,13 @@ struct DockerView: View {
                 iconAction(on ? "stop.fill" : "play.fill", on ? "Parar" : "Arrancar", kind: on ? "stop" : "play") {
                     model.containerAction(c, on ? "parar" : "arrancar")
                 }
-                .disabled(!own || model.busy)
+                .disabled(!own).busyGuard(model.busy)
                 iconAction("arrow.clockwise", "Reiniciar") { model.containerAction(c, "reiniciar") }
-                    .disabled(!own || !on || model.busy)
+                    .disabled(!own || !on).busyGuard(model.busy)
                 iconAction("doc.text", "Registros") { model.containerAction(c, "registros") }
-                    .disabled(!own || model.busy)
+                    .disabled(!own).busyGuard(model.busy)
                 iconAction("trash", "Eliminar este contenedor") { model.containerAction(c, "borrar") }
-                    .disabled(!own || model.busy)
+                    .disabled(!own).busyGuard(model.busy)
             }
             .col(DK_ACTIONS_WIDTH, align: .trailing)
         }
@@ -592,9 +592,9 @@ struct DockerView: View {
                 .lineLimit(1).col(110)
             HStack(spacing: 4) {
                 iconAction("icloud.and.arrow.down", pullTip) { model.imagePull(i) }
-                    .disabled(!pullable || model.busy)
+                    .disabled(!pullable).busyGuard(model.busy)
                 iconAction("trash", inUse ? "La usa un contenedor: bórralo antes" : "Borrar la imagen") { model.imageDelete(i) }
-                    .disabled(inUse || model.busy)
+                    .disabled(inUse).busyGuard(model.busy)
             }
             .col(DK_IMAGE_ACTIONS_WIDTH, align: .trailing)
         }
@@ -631,7 +631,7 @@ struct DockerView: View {
             iconAction("trash", inUse ? "Lo usa un contenedor: bórralo antes (o el proyecto entero)" : "Borrar el volumen") {
                 model.volumeDelete(v)
             }
-            .disabled(inUse || model.busy)
+            .disabled(inUse).busyGuard(model.busy)
         }
         .col(DK_VOLUME_ACTIONS_WIDTH, align: .trailing)
     }

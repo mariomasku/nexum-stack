@@ -60,6 +60,27 @@ extension View {
     func hoverPointer() -> some View { modifier(HoverPointer()) }
     /// En vez de .help(): el mensaje al dejar el ratón encima con el aspecto de la ventana
     func tip(_ text: String) -> some View { modifier(Tip(text: text)) }
+    /// Lo que lanza una tarea, con otra en marcha (busy): atenuado, pero se puede pulsar; en vez de hacer lo suyo
+    /// dice cuál sigue y la enseña. (Dentro de un menú no hay capa que valga: allí lo para runTask o confirm)
+    func busyGuard(_ busy: Bool) -> some View { modifier(BusyGuard(busy: busy)) }
+}
+
+struct BusyGuard: ViewModifier {
+    let busy: Bool
+    func body(content: Content) -> some View {
+        content
+            .opacity(busy ? 0.5 : 1)
+            .allowsHitTesting(!busy)
+            .overlay(Group {
+                if busy {
+                    Color.white.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let m = AppModel.current, let cur = m.runningTask { m.refuseTask(cur) }
+                        }
+                }
+            })
+    }
 }
 
 /// Mensaje al dejar el ratón encima: gris oscuro y con las esquinas redondeadas, como el resto de la

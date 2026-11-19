@@ -19,7 +19,7 @@ else
     check "Linux: el centrado de los diálogos no toca los pasos" 'grep -qF "or getattr(w, \"nv_pasos\", False):" "$SRC"'
     check "Linux: crear dominio, copiar, replicar, cargar, actualizar, instalar y Actualizar todo, con pasos" '[ "$(grep -cE "steps=(steps|notes|what|res\[\"items\"\]|\[\"Se instala|notes \+)" "$SRC")" -ge 7 ]'
     check "Linux: git pull antes de copiar, con los pasos" 'grep -qF "pack_start(steps_box(what," "$SRC"'
-    check "Linux: con otra tarea en marcha, lo dice nombrándola en la ventana que se mira" 'grep -qF "TASK_GUARD[0] = lambda: bool(self.task_running()) and (self.refuse_task() or True)" "$SRC" && grep -qF "sigue en marcha. Espera a que acabe y vuelve a probar.\" % (cur.title" "$SRC" && grep -qF "if w.is_active() and w.get_visible()), self.win)" "$SRC"'
+    check "Linux: con otra tarea en marcha, lo dice nombrándola en la ventana que se mira" 'grep -qF "TASK_GUARD[0] = lambda check=False: bool(self.task_running()) and (check or self.refuse_task() or True)" "$SRC" && grep -qF "sigue en marcha. Espera a que acabe y vuelve a probar.\" % (cur.title" "$SRC" && grep -qF "if w.is_active() and w.get_visible()), self.win)" "$SRC"'
     check "Linux: la tarea en marcha se mira aunque no esté en segundo plano" 'grep -qF "        self.cur_task = Task(self, title, args, on_done=done, **kw)" "$SRC" && ! grep -qF "if self.busy and bg is not None and not bg.finished:" "$SRC"'
     check "Linux: cancelar la propia tarea sí se pregunta" 'grep -qF "destructive=True, task=False):" "$SRC"'
     check "Linux: ya no hay listas con viñetas en los diálogos" '! grep -qE "confirm\(.*\"• \" \+ x" "$SRC"'

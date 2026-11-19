@@ -28,7 +28,7 @@ class NvDocker:
                                                   auto_close=True, done_text="Contenedores de Nexum parados",
                                                   on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
                          "nv-proyecto-btn", "nv-stop")
-        stop.set_sensitive(bool(running) and not self.busy)
+        busy_guard(stop, self.busy).set_sensitive(bool(running))
         head.pack_end(stop, False, False, 0)
         box.pack_start(head, False, False, 0)
         for text, sub, btn in ([("Hay otro Docker en marcha: el de Ubuntu, como administrador",
@@ -241,11 +241,11 @@ class NvDocker:
                          lambda *_: self.run_task("Descargando %s" % ref, ["docker-imagenes", "descargar", ref],
                                                   done_text="%s descargada" % ref,
                                                   on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
-        pull.set_sensitive(pullable and not self.busy)
+        busy_guard(pull, self.busy).set_sensitive(pullable)
         a.pack_start(pull, False, False, 0)
         rm = nv_button("user-trash-symbolic", None, "La usa un contenedor: bórralo antes" if in_use else "Borrar la imagen",
                        lambda *_: self.nv_image_delete(i, ref))
-        rm.set_sensitive(not in_use and not self.busy)
+        busy_guard(rm, self.busy).set_sensitive(not in_use)
         a.pack_start(rm, False, False, 0)
         return a
 
@@ -263,7 +263,7 @@ class NvDocker:
         a = Gtk.Box(spacing=6, halign=Gtk.Align.START)
         rm = nv_button("user-trash-symbolic", None, "Lo usa un contenedor: bórralo antes"
                        if in_use else "Borrar el volumen", lambda *_: self.nv_volume_delete(v))
-        rm.set_sensitive(not in_use and not self.busy)
+        busy_guard(rm, self.busy).set_sensitive(not in_use)
         a.pack_start(rm, False, False, 0)
         return a
 
@@ -402,7 +402,7 @@ class NvDocker:
         else:
             vb = nv_button("go-up-symbolic", "Pasar al Apache de Docker", "Varias versiones de PHP a la vez",
                            lambda *_: self.nv_docker_pass(p), "nv-proyecto-btn")
-        vb.set_sensitive(not self.busy)
+        busy_guard(vb, self.busy).set_sensitive(True)
         conf = buttons_conf()
         self.nv_restyle(vb, conf, ("icono", "list-add-symbolic" if web else "go-up-symbolic"),
                         "Versiones de PHP" if web else "Pasar")
@@ -414,7 +414,7 @@ class NvDocker:
                                                    ["docker-parar" if up else "docker-arrancar", p["slug"]], auto_close=True,
                                                    on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)),
                           "nv-proyecto-btn", "nv-stop" if up else "nv-play")
-        power.set_sensitive(not self.busy)
+        busy_guard(power, self.busy).set_sensitive(True)
         self.nv_restyle(power, conf, ("icono", "media-playback-stop-symbolic" if up else "media-playback-start-symbolic"),
                         "Parar" if up else "Arrancar")
         acts.pack_end(power, False, False, 0)
@@ -540,7 +540,7 @@ class NvDocker:
             for ic, tip, fn, ok in items:
                 b = nv_button(ic, None, tip, lambda *_, fn=fn: fn(), "nv-clasico",
                               *(["nv-stop"] if "stop" in ic else ["nv-play"] if "start" in ic else []))
-                b.set_sensitive(ok and not self.busy)
+                busy_guard(b, self.busy).set_sensitive(ok)
                 a.pack_start(b, False, False, 2)
             return a
 
@@ -582,10 +582,10 @@ class NvDocker:
                                       tooltip_text="En marcha"), False, False, 0)
             if p:
                 web = p.get("web")
-                php = Gtk.Button(label="PHP %s" % " · ".join(p["versions"]) if web else "PHP %s" % p["php"],
-                                 valign=Gtk.Align.CENTER, sensitive=not self.busy,
+                php = busy_guard(Gtk.Button(label="PHP %s" % " · ".join(p["versions"]) if web else "PHP %s" % p["php"],
+                                 valign=Gtk.Align.CENTER,
                                  tooltip_text="Gestionar sus versiones de PHP"
-                                 if web else "Cambiar la versión de PHP")
+                                 if web else "Cambiar la versión de PHP"), self.busy)
                 php.connect("clicked", lambda *_, p=p: self.nv_docker_versions(p) if p.get("web") else self.on_docker_php(p))
                 img_cell = Gtk.Box()
                 img_cell.pack_start(php, False, False, 0)

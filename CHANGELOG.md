@@ -4,6 +4,10 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.57.34 · 19 nov 2026
+
+- Con una tarea en marcha, los botones que lanzarían otra ya no se apagan: se ven atenuados y se pueden pulsar, y en vez de hacer lo suyo dicen qué tarea sigue en marcha. Vale para botones, interruptores y desplegables de todas las páginas.
+
 ## 1.57.33 · 19 nov 2026
 
 - Con una tarea en marcha (como actualizar los componentes), lo que lanza otra avisa antes de preguntar nada: «Hay una tarea en marcha», con el nombre de la que sigue, y te la enseña para que esperes a que acabe. En Linux, el aviso sale en la ventana que estás mirando (como «Instalar versión», que tapaba el de abajo).

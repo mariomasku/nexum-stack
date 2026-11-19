@@ -48,8 +48,8 @@ class AppServicios:
         # (en la ventana nueva, arrancar o parar la version entera: lo que hacia el boton Encendidos)
         if hasattr(self, "nv_power"):
             on = d["running"]
-            b = Gtk.Button(label="Parar y desactivar" if on else "Arrancar lampp-%s" % d["active"],
-                           valign=Gtk.Align.CENTER, sensitive=not self.busy)
+            b = busy_guard(Gtk.Button(label="Parar y desactivar" if on else "Arrancar lampp-%s" % d["active"],
+                           valign=Gtk.Align.CENTER), self.busy)
             if not on:
                 css(b, "verde")
             b.connect("clicked", lambda *_: (self.services_pop.popdown(), self.nv_power()))

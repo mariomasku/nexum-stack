@@ -457,7 +457,7 @@ class NvActualizarProyecto:
         b = nv_button(logo("imagenes", 18), "Imágenes de producción",
                       "Traer de producción las imágenes que falten",
                       lambda *_: self.nv_wp_media(x), "nv-proyecto-btn")
-        b.set_sensitive(not self.busy)
+        busy_guard(b, self.busy).set_sensitive(True)
         return b
 
     def nv_wp_media(self, x):

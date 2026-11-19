@@ -21,7 +21,7 @@ struct VersionsView: View {
                     .tip("Componentes de cada versión")
                     Button(action: { model.panel = .install }) { Label("Instalar versión…", systemImage: "plus") }
                         .buttonStyle(OutlineButton(kind: "primary"))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
                 TableBox {
                     TableHead(cols: [("Versión", 200), ("PHP", 70), ("Soporte", 170), ("Último parche", 160), ("BBDD", 40), ("", 0)])
@@ -85,7 +85,7 @@ struct VersionsView: View {
                     // (como «Cargar» en Proyectos: solo en la versión con el ratón encima)
                     Button(action: { model.activate(inst.folder) }) { Text("Activar").frame(width: 64) }
                         .buttonStyle(OutlineButton(kind: "primary"))
-                        .disabled(model.busy || d.official)
+                        .disabled(d.official).busyGuard(model.busy)
                         .opacity(hover ? 1 : 0)
                         .allowsHitTesting(hover)
                 }
@@ -177,7 +177,7 @@ struct VersionsView: View {
                 if inst.blocker.isEmpty { model.remove(inst) } else { message("No se puede desinstalar", inst.blocker) }
             }
         }
-        .disabled(model.busy)
+        .busyGuard(model.busy)
     }
 }
 
