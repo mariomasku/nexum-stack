@@ -16,6 +16,10 @@ python3 -I "$HERE/demo-linux.py" "$W/demo" > /dev/null
 mkdir -p "$W/home" "$W/capturas"
 # (con Nginx encendido, para que salga su pestaña: apagado de serie)
 mkdir -p "$W/home/.nexum/nginx" && : > "$W/home/.nexum/nginx/usar"
+# (y una web permitida en la barrera entre webs, inventada)
+printf '%s\n' erp.ejemplo-empresa.com > "$W/home/.nexum/barrera-webs-permitidas"
+# (y la carpeta de los espacios de trabajo de VS Code, inventada)
+printf '%s\n' "/home/ana/Espacios de VS Code" > "$W/home/.nexum/vscode-espacios"
 
 # Correo de pruebas: un Mailpit solo para la demostración (otros puertos y su base en la carpeta temporal: el
 # tuyo, en el 8025, no se toca), con unos correos inventados. Sin Mailpit instalado, la bandeja sale vacía

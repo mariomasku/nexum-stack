@@ -307,9 +307,11 @@ class NvGithub:
         clear(box)
         head = Gtk.Box(spacing=12)
         t = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        tl = Gtk.Box(spacing=10)
-        tl.pack_start(logo("nginx", 34), False, False, 0)
-        tl.pack_start(label("Nginx", "nv-titulo-grande"), False, False, 0)
+        # (de título, el logotipo de NGINX: sus letras, en su verde, como los de Docker y Node)
+        tl = BrandLogo("nginx", 26)
+        tl.set_halign(Gtk.Align.START)
+        tl.set_margin_top(4)
+        tl.set_margin_bottom(4)
         t.pack_start(tl, False, False, 0)
         t.pack_start(label("Otro servidor web, aparte de Apache, para los proyectos de %s que le añadas (Laravel, Symfony, "
                            "PHP...). Solo en este equipo y con tu usuario: cada uno por su nombre, con el PHP de la versión "
@@ -658,11 +660,13 @@ class NvGithub:
         self.toast("Repositorio copiado: %s" % repo["name"])
 
     def nv_repo_fetch(self, repo):
+        # (solo con git, en su carpeta y sin sudo: va ya, al lado de la que siga, si no es de la misma carpeta)
+        free = self.task_free(repo["folder"])
         if repo["state"] == "clonado":
             if not confirm(self.win, "¿Traer los cambios de GitHub a %s?" % repo["folder"],
                            "Este repositorio ya está clonado en /opt/htdocs/%s. Se traen sus cambios de GitHub (git pull) "
                            "y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca "
-                           "nada y se dice." % repo["folder"], "Traer los cambios"):
+                           "nada y se dice." % repo["folder"], "Traer los cambios", task=not free):
                 return
             args, title = ["repo-traer", repo["full"], "--actualizar"], "Trayendo los cambios de %s" % repo["name"]
         else:
@@ -673,7 +677,7 @@ class NvGithub:
             self.nv_repos_load(cache=True)
             if ok and repo["state"] != "clonado":
                 self.toast("%s, en Proyectos" % repo["name"])
-        self.run_task(title, args, auto_close=True, done_text="Hecho", on_done=done)
+        self.run_task(title, args, auto_close=True, done_text="Hecho", on_done=done, free=free)
 
     def nv_docker_tools(self):
         """Configuración del Apache de Docker (docker-web): su dirección y sus puertos, permitir que Docker
@@ -1410,6 +1414,50 @@ class NvGithub:
                       ["docker-web", "dns", "activar" if on else "quitar"],
                       done_text="DNS de *.docker.test " + ("puesto" if on else "quitado"),
                       on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
+
+    def on_cross_site_allow(self):
+        """Webs permitidas: una de confianza (el ERP de la empresa) que la barrera deja pasar en todas las
+        versiones. Se escribe el dominio o se pega la dirección entera."""
+        allowed = cross_site_allowed()
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE, text="Permitir una web")
+        dlg.format_secondary_text(
+            "Lo que mande esa web a tus proyectos (un formulario que te lleva a tu back office, su vuelta con un "
+            "POST, un iframe, un fetch) pasa la barrera. Pon solo webs tuyas o de confianza. Se aplica a todas las "
+            "versiones y pide la contraseña de administrador.")
+        hint_text = "erp.empresa.com, o *.empresa.com para todos sus subdominios"
+        entry = Gtk.Entry(max_length=253, activates_default=True, placeholder_text="erp.empresa.com")
+        hint = label(hint_text, "dim-label", xalign=0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(entry, False, False, 0)
+        box.pack_start(hint, False, False, 0)
+        dlg.get_message_area().pack_start(box, False, False, 0)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        ok = css(dlg.add_button("Permitir", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+
+        def update(*_):
+            dom = cross_site_domain(entry.get_text())
+            ok.set_sensitive(bool(dom) and dom not in allowed)
+            hint.set_label("Ya está en la lista." if dom in allowed else ("Se permite %s" % dom) if dom else hint_text)
+        entry.connect("changed", update)
+        update()
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        dom = cross_site_domain(entry.get_text())
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not dom:
+            return
+        self.run_task("Permitiendo %s" % dom, ["barrera-web", "permitir", dom], auto_close=True,
+                      done_text="%s, permitida" % dom, on_done=lambda *_: self.build_tools())
+
+    def on_cross_site_unallow(self, dom):
+        if not confirm(self.win, "¿Quitar %s de las webs permitidas?" % dom,
+                       "La barrera vuelve a parar lo que mande a tus proyectos, como a cualquier otra web. Se aplica "
+                       "a todas las versiones y pide la contraseña de administrador.", "Quitar", destructive=True):
+            return
+        self.run_task("Quitando %s de las webs permitidas" % dom, ["barrera-web", "quitar", dom], auto_close=True,
+                      done_text="%s ya no está permitida" % dom, on_done=lambda *_: self.build_tools())
 
     def on_cross_site(self, sw, _p):
         on = sw.get_active()

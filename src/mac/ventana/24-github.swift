@@ -285,10 +285,9 @@ struct WpCliCard: View {
     }
 
     func change(_ v: Bool) {
-        if let guardTask = TASK_GUARD, guardTask() { return }
         let r = runDialog(title: v ? "¿Poner WP-CLI en los contenedores de PHP?" : "¿Quitar WP-CLI de los contenedores de PHP?",
-                          text: v ? "Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."
-                                  : "Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian.",
+                          text: withTaskNote(v ? "Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."
+                                  : "Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."),
                           okLabel: v ? "Poner" : "Quitar", style: .informational, destructive: false,
                           checkbox: "Rehacer ya las imágenes de PHP que tienes (unos minutos cada una)", checked: true)
         guard r.ok else { return }
@@ -506,9 +505,12 @@ struct NginxView: View {
 
     var body: some View {
         WidePage {
-            PageTitle(title: "Nginx",
-                      sub: "Otro servidor web, aparte de Apache, para los proyectos de \(HTDOCS) que le añadas (Laravel, Symfony, PHP...). Solo en este Mac y con tu usuario: cada uno por su nombre, con el PHP de la versión activa y sus BBDD.",
-                      logo: "nginx")
+            // (de título, el logotipo de NGINX: sus letras, en su verde, como los de Docker y Node)
+            VStack(alignment: .leading, spacing: 2) {
+                BrandImage(key: "nginx", height: 26).padding(.vertical, 4)
+                Text("Otro servidor web, aparte de Apache, para los proyectos de \(HTDOCS) que le añadas (Laravel, Symfony, PHP...). Solo en este Mac y con tu usuario: cada uno por su nombre, con el PHP de la versión activa y sus BBDD.")
+                    .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if let n = model.nginx {
                 Card { status(n) }
                 if n.installed {

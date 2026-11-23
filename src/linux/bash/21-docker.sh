@@ -112,6 +112,8 @@ function docker_projects() {
 #   C|contenedor|imagen|estado (running, exited...)|estado en texto|puertos|proyecto de compose
 #     (todos los contenedores de tu Docker, para la consola de la pestaña)
 #   I|imagen:etiqueta|tamaño|creada  y  O|volumen|driver   (imagenes y volumenes de tu Docker)
+#   Z|nombre|su ultima copia en ~/nexum-backups (o nada)   lo que ha perdido su BBDD (docker_lost: Docker
+#     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" p
     [ -x "$DOCKER_BIN" ] && installed=1
@@ -145,6 +147,7 @@ function gui_docker() {
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
         dk volume ls --format '{{.Name}}|{{.Driver}}' 2> /dev/null \
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "O|" $0 }'
+        docker_lost | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "Z|" $0 }'
     fi
     return 0
 }
@@ -824,6 +827,7 @@ function docker_test_admin() {
 #@incluir comun/docker/docker_db_backup.sh
 #@incluir comun/docker/docker_wp_cli.sh
 #@incluir comun/docker/docker_pg_name.sh
+#@incluir comun/docker/docker_lost.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

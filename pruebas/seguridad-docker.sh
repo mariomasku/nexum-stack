@@ -13,6 +13,7 @@ else
     W=$(mktemp -d "$TMPBASE/w-barrera.XXXX") || exit 1
     trap 'rm -rf "${W:?}"' EXIT
     extract "$SRC" cross_site_command || exit 1
+    grep -q '^function cross_site_apply() {' "$SRC" && { extract "$SRC" cross_site_apply cross_site_allowed || exit 1; }
     function cross_site_on() { [ ! -e "$CROSS_SITE_OFF" ]; }
     function sudo_first() { return 0; }
     function secure_all() { return 0; }

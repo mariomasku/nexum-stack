@@ -121,7 +121,7 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
 # Una web de fuera no puede leer las respuestas de tus proyectos: WordPress responde a cualquier
 # origen en su API (Access-Control-Allow-Origin), y se quita si el origen no es la propia web
 <IfModule headers_module>
-    <If "-n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST}">
+    <If "-n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} !~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?$#i">
         Header unset Access-Control-Allow-Origin
         Header always unset Access-Control-Allow-Origin
         Header unset Access-Control-Allow-Credentials
@@ -163,9 +163,9 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
 # fichero con esa extension y que el navegador pide como tal), con una de las dos webs en Docker
 # (*.docker.test, *.docker.local). Elementor guarda en sus CSS la direccion de la web que los genero
 # >>> barrera entre webs
-<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/))) && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Dest} =~ /^(font|image|style)$/i && %{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot|css|png|jpe?g|gif|webp|avif|svg|ico)$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?/#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i))">
+<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && (-z %{HTTP:Sec-Fetch-Mode} || %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i) && (-z %{HTTP:Sec-Fetch-Dest} || %{HTTP:Sec-Fetch-Dest} =~ /^document$/i))) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/))) && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Dest} =~ /^(font|image|style)$/i && %{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot|css|png|jpe?g|gif|webp|avif|svg|ico)$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?/#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i)) && !(%{HTTP:Origin} =~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?(/|$)#i)">
     Require all denied
-    ErrorDocument 403 "Otra web ha intentado mandar algo a esta: no se ha hecho nada (barrera entre webs de lvm-instalador). Si es una pasarela de pago que vuelve a la tienda, apaga la barrera en Configuracion mientras la pruebas."
+    ErrorDocument 403 "Otra web ha intentado mandar algo a esta: no se ha hecho nada (barrera entre webs de lvm-instalador). Si es una pasarela de pago que vuelve a la tienda, apaga la barrera en Configuracion mientras la pruebas. Si es una web tuya de confianza (tu ERP), añadela en Configuracion, Webs permitidas."
 </If>
 # <<< barrera entre webs
 # Peticiones de 64 MB como mucho (lo mismo que post_max_size y upload_max_filesize de PHP)
@@ -200,10 +200,61 @@ function cross_site_on() {
     [ ! -e "$CROSS_SITE_OFF" ]
 }
 
-# Texto de lvm-dominio-desconocido.conf con la barrera entre webs o sin ella: lo deja en HOST_VHOST
+# Webs permitidas (Configuracion, Seguridad entre webs; nexum barrera-web permitir <dominio>): las tuyas
+# de confianza, como el ERP de la empresa, que si pueden mandar formularios a tus proyectos, llevarte a su
+# back office con un POST, abrirlos en un iframe o hacerles peticiones (fetch). Un dominio por linea; *.empresa.com
+# vale para empresa.com y todos sus subdominios. Sin ninguna, el hueco de la barrera lleva un dominio que
+# no existe (lvm-permitidas.invalid)
+CROSS_SITE_ALLOW="$LOG_DIR/barrera-webs-permitidas"
+CROSS_SITE_ALLOW_SLOT='lvm-permitidas\.invalid'
+CROSS_SITE_ALLOW_RE='^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+function cross_site_allowed() {
+    [ -f "$CROSS_SITE_ALLOW" ] || return 0
+    grep -E "$CROSS_SITE_ALLOW_RE" "$CROSS_SITE_ALLOW" 2> /dev/null | LC_ALL=C sort -u
+}
+
+# Un dominio tal como se escribe (o pegado de la barra del navegador: https://erp.empresa.com/login) en la
+# forma de la lista: sin el protocolo, la ruta, el puerto ni el punto final, en minusculas. Vacio si no vale
+function cross_site_domain() {
+    local d
+    d=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    d=${d#*://}
+    d=${d%%/*}
+    d=${d%%\?*}
+    d=${d%%:*}
+    d=${d%.}
+    [[ $d =~ $CROSS_SITE_ALLOW_RE ]] && printf '%s' "$d"
+}
+
+# Los dominios permitidos como expresion para Apache: erp\.empresa\.com|([a-z0-9-]+\.)*empresa\.com
+function cross_site_allow_regex() {
+    local d w out=""
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        w=""
+        [ "${d#\*.}" != "$d" ] && { w='([a-z0-9-]+\.)*'; d=${d#\*.}; }
+        out=${out:+$out|}$w$(printf '%s' "$d" | sed 's/\./\\./g')
+    done < <(cross_site_allowed)
+    printf '%s' "${out:-$CROSS_SITE_ALLOW_SLOT}"
+}
+
+# Un texto con el hueco de las webs permitidas relleno con las de la lista
+function cross_site_fill() {
+    local text=$1 re out=""
+    re=$(cross_site_allow_regex)
+    while [[ $text == *"$CROSS_SITE_ALLOW_SLOT"* ]]; do
+        out+=${text%%"$CROSS_SITE_ALLOW_SLOT"*}$re
+        text=${text#*"$CROSS_SITE_ALLOW_SLOT"}
+    done
+    printf '%s' "$out$text"
+}
+
+# Texto de lvm-dominio-desconocido.conf con la barrera entre webs o sin ella, y con las webs permitidas: lo
+# deja en HOST_VHOST
 function host_vhost() {
     HOST_VHOST=$UNKNOWN_HOST_VHOST
-    cross_site_on && return 0
-    HOST_VHOST=${UNKNOWN_HOST_VHOST%%"# >>> barrera entre webs"*}${UNKNOWN_HOST_VHOST#*"# <<< barrera entre webs"$'\n'}
+    cross_site_on || HOST_VHOST=${UNKNOWN_HOST_VHOST%%"# >>> barrera entre webs"*}${UNKNOWN_HOST_VHOST#*"# <<< barrera entre webs"$'\n'}
+    HOST_VHOST=$(cross_site_fill "$HOST_VHOST"; printf x)
+    HOST_VHOST=${HOST_VHOST%x}
 }
 

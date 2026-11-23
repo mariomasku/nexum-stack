@@ -336,10 +336,10 @@ $block"
 # si no existia). Se escribe con edit_hosts --aplicar (copia del anterior en ~/nexum-backups si esta
 # el ajuste copias-ficheros).
 function hosts_fake() {
-    local mode=$1 copy rc
+    local mode=$1 copy rc out ips
     shift
     copy=$(mktemp "${TMPDIR:-/tmp}/lvm-hosts.XXXXXX") || return 1
-    LVM_INFO=$(vhosts_info) LVM_LOCAL_OFF="$(cat "$LOCAL_OFF_FILE" 2> /dev/null) $LOCAL_OFF_DRY" \
+    out=$(LVM_INFO=$(vhosts_info) LVM_LOCAL_OFF="$(cat "$LOCAL_OFF_FILE" 2> /dev/null) $LOCAL_OFF_DRY" \
         python3 -I - "$HOSTS_FILE" "$copy" "$mode" "$PROJECT_VHOST $(project_link)" "$@" <<'EOF'
 import os, re, sys
 src, dst, mode, links = sys.argv[1:5]
@@ -431,14 +431,21 @@ open(dst, "w").write("\n".join(out) + "\n")
 for c in changes:
     print(c)
 EOF
+)
     rc=$?
+    [ -n "$out" ] && echo "$out"
     if [ $rc -ne 0 ]; then
         rm -f "$copy"
         echo "No se ha podido preparar el nuevo $HOSTS_FILE"
         return 1
     fi
     if ! cmp -s "$copy" "$HOSTS_FILE"; then
+        # (las direcciones de la web real de los que se van a falsear: despues, hosts ya no las da)
+        # shellcheck disable=SC2046  # (un dominio por palabra)
+        ips=$(hosts_real_ips $(sed -n 's/^Falseado en [^:]*: //p' <<< "$out"))
         edit_hosts --aplicar "$copy" || { rm -f "$copy"; return 1; }
+        # shellcheck disable=SC2086  # (una direccion por palabra)
+        browser_reconnect $ips || true
     fi
     # Los WordPress con dominio propio, a la direccion que toca: la del dominio si esta falseado y la
     # de web.local si no (en simulacion, con el hosts que quedaria)
@@ -448,6 +455,77 @@ EOF
         wp_urls_sync_all
     fi
     rm -f "$copy"
+}
+
+# Las direcciones de la web real de unos dominios (las que da ahora el sistema; solo las de fuera de
+# este equipo), para browser_reconnect. Como mucho 3 s por dominio
+function hosts_real_ips() {
+    local d
+    for d in "$@"; do
+        valid_domain "$d" || continue
+        timeout 3 getent ahosts "$d" 2> /dev/null | awk '{ print $1 }'
+    done | grep -vE '^(127\.|::1$|::ffff:127\.|0\.0\.0\.0$|::$)' | sort -u | tr '\n' ' '
+}
+
+# Al falsear o dejar de falsear un dominio, el navegador sigue un rato (a veces minutos) con las
+# conexiones que ya tenia abiertas: con la web real o con este equipo, sin volver a mirar hosts. Una
+# pestaña que llama sola al servidor (el editor de Elementor, por ejemplo) las mantiene. Se cortan las
+# suyas, solo las de los navegadores (Chrome, Chromium, Brave, Edge, Opera, Vivaldi, Firefox) a los
+# puertos de las webs, con este equipo y con las direcciones dadas (las de la web real de lo que se
+# acaba de falsear): el navegador vuelve a conectar al momento y ya va adonde dice hosts
+function browser_reconnect() {
+    local list n=0 l
+    # (solo con el hosts del sistema: el de las pruebas o uno de otro sitio no lo mira el navegador)
+    [ "$HOSTS_FILE" == /etc/hosts ] || return 0
+    command -v ss > /dev/null || return 0
+    # (la lista de ss, aparte: la entrada del python es su programa)
+    list=$(LVM_SS=$(ss -Htnp state established 2> /dev/null) python3 -I - "$PORT_HTTP $PORT_HTTPS 80 443" "$*" <<'EOF'
+import ipaddress, os, re, sys
+ports, ips = set(sys.argv[1].split()), set()
+for a in sys.argv[2].split():
+    try:
+        ips.add(ipaddress.ip_address(a))
+    except ValueError:
+        pass
+browsers = re.compile(r'\(\("(chrome|chromium|chromium-browse|brave|msedge|opera|vivaldi-bin|firefox|firefox-bin|Socket Process)"')
+def split(ep):
+    host, _, port = ep.rpartition(":")
+    host = host.strip("[]").split("%")[0]
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return None, None, port
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip, host, port
+def show(h, p):
+    return "[%s]:%s" % (h, p) if ":" in h else "%s:%s" % (h, p)
+for line in os.environ.get("LVM_SS", "").splitlines():
+    f = line.split(None, 4)
+    if len(f) < 5 or not browsers.search(f[4]):
+        continue
+    lip, lhost, lport = split(f[2])
+    pip, phost, pport = split(f[3])
+    if lip is None or pip is None or pport not in ports or not (pip.is_loopback or pip in ips):
+        continue
+    print("%s %s" % (show(lhost, lport), show(phost, pport)))
+EOF
+)
+    [ -n "$list" ] || return 0
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] se cortan $(wc -l <<< "$list") conexiones del navegador, para que vuelva a conectar adonde dice hosts"
+        return 0
+    fi
+    while read -r l; do
+        # shellcheck disable=SC2086  # (origen y destino)
+        set -- $l
+        sudo -n ss -K src "$1" dst "$2" > /dev/null 2>&1 && n=$((n + 1))
+    done <<< "$list"
+    if [ $n -gt 0 ]; then
+        echo "El navegador vuelve a conectar adonde dice hosts (cortadas $n conexiones que tenia abiertas)"
+    else
+        echo "Si el navegador aun muestra la otra web, en Mas, «Vaciar la cache de Chrome…» (o cierralo y vuelve a abrirlo)"
+    fi
 }
 
 # hosts-enlace: el vhost de los proyectos (web.local) pasa a 127.0.0.1 en hosts, que es donde escucha

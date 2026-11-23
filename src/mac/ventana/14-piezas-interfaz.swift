@@ -60,26 +60,15 @@ extension View {
     func hoverPointer() -> some View { modifier(HoverPointer()) }
     /// En vez de .help(): el mensaje al dejar el ratón encima con el aspecto de la ventana
     func tip(_ text: String) -> some View { modifier(Tip(text: text)) }
-    /// Lo que lanza una tarea, con otra en marcha (busy): atenuado, pero se puede pulsar; en vez de hacer lo suyo
-    /// dice cuál sigue y la enseña. (Dentro de un menú no hay capa que valga: allí lo para runTask o confirm)
+    /// Lo que lanza una tarea, con otra en marcha (busy): algo atenuado, pero hace lo suyo igual (su tarea va a la
+    /// cola y empieza cuando acabe la de ahora)
     func busyGuard(_ busy: Bool) -> some View { modifier(BusyGuard(busy: busy)) }
 }
 
 struct BusyGuard: ViewModifier {
     let busy: Bool
     func body(content: Content) -> some View {
-        content
-            .opacity(busy ? 0.5 : 1)
-            .allowsHitTesting(!busy)
-            .overlay(Group {
-                if busy {
-                    Color.white.opacity(0.001)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if let m = AppModel.current, let cur = m.runningTask { m.refuseTask(cur) }
-                        }
-                }
-            })
+        content.opacity(busy ? 0.7 : 1)
     }
 }
 
@@ -567,6 +556,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
     ("Copias de los ficheros", "doc.on.doc.fill", .gray),
+    ("Espacios de trabajo de VS Code", "chevron.left.forwardslash.chevron.right", .blue),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
     ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),

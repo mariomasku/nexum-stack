@@ -35,10 +35,12 @@ suite() {
     n=$((n + 1)) f=$LVM_TMP/grupo.$n
     items+=("s|$n|$name")
     while [ "$(jobs -rp | wc -l)" -ge "$N" ]; do wait -n; done
-    # (los que arrancan una MariaDB de verdad, de uno en uno: a la vez se quedan sin recursos al crearla)
+    # (los que arrancan una MariaDB de verdad, pocos a la vez: todos juntos se quedan sin recursos al crearla,
+    # y de uno en uno hacian cola casi dos minutos. Por turnos: LVM_PRUEBAS_MARIADB, por defecto 3)
     local a lock=()
     for a in "$@"; do
-        [[ "$a" == *.sh ]] && [ -f "$a" ] && grep -q "mysql_install_db" "$a" && lock=(flock "$LVM_TMP/mariadb.lock")
+        [[ "$a" == *.sh ]] && [ -f "$a" ] && grep -q "mysql_install_db" "$a" \
+            && lock=(flock "$LVM_TMP/mariadb.$((mdb_turn++ % ${LVM_PRUEBAS_MARIADB:-3})).lock")
     done
     # (sin entrada: una prueba que se pusiera a leer del teclado se quedaria esperando para siempre)
     ( t0=$(date +%s%N); "${lock[@]}" "$@" > "$f.out" 2>&1 < /dev/null; echo $? > "$f.rc"; echo $(( ($(date +%s%N) - t0) / 1000000 )) > "$f.ms" ) &
@@ -137,6 +139,9 @@ suite "barrera en Docker, imagen fijada y copias del Mac (1.57.12)" "$HERE/segur
 suite "WP-CLI en las imagenes de PHP de Docker (1.57.37)" "$HERE/docker-wp-cli.sh" "$L"
 suite "PostgreSQL y Nginx comunes de Docker (1.57.39)" "$HERE/docker-postgres-nginx.sh" "$L"
 suite "avisos largos con sus botones debajo (1.57.38)" "$HERE/avisos-largos.sh" "$L"
+suite "cola de tareas, Avisos en amarillo, registro y logotipo de NGINX (1.57.40)" "$HERE/cola-tareas.sh" "$L"
+suite "webs permitidas de la barrera y espacios de trabajo de VS Code (1.57.41)" "$HERE/webs-permitidas.sh" "$L"
+suite "una versión nueva o rehecha, ya protegida (1.57.42)" "$HERE/proteger-al-instalar.sh" "$L"
 suite "Apache con la configuracion de antes (1.57.20)" "$HERE/apache-recargado.sh" "$L"
 suite "diálogos con los cambios numerados (1.57.4)" "$HERE/dialogos.sh" "$L"
 suite "con una tarea en marcha, se puede pulsar y avisa (1.57.34)" "$HERE/tarea-ocupada.sh" "$L"
@@ -226,6 +231,9 @@ suite "barrera en Docker, imagen fijada y copias del Mac (1.57.12)" "$HERE/segur
 suite "WP-CLI en las imagenes de PHP de Docker (1.57.37)" "$HERE/docker-wp-cli.sh" "$M"
 suite "PostgreSQL y Nginx comunes de Docker (1.57.39)" "$HERE/docker-postgres-nginx.sh" "$M"
 suite "avisos largos con sus botones debajo (1.57.38)" "$HERE/avisos-largos.sh" "$M"
+suite "cola de tareas, Avisos en amarillo, registro y logotipo de NGINX (1.57.40)" "$HERE/cola-tareas.sh" "$M"
+suite "webs permitidas de la barrera y espacios de trabajo de VS Code (1.57.41)" "$HERE/webs-permitidas.sh" "$M"
+suite "una versión nueva o rehecha, ya protegida (1.57.42)" "$HERE/proteger-al-instalar.sh" "$M"
 suite "Apache con la configuracion de antes (1.57.20)" "$HERE/apache-recargado.sh" "$M"
 suite "diálogos con los cambios numerados (1.41.3)" "$HERE/dialogos.sh" "$M"
 suite "con una tarea en marcha, se puede pulsar y avisa (1.57.34)" "$HERE/tarea-ocupada.sh" "$M"

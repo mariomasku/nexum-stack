@@ -132,8 +132,12 @@ class App2(NvBandeja,
         self.term_paned.pack1(self.stack, True, False)
         self.term_paned.pack2(self.nv_term_panel(), False, False)
         body.pack_start(self.term_paned, True, True, 0)
+        # (abajo, a lo ancho de la ventana, la barra de estado: a dónde apunta web.local)
+        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        main.pack_start(body, True, True, 0)
+        main.pack_start(self.nv_status_bar(), False, False, 0)
         overlay = Gtk.Overlay()
-        overlay.add(body)
+        overlay.add(main)
         overlay.add_overlay(self.build_toast())
         self.win.add(overlay)
         self.nv_build_projects_shell()
@@ -158,6 +162,45 @@ class App2(NvBandeja,
         # Capturas de cada página (LVM_CAPTURA=<carpeta>: las del manual, con LVM_DEMO)
         if os.environ.get("LVM_CAPTURA"):
             GLib.timeout_add(6000, self.nv_capture_all)
+
+    # ------------------------------------------------------------------ barra de estado
+    def nv_status_bar(self):
+        """La barra de abajo: «web.local >>>>> proyecto» (los chevrones en verde, con su onda), «web.local
+        >>>>> dominio falseado · tienda.com» si el dominio del proyecto cargado está falseado o, sin proyecto
+        cargado, «web.local >>>>> sin enlace» (chevrones y texto en gris)."""
+        bar = css(Gtk.Box(spacing=6), "nv-estado")
+        self.st_link = label("web.local", "nv-mono", "nv-chico")
+        self.st_chev = LinkChevrons()
+        self.st_target = label("sin enlace", "nv-mono", "nv-chico", "nv-tenue", ellipsize=2)  # (Pango.EllipsizeMode.MIDDLE)
+        for w in (self.st_link, self.st_chev, self.st_target):
+            bar.pack_start(w, False, False, 0)
+        # (pegado a los chevrones, con el ancho de su nombre: el sitio que sobra queda a su derecha)
+        self.st_target.set_max_width_chars(90)
+        self.nv_status_update()
+        return bar
+
+    def nv_status_update(self):
+        if getattr(self, "st_link", None) is None:
+            return
+        p = self.projects or {}
+        self.st_link.set_text(p.get("link") or "web.local")
+        folder = self.loaded_project_folder()
+        ctx = self.st_target.get_style_context()
+        # (con el dominio del proyecto falseado, se dice: sus visitas van a esta copia y no a la web real)
+        fakes = [h["name"] for h in self.project_hosts(os.path.basename(folder)) if h["fake"]] if folder else []
+        if fakes:
+            self.st_target.set_text("dominio falseado · %s" % ", ".join(fakes))
+            ctx.remove_class("nv-tenue")
+            self.st_target.set_tooltip_text("%s, con %s falseado: va a esta copia y no a la web real" % (folder, ", ".join(fakes)))
+        elif folder:
+            self.st_target.set_text(os.path.basename(folder))
+            ctx.remove_class("nv-tenue")
+            self.st_target.set_tooltip_text(folder)
+        else:
+            self.st_target.set_text("sin enlace")
+            ctx.add_class("nv-tenue")
+            self.st_target.set_tooltip_text("Ningún proyecto cargado: %s enseña una página vacía" % (p.get("link") or "web.local"))
+        self.st_chev.set_linked(bool(folder))
 
     def nv_capture_all(self):
         """Una captura de cada página y de cada apartado de Configuración en LVM_CAPTURA (nombre-de-pagina.png),

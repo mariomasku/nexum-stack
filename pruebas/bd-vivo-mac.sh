@@ -62,4 +62,13 @@ check "XAMPP-X: al arrancar o activar, el traspaso y el puente al 3306; al parar
 check "configuracion: el servidor de su BBDD es el puente; borrar nunca toca la de XAMPP-X" 'grep -q "server=\$(lampp_bd_bridge \"\$(docker_conf \"\$slug\" LAMPP_BD)\")" "$SRC" && grep -q "db=\$(docker_conf \"\$slug\" BBDD_DOCKER) user=\$(docker_conf \"\$slug\" USUARIO_DOCKER)" "$SRC"'
 check "ventana (Mac): botón BBDD en la fila de un WordPress, «Cómo» al montarlo y el puente con su nombre" 'grep -q "model.dockerDbMode(p)" "$SRC" && grep -q "args += \[\"--bd\", src\[1\], \"--desde\", src\[0\], \"--en-vivo\"\]" "$SRC" && grep -q "title = \"Puente a la BBDD de XAMPP-\"" "$SRC" && grep -q "lampp-bd-\[0-9\]{1,2}-\[0-9\]{1,2}(-\[0-9\]{1,3})?)\$\"," "$SRC"'
 check "datos (Mac): la version en vivo en la fila del proyecto y el puente agrupado con su nombre" 'grep -q "|\$(docker_conf \"\$p\" TIPO)|\$(docker_conf \"\$p\" PHP)|\$(docker_conf \"\$p\" LAMPP_BD)\"" "$SRC" && grep -q "lampp: isWeb ? field(f, 13) : \"\"" "$SRC"'
+# (1.57.46: tiendas en vivo) Las credenciales de su parameters.php, su dominio de verdad en la web del
+# contenedor (solo responde a su dominio) y en el vhost, y la ventana con «Cómo» y el botón BBDD tambien en ellas
+if grep -q '^function lampp_bd_shop_domain() {' "$SRC"; then
+    mkdir -p "$HTDOCS_DIR/tienda/app/config"
+    printf "<?php return array('parameters' => array('database_name' => 'ps_t', 'database_user' => 'u', 'database_password' => 'p'));\n" > "$HTDOCS_DIR/tienda/app/config/parameters.php"
+    check "tienda: credenciales de su parameters.php" '[ "$(lampp_bd_creds tienda | head -1)" == "u|ps_t" ]'
+    check "tienda en vivo: la web del contenedor espera su dominio de verdad y el vhost se lo pone" 'grep -q "host=\$(docker_conf \"\$slug\" DOMINIO_TIENDA)" "$SRC" && grep -q "docker_web_ps_live \"\$slug\" \"\$dom\"" "$SRC" && grep -q "^LoadModule substitute_module modules/mod_substitute.so$" "$SRC"'
+    check "ventana (Mac): «Cómo» y el botón BBDD tambien en una tienda" 'grep -q "if p.isWeb \&\& (p.kind == \"wp\" || p.kind == \"ps\")" "$SRC" && grep -q "let wp = x.kind == \"wp\" || x.kind == \"ps\"" "$SRC" && grep -q "(x?.kind == \"wp\" || x?.kind == \"ps\")" "$SRC"'
+fi
 exit $fail

@@ -20,7 +20,14 @@ extract "$SRC" docker_bin docker_sock dk docker_config_dir docker_ready docker_s
     docker_conf_set docker_web_ps_domain docker_web_create docker_web_add docker_web_remove docker_web_switch \
     docker_web_action docker_test_admin gui_docker docker_pass docker_shared_warn docker_web_idle_stop \
     docker_db_password docker_migrate db_valid_name valid_version_name web_barrier_on unknown_host_vhost || exit 1
+# (1.57.41: las webs permitidas, en el hueco de la barrera; sin la lista, el de siempre)
+grep -q '^function web_barrier_fill() {' "$SRC" && { extract "$SRC" web_barrier_fill web_barrier_allow_regex web_barrier_allowed || exit 1
+    eval "$(grep -E '^WEB_BARRIER_(SLOT|ALLOW_RE)=' "$SRC")"; WEB_BARRIER_ALLOW=$W/sin-lista; }
 grep -q '^function docker_web_media() {' "$SRC" && { extract "$SRC" docker_web_media media_saved || exit 1; }
+# (1.57.46: tiendas en vivo y la BBDD de cada proyecto, la comun o la de su version en vivo)
+grep -q '^function docker_web_ps_live() {' "$SRC" && { extract "$SRC" docker_web_ps_live docker_web_db_up valid_domain || exit 1; }
+# (Docker sin las BBDD de sus proyectos, en gui-docker: aqui no falta ninguna)
+grep -q '^function docker_lost() {' "$SRC" && docker_lost() { :; }
 MEDIA_PROJECTS_FILE=$W/media-produccion
 docker_idle_ensure() { :; }
 custom_domain() { [ "$1" == blog ] && echo blog.test; }

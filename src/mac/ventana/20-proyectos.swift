@@ -412,6 +412,9 @@ struct ProjectsView: View {
         if x.kind == "ps" {
             items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
         }
+        if !model.projectHosts(x.name).isEmpty {
+            items.append(("Vaciar la caché de Chrome…", { model.browserCacheHelp() }))
+        }
         items.append(("Personalizar los botones…", { model.panel = .buttons }))
         items.append(("Borrar el proyecto…", { model.deleteProject(x) }))
         return items
@@ -575,6 +578,9 @@ struct ProjectsView: View {
                         }
                         if x.kind == "ps" {
                             Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
+                        }
+                        if !model.projectHosts(x.name).isEmpty {
+                            Button("Vaciar la caché de Chrome…") { model.browserCacheHelp() }
                         }
                         Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }

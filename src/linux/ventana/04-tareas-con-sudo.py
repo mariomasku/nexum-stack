@@ -118,8 +118,11 @@ class Task:
     El resto: barra en movimiento y la salida en el registro."""
 
     def __init__(self, app, title, args, progress=False, done_text=None, on_done=None,
-                 auto_close=False, env=None, cancel_text=None):
+                 auto_close=False, env=None, cancel_text=None, free=False):
         self.app, self.args, self.progress = app, args, progress
+        # free: va al lado de la que sigue, sin cola (run_task): no se esconde en segundo plano
+        self.free = free
+        self.ok = self.closed = False
         self.env, self.cancel_text = env or {}, cancel_text
         self.done_text, self.on_done, self.auto_close = done_text, on_done, auto_close
         # (escondida con «Seguir en segundo plano»: el aviso de al lado del visor la trae de vuelta)
@@ -143,6 +146,7 @@ class Task:
         dlg.get_header_bar().set_show_close_button(False)
         # (Esc o cerrarla con la tarea en marcha: sigue en segundo plano, si la ventana tiene su aviso)
         dlg.connect("delete-event", self.on_delete)
+        dlg.connect("destroy", lambda *_: setattr(self, "closed", True))
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=24)
         # Al terminar bien, un check verde grande: «Terminado» en gris no se ve de un vistazo
         ok_icon = "emblem-ok-symbolic" if Gtk.IconTheme.get_default().has_icon(
@@ -167,6 +171,16 @@ class Task:
         box.pack_start(self.info, False, False, 0)
         # Porcentaje que se lee en la salida (tareas sin progreso propio): (primero, último, cuándo empezó)
         self.seen_pct = None
+
+        # La cola: las que empiezan cuando acabe esta, con «Vaciar la cola»
+        self.queue_box = Gtk.Box(spacing=8, margin_top=2)
+        self.queue_lbl = label("", "nv-chico", "nv-tenue", xalign=0, wrap=True)
+        self.queue_box.pack_start(self.queue_lbl, True, True, 0)
+        qb = css(Gtk.Button(label="Vaciar la cola", valign=Gtk.Align.CENTER), "pildora")
+        qb.connect("clicked", lambda *_: self.app.task_queue_clear())
+        self.queue_box.pack_end(qb, False, False, 0)
+        self.queue_box.set_no_show_all(True)
+        box.pack_start(self.queue_box, False, False, 0)
 
         self.parts_box = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
         self.parts_box.set_no_show_all(True)
@@ -196,7 +210,7 @@ class Task:
         self.bg_btn = css(Gtk.Button(label="Seguir en segundo plano",
                                      tooltip_text="Esconder esta ventana y seguir usando el programa"), "pildora")
         self.bg_btn.connect("clicked", self.to_background)
-        self.bg_btn.set_no_show_all(not hasattr(self.app, "nv_task_badge"))
+        self.bg_btn.set_no_show_all(self.free or not hasattr(self.app, "nv_task_badge"))
         buttons.pack_start(self.bg_btn, False, False, 0)
         self.close_btn = css(Gtk.Button(label="Cancelar"), "pildora")
         self.close_btn.connect("clicked", self.on_close)
@@ -502,14 +516,14 @@ class Task:
     def on_delete(self, *_):
         if self.finished:
             return False
-        if hasattr(self.app, "nv_task_badge"):
+        if hasattr(self.app, "nv_task_badge") and not self.free:
             self.to_background()
         return True
 
     def to_background(self, *_):
         """La tarea sigue sin su ventana: el programa se puede usar (sin lanzar otra tarea a la vez) y, al
         lado del visor, una flecha verde que late la trae de vuelta."""
-        if self.finished or not hasattr(self.app, "nv_task_badge"):
+        if self.finished or self.free or not hasattr(self.app, "nv_task_badge"):
             return
         self.background = True
         self.dlg.set_modal(False)
@@ -536,7 +550,7 @@ class Task:
                 os.unlink(self.pfile)
             except OSError:
                 pass
-        ok = rc == 0 and not self.cancelled
+        ok = self.ok = rc == 0 and not self.cancelled
         self.save_log("Cancelada" if self.cancelled else "Terminada bien" if ok else "Ha fallado (código %d)" % rc,
                       self.log_text() or "(sin salida)")
         # (Configuración, General: el registro de tareas, con esta ya acabada)
@@ -656,10 +670,30 @@ class Task:
             if res and len(good) == len(res):
                 self.head.set_label(self.done_text or "Terminado")
 
+    def queue_show(self, queue):
+        """Las que esperan a que acabe esta (la cola de la ventana), o nada si no hay."""
+        if not queue:
+            self.queue_box.hide()
+            return
+        self.queue_lbl.set_label("Después, en la cola: %s" % ", ".join("«%s»" % q["title"] for q in queue))
+        # (con no_show_all, show_all no la enseña: se enseña ella y lo de dentro)
+        self.queue_box.show()
+        for w in self.queue_box.get_children():
+            w.show()
+
     def offer(self, text, callback):
         self.extra_btn.set_label(text)
-        self.extra_btn.connect("clicked", lambda *_: (self.dlg.destroy(), callback()))
+        self.extra_btn.connect("clicked", lambda *_: self.offer_go(callback))
         self.extra_btn.show()
+
+    def offer_go(self, callback):
+        """El botón de la que ha terminado: si lanza otra tarea, va la primera de la cola (sigue a esta)."""
+        self.app.task_from_offer = True
+        try:
+            self.dlg.destroy()
+            callback()
+        finally:
+            self.app.task_from_offer = False
 
     def cancel(self):
         if self.finished:

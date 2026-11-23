@@ -282,6 +282,8 @@ if [ "${LVM_TAREA:-}" == 1 ]; then
         docker-wp-cli) ;;
         # (PostgreSQL y Nginx de Docker: Docker sin root y ficheros de ~/.nexum)
         docker-postgres) ;;
+        # (la copia de las BBDD de Docker: Docker sin root (o Docker Desktop) y ~/nexum-backups)
+        docker-copia) ;;
         docker-nginx) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
@@ -364,6 +366,8 @@ case "$1" in
     docker-imagen) docker_update_image "$2" ;;
     docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
     docker-postgres) shift; docker_pg_command "$@" ;;
+    docker-copia) docker_backup_all ;;
+    docker-recuperar) shift; docker_recover "$@" ;;
     docker-nginx) shift; docker_nginx_command "$@" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
@@ -416,7 +420,7 @@ case "$1" in
         STEP_LOG="" STEP_DESC=""
         stack_build_phase
         ;;
-    barrera-web|barrera-webs) cross_site_command "$2" ;;
+    barrera-web|barrera-webs) cross_site_command "$2" "$3" ;;
     correo) mail_command "$2" "$3" ;;
     reparar-bd-sistema) repair_db_system "$2" ;;
     arreglar-certificados) fix_certs ;;

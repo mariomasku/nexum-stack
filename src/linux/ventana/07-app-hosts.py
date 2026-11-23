@@ -13,6 +13,9 @@ class AppHosts:
             self.hosts = rows
             self.hosts_link_fix = link_fix
             self.build_hosts()
+            # (la barra de estado dice si el dominio del proyecto cargado está falseado)
+            if hasattr(self, "nv_status_update"):
+                self.nv_status_update()
         return False
 
     def build_hosts(self):

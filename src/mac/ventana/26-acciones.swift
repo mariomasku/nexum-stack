@@ -399,7 +399,7 @@ struct DockerNewPanel: View {
             formRow("Carpeta") {
                 SearchPicker(selection: Binding(get: { model.dkForm.folder }, set: { v in
                     model.dkForm.folder = v
-                    model.dkForm.source = ""
+                    model.dkForm.source = model.dockerDefaultSource(v)
                     if !model.dkForm.domainSet { model.dkForm.domain = dockerSlug(v) + ".docker.local" }
                 }), items: folders.map { ($0, $0) }, width: wide)
             }
@@ -419,7 +419,7 @@ struct DockerNewPanel: View {
                              items: [("", "— Ninguna: vacía —")] + pairs.map { pr in ("\(pr.0.folder)|\(pr.1)", "\(pr.1) (XAMPP-\(pr.0.folder))") },
                              width: wide)
             }
-            if !model.dkForm.source.isEmpty && x?.kind == "wp" {
+            if !model.dkForm.source.isEmpty && (x?.kind == "wp" || x?.kind == "ps") {
                 formRow("Cómo") {
                     SearchPicker(selection: Binding(get: { model.dkForm.live ? "vivo" : "copia" },
                                                     set: { model.dkForm.live = $0 == "vivo" }),

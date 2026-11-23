@@ -63,7 +63,8 @@ class NvBandeja:
     def nv_tray_hide(self):
         """La X de la ventana: con el icono, la esconde (True: no se cierra); sin él, se cierra como siempre."""
         if self.tray is None:
-            return False
+            # (sin el icono, se cierra el programa: con tareas en la cola, antes se pregunta)
+            return not self.task_queue_quit()
         self.win.hide()
         return True
 
@@ -83,6 +84,8 @@ class NvBandeja:
             self.open_uri(self.project_web())
 
     def nv_tray_quit(self):
+        if not self.task_queue_quit():
+            return
         self.nv_tray_remove()
         self.win.destroy()
 
@@ -252,7 +255,7 @@ class NvBandeja:
         pill.pack_start(Gtk.Box(), False, False, 2)
         self.warn_btn = Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE)
         wb = Gtk.Box(spacing=4)
-        wb.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+        wb.pack_start(css(icon("dialog-warning-symbolic"), "nv-aviso-icono"), False, False, 0)
         self.warn_num = label("0", "nv-aviso-num", valign=Gtk.Align.CENTER)
         wb.pack_start(self.warn_num, False, False, 0)
         self.warn_btn.add(wb)

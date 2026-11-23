@@ -22,6 +22,9 @@ struct TaskBadge: View {
                 if let r = task.pctText.range(of: "%") {
                     Text(String(task.pctText[..<r.upperBound])).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
                 }
+                if !model.taskQueue.isEmpty {
+                    Text("· \(model.taskQueue.count) en la cola").font(.system(size: 11.5, weight: .semibold))
+                }
             }
             .foregroundColor(.green)
             .padding(.horizontal, 9)
@@ -269,7 +272,8 @@ struct TopBar: View {
         if model.data != nil, n > 0 {
             Button(action: { warnOpen.toggle() }) {
                 HStack(spacing: 5) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+                    // (en amarillo: avisa, no es un error)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow)
                     Text("\(n)").font(.system(size: 12, weight: .bold))
                 }
             }

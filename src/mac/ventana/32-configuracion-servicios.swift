@@ -508,6 +508,20 @@ struct ToolsView: View {
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                         .disabled(d.installs.isEmpty).busyGuard(model.busy)
                 }
+                // Webs permitidas: las de confianza (el ERP de la empresa), que la barrera deja pasar
+                Tile("Webs permitidas", d.barrierAllowed.isEmpty
+                     ? "Ninguna. Añade las de confianza (el ERP de tu empresa) para que puedan mandarte a tus proyectos con un formulario, abrirlos en un iframe o hacerles peticiones (fetch)"
+                     : "La barrera deja pasar lo que mandan a tus proyectos (*.dominio vale también para sus subdominios)") {
+                    Button("Añadir…") { model.addBarrierAllowed() }
+                        .disabled(d.installs.isEmpty).busyGuard(model.busy)
+                }
+                ForEach(d.barrierAllowed, id: \.self) { dom in
+                    Tile(dom, dom.hasPrefix("*.") ? "\(dom.dropFirst(2)) y todos sus subdominios" : "Solo este dominio",
+                         leading: { Image(systemName: "checkmark.shield").font(.system(size: 15)).foregroundColor(.green).frame(width: 22) },
+                         trailing: {
+                             Button("Quitar") { model.removeBarrierAllowed(dom) }.busyGuard(model.busy)
+                         })
+                }
             }
             // Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
             TileCard("Qué es", wide: true) {
@@ -554,6 +568,7 @@ struct ToolsView: View {
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                         .busyGuard(model.busy)
                 }
+                VSCodeWsTile()
                 Tile("Registros de instalaciones", "~/.nexum: logs de las instalaciones y de la ventana") {
                     Button("Abrir") { openFolder(LOG_DIR) }
                 }
@@ -599,7 +614,7 @@ struct ToolsView: View {
             generalBlock("Registro de tareas", "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.nexum/tareas, solo para ti; las contraseñas y los tokens no se escriben.") {
                 TaskLogsCard()
             }
-            generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD.") {
+            generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), Docker Desktop (frente a la que ofrece su actualizador) y las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), los Node que ha descargado Nexum (frente a lo último de su rama), Mailpit, cloudflared y Nginx. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD. Docker Desktop se instala a mano: antes, «Actualizar todo» copia todas las BBDD de Docker en ~/nexum-backups y abre su descarga.") {
                 componentsCard()
             }
             generalBlock("Programa", "El propio Nexum Dev Stack: lo que hace al cerrar la ventana y al iniciar sesión.") {
@@ -1020,17 +1035,32 @@ struct AdminTestCard: View {
     }
 }
 
+/// El alto de cada fila del registro de tareas (por su posición), tal como queda en la ventana
+private struct TaskRowHeightsKey: PreferenceKey {
+    static var defaultValue: [Int: CGFloat] = [:]
+    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 struct TaskLogsCard: View {
     @EnvironmentObject var model: AppModel
     @State private var logs: [TaskLogEntry] = []
+    /// El alto de las 4 primeras filas, medido (hasta medirlas, el de 4 filas de las de siempre)
+    @State private var listHeight: CGFloat = 4 * 58
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // (todas, pero se ven 4: con más, la lista se desplaza dentro de su recuadro)
+            // (todas, pero se ven 4: con más, la lista se desplaza dentro de su recuadro, con el alto justo de las
+            // 4 primeras tal como quedan, y nunca menos de 3 filas)
             if logs.count > 4 {
                 TileCard(wide: true) {
                     ScrollView { VStack(spacing: 0) { rows() } }
-                        .frame(height: 4 * 54)
+                        .frame(height: max(listHeight, 3 * 54))
+                        .onPreferenceChange(TaskRowHeightsKey.self) { h in
+                            let first = (0..<4).compactMap { h[$0] }
+                            if first.count == 4 { listHeight = first.reduce(0, +) }
+                        }
                 }
             } else {
                 TileCard(wide: true) { rows() }
@@ -1055,11 +1085,14 @@ struct TaskLogsCard: View {
         if logs.isEmpty {
             Tile("Todavía no hay ninguna tarea", "Cada tarea que lances desde la ventana se guarda aquí")
         }
-        ForEach(logs) { e in
+        ForEach(Array(logs.enumerated()), id: \.element.id) { i, e in
             Tile(e.title, e.when + "  ·  " + e.result, leading: { mark(e.state) }) {
                 Button("Ver") { showTaskLog(e.path) }
                     .tip(e.command)
             }
+            .background(GeometryReader { g in
+                Color.clear.preference(key: TaskRowHeightsKey.self, value: i < 4 ? [i: g.size.height] : [:])
+            })
         }
     }
 
@@ -1213,5 +1246,44 @@ struct CleanCard: View {
                 sizes = got
             }
         }
+    }
+}
+
+/// Carpetas: la de los espacios de trabajo de VS Code (vscodeWorkspace)
+struct VSCodeWsTile: View {
+    @EnvironmentObject var model: AppModel
+    @State private var dir = vscodeWsDir()
+
+    var body: some View {
+        Tile("Espacios de trabajo de VS Code", dir.isEmpty
+             ? "Sin elegir: los proyectos se abren como carpeta. Elige dónde guardas tus .code-workspace para abrir cada uno con el suyo"
+             : "\(dir): cada proyecto se abre con su .code-workspace (si no tiene, se le crea uno)") {
+            if !dir.isEmpty && FileManager.default.fileExists(atPath: dir) {
+                Button("Abrir") { openFolder(dir) }
+            }
+            Button(dir.isEmpty ? "Elegir…" : "Cambiar…") { choose() }
+            if !dir.isEmpty {
+                Button("Quitar") {
+                    saveVscodeWsDir("")
+                    dir = ""
+                    model.toast("Los proyectos vuelven a abrirse en VS Code como carpeta")
+                }
+            }
+        }
+    }
+
+    func choose() {
+        let panel = NSOpenPanel()
+        panel.title = "Carpeta de los espacios de trabajo de VS Code"
+        panel.prompt = "Elegir"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        if !dir.isEmpty { panel.directoryURL = URL(fileURLWithPath: dir, isDirectory: true) }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        saveVscodeWsDir(url.path)
+        dir = url.path
+        model.toast("Los proyectos se abren en VS Code con su espacio de trabajo de \(url.path)")
     }
 }

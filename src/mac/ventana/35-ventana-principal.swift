@@ -24,6 +24,9 @@ struct ContentView: View {
                     }
                 }
             }
+            // (abajo, a lo ancho de la ventana, la barra de estado: a dónde apunta web.local)
+            Divider()
+            StatusBar()
         }
         // Todos los botones: con borde, la mano y el borde azul al pasar el ratón (como en Linux)
         .buttonStyle(PointerButtonStyle())
@@ -32,7 +35,7 @@ struct ContentView: View {
         // (escondida en segundo plano, la hoja no se ve; la tarea sigue y su aviso está al lado del visor)
         .sheet(item: Binding(get: { model.taskHidden ? nil : model.task },
                              set: { t in if t == nil && !model.taskHidden { model.task = nil } })) { t in
-            TaskView(task: t).buttonStyle(PointerButtonStyle())
+            TaskView(task: t).environmentObject(model).buttonStyle(PointerButtonStyle())
         }
         // (Apariencia, cristal: el escritorio desenfocado detrás de la ventana)
         .background(GlassBackground(on: model.look.cristal))
@@ -109,6 +112,93 @@ struct ContentView: View {
                                         lineWidth: 3))
             .shadow(color: Color.black.opacity(0.30), radius: 9, y: 4)
             .padding(.bottom, 24)
+        }
+    }
+}
+
+/// La barra de abajo: «web.local >>>>> proyecto» (los chevrones en verde, con su onda), «web.local >>>>>
+/// dominio falseado · tienda.com» si el dominio del proyecto cargado está falseado o, sin proyecto cargado,
+/// «web.local >>>>> sin enlace» (chevrones y texto en gris)
+struct StatusBar: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        let link = (model.projects?.link ?? "").isEmpty ? "web.local" : model.projects!.link
+        let folder = loadedProjectFolder(model.projects?.current ?? "")
+        // (con el dominio del proyecto falseado, se dice: sus visitas van a esta copia y no a la web real)
+        let fakes = folder.map { f in model.projectHosts((f as NSString).lastPathComponent).filter { $0.fake }.map { $0.name } } ?? []
+        let text = !fakes.isEmpty ? "dominio falseado · " + fakes.joined(separator: ", ")
+            : folder.map { ($0 as NSString).lastPathComponent } ?? "sin enlace"
+        let tip = folder.map { f in fakes.isEmpty ? f : "\(f), con \(fakes.joined(separator: ", ")) falseado: va a esta copia y no a la web real" }
+            ?? "Ningún proyecto cargado: \(link) enseña una página vacía"
+        HStack(spacing: 6) {
+            Text(link)
+            LinkChevrons(linked: folder != nil)
+            Text(text)
+                .foregroundColor(folder == nil ? .secondary : .primary)
+                .lineLimit(1).truncationMode(.middle)
+                .help(tip)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 11, design: .monospaced))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity)
+        .background(Color.primary.opacity(0.035))
+    }
+}
+
+/// Los chevrones de la barra de estado: enlazado, en verde, con una onda de luz que va de izquierda a derecha;
+/// sin enlace, grises y quietos. El paso de uno a otro, fundido (como en Linux)
+struct LinkChevrons: View {
+    let linked: Bool
+    @State private var from: Double = 0
+    @State private var goal: Double = 0
+    @State private var changed = Date.distantPast
+    @State private var still = true
+    static let count = 5, step: CGFloat = 9, period = 1.6, fade = 0.45
+    static let dim = (0.10, 0.45, 0.25), bright = (0.19, 0.82, 0.35)
+
+    func level(_ now: Date) -> Double {
+        let k = min(1, max(0, now.timeIntervalSince(changed) / Self.fade))
+        return from + (goal - from) * k
+    }
+
+    var body: some View {
+        // (unos 30 dibujos por segundo bastan para la onda; quieto y sin enlace, no se dibuja más)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: still && !linked)) { ctx in
+            Canvas { g, size in
+                let lv = level(ctx.date)
+                let t = ctx.date.timeIntervalSinceReferenceDate
+                for i in 0..<Self.count {
+                    // (la onda: cada chevrón, algo después que el de su izquierda)
+                    let wave = 0.5 + 0.5 * sin(2 * Double.pi * (t / Self.period - Double(i) / Double(Self.count)))
+                    let r = Self.dim.0 + (Self.bright.0 - Self.dim.0) * wave
+                    let gr = Self.dim.1 + (Self.bright.1 - Self.dim.1) * wave
+                    let b = Self.dim.2 + (Self.bright.2 - Self.dim.2) * wave
+                    let gray = Color.secondary.opacity(1 - lv)
+                    let green = Color(red: r, green: gr, blue: b).opacity(lv * (0.55 + 0.45 * wave))
+                    let x = 3 + CGFloat(i) * Self.step, y = size.height / 2
+                    var path = Path()
+                    path.move(to: CGPoint(x: x, y: y - 4.5))
+                    path.addLine(to: CGPoint(x: x + 4.5, y: y))
+                    path.addLine(to: CGPoint(x: x, y: y + 4.5))
+                    let style = StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
+                    g.stroke(path, with: .color(gray), style: style)
+                    g.stroke(path, with: .color(green), style: style)
+                }
+            }
+        }
+        .frame(width: CGFloat(Self.count - 1) * Self.step + 10, height: 14)
+        .onAppear { from = linked ? 1 : 0; goal = from }
+        .onChange(of: linked) { on in
+            // (desde donde iba el fundido, hacia el nuevo)
+            let now = Date()
+            from = level(now)
+            goal = on ? 1 : 0
+            changed = now
+            still = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.fade + 0.1) { still = true }
         }
     }
 }

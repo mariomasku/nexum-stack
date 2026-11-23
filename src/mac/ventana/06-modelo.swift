@@ -28,15 +28,23 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var task: TaskRunner? = nil {
-        // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea)
+        // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea y las de la
+        // cola. Al cerrarse la hoja de una, la siguiente de la cola: después, por si su botón lanza otra, que va antes)
         didSet {
             if task == nil && taskHidden { taskHidden = false }
-            if task == nil && oldValue != nil && !TrayIcon.shared.on
+            if task == nil, let old = oldValue {
+                DispatchQueue.main.async { [weak self] in self?.taskClosed(old) }
+            }
+            if task == nil && oldValue != nil && taskQueue.isEmpty && !TrayIcon.shared.on
                 && !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
                 DispatchQueue.main.async { NSApp.terminate(nil) }
             }
         }
     }
+    /// La cola de tareas: las que se piden con otra en marcha (runTask), en orden
+    @Published var taskQueue: [QueuedTask] = []
+    /// Si la última tarea acabó bien (si no, antes de seguir con la cola se pregunta)
+    var lastTaskOk = true
     /// El modelo de la aplicación, para el delegado (que no lo ve de otro modo)
     static weak var current: AppModel?
     @Published var toastText: String? = nil
@@ -340,11 +348,7 @@ final class AppModel: ObservableObject {
 
     init() {
         AppModel.current = self
-        TASK_GUARD = { [weak self] in
-            guard let self = self, let cur = self.runningTask else { return false }
-            self.refuseTask(cur)
-            return true
-        }
+        TASK_NOTE = { [weak self] in self?.taskNote }
         reload(branches: true)
         // Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
         // vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
@@ -391,8 +395,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), las
-    /// imágenes de Docker, Mailpit y cloudflared
+    /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), Docker Desktop
+    /// y las imágenes de Docker, Node, Mailpit, cloudflared y Nginx
     func reloadComponents(_ then: ((ComponentsState) -> Void)? = nil) {
         runQuick(["componentes"]) { _, out in
             let c = parseComponents(out)

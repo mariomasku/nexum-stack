@@ -167,12 +167,18 @@ extension AppModel {
     func fetchRepo(_ r: RepoItem) {
         var args = ["repo-traer", r.full]
         var title = "Clonando \(r.name)"
+        // (solo con git, en su carpeta y sin sudo: va ya, al lado de la que siga, si no es de la misma carpeta)
+        let free = task != nil && taskFree(r.folder)
         if r.state == "clonado" {
             guard confirm("¿Traer los cambios de GitHub a \(r.folder)?",
                           "Este repositorio ya está clonado en \(HTDOCS)/\(r.folder). Se traen sus cambios de GitHub (git pull) y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca nada y se dice.",
-                          "Traer los cambios") else { return }
+                          "Traer los cambios", task: !free) else { return }
             args.append("--actualizar")
             title = "Trayendo los cambios de \(r.name)"
+        }
+        if free {
+            runFree(title, args, doneText: "Hecho") { [weak self] _ in self?.reloadRepos(cache: true) }
+            return
         }
         _ = runTask(title, args, doneText: "Hecho", autoClose: true) { ok, _, _ in
             self.reloadRepos(cache: true)
@@ -181,7 +187,7 @@ extension AppModel {
     }
 
     func updateComponents(_ c: ComponentsState) {
-        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian." + (c.docker ? " Docker Desktop se instala a mano: antes se copian todas las BBDD de Docker en ~/nexum-backups y luego se abre su descarga." : ""),
                             "Actualizar todo", steps: c.items, warning: UPDATE_COPY_WARNING)
         if !r.ok { return }
         components = nil
@@ -288,6 +294,7 @@ extension AppModel {
                 d.php2shell[f[1]] = f[2]
             case "T" where f.count >= 2:
                 d.barrier = f[1] != "0"
+                d.barrierAllowed = f.count >= 3 ? f[2].split(separator: " ").map(String.init) : []
             case "E" where f.count >= 8:
                 var m = MailState()
                 m.installed = f[1] == "1"

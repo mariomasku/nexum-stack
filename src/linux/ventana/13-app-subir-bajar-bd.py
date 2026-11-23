@@ -308,6 +308,10 @@ class AppSubirBajarBD:
                 message(self.win, "No se ha podido crear la BBDD", out.strip()[-600:],
                         Gtk.MessageType.ERROR)
             return False
+        # (con una tarea en marcha, no: puede estar reiniciando MariaDB; espera a que acabe)
+        if self.task_running():
+            self.refuse_task()
+            return
         run_quick(["crear-bd", name], created, env=self.db_env())
 
     def on_drop_db(self, db):

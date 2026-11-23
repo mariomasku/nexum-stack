@@ -1,12 +1,13 @@
 # ===========================================================================
 # BBDD de LAMPP en Docker (en vivo)
 # ===========================================================================
-# Un WordPress de Docker puede usar la BBDD de una version LAMPP en vivo: la misma que web.local, sin
-# copias. Su MariaDB (si no esta en marcha, solo ella y sin red: no choca con la de la version activa
+# Un WordPress o una tienda PrestaShop de Docker puede usar la BBDD de una version LAMPP en vivo: la misma
+# que web.local, sin copias. Su MariaDB (si no esta en marcha, solo ella y sin red: no choca con la de la version activa
 # en el 3306) y, en la red de Docker, un puente hasta su socket (socat, de la imagen de MariaDB; ella ve
 # las conexiones como de localhost, como las de web.local). El proyecto entra con el usuario y la
-# contraseña de su wp-config.php, los mismos que con web.local. PrestaShop no: guarda su dominio en la
-# BBDD y una misma BBDD no puede servir a web.local y a Docker a la vez
+# contraseña de su wp-config.php (o de su parameters.php o settings.inc.php), los mismos que con web.local.
+# Una tienda guarda su dominio en la BBDD, que no se toca: sigue en el suyo de verdad, y el Apache de
+# Docker se lo cambia por el de Docker en lo que entra y en lo que sale (docker_web_ps_live)
 LAMPP_BD_BRIDGE_IMAGE=mariadb:11.8
 LAMPP_BD_MARK_DIR=$DOCKER_DIR/lampp-bd
 
@@ -155,23 +156,35 @@ function lampp_bd_keep() {
 # version LAMPP (la misma que web.local) o su copia en la MariaDB comun de Docker (la de antes, que no
 # se borra al pasar a LAMPP)
 function docker_db_mode() {
-    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was
+    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was shop=""
     docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
     dir=$DOCKER_DIR/$slug
     case $mode in
         lampp)
-            [ "$(docker_conf "$slug" TIPO)" == wp ] || { echo "Solo WordPress: una tienda guarda su dominio en la BBDD y no puede servir a web.local y a Docker a la vez"; return 1; }
+            [ "$(docker_conf "$slug" TIPO)" == wp ] || [ "$(docker_conf "$slug" TIPO)" == ps ] \
+                || { echo "Solo un WordPress o una tienda PrestaShop"; return 1; }
             valid_version_name "$v" && [ -d "${TEST_DIR:-/opt}/lampp-$v" ] || { echo "No existe la version lampp-$v"; return 1; }
             owner=$(lampp_bd_owner "$v")
-            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base del wp-config.php de $(docker_conf "$slug" CARPETA)"; return 1; }
+            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base de la configuracion de $(docker_conf "$slug" CARPETA)"; return 1; }
             user=${creds%%|*} db=$(head -1 <<< "$creds" | cut -d'|' -f2) pass=$(sed -n 2p <<< "$creds")
             echo "$slug: BBDD $db de lampp-$owner, en vivo (la misma que web.local; la copia de Docker se queda)"
             [ "$DRY" -eq 1 ] && return 0
+            # (una tienda sigue en su dominio de verdad: se lee de su BBDD antes de cambiar nada)
+            if [ "$(docker_conf "$slug" TIPO)" == ps ]; then
+                lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+                shop=$(lampp_bd_shop_domain "$owner" "$db" "$user" "$pass")
+                [ -n "$shop" ] || { echo "No se ha podido leer el dominio de la tienda en $db (tabla shop_url): mira su usuario y su contraseña"; return 1; }
+                echo "Tienda en vivo: sigue en $shop en su BBDD (no se toca); el Apache de Docker la enseña en $(docker_web_url "$(docker_conf "$slug" DOMINIO)")"
+            fi
             # (los de Docker de antes, para volver: BBDD y usuario de su copia)
             [ -z "$(docker_conf "$slug" LAMPP_BD)" ] && docker_conf_set "$slug" BBDD_DOCKER "$(docker_conf "$slug" BBDD)" \
                 && docker_conf_set "$slug" USUARIO_DOCKER "$(docker_conf "$slug" USUARIO)" \
                 && { grep -q '^DB_PASS_DOCKER=' "$dir/.env" || ( umask 077; sed -n 's/^DB_PASS=/DB_PASS_DOCKER=/p' "$dir/.env" >> "$dir/.env" ); }
             docker_conf_set "$slug" LAMPP_BD "$owner" && docker_conf_set "$slug" BBDD "$db" && docker_conf_set "$slug" USUARIO "$user" || return 1
+            if [ -n "$shop" ]; then
+                docker_conf_set "$slug" DOMINIO_TIENDA "$shop" || return 1
+                [[ "$shop" != *.local && "$shop" != *.docker.test && "$shop" != *.docker.local ]] && docker_conf_set "$slug" PRODUCCION "${shop#www.}"
+            fi
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; printf 'DB_PASS=%s\n' "$pass"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
         docker)
             owner=$(docker_conf "$slug" LAMPP_BD)
@@ -180,16 +193,24 @@ function docker_db_mode() {
             echo "$slug: vuelve a su copia de Docker ($(docker_conf "$slug" BBDD_DOCKER))"
             [ "$DRY" -eq 1 ] && return 0
             docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
-                && docker_conf_set "$slug" LAMPP_BD "" || return 1
+                && docker_conf_set "$slug" LAMPP_BD "" && docker_conf_set "$slug" DOMINIO_TIENDA "" || return 1
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
         *) echo "Uso: nexum docker-bd <nombre> lampp <version> | docker"; return 1 ;;
     esac
     # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
     was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
     for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+    # (una tienda: su vhost del Apache de Docker cambia, con su dominio de verdad o sin el, y su compose.yaml)
+    if [ "$(docker_conf "$slug" TIPO)" == ps ]; then
+        docker_web_compose "$slug" || return 1
+        if [ "$(docker_web_state)" == marcha ]; then docker_web_up > /dev/null || return 1; fi
+    fi
     if [ "$was" -gt 0 ]; then
         docker_web_action arrancar "$slug" || return 1
         [ "$mode" == docker ] && lampp_bd_release "$owner" "$slug"
+    elif [ "$mode" == lampp ] && [ -n "$shop" ]; then
+        # (el puente para leer su dominio: fuera, si no lo usa nadie en marcha)
+        lampp_bd_release "$owner" "$slug"
     fi
     echo "Listo"
 }

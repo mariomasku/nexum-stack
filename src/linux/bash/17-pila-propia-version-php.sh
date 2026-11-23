@@ -2999,6 +2999,12 @@ function install_stack() {
         init_stack_databases "$target" || stack_fail
     fi
 
+    # Protegida desde el principio (1.57.42): lo que pone asegurar y no trae la pila recien hecha (el
+    # httpd.conf original de Apache, el correo de pruebas, el https de lvm-dominio-desconocido.conf).
+    # Sin esto, cada version nueva o rehecha salia en Versiones como «sin proteger» hasta Protegerlas
+    secure_lampp "$target"
+    [ $? -eq 2 ] && echo "Aviso: no se ha podido proteger del todo; hazlo en Versiones › Protegerlas (nexum asegurar --todas)"
+
     echo "Comprobando la configuracion..."
     $SUDO "$target/apache2/bin/httpd" -t -f "$target/etc/httpd.conf" 2>&1 | sed 's/^/  Apache: /'
     $SUDO "$target/php/sbin/php-fpm" -t --fpm-config "$target/php/etc/php-fpm.conf" 2>&1 | sed 's/^.*NOTICE: /  PHP-FPM: /'

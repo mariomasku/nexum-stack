@@ -347,7 +347,7 @@
     borra). Los cortos, de menos de 8 opciones, se abren como siempre.</div>
 
   <div class="nota"><b>Dos botones que solo salen a veces</b>Junto al recuadro de la versión activa pueden aparecer dos botones
-    más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo con un número), cuando hay algo que conviene
+    más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo amarillo con un número), cuando hay algo que conviene
     hacer, y el de la <b>tarea en segundo plano</b> (una flecha verde que late), cuando una tarea sigue trabajando sin su ventana.</div>
 
   <div class="nota"><b>La ventana y la orden nexum</b>Todo lo que cambia algo en esta ventana lo hace la orden
@@ -495,7 +495,7 @@
     avisos. Púlsalo para ver la lista. Si no hay ninguno, el botón no está. Cada aviso explica qué pasa y tiene su botón:</p>
   <ul>
     <li><b>«Hay parches nuevos»</b> (siempre el primero): la lista de lo que tiene un parche de seguridad publicado (versiones de PHP y sus
-      componentes, imágenes de Docker, Mailpit, cloudflared). Un <b>parche</b> es una versión nueva que corrige fallos sin cambiar la rama
+      componentes, Docker y sus imágenes, Node, Mailpit, cloudflared y Nginx). Un <b>parche</b> es una versión nueva que corrige fallos sin cambiar la rama
       (de PHP 8.4.26 a 8.4.27, por ejemplo). <b>«Actualizar todo»</b> te enseña los pasos (con la casilla «Guardar antes una
       copia en ~/nexum-backups», como en <a href="#parches">Parches nuevos</a>) y, si aceptas, lo actualiza todo en una tarea; lo de ahora
       sigue funcionando mientras tanto. <b>«Ahora no»</b> lo quita hasta que salga otro parche distinto; los sigues
@@ -818,6 +818,15 @@
       (<code>http://127.0.0.1:8025/</code>).</li>
   </ul>
 
+  <h3 id="ventana-barra-estado">La barra de estado</h3>
+  <p>A lo ancho de la parte de abajo de la ventana, siempre a la vista, dice a dónde apunta <code>web.local</code>: su nombre, unos
+    chevrones y la carpeta del proyecto cargado, como <code>web.local &gt;&gt;&gt;&gt;&gt; panaderia-luna</code>. Con un proyecto cargado,
+    los chevrones se ven en verde y se iluminan uno detrás de otro, como una onda: está enlazado. Al dejar el ratón encima del nombre sale
+    su carpeta entera. Si el dominio del proyecto cargado está falseado, lo dice en lugar del nombre:
+    <code>web.local &gt;&gt;&gt;&gt;&gt; dominio falseado · panaderia-luna.com</code>; sus visitas van a esta copia y no a la web real.
+    Sin proyecto cargado (al desmontarlo, por ejemplo) se ven en gris y quietos, con <b>«sin enlace»</b>:
+    <code>web.local</code> enseña una página vacía.</p>
+
   <h3 id="ventana-terminal">La terminal de abajo</h3>
   <p>El botón <b>«Terminal»</b> de arriba a la derecha la enseña o la esconde. Es tu terminal de siempre, con tu usuario, y empieza en la
     carpeta del proyecto cargado (o en la carpeta de los proyectos si no hay ninguno). Al esconderla sigue abierta, con lo que tuvieras
@@ -855,7 +864,8 @@
     <code>nexum …</code> en una terminal.</p>
   <ul>
     <li><b>«Seguir en segundo plano»</b>: esconde la ventana y puedes seguir usando el programa. Arriba, junto al recuadro de la versión
-      activa, sale una flecha verde que late con lo que hace y el porcentaje («Instalando… 45 %»); púlsala para volver a ver la ventana.
+      activa, sale una flecha verde que late con lo que hace y el porcentaje («Instalando… 45 %»), y cuántas esperan en la cola
+      («· 2 en la cola»); púlsala para volver a ver la ventana.
       <span data-so="linux">Cerrar la ventana o pulsar <kbd>Esc</kbd> hace lo mismo. </span>Al acabar, la ventana vuelve sola para decirte
       cómo ha ido.</li>
     <li><b>«Cancelar»</b>: para la tarea. En las instalaciones te pregunta antes («¿Cancelar la instalación?»: se pierde lo descargado y
@@ -868,10 +878,32 @@
   <p>Cada tarea guarda además su registro entero (la orden de <code>nexum</code> que se ha ejecutado, toda su salida y cómo acabó), sin
     contraseñas: lo tienes después, aunque hayas cerrado su ventana, en Configuración → General, <a href="#tareas">Registro de
     tareas</a>.</p>
-  <div class="nota"><b>Solo va una tarea a la vez</b>Mientras una sigue trabajando, lo que lanzaría otra se ve atenuado. Si lo pulsas,
-    antes de preguntarte nada sale «Hay una tarea en marcha» con el nombre de la que sigue (por ejemplo, «Actualizando los componentes» sigue en marcha), en la
-    ventana que estás mirando, aunque sea «Instalar versión». Al cerrarlo te enseña la que está trabajando: espera a que acabe y vuelve a
-    probar.</div>
+  <h3 id="ventana-cola">La cola de tareas</h3>
+  <p>Solo trabaja una tarea a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los componentes y compilar otra versión de
+    PHP). Mientras una sigue, lo que lanzaría otra se ve algo atenuado, pero se puede pulsar: la nueva va a la <b>cola</b> y empieza sola
+    cuando acaba la de ahora. Así puedes dejar pedidas varias, una detrás de otra, sin esperar delante.</p>
+  <ul>
+    <li><b>Al pedirla.</b> Si la tarea pregunta antes («¿Activar…?», «¿Instalar…?»), la pregunta lo dice: «“Actualizando los
+      componentes” sigue en marcha: esta se pone en la cola y empieza cuando acabe». Abajo sale «En la cola: …».</li>
+    <li><b>Mientras espera.</b> La ventana de la tarea en marcha dice cuáles vienen después («Después, en la cola: …») y tiene
+      <b>«Vaciar la cola»</b>, que las quita sin hacerlas. La flecha verde de arriba dice cuántas esperan.</li>
+    <li><b>Una detrás de otra.</b> Cuando una acaba bien, su ventana se cierra sola y empieza la siguiente. Si la que acaba te ofrece un
+      botón («Activar…», «Pasar las BBDD…»), su ventana espera a que lo pulses o la cierres, y lo que lance ese botón va antes que las de la
+      cola.</li>
+    <li><b>Si una falla</b> (o la cancelas), su ventana se queda para que veas qué ha pasado. Al cerrarla te pregunta <b>«¿Seguir con la
+      cola?»</b>: si sigues, cada una comprueba lo suyo al empezar; si no, se quitan sin hacer nada.</li>
+    <li><b>Al cerrar el programa</b> con tareas en la cola, te pregunta antes, porque no se harían. La que está en marcha sigue hasta
+      acabar.</li>
+  </ul>
+  <p>Algunas cosas no esperan, porque no tocan nada de lo de las tareas:</p>
+  <ul>
+    <li><b>Traer los cambios</b> o <b>clonar</b> un repositorio (<a href="#repositorios">Repositorios</a>) va ya, al lado de la que sigue, salvo
+      si la de ahora es de esa misma carpeta: entonces va a la cola.<span data-so="mac"> En el Mac va sin ventana (solo se ve una) y al
+      acabar lo dice abajo.</span></li>
+    <li>Copiar contraseñas, abrir registros y carpetas y mirar cómo está todo, como siempre.</li>
+    <li><b>Crear una BBDD vacía</b> sí espera, porque la tarea de ahora puede estar reiniciando MariaDB: te dice cuál sigue en marcha y lo
+      vuelves a probar cuando acabe.</li>
+  </ul>
 
   <h3 id="ventana-contrasena">La contraseña de administrador</h3>
   <p>Cuando una tarea necesita permisos de administrador (lo que en la terminal se hace con <code>sudo</code> delante), se abre una ventana
@@ -990,7 +1022,7 @@
         interruptor hace que su dirección de verdad se abra en tu equipo y no en internet. Sirve para probar una tienda con su dominio
         real. Ver <a href="#falsear-host">Falsear Host</a>.</span></li>
       <li data-x="95.2" data-y="30.8"><b>Más (⋮)</b><span>Las opciones de su BBDD, abrir su carpeta, quitarlo de Docker, vaciar la caché
-        de una tienda, las imágenes de producción, personalizar los botones o borrar el proyecto. Ver <a href="#menu-mas">el menú Más</a>.</span></li>
+        de una tienda, las imágenes de producción, vaciar la caché de Chrome, personalizar los botones o borrar el proyecto. Ver <a href="#menu-mas">el menú Más</a>.</span></li>
       <li data-x="65.0" data-y="39.8"><b>Buscar y filtrar</b><span>Escribe parte del nombre de la carpeta <b>o de su base de datos</b> para
         encontrarlo, y elige qué tipo ver: Todos, WordPress, PrestaShop u Otros.</span></li>
       <li data-x="88.1" data-y="39.8"><b>Nuevo proyecto…</b><span>Clona un repositorio (de GitHub o de otro servidor) en
@@ -1268,7 +1300,9 @@
       nada. En la terminal, lo mismo es
       <code data-so="linux">xdg-open https://web.local/</code><code data-so="mac">open https://web.local/</code>.</li>
     <li><b>«VS Code»</b>: abre su carpeta en Visual Studio Code (el editor de código). Si ya estaba abierta, trae su ventana delante. Solo
-      sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>.</li>
+      sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>. Si trabajas con espacios de trabajo
+      de VS Code, elige su carpeta en <a href="#carpetas">Configuración → Carpetas</a>: entonces abre el del proyecto
+      (<code>code ~/"Espacios de VS Code/panaderia-luna.code-workspace"</code>) y, si aún no tiene, se le crea.</li>
     <li><b>«GitHub»</b>: abre su repositorio en el navegador, por ejemplo <code>https://github.com/ana/panaderia-luna</code>. Solo sale si
       la carpeta es un repositorio git con un remote <code>origin</code>; si es de otro servidor (GitLab, Bitbucket…), se llama
       «Repositorio». La dirección sale de <code>.git/config</code> y nunca lleva el usuario ni la contraseña (o el token) que tuviera. En la
@@ -1355,6 +1389,12 @@
       programa</a> encendidas, guarda una copia del fichero de hosts en <code>~/nexum-backups</code>.</li>
     <li>Al cargar otro proyecto, los dominios falseados de este vuelven a la web real. Lo mismo se hace en <a href="#dominios">Dominios y
       hosts</a>.</li>
+    <li>El navegador no siempre se entera al momento: sigue usando un rato las conexiones que ya tenía abiertas y lo que recuerda del
+      DNS, sobre todo con una pestaña que llama sola al servidor, como el editor de Elementor.<span data-so="linux"> Por eso, al falsear
+      o dejar de falsear un dominio, el programa corta las conexiones que Chrome, Firefox y los demás navegadores tienen abiertas con la
+      web real y con tu equipo, y el navegador vuelve a conectar al momento adonde dice <code>/etc/hosts</code>.</span> Si aun así sigue
+      en la otra web, usa «Vaciar la caché de Chrome…» del <a href="#menu-mas">menú Más</a>. Para saber en cuál estás, mira algo que
+      solo tenga tu copia, como el título de la página.</li>
   </ul>
   <div class="nota cuidado"><b>Mientras esté falseado, la web real no la ves</b>Con el interruptor encendido, ni tú ni tu navegador llegáis
     a la web de producción de ese dominio: todo va a tu copia. Apágalo cuando quieras ver la de verdad.</div>
@@ -1370,6 +1410,9 @@
         <code>#</code> delante.</li>
       <li>Con las copias de los ficheros encendidas, guarda el de antes en <code>~/nexum-backups/hosts-&lt;fecha&gt;</code>.</li>
       <li>Escribe la copia encima: <code>sudo tee /etc/hosts</code>.</li>
+      <li data-so="linux">Corta las conexiones de los navegadores con la web real de ese dominio (la dirección que tenía antes de
+        falsearlo) y con tu equipo, en los puertos de las webs: <code>sudo ss -K src 127.0.0.1:51234 dst 127.0.0.1:443</code>, una por
+        conexión. Las de otros programas no las toca.</li>
     </ol>
     <p>Para comprobarlo: <code>grep ferreteria-norte /etc/hosts</code> (sin <code>#</code> delante, está falseado) o
       <code>getent hosts ferreteria-norte.com</code>, que dice <code>127.0.0.1</code> mientras está falseado.</p>
@@ -1611,7 +1654,7 @@
     <li><b>PHP</b> y <b>MariaDB</b>: proponen las de la versión activa.</li>
     <li><b>BBDD</b> (o <b>«BBDD que se copia»</b>, si no es un WordPress): «Ninguna: empieza vacía» o una de sus bases de LAMPP, como
       «wp_panaderia_luna (lampp-8.4)».</li>
-    <li><b>Cómo</b> (solo WordPress): <b>«En vivo: la misma que web.local (sin copias)»</b>, que es la de partida, o <b>«Una copia en
+    <li><b>Cómo</b> (WordPress o PrestaShop): <b>«En vivo: la misma que web.local (sin copias)»</b>, que es la de partida, o <b>«Una copia en
       Docker»</b>. En vivo, lo que cambies en un lado se ve en el otro. Solo tiene efecto si has elegido una base.</li>
     <li><b>Dominio</b>: la dirección <code>https://…</code> que tendrá en el Apache de Docker. Cambia al cambiar el PHP.</li>
   </ul>
@@ -1689,6 +1732,11 @@
       <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</li>
     <li><b>«Imágenes de producción…»</b> (WordPress y PrestaShop) y <b>«Descargar de producción las imágenes que faltan…»</b>
       (PrestaShop): ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
+    <li><b>«Vaciar la caché de Chrome…»</b>: solo en los proyectos con dominio. Para cuando acabas de falsear o dejar de falsear su
+      dominio y Chrome sigue en la otra web. Copia <code>chrome://net-internals/#sockets</code> y te dice qué hacer: pegarlo en la barra de
+      direcciones, pulsar <b>«Flush socket pools»</b> y, a la izquierda, en <b>DNS</b>, <b>«Clear host cache»</b>; después, recargar la
+      pestaña con <span data-so="linux">Ctrl+Mayús+R</span><span data-so="mac">Cmd+Mayús+R</span>. Chrome no deja que otro programa abra
+      esa página ni pulse sus botones, por eso hay que pegarla. En Firefox es <code>about:networking#dns</code>, <b>«Clear DNS Cache»</b>.</li>
     <li><b>«Personalizar los botones…»</b>: ver <a href="#personalizar-botones">Personalizar los botones</a>.</li>
     <li><b>«Borrar el proyecto…»</b>: ver <a href="#borrar-proyecto">Borrar un proyecto</a>.</li>
   </ul>
@@ -3276,8 +3324,8 @@
     data-so="mac">En el Mac, Docker es <b>Docker Desktop</b>: los contenedores van dentro de su máquina virtual, apartados del Mac, y se
     instala a mano, como cualquier aplicación. </span>Los
     proyectos los sirve el <b>Apache de Docker</b> (sin necesidad de LAMPP), con las mismas reglas de seguridad y los <code>.htaccess</code>
-    de cada proyecto. Las bases de datos van en una <b>MariaDB común</b> por versión, o, en WordPress, puedes usar <b>en vivo</b> la de una
-    versión LAMPP.</p>
+    de cada proyecto. Las bases de datos van en una <b>MariaDB común</b> por versión, o, en WordPress y PrestaShop, puedes usar <b>en vivo</b> la
+    de una versión LAMPP.</p>
   <p>Cada proyecto tiene su dirección <code>https://…</code>. De partida acaban en <code>.docker.local</code> (por ejemplo,
     <code>https://academia-flor-php84.docker.local</code>) y phpMyAdmin está en <code>https://pma.docker.local</code>. Si activas el DNS en
     <a href="#docker-config">Configuración → Docker</a>, pasan a acabar en <code>.docker.test</code>, como en la captura.</p>
@@ -3346,7 +3394,7 @@
         las imágenes de todas sus versiones de PHP. La base de datos y la configuración no cambian. Antes te pregunta.</span></li>
       <li data-x="90" data-y="54.1"><b>Registros</b><span>Lo último que han dicho sus contenedores (200 líneas): para ver por qué algo no
         arranca.</span></li>
-      <li data-x="92.7" data-y="54.1"><b>Qué base de datos usa</b><span>Solo WordPress con el Apache de Docker: su copia en la MariaDB de Docker
+      <li data-x="92.7" data-y="54.1"><b>Qué base de datos usa</b><span>WordPress y PrestaShop con el Apache de Docker: su copia en la MariaDB de Docker
         o, <b>en vivo</b>, la de una versión LAMPP (la misma que <code>web.local</code>, sin copias).</span></li>
       <li data-x="95.5" data-y="54.1"><b>Eliminar de Docker</b><span>Borra sus contenedores y su base de datos de Docker; antes te pregunta, con la
         casilla de guardar antes una copia de esa base. Tu carpeta y las bases de LAMPP no se tocan.</span></li>
@@ -3446,6 +3494,12 @@
     <li data-so="mac"><b>«La dirección 127.0.0.2 aún no está en este Mac»</b>, con el botón <b>«Permitir»</b>. macOS solo tiene de partida la
       dirección <code>127.0.0.1</code>: la del Apache de Docker se da de alta una vez y se vuelve a poner en cada arranque. Pide la contraseña
       de administrador. O elige otra dirección en Configuración.</li>
+    <li><b>«Docker se ha quedado sin las BBDD de …»</b>, con el botón <b>«Recuperar…»</b>. Sale cuando Docker ya no tiene la base de datos
+      de algún proyecto: pasa si cambia de almacén de imágenes (Docker 29 usa el de containerd en las instalaciones nuevas<span
+      data-so="mac">; en Docker Desktop, Settings › General › «Use containerd for pulling and storing images»: al dejarlo como estaba, lo de
+      antes vuelve a verse</span>)<span data-so="mac"> o si Docker Desktop empieza con un disco nuevo; no hagas «Reset to factory
+      defaults»</span>. «Recuperar…» rehace sus imágenes y sus contenedores y carga en cada uno su última copia de ~/nexum-backups; lo que
+      no tiene copia se queda con la base de datos vacía. En la terminal: <code>nexum docker-recuperar</code>.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-web permitir</code> (el botón «Permitir»).</p>
@@ -3622,8 +3676,8 @@
       ellos, se arranca solo.</li>
     <li><b>«MariaDB … (común)»</b>: las bases de datos de los proyectos que van con esa versión de MariaDB. Si la paras, se quedan sin base de
       datos.</li>
-    <li><b>«Puente a la BBDD de lampp-… (en vivo)»</b>: conecta Docker a la MariaDB de esa versión LAMPP, para los WordPress que la usan en
-      vivo. Si lo paras, se quedan sin base de datos.</li>
+    <li><b>«Puente a la BBDD de lampp-… (en vivo)»</b>: conecta Docker a la MariaDB de esa versión LAMPP, para los WordPress y las tiendas que
+      la usan en vivo. Si lo paras, se quedan sin base de datos.</li>
   </ul>
   <p>Si paras algo común que usa un proyecto en marcha, te avisa: «¿Parar …?», con los proyectos que lo usan. Confirma con <b>«Pararlo
     igualmente»</b> o <b>«Pararla igualmente»</b>.</p>
@@ -3673,21 +3727,23 @@
     <li><b>Pulsa «Proyecto en Docker…».</b> Se abre el cuadro «Proyecto en Docker».</li>
     <li><b>Elige la carpeta.</b> Solo salen las que aún no están en Docker.</li>
     <li><b>Elige su versión de PHP y la de MariaDB.</b></li>
-    <li><b>Elige la base de datos que se copia</b> («BBDD que se copia»): «— Ninguna: vacía —» o una de LAMPP, como
-      «wp_panaderia_luna (lampp-8.4)». Se copia a Docker; la de LAMPP no se toca. Su <code>wp-config.php</code> (o la configuración de
+    <li><b>Elige la base de datos que se copia</b> («BBDD que se copia»): una de LAMPP, como «wp_panaderia_luna
+      (lampp-8.4)», o «— Ninguna: vacía —». De partida sale la de la carpeta en la versión activa (o, si no está en ella, la primera que
+      tenga en otra); una tienda sin sus tablas no abre (error 500). Se copia a Docker; la de LAMPP no se toca. Su <code>wp-config.php</code> (o la configuración de
       PrestaShop) se cambia solo dentro del contenedor: el de tu carpeta no cambia y la puedes seguir usando con LAMPP.</li>
+    <li><b>Elige cómo</b> (WordPress o PrestaShop): «En vivo» o «Una copia en Docker».</li>
     <li><b>Mira el dominio.</b> Sale solo, según la carpeta y la versión de PHP.</li>
     <li><b>Pulsa «Crear en Docker».</b> Te pregunta «¿Crear … en Docker?», con la dirección que tendrá. La primera vez con cada PHP se prepara
       su imagen, unos minutos. Al acabar te da su dirección.</li>
   </ol>
-  <div class="nota"><b>Para usar en vivo la base de LAMPP</b>Este cuadro siempre copia la base (o la deja vacía). Para que un WordPress use
-    <b>en vivo</b> la misma base que <code>web.local</code>, móntalo desde <b>Proyectos</b>: el botón «Docker» del proyecto cargado, o el menú
-    <b>⋮</b> de su fila → «Añadir entorno en Docker…». Ese cuadro, «Montar … en Docker», tiene la opción «Cómo»: «En vivo: la misma que web.local (sin copias)» o
-    «Una copia en Docker». También puedes cambiarlo después con el icono «Qué base de datos usa».</div>
+  <div class="nota"><b>Para usar en vivo la base de LAMPP</b>Con un WordPress o una tienda PrestaShop y una base elegida, sale «Cómo»: «En
+    vivo: la misma que web.local (sin copias)», que es la de partida, o «Una copia en Docker». También puedes cambiarlo después con el icono
+    «Qué base de datos usa». Una tienda en vivo sigue con su dominio de verdad en la base, que no se toca: el Apache de Docker la enseña con
+    el dominio de Docker, así que entras en su back office sin falsear el dominio.</div>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-nuevo panaderia-luna 8.4 11.8 --bd wp_panaderia_luna --desde 8.4</code> (carpeta,
       versión de PHP y versión de MariaDB; con la base que se copia y la versión LAMPP de donde sale). Sin <code>--bd</code> ni
-      <code>--desde</code>, la base empieza vacía. Con <code>--en-vivo</code> detrás, usa en vivo la de LAMPP (solo WordPress).</p>
+      <code>--desde</code>, la base empieza vacía. Con <code>--en-vivo</code> detrás, usa en vivo la de LAMPP (WordPress o PrestaShop).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba que la carpeta existe, que no está ya en Docker y que Docker responde y puede usar sus puertos. Pide la contraseña de
@@ -3811,14 +3867,20 @@
     <li><b>Pulsa «Usarla».</b> Si el proyecto estaba en marcha, se arranca de nuevo con la base elegida.</li>
   </ol>
   <p>En vivo, lo que cambies en Docker se ve en <code>web.local</code> y al revés. Si la MariaDB de esa versión no está en marcha, se arranca
-    solo ella (pide la contraseña). La copia de Docker no se borra: puedes volver a ella. Solo WordPress: una tienda guarda su dominio en la
-    base y no puede servir a dos sitios a la vez.</p>
+    solo ella (pide la contraseña). La copia de Docker no se borra: puedes volver a ella. Una tienda guarda su dominio en la base: en vivo,
+    esa no se toca y sigue en su dominio de verdad. El Apache de Docker se lo pone a cada visita y, en lo que devuelve (las páginas, sus
+    redirecciones y sus cookies), lo cambia por el de Docker.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-bd academia-flor lampp 8.4</code> (en vivo, la de <code>lampp-8.4</code>) o
       <code>nexum docker-bd academia-flor docker</code> (su copia de Docker).</p>
     <p>Lo que hace al pasar a en vivo, paso a paso:</p>
     <ol>
-      <li>Lee el usuario, la contraseña y la base de tu <code>wp-config.php</code> (los mismos que usa <code>web.local</code>).</li>
+      <li>Lee el usuario, la contraseña y la base de tu <code>wp-config.php</code> (en una tienda, de su <code>app/config/parameters.php</code>
+        o <code>config/settings.inc.php</code>): los mismos que usa <code>web.local</code>.</li>
+      <li>En una tienda, lee su dominio de verdad de su tabla <code>shop_url</code> por el puente y lo apunta en <code>proyecto.conf</code>
+        (<code>DOMINIO_TIENDA</code>). Su vhost del Apache de Docker lleva <code>RequestHeader set Host "&lt;su dominio&gt;" early</code>,
+        <code>Substitute</code> (de su dominio al de Docker, también escapado y codificado) y <code>Header edit</code> de <code>Location</code>
+        y <code>Set-Cookie</code>.</li>
       <li>Apunta en <code>proyecto.conf</code> y <code>.env</code> la base de LAMPP y guarda aparte los datos de su copia de Docker, para poder
         volver.</li>
       <li>Rehace su <code>config-84.php</code> para que apunte al puente <code>nexum-lampp-bd-8-4</code>.</li>
@@ -4593,7 +4655,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <li><a href="#informacion">Información</a></li>
   </ul>
   <p>Arriba de cada apartado van su nombre y una frase que dice para qué sirve. Mientras hay una tarea en marcha, los botones que cambian algo
-    se ven atenuados hasta que acabe. Se pueden pulsar: en vez de hacer lo suyo, te dicen qué tarea sigue en marcha.</p>
+    se ven algo atenuados hasta que acabe. Se pueden pulsar: lo que lanzan va a la <a href="#ventana-cola">cola de tareas</a>.</p>
 
   <h3 id="configuracion-antes">Antes de empezar: tres ideas que salen en todo el capítulo</h3>
   <ul>
@@ -4741,7 +4803,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png" alt="Configuración, Parches nuevos" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
-      <li data-x="40" data-y="66"><b>Componentes</b><span>Mientras mira, dice «Buscando parches nuevos…». Luego, «Todo al día: no hay parches nuevos.», o la lista de lo que tiene un parche nuevo, con la versión de ahora y la nueva (cada versión de PHP con su Apache, MariaDB, FTP, Perl y phpMyAdmin, las imágenes de Docker, Mailpit y cloudflared). Si algo no se ha podido consultar (por ejemplo, sin internet), dice «No se ha podido consultar: …».</span></li>
+      <li data-x="40" data-y="66"><b>Componentes</b><span>Mientras mira, dice «Buscando parches nuevos…». Luego, «Todo al día: no hay parches nuevos.», o la lista de lo que tiene un parche nuevo, con la versión de ahora y la nueva (cada versión de PHP con su Apache, MariaDB, FTP, Perl y phpMyAdmin, <span data-so="linux">los paquetes de Docker</span><span data-so="mac">Docker Desktop</span>, las imágenes de Docker, los Node de Nexum, Mailpit, cloudflared y Nginx). Si algo no se ha podido consultar (por ejemplo, sin internet), dice «No se ha podido consultar: …». Debajo, con ·, lo publicado más nuevo que lo que pone Nexum (Mailpit, cloudflared o Nginx): solo para saberlo.</span></li>
       <li data-x="92" data-y="66"><b>Buscar de nuevo</b><span>Vuelve a consultar ahora. Si hay algo, sale al lado «Actualizar todo (N)», en verde, que lo pone al día de una vez.</span></li>
     </ol>
   </figure>
@@ -4753,7 +4815,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <li><b>Las imágenes de Docker</b>: una <i>imagen</i> es el paquete del que sale un <i>contenedor</i> (un pequeño sistema aislado donde
       funciona un programa, como la MariaDB de tus proyectos de Docker). Se compara su huella con la de Docker Hub (el sitio de donde se
       descargan), sin descargar nada.</li>
-    <li><b>Mailpit</b> (el correo de pruebas) y <b>cloudflared</b> (el de los túneles), frente a los que trae esta versión del programa.</li>
+    <li data-so="linux"><b>Docker</b>: sus paquetes de Ubuntu (docker.io, docker-compose-v2 y rootlesskit), frente a la versión que ofrece apt.</li>
+    <li data-so="mac"><b>Docker Desktop</b>, frente a la que ofrece su actualizador. Se instala a mano, como cualquier aplicación.</li>
+    <li><b>Node</b>: los que ha descargado el programa (en ~/.nexum/node), frente a lo último de su rama en nodejs.org.</li>
+    <li><b>Mailpit</b> (el correo de pruebas), <b>cloudflared</b> (el de los túneles) y <b>Nginx</b>, frente a los que trae esta versión del
+      programa. Si se ha publicado uno más nuevo, se dice, pero no cuenta como parche: llega con una versión del programa.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum componentes</code> (la que lanzan la búsqueda al abrir la ventana y «Buscar de nuevo»).
@@ -4772,7 +4838,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         versión entera (sus piezas se compilan juntas) conservando sus bases de datos.</li>
       <li>Si Docker está en marcha, compara cada imagen que usas (<code>mariadb:</code><i>versión</i>, la de phpMyAdmin y la base de cada
         imagen de PHP, <code>php:</code><i>versión</i><code>-fpm</code>) con Docker Hub: <code>K|mariadb:11.4|…</code>.</li>
-      <li>Compara Mailpit y cloudflared con los que trae el programa: <code>X|Mailpit|1.21.0|1.22.0</code>.</li>
+      <li data-so="linux">Compara los paquetes de Docker con los de apt: <code>X|docker.io|29.1.3-…|29.1.4-…</code>.</li>
+      <li data-so="mac">Compara Docker Desktop con su actualizador: <code>M|Docker Desktop|4.99.0|4.100.0|…</code>.</li>
+      <li>Cada rama de Node: <code>X|Node|22.11.0|22.12.0</code>.</li>
+      <li>Compara Mailpit, cloudflared y Nginx con los que trae el programa (<code>X|Mailpit|1.21.0|1.22.0</code>) y con los publicados
+        (<code>N|Mailpit|1.32.0|1.34.0</code>, que no cuenta en <code>S|</code>).</li>
       <li>Al final, <code>S|</code><i>número</i>: cuántas cosas tienen parche. Las líneas <code>F|</code> son versiones que no se ponen al día
         solas, y las <code>E|</code>, lo que no se ha podido consultar.</li>
     </ol>
@@ -4785,7 +4855,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li><b>Actualizar todo (N):</b> te pregunta «¿Actualizar todo?» con la lista de lo que se va a poner al día. Las versiones de PHP se
         vuelven a <i>compilar</i> (se construyen desde su código fuente) con lo último de su rama: la de ahora sigue funcionando mientras
         tanto, varios minutos. Los contenedores de Docker en marcha se rehacen en segundos, sin cambiar sus bases de datos ni su
-        configuración; Mailpit y cloudflared se reinstalan. Trae la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada:
+        configuración; Mailpit y cloudflared se reinstalan; los Node, con lo último de su rama. <span data-so="linux">Docker va primero: antes
+        se copian todas sus BBDD en ~/nexum-backups (si la copia falla, Docker no se toca), y luego se instalan sus paquetes nuevos y se
+        arranca de nuevo.</span><span data-so="mac">Docker Desktop: se copian todas sus BBDD en ~/nexum-backups y se abre su página de
+        descarga.</span> Trae la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada:
         márcala si alguna versión puede cambiar de rama de MariaDB, porque entonces empieza con las bases de datos vacías. Sin ella, avisa
         en rojo: «Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar.» Pulsa «Actualizar todo» y escribe la contraseña
         de administrador. La tarea «Actualizando los componentes» acaba con «Componentes al día».</li>
@@ -4801,6 +4874,9 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <ol>
       <li>Busca de nuevo los parches (como <code>nexum componentes</code>) y dice lo que va a poner al día. Si no hay nada:
         «Todo está al día: no hay parches nuevos.»</li>
+      <li data-so="linux">Docker: <code>nexum docker-copia</code>; fija el almacén de imágenes en <code>~/.config/docker/daemon.json</code>
+        (<code>features.containerd-snapshotter</code>); <code>sudo apt-get install -y --only-upgrade docker.io …</code>; apaga otra vez el
+        Docker del sistema y <code>systemctl --user restart docker.service</code>.</li>
       <li>Cada MariaDB común de Docker con versión nueva: descarga la imagen (<code>docker pull mariadb:</code><i>versión</i>) y, si su
         contenedor está en marcha, lo vuelve a crear con ella. Sus bases de datos no se tocan (están aparte, en un volumen).</li>
       <li>phpMyAdmin de Docker: <code>docker pull</code> de su imagen y, si el Apache de Docker está en marcha, se rehace.</li>
@@ -4808,6 +4884,8 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         y los contenedores en marcha de los proyectos que la usan se rehacen (<code>docker compose … up -d</code>). Luego se borran las
         imágenes viejas que ya no usa nadie: <code>docker image prune -f</code>.</li>
       <li>Mailpit y cloudflared: se descargan e instalan otra vez, con su versión nueva.</li>
+      <li>Cada rama de Node con parche: se descarga, como al arrancar un proyecto de Node, y se quitan los anteriores de esa rama que no
+        estén en marcha.</li>
       <li>Cada versión de PHP con parche: se recompila en su carpeta, como <code>nexum actualizar</code> <i>versión</i> (con
         <code>--copia</code>, guarda antes sus bases de datos en <code>~/nexum-backups</code>). Esto pide la contraseña de administrador,
         porque las carpetas de las versiones son suyas.</li>
@@ -5044,7 +5122,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <ol class="puntos">
       <li data-x="40" data-y="21"><b>Barrera entre webs</b><span>«Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos». Apagada: «Apagada: enciéndela cuando acabes de probar los pagos».</span></li>
       <li data-x="95" data-y="22"><b>El interruptor</b><span>Al cambiarlo se aplica a todas tus versiones de PHP y se recarga Apache. Pide la contraseña de administrador. Si no se puede aplicar en todas, lo deja como estaba.</span></li>
-      <li data-x="35" data-y="29"><b>Qué es</b><span>La explicación en cuatro puntos: el problema, lo que hace la barrera, cuándo apagarla y dónde se aplica.</span></li>
+      <li data-x="40" data-y="28.3"><b>Webs permitidas</b><span>Las de confianza, como el ERP de tu empresa, que la barrera deja pasar. Sin ninguna: «Ninguna. Añade las de confianza (el ERP de tu empresa)…».</span></li>
+      <li data-x="93.6" data-y="28.3"><b>Añadir…</b><span>Pregunta «Permitir una web»: escribe el dominio (<code>erp.empresa.com</code>) o pega la dirección entera, que se queda en su dominio («Se permite erp.empresa.com»). <code>*.empresa.com</code> vale para <code>empresa.com</code> y todos sus subdominios. Pulsa «Permitir»: se aplica a todas tus versiones, se recarga Apache y pide la contraseña de administrador.</span></li>
+      <li data-x="40" data-y="34.5"><b>Cada web permitida</b><span>Con el escudo verde y lo que abarca («Solo este dominio», o el dominio y todos sus subdominios).</span></li>
+      <li data-x="94.2" data-y="34.5"><b>Quitar</b><span>Pregunta «¿Quitar erp.empresa.com de las webs permitidas?» y pulsa «Quitar», en rojo: la barrera vuelve a pararla como a cualquier otra web. Pide la contraseña de administrador.</span></li>
+      <li data-x="35" data-y="41.5"><b>Qué es</b><span>La explicación en cinco puntos: el problema, lo que hace la barrera, cuándo apagarla, las webs permitidas y dónde se aplica.</span></li>
     </ol>
   </figure>
   <p><b>El problema, en sencillo.</b> Mientras trabajas, el navegador tiene abierta tu sesión en tus proyectos (has entrado en el panel de
@@ -5064,12 +5146,20 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         tipografías y sus imágenes de fondo.</li>
       <li><b>Cuándo apagarla:</b> solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a tu tienda mandando un
         formulario desde su web. Enciéndela al acabar.</li>
+      <li><b>Webs permitidas:</b> ninguna de partida. Las que añadas (las tuyas o de confianza, como el ERP de tu empresa) pasan la barrera
+        en todos tus proyectos: su formulario que te lleva a tu back office o a tu tienda, su vuelta con un envío (también tras una
+        redirección), tus páginas dentro de un iframe suyo y sus peticiones (<code>fetch</code>). Si tu proyecto les da su cabecera
+        <code>Access-Control-Allow-Origin</code>, ya no se quita, así que pueden leer lo que les responde. Las demás webs siguen frenadas, y
+        phpMyAdmin no es para ninguna. Una pasarela de pago que vuelve siempre desde el mismo dominio también se puede añadir aquí en lugar
+        de apagar la barrera.</li>
       <li><b>Dónde vale:</b> en todas tus versiones: localhost, web.local, los dominios falseados y los vhosts de los proyectos.</li>
     </ul>
   </div>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum barrera-web no</code> para apagarla y <code>nexum barrera-web si</code> para
-      encenderla. Sin nada detrás, <code>nexum barrera-web</code> dice cómo está.</p>
+      encenderla. Sin nada detrás, <code>nexum barrera-web</code> dice cómo está (y cuáles son las webs permitidas). Las webs permitidas:
+      <code>nexum barrera-web permitir erp.empresa.com</code>, <code>nexum barrera-web quitar erp.empresa.com</code> y
+      <code>nexum barrera-web permitidas</code> (la lista).</p>
     <p>Lo que hace, paso a paso:</p>
     <div data-so="linux">
       <ol>
@@ -5088,6 +5178,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code>, o
         <code>grep -c "barrera entre webs" /opt/lampp/etc/extra/lvm-dominio-desconocido.conf</code> (más de 0: encendida).</p>
+      <p>Las webs permitidas están en <code>~/.nexum/barrera-webs-permitidas</code>, una por línea. Al añadir o quitar una, hace lo mismo
+        que arriba (contraseña, cada versión, Apache y el de Docker): en la regla de la barrera, y en la que quita la cabecera
+        <code>Access-Control-Allow-Origin</code> a las demás webs, el hueco de las permitidas (sin ninguna, un dominio que no existe,
+        <code>lvm-permitidas.invalid</code>) pasa a llevar sus dominios.</p>
     </div>
     <div data-so="mac">
       <ol>
@@ -5105,6 +5199,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         <li>Si tienes el Apache de Docker, rehace también su configuración (<code>~/.nexum/docker/web/conf</code>), que lleva las mismas reglas, y, si está en marcha, lo recarga sin cortar las conexiones: <code>docker exec nexum-web httpd -k graceful</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>nexum barrera-web</code> («Barrera entre webs: puesta» o «apagada»).</p>
+      <p>Las webs permitidas están en <code>/Library/Nexum/XAMPP-compartido/lvm-barrera-permitidas</code>, una por línea. Es del
+        administrador, como el de la barrera apagada, para que ningún programa tuyo pueda añadir la suya. Al añadir o quitar una, hace lo
+        mismo que arriba (contraseña, cada versión, Apache y el de Docker): en la regla de la barrera, y en la que quita la cabecera
+        <code>Access-Control-Allow-Origin</code> a las demás webs, el hueco de las permitidas (sin ninguna, un dominio que no existe,
+        <code>lvm-permitidas.invalid</code>) pasa a llevar sus dominios.</p>
     </div>
   </details>
 
@@ -5763,9 +5862,12 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
       <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
       <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
-      <li data-x="40" data-y="40.7"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
-      <li data-x="40" data-y="46.9"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span><span data-so="mac"> (<code>/Library/Nexum/descargas</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
-      <li data-x="94" data-y="46.9"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
+      <li data-x="40" data-y="40.7"><b>Espacios de trabajo de VS Code</b><span>La carpeta donde guardas tus <code>.code-workspace</code>. Elegida, dice «cada proyecto se abre con su .code-workspace (si no tiene, se le crea uno)»; sin elegir, «los proyectos se abren como carpeta». No pide la contraseña.</span></li>
+      <li data-x="87.5" data-y="40.7"><b>Elegir… o Cambiar…</b><span>Abre el selector de carpetas para elegirla. Con una elegida que existe, sale también «Abrir», que la abre en tu explorador de archivos.</span></li>
+      <li data-x="94.3" data-y="40.7"><b>Quitar</b><span>Deja de usarla: los proyectos vuelven a abrirse en VS Code como carpeta. Sus <code>.code-workspace</code> no se tocan.</span></li>
+      <li data-x="40" data-y="46.9"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
+      <li data-x="40" data-y="53.1"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span><span data-so="mac"> (<code>/Library/Nexum/descargas</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
+      <li data-x="94" data-y="53.1"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
@@ -5775,6 +5877,12 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         de que el programa los cambie, y la caché vieja de una tienda se aparta allí en lugar de borrarse. En la terminal:
         <code>nexum copias-ficheros si</code> (o <code>no</code>).</li>
       <li>Las copias de bases de datos y de código no dependen de este ajuste: se guardan cuando marcas su casilla en cada diálogo.</li>
+      <li><b>Espacios de trabajo de VS Code</b>: sin elegir de partida (cada proyecto se abre como carpeta). Con una carpeta elegida, el botón
+        «VS Code» de cada proyecto abre su espacio de trabajo: <i>carpeta-del-proyecto</i><code>.code-workspace</code> si lo hay en ella;
+        si no, otro que ya tenga la carpeta del proyecto entre sus carpetas (aunque se llame distinto); y si no tiene ninguno, le crea
+        <i>carpeta-del-proyecto</i><code>.code-workspace</code> con su carpeta («Espacio de trabajo nuevo: …»), que luego puedes cambiar
+        en VS Code como cualquier otro. Así, un proyecto nuevo tiene el suyo la primera vez que lo abres. Se guarda en
+        <code>~/.nexum/vscode-espacios</code>; es tuyo, de tu usuario, y cada uno en su equipo elige la suya.</li>
       <li>Lo demás no se configura: «Abrir» abre cada carpeta en tu explorador de archivos, y «Borrar…» y «Vaciar…» las vacían.</li>
     </ul>
   </div>
@@ -6385,6 +6493,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     al momento.</p>
   <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración
     → Seguridad entre webs</a>, con el interruptor «Barrera entre webs», y vuelve a encenderla al acabar. Pide la contraseña de administrador.</p>
+  <p>Las webs de confianza, como el ERP de tu empresa, no hace falta apagarla: añádelas en «Webs permitidas», en el mismo sitio. Lo que
+    llega de ellas pasa la barrera (lo dice su <code>Origin</code> o, si no lo trae, su <code>Referer</code>), y la cabecera
+    <code>Access-Control-Allow-Origin</code> que les dé tu proyecto no se quita. Solo esos dominios: una web que se les parezca
+    (<code>erp.empresa.com.otra-web.com</code>) sigue frenada, y phpMyAdmin no se abre a ninguna.</p>
   <p>La barrera está en la configuración de Apache de cada versión de PHP, que es de root. Al actualizar Nexum no se toca: la
     primera vez que abres la ventana tras actualizar, si a las versiones les falta lo de la nueva, te pregunta si se aplica ya (pide
     la contraseña de administrador y reinicia Apache si está en marcha). Si lo dejas para luego, está en Versiones › «Protegerlas», o
@@ -6395,7 +6507,8 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     Mac, en los avisos). En la terminal: <code>nexum servicio apache reiniciar</code>.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum barrera-web no</code> (apagar), <code>nexum barrera-web si</code> (encender) o
-      <code>nexum barrera-web</code> (cómo está).</p>
+      <code>nexum barrera-web</code> (cómo está). Las webs permitidas: <code>nexum barrera-web permitir</code> <i>dominio</i>,
+      <code>nexum barrera-web quitar</code> <i>dominio</i> y <code>nexum barrera-web permitidas</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Pide la contraseña de administrador.</li>
@@ -6583,8 +6696,8 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <code>/opt/lampp</code>: lo mueve a <code>/opt/lampp-&lt;nombre&gt;</code>, le enlaza la carpeta de los proyectos y los vhosts
       compartidos, hace que Apache trabaje con tu usuario y lo deja solo para este equipo. Es el «Registrar…» de los avisos. Ejemplo:
       <code>nexum add 8.2.12</code>.</dd>
-    <dt><code>componentes</code></dt><dd>Busca parches nuevos de todo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), las imágenes
-      de Docker, Mailpit y cloudflared. Solo mira. Ejemplo: <code>nexum componentes</code>.</dd>
+    <dt><code>componentes</code></dt><dd>Busca parches nuevos de todo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), Docker y sus
+      imágenes, los Node de Nexum, Mailpit, cloudflared y Nginx. Solo mira. Ejemplo: <code>nexum componentes</code>.</dd>
     <dt><code>componentes-actualizar [--copia]</code></dt><dd>Lo pone todo al día (lo de «Actualizar todo»). <code>--copia</code> funciona
       como en <code>actualizar</code>, para cada versión que se rehace. Ejemplo: <code>nexum componentes-actualizar
       --copia</code>.</dd>
@@ -6744,6 +6857,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <dt><code>barrera-web [si|no]</code></dt><dd>La barrera entre webs (encendida si no la apagas): otra web abierta en el navegador no
       puede mandar formularios ni peticiones a tus proyectos. Una pasarela de pago que vuelve a la tienda con un envío de formulario no
       pasa: apágala mientras la pruebas. Sin nada, dice cómo está. Ejemplo: <code>nexum barrera-web no</code>.</dd>
+    <dt><code>barrera-web permitir|quitar</code> <i>dominio</i> · <code>barrera-web permitidas</code></dt><dd>Las webs permitidas: las
+      de confianza (el ERP de tu empresa) que la barrera deja pasar en todas las versiones. <code>*.empresa.com</code> vale también para
+      sus subdominios; se puede pegar la dirección entera. <code>permitidas</code> dice la lista. Ejemplo:
+      <code>nexum barrera-web permitir erp.empresa.com</code>.</dd>
     <dt><code>arreglar-certificados</code></dt><dd>Los vhosts https con certificados en los que confía todo el equipo (los de
       <code>/etc/ssl/certs</code>, los de una autoridad o CA) pasan a uno propio que solo vale para su dominio, y esa CA deja de ser de
       confianza. Ejemplo: <code>nexum arreglar-certificados</code>.</dd>
@@ -6786,8 +6903,8 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       misma que <code>web.local</code>. Se abre en <code>&lt;proyecto&gt;-php83.docker.local</code> (un WordPress) o
       <code>&lt;proyecto&gt;.docker.local</code> (una tienda). Ejemplo: <code>nexum docker-nuevo panaderia-luna 8.3 11.4 --bd
       wp_panaderia_luna --desde 8.4</code>.</dd>
-    <dt><code>docker-bd &lt;nombre&gt; lampp &lt;versión&gt; | docker</code></dt><dd>Un WordPress de Docker pasa a usar en vivo la base de
-      esa versión LAMPP (<code>lampp</code>) o vuelve a su copia en la MariaDB común de Docker (<code>docker</code>). Ejemplo:
+    <dt><code>docker-bd &lt;nombre&gt; lampp &lt;versión&gt; | docker</code></dt><dd>Un WordPress o una tienda de Docker pasa a usar en vivo
+      la base de esa versión LAMPP (<code>lampp</code>; una tienda sigue en su dominio de verdad: el Apache de Docker lo cambia por el suyo) o vuelve a su copia en la MariaDB común de Docker (<code>docker</code>). Ejemplo:
       <code>nexum docker-bd panaderia-luna docker</code>.</dd>
     <dt><code>docker-php-anadir</code> · <code>docker-php-quitar</code> · <code>docker-php-elegir &lt;nombre&gt; &lt;php&gt;</code></dt>
     <dd>Añade otra versión de PHP al proyecto (se abre a la vez con las dos), quita una, o elige con cuál se abre una tienda. Ejemplo:
@@ -6797,6 +6914,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <code>nexum docker-pasar clinica-del-sol --copia</code>.</dd>
     <dt><code>docker-parar-todo</code></dt><dd>Para todos los contenedores del programa. Ejemplo: <code>nexum
       docker-parar-todo</code>.</dd>
+    <dt><code>docker-copia</code> · <code>docker-recuperar [nombre...]</code></dt><dd>Copia de todas las BBDD de Docker en ~/nexum-backups
+      (la de cada proyecto, las de las MariaDB comunes sin proyecto y cada PostgreSQL entera); la hace también «Actualizar todo» antes de
+      poner Docker al día. <code>docker-recuperar</code> rehace lo que ha perdido su base de datos y le carga su última copia. Ejemplo:
+      <code>nexum docker-copia</code>.</dd>
     <dt><code>docker-web [estado] | puertos &lt;ip&gt; &lt;http&gt; &lt;https&gt; | permitir | arrancar | parar | confiar | dns activar|quitar</code></dt>
     <dd>El Apache de Docker: cómo está; su dirección y puertos (de serie <code>127.0.0.2</code>, 80 y 443);
       <span data-so="linux"><code>permitir</code> deja que Docker sin root use los puertos de menos de 1024;</span><span data-so="mac">dar de
@@ -7098,10 +7219,14 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Ábrela desde una terminal para ver qué dice: <code>nexum ventana</code>.<span data-so="linux"> Si falta GTK para Python, te
       dice cómo instalarlo (<code>sudo apt install python3-gi gir1.2-gtk-3.0</code>); los errores de cuando se abre desde el menú quedan en
       <code>~/.nexum/ventana.log</code>.</span> Mientras tanto, todo se puede hacer desde el panel: <code>nexum</code>.</p></details>
-  <details><summary>«Hay una tarea en marcha»: no me deja instalar ni crear nada</summary>
-    <p>Solo va una tarea a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los componentes y compilar otra versión de PHP). El
-      aviso dice cuál sigue en marcha. Pulsa la flecha verde de arriba para verla, y espera a que acabe o cancélala; luego vuelve a
-      pulsar.</p></details>
+  <details><summary>He pedido una tarea y no empieza</summary>
+    <p>Está en la <a href="#ventana-cola">cola</a>: solo trabaja una a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los
+      componentes y compilar otra versión de PHP). Empieza sola cuando acaba la de ahora. Pulsa la flecha verde de arriba para ver la que
+      sigue y las que esperan; ahí, «Vaciar la cola» las quita. Si la de antes falló, la cola espera a que cierres su ventana y te pregunta si
+      sigue.</p></details>
+  <details><summary>«Hay una tarea en marcha» al crear una BBDD vacía</summary>
+    <p>Crear una BBDD vacía espera a que acabe la tarea de ahora, porque puede estar reiniciando MariaDB. El aviso dice cuál sigue: vuelve a
+      probar cuando acabe.</p></details>
   <details><summary>Una orden dice que MariaDB «no responde o root tiene contraseña»</summary>
     <p>Las órdenes de bases de datos entran en MariaDB como <code>root</code> sin contraseña. Si se la has puesto, pásasela delante.</p>
     <p><b>En la terminal:</b> <code>MYSQL_PWD=tu_contraseña nexum list-db</code>. Si es que no está en marcha:

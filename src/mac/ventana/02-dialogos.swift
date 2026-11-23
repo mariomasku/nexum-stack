@@ -411,14 +411,20 @@ func message(_ title: String, _ text: String = "", error: Bool = false) {
 
 /// steps: los cambios que se van a hacer (numerados, con «Qué se va a realizar»); text va entonces
 /// debajo, como nota. warning: un aviso en rojo debajo de todo
-/// Con otra tarea en marcha, lo dice (nombrándola) y devuelve true: lo que se iba a confirmar no se pregunta,
-/// porque no van dos tareas a la vez (tocarían lo mismo). Lo pone el modelo al arrancar
-var TASK_GUARD: (() -> Bool)? = nil
+/// task: lo que se confirma es una tarea; con otra en marcha, se dice que va a la cola (TASK_NOTE: lo que se
+/// añade, o nil si no hay ninguna). Lo pone el modelo al arrancar
+var TASK_NOTE: (() -> String?)? = nil
+
+/// El texto de la pregunta de una tarea, con la nota de la cola si hay otra en marcha
+func withTaskNote(_ text: String) -> String {
+    guard let note = TASK_NOTE?() else { return text }
+    return text.isEmpty ? note : text + "\n\n" + note
+}
 
 func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
              steps: [String] = [], warning: String? = nil, task: Bool = true) -> Bool {
-    if task, let guardTask = TASK_GUARD, guardTask() { return false }
-    return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+    return runDialog(title: title, text: task ? withTaskNote(text) : text, okLabel: okLabel,
+                     style: destructive ? .warning : .informational,
                      destructive: destructive, steps: steps, warning: warning).ok
 }
 
@@ -446,8 +452,7 @@ func copyCheckViews(warning: String = COPY_WARNING) -> (box: NSButton, note: NST
 /// esté, el aviso en rojo (warning). copy: si se ha marcado (se pasa --copia)
 func confirmCopy(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
                  steps: [String] = [], warning: String = COPY_WARNING) -> (ok: Bool, copy: Bool) {
-    if let guardTask = TASK_GUARD, guardTask() { return (false, false) }
-    let r = runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+    let r = runDialog(title: title, text: withTaskNote(text), okLabel: okLabel, style: destructive ? .warning : .informational,
                       destructive: destructive, checkbox: COPY_CHECKBOX, checked: false, steps: steps,
                       copyWarning: warning)
     return (r.ok, r.ok && r.checked)

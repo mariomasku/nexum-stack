@@ -86,14 +86,18 @@
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
 #
 #   nexum docker-bd <nombre> lampp <version> | docker
-#       Un WordPress de Docker con la BBDD de esa version XAMPP-X en vivo, la misma que web.local (sin
-#       copias; su MariaDB se arranca sola en otro puerto si no esta en marcha). docker: vuelve a su
+#       Un WordPress o una tienda de Docker con la BBDD de esa version XAMPP-X en vivo, la misma que
+#       web.local (sin copias; su MariaDB se arranca sola en otro puerto si no esta en marcha; una tienda
+#       sigue en su dominio en la BBDD y el Apache de Docker se lo cambia por el suyo). docker: vuelve a su
 #       copia en la MariaDB comun de Docker. Al crearlo: docker-nuevo ... --bd <base> --desde <v> --en-vivo
 #
 #   nexum componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
-#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
-#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
+#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Docker Desktop (frente a la que ofrece
+#       su actualizador: se instala a mano; antes, una copia de las BBDD de Docker),
+#       los Node descargados por Nexum (frente al ultimo de su rama), Mailpit, cloudflared y Nginx; y
+#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar). Ademas, sin
+#       contar como parche: Mailpit, cloudflared o Nginx publicados mas nuevos que los que pone Nexum
 #
 #   nexum descargas [vaciar]
 #       La cache de descargas de las pilas propias (/Library/Nexum/descargas): el codigo de cada
@@ -323,6 +327,10 @@
 #       en ninguna version (puesta de serie). Corta la vuelta por POST de una pasarela de pago:
 #       apagala mientras la pruebes. Sin si/no, dice como esta
 #
+#   nexum barrera-web permitir|quitar <dominio> | permitidas
+#       Webs permitidas: las de confianza (el ERP de la empresa) que la barrera deja pasar: sus
+#       formularios, su vuelta a tus proyectos, sus iframes. *.empresa.com, con sus subdominios
+#
 #   nexum arreglar-certificados
 #       Los vhosts https con certificados en los que confia todo el equipo (en /etc/ssl/certs,
 #       de CA o de una CA local sin limite de dominios) pasan a uno propio, y esa CA deja de
@@ -422,6 +430,11 @@
 #
 #   nexum docker-wp-cli si|no [--rehacer]
 #   nexum docker-postgres [estado] | arrancar|parar|borrar <18|17|16>   PostgreSQL comun de Docker
+#   nexum docker-copia | docker-recuperar [nombre...]
+#       Copia de todas las BBDD de Docker en ~/nexum-backups (la de cada proyecto, las de las MariaDB
+#       comunes sin proyecto y cada PostgreSQL entera). Si Docker se queda sin ellas (cambia de almacen
+#       de imagenes o Docker Desktop empieza con un disco nuevo), docker-recuperar rehace los
+#       contenedores de los que las han perdido y les carga su ultima copia
 #   nexum docker-nginx [estado] | arrancar | parar | anadir|quitar <proyecto> | puertos <http> <https>   Nginx comun de Docker
 #       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
 #       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan

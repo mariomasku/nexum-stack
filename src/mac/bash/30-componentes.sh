@@ -4,16 +4,20 @@
 # Lo que tiene un parche nuevo publicado: cada version de PHP (su PHP, Apache, MariaDB, ProFTPD, Perl y
 # phpMyAdmin, frente a lo ultimo de su rama), las imagenes de Docker que se usan (las MariaDB comunes,
 # phpMyAdmin y la base de cada imagen de PHP, frente a su huella en Docker Hub: sin descargar nada), y
-# Mailpit, cloudflared y Nginx (frente a los que pone esta version del gestor). componentes [--sin-docker]:
+# Docker Desktop (frente a la que ofrece su actualizador), los Node de Nexum (frente al ultimo de su rama)
+# y Mailpit, cloudflared y Nginx (frente a los que pone esta version del gestor). componentes [--sin-docker]:
 #   L|carpeta|componente|instalada|nueva   una version de PHP: se rehace entera con lo ultimo de su rama
 #   F|carpeta|motivo                       una version que no se pone al dia sola (parche concreto, XAMPP)
 #   K|imagen|para que                      una imagen de Docker con una version nueva en Docker Hub
-#   X|programa|instalada|nueva             Mailpit, cloudflared o Nginx
+#   X|programa|instalada|nueva             Node (una por rama), Mailpit, cloudflared o Nginx
+#   M|programa|instalada|nueva|descarga    Docker Desktop: se instala a mano (antes, la copia de sus BBDD)
+#   N|programa|la de Nexum|la publicada    Mailpit, cloudflared o Nginx publicados mas nuevos que los que
+#                                          pone esta version: solo para saberlo (no cuenta ni se instala)
 #   E|lo que no se ha podido consultar
 #   S|cuantos componentes tienen parche nuevo
 function components_check() {
     local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
-    local a b broken
+    local a b broken more
     releases=$(php_releases)
     [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
     local pinned
@@ -93,16 +97,61 @@ function components_check() {
         echo "X|Nginx|$(nginx_installed_version)|$NGINX_VERSION"
         n=$((n + 1))
     fi
+    more=$(docker_desktop_outdated; node_outdated)
+    if [ -n "$more" ]; then
+        echo "$more"
+        n=$((n + $(grep -c '^[XM]|' <<< "$more")))
+    fi
+    components_upstream
     echo "S|$n"
 }
 
+# Docker Desktop: la version instalada frente a la que ofrece su actualizador (su appcast, el de este
+# procesador). Se instala a mano, como cualquier aplicacion: M|Docker Desktop|instalada|nueva|descarga.
+# E| si no se ha podido consultar
+function docker_desktop_outdated() {
+    local plist=$DOCKER_APP/Contents/Info.plist cur arch latest
+    [ -f "$plist" ] || return 0
+    cur=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2> /dev/null)
+    [[ "$cur" =~ ^[0-9]+(\.[0-9]+)+$ ]] || return 0
+    case "$(uname -m)" in arm64) arch=arm64 ;; *) arch=amd64 ;; esac
+    latest=$(curl -q --proto =https -fsS --max-time 10 "https://desktop.docker.com/mac/main/$arch/appcast.xml" 2> /dev/null \
+        | grep -oE 'sparkle:shortVersionString="[0-9.]+"' | grep -oE '[0-9]+(\.[0-9]+)+' | sort -V | tail -1)
+    if [ -z "$latest" ]; then
+        echo "E|desktop.docker.com (la versión de Docker Desktop)"
+    elif [ "$latest" != "$cur" ] && [ "$(printf '%s\n%s\n' "$cur" "$latest" | sort -V | tail -1)" == "$latest" ]; then
+        echo "M|Docker Desktop|$cur|$latest|$DOCKER_DOWNLOAD_URL"
+    fi
+    return 0
+}
+
+# Docker Desktop nuevo (lo que diga docker_desktop_outdated): se instala a mano, pero antes, una copia de
+# todas las BBDD de Docker (si no se puede hacer, se dice y no se abre la descarga). Despues, su pagina
+# de descarga; al instalarlo, la pestaña Docker avisa si se ha quedado sin las BBDD de algun proyecto
+function docker_desktop_update() {
+    if docker_ready; then
+        docker_backup_all "no se abre la descarga de Docker Desktop" || return 1
+    elif [ -n "$(docker_projects)" ]; then
+        echo "Docker Desktop no está en marcha: ábrelo para hacer antes la copia de sus BBDD (si no, no se abre su descarga)"
+        return 1
+    fi
+    echo "Docker Desktop $1: instálalo tú, como cualquier aplicación (o con su «Check for updates»)."
+    echo "Si al abrirlo no salen tus contenedores ni tus imágenes, no hagas «Reset to factory defaults»: mira en"
+    echo "su Settings, General, «Use containerd for pulling and storing images» (al cambiarlo, lo de antes vuelve"
+    echo "a verse). Si no vuelven, la pestaña Docker los rehace con su última copia (nexum docker-recuperar)."
+    [ "$DRY" -eq 1 ] || /usr/bin/open "$DOCKER_DOWNLOAD_URL"
+    return 0
+}
+
 #@incluir comun/componentes/docker_image_outdated.sh
+#@incluir comun/componentes/components_more.sh
 #@incluir comun/componentes/stack_broken.sh
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
-# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
-# version que se rehace (como actualizar --copia)
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version; Node, con node_install;
+# Docker Desktop, a mano, tras una copia de sus BBDD (docker_desktop_update). --copia: a cada version que
+# se rehace (como actualizar --copia)
 # piezas-danadas: para la ventana (Versiones de PHP), D|version|piezas por cada version de pila propia con
 # alguna dañada (stack_broken, que en el Mac solo mira que esten). Sin consultar nada de fuera
 function gui_broken() {
@@ -116,7 +165,7 @@ function gui_broken() {
 }
 
 function components_update() {
-    local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    local out line f cf folders="" imgs="" progs="" desktop="" fail=0 v slug dir running
     [ "$1" == "--copia" ] && STACK_DB_COPY=1
     echo "Buscando parches nuevos..."
     out=$(components_check)
@@ -126,17 +175,21 @@ function components_update() {
             L) echo "  XAMPP-${f[1]}: ${f[2]} ${f[3]} → ${f[4]}"
                [[ " $folders " == *" ${f[1]} "* ]] || folders+=" ${f[1]}" ;;
             K) echo "  ${f[1]} (${f[2]}): versión nueva en Docker Hub"; imgs+=" ${f[1]}" ;;
-            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"; progs+=" ${f[1]}" ;;
+            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"
+               [[ " $progs " == *" ${f[1]} "* ]] || progs+=" ${f[1]}" ;;
+            M) echo "  ${f[1]}: ${f[2]} → ${f[3]} (se instala a mano)"; desktop=${f[3]} ;;
+            N) echo "  (${f[1]} ${f[3]} publicado: Nexum pone el ${f[2]} hasta que lo traiga una versión suya)" ;;
             F) echo "  XAMPP-${f[1]}: ${f[2]}" ;;
             E) echo "  (no se ha podido consultar: ${f[1]})" ;;
         esac
     done <<< "$out"
-    if [ -z "$folders$imgs$progs" ]; then
+    if [ -z "$folders$imgs$progs$desktop" ]; then
         echo "Todo está al día: no hay parches nuevos."
         return 0
     fi
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
     local steps=()
+    [ -n "$desktop" ] && steps+=("Copia de las BBDD de Docker (para Docker Desktop $desktop)")
     for v in $imgs; do
         case $v in
             mariadb:*) steps+=("MariaDB ${v#mariadb:} de Docker") ;;
@@ -149,6 +202,10 @@ function components_update() {
     for v in $progs; do steps+=("$v"); done
     for v in $folders; do steps+=("XAMPP-$v"); done
     task_plan "Actualizando los componentes" "${steps[@]}"
+    if [ -n "$desktop" ]; then
+        task_step
+        docker_desktop_update "$desktop" || fail=1
+    fi
     for v in $imgs; do
         task_step
         case $v in
@@ -192,6 +249,7 @@ function components_update() {
     [[ " $progs " == *" cloudflared "* ]] && { task_step; tunnel_install || fail=1; }
     # (Nginx: se compila otra vez, con tu usuario, y si estaba en marcha sigue con el nuevo)
     [[ " $progs " == *" Nginx "* ]] && { task_step; nginx_build_deps && nginx_build || fail=1; }
+    [[ " $progs " == *" Node "* ]] && { task_step; node_update || fail=1; }
     for v in $folders; do
         task_step
         echo "XAMPP-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"

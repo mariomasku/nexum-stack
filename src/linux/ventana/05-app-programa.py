@@ -322,7 +322,9 @@ class AppPrograma:
 
     def open_in_vscode(self, folder=None):
         """Abre el proyecto cargado (u otra carpeta de htdocs) en Visual Studio Code. Si ya tiene una
-        ventana con esa carpeta, VS Code la trae delante en lugar de abrir otra."""
+        ventana con esa carpeta, VS Code la trae delante en lugar de abrir otra. Con la carpeta de los
+        espacios de trabajo elegida (Configuración, Carpetas), con el .code-workspace del proyecto: el suyo
+        o, si no tiene, uno nuevo con su carpeta."""
         folder, app = folder or self.loaded_project_folder(), vscode_app()
         if folder is None:
             message(self.win, "No se encuentra la carpeta del proyecto cargado",
@@ -337,7 +339,17 @@ class AppPrograma:
             # (con el contexto de la ventana, el escritorio deja que VS Code se ponga delante)
             ctx = self.win.get_display().get_app_launch_context()
             ctx.set_timestamp(Gtk.get_current_event_time())
-            app.launch([Gio.File.new_for_path(folder)], ctx)
+            target, wsdir = folder, vscode_ws_dir()
+            if wsdir:
+                had = vscode_workspace(folder, create=False)
+                ws = had or vscode_workspace(folder)
+                if ws is None:
+                    self.toast("No se ha podido crear su espacio de trabajo en %s: se abre la carpeta" % wsdir)
+                else:
+                    target = ws
+                    if had is None:
+                        self.toast("Espacio de trabajo nuevo: %s" % os.path.basename(ws))
+            app.launch([Gio.File.new_for_path(target)], ctx)
         except GLib.Error as exc:
             message(self.win, "No se ha podido abrir Visual Studio Code", exc.message, Gtk.MessageType.ERROR)
 

@@ -2,7 +2,8 @@
 # Pruebas de la barrera entre webs (1.54.1) en un Apache temporal (puertos 28471 y 28472, solo
 # 127.0.0.1, como web.sh): lo que manda otra web a web.local, con la barrera encendida y apagada, y
 # peticiones de mas de 64 MB. Tambien que SECURE_PY rehace lvm-dominio-desconocido.conf al cambiarla
-# y que los vhosts la admiten. Uso: barrera.sh <lvm-instalador.sh>
+# y que los vhosts la admiten. Y las webs permitidas (1.57.41): las de confianza pasan, las demas no.
+# Uso: barrera.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 grep -q '^function host_vhost() {' "$SRC" || { echo "  ok    (sin barrera entre webs)"; exit 0; }
@@ -13,11 +14,17 @@ SECURE_PY=$(getvar SECURE_PY); SECURE_PY=${SECURE_PY%.}
 SSL=$(getvar UNKNOWN_HOST_SSL); SSL=${SSL%.}
 VCHECK=$(getvar VHOSTS_CHECK_PY); VCHECK=${VCHECK%.}
 CONF=$(grep -m1 '^UNKNOWN_HOST_CONF=' "$SRC" | cut -d= -f2)
-extract "$SRC" host_vhost cross_site_on || exit 1
-CROSS_SITE_OFF=$W/sin-barrera-entre-webs UNKNOWN_HOST_VHOST=$VH
+extract "$SRC" host_vhost cross_site_on cross_site_allowed cross_site_domain cross_site_allow_regex cross_site_fill || exit 1
+eval "$(grep -E "^CROSS_SITE_ALLOW_(SLOT|RE)=" "$SRC")"
+CROSS_SITE_OFF=$W/sin-barrera-entre-webs CROSS_SITE_ALLOW=$W/barrera-webs-permitidas UNKNOWN_HOST_VHOST=$VH
 host_vhost; ON=$HOST_VHOST
 : > "$CROSS_SITE_OFF"; host_vhost; OFF=$HOST_VHOST; rm -f "$CROSS_SITE_OFF"
+printf '%s\n' erp.ejemplo-empresa.com '*.grupo.example' 'no vale' '*.example' > "$CROSS_SITE_ALLOW"
+host_vhost; ALLOW=$HOST_VHOST; rm -f "$CROSS_SITE_ALLOW"
 check "encendida: el texto de siempre (UNKNOWN_HOST_VHOST)" '[ "$ON" == "$VH" ]'
+check "permitidas: sin ninguna, su hueco lleva un dominio que no existe (en la barrera y en CORS)" '[ "$(grep -c "lvm-permitidas\\\\.invalid" <<< "$VH")" = 2 ]'
+check "permitidas: con ellas, en la barrera y en CORS (las que no valen, fuera)" '[ "$(grep -cF "(([a-z0-9-]+\.)*grupo\.example|erp\.ejemplo-empresa\.com)" <<< "$ALLOW")" = 2 ] && ! grep -q "lvm-permitidas" <<< "$ALLOW" && ! grep -qF "no vale" <<< "$ALLOW" && [ "${ALLOW: -1}" == $'"'"'\n'"'"' ]'
+check "permitidas: lo que se escribe o se pega, en la forma de la lista" '[ "$(cross_site_domain "HTTPS://ERP.Ejemplo-Empresa.com:8443/login?x=1")" = erp.ejemplo-empresa.com ] && [ "$(cross_site_domain "*.grupo.example")" = "*.grupo.example" ] && [ -z "$(cross_site_domain localhost)" ] && [ -z "$(cross_site_domain "*.com")" ] && [ -z "$(cross_site_domain "a b.com")" ]'
 check "apagada: sin la regla y con lo demas" '! grep -q "HTTP:Sec-Fetch-Mode" <<< "$OFF" && grep -q "LimitRequestBody 67108864" <<< "$OFF" && grep -q "TraceEnable Off" <<< "$OFF" && grep -q "/phpmyadmin" <<< "$OFF"'
 check "apagada: acaba en salto de linea, como la encendida" '[ "${OFF: -1}" == $'"'"'\n'"'"' ]'
 
@@ -87,6 +94,15 @@ check "docker: desde Docker, un fetch, un PHP o un POST siguen frenados: 403" '[
 head -c 70000000 /dev/zero > "$W/grande"
 check "peticion de mas de 64 MB: 413" '[ "$(wl -X POST --data-binary @"$W/grande" "$U/no-existe.php")" = 413 ]'
 rm -f "$W/grande"
+stop
+start "$ALLOW" || { echo "  FALLA no arranca el Apache de prueba con webs permitidas"; exit 1; }
+ap() { wl -X POST -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: ${2:-navigate}" -H "Sec-Fetch-Dest: ${3:-document}" "${@:4}" -H "Origin: $1" -d x=1 "$U/no-existe.php"; }
+check "permitidas: el formulario del ERP que te lleva al back office: pasa" '[ "$(ap https://erp.ejemplo-empresa.com)" = 404 ] && [ "$(ap http://erp.ejemplo-empresa.com:8080)" = 404 ]'
+check "permitidas: su fetch y su iframe: pasan" '[ "$(ap https://erp.ejemplo-empresa.com cors empty)" = 404 ] && [ "$(wl -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Dest: iframe" -H "Referer: https://erp.ejemplo-empresa.com/pedidos" "$U/no-existe.php")" = 404 ]'
+check "permitidas: *.grupo.example, el dominio y sus subdominios: pasan" '[ "$(ap https://grupo.example)" = 404 ] && [ "$(ap https://tienda.eu.grupo.example)" = 404 ]'
+check "permitidas: tras una redireccion (Origin null), por su Referer: pasa" '[ "$(ap null navigate document -H "Referer: https://erp.ejemplo-empresa.com/")" = 404 ]'
+check "permitidas: las que se le parecen, no: 403" '[ "$(ap https://erp.ejemplo-empresa.com.evil.example)" = 403 ] && [ "$(ap https://malerp.ejemplo-empresa.com)" = 403 ] && [ "$(ap https://grupo.example.evil.example)" = 403 ] && [ "$(ap https://evilgrupo.example)" = 403 ] && [ "$(ap https://evil.example navigate document -H "Referer: https://evil.example/?https://erp.ejemplo-empresa.com/")" = 403 ]'
+check "permitidas: phpMyAdmin no es para ellas: 403" '[ "$(curl -s -o /dev/null -w "%{http_code}" -H "Host: 127.0.0.1:28471" -X POST -H "Sec-Fetch-Site: cross-site" -H "Origin: https://erp.ejemplo-empresa.com" -d x=1 "$U/phpmyadmin/no-existe.php")" = 403 ]'
 stop
 start "$OFF" || { echo "  FALLA no arranca el Apache de prueba sin la barrera"; exit 1; }
 check "apagada: el formulario de una pasarela de pago pasa" '[ "$(wl -X POST -H "Sec-Fetch-Site: cross-site" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Dest: document" -H "Origin: https://pagos.example" -d x=1 "$U/no-existe.php")" = 404 ]'

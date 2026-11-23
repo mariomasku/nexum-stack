@@ -141,7 +141,8 @@ class NvProyectos:
                              "BBDD de LAMPP no se tocan.", "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
         combos = {}
-        wp = project_kind(x["name"]) == "wp"
+        # (un WordPress o una tienda: en vivo, la misma que web.local, o una copia; de partida, en vivo)
+        wp = project_kind(x["name"]) in ("wp", "ps")
         for key, title, items, current in [("php", "PHP", [(v, "PHP %s" % v) for v in d["php"]], php),
                                            ("maria", "MariaDB", [(v, "MariaDB %s" % v) for v in d["maria"]], maria),
                                            ("source", "BBDD" if wp else "BBDD que se copia", sources, source)] + (
@@ -191,8 +192,8 @@ class NvProyectos:
                       done_text="%s en Docker: https://%s" % (x["name"], domain), on_done=done)
 
     def nv_docker_db_mode(self, p):
-        """La BBDD de un WordPress de Docker: en vivo la de una versión LAMPP (la misma que web.local) o su
-        copia en la MariaDB común de Docker."""
+        """La BBDD de un WordPress o una tienda de Docker: en vivo la de una versión LAMPP (la misma que web.local)
+        o su copia en la MariaDB común de Docker."""
         x = {"name": p["folder"], "db": p["db"]}
         versions = []
         for i, _db in (self.project_pairs(x) if self.data else []):

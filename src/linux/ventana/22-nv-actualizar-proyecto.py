@@ -287,9 +287,28 @@ class NvActualizarProyecto:
             items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
+        if self.project_hosts(x["name"]):
+            items.append(("Vaciar la caché de Chrome…", lambda: self.nv_browser_cache()))
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
+
+    def nv_browser_cache(self):
+        """Más, «Vaciar la caché de Chrome…» (de un proyecto con dominio): tras falsear o dejar de falsear su
+        dominio, Chrome puede seguir un rato en la otra web, con su caché de DNS y las conexiones que ya tenía
+        abiertas. Chrome no deja que otro programa abra sus páginas internas ni pulse sus botones: se copia
+        la dirección y se dice qué pulsar."""
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(BROWSER_SOCKETS_URL, -1)
+        message(self.win, "Vaciar la caché de Chrome",
+                "Si después de falsear o dejar de falsear un dominio Chrome sigue en la otra web (la real o la "
+                "de este equipo), es por las conexiones que tenía abiertas y su caché de DNS. Nexum ya corta "
+                "esas conexiones al cambiar hosts; si aun así sigue, en Chrome:\n\n"
+                "1. Pega en la barra de direcciones %s (ya está copiada) y pulsa Intro.\n"
+                "2. Pulsa «Flush socket pools».\n"
+                "3. A la izquierda, en «DNS», pulsa «Clear host cache».\n"
+                "4. Recarga la pestaña del proyecto con Ctrl+Mayús+R.\n\n"
+                "Chrome no deja que otro programa abra esa página ni pulse sus botones. En Firefox: "
+                "about:networking#dns y «Clear DNS Cache»." % BROWSER_SOCKETS_URL)
 
     # --- Exportar proyecto: un zip con su código y su BBDD (gui-exportar-proyecto y exportar-proyecto) ---
 

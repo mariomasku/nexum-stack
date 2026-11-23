@@ -293,6 +293,8 @@ if [ "${LVM_TAREA:-}" == 1 ]; then
         docker-wp-cli) ;;
         # (PostgreSQL y Nginx de Docker: Docker sin root y ficheros de ~/.nexum)
         docker-postgres) ;;
+        # (la copia de las BBDD de Docker: Docker sin root (o Docker Desktop) y ~/nexum-backups)
+        docker-copia) ;;
         docker-nginx) ;;
         # (confiar: el certificado va a tu llavero, y el Mac pide la contraseña en su propio aviso)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
@@ -391,6 +393,8 @@ case "$1" in
     docker-imagen) docker_update_image "$2" ;;
     docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
     docker-postgres) shift; docker_pg_command "$@" ;;
+    docker-copia) docker_backup_all ;;
+    docker-recuperar) shift; docker_recover "$@" ;;
     docker-nginx) shift; docker_nginx_command "$@" ;;
     docker-clave) docker_db_password "$2" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
@@ -438,7 +442,7 @@ case "$1" in
     exportar-bd|descargar-bd) export_database "$2" "$3" "$4" ;;
     copiar-bd) shift; copy_database "$@" ;;
     pasar-version) move_to_version "$2" "$3" ;;
-    barrera-web) web_barrier_command "$2" ;;
+    barrera-web) web_barrier_command "$2" "$3" ;;
     correo) mail_command "$2" "$3" ;;
     vincular-bd) link_database "$2" "$3" "$4" ;;
     rehacer|actualizar) cli_rebuild "$2" "$3" ;;

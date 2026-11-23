@@ -627,8 +627,72 @@ func projectAdmin(_ folder: String) -> (String, String) {
     return ("", "")
 }
 
+/// Espacios de trabajo de VS Code (Configuración, Carpetas): la carpeta con los .code-workspace de cada
+/// proyecto. Elegida, «VS Code» abre el del proyecto (<carpeta>.code-workspace, o el que ya lleve su carpeta)
+/// y, si no tiene, se le crea. Sin elegir, se abre la carpeta del proyecto. El mismo fichero que en Linux
+let VSCODE_WS_FILE = LOG_DIR + "/vscode-espacios"
+private var vscodeWsSim: String? = nil
+
+/// La carpeta elegida ("" sin elegir)
+func vscodeWsDir() -> String {
+    if let s = vscodeWsSim { return s }
+    guard let text = try? String(contentsOfFile: VSCODE_WS_FILE, encoding: .utf8) else { return "" }
+    let path = text.split(separator: "\n").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+    return path.hasPrefix("/") ? path : ""
+}
+
+func saveVscodeWsDir(_ path: String) {
+    if SIMULATE { vscodeWsSim = path; return }
+    if path.isEmpty { try? FileManager.default.removeItem(atPath: VSCODE_WS_FILE); return }
+    try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
+                                             attributes: [.posixPermissions: 0o700])
+    try? (path + "\n").write(toFile: VSCODE_WS_FILE, atomically: true, encoding: .utf8)
+}
+
+/// Las carpetas de un .code-workspace (JSON con comentarios y comas de más, como lo guarda VS Code), con las
+/// rutas relativas a su sitio ya resueltas. [] si no se puede leer
+func vscodeWsFolders(_ path: String) -> [String] {
+    guard var text = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
+    // (sin los comentarios, fuera de las cadenas, ni las comas antes de ] o })
+    if let re = try? NSRegularExpression(pattern: "(\"(?:\\\\.|[^\"\\\\])*\")|//[^\\n]*|/\\*[\\s\\S]*?\\*/") {
+        text = re.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1")
+    }
+    text = text.replacingOccurrences(of: ",(\\s*[\\]}])", with: "$1", options: .regularExpression)
+    guard let data = text.data(using: .utf8),
+          let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+          let folders = o["folders"] as? [[String: Any]] else { return [] }
+    let base = URL(fileURLWithPath: path).deletingLastPathComponent()
+    return folders.compactMap { f in
+        guard let p = f["path"] as? String, !p.isEmpty else { return nil }
+        let e = (p as NSString).expandingTildeInPath
+        let u = e.hasPrefix("/") ? URL(fileURLWithPath: e) : base.appendingPathComponent(e)
+        return u.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+}
+
+/// El .code-workspace de un proyecto en la carpeta de los espacios de trabajo: <carpeta>.code-workspace si
+/// existe; si no, otro que ya tenga la carpeta del proyecto; si no hay ninguno, se crea <carpeta>.code-workspace
+/// con ella (con create). nil sin carpeta elegida o si no se ha podido crear
+func vscodeWorkspace(_ folder: String, create: Bool = true) -> String? {
+    let dir = vscodeWsDir()
+    var isDir: ObjCBool = false
+    guard !dir.isEmpty, FileManager.default.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue else { return nil }
+    let real = URL(fileURLWithPath: folder).resolvingSymlinksInPath().path
+    let path = dir + "/" + (real as NSString).lastPathComponent + ".code-workspace"
+    if FileManager.default.fileExists(atPath: path) { return path }
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).filter { $0.hasSuffix(".code-workspace") }.sorted()
+    for n in names where vscodeWsFolders(dir + "/" + n).contains(real) { return dir + "/" + n }
+    if !create { return nil }
+    if SIMULATE { return path }
+    let o: [String: Any] = ["folders": [["path": real]], "settings": [String: Any]()]
+    guard let data = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted, .withoutEscapingSlashes]),
+          FileManager.default.createFile(atPath: path, contents: data + Data("\n".utf8)) else { return nil }
+    return path
+}
+
 /// Abre una carpeta en Visual Studio Code. Si ya tiene una ventana con ella, VS Code la trae delante
-/// en lugar de abrir otra
+/// en lugar de abrir otra. Con la carpeta de los espacios de trabajo elegida (Configuración, Carpetas), con
+/// el .code-workspace del proyecto: el suyo o, si no tiene, uno nuevo con su carpeta
 func openInVSCode(_ folder: String) {
     guard let app = vscodeURL() else {
         message("Visual Studio Code no está instalado", "Descárgalo de code.visualstudio.com y muévelo a Aplicaciones.", error: true)
@@ -636,7 +700,18 @@ func openInVSCode(_ folder: String) {
     }
     let conf = NSWorkspace.OpenConfiguration()
     conf.activates = true
-    NSWorkspace.shared.open([URL(fileURLWithPath: folder, isDirectory: true)], withApplicationAt: app,
+    var target = URL(fileURLWithPath: folder, isDirectory: true)
+    let wsDir = vscodeWsDir()
+    if !wsDir.isEmpty {
+        let had = vscodeWorkspace(folder, create: false)
+        if let ws = had ?? vscodeWorkspace(folder) {
+            target = URL(fileURLWithPath: ws)
+            if had == nil { AppModel.current?.toast("Espacio de trabajo nuevo: \((ws as NSString).lastPathComponent)") }
+        } else {
+            AppModel.current?.toast("No se ha podido crear su espacio de trabajo en \(wsDir): se abre la carpeta")
+        }
+    }
+    NSWorkspace.shared.open([target], withApplicationAt: app,
                             configuration: conf) { _, error in
         guard let error = error else { return }
         DispatchQueue.main.async {

@@ -4,16 +4,21 @@
 # Lo que tiene un parche nuevo publicado: cada version de PHP (su PHP, Apache, MariaDB, ProFTPD, Perl y
 # phpMyAdmin, frente a lo ultimo de su rama), las imagenes de Docker que se usan (las MariaDB comunes,
 # phpMyAdmin y la base de cada imagen de PHP, frente a su huella en Docker Hub: sin descargar nada), y
-# Mailpit, cloudflared y Nginx (frente a los que pone esta version del gestor). componentes [--sin-docker]:
+# Docker sin root (sus paquetes de Ubuntu, frente a lo que ofrece apt), los Node de Nexum (frente al ultimo
+# de su rama) y Mailpit, cloudflared y Nginx (frente a los que pone esta version del gestor).
+# componentes [--sin-docker]:
 #   L|carpeta|componente|instalada|nueva   una version de PHP: se rehace entera con lo ultimo de su rama
 #   F|carpeta|motivo                       una version que no se pone al dia sola (parche concreto, XAMPP)
 #   K|imagen|para que                      una imagen de Docker con una version nueva en Docker Hub
-#   X|programa|instalada|nueva             Mailpit, cloudflared o Nginx
+#   X|programa|instalada|nueva             docker.io, docker-compose-v2, rootlesskit, Node (una por
+#                                          rama), Mailpit, cloudflared o Nginx
+#   N|programa|la de Nexum|la publicada    Mailpit, cloudflared o Nginx publicados mas nuevos que los que
+#                                          pone esta version: solo para saberlo (no cuenta ni se instala)
 #   E|lo que no se ha podido consultar
 #   S|cuantos componentes tienen parche nuevo
 function components_check() {
     local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
-    local a b broken
+    local a b broken more
     releases=$(php_releases)
     [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
     for dir in $(lampp_dirs); do
@@ -80,16 +85,110 @@ function components_check() {
         echo "X|Nginx|$(nginx_installed_version)|$NGINX_VERSION"
         n=$((n + 1))
     fi
+    more=$(docker_apt_outdated; node_outdated)
+    if [ -n "$more" ]; then
+        echo "$more"
+        n=$((n + $(grep -c '^X|' <<< "$more")))
+    fi
+    components_upstream
     echo "S|$n"
 }
 
+# Docker sin root, frente a lo que ofrece apt (lo que Ubuntu sabe por su ultima lista de paquetes: sin
+# root, sin apt update). X|paquete|instalado|nuevo de cada uno de DOCKER_APT_PACKAGES con uno nuevo
+DOCKER_APT_PACKAGES="docker.io docker-compose-v2 rootlesskit"
+function docker_apt_outdated() {
+    local p inst cand
+    [ -x "$DOCKER_BIN" ] && command -v apt-cache > /dev/null || return 0
+    for p in $DOCKER_APT_PACKAGES; do
+        read -r inst cand < <(LC_ALL=C apt-cache policy "$p" 2> /dev/null \
+            | awk '$1 == "Installed:" { i = $2 } $1 == "Candidate:" { c = $2 } END { print i, c }')
+        [ -n "$inst" ] && [ "$inst" != "(none)" ] && [ -n "$cand" ] && [ "$cand" != "(none)" ] && [ "$inst" != "$cand" ] || continue
+        dpkg --compare-versions "$cand" gt "$inst" && echo "X|$p|$inst|$cand"
+    done
+    return 0
+}
+
+# Que Docker sin root siga con el almacen de imagenes de ahora al cambiar de version: Docker 29 usa el de
+# containerd en las instalaciones nuevas y, al cambiar de almacen, lo de antes deja de verse (sigue en el
+# disco). Se fija en tu ~/.config/docker/daemon.json (features.containerd-snapshotter), si no lo esta ya
+function docker_store_pin() {
+    local f=${XDG_CONFIG_HOME:-$HOME/.config}/docker/daemon.json val=false
+    docker_ready || return 0
+    dk info --format '{{json .DriverStatus}}' 2> /dev/null | grep -q 'io.containerd.snapshotter' && val=true
+    python3 -I - "$f" "$val" << 'PY'
+import json, os, sys
+path, val = sys.argv[1], sys.argv[2] == "true"
+try:
+    data = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+except (OSError, ValueError):
+    data = None
+if not isinstance(data, dict) or not isinstance(data.get("features", {}), dict):
+    print("No se entiende %s: el almacén de imágenes de Docker no se fija" % path)
+    sys.exit(0)
+feat = data.setdefault("features", {})
+if "containerd-snapshotter" in feat:
+    sys.exit(0)
+feat["containerd-snapshotter"] = val
+os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+with open(path + ".nuevo", "w", encoding="utf-8") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+os.replace(path + ".nuevo", path)
+print("Almacén de imágenes de Docker fijado (%s) en %s: no cambia al ponerlo al día"
+      % ("el de containerd" if val else "el clásico, overlay2", path))
+PY
+}
+
+# Pone al dia los paquetes de Docker sin root que diga docker_apt_outdated: antes, una copia de todas sus
+# BBDD (si no se puede hacer, Docker no se toca) y su almacen de imagenes fijado; despues, el Docker del
+# sistema apagado otra vez (el paquete lo enciende) y el tuyo arrancado de nuevo. Si aun asi Docker se
+# queda sin las BBDD de algun proyecto (docker_lost), se dice como recuperarlas
+function docker_apt_update() {
+    local pkgs=$1 i lost
+    if ! docker_ready; then
+        systemctl --user start docker.service > /dev/null 2>&1
+        for i in $(seq 20); do docker_ready && break; sleep 1; done
+    fi
+    if docker_ready; then
+        docker_backup_all "Docker no se actualiza" || return 1
+        docker_store_pin
+    elif [ -n "$(docker_projects)" ]; then
+        echo "Docker sin root no responde: sin la copia de sus BBDD, Docker no se actualiza (arráncalo en la pestaña Docker)"
+        return 1
+    fi
+    echo "Paquetes de Docker:$pkgs"
+    run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade $pkgs || return 1
+    # (el paquete vuelve a encender el Docker del sistema, el de root: se apaga otra vez)
+    if systemctl is-enabled -q docker.service docker.socket containerd.service 2> /dev/null \
+            || systemctl is-active -q docker.service docker.socket containerd.service 2> /dev/null; then
+        run sudo systemctl disable --now docker.service docker.socket containerd.service 2> /dev/null || true
+    fi
+    run systemctl --user restart docker.service || return 1
+    for i in $(seq 30); do docker_ready && break; sleep 1; done
+    if ! docker_ready; then
+        echo "Docker sin root no responde tras ponerlo al día. Lo que dice:"
+        journalctl --user -u docker.service -n 30 --no-pager 2> /dev/null
+        return 1
+    fi
+    echo "Docker $(dk version --format '{{.Server.Version}}' 2> /dev/null | tr -cd '0-9.'), en marcha"
+    lost=$(docker_lost | cut -d'|' -f1 | tr '\n' ' ')
+    if [ -n "${lost// /}" ]; then
+        echo "Aviso: Docker no tiene las BBDD de $lost(su última copia está en $COPIES_DIR)."
+        echo "Recupéralas en la pestaña Docker, o con: nexum docker-recuperar"
+    fi
+    return 0
+}
+
 #@incluir comun/componentes/docker_image_outdated.sh
+#@incluir comun/componentes/components_more.sh
 #@incluir comun/componentes/stack_broken.sh
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
-# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
-# version que se rehace (como actualizar --copia)
+# y su configuracion no cambian); Mailpit y cloudflared se instalan con su version; Docker sin root, con
+# apt, tras una copia de sus BBDD (docker_apt_update); Node, con node_install. --copia: a cada version
+# que se rehace (como actualizar --copia)
 # piezas-danadas: para la ventana (Versiones de PHP), D|version|piezas por cada version de pila propia con
 # alguna dañada (stack_broken). Sin consultar nada de fuera: cerca de un segundo
 function gui_broken() {
@@ -103,7 +202,7 @@ function gui_broken() {
 }
 
 function components_update() {
-    local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
+    local out line f cf folders="" imgs="" progs="" apt="" fail=0 v slug dir running
     [ "$1" == "--copia" ] && STACK_DB_COPY=1
     echo "Buscando parches nuevos..."
     out=$(components_check)
@@ -113,16 +212,20 @@ function components_update() {
             L) echo "  lampp-${f[1]}: ${f[2]} ${f[3]} → ${f[4]}"
                [[ " $folders " == *" ${f[1]} "* ]] || folders+=" ${f[1]}" ;;
             K) echo "  ${f[1]} (${f[2]}): versión nueva en Docker Hub"; imgs+=" ${f[1]}" ;;
-            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"; progs+=" ${f[1]}" ;;
+            X) echo "  ${f[1]}: ${f[2]} → ${f[3]}"
+               [[ " $progs " == *" ${f[1]} "* ]] || progs+=" ${f[1]}" ;;
+            N) echo "  (${f[1]} ${f[3]} publicado: Nexum pone el ${f[2]} hasta que lo traiga una versión suya)" ;;
             E) echo "  (no se ha podido consultar: ${f[1]})" ;;
         esac
     done <<< "$out"
+    for v in $progs; do [[ " $DOCKER_APT_PACKAGES " == *" $v "* ]] && apt+=" $v"; done
     if [ -z "$folders$imgs$progs" ]; then
         echo "Todo está al día: no hay parches nuevos."
         return 0
     fi
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] se actualizaria lo de arriba"; return 0; }
     local steps=()
+    [ -n "$apt" ] && steps+=("Docker (copia de sus BBDD y paquetes de Ubuntu)")
     for v in $imgs; do
         case $v in
             mariadb:*) steps+=("MariaDB ${v#mariadb:} de Docker") ;;
@@ -132,9 +235,14 @@ function components_update() {
             *) steps+=("$v") ;;
         esac
     done
-    for v in $progs; do steps+=("$v"); done
+    for v in $progs; do [[ " $DOCKER_APT_PACKAGES " == *" $v "* ]] || steps+=("$v"); done
     for v in $folders; do steps+=("lampp-$v"); done
     task_plan "Actualizando los componentes" "${steps[@]}"
+    # (Docker, lo primero: se reinicia, y las imagenes van despues con el nuevo)
+    if [ -n "$apt" ]; then
+        task_step
+        docker_apt_update "$apt" || fail=1
+    fi
     for v in $imgs; do
         task_step
         case $v in
@@ -178,6 +286,7 @@ function components_update() {
     [[ " $progs " == *" cloudflared "* ]] && { task_step; tunnel_install || fail=1; }
     # (Nginx: se compila otra vez, con tu usuario, y si estaba en marcha sigue con el nuevo)
     [[ " $progs " == *" Nginx "* ]] && { task_step; nginx_build_deps && nginx_build || fail=1; }
+    [[ " $progs " == *" Node "* ]] && { task_step; node_update || fail=1; }
     for v in $folders; do
         task_step
         echo "lampp-$v: se rehace con lo último de su rama (sigue funcionando mientras se compila)"

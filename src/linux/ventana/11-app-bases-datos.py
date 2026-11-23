@@ -522,6 +522,8 @@ class AppBasesDatos:
             if self.projects is not None:
                 self.projects = dict(self.projects, link=link, current=folder, create=False)
                 self.selected_project = folder
+                if hasattr(self, "nv_status_update"):
+                    self.nv_status_update()
             if self.data is not None and target != self.data["active"]:
                 self.data = dict(self.data, active=target)
             self.update_project_search()

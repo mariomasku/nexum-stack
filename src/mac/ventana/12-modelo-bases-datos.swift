@@ -53,6 +53,11 @@ extension AppModel {
                           })
         if !r.ok { return }
         let name = r.text
+        // (con una tarea en marcha, no: puede estar reiniciando MariaDB; espera a que acabe)
+        if let cur = runningTask {
+            refuseTask(cur)
+            return
+        }
         runQuick(["crear-bd", name], env: dbEnv()) { rc, out in
             if rc == 0 {
                 self.impDb = name

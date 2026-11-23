@@ -2,6 +2,29 @@ class NvDocker:
     """Docker (como Docker Desktop)."""
 
     # ------------------------------------------------------------------ Docker (como Docker Desktop)
+    def nv_docker_lost_warning(self, lost):
+        """El aviso de Docker vacío (gui-docker, Z): los proyectos (y las PostgreSQL comunes) cuyas BBDD ya no
+        están en Docker, por qué pasa y «Recuperar…» (docker-recuperar, con la última copia de cada uno)."""
+        names = [re.sub(r"^postgres-(\d+)$", r"la PostgreSQL \1", x["name"]) for x in lost]
+        with_copy = [x for x in lost if x["copy"]]
+        sub = ("Docker no tiene las BBDD de %s. Pasa cuando Docker cambia de almacén de imágenes (Docker 29 usa el de "
+               "containerd en las instalaciones nuevas) o cuando empieza con un disco nuevo: lo de antes suele seguir "
+               "en el disco, pero no se ve. «Recuperar…» rehace sus contenedores y les carga su última copia de "
+               "~/nexum-backups (%s)." % (", ".join(names), "la tienen %d de %d" % (len(with_copy), len(lost))
+                                          if len(with_copy) < len(lost) else "la tienen todos"))
+
+        def go(*_):
+            steps = ["%s: %s" % (n, os.path.basename(x["copy"]) if x["copy"] else "sin copia, con la BBDD vacía")
+                     for n, x in zip(names, lost)]
+            if confirm(self.win, "¿Recuperar lo de Docker?",
+                       "Se rehacen las imágenes y los contenedores de cada uno y se le carga su última copia. Lo que no "
+                       "tiene copia se queda con su BBDD vacía.", "Recuperar", steps=steps):
+                self.run_task("Recuperando lo de Docker", ["docker-recuperar"], progress=True,
+                              done_text="Docker recuperado",
+                              on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))
+        return ("Docker se ha quedado sin las BBDD de %s" % (names[0] if len(names) == 1 else "%d proyectos" % len(names)),
+                sub, ("Recuperar…", go))
+
     def build_docker(self):
         d = self.docker
         if d is None or not d["ready"]:
@@ -40,9 +63,10 @@ class NvDocker:
                                if d.get("rootful") else []) + \
                               ([("La versión LAMPP activa está parada", "Los proyectos en Docker de antes se abren por su "
                                  "Apache (los del Apache de Docker, no).", ("Arrancarla", lambda *_: self.nv_power()))]
-                               if not d["lampp"] and any(not p.get("web") for p in d["projects"]) else []):
+                               if not d["lampp"] and any(not p.get("web") for p in d["projects"]) else []) + \
+                              ([self.nv_docker_lost_warning(d["lost"])] if d.get("lost") else []):
             r = css(Gtk.Box(spacing=10), "nv-stat")
-            r.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+            r.pack_start(css(icon("dialog-warning-symbolic"), "nv-aviso-icono"), False, False, 0)
             tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             tt.pack_start(label(text), False, False, 0)
             tt.pack_start(label(sub, "nv-chico", "nv-tenue"), False, False, 0)
@@ -611,7 +635,7 @@ class NvDocker:
                      lambda p=p: self.nv_docker_update_image(p), True),
                     ("text-x-generic-symbolic", "Registros", lambda p=p: self.run_task("Registros de %s" % p["folder"], ["docker-registros", p["slug"]]), True)] + (
                     [("network-transmit-receive-symbolic", "BBDD: la de LAMPP en vivo (la misma que web.local) o su copia de Docker",
-                      lambda p=p: self.nv_docker_db_mode(p), True)] if web and p.get("kind") == "wp" else []) + [
+                      lambda p=p: self.nv_docker_db_mode(p), True)] if web and p.get("kind") in ("wp", "ps") else []) + [
                     ("user-trash-symbolic", "Eliminar el proyecto de Docker: sus contenedores y la copia de su BBDD "
                      "(la carpeta y la BBDD de LAMPP no se tocan)", lambda p=p: self.on_docker_delete(p), True)])
             else:

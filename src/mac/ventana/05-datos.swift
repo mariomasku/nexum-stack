@@ -83,8 +83,9 @@ struct AppData: Equatable {
     /// Estado de cada versión frente a PHP2Shell (X|carpeta|estado): ok, parche, parcheable,
     /// actualizable o sin-arreglo
     var php2shell: [String: String] = [:]
-    /// Barrera entre webs puesta (T|1) o apagada (T|0)
+    /// Barrera entre webs puesta (T|1) o apagada (T|0), y sus webs permitidas (T|1|erp.empresa.com *.grupo.es)
     var barrier = true
+    var barrierAllowed: [String] = []
     /// Correo de pruebas (E|…): nil si el script no lo trae
     var mail: MailState? = nil
 }

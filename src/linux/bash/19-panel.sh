@@ -1131,6 +1131,104 @@ QUE HACE
 
 VERSIONES
 
+1.57.46 (23 nov 2026)
+- Tiendas en Docker, en vivo: como con WordPress, al montarla en Docker
+  puedes elegir «En vivo: la misma que web.local (sin copias)», que es
+  la de partida, o «Una copia en Docker». En vivo, su BBDD no se toca:
+  sigue en su dominio de verdad, y el Apache de Docker la enseña en el
+  de Docker. Puedes entrar en su back office por
+  https://<carpeta>.docker.test sin falsear el dominio, y lo que cambies
+  se ve también en web.local. Se puede cambiar después con el botón de
+  la BBDD de su fila (nexum docker-bd <nombre> lampp <versión> |
+  docker).
+- Nuevo proyecto en Docker (pestaña Docker): también tiene «Cómo», para
+  WordPress y tiendas.
+
+1.57.45 (23 nov 2026)
+- Docker, Nuevo proyecto en Docker: «BBDD que se copia» trae de partida
+  la de la carpeta en la versión activa (o, si no está en ella, la
+  primera que tenga en otra). Antes empezaba en «Ninguna: vacía», y una
+  tienda montada así daba error 500 por no tener sus tablas.
+
+1.57.44 (23 nov 2026)
+- Barra de estado, con el dominio falseado: si el dominio del proyecto
+  cargado está falseado, lo dice (web.local >>>>> dominio falseado ·
+  tienda.com): sus visitas van a esta copia y no a la web real. Al dejar
+  el ratón encima, la carpeta del proyecto.
+
+1.57.43 (23 nov 2026)
+- Barra de estado, abajo en la ventana: a dónde apunta web.local, con
+  unos chevrones en verde que se iluminan como una onda (web.local >>>>>
+  proyecto). Sin proyecto cargado, en gris: web.local >>>>> sin enlace.
+- Parches nuevos, también de Docker: en Linux, sus paquetes de Ubuntu
+  (docker.io, docker-compose-v2 y rootlesskit); en el Mac, Docker
+  Desktop, frente a la versión que ofrece su actualizador. Antes de
+  ponerlo al día se copian todas las BBDD de Docker en ~/nexum-backups,
+  y si la copia falla Docker no se toca. En Linux, además, el almacén de
+  imágenes se fija para que no cambie al actualizar. En el Mac, Docker
+  Desktop se instala a mano: «Actualizar todo» hace la copia y abre su
+  descarga.
+- Node, al día: los Node que ha descargado Nexum salen en Parches nuevos
+  cuando hay un parche de su rama; al ponerlo, se quitan los anteriores
+  de esa rama que no estén en marcha.
+- Mailpit, cloudflared y Nginx: si se publica una versión más nueva que
+  la que pone Nexum, Parches nuevos lo dice (solo para saberlo: no
+  cuenta como parche y llega con una versión de Nexum).
+- Docker sin las BBDD de tus proyectos: si Docker cambia de almacén de
+  imágenes o Docker Desktop empieza con un disco nuevo, la pestaña
+  Docker lo avisa y «Recuperar…» rehace los contenedores con la última
+  copia de cada proyecto. En la terminal: nexum docker-copia y nexum
+  docker-recuperar.
+
+1.57.42 (23 nov 2026)
+- Dominio falseado, sin esperas en el navegador: al falsear o dejar de
+  falsear un dominio (también al cargar otro proyecto), Nexum corta las
+  conexiones que Chrome, Firefox y los demás navegadores tenían abiertas
+  con la web real o con este equipo. Antes, una pestaña abierta (el
+  editor de Elementor, por ejemplo) podía seguir unos minutos en la otra
+  web.
+- Más, «Vaciar la caché de Chrome…» (en los proyectos con dominio): copia
+  chrome://net-internals/#sockets y dice qué pulsar, por si aun así
+  Chrome sigue en la otra web. Chrome no deja que otro programa abra esa
+  página ni pulse sus botones.
+- Versiones de PHP: la que instalas o rehaces (también al poner sus
+  parches nuevos) queda protegida al acabar, con el correo de pruebas y
+  el https de la seguridad. Antes se quedaba «sin proteger» hasta pulsar
+  Protegerlas, y por eso, tras actualizar Nexum, casi siempre salía la
+  pregunta de aplicar la seguridad aunque esa versión de Nexum no trajera
+  nada nuevo para Apache.
+
+1.57.41 (20 nov 2026)
+- Barrera entre webs, con webs permitidas (Configuración > Seguridad entre
+  webs, «Añadir…»): las de confianza, como el ERP de tu empresa, pueden
+  llevarte a tu back office o a tu tienda con un formulario, abrirlos en
+  un iframe o hacerles peticiones (fetch) sin apagar la barrera; la
+  cabecera CORS que les dé tu proyecto ya no se quita. Se escribe el
+  dominio o se pega la dirección; *.empresa.com vale también para sus
+  subdominios. Las demás webs siguen frenadas, y phpMyAdmin no es para
+  ninguna. En la terminal, nexum barrera-web permitir|quitar <dominio> y
+  nexum barrera-web permitidas.
+- VS Code con espacios de trabajo (Configuración > Carpetas, «Espacios de
+  trabajo de VS Code»): elige la carpeta de tus .code-workspace y «VS Code»
+  abre cada proyecto con el suyo (<carpeta>.code-workspace, o el que ya
+  lleve su carpeta). Un proyecto que aún no tiene el suyo, al abrirlo, se
+  le crea. Sin elegir, se abre la carpeta, como siempre.
+
+1.57.40 (20 nov 2026)
+- Cola de tareas: con una tarea en marcha, lo que lanzaría otra se puede
+  pulsar y va a la cola; empieza sola cuando acaba la de ahora. La
+  ventana de la tarea dice cuáles vienen después, con «Vaciar la cola»,
+  y la flecha verde de arriba, cuántas esperan. Si una falla, al cerrar
+  su ventana pregunta si sigue; al cerrar el programa con tareas en la
+  cola, también.
+- Traer los cambios o clonar un repositorio va ya, al lado de la tarea
+  en marcha, si no es de su misma carpeta.
+- Avisos, en amarillo (avisan, no son errores).
+- Configuración > General, Registro de tareas: el alto de la lista se
+  mide con sus filas ya colocadas en la ventana, para que se vean las 4
+  últimas (nunca menos de 3).
+- Pestaña Nginx: de título, el logotipo de NGINX con sus letras.
+
 1.57.39 (19 nov 2026)
 - Nginx (pestaña Nginx), apagado de serie: su pestaña no sale hasta que
   enciendes «Usar Nginx» en Configuración > Nginx. Apagarlo lo para y la

@@ -27,8 +27,8 @@ function gui_data() {
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
     echo "A|$([ -n "$active" ] && version_name "$active")|$(lampp_running && echo 1 || echo 0)|$(official_xampp && echo 1 || echo 0)"
     echo "H|$ACTIVE_VHOSTS|$HOSTS_FILE"
-    # T|barrera entre webs puesta (1) o apagada (0)
-    echo "T|$(web_barrier_on && echo 1 || echo 0)"
+    # T|barrera entre webs puesta (1) o apagada (0)|webs permitidas (separadas por espacios)
+    echo "T|$(web_barrier_on && echo 1 || echo 0)|$(web_barrier_allowed | paste -sd ' ' -)"
     # Correo de pruebas: E|Mailpit instalado (1/0)|encendido (1/0)|modo de WordPress|Mailpit en marcha
     # (1/0)|version instalada|direccion de su web|version que instala el gestor. Si la version activa
     # esta en marcha y Mailpit no (se ha cerrado la sesion, por ejemplo), se arranca

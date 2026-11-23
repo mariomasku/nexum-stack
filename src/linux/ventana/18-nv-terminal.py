@@ -340,9 +340,12 @@ class NvTerminal:
         m = re.search(r"\d+ ?%", task.pct.get_label() or "")
         # (lo que hace, con la primera palabra del título: «Actualizando…», «Instalando…»)
         verb = (task.dlg.get_title() or "En marcha").split()[0].rstrip(".,:")
-        self.task_badge_lbl.set_label("%s…%s" % (verb, "  " + m.group(0) if m else ""))
-        self.task_badge.set_tooltip_text("%s\n%s\nPulsa para ver la ventana" % (
-            task.dlg.get_title(), task.what.get_label() or "En marcha"))
+        queue = getattr(self, "task_queue", [])
+        self.task_badge_lbl.set_label("%s…%s%s" % (verb, "  " + m.group(0) if m else "",
+                                                   "  · %d en la cola" % len(queue) if queue else ""))
+        self.task_badge.set_tooltip_text("%s\n%s%s\nPulsa para ver la ventana" % (
+            task.dlg.get_title(), task.what.get_label() or "En marcha",
+            "\nDespués: " + ", ".join(q["title"] for q in queue) if queue else ""))
         return True
 
     def nv_sidebar(self):

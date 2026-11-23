@@ -2059,6 +2059,11 @@ function install_stack() {
         trusted_version_dir "$root" || trusted=0
     fi
     if [ $trusted -eq 1 ]; then
+        # Protegida desde el principio (1.57.42): lo que pone asegurar y no trae la pila recien hecha (el
+        # correo de pruebas, el https de lvm-dominio-desconocido.conf...). Sin esto, cada version nueva o
+        # rehecha salia como «sin proteger» hasta Protegerlas
+        secure_version "$root"
+        [ $? -eq 2 ] && echo "Aviso: no se ha podido proteger del todo; hazlo con Protegerlas (nexum asegurar --todas)"
         echo "Comprobando la configuracion..."
         $SUDO "$target/apache2/bin/httpd" -t -f "$target/etc/httpd.conf" 2>&1 | sed 's/^/  Apache: /'
         $SUDO "$target/php/sbin/php-fpm" -t --fpm-config "$target/php/etc/php-fpm.conf" 2>&1 | sed 's/^.*NOTICE: /  PHP-FPM: /'

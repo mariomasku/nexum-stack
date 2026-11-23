@@ -98,8 +98,11 @@
 #
 #   nexum componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
-#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
-#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
+#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Docker sin root (docker.io, docker-compose-v2 y rootlesskit, frente
+#       a lo que ofrece apt; antes de ponerlo al dia, una copia de las BBDD de Docker),
+#       los Node descargados por Nexum (frente al ultimo de su rama), Mailpit, cloudflared y Nginx; y
+#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar). Ademas, sin
+#       contar como parche: Mailpit, cloudflared o Nginx publicados mas nuevos que los que pone Nexum
 #
 #   nexum descargas [vaciar]
 #       La cache de descargas de las pilas propias (/var/cache/nexum-stack): el codigo de cada
@@ -185,8 +188,9 @@
 #
 #   nexum docker-nuevo <carpeta> <php> <mariadb> [--bd <base> --desde <version> [--en-vivo] | --volcado <fichero>]
 #   nexum docker-bd <nombre> lampp <version> | docker
-#       --en-vivo y docker-bd lampp: un WordPress de Docker con la BBDD de esa version LAMPP en vivo, la
-#       misma que web.local (sin copias; su MariaDB se arranca sola, sin red, si no esta en marcha).
+#       --en-vivo y docker-bd lampp: un WordPress o una tienda de Docker con la BBDD de esa version LAMPP
+#       en vivo, la misma que web.local (sin copias; su MariaDB se arranca sola, sin red, si no esta en
+#       marcha; una tienda sigue en su dominio en la BBDD y el Apache de Docker se lo cambia por el suyo).
 #       docker-bd docker: vuelve a su copia en la MariaDB comun de Docker
 #   nexum docker-php-anadir | docker-php-quitar | docker-php-elegir <nombre> <version de PHP>
 #   nexum docker-pasar <nombre> [--copia]
@@ -233,6 +237,11 @@
 #       Uno solo de los contenedores de un proyecto en Docker
 #   nexum docker-wp-cli si|no [--rehacer]
 #   nexum docker-postgres [estado] | arrancar|parar|borrar <18|17|16>   PostgreSQL comun de Docker
+#   nexum docker-copia | docker-recuperar [nombre...]
+#       Copia de todas las BBDD de Docker en ~/nexum-backups (la de cada proyecto, las de las MariaDB
+#       comunes sin proyecto y cada PostgreSQL entera). Si Docker se queda sin ellas (cambia de almacen
+#       de imagenes o Docker Desktop empieza con un disco nuevo), docker-recuperar rehace los
+#       contenedores de los que las han perdido y les carga su ultima copia
 #   nexum docker-nginx [estado] | arrancar | parar | anadir|quitar <proyecto> | puertos <http> <https>   Nginx comun de Docker
 #       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
 #       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
@@ -383,6 +392,10 @@
 #       Barrera entre webs (encendida si no se apaga): otra web abierta en el navegador no
 #       puede mandar formularios ni peticiones a tus proyectos. Una pasarela de pago que vuelve
 #       a la tienda con un POST no pasa: apagala mientras la pruebas. Sin argumento, como esta
+#
+#   nexum barrera-web permitir|quitar <dominio> | permitidas
+#       Webs permitidas: las de confianza (el ERP de la empresa) que la barrera deja pasar: sus
+#       formularios, su vuelta a tus proyectos, sus iframes. *.empresa.com, con sus subdominios
 #
 #   nexum correo [estado] | si [--instalar] | no
 #       Correo de pruebas (encendido si no se apaga): lo que mandan las webs locales (formularios,
@@ -920,7 +933,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.39"
+APP_VERSION="1.57.46"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

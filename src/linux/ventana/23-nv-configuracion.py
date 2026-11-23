@@ -63,6 +63,27 @@ class NvConfiguracion:
         sw.connect("notify::active", self.on_cross_site)
         row.add_suffix(sw)
         lb.add(row)
+        # Webs permitidas (nexum barrera-web permitir|quitar): las de confianza, como el ERP de la empresa
+        allowed = cross_site_allowed()
+        row = ActionRow("Webs permitidas",
+                        "La barrera deja pasar lo que mandan a tus proyectos (*.dominio vale también para sus subdominios)"
+                        if allowed else
+                        "Ninguna. Añade las de confianza (el ERP de tu empresa) para que puedan mandarte a tus proyectos "
+                        "con un formulario, abrirlos en un iframe o hacerles peticiones (fetch)")
+        row.subtitle.set_ellipsize(0)
+        row.subtitle.set_line_wrap(True)
+        row.subtitle.set_xalign(0)
+        b = busy_guard(Gtk.Button(label="Añadir…", valign=Gtk.Align.CENTER), self.busy)
+        b.connect("clicked", lambda *_: self.on_cross_site_allow())
+        row.add_suffix(b)
+        lb.add(row)
+        for dom in allowed:
+            row = ActionRow(dom, "%s y todos sus subdominios" % dom[2:] if dom.startswith("*.") else "Solo este dominio")
+            row.add_prefix(css(symbol("security-high-symbolic", 18), "nv-permitida"))
+            b = busy_guard(Gtk.Button(label="Quitar", valign=Gtk.Align.CENTER), self.busy)
+            b.connect("clicked", lambda _b, d=dom: self.on_cross_site_unallow(d))
+            row.add_suffix(b)
+            lb.add(row)
         # Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
         box.pack_start(label("Qué es", "nv-apartado-titulo", xalign=0, margin_top=20), False, False, 0)
         why = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=6), "caja")
@@ -565,6 +586,9 @@ class NvConfiguracion:
         self.tasks_sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
                                            max_content_height=4 * 58)
         self.tasks_sw.add(lb)
+        # (el alto, con las filas ya en la ventana: medidas fuera de ella, sin su estilo, salen más bajas)
+        lb.connect("size-allocate", lambda *_: GLib.idle_add(self.nv_tasks_fit))
+        self.tasks_sw.connect("map", lambda *_: GLib.idle_add(self.nv_tasks_fit))
         if pos is None:
             parent.add(self.tasks_sw)
         else:
@@ -616,13 +640,29 @@ class NvConfiguracion:
         lb.show_all()
         line.show_all()
 
-        # (el alto justo de las 4 primeras filas, el que pide cada una: con menos, el de las que haya)
-        sw = getattr(self, "tasks_sw", None)
-        if sw is not None:
-            h = sum(r.get_preferred_height()[1] for r in lb.get_children()[:4])
-            if h > 0:
+        self.nv_tasks_fit()
+
+    def nv_tasks_fit(self):
+        """El alto de la lista: el justo de sus 4 primeras filas (con menos, el de las que haya). Con las filas ya
+        colocadas, el que tienen en la ventana; antes, el que piden. Se mira al rellenarla, al enseñarla y al
+        recolocarla, y solo se cambia si es otro (no se repite sin fin)."""
+        sw, lb = getattr(self, "tasks_sw", None), getattr(self, "tasks_lb", None)
+        if sw is None or lb is None:
+            return False
+        rows = lb.get_children()[:4]
+        placed = lb.get_mapped() and all(r.get_allocated_height() > 1 for r in rows)
+        h = sum(r.get_allocated_height() if placed else r.get_preferred_height()[1] for r in rows)
+        # (nunca menos de 3 filas de las de siempre, aunque se midan mal)
+        h = max(h, min(len(rows), 3) * 54)
+        if h > 0 and abs(sw.get_max_content_height() - h) > 1:
+            # (GTK no quiere el mínimo por encima del máximo: primero el que deja sitio)
+            if h > sw.get_max_content_height():
+                sw.set_max_content_height(h)
+                sw.set_min_content_height(h)
+            else:
                 sw.set_min_content_height(h)
                 sw.set_max_content_height(h)
+        return False
 
     def nv_tasks_empty(self):
         """«Vaciar el registro…»: borra los registros de las tareas que ya han acabado (el de una en marcha se
@@ -705,14 +745,16 @@ class NvConfiguracion:
 
     def nv_components_tools(self):
         """Configuración, Parches nuevos: lo que tiene un parche publicado (cada versión de PHP con su
-        Apache, MariaDB, phpMyAdmin…, las imágenes de Docker, Mailpit y cloudflared) y «Actualizar todo»."""
+        Apache, MariaDB, phpMyAdmin…, Docker y sus imágenes, Node, Mailpit, cloudflared y Nginx) y «Actualizar todo»."""
         box, lb = tile_group("Parches nuevos",
                              "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, "
-                             "MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), las imágenes de "
-                             "Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), Mailpit y "
-                             "cloudflared. Se busca al abrir la ventana el primer arranque del día y cada pocos "
+                             "MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), Docker (sus "
+                             "paquetes de Ubuntu) y sus imágenes (las MariaDB comunes, phpMyAdmin y PHP, frente a "
+                             "Docker Hub), los Node que ha descargado Nexum (frente a lo último de su rama), Mailpit, "
+                             "cloudflared y Nginx. Se busca al abrir la ventana el primer arranque del día y cada pocos "
                              "arranques. Las versiones de PHP se rehacen (la de ahora sigue funcionando mientras se "
-                             "compila); los contenedores de Docker se rehacen en unos segundos, con sus BBDD.")
+                             "compila); los contenedores de Docker se rehacen en unos segundos, con sus BBDD. Antes de "
+                             "poner Docker al día se hace una copia de todas sus BBDD en ~/nexum-backups.")
         row = ActionRow("Componentes", "Buscando parches nuevos…")
         row.add_prefix(icon("software-update-available-symbolic", 18))
         row.wide = True
@@ -735,6 +777,9 @@ class NvConfiguracion:
                 res["items"].append("%s (%s): versión nueva en Docker Hub" % (f[1], f[2]))
             elif f[0] == "X" and len(f) >= 4:
                 res["items"].append("%s: %s → %s" % (f[1], f[2], f[3]))
+            elif f[0] == "N" and len(f) >= 4:
+                res["notes"].append("%s %s publicado (Nexum pone el %s hasta que lo traiga una versión suya)"
+                                    % (f[1], f[3], f[2]))
             elif f[0] == "E" and len(f) >= 2:
                 res["errors"].append(f[1])
             elif f[0] == "S" and len(f) >= 2 and f[1].isdigit():
@@ -755,6 +800,8 @@ class NvConfiguracion:
             text = "Todo al día: no hay parches nuevos."
         if res["items"] and res["errors"]:
             text += "\n(No se ha podido consultar: %s)" % ", ".join(res["errors"])
+        if res["notes"]:
+            text += "\n" + "\n".join("· " + n for n in res["notes"])
         row.subtitle.set_label(text)
         for ch in row.suffix.get_children():
             row.suffix.remove(ch)
@@ -772,7 +819,11 @@ class NvConfiguracion:
         if ask and not confirm(self.win, "¿Actualizar todo?",
                                "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de "
                                "ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se "
-                               "rehacen en unos segundos: sus BBDD y su configuración no cambian.", "Actualizar todo",
+                               "rehacen en unos segundos: sus BBDD y su configuración no cambian."
+                               + (" Antes de poner Docker al día se copian todas sus BBDD en ~/nexum-backups (si la "
+                                  "copia falla, Docker no se toca)." if any(i.startswith(("docker.io:", "docker-compose-v2:",
+                                                                                         "rootlesskit:")) for i in res["items"]) else ""),
+                               "Actualizar todo",
                                steps=res["items"], extra=extra):
             return
         self.components = None

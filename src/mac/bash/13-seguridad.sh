@@ -88,7 +88,7 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
 # Una web de fuera no puede leer las respuestas de tus proyectos: WordPress responde a cualquier
 # origen en su API (Access-Control-Allow-Origin), y se quita si el origen no es la propia web
 <IfModule headers_module>
-    <If "-n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST}">
+    <If "-n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} !~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?$#i">
         Header unset Access-Control-Allow-Origin
         Header always unset Access-Control-Allow-Origin
         Header unset Access-Control-Allow-Credentials
@@ -130,9 +130,9 @@ LimitRequestBody 67108864
 # Y lo que se piden un proyecto y su copia en Docker: tipografias, imagenes y CSS (GET o HEAD, de un
 # fichero con esa extension y que el navegador pide como tal), con una de las dos webs en Docker
 # (*.docker.test, *.docker.local). Elementor guarda en sus CSS la direccion de la web que los genero
-<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/))) && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Dest} =~ /^(font|image|style)$/i && %{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot|css|png|jpe?g|gif|webp|avif|svg|ico)$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?/#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i))">
+<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/))) && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Dest} =~ /^(font|image|style)$/i && %{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot|css|png|jpe?g|gif|webp|avif|svg|ico)$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?/#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i)) && !(%{HTTP:Origin} =~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https?://(lvm-permitidas\.invalid)(:[0-9]+)?(/|$)#i)">
     Require all denied
-    ErrorDocument 403 "Otra web ha intentado mandar algo a este proyecto: no se ha hecho nada (barrera entre webs de lvm-instalador; se apaga en Configuracion)."
+    ErrorDocument 403 "Otra web ha intentado mandar algo a este proyecto: no se ha hecho nada (barrera entre webs de lvm-instalador; se apaga en Configuracion). Si es una web tuya de confianza (tu ERP), añadela en Configuracion, Webs permitidas."
 </If>
 # /lvm-barrera-web
 '
@@ -170,18 +170,78 @@ function web_barrier_on() {
     return 0
 }
 
-# UNKNOWN_HOST_VHOST tal cual o, con la barrera apagada, sin su bloque (siempre acaba en salto de linea)
+# Webs permitidas (Configuracion, Seguridad entre webs; nexum barrera-web permitir <dominio>): las tuyas
+# de confianza, como el ERP de la empresa, que si pueden mandar formularios a tus proyectos, llevarte a su
+# back office con un POST, abrirlos en un iframe o hacerles peticiones (fetch). Un dominio por linea; *.empresa.com
+# vale para empresa.com y todos sus subdominios. Es del administrador, como el de la barrera apagada (un
+# programa tuyo no puede añadir la suya). Sin ninguna, el hueco de la barrera lleva un dominio que no
+# existe (lvm-permitidas.invalid)
+WEB_BARRIER_ALLOW=$COMMON/lvm-barrera-permitidas
+WEB_BARRIER_SLOT='lvm-permitidas\.invalid'
+WEB_BARRIER_ALLOW_RE='^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+function web_barrier_allowed() {
+    [ -f "$WEB_BARRIER_ALLOW" ] && [ ! -L "$WEB_BARRIER_ALLOW" ] || return 0
+    # (en las pruebas sin sudo vale cualquier fichero)
+    [ -n "$TEST_DIR" ] || [ "$(stat -f %u "$WEB_BARRIER_ALLOW" 2> /dev/null)" == 0 ] || return 0
+    grep -E "$WEB_BARRIER_ALLOW_RE" "$WEB_BARRIER_ALLOW" 2> /dev/null | LC_ALL=C sort -u
+}
+
+# Un dominio tal como se escribe (o pegado de la barra del navegador: https://erp.empresa.com/login) en la
+# forma de la lista: sin el protocolo, la ruta, el puerto ni el punto final, en minusculas. Vacio si no vale
+function web_barrier_domain() {
+    local d
+    d=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    d=${d#*://}
+    d=${d%%/*}
+    d=${d%%\?*}
+    d=${d%%:*}
+    d=${d%.}
+    [[ $d =~ $WEB_BARRIER_ALLOW_RE ]] && printf '%s' "$d"
+}
+
+# Los dominios permitidos como expresion para Apache: erp\.empresa\.com|([a-z0-9-]+\.)*empresa\.com
+function web_barrier_allow_regex() {
+    local d w out=""
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        w=""
+        [ "${d#\*.}" != "$d" ] && { w='([a-z0-9-]+\.)*'; d=${d#\*.}; }
+        out=${out:+$out|}$w$(printf '%s' "$d" | sed 's/\./\\./g')
+    done < <(web_barrier_allowed)
+    printf '%s' "${out:-$WEB_BARRIER_SLOT}"
+}
+
+# Un texto con el hueco de las webs permitidas relleno con las de la lista
+function web_barrier_fill() {
+    local text=$1 re out=""
+    re=$(web_barrier_allow_regex)
+    while [[ $text == *"$WEB_BARRIER_SLOT"* ]]; do
+        out+=${text%%"$WEB_BARRIER_SLOT"*}$re
+        text=${text#*"$WEB_BARRIER_SLOT"}
+    done
+    printf '%s' "$out$text"
+}
+
+# UNKNOWN_HOST_VHOST tal cual o, con la barrera apagada, sin su bloque (siempre acaba en salto de linea),
+# con las webs permitidas
 function unknown_host_vhost() {
+    local text
     if web_barrier_on; then
-        printf '%s' "$UNKNOWN_HOST_VHOST"
+        text=$UNKNOWN_HOST_VHOST
     else
-        awk '/^# lvm-barrera-web:/ { skip = 1 } !skip { print } /^# \/lvm-barrera-web$/ { skip = 0 }' <<< "${UNKNOWN_HOST_VHOST%$'\n'}"
+        text=$(awk '/^# lvm-barrera-web:/ { skip = 1 } !skip { print } /^# \/lvm-barrera-web$/ { skip = 0 }' <<< "${UNKNOWN_HOST_VHOST%$'\n'}"; printf x)
+        text=${text%x}
     fi
+    web_barrier_fill "$text"
 }
 
 # barrera-web si|no: pone o quita la barrera entre webs en todas las versiones (y reinicia Apache
 # de la activa si esta en marcha). Sin argumento, dice como esta
 function web_barrier_command() {
+    case "$1" in
+        permitidas) web_barrier_allowed; return 0 ;;
+        permitir|quitar) web_barrier_allow_command "$1" "$2"; return ;;
+    esac
     # (si hay que cambiarla: la contraseña antes de nada; cancelarla la deja como estaba)
     if { [ "$1" == si ] && ! web_barrier_on; } || { [ "$1" == no ] && web_barrier_on; }; then
         sudo_first || return 1
@@ -189,9 +249,10 @@ function web_barrier_command() {
     case "$1" in
         "")
             web_barrier_on && echo "Barrera entre webs: puesta" || echo "Barrera entre webs: apagada"
+            [ -n "$(web_barrier_allowed)" ] && echo "Webs permitidas: $(web_barrier_allowed | paste -sd ' ' -)"
             return 0 ;;
         si|no) ;;
-        *) echo "Uso: nexum barrera-web [si|no]"; return 1 ;;
+        *) echo "Uso: nexum barrera-web [si|no] | permitir <dominio> | quitar <dominio> | permitidas"; return 1 ;;
     esac
     if [ "$1" == si ]; then
         web_barrier_on && { echo "La barrera entre webs ya esta puesta"; return 0; }
@@ -208,8 +269,7 @@ function web_barrier_command() {
         fi
     fi
     [ "$DRY" -eq 1 ] && return 0
-    secure_all
-    if [ $? -eq 2 ]; then
+    if ! web_barrier_apply; then
         # (no se ha podido aplicar: el interruptor vuelve a como estaba)
         if [ "$1" == si ]; then
             echo "Apagada con nexum barrera-web no" | $SUDO tee "$WEB_BARRIER_OFF" > /dev/null
@@ -221,16 +281,68 @@ function web_barrier_command() {
         echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
         return 1
     fi
+    echo "Listo"
+}
+
+# barrera-web permitir|quitar <dominio>: añade o quita una web de las permitidas y lo aplica en todas las
+# versiones (y en el Apache de Docker), como al poner o apagar la barrera
+function web_barrier_allow_command() {
+    local d list old
+    d=$(web_barrier_domain "$2")
+    if [ -z "$d" ]; then
+        echo "«$2» no es un dominio: escribe uno como erp.empresa.com (o *.empresa.com para todos sus subdominios)"
+        return 1
+    fi
+    list=$(web_barrier_allowed)
+    if [ "$1" == permitir ]; then
+        grep -qxF -- "$d" <<< "$list" && { echo "$d ya estaba entre las webs permitidas"; return 0; }
+    else
+        grep -qxF -- "$d" <<< "$list" || { echo "$d no estaba entre las webs permitidas"; return 0; }
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $d $([ "$1" == permitir ] && echo "pasa a estar permitida" || echo "deja de estar permitida") en todas las versiones"
+        return 0
+    fi
+    [ -d "$COMMON" ] || { echo "No existe $COMMON (se crea al instalar la primera version)"; return 1; }
+    sudo_first || return 1
+    old=$list
+    {
+        if [ "$1" == permitir ]; then
+            printf '%s\n' "$list" "$d"
+        else
+            grep -vxF -- "$d" <<< "$list"
+        fi
+    } | grep -E "$WEB_BARRIER_ALLOW_RE" | LC_ALL=C sort -u | $SUDO tee "$WEB_BARRIER_ALLOW" > /dev/null || return 1
+    [ -z "$SUDO" ] || $SUDO chmod 644 "$WEB_BARRIER_ALLOW" || return 1
+    if ! web_barrier_apply; then
+        # (no se ha podido aplicar: la lista vuelve a como estaba)
+        printf '%s\n' "$old" | grep -E "$WEB_BARRIER_ALLOW_RE" | $SUDO tee "$WEB_BARRIER_ALLOW" > /dev/null
+        secure_all > /dev/null 2>&1
+        echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
+        return 1
+    fi
+    if [ "$1" == permitir ]; then
+        echo "$d, permitida: la barrera entre webs la deja pasar (formularios, su vuelta a tus proyectos, iframes)"
+    else
+        echo "$d ya no esta permitida: la barrera entre webs la para como a cualquier otra web"
+    fi
+}
+
+# Lo que cambia la barrera o sus webs permitidas, en todas las versiones: su lvm-dominio-desconocido.conf,
+# el Apache de la activa (recargado si esta en marcha) y el de Docker. 1 si no se ha podido escribir
+function web_barrier_apply() {
+    secure_all
+    [ $? -eq 2 ] && return 1
     if [ -n "$(active_dir)" ] && [ -f "$LINK/xamppfiles/logs/httpd.pid" ]; then
         echo "Recargando Apache de la version activa..."
-        xampp_ctl reloadapache > /dev/null || { echo "No se ha podido recargar Apache: reinicia la version activa."; return 1; }
+        xampp_ctl reloadapache > /dev/null || echo "No se ha podido recargar Apache: reinicia la version activa."
     fi
     # (y el Apache de Docker, si lo hay: lleva las mismas reglas de seguridad. Se rehace su configuracion y,
     # si esta en marcha, se recarga sin cortar las conexiones; parado, la toma al arrancar)
     if [ -f "$DOCKER_WEB_DIR/conf/httpd.conf" ]; then
         docker_web_reload || echo "Aviso: el Apache de Docker no se ha podido poner al dia; la tomara al arrancar"
     fi
-    echo "Listo"
+    return 0
 }
 
 # PHP de las pilas propias contra PHP2Shell (CVE-2026-109618 y CVE-2026-109619): la subida de

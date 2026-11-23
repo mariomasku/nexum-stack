@@ -1,11 +1,12 @@
-# Clics de verdad (eventos de GTK) sobre lo que lleva busy_guard: lo usa tarea-ocupada.sh
+# Clics de verdad (eventos de GTK) sobre lo que lleva busy_guard: lo usa tarea-ocupada.sh. Con una tarea en marcha
+# se ve atenuado y hace lo suyo igual (su tarea va a la cola, 1.57.40)
 import sys
 src = open(sys.argv[1], encoding="utf-8").read()
 ns = {"__name__": "prueba"}
 exec(compile(src[:src.index("\nif __name__")], "gui", "exec"), ns)
 Gtk, GLib, Gdk = ns["Gtk"], ns["GLib"], ns["Gdk"]
-state = {"busy": True, "warned": 0}
-ns["TASK_GUARD"][0] = lambda check=False: state["busy"] and (check or state.__setitem__("warned", state["warned"] + 1) or True)
+state = {"busy": True}
+ns["TASK_GUARD"][0] = lambda: "va a la cola" if state["busy"] else None
 log = []
 win = Gtk.Window(); box = Gtk.Box(spacing=10)
 b = ns["busy_guard"](Gtk.Button(label="Instalar"), True); b.connect("clicked", lambda *_: log.append("clic"))
@@ -37,15 +38,20 @@ def run():
     return False
 def phase2():
     pop = combo.get_property("popup-shown")
-    steps.append("ocupado: clics=%d interruptor=%s desplegable_abierto=%s avisos=%d atenuado=%s" % (
-        log.count("clic"), sw.get_active(), pop, state["warned"], b.get_style_context().has_class("nv-espera")))
+    steps.append("ocupado: clics=%d interruptor=%s desplegable_abierto=%s atenuado=%s" % (
+        log.count("clic"), sw.get_active(), pop, b.get_style_context().has_class("nv-espera")))
+    # (el desplegable se cierra, y un rato después los mismos clics sin tarea)
+    combo.popdown()
     state["busy"] = False; ns["busy_guard"](b, False)
+    GLib.timeout_add(400, phase2b)
+    return False
+def phase2b():
     click(b); click(sw); click(combo)
     GLib.timeout_add(400, phase3)
     return False
 def phase3():
     steps.append("libre: desplegable_abierto=%s" % combo.get_property("popup-shown"))
-    steps.append("libre: clics=%d interruptor=%s avisos=%d atenuado=%s" % (log.count("clic"), sw.get_active(), state["warned"], b.get_style_context().has_class("nv-espera")))
+    steps.append("libre: clics=%d interruptor=%s atenuado=%s" % (log.count("clic"), sw.get_active(), b.get_style_context().has_class("nv-espera")))
     print("\n".join(steps)); Gtk.main_quit()
     return False
 GLib.timeout_add(800, run)
