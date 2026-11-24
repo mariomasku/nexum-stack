@@ -240,18 +240,18 @@ class AppVersiones:
         w["db"] = Gtk.Entry(placeholder_text="wp_proyecto")
         w["db"].connect("changed", lambda *_: self.new_project_check())
         p3.pack_start(w["db"], False, False, 0)
-        p3.pack_start(label("Volcado que se sube a la BBDD (.sql, .sql.gz o .zip):"), False, False, 0)
+        p3.pack_start(label("Volcado que se sube a la BBDD (.sql, .gz o .zip):"), False, False, 0)
         w["file"] = Gtk.FileChooserButton(title="Elige el volcado de la BBDD",
                                           action=Gtk.FileChooserAction.OPEN)
         flt = Gtk.FileFilter()
-        flt.set_name("Volcados (.sql, .sql.gz, .zip)")
-        for pat in ("*.sql", "*.sql.gz", "*.zip", "*.SQL", "*.GZ", "*.ZIP"):
+        flt.set_name("Volcados (.sql, .gz, .zip)")
+        for pat in ("*.sql", "*.gz", "*.zip", "*.SQL", "*.GZ", "*.ZIP"):
             flt.add_pattern(pat)
         w["file"].add_filter(flt)
         w["file"].connect("file-set", lambda *_: self.new_project_check())
         p3.pack_start(w["file"], False, False, 0)
-        p3.pack_start(label("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga con "
-                            "la carga protegida (con el usuario de la BBDD y sin DEFINER).",
+        p3.pack_start(label("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga como root "
+                            "(con todos los permisos) y sin DEFINER.",
                             "dim-label", wrap=True), False, False, 0)
         w["nodb_note"] = label("", "aviso", wrap=True)
         p3.pack_start(w["nodb_note"], False, False, 0)

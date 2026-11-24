@@ -167,7 +167,7 @@
 #       Crea una base vacia (utf8mb4_general_ci)
 #
 #   nexum importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
-#       Carga un .sql, .sql.gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
+#       Carga un .sql, .gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
 #       borran todas sus tablas (con --copia, antes se guarda una copia en ~/nexum-backups si tenia
 #       alguna; sin ella, no se podran recuperar); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
 #       con la plantilla; PrestaShop, su parameters.php pasa a usarla
@@ -188,6 +188,14 @@
 #
 #   nexum borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/nexum-backups
+#
+#   nexum marcar-bd <version> <base> [--quitar]
+#       La marca para borrarla mas adelante (aunque su version no este en marcha): al cargar esa
+#       version, se dice cuantas tiene marcadas y la ventana pregunta si se borran. --quitar la desmarca
+#
+#   nexum borrar-bd-marcadas [--copia]
+#       Borra las marcadas de la version activa (las que ya no estan, solo se desmarcan); --copia
+#       guarda antes una copia de cada una en ~/nexum-backups
 #
 #   nexum reparar-bd-sistema [--copia]
 #       Pone al dia las tablas del sistema de MariaDB de la version montada (las bases de los
@@ -210,7 +218,7 @@
 #   nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd
 #       Proyecto nuevo desde GitHub (u otro repositorio): lo clona en htdocs/<carpeta> con tu
 #       usuario (solo https o ssh, sin submodulos), lo carga en esa version, crea su base y,
-#       si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga protegida.
+#       si se indica, carga en ella el volcado (.sql, .gz o .zip) con importar-bd (como root).
 #       Con --sin-bd, sin base: se clona y se carga sin BBDD vinculada (un WordPress o una
 #       tienda no abren hasta que tengan la suya: se sube en Bases de datos)
 #
@@ -268,10 +276,11 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version activa (si no existe)
 #
-#   nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
+#   nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--crear-base] [--copia]
 #       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
-#       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
-#       y la BBDD de antes, en ~/nexum-backups
+#       de importar-bd, como root) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
+#       y la BBDD de antes, en ~/nexum-backups. --crear-base: si el proyecto no tiene BBDD, se crea la
+#       de --base (vacia o con el volcado de --bd) y queda como la suya
 #
 #   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>]
 #                           [--destino <carpeta> | --zip <fichero> [--sobrescribir]]

@@ -386,5 +386,7 @@ function use_lampp() {
     mailpit_sync
 
     echo "Usando lampp $version"
+    # (las BBDD que se marcaron para borrar al cargarla)
+    db_marks_notice "$version"
 }
 

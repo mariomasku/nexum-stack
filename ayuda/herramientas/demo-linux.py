@@ -129,6 +129,8 @@ def gui_datos():
             out.append(("D", ver, db, NOW - n * 3 * DAY, "c"))
     # (una copia antigua de una base, en otra versión: la de la tienda, en la 8.2)
     out.append(("D", "8.2", "ps_ferreteria_norte", NOW - 60 * DAY, "i"))
+    # (y marcada para borrar al cargar la 8.2: ya no se usa)
+    out.append(("J", "8.2", "ps_ferreteria_norte"))
     return lines(out)
 
 

@@ -344,7 +344,8 @@
   <div class="nota"><b>Desplegables con buscador</b>Cualquier desplegable de 8 opciones o más (proyectos, bases de datos, carpetas,
     versiones…) se abre con un campo «Buscar…» arriba. Empieza a escribir y la lista se queda solo con lo que lleva ese texto, como en la barra de búsqueda de
     los proyectos. Las flechas mueven la selección, Intro elige la marcada y Esc cierra sin cambiar nada (con algo escrito, Esc primero lo
-    borra). Los cortos, de menos de 8 opciones, se abren como siempre.</div>
+    borra). Los cortos, de menos de 8 opciones, se abren como una lista. Todos se abren justo debajo (o encima, si debajo no hay sitio) y
+    con el alto que cabe en la ventana: no se cortan ni aparecen lejos del botón.</div>
 
   <div class="nota"><b>Dos botones que solo salen a veces</b>Junto al recuadro de la versión activa pueden aparecer dos botones
     más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo amarillo con un número), cuando hay algo que conviene
@@ -1276,8 +1277,8 @@
       <li>Hace un <b>volcado</b> (un fichero <code>.sql</code> con todas las tablas y sus datos, que se puede volver a cargar) de la base
         de origen con <code>mysqldump</code>, a un fichero temporal en <code>~/.nexum</code>. Si la versión de origen no está en
         marcha, arranca su MariaDB aparte, sin red, solo para eso.</li>
-      <li>Lo carga en la de destino con la carga protegida de <code>importar-bd</code> (crea la base, la vacía si existía y carga el
-        volcado con un usuario propio de la base, no como root). Si el destino no es la versión activa, arranca su MariaDB aparte
+      <li>Lo carga en la de destino con <code>importar-bd</code> (crea la base, la vacía si existía y carga el volcado como
+        <code>root</code>, con todos los permisos). Si el destino no es la versión activa, arranca su MariaDB aparte
         (<code>sudo</code>), solo para la copia, y la para al acabar.</li>
       <li>Borra el fichero temporal y vincula la copia: <code>wp_panaderia_luna_8_2@8.2=panaderia-luna</code> en
         <code>~/.nexum/proyectos</code>.</li>
@@ -1424,8 +1425,13 @@
     las dos cosas. Sirve, por ejemplo, cuando el cliente ha añadido productos o entradas y quieres trabajar con lo último. Se abre con el
     botón <b>«Actualizar»</b>.</p>
   <ul>
+    <li><b>Si el proyecto no tiene base de datos</b> (ni asociada ni en su configuración, o la suya no existe en la versión activa),
+      arriba lo dice en naranja: «Este proyecto no tiene base de datos» (o «La BBDD de este proyecto, …, no existe en la versión
+      activa»), con la casilla <b>«Crear la BBDD para este proyecto»</b>, marcada. Te propone un nombre (<code>wp_</code> más el de la
+      carpeta en un WordPress, <code>ps_</code> en una tienda) que puedes cambiar. Se crea vacía o, si eliges un volcado, con él, y queda
+      como la suya: su configuración pasa a usarla. Sin volcado ni código, el botón es «Crear la BBDD…».</li>
     <li><b>«Base de datos de producción»</b>: arrastra aquí el volcado (la copia de la base que descargas de producción, por ejemplo
-      desde su phpMyAdmin) o pulsa «Elegir fichero…». Vale un <code>.sql</code>, un <code>.sql.gz</code> o un <code>.zip</code>. Debajo te
+      desde su phpMyAdmin) o pulsa «Elegir fichero…». Vale un <code>.sql</code>, un <code>.gz</code> (como <code>.sql.gz</code>) o un <code>.zip</code>. Debajo te
       dice en qué base se carga («Se carga en la BBDD wp_panaderia_luna (al confirmar, puedes guardar antes una copia de la actual)»). Si
       el proyecto aún no tiene base, escribes su nombre. Sin fichero, «Se sigue usando la BBDD …».</li>
     <li><b>«Código de producción»</b>: arrastra aquí un <code>.zip</code>, un <code>.tar.gz</code> (o <code>.tar</code>, <code>.tgz</code>,
@@ -1453,9 +1459,27 @@
     <li><code>git pull</code>, si lo has pedido.</li>
     <li>Copia el código encima de la carpeta. Su <code>.git</code> no se toca, y lo que no cambia no se vuelve a escribir. Si el paquete trae
       todo dentro de una carpeta (como <code>public_html</code>), se usa lo de dentro.</li>
-    <li>Vacía la base y carga el volcado, con la carga protegida.</li>
+    <li>Si el proyecto no tenía base y has dejado marcada «Crear la BBDD para este proyecto», la crea (vacía, o al cargar el volcado) y la
+      asocia al proyecto.</li>
+    <li>Vacía la base y carga el volcado como <code>root</code>, con todos los permisos.</li>
     <li>Vuelve a cargar el proyecto, para que su configuración apunte otra vez a la base y al dominio locales, y lo comprueba.</li>
   </ol>
+  <div class="nota"><b>Lo que sale en el registro</b>Del <code>git pull</code>, lo que ha traído: los ficheros nuevos (<code>+</code>),
+    modificados (<code>~</code>) y borrados (<code>-</code>), y un recuadro con el total de ficheros del repositorio y cuántos son
+    nuevos, modificados, sin tocar y borrados (o «ya estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que
+    ocupan, la lista de nuevos, modificados y que ya no están (los 200 primeros de cada uno), y un recuadro con sus cuentas:
+    <pre>┌─────────────────────────────────────┐
+│ Código de producción                │
+├─────────────────────────────────────┤
+│ Ficheros del código (total)   4.812 │
+│ Nuevos                           12 │
+│ Modificados                     340 │
+│ Sin tocar (iguales)           4.460 │
+│ Ya no están                       0 │
+│ No vienen y se dejan             35 │
+└─────────────────────────────────────┘</pre>
+    «No vienen y se dejan» sale al fusionar: lo que hay en la carpeta y no trae el código. Al sobrescribir, eso es «Ya no están
+    (quitados)».</div>
   <div class="nota"><b>Copias que guarda</b>Con la casilla marcada, lo que el código sustituye o borra va a
     <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,
     como <code>.sql.gz</code>. Sin ella, lo que el código sustituye o quita se borra. Si cancelas a medias, el proyecto queda con lo hecho
@@ -1464,7 +1488,9 @@
     <p>La orden del programa: <code>nexum actualizar-proyecto panaderia-luna --codigo ~/Descargas/produccion.zip --modo
       fusionar --pull --bd ~/Descargas/wp_panaderia_luna.sql.gz --base wp_panaderia_luna --copia</code>. Cada parte, solo si la has
       pedido: <code>--codigo</code> y <code>--modo</code> con el código (<code>fusionar</code> o <code>sobrescribir</code>),
-      <code>--pull</code> con «Hacer pull y copiar», <code>--bd</code> con el volcado y <code>--copia</code> con la casilla.</p>
+      <code>--pull</code> con «Hacer pull y copiar», <code>--bd</code> con el volcado, <code>--crear-base</code> con «Crear la BBDD para este
+      proyecto» y <code>--copia</code> con la casilla. Solo crear la base, sin código ni volcado:
+      <code>nexum actualizar-proyecto panaderia-luna --crear-base --base wp_panaderia_luna</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba que los ficheros se pueden leer y, con <code>--bd</code>, que entra en MariaDB. Pide la contraseña
@@ -1474,6 +1500,8 @@
         encima de <code data-so="linux">/opt/htdocs/panaderia-luna</code><code data-so="mac">htdocs/panaderia-luna</code>, sin tocar su
         <code>.git</code>. Con <code>sobrescribir</code>, además borra lo que el paquete no trae. Con <code>--copia</code>, lo que
         sustituye o borra lo mueve antes a <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-&lt;fecha&gt;</code>.</li>
+      <li>Con <code>--crear-base</code> y sin <code>--bd</code>: si la base no existe, la crea vacía (<code>nexum crear-bd
+        wp_panaderia_luna</code>); y la asocia al proyecto, como al cargar un volcado con su proyecto.</li>
       <li>Con <code>--bd</code>: <code>nexum importar-bd &lt;fichero&gt; wp_panaderia_luna --crear --proyecto panaderia-luna</code>
         (con <code>--copia</code>, antes guarda la base de ahora como <code>.sql.gz</code> en <code>~/nexum-backups</code>); vacía la base
         y carga el volcado.</li>
@@ -1945,7 +1973,7 @@
       contraseña, con una clave guardada en <code>~/.ssh</code>); un repositorio privado por https se prueba solo por SSH.</li>
     <li><b>Paso 2 de 4: versión de PHP.</b> Elige en cuál se crea. Viene marcada la activa.</li>
     <li><b>Paso 3 de 4: BBDD nueva.</b> Su nombre (se propone <code>wp_</code> y el de la carpeta, como <code>wp_panaderia_luna</code>) y, si
-      quieres, el volcado que se le carga (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>). Sin volcado, se crea vacía. No puede
+      quieres, el volcado que se le carga (<code>.sql</code>, <code>.gz</code> o <code>.zip</code>). Sin volcado, se crea vacía. No puede
       existir ya en esa versión. Si el proyecto no lleva base de datos (o aún no la tienes), marca <b>«Sin base de datos»</b>: el nombre y el
       volcado se apagan, el paso pasa a llamarse «Paso 3 de 4: sin BBDD» y el proyecto se clona y se carga sin ninguna base vinculada. Si es
       un WordPress o una tienda PrestaShop, el asistente avisa de que la web no funcionará hasta que tenga su base (te deja seguir): súbela
@@ -2725,7 +2753,7 @@
     No se muestran las bases del sistema (<code>mysql</code>, <code>phpmyadmin</code>…), que son las que MariaDB usa para funcionar.</p>
   <p>Un <b>volcado</b> o <b>copia <code>.sql</code></b> es un fichero de texto con todas las órdenes para volver a crear una base: sus tablas y sus
     filas. Es lo que te descargas de producción (la web de verdad, en internet) para tener la misma web en tu equipo. Puede venir
-    comprimido: <code>.sql.gz</code> (con gzip) o <code>.zip</code>.</p>
+    comprimido: <code>.gz</code> (con gzip, como <code>.sql.gz</code>) o <code>.zip</code>.</p>
   <p data-so="mac">En el Mac, las versiones se llaman <code>XAMPP-&lt;versión&gt;</code> (por ejemplo, <code>XAMPP-8.4.27</code>) donde en
     este capítulo pone <code>lampp-…</code>. Es lo mismo con otro nombre.</p>
   <div class="nota"><b>Los recuadros «En la terminal»</b>Debajo de cada cosa que hace algo tienes la orden del programa que lanza la
@@ -2755,7 +2783,7 @@
         cuánto.</span></li>
       <li data-x="88.4" data-y="23.5"><b>Ocupan las BBDD</b><span>Lo que ocupan las bases de todas las versiones y, en la barra, el espacio libre
         del disco. Cada versión se mide cuando está activa y en marcha. Si falta alguna por medir, pasa el ratón por encima y te dice cuántas.</span></li>
-      <li data-x="27.3" data-y="34.8"><b>Subir o actualizar una BBDD</b><span>Carga una copia <code>.sql</code>, <code>.sql.gz</code> o
+      <li data-x="27.3" data-y="34.8"><b>Subir o actualizar una BBDD</b><span>Carga una copia <code>.sql</code>, <code>.gz</code> o
         <code>.zip</code> en la versión activa. Antes borra todas las tablas de la base de destino (si quieres, <b>guardando una
         copia</b> en <code>~/nexum-backups</code>). Al lado dice en qué versión se carga.</span></li>
       <li data-x="21.9" data-y="40.9"><b>Elegir…</b><span>Elige el fichero. Si se llama como una base de datos de la versión activa
@@ -2811,6 +2839,8 @@
     <li><b>Cargar su proyecto</b> (la carpeta): «Cargar su proyecto (en lampp-…)». Pone su proyecto en <code>web.local</code> con esa
       versión de PHP. Ver <a href="#bbdd-proyecto">Cargar el proyecto de una base</a>.</li>
     <li><b>Borrar</b> (la papelera, solo en la versión activa): «Borrar la BBDD …». Ver <a href="#bbdd-borrar">Borrar una base de datos</a>.</li>
+    <li><b>Marcar para borrar</b> (en las demás versiones): «Marcar para borrar al cargar lampp-…». La base sale con la etiqueta roja
+      «Para borrar» y se borra cuando cargues esa versión. Ver <a href="#bbdd-borrar-luego">Borrar más adelante</a>.</li>
   </ul>
   <p>Vaciar la caché, copiar, descargar y cargar su proyecto funcionan en cualquier versión, también en las que no están activas.</p>
   <details class="terminal"><summary>En la terminal</summary>
@@ -2921,7 +2951,7 @@
     descargar el volcado desde phpMyAdmin o el panel del hosting de producción y cargarlo aquí. También sirve para volver a una copia
     de <code>~/nexum-backups</code> (la carpeta de copias de seguridad que hay en tu carpeta personal).</p>
   <ol class="pasos-tarea">
-    <li><b>Pulsa «Elegir…»</b> y busca el fichero (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>). Empieza en tu carpeta de
+    <li><b>Pulsa «Elegir…»</b> y busca el fichero (<code>.sql</code>, <code>.gz</code> o <code>.zip</code>). Empieza en tu carpeta de
       Descargas. Si la base que se llama como el fichero solo está en otra versión, te lo dice.</li>
     <li><b>Elige la base de destino</b> (o créala con <b>+</b>). Al elegirla, te propone su proyecto si lo sabe.</li>
     <li><b>Si quieres, elige su proyecto.</b> En un WordPress, su <code>wp-config.php</code> se rehace con la plantilla de este equipo para usar
@@ -2946,8 +2976,9 @@
   </ul>
   <div class="nota cuidado"><b>Si cancelas la carga</b>Te pregunta «¿Cancelar la carga?»: la base se queda a medias, con lo que se haya cargado
     hasta ese momento. Lo que tenía antes está en la copia de <code>~/nexum-backups</code>, si la guardaste.</div>
-  <div class="nota"><b>Por seguridad</b>La copia se carga con un usuario que solo puede tocar esa base. Una copia de varias bases a la vez (o
-    que intente crear usuarios) falla con «Access denied»: usa una copia de una sola base, como las de phpMyAdmin.</div>
+  <div class="nota"><b>Con todos los permisos</b>La copia se carga como <code>root</code>, el usuario de MariaDB con todos los permisos: lo que
+    traiga (otras bases, usuarios, vistas o rutinas) se carga tal cual, sin «Access denied». Solo los <code>SET GLOBAL</code> del volcado no
+    se ejecutan, porque cambiarían el MariaDB de todas tus webs.</div>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum importar-bd ~/Descargas/wp_panaderia_luna.sql.gz wp_panaderia_luna --copia --proyecto panaderia-luna</code>.
       <code>--copia</code> es la casilla «Guardar antes una copia»; <code>--proyecto</code>, el desplegable «Proyecto (opcional)»;
@@ -2956,25 +2987,17 @@
     <div data-so="linux"><ol>
       <li>Mira qué es el fichero por sus primeros bytes (gzip, zip o texto) y comprueba que la terminación cuadra. Si no es un
         <code>.gz</code> o <code>.zip</code> válido, para sin tocar nada.</li>
-      <li>Comprueba que MariaDB no tiene activos los motores FEDERATED, CONNECT, SPIDER u OQGRAPH (con ellos, una tabla del volcado podría
-        entrar en otras bases). Si los tiene, no carga.</li>
       <li>Si la base tiene tablas y has pedido la copia, la guarda antes, como en <a href="#bbdd-descargar">Descargar una copia</a>, en
         <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>. Si no se puede guardar, para.</li>
       <li>Vacía la base borrándola y creándola otra vez con su mismo juego de caracteres:
         <code>/opt/lampp/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`; CREATE DATABASE `wp_panaderia_luna` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"</code></li>
       <li>Deja que el servidor acepte filas grandes, hasta 1 GB:
         <code>/opt/lampp/bin/mysql -uroot -e "SET GLOBAL max_allowed_packet = 1073741824"</code></li>
-      <li>Crea un usuario de MariaDB solo para esa base, con una contraseña al azar:
-        <code>CREATE USER 'lvm_bd_wp_panaderia_luna'@'localhost' …; GRANT ALL PRIVILEGES ON `wp\_panaderia\_luna`.* TO 'lvm_bd_wp_panaderia_luna'@'localhost'</code>.
-        Así, un volcado manipulado no puede tocar otras bases ni crear usuarios.</li>
-      <li>Carga el volcado con ese usuario, descomprimiéndolo al vuelo y quitando los <code>DEFINER</code> (el usuario que creó cada vista o
-        disparador en producción, que aquí no existe):
-        <code>gzip -dc wp_panaderia_luna.sql.gz | sed -E 's/DEFINER=`[^`]*`@`[^`]*`//g' | MYSQL_PWD=&lt;su contraseña&gt; /opt/lampp/bin/mysql -ulvm_bd_wp_panaderia_luna --default-character-set=utf8mb4 --binary-mode --local-infile=0 --max-allowed-packet=1G wp_panaderia_luna</code>.
+      <li>Carga el volcado como <code>root</code>, descomprimiéndolo al vuelo, quitando los <code>DEFINER</code> (el usuario que creó cada
+        vista o disparador en producción, que aquí no existe) y cambiando los <code>SET GLOBAL</code> por <code>DO 0</code>, que no hace nada:
+        <code>gzip -dc wp_panaderia_luna.sql.gz | sed -E -e 's/^(\/\*![0-9]* *)?SET GLOBAL [^;*]*/\1DO 0 /' -e 's/DEFINER=`[^`]*`@`[^`]*`//g' | /opt/lampp/bin/mysql -uroot --default-character-set=utf8mb4 --binary-mode --local-infile=0 --max-allowed-packet=1G wp_panaderia_luna</code>.
         <code>--binary-mode</code> y <code>--local-infile=0</code> impiden que el volcado ejecute órdenes o lea ficheros de tu equipo. Si el
-        volcado empieza por <code>/*M!999999\- enable the sandbox mode */</code>, se quita esa línea (los MariaDB antiguos no la entienden), y
-        las vistas y rutinas «INVOKER» pasan a ejecutarse con el usuario de la base.</li>
-      <li>Al acabar, corta las conexiones de ese usuario, borra los eventos del volcado (tareas programadas dentro de la base) y bloquea el
-        usuario (<code>ACCOUNT LOCK</code>): ya no puede entrar, pero las vistas y disparadores siguen funcionando.</li>
+        volcado empieza por <code>/*M!999999\- enable the sandbox mode */</code>, se quita esa línea (los MariaDB antiguos no la entienden).</li>
       <li>Apunta la fecha de la carga en <code>~/.nexum/importaciones</code> (la «· importada» de la lista).</li>
       <li>Crea o deja al día el administrador de pruebas, <code>local@local.test</code> o el de Configuración (lo mismo que
         <code>nexum usuario-pruebas wp_panaderia_luna</code>) y pone la base en el correo de pruebas (lo mismo que
@@ -2988,10 +3011,10 @@
       <li>Los mismos pasos que en Linux, con el cliente <code>/Applications/XAMPP/xamppfiles/bin/mysql</code>.</li>
       <li>La copia de antes se llama <code>~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>.</li>
       <li>La carga:
-        <code>gzip -dc wp_panaderia_luna.sql.gz | sed -E 's/DEFINER=`[^`]*`@`[^`]*`//g' | MYSQL_PWD=&lt;su contraseña&gt; /Applications/XAMPP/xamppfiles/bin/mysql -ulvm_bd_wp_panaderia_luna --default-character-set=utf8mb4 --binary-mode --local-infile=0 --max-allowed-packet=1G wp_panaderia_luna</code></li>
+        <code>gzip -dc wp_panaderia_luna.sql.gz | sed -E -e 's/^(\/\*![0-9]* *)?SET GLOBAL [^;*]*/\1DO 0 /' -e 's/DEFINER=`[^`]*`@`[^`]*`//g' | /Applications/XAMPP/xamppfiles/bin/mysql -uroot --default-character-set=utf8mb4 --binary-mode --local-infile=0 --max-allowed-packet=1G wp_panaderia_luna</code></li>
       <li>Con <code>--proyecto</code>, la carpeta es <code>/Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code>.</li>
     </ol></div>
-    <p>Hecho a mano, sin las protecciones del programa, sería solo: <code data-so="linux">gzip -dc wp_panaderia_luna.sql.gz | /opt/lampp/bin/mysql -uroot wp_panaderia_luna</code><code data-so="mac">gzip -dc wp_panaderia_luna.sql.gz | /Applications/XAMPP/xamppfiles/bin/mysql -uroot wp_panaderia_luna</code>.</p>
+    <p>Hecho a mano, sin los arreglos del programa, sería solo: <code data-so="linux">gzip -dc wp_panaderia_luna.sql.gz | /opt/lampp/bin/mysql -uroot wp_panaderia_luna</code><code data-so="mac">gzip -dc wp_panaderia_luna.sql.gz | /Applications/XAMPP/xamppfiles/bin/mysql -uroot wp_panaderia_luna</code>.</p>
     <p>Para comprobarlo: <code data-so="linux">/opt/lampp/bin/mysql -uroot -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='wp_panaderia_luna'"</code><code data-so="mac">/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='wp_panaderia_luna'"</code>
       (cuántas tablas tiene ahora).</p>
   </details>
@@ -3002,7 +3025,8 @@
   <ol class="pasos-tarea">
     <li><b>Despliega la versión</b> donde está y pulsa el icono de <b>copiar</b> de la base.</li>
     <li><b>Elige la versión de destino</b> en «Copiar BBDD» («¿A qué versión de PHP copias …?»). Se copia con el mismo nombre. Si una ya la
-      tiene, lo dice: «ya la tiene: se sustituye». Pulsa <b>«Copiar»</b>.</li>
+      tiene, lo dice: «ya la tiene: se sustituye». Con muchas versiones, la lista va con su barra de desplazamiento y el
+      diálogo cabe en la pantalla. Pulsa <b>«Copiar»</b>.</li>
     <li><b>Confirma.</b> «¿Copiar … a lampp-…?» (botón «Copiar a lampp-…») o, si ya la tiene, «¿Sustituir … en lampp-…?» (botón
       «Sustituir en lampp-…», con la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada). Pide la contraseña de
       administrador.</li>
@@ -3210,6 +3234,29 @@
       <li>Quita su fecha de carga de <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum list-db</code> (ya no sale) y <code>ls -l ~/nexum-backups</code> (la copia, si la pediste).</p>
+  </details>
+
+  <h3 id="bbdd-borrar-luego">Borrar más adelante (bases de versiones que ya no usas)</h3>
+  <p>Las bases de versiones antiguas de un proyecto, en versiones de PHP que ya no cargas, solo se pueden borrar con su MariaDB en marcha.
+    Para no tener que cargar cada versión solo para eso, se marcan ahora y se borran la próxima vez que cargues esa versión.</p>
+  <ol class="pasos-tarea">
+    <li><b>Despliega la versión</b> (no hace falta que esté activa ni en marcha) y pulsa el botón de <b>marcar</b> de la base: «Marcar
+      para borrar al cargar lampp-…». Sale con la etiqueta roja «Para borrar» y la versión dice cuántas tiene («· 2 para borrar»).
+      Todavía no se borra nada.</li>
+    <li><b>Para desmarcarla</b>, pulsa el mismo botón: «Desmarcar: ya no se borra al cargar lampp-…».</li>
+    <li><b>Carga esa versión</b> cuando te venga bien. Con su MariaDB en marcha, la ventana pregunta «lampp-… tiene 2 BBDD marcadas para
+      borrar», con la lista y la casilla «Guardar antes una copia de cada una en ~/nexum-backups» (desmarcada).</li>
+    <li><b>Elige.</b> «Borrar las 2 BBDD» las borra; «Desmarcarlas» les quita la marca sin borrar nada; «Más tarde» las deja marcadas
+      (se pueden borrar después con la papelera de la versión, «Borrar las … marcadas»).</li>
+  </ol>
+  <p>Solo pregunta una vez cada vez que se carga la versión. Las que ya no estén al cargarla se desmarcan sin más. Borrar una marcada con su
+    papelera también le quita la marca.</p>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>Marcar y desmarcar: <code>nexum marcar-bd 7.4 wp_panaderia_luna_7_4</code> y <code>nexum marcar-bd 7.4 wp_panaderia_luna_7_4
+      --quitar</code>. Las marcas van en <code>~/.nexum/bbdd-para-borrar</code>, una línea <code>versión|base|fecha</code> por cada una.</p>
+    <p>Al cargar la versión (<code>nexum use 7.4</code>), si tiene alguna, lo dice: «Tiene 2 BBDD marcadas para borrar (…): nexum
+      borrar-bd-marcadas [--copia]». Esa orden borra, con <code>borrar-bd</code>, las marcadas de la versión activa, y con
+      <code>--copia</code> guarda antes una copia de cada una.</p>
   </details>
 
   <h3 id="bbdd-phpmyadmin">phpMyAdmin</h3>
@@ -5862,7 +5909,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
       <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
       <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
-      <li data-x="40" data-y="40.7"><b>Espacios de trabajo de VS Code</b><span>La carpeta donde guardas tus <code>.code-workspace</code>. Elegida, dice «cada proyecto se abre con su .code-workspace (si no tiene, se le crea uno)»; sin elegir, «los proyectos se abren como carpeta». No pide la contraseña.</span></li>
+      <li data-x="40" data-y="40.7"><b>Espacios de trabajo de VS Code</b><span>La carpeta donde guardas tus <code>.code-workspace</code>. Elegida, dice «cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no tiene, se le crea uno aquí)»; sin elegir, «los proyectos se abren como carpeta». No pide la contraseña.</span></li>
       <li data-x="87.5" data-y="40.7"><b>Elegir… o Cambiar…</b><span>Abre el selector de carpetas para elegirla. Con una elegida que existe, sale también «Abrir», que la abre en tu explorador de archivos.</span></li>
       <li data-x="94.3" data-y="40.7"><b>Quitar</b><span>Deja de usarla: los proyectos vuelven a abrirse en VS Code como carpeta. Sus <code>.code-workspace</code> no se tocan.</span></li>
       <li data-x="40" data-y="46.9"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
@@ -5878,9 +5925,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         <code>nexum copias-ficheros si</code> (o <code>no</code>).</li>
       <li>Las copias de bases de datos y de código no dependen de este ajuste: se guardan cuando marcas su casilla en cada diálogo.</li>
       <li><b>Espacios de trabajo de VS Code</b>: sin elegir de partida (cada proyecto se abre como carpeta). Con una carpeta elegida, el botón
-        «VS Code» de cada proyecto abre su espacio de trabajo: <i>carpeta-del-proyecto</i><code>.code-workspace</code> si lo hay en ella;
-        si no, otro que ya tenga la carpeta del proyecto entre sus carpetas (aunque se llame distinto); y si no tiene ninguno, le crea
-        <i>carpeta-del-proyecto</i><code>.code-workspace</code> con su carpeta («Espacio de trabajo nuevo: …»), que luego puedes cambiar
+        «VS Code» de cada proyecto abre su espacio de trabajo, que busca en esa carpeta y en sus subcarpetas de primer nivel (por si los
+        tienes clasificados por tipo de proyecto, como <code>wordpress/</code> o <code>tiendas/</code>): <i>carpeta-del-proyecto</i><code>.code-workspace</code>
+        si lo hay; si no, otro que ya tenga la carpeta del proyecto entre sus carpetas (aunque se llame distinto); y si no tiene ninguno, le crea
+        <i>carpeta-del-proyecto</i><code>.code-workspace</code> con su carpeta en la carpeta elegida («Espacio de trabajo nuevo: …»), que luego puedes cambiar
         en VS Code como cualquier otro. Así, un proyecto nuevo tiene el suyo la primera vez que lo abres. Se guarda en
         <code>~/.nexum/vscode-espacios</code>; es tuyo, de tu usuario, y cada uno en su equipo elige la suya.</li>
       <li>Lo demás no se configura: «Abrir» abre cada carpeta en tu explorador de archivos, y «Borrar…» y «Vaciar…» las vacían.</li>
@@ -6720,7 +6768,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <dt><code>crear-bd &lt;base&gt;</code></dt><dd>Crea una base vacía (con la codificación <code>utf8mb4_general_ci</code>, la que
       admite cualquier carácter, también emojis). Ejemplo: <code>nexum crear-bd wp_moda_verde</code>.</dd>
     <dt><code>importar-bd &lt;fichero&gt; &lt;base&gt; [--crear] [--copia] [--proyecto &lt;carpeta&gt;]</code></dt><dd>Carga un volcado
-      (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>) en una base. <code>--crear</code> la crea si no existe. Si ya existe,
+      (<code>.sql</code>, <code>.gz</code> o <code>.zip</code>) en una base. <code>--crear</code> la crea si no existe. Si ya existe,
       antes borra todas sus tablas: con <code>--copia</code> guarda antes una copia en <code>~/nexum-backups</code>. Con
       <code>--proyecto</code>, la deja como la base de esa carpeta: en un WordPress rehace su <code>wp-config.php</code>; en una tienda
       PrestaShop, su <code>parameters.php</code> pasa a usarla. Ejemplo: <code>nexum importar-bd ~/Descargas/clinica.sql.gz
@@ -6738,6 +6786,10 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <code>nexum vincular-bd wp_academia_flor 8.4 academia-flor</code>.</dd>
     <dt><code>borrar-bd &lt;base&gt; [--copia]</code></dt><dd>Borra una base de la versión activa. Con <code>--copia</code>, antes guarda
       una copia en <code>~/nexum-backups</code>. Ejemplo: <code>nexum borrar-bd wp_moda_verde --copia</code>.</dd>
+    <dt><code>marcar-bd &lt;versión&gt; &lt;base&gt; [--quitar]</code></dt><dd>La marca para borrarla al cargar esa versión (aunque no esté
+      en marcha); <code>--quitar</code> la desmarca. Ejemplo: <code>nexum marcar-bd 7.4 wp_moda_verde_7_4</code>.</dd>
+    <dt><code>borrar-bd-marcadas [--copia]</code></dt><dd>Borra las marcadas de la versión activa. Con <code>--copia</code>, antes guarda
+      una copia de cada una en <code>~/nexum-backups</code>.</dd>
     <dt><code>reparar-bd-sistema [--copia]</code></dt><dd>Pone al día las tablas propias de MariaDB (<code>mysql.*</code>, sus usuarios y
       permisos) cuando vienen de una MariaDB anterior y llenan su registro de errores. Las bases de los proyectos no se tocan. Con
       <code>--copia</code>, antes guarda la base <code>mysql</code>. Ejemplo: <code>nexum reparar-bd-sistema --copia</code>.</dd>

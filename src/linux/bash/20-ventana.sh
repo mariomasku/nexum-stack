@@ -201,6 +201,7 @@ function gui_open() {
 #   A|activa|en marcha (1/0)|/opt/lampp sin registrar (1/0)|binarios x86_64 (1/0)|acceso del menu (1/0)
 #   V|carpeta|php|apache|mariadb|proftpd|perl|phpmyadmin|tipo|bases de|motivo para no desinstalar
 #   D|carpeta|base de datos|fecha|tipo (i: importada con nexum, c: ultimo cambio de tablas)
+#   J|carpeta|base de datos     marcada para borrar al cargar esa version (marcar-bd)
 #   Z|procesos de LAMPP que sobran en memoria (de otras versiones)
 #   Y|version montada|bytes del registro de errores: sus tablas del sistema de MariaDB son antiguas
 #   R|carpeta|ok, parche o vulnerable|texto     PHP2Shell en cada version (php2shell_state)
@@ -273,6 +274,8 @@ function gui_data() {
     done
     # (las fechas de las BBDD de todas las versiones en un solo python3)
     [ ${#dates[@]} -gt 0 ] && db_dates --varias "${dates[@]}"
+    # (las marcadas para borrar al cargar su version)
+    gui_db_marks
     return 0
 }
 

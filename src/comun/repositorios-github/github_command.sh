@@ -152,7 +152,7 @@ for r, pre in shown:
 # git pull seguro de un clon: repo_pull <carpeta> <direccion SSH o nada> <fichero de servidores conocidos>.
 # Si no se puede (sin conexion, o choca con lo que no se ha subido o guardado), no se toca nada
 function repo_pull() {
-    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up
+    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up before
     branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
     origin=$(git -C "$dir" config --get remote.origin.url)
     # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
@@ -161,6 +161,7 @@ function repo_pull() {
         from=("$ssh_url" "${up#refs/heads/}")
         [ -n "${from[1]}" ] || from[1]=$branch
     fi
+    before=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
     # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
     if ! GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
             GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
@@ -171,6 +172,62 @@ function repo_pull() {
         echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
         return 1
     fi
+    repo_pull_summary "$dir" "$before"
+}
+
+# Lo que ha traido un git pull (de <commit de antes> a HEAD), para el registro de la tarea: la lista de
+# ficheros nuevos (+), modificados (~) y borrados (-), las 200 primeras de cada uno, y un recuadro con
+# las cuentas. repo_pull_summary <carpeta> <commit de antes>
+function repo_pull_summary() {
+    local dir=$1 before=$2 after changes total
+    after=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
+    if [ -z "$before" ] || [ -z "$after" ]; then
+        return 0
+    fi
+    if [ "$before" == "$after" ]; then
+        echo "git pull: ya estaba al día, no ha traído ningún fichero"
+        return 0
+    fi
+    changes=$(git -C "$dir" -c core.quotePath=false diff --no-renames --name-status "$before" "$after" 2> /dev/null)
+    total=$(git -C "$dir" ls-files 2> /dev/null | wc -l)
+    echo "git pull: de ${before:0:9} a ${after:0:9} ($(git -C "$dir" rev-list --count "$before..$after" 2> /dev/null) commits)"
+    awk -F'\t' '
+        { k = substr($1, 1, 1); g = (k == "A") ? "a" : (k == "D") ? "d" : "m"; n[g]++
+          if (n[g] <= 200) list[g] = list[g] "  " ((g == "a") ? "+" : (g == "d") ? "-" : "~") " " $2 "\n" }
+        END {
+            t["a"] = "Nuevos"; t["m"] = "Modificados"; t["d"] = "Borrados"
+            for (i = 1; i <= 3; i++) {
+                g = (i == 1) ? "a" : (i == 2) ? "m" : "d"
+                if (n[g] > 0) {
+                    printf "%s con el pull: %d %s\n%s", t[g], n[g], (n[g] == 1) ? "fichero" : "ficheros", list[g]
+                    if (n[g] > 200) printf "  ... y %d más\n", n[g] - 200
+                }
+            }
+        }' <<< "$changes"
+    summary_box "git pull" "Ficheros del repositorio (total)|$total" \
+        "Nuevos|$(grep -c '^A' <<< "$changes")" "Modificados|$(grep -c '^[^AD]' <<< "$changes")" \
+        "Sin tocar|$(( total - $(grep -c '^[^D]' <<< "$changes") ))" "Ya no están (borrados)|$(grep -c '^D' <<< "$changes")"
+}
+
+# Un recuadro con un titulo y sus filas (texto|numero), para el registro de una tarea (que va en letra de
+# ancho fijo): summary_box <titulo> <texto|numero>...
+function summary_box() {
+    local title=$1 row text n width=${#1} line i
+    shift
+    for row in "$@"; do
+        text=${row%|*} n=${row##*|}
+        (( ${#text} + 2 + ${#n} > width )) && width=$(( ${#text} + 2 + ${#n} ))
+    done
+    line=""
+    for (( i = 0; i < width + 2; i++ )); do line+="─"; done
+    echo "┌$line┐"
+    printf '│ %s%*s │\n' "$title" $(( width - ${#title} )) ""
+    echo "├$line┤"
+    for row in "$@"; do
+        text=${row%|*} n=${row##*|}
+        printf '│ %s%*s%s │\n' "$text" $(( width - ${#text} - ${#n} )) "" "$n"
+    done
+    echo "└$line┘"
 }
 
 # repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
@@ -255,7 +312,13 @@ target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
 simulate = simulate == "1"
 SKIP = {".git", "__MACOSX", ".DS_Store"}
 sys.stdout.reconfigure(errors="replace", line_buffering=True)
-counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0, "old": 0}
+# copied: nuevos + modificados (para el avance); removed: lo quitado (una carpeta cuenta 1) y gone, sus ficheros
+counts = {"copied": 0, "new": 0, "changed": 0, "same": 0, "removed": 0, "gone": 0, "kept": 0, "skipped": 0,
+          "old": 0, "packed": 0, "packed_dirs": 0, "packed_bytes": 0}
+# (las rutas de cada grupo, para el registro: se ensenan las primeras LIST_MAX de cada uno)
+lists = {"new": [], "changed": [], "gone": [], "kept": []}
+listed = {"new": 0, "changed": 0, "gone": 0, "kept": 0}
+LIST_MAX = 200
 errors, seen = [], set()
 
 
@@ -303,8 +366,11 @@ def extract_zip(path, root):
             if out is None or kind not in (0, stat.S_IFREG, stat.S_IFDIR):
                 counts["skipped"] += 1
             elif m.is_dir():
+                counts["packed_dirs"] += 1
                 os.makedirs(out, mode=0o755, exist_ok=True)
             else:
+                counts["packed"] += 1
+                counts["packed_bytes"] += m.file_size
                 with z.open(m) as data:
                     write_member(out, data, (m.external_attr >> 16) & 0o111)
 
@@ -316,8 +382,11 @@ def extract_tar(path, root):
             if out is None or not (m.isreg() or m.isdir()):
                 counts["skipped"] += 1
             elif m.isdir():
+                counts["packed_dirs"] += 1
                 os.makedirs(out, mode=0o755, exist_ok=True)
             else:
+                counts["packed"] += 1
+                counts["packed_bytes"] += m.size
                 write_member(out, t.extractfile(m), m.mode & 0o111)
 
 
@@ -360,6 +429,20 @@ def save_old(path, rel):
         else:
             shutil.copy2(path, dest, follow_symlinks=False)
             os.unlink(path)
+
+
+def note(group, rel, count=1):
+    counts[group] += count
+    listed[group] += 1
+    if len(lists[group]) < LIST_MAX:
+        lists[group].append(rel)
+
+
+def files_in(path):
+    """Los ficheros de lo que se quita (una carpeta: los de dentro; un fichero o un enlace: 1)."""
+    if not is_real_dir(path):
+        return 1
+    return sum(len(files) for _r, _d, files in os.walk(path)) or 0
 
 
 def tick():
@@ -405,6 +488,7 @@ def copy_file(e, out, sub):
         counts["same"] += 1
         return
     counts["copied"] += 1
+    note("changed" if exists else "new", sub)
     if simulate:
         return
     # (primero la copia nueva y luego se aparta la de antes: si no cabe, el proyecto sigue como estaba)
@@ -434,12 +518,75 @@ def remove_rest(dst, rel):
                     remove_rest(e.path, sub)
                 else:
                     counts["removed"] += 1
+                    n = files_in(e.path)
+                    note("gone", sub + ("/ (%s)" % plural(n) if is_real_dir(e.path) else ""), n)
                     save_old(e.path, sub)
             elif is_real_dir(e.path):
                 remove_rest(e.path, sub)
             tick()
         except OSError as exc:
             errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def count_rest(dst, rel):
+    """Al fusionar: lo que hay en la carpeta y no viene en el codigo (se deja como esta)."""
+    try:
+        found = sorted(os.scandir(dst), key=lambda x: x.name)
+    except OSError:
+        return
+    for e in found:
+        sub = os.path.join(rel, e.name)
+        if e.name in SKIP or e.name.startswith(".lvm-parte-"):
+            continue
+        if sub not in seen:
+            note("kept", sub, files_in(e.path))
+        elif is_real_dir(e.path):
+            count_rest(e.path, sub)
+
+
+def size_text(n):
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return ("%d %s" % (n, unit)) if unit == "B" else ("%.1f %s" % (n, unit)).replace(".", ",")
+        n /= 1024.0
+
+
+def num(n):
+    return "{:,}".format(n).replace(",", ".")
+
+
+def plural(n):
+    return "%s %s" % (num(n), "fichero" if n == 1 else "ficheros")
+
+
+def show_list(title, group, mark):
+    items = lists[group]
+    if not items:
+        return
+    print("%s: %s" % (title, plural(counts[group])))
+    for rel in items:
+        print("  %s %s" % (mark, rel))
+    rest = listed[group] - len(items)
+    if rest > 0:
+        print("  ... y %s más" % num(rest))
+
+
+def summary():
+    """El recuadro con las cuentas, para el registro de la tarea (que va en letra de ancho fijo)."""
+    total = counts["new"] + counts["changed"] + counts["same"]
+    rows = [("Ficheros del código (total)", total), ("Nuevos", counts["new"]), ("Modificados", counts["changed"]),
+            ("Sin tocar (iguales)", counts["same"]),
+            ("Ya no están (quitados)" if mode == "sobrescribir" else "Ya no están", counts["gone"])]
+    if mode == "fusionar":
+        rows.append(("No vienen y se dejan", counts["kept"]))
+    title = "Código de producción" + (" (simulación)" if simulate else "")
+    width = max(len(title), max(len(t) + 2 + len(num(n)) for t, n in rows))
+    print("\u250c" + "\u2500" * (width + 2) + "\u2510")
+    print("\u2502 " + title.ljust(width) + " \u2502")
+    print("\u251c" + "\u2500" * (width + 2) + "\u2524")
+    for t, n in rows:
+        print("\u2502 " + t + " " * (width - len(t) - len(num(n))) + num(n) + " \u2502")
+    print("\u2514" + "\u2500" * (width + 2) + "\u2518")
 
 
 def main():
@@ -466,17 +613,31 @@ def main():
                     fail("%s no es un .zip, un .tar.gz ni una carpeta" % os.path.basename(source))
             except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError) as exc:
                 fail("No se ha podido abrir %s: %s" % (os.path.basename(source), exc))
+            print("Abierto: %s y %s carpetas (%s sin comprimir)"
+                  % (plural(counts["packed"]), num(counts["packed_dirs"]), size_text(counts["packed_bytes"])))
+        else:
+            print("Se copia de la carpeta %s" % source)
         root = inner_root(root)
         if not any(True for _ in entries(root)):
             fail("No trae ningun fichero: no se ha tocado nada")
+        print("Comparando con %s..." % target)
         sync(root, target, "")
         if mode == "sobrescribir":
             remove_rest(target, "")
+        else:
+            count_rest(target, "")
     finally:
         if work:
             shutil.rmtree(work, ignore_errors=True)
-    print("%s%d copiados, %d iguales (no se tocan), %d quitados"
-          % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
+    if simulate:
+        print("[simulacion] no se cambia nada: esto es lo que se haría")
+    show_list("Nuevos" + (" (se copiarían)" if simulate else ""), "new", "+")
+    show_list("Modificados" + (" (se sustituirían)" if simulate else ""), "changed", "~")
+    show_list("Ya no están" + (" (se quitarían)" if simulate else ""), "gone", "-")
+    if mode == "fusionar" and counts["kept"]:
+        print("En la carpeta y no en el código: %s (al fusionar se dejan; con Sobrescribir se quitarían)"
+              % plural(counts["kept"]))
+    summary()
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
     if backup and os.path.isdir(backup):
@@ -528,14 +689,17 @@ function project_config_local() {
 }
 
 # actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
-#                     [--bd <fichero>] [--base <base>] [--copia]
+#                     [--bd <fichero>] [--base <base>] [--crear-base] [--copia]
 # El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
-# protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
+# de importar-bd, como root) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
 # comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
 # que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar). Con --copia, lo
-# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no
+# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no.
+# --crear-base (para un proyecto que no tiene BBDD): si la de --base no existe, se crea (vacia, o con el
+# volcado de --bd) y queda como la del proyecto; vale tambien sin codigo ni volcado
 function project_update() {
     local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies="" full ssh_url="" known load_db
+    local create=0
     local backup=()
     shift
     while [ $# -gt 0 ]; do
@@ -545,13 +709,15 @@ function project_update() {
             --pull) pull=1 ;;
             --bd) file=$2; shift ;;
             --base) db=$2; shift ;;
+            --crear-base) create=1 ;;
             --copia) backup=(--copia) ;;
             *) folder="" ;;
         esac
         shift
     done
-    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
-        echo "Uso: nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
+    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ] && [ $create -eq 0 ]; } \
+            || [[ "$mode" != fusionar && "$mode" != sobrescribir ]] || { [ $create -eq 1 ] && [ -z "$db" ]; }; then
+        echo "Uso: nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--crear-base] [--copia]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -563,6 +729,8 @@ function project_update() {
     [ -z "$source" ] || [ -r "$source" ] || { echo "No se puede leer $source"; return 1; }
     if [ -n "$file" ]; then
         [ -f "$file" ] && [ -r "$file" ] || { echo "No se puede leer el fichero $file"; return 1; }
+    fi
+    if [ -n "$file" ] || [ $create -eq 1 ]; then
         db_connect || return $?
     fi
     { [ -z "$file" ] && [ -z "$db" ]; } || db_valid_name "$db" || return 1
@@ -578,6 +746,7 @@ function project_update() {
     local steps=()
     [ -n "$source" ] && [ "$pull" -eq 1 ] && steps+=("Traer los cambios con git pull")
     [ -n "$source" ] && steps+=("Copiar el código de producción")
+    [ -z "$file" ] && [ $create -eq 1 ] && steps+=("Crear la BBDD $db")
     [ -n "$file" ] && steps+=("Cargar la BBDD $db")
     steps+=("Volver a cargar el proyecto" "Comprobar su configuración")
     task_plan "Actualizando $folder" "${steps[@]}"
@@ -613,9 +782,21 @@ function project_update() {
         fi
         htdocs_close_world "$dir"
     fi
+    if [ -z "$file" ] && [ $create -eq 1 ]; then
+        task_step
+        echo "== BBDD del proyecto"
+        if db_exists "$db"; then
+            echo "Ya hay una base de datos $db: no se crea, se asocia al proyecto"
+        else
+            echo "$folder no tenía BBDD: se crea $db, vacía"
+            create_database "$db" || return 1
+        fi
+        import_project "$db" "$folder" || return 1
+    fi
     if [ -n "$file" ]; then
         task_step
         echo "== BBDD de produccion"
+        [ $create -eq 1 ] && ! db_exists "$db" && echo "$folder no tenía BBDD: se crea $db con el volcado"
         import_database "$file" "$db" --crear --proyecto "$folder" "${backup[@]}" || return 1
     fi
     task_step
@@ -640,7 +821,7 @@ function git_url_ok() {
 
 # montar-proyecto <url de git> <carpeta> <version> <base> [volcado]: proyecto nuevo desde un
 # repositorio (GitHub u otro). Lo clona en htdocs, lo carga en esa version de PHP, crea su BBDD y,
-# si se indica, carga en ella el volcado (con la carga protegida de importar-bd). El clon va con tu
+# si se indica, carga en ella el volcado (con importar-bd, como root). El clon va con tu
 # usuario (sin sudo), sin submodulos ni ganchos y solo por https o ssh; sin preguntas: un
 # repositorio privado por https falla (se usa la direccion SSH con tu clave)
 # Clona un repositorio con tu usuario: repo_clone <direccion> <carpeta> <known_hosts de mas>. Sin

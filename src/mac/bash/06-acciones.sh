@@ -502,5 +502,7 @@ function use_version() {
     mailpit_sync
 
     echo "Usando XAMPP-$version (PHP $(php_version "$dir"))"
+    # (las BBDD que se marcaron para borrar al cargarla)
+    db_marks_notice "$version"
 }
 

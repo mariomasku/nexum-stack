@@ -134,10 +134,9 @@ struct AppearanceCard: View {
             }
             block("Tamaño y aspecto", "Más pequeña para que quepa más, y el aspecto de cristal") {
                 Tile("Tamaño de la ventana", "Letras, márgenes y botones. 100 %: el de siempre") {
-                    Picker("", selection: Binding(get: { model.look.zoom }, set: { model.look.zoom = $0 })) {
-                        ForEach(LOOK_ZOOMS, id: \.self) { Text("\($0) %").tag($0) }
-                    }
-                    .labelsHidden().frame(width: 90)
+                    SearchPicker(selection: Binding(get: { String(model.look.zoom) },
+                                                    set: { v in if let z = Int(v) { model.look.zoom = z } }),
+                                 items: LOOK_ZOOMS.map { (String($0), "\($0) %") }, width: 90)
                 }
                 Tile("Cristal", "Translúcida, con el escritorio desenfocado detrás. Lo pinta macOS con la tarjeta gráfica: la ventana casi no gasta más") {
                     Toggle("", isOn: Binding(get: { model.look.cristal }, set: { model.look.cristal = $0 }))

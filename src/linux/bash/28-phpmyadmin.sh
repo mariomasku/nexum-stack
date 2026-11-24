@@ -273,7 +273,7 @@ if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
         gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual|nginx-usar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;
         # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd|borrar-bd-marcadas|marcar-bd) ;;
         # (el administrador de pruebas: solo un ajuste de ~/.nexum)
         admin-pruebas) ;;
         # (Nginx: con tu usuario; instalarlo, solo si en Linux falta algun paquete para compilarlo)
@@ -382,6 +382,8 @@ case "$1" in
     importar-bd) import_database "$2" "$3" "${@:4}" ;;
     crear-bd) create_database "$2" ;;
     borrar-bd) drop_database "$2" "$3" ;;
+    marcar-bd) db_mark_drop "$2" "$3" "$4" ;;
+    borrar-bd-marcadas) drop_marked_databases "$2" ;;
     exportar-bd|descargar-bd) export_database "$2" "$3" "$4" ;;
     copiar-bd) shift; copy_database "$@" ;;
     gui-bd-info) gui_db_info "$2" ;;

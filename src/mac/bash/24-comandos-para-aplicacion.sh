@@ -83,6 +83,8 @@ function gui_data() {
     done
     # (las fechas de las BBDD de todas las versiones en un solo python3)
     [ ${#dates[@]} -gt 0 ] && db_dates --varias "${dates[@]}"
+    # (las marcadas para borrar al cargar su version)
+    gui_db_marks
     return 0
 }
 

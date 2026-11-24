@@ -163,7 +163,7 @@ struct NewProjectWizard: View {
             TextField("wp_proyecto", text: $model.npDb)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .disabled(model.npNoDb)
-            Text("Volcado que se sube a la BBDD (.sql, .sql.gz o .zip):")
+            Text("Volcado que se sube a la BBDD (.sql, .gz o .zip):")
                 .foregroundColor(model.npNoDb ? .secondary : .primary)
             HStack {
                 Button("Elegir…") { model.npPickDump() }
@@ -179,7 +179,7 @@ struct NewProjectWizard: View {
                 }
             }
             .disabled(model.npNoDb)
-            Text("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga con la carga protegida (con el usuario de la BBDD y sin DEFINER).")
+            Text("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga como root (con todos los permisos) y sin DEFINER.")
                 .font(.caption).foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if model.npNoDb {

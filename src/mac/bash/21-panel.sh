@@ -158,7 +158,7 @@ function panel_databases() {
         [ -n "$active" ] && where="XAMPP-$(version_name "$active")"
         choice=$(ui_menu "Bases de datos. Cargar, crear y borrar se hace en la version activa ($where)." "${choice:-ver}" \
             "ver" "Ver las bases de datos de cada version" \
-            "cargar" "Subir o actualizar una base de datos (fichero .sql, .sql.gz o .zip)" \
+            "cargar" "Subir o actualizar una base de datos (fichero .sql, .gz o .zip)" \
             "crear" "Crear una base de datos" \
             "borrar" "Borrar una base de datos") || return 0
         case "$choice" in

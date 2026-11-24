@@ -87,6 +87,41 @@ func dialogOptions(_ views: [NSView], spacing: CGFloat = 10) -> NSStackView {
     return stack
 }
 
+/// Contenedor con el origen arriba: dentro de un NSScrollView, lo primero que se ve es el principio
+final class FlippedView: NSView {
+    override var isFlipped: Bool { return true }
+}
+
+/// Alto que puede ocupar una lista dentro de un aviso: lo que deja la pantalla (quitando el título,
+/// los textos y los botones del aviso), entre 160 y maxHeight
+func dialogListHeight(_ maxHeight: CGFloat = 360) -> CGFloat {
+    let screen: CGFloat = (NSScreen.main?.visibleFrame.height) ?? 800
+    let room: CGFloat = screen - 340
+    return Swift.min(maxHeight, Swift.max(160, room))
+}
+
+/// La vista tal cual si cabe en maxHeight; si no, dentro de un recuadro con scroll de ese alto (sin
+/// que el aviso crezca hasta salirse de la pantalla)
+func dialogScroll(_ view: NSView, maxHeight: CGFloat = dialogListHeight()) -> NSView {
+    let size: NSSize = view.fittingSize
+    if size.height <= maxHeight { return view }
+    let width: CGFloat = size.width
+    let doc = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: size.height))
+    view.translatesAutoresizingMaskIntoConstraints = true
+    view.frame = NSRect(x: 0, y: 0, width: width, height: size.height)
+    doc.addSubview(view)
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width + 18, height: maxHeight))
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = false
+    scroll.drawsBackground = false
+    scroll.borderType = .noBorder
+    scroll.documentView = doc
+    scroll.translatesAutoresizingMaskIntoConstraints = false
+    scroll.widthAnchor.constraint(equalToConstant: width + 18).isActive = true
+    scroll.heightAnchor.constraint(equalToConstant: maxHeight).isActive = true
+    return scroll
+}
+
 /// Botones de opción que van en columnas distintas y aun así se excluyen entre sí
 final class RadioGroup: NSObject {
     var buttons: [NSButton] = []

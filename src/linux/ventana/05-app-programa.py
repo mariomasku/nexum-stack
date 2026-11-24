@@ -425,7 +425,7 @@ class AppPrograma:
         return False
 
     def on_data(self, rc, out):
-        d = {"installs": [], "dbs": {}, "dbdate": {}, "active": "", "running": False,
+        d = {"installs": [], "dbs": {}, "dbdate": {}, "marks": set(), "active": "", "running": False,
              "unregistered": False, "native": True, "launcher": True,
              "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
@@ -449,6 +449,9 @@ class AppPrograma:
                 d["dbs"].setdefault(f[1], []).append(f[2])
                 if len(f) >= 5 and f[3].isdigit():
                     d["dbdate"][(f[1], f[2])] = (int(f[3]), f[4])
+            elif f[0] == "J" and len(f) >= 3:
+                # (marcada para borrar al cargar su versión: marcar-bd)
+                d["marks"].add((f[1], f[2]))
             elif f[0] == "H" and len(f) >= 3:
                 d["vhosts"], d["hosts"] = f[1], f[2]
             elif f[0] == "Z" and len(f) >= 2:
@@ -504,6 +507,8 @@ class AppPrograma:
         self.build_tools()
         if self.branches is not None:
             self.build_install()
+        # (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
+        self.nv_db_marks_check()
         return False
 
     def on_branches(self, rc, out):

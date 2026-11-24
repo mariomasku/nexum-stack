@@ -1131,6 +1131,36 @@ QUE HACE
 
 VERSIONES
 
+1.57.48 (24 nov 2026)
+- Bases de datos: los volcados se cargan como root, con todos los
+  permisos (antes, con un usuario que solo podía tocar esa base). Un
+  volcado que toca otras bases, crea usuarios o trae SET GLOBAL ya no
+  falla con «Access denied». Solo los SET GLOBAL no se ejecutan: se
+  cambian por DO 0, para no tocar el MariaDB de todas tus webs.
+- Bases de datos: se pueden cargar ficheros .gz con cualquier nombre, no
+  solo los .sql comprimidos; los selectores de fichero ya los enseñan.
+- Actualizar proyecto: si el proyecto no tiene base de datos (o la suya
+  no existe en la versión activa), lo dice y deja crearla desde ahí:
+  vacía o con el volcado que elijas, y queda como la suya
+  (nexum actualizar-proyecto <carpeta> --crear-base --base <base>).
+- Registro de Actualizar proyecto: lo que hace la extracción del código (ficheros y carpetas del paquete, su tamaño), la
+  lista de ficheros nuevos, modificados y que ya no están, y un recuadro
+  con las cuentas: ficheros en total, nuevos, modificados, sin tocar y
+  quitados. El git pull dice también lo que ha traído, con su recuadro.
+- VS Code: el espacio de trabajo de cada proyecto se busca también en
+  las subcarpetas de la carpeta elegida (por si los tienes clasificados
+  por tipo de proyecto); los nuevos se siguen creando en la elegida.
+- Al cargar un volcado que falla a medias ya no sale un error de Python
+  (BrokenPipeError) en el registro.
+- Bases de datos: las de versiones que no están cargadas se pueden
+  marcar para borrar; al cargar esa versión, la ventana dice cuántas
+  tiene marcadas y pregunta si se borran (nexum marcar-bd y
+  nexum borrar-bd-marcadas).
+- Desplegables: se abren justo debajo del botón (o encima, si no hay
+  sitio) y con el alto que cabe; ya no se cortan ni salen lejos.
+- Copiar una BBDD a otra versión: con muchas versiones, la lista va
+  con barra de desplazamiento y el diálogo cabe en la pantalla.
+
 1.57.46 (23 nov 2026)
 - Tiendas en Docker, en vivo: como con WordPress, al montarla en Docker
   puedes elegir «En vivo: la misma que web.local (sin copias)», que es

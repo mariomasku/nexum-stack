@@ -670,18 +670,45 @@ func vscodeWsFolders(_ path: String) -> [String] {
     }
 }
 
-/// El .code-workspace de un proyecto en la carpeta de los espacios de trabajo: <carpeta>.code-workspace si
-/// existe; si no, otro que ya tenga la carpeta del proyecto; si no hay ninguno, se crea <carpeta>.code-workspace
-/// con ella (con create). nil sin carpeta elegida o si no se ha podido crear
+/// Los .code-workspace de la carpeta elegida y de sus subcarpetas de primer nivel (por si se tienen
+/// clasificados por tipo de proyecto: wordpress/, tiendas/...): primero los de la carpeta, luego cada
+/// subcarpeta por orden. Las subcarpetas ocultas no cuentan
+func vscodeWsCandidates(_ dir: String) -> [String] {
+    let fm = FileManager.default
+    var out: [String] = [], subdirs: [String] = []
+    for n in ((try? fm.contentsOfDirectory(atPath: dir)) ?? []).sorted() {
+        let p = dir + "/" + n
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: p, isDirectory: &isDir) else { continue }
+        if isDir.boolValue {
+            if !n.hasPrefix(".") { subdirs.append(p) }
+        } else if n.hasSuffix(".code-workspace") {
+            out.append(p)
+        }
+    }
+    for d in subdirs {
+        for n in ((try? fm.contentsOfDirectory(atPath: d)) ?? []).sorted() where n.hasSuffix(".code-workspace") {
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: d + "/" + n, isDirectory: &isDir), !isDir.boolValue { out.append(d + "/" + n) }
+        }
+    }
+    return out
+}
+
+/// El .code-workspace de un proyecto en la carpeta de los espacios de trabajo o en una de sus subcarpetas de
+/// primer nivel: <carpeta>.code-workspace si existe; si no, otro que ya tenga la carpeta del proyecto; si no hay
+/// ninguno, se crea <carpeta>.code-workspace con ella en la carpeta elegida (con create). nil sin carpeta
+/// elegida o si no se ha podido crear
 func vscodeWorkspace(_ folder: String, create: Bool = true) -> String? {
     let dir = vscodeWsDir()
     var isDir: ObjCBool = false
     guard !dir.isEmpty, FileManager.default.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue else { return nil }
     let real = URL(fileURLWithPath: folder).resolvingSymlinksInPath().path
-    let path = dir + "/" + (real as NSString).lastPathComponent + ".code-workspace"
-    if FileManager.default.fileExists(atPath: path) { return path }
-    let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).filter { $0.hasSuffix(".code-workspace") }.sorted()
-    for n in names where vscodeWsFolders(dir + "/" + n).contains(real) { return dir + "/" + n }
+    let name = (real as NSString).lastPathComponent + ".code-workspace"
+    let path = dir + "/" + name
+    let found = vscodeWsCandidates(dir)
+    if let p = found.first(where: { ($0 as NSString).lastPathComponent == name }) { return p }
+    if let p = found.first(where: { vscodeWsFolders($0).contains(real) }) { return p }
     if !create { return nil }
     if SIMULATE { return path }
     let o: [String: Any] = ["folders": [["path": real]], "settings": [String: Any]()]

@@ -35,25 +35,46 @@ struct UpdateProjectSheet: View {
 
     var body: some View {
         let dbOk = validDbName(model.upDb.trimmingCharacters(in: .whitespaces))
-        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk)
+        let making = model.upNoDb && model.upCreateDb
+        let hasSql = !model.upSql.isEmpty, hasCode = !model.upCode.isEmpty
+        let can: Bool = (hasSql || hasCode || making) && ((!hasSql && !making) || dbOk)
+        // (los textos, ya calculados: en la vista, sin ternarias que el compilador tenga que resolver)
+        var warn: String = "Este proyecto no tiene base de datos"
+        if !model.upDbGone.isEmpty { warn = "La BBDD de este proyecto, " + model.upDbGone + ", no existe en la versión activa" }
+        var dbLine: String = hasSql ? "Se carga en la BBDD" : "Se sigue usando la BBDD"
+        if making { dbLine = hasSql ? "Se crea la BBDD y se carga en ella" : "Se crea la BBDD, vacía" }
+        let goTitle: String = making && !hasSql && !hasCode ? "Crear la BBDD…" : "Actualizar…"
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Actualizar proyecto").font(.headline)
                 Text(model.upFolder).font(.caption).foregroundColor(.secondary)
             }
-            zone("Base de datos de producción", ".sql, .sql.gz o .zip", symbol: "cylinder.split.1x2", path: model.upSql, error: model.upSqlError,
+            // Sin BBDD: se dice y se puede crear desde aquí (vacía, o con el volcado que se elija debajo)
+            if model.upNoDb {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text(verbatim: warn)
+                    }
+                    .foregroundColor(.orange).font(.system(size: 13, weight: .semibold))
+                    Toggle("Crear la BBDD para este proyecto", isOn: $model.upCreateDb)
+                    Text("Se crea vacía o, si eliges un volcado debajo, con él, y queda como la suya (su configuración pasa a usarla).")
+                        .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            zone("Base de datos de producción", ".sql, .gz o .zip", symbol: "cylinder.split.1x2", path: model.upSql, error: model.upSqlError,
                  over: $overSql, code: false, folders: false)
             // (sin fichero de BBDD no se toca: se sigue usando la misma)
-            if model.upDbKnown || !model.upSql.isEmpty {
+            if model.upDbKnown || hasSql || making {
                 HStack(spacing: 8) {
-                    Text(model.upSql.isEmpty ? "Se sigue usando la BBDD" : "Se carga en la BBDD").foregroundColor(.secondary)
+                    Text(verbatim: dbLine).foregroundColor(.secondary)
                     // (su nombre, como texto; solo si el proyecto no tiene ninguna hay que escribirlo)
                     if model.upDbKnown {
                         Text(model.upDb).fontWeight(.bold).foregroundColor(.blue)
                     } else {
                         TextField("", text: $model.upDb).frame(width: 220)
                     }
-                    if !model.upSql.isEmpty {
+                    if hasSql && !making {
                         Text("(al confirmar, puedes guardar antes una copia de la actual)").font(.caption).foregroundColor(.secondary)
                     }
                 }
@@ -75,7 +96,7 @@ struct UpdateProjectSheet: View {
             HStack {
                 Spacer()
                 Button("Cancelar") { model.upShown = false }.buttonStyle(OutlineButton(big: true))
-                Button("Actualizar…") { model.upAsk() }
+                Button(goTitle) { model.upAsk() }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
                     .disabled(!can).busyGuard(model.busy)
             }

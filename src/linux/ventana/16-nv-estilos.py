@@ -130,6 +130,7 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-mosaico-titulo { font-weight: 600; }
 .nv-etiqueta { font-size: 0.78em; padding: 1px 8px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.07); color: alpha(@theme_fg_color, 0.75); }
 .nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
+.nv-etiqueta-roja { background-color: alpha(#e01b24, 0.16); color: #e5484d; }
 .nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
 .nv-chip-docker { background-color: alpha(#1d63ed, 0.16); color: #4c8dff; }
 .nv-selectores { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;

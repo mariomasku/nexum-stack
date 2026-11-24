@@ -189,13 +189,15 @@ struct SoftSunken: View {
 struct SmallTag: View {
     let text: String
     var blue = false
+    var red = false
     var body: some View {
-        Text(text)
+        let tint: Color = red ? RED : (blue ? ACCENT : Color.secondary)
+        return Text(text)
             .font(.system(size: 10.5, weight: .semibold))
-            .foregroundColor(blue ? ACCENT : Color.secondary)
+            .foregroundColor(tint)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .background(Capsule().fill((blue ? ACCENT : Color.secondary).opacity(0.14)))
+            .background(Capsule().fill(tint.opacity(0.14)))
     }
 }
 
@@ -307,6 +309,54 @@ struct SearchField: View {
 /// items: (valor, texto)
 let COMBO_SEARCH_MIN = 8
 
+/// Desplegable que se abre debajo del botón, como una lista (el de macOS pone la opción elegida encima del
+/// botón: con ella abajo, el menú sube y se sale por arriba, o aparece donde no se espera). Sirve igual
+/// en los avisos que en la ventana
+final class DropDownButton: NSPopUpButton {
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled, let menu = self.menu else { return }
+        menu.minimumWidth = bounds.width
+        let y: CGFloat = isFlipped ? bounds.height + 3 : -3
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: y), in: self)
+    }
+}
+
+/// DropDownButton en SwiftUI: items (valor, texto), como SearchPicker
+struct MenuPicker: NSViewRepresentable {
+    @Binding var selection: String
+    let items: [(String, String)]
+    var width: CGFloat = 230
+
+    final class Coordinator: NSObject {
+        var parent: MenuPicker
+        init(_ parent: MenuPicker) { self.parent = parent }
+        @objc func picked(_ sender: NSPopUpButton) {
+            let i: Int = sender.indexOfSelectedItem
+            if i >= 0 && i < parent.items.count { parent.selection = parent.items[i].0 }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { return Coordinator(self) }
+
+    func makeNSView(context: Context) -> DropDownButton {
+        let b = DropDownButton(frame: NSRect(x: 0, y: 0, width: width, height: 24), pullsDown: false)
+        b.target = context.coordinator
+        b.action = #selector(Coordinator.picked(_:))
+        return b
+    }
+
+    func updateNSView(_ b: DropDownButton, context: Context) {
+        context.coordinator.parent = self
+        let titles: [String] = items.map { $0.1 }
+        if b.itemTitles != titles {
+            b.removeAllItems()
+            b.addItems(withTitles: titles)
+        }
+        b.selectItem(at: items.firstIndex(where: { $0.0 == selection }) ?? -1)
+        b.isEnabled = context.environment.isEnabled
+    }
+}
+
 struct SearchPicker: View {
     @Binding var selection: String
     let items: [(String, String)]
@@ -319,11 +369,9 @@ struct SearchPicker: View {
 
     var body: some View {
         if items.count < COMBO_SEARCH_MIN {
-            Picker("", selection: $selection) {
-                ForEach(items, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .labelsHidden()
-            .frame(width: width)
+            // (con pocas, el menú de siempre, pero debajo del botón)
+            MenuPicker(selection: $selection, items: items, width: width)
+                .frame(width: width, height: 24)
         } else {
             Button(action: { query = ""; mark = shown().firstIndex(where: { $0.0 == selection }) ?? 0; open = true }) {
                 HStack(spacing: 6) {

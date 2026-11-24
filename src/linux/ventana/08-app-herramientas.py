@@ -94,7 +94,8 @@ class AppHerramientas:
         """Carpetas: la de los espacios de trabajo de VS Code (vscode_workspace)."""
         wsdir = vscode_ws_dir()
         row = ActionRow("Espacios de trabajo de VS Code",
-                        "%s: cada proyecto se abre con su .code-workspace (si no tiene, se le crea uno)" % wsdir
+                        "%s: cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no "
+                        "tiene, se le crea uno aquí)" % wsdir
                         if wsdir else
                         "Sin elegir: los proyectos se abren como carpeta. Elige dónde guardas tus .code-workspace "
                         "para abrir cada uno con el suyo")

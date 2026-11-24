@@ -57,6 +57,8 @@ struct AppData: Equatable {
     var dbs: [String: [String]] = [:]
     /// Fecha de cada base («versión|base»): la de su importación o la del último cambio de sus tablas
     var dbDates: [String: DbDate] = [:]
+    /// Las marcadas para borrar al cargar su versión («versión|base»: marcar-bd)
+    var marks: Set<String> = []
     /// Procesos de XAMPP en memoria que no son de la versión montada (resumen)
     var stray = ""
     /// Vhosts de proyectos cuya carpeta ya no está en htdocs

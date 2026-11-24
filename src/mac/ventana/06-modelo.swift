@@ -84,6 +84,14 @@ final class AppModel: ObservableObject {
     @Published var upMode = "fusionar"
     @Published var upDb = ""
     var upDbKnown = false
+    /// El proyecto no tiene BBDD (ni vinculada ni en su configuración, o la suya no existe en la versión activa)
+    /// y, si se marca, se crea al actualizar (actualizar-proyecto --crear-base)
+    var upNoDb = false
+    /// (la suya, si tiene nombre pero no existe en la versión activa: para decirlo)
+    var upDbGone = ""
+    @Published var upCreateDb = false
+    /// La versión por la que ya se ha preguntado si se borran sus BBDD marcadas (una vez por carga)
+    var marksAsked: String? = nil
     @Published var upSqlError = ""
     @Published var upCodeError = ""
     @Published var npRepos: [RepoItem] = []

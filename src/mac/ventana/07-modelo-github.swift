@@ -266,6 +266,8 @@ extension AppModel {
                 if f.count >= 5, let when = Int(f[3]) {
                     d.dbDates[f[1] + "|" + f[2]] = DbDate(when: when, imported: f[4] == "i")
                 }
+            case "J" where f.count >= 3:
+                d.marks.insert(f[1] + "|" + f[2])
             case "H" where f.count >= 3:
                 d.vhosts = f[1]
                 d.hosts = f[2]
@@ -324,6 +326,8 @@ extension AppModel {
         }
         if let db = impDb, !(d.dbs[d.active] ?? []).contains(db) { impDb = nil }
         if d != data { data = d }
+        // (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
+        dbMarksCheck()
         // (los correos sin leer, solo con Mailpit en marcha)
         pollMail()
         if !sized {

@@ -545,24 +545,48 @@ def vscode_ws_folders(path):
     return out
 
 
+def vscode_ws_candidates(wsdir):
+    """Los .code-workspace de la carpeta elegida y de sus subcarpetas de primer nivel (por si se tienen
+    clasificados por tipo de proyecto: wordpress/, tiendas/...): primero los de la carpeta, luego cada
+    subcarpeta por orden. Las subcarpetas ocultas no cuentan."""
+    out = []
+    try:
+        entries = sorted(os.listdir(wsdir))
+    except OSError:
+        return out
+    subdirs = []
+    for n in entries:
+        p = os.path.join(wsdir, n)
+        if n.endswith(".code-workspace") and os.path.isfile(p):
+            out.append(p)
+        elif not n.startswith(".") and os.path.isdir(p):
+            subdirs.append(p)
+    for d in subdirs:
+        try:
+            out.extend(os.path.join(d, n) for n in sorted(os.listdir(d))
+                       if n.endswith(".code-workspace") and os.path.isfile(os.path.join(d, n)))
+        except OSError:
+            pass
+    return out
+
+
 def vscode_workspace(folder, create=True):
-    """El .code-workspace de un proyecto en la carpeta de los espacios de trabajo: <carpeta>.code-workspace si
-    existe; si no, otro que ya tenga la carpeta del proyecto; si no hay ninguno, se crea <carpeta>.code-workspace
-    con ella (con create). None sin carpeta elegida o si no se ha podido crear."""
+    """El .code-workspace de un proyecto en la carpeta de los espacios de trabajo o en una de sus subcarpetas de
+    primer nivel: <carpeta>.code-workspace si existe; si no, otro que ya tenga la carpeta del proyecto; si no hay
+    ninguno, se crea <carpeta>.code-workspace con ella en la carpeta elegida (con create). None sin carpeta
+    elegida o si no se ha podido crear."""
     wsdir = vscode_ws_dir()
     if not wsdir or not os.path.isdir(wsdir):
         return None
     folder = os.path.realpath(folder)
     path = os.path.join(wsdir, os.path.basename(folder) + ".code-workspace")
-    if os.path.isfile(path):
-        return path
-    try:
-        names = sorted(n for n in os.listdir(wsdir) if n.endswith(".code-workspace"))
-    except OSError:
-        names = []
-    for n in names:
-        if folder in vscode_ws_folders(os.path.join(wsdir, n)):
-            return os.path.join(wsdir, n)
+    found = vscode_ws_candidates(wsdir)
+    for p in found:
+        if os.path.basename(p) == os.path.basename(path):
+            return p
+    for p in found:
+        if folder in vscode_ws_folders(p):
+            return p
     if not create:
         return None
     if SIMULATE:
@@ -1382,6 +1406,27 @@ def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=
     return resp == Gtk.ResponseType.ACCEPT
 
 
+def screen_height(widget=None):
+    """Alto útil (sin barras del escritorio) del monitor de widget o, sin él, del principal."""
+    try:
+        disp = Gdk.Display.get_default()
+        win = widget.get_window() if widget is not None else None
+        mon = (disp.get_monitor_at_window(win) if win is not None else None) or \
+            disp.get_primary_monitor() or disp.get_monitor(0)
+        return mon.get_workarea().height
+    except Exception:  # noqa: BLE001
+        return 800
+
+
+def scroll_list(child, parent=None, top=360):
+    """child en un recuadro con scroll si no cabe: como mucho top de alto, y menos si la pantalla
+    (la de parent) es baja, para que el diálogo no crezca hasta salirse de ella."""
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                            max_content_height=max(160, min(top, screen_height(parent) - 340)))
+    sw.add(child)
+    return sw
+
+
 # Los desplegables de la ventana con COMBO_SEARCH_MIN opciones o más: al abrirlos, en lugar del menú de
 # GTK, una lista con un buscador. Se escribe y se queda solo lo que lleva ese texto, como en la barra de
 # búsqueda de los proyectos; las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada
@@ -1394,7 +1439,20 @@ def combo_search(combo):
     if model is None or len(model) < COMBO_SEARCH_MIN or not isinstance(model[0][0], str):
         return False
     names = [row[0] for row in model]
-    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.BOTTOM, modal=True)
+    # La lista no puede salir de su ventana (GTK 3 la recorta por el borde): se abre hacia donde haya
+    # más sitio (debajo, si cabe) y con el alto que quede, para que no se corte
+    up, room = False, 360
+    top = combo.get_toplevel()
+    pos = combo.translate_coordinates(top, 0, 0) if top is not None else None
+    if pos is not None:
+        win_h, combo_h = top.get_allocated_height(), combo.get_allocated_height()
+        below, above = win_h - pos[1] - combo_h, pos[1]
+        up = below < min(above, 300)
+        # (quitando el buscador, los márgenes y la flecha)
+        room = (above if up else below) - 80
+    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.TOP if up else Gtk.PositionType.BOTTOM,
+                      modal=True)
+    pop.set_constrain_to(Gtk.PopoverConstraint.WINDOW)
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
     entry = Gtk.SearchEntry(placeholder_text="Buscar…")
     lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE, activate_on_single_click=True)
@@ -1413,7 +1471,8 @@ def combo_search(combo):
     # (como poco, tan ancha como el desplegable; si los nombres son más largos, lo que haga falta para
     # verlos enteros, hasta 640)
     sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
-                            propagate_natural_width=True, max_content_height=360, max_content_width=640,
+                            propagate_natural_width=True, max_content_height=max(120, min(360, room)),
+                            max_content_width=640,
                             min_content_width=max(combo.get_allocated_width(), 240))
     sw.add(lb)
     box.pack_start(entry, False, False, 0)

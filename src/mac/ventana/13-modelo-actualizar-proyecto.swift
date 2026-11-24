@@ -8,7 +8,22 @@ extension AppModel {
         upCode = ""
         upMode = "fusionar"
         upDb = loadedDb(x)
-        upDbKnown = !upDb.isEmpty
+        // ¿Tiene BBDD? La suya (vinculada o de su configuración) y que exista en la versión activa
+        var activeDbs: [String] = []
+        if let d = data { activeDbs = d.dbs[d.active] ?? [] }
+        let named: Bool = validDbName(upDb)
+        upNoDb = !named || !activeDbs.contains(upDb)
+        upCreateDb = upNoDb
+        upDbGone = (upNoDb && named) ? upDb : ""
+        upDbKnown = !upNoDb
+        if upNoDb && upDb.isEmpty {
+            // (se propone un nombre, como en Nuevo proyecto)
+            let clean: String = x.name.lowercased().replacingOccurrences(of: "[^a-z0-9_]", with: "_", options: .regularExpression)
+            let base: String = String(clean.trimmingCharacters(in: CharacterSet(charactersIn: "_")).prefix(40))
+            var prefix: String = ""
+            if x.kind == "wp" { prefix = "wp_" } else if x.kind == "ps" { prefix = "ps_" }
+            upDb = prefix + base
+        }
         upSqlError = ""
         upCodeError = ""
         upShown = true
@@ -25,7 +40,7 @@ extension AppModel {
             upCode = ok ? path : ""
         } else {
             let ok = path.isEmpty || (exists && !isDir.boolValue && [".sql", ".gz", ".zip"].contains(where: { low.hasSuffix($0) }))
-            upSqlError = ok ? "" : "Tiene que ser .sql, .sql.gz o .zip"
+            upSqlError = ok ? "" : "Tiene que ser .sql, .gz o .zip"
             upSql = ok ? path : ""
         }
     }
@@ -45,19 +60,27 @@ extension AppModel {
     func upAsk() {
         upShown = false
         let folder = upFolder, sql = upSql, db = upDb.trimmingCharacters(in: .whitespaces), code = upCode, mode = upMode
+        let making = upNoDb && upCreateDb
         var what: [String] = []
+        if making {
+            let how: String = sql.isEmpty ? ", vacía," : " con el volcado"
+            what.append("Se crea la BBDD " + db + how + " y queda como la de " + folder + ".")
+        }
         if !code.isEmpty {
             let name = (code as NSString).lastPathComponent
             what.append(mode == "fusionar" ? "Se fusiona «\(name)» con \(HTDOCS)/\(folder)."
                         : "Se sobrescribe la carpeta con «\(name)» en \(HTDOCS)/\(folder): se borra lo que no traiga.")
         }
-        if !sql.isEmpty { what.append("La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)».") }
+        if !sql.isEmpty {
+            what.append(making ? "Se carga «\((sql as NSString).lastPathComponent)» en ella."
+                        : "La BBDD \(db) se vacía y se carga «\((sql as NSString).lastPathComponent)».")
+        }
         runQuick(["gui-proyecto-git", folder]) { _, out in
             let f = parseLines(out).first(where: { $0.first == "G" && $0.count >= 6 })
             guard !code.isEmpty, let g = f, g[1] == "1" else {
                 let c = confirmCopy("¿Actualizar \(folder)?", "", "Actualizar", steps: what)
                 if c.ok {
-                    self.upStart(folder, sql, db, code, mode, pull: false, copy: c.copy)
+                    self.upStart(folder, sql, db, code, mode, pull: false, copy: c.copy, create: making)
                 }
                 return
             }
@@ -82,15 +105,17 @@ extension AppModel {
             let resp = withExtendedLifetime(cc.validator) { alert.runModal() }
             let copy = cc.box.state == .on
             if canPull && resp == .alertFirstButtonReturn {
-                self.upStart(folder, sql, db, code, mode, pull: true, copy: copy)
+                self.upStart(folder, sql, db, code, mode, pull: true, copy: copy, create: making)
             } else if resp == (canPull ? .alertSecondButtonReturn : .alertFirstButtonReturn) {
-                self.upStart(folder, sql, db, code, mode, pull: false, copy: copy)
+                self.upStart(folder, sql, db, code, mode, pull: false, copy: copy, create: making)
             }
         }
     }
 
-    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool, copy: Bool) {
-        var args = ["actualizar-proyecto", folder] + (copy ? ["--copia"] : [])
+    /// create: el proyecto no tiene BBDD y se crea (--crear-base)
+    func upStart(_ folder: String, _ sql: String, _ db: String, _ code: String, _ mode: String, pull: Bool, copy: Bool,
+                 create: Bool = false) {
+        var args = ["actualizar-proyecto", folder] + (copy ? ["--copia"] : []) + (create ? ["--crear-base"] : [])
         if !code.isEmpty { args += ["--codigo", code, "--modo", mode] + (pull ? ["--pull"] : []) }
         if !sql.isEmpty { args += ["--bd", sql] }
         // (también solo con el código: al volver a cargarlo, su configuración vuelve a esta BBDD)
@@ -102,7 +127,7 @@ extension AppModel {
                                               + (copy ? " Lo sustituido sigue en ~/nexum-backups." : ""),
                                           "Cancelar la actualización"))
         }
-        if sql.isEmpty { go() } else { checkDbAccess { go() } }
+        if sql.isEmpty && !create { go() } else { checkDbAccess { go() } }
     }
 
     /// Al escribir en el buscador: un repositorio pegado (botón de copiar de Repositorios) o escrito entero
@@ -314,7 +339,7 @@ extension AppModel {
                            target: group, action: #selector(RadioGroup.pick(_:)))
         group.buttons = [exist, new]
         group.onPick = { _ in validator.update() }
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 360, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 360, height: 26), pullsDown: false)
         for b in branches {
             let place: String = b[1] == current ? "la actual"
                 : field(b, 2) != "1" ? "de origin: se crea en local siguiendo a origin"
@@ -840,7 +865,8 @@ extension AppModel {
             group.buttons.append(b)
             options.append(b)
         }
-        views.append(dialogOptions(options))
+        // (con muchas versiones, la lista va con scroll: el aviso no crece hasta salirse de la pantalla)
+        views.append(dialogScroll(dialogOptions(options)))
         alert.accessoryView = dialogStack(views, spacing: 14)
         guard alert.runStyled() == .alertFirstButtonReturn else { return }
         let chosen = targets[group.buttons.firstIndex(where: { $0.state == .on }) ?? 0]
@@ -886,7 +912,7 @@ extension AppModel {
         let okButton = alert.buttons[0]
         let width: CGFloat = 380
         func popup() -> NSPopUpButton {
-            let b = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+            let b = DropDownButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
             b.translatesAutoresizingMaskIntoConstraints = false
             b.widthAnchor.constraint(equalToConstant: width).isActive = true
             return b

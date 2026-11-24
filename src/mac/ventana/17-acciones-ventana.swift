@@ -363,7 +363,7 @@ extension AppModel {
         alert.messageText = "BBDD de \(p.folder) en Docker"
         alert.addButton(withTitle: "Usarla")
         alert.addButton(withTitle: "Cancelar")
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 380, height: 26), pullsDown: false)
         pop.addItems(withTitles: choices.map { $0.1 })
         pop.selectItem(at: choices.firstIndex(where: { $0.0 == now }) ?? 0)
         alert.accessoryView = dialogStack([
@@ -408,7 +408,7 @@ extension AppModel {
         alert.informativeText = "Solo cambia su contenedor de PHP: su BBDD y su configuración se quedan. La primera vez con cada versión se prepara su imagen. Si no arranca, vuelve a PHP \(p.php)."
         alert.addButton(withTitle: "Cambiar de PHP")
         alert.addButton(withTitle: "Cancelar")
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
         pop.addItems(withTitles: k.php.map { "PHP \($0)" + ($0 == p.php ? "  (ahora)" : "") })
         if let i = k.php.firstIndex(of: p.php) { pop.selectItem(at: i) }
         alert.accessoryView = pop
@@ -605,7 +605,7 @@ extension AppModel {
         // (ancho del nombre más largo: la BBDD con su versión, entera)
         let width = fitWidth(pairs.map { "\($0.1) (XAMPP-\($0.0.folder))" }, min: 300, max: 520)
         func popup(_ items: [String], _ selected: Int) -> NSPopUpButton {
-            let b = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+            let b = DropDownButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
             b.addItems(withTitles: items)
             if selected >= 0 && selected < items.count { b.selectItem(at: selected) }
             b.translatesAutoresizingMaskIntoConstraints = false

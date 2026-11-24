@@ -23,11 +23,10 @@ for i in $(seq 50); do "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 && bre
 "$DB_CLIENT" -uroot -e 'SELECT 1' > /dev/null 2>&1 || { echo "  FALLA el MariaDB temporal no arranca"; exit 1; }
 trap '"$DB_CLIENT" -uroot -e "SHUTDOWN" > /dev/null 2>&1; wait; rm -rf "$MDB"; [ "$SOCKD" != "$MDB" ] && rm -rf "$SOCKD"' EXIT
 
-extract "$SRC" import_database db_exists db_pass_hash db_drop_import_users db_kill_user db_neutralize_extras \
-    db_neutralize_invoker db_lock_import_user db_root_cleanup || exit 1
+extract "$SRC" import_database db_exists db_drop_import_users db_kill_user db_lock_import_user db_root_cleanup || exit 1
 [ $MAC -eq 1 ] && { extract "$SRC" human_size || exit 1; }
 for v in DB_SAFE; do eval "$(grep -m1 "^$v=(" "$SRC")"; done
-for v in INVOKER_PY DB_DIRECTORY_PY ZIP_SQL_PY; do
+for v in DB_DIRECTORY_PY ZIP_SQL_PY; do
     eval "$(sed -n "/^$v='/,/^'\$/p" "$SRC")"
     [ -n "${!v}" ] || { echo "  FALLA no esta $v"; exit 1; }
 done
@@ -112,6 +111,26 @@ check "un .gz roto no vacia la base" '[ $rc -ne 0 ] && [ "$(sql "SELECT COUNT(*)
 printf 'CREATE TABLE a (x INT);\nINSERT INTO noexiste VALUES (1);\n' > "$MDB/roto.sql"
 out=$(load "$MDB/roto.sql" wpz --copia); rc=$?
 check "si el volcado falla, dice donde esta la copia de lo que habia" '[ $rc -ne 0 ] && grep -q "Lo que tenia antes esta en .*nexum-backups/.*-wpz-antes-de-cargar-" <<< "$out"'
+
+# Como root (desde la 1.57.48): un volcado que toca otra base, crea usuarios o trae SQL SECURITY
+# INVOKER se carga tal cual, sin «Access denied»
+printf '%s\n' 'CREATE DATABASE IF NOT EXISTS otra_de_volcado;' 'CREATE TABLE otra_de_volcado.t (x INT);' \
+    "CREATE USER IF NOT EXISTS 'u_volcado'@'localhost';" 'CREATE TABLE propia (x INT);' \
+    'CREATE SQL SECURITY INVOKER VIEW vi AS SELECT x FROM propia;' > "$MDB/root.sql"
+out=$(load "$MDB/root.sql" wpr --crear); rc=$?
+check "como root: carga lo de otras bases, los usuarios y las vistas INVOKER" '[ $rc -eq 0 ] && [ "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"otra_de_volcado\"")" = 1 ] && [ "$(sql "SELECT COUNT(*) FROM mysql.user WHERE User=\"u_volcado\"")" = 1 ] && [ "$(sql "SELECT SECURITY_TYPE FROM information_schema.VIEWS WHERE TABLE_SCHEMA=\"wpr\"")" = INVOKER ]' || echo "$out" | tail -5
+check "como root: no se crea el usuario lvm_bd_ de la base" '[ "$(sql "SELECT COUNT(*) FROM mysql.user WHERE User LIKE \"lvm\\_bd\\_%\"")" = 0 ]'
+
+# Volcados que empiezan con SET GLOBAL: pasan a DO 0 (no cambian el MariaDB de todas las webs)
+printf '%s\n' '/*!40030 SET GLOBAL max_allowed_packet=16777216 */;' 'SET @@GLOBAL.net_buffer_length=16384;' \
+    '/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE */;' "CREATE TABLE g (x VARCHAR(40));" \
+    "INSERT INTO g VALUES ('SET GLOBAL no se toca dentro de un valor');" > "$MDB/global.sql"
+out=$(load "$MDB/global.sql" wpg --crear); rc=$?
+check "un volcado con SET GLOBAL se carga sin cambiar el paquete del servidor" '[ $rc -eq 0 ] && [ "$(sql "SELECT @@GLOBAL.max_allowed_packet")" = 1073741824 ] && [ "$(sql "SELECT x FROM wpg.g")" = "SET GLOBAL no se toca dentro de un valor" ]' || echo "$out" | tail -5
+# (lo de despues del error, largo: el cliente se para y el filtro de Python se queda escribiendo)
+{ printf 'INSERT INTO noexiste VALUES (1);\n'; yes "INSERT INTO g VALUES ('relleno');" | head -n 400000; } > "$MDB/roto-largo.sql"
+out=$(load "$MDB/roto-largo.sql" wpg); rc=$?
+check "si el volcado falla, no sale un BrokenPipeError de Python" '[ $rc -ne 0 ] && ! grep -q "Traceback\|BrokenPipe" <<< "$out"' || echo "$out" | tail -5
 
 # Simulacion: no cambia nada
 t0=$(sql "SELECT GROUP_CONCAT(TABLE_NAME) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\"")

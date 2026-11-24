@@ -119,6 +119,8 @@ struct DatabasesView: View {
         let active = inst.folder == d.active
         // Lo que ocupan todas sus BBDD (las que se han medido)
         let total = (d.dbs[inst.folder] ?? []).reduce(Int64(0)) { $0 + (model.dbSizes[inst.folder + "|" + $1]?.first ?? 0) }
+        let marked: Int = (d.dbs[inst.folder] ?? []).filter { d.marks.contains(inst.folder + "|" + $0) }.count
+        let count: String = plural(n, "BBDD", "BBDD") + (marked > 0 ? " · \(marked) para borrar" : "")
         // (una versión abierta cada vez: abrir otra cierra la que estaba; pulsar la abierta la cierra)
         return HoverRow(action: {
             if model.expanded.contains(key) {
@@ -140,8 +142,12 @@ struct DatabasesView: View {
                 .lineLimit(1).col(180)
             Text(total > 0 ? fmtSize(total) : "—").font(.system(size: 11.5, design: .monospaced))
                 .foregroundColor(.secondary).col(90)
-            Text(plural(n, "BBDD", "BBDD")).font(.caption).foregroundColor(.secondary).col(160)
+            Text(count).font(.caption).foregroundColor(.secondary).col(160)
             HStack(spacing: 6) {
+                if active && marked > 0 {
+                    iconAction("trash.circle", "Borrar las " + plural(marked, "BBDD", "BBDD") + " marcadas") { model.dbMarksAsk() }
+                        .disabled(!d.running).busyGuard(model.busy)
+                }
                 if active {
                     logoAction("phpmyadmin", "Abrir phpMyAdmin") { openURL("http://127.0.0.1/phpmyadmin/") }
                         .disabled(!d.running)
@@ -159,6 +165,9 @@ struct DatabasesView: View {
         let loaded = model.loadedEntry()
         let isUsed = active && loaded != nil && db == model.loadedProjectDb()
         let date = d.dbDates[folder + "|" + db]
+        let isMarked: Bool = d.marks.contains(folder + "|" + db)
+        let markTip: String = isMarked ? "Desmarcar: ya no se borra al cargar XAMPP-" + folder
+            : "Marcar para borrar al cargar XAMPP-" + folder
         return HoverRow { _ in
             HStack(spacing: 8) {
                 // Punto verde: la usa el proyecto cargado (invisible en las demás: así quedan alineadas)
@@ -170,6 +179,9 @@ struct DatabasesView: View {
                     BrandLogo(name: "wordpress", size: 13)
                 }
                 Text(db).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle).tip(db)
+                if isMarked {
+                    SmallTag(text: "Para borrar", red: true).tip("Marcada para borrar: se pregunta al cargar XAMPP-" + folder)
+                }
             }
             .padding(.leading, 26)
             .col(270)
@@ -195,6 +207,12 @@ struct DatabasesView: View {
                 if active {
                     iconAction("trash", "Borrar la BBDD \(db)") { model.dropDb(db) }
                         .busyGuard(model.busy)
+                }
+                // (en las otras versiones no se puede borrar ya: se marca y se pregunta al cargarla)
+                if !active || isMarked {
+                    iconAction(isMarked ? "arrow.uturn.backward" : "trash.slash", markTip) {
+                        model.markDb(folder, db, !isMarked)
+                    }
                 }
             }
             .col(0)
@@ -240,7 +258,7 @@ struct DatabasesView: View {
     /// Cargar en columnas, dentro de un visor hundido, antes de la tabla
     func importCard(_ d: AppData) -> some View {
         let act = d.installs.first(where: { $0.folder == d.active })
-        let desc = "Carga una copia .sql, .sql.gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa. "
+        let desc = "Carga una copia .sql, .gz o .zip (como las que se descargan del servidor) en el MariaDB de la versión activa. "
             + "Antes se borran todas las tablas de la BBDD de destino (si quieres, con una copia en ~/nexum-backups), para que no quede nada de lo anterior."
         let dbs = d.dbs[d.active] ?? []
         let hint = model.importHint()
