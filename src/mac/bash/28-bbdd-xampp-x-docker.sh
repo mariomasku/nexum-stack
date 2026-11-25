@@ -419,6 +419,9 @@ QUE HACE
 VERSIONES
 
 1.57.51 (25 nov 2026)
+- Mac: la ventana vuelve a compilar (el botón Abrir de los espacios de
+  trabajo de VS Code llamaba a algo que no existía en esa vista, y se
+  quedaba solo el Terminal).
 - Aviso de versión nueva: se busca cada vez que se abre el programa
   (antes, solo el primer arranque del día), también al volver a
   abrirlo cuando estaba escondido junto al reloj (si hace más de media

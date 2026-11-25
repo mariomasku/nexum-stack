@@ -34,4 +34,6 @@ check "Docker: XAMPP-X parado solo avisa con proyectos de antes" 'grep -q "if !k
 check "Docker: el DNS de *.docker.test en Configuración y los dominios con su final (docker.local o docker.test)" 'grep -q "model.dockerDNS(!w.dns)" "$SRC" && grep -q "\[\"docker-web\", \"dns\", on ? \"activar\" : \"quitar\"\]" "$SRC" && grep -q "tld: field(f, 6) == \"docker.test\" ? \"docker.test\" : \"docker.local\", dns: field(f, 7) == \"1\")" "$SRC" && ! grep -q "\"pma.docker.local\"" "$SRC"'
 check "configuración: página ancha y sus apartados en tarjetas de dos en dos" 'grep -q "^struct TileCard<Content: View>: View {" "$SRC" && [ "$(grep -c "TileCard(" "$SRC")" -ge 10 ] && grep -q "Tile(\"Dirección y puertos\"" "$SRC"'
 check "botones: el panel en horizontal (cabe en un portátil)" 'grep -q "case .buttons: return 900" "$SRC" && grep -q "HStack(alignment: .top, spacing: 24) {" "$SRC"'
+# (1.57.51) openFolder es de ToolsView: fuera de ella no existe y la ventana no compila (VS Code, Abrir)
+check "openFolder solo dentro de ToolsView; fuera, showFolder" '[ -z "$(awk "/^struct ToolsView: View/ {t=1; next} /^(struct|final class|class|extension|func) / {t=0} !t && /openFolder\\(/ {print NR}" "$SRC")" ] && grep -q "Button(\"Abrir\") { showFolder(dir) }" "$SRC"'
 exit $fail

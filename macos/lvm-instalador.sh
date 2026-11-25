@@ -36367,7 +36367,7 @@ struct VSCodeWsTile: View {
              ? "Sin elegir: los proyectos se abren como carpeta. Elige dónde guardas tus .code-workspace para abrir cada uno con el suyo"
              : "\(dir): cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no tiene, se le crea uno aquí)") {
             if !dir.isEmpty && FileManager.default.fileExists(atPath: dir) {
-                Button("Abrir") { openFolder(dir) }
+                Button("Abrir") { showFolder(dir) }
             }
             Button(dir.isEmpty ? "Elegir…" : "Cambiar…") { choose() }
             if !dir.isEmpty {
@@ -42180,6 +42180,9 @@ QUE HACE
 VERSIONES
 
 1.57.51 (25 nov 2026)
+- Mac: la ventana vuelve a compilar (el botón Abrir de los espacios de
+  trabajo de VS Code llamaba a algo que no existía en esa vista, y se
+  quedaba solo el Terminal).
 - Aviso de versión nueva: se busca cada vez que se abre el programa
   (antes, solo el primer arranque del día), también al volver a
   abrirlo cuando estaba escondido junto al reloj (si hace más de media

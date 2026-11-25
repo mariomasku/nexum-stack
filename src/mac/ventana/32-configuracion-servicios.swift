@@ -1259,7 +1259,7 @@ struct VSCodeWsTile: View {
              ? "Sin elegir: los proyectos se abren como carpeta. Elige dónde guardas tus .code-workspace para abrir cada uno con el suyo"
              : "\(dir): cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no tiene, se le crea uno aquí)") {
             if !dir.isEmpty && FileManager.default.fileExists(atPath: dir) {
-                Button("Abrir") { openFolder(dir) }
+                Button("Abrir") { showFolder(dir) }
             }
             Button(dir.isEmpty ? "Elegir…" : "Cambiar…") { choose() }
             if !dir.isEmpty {
