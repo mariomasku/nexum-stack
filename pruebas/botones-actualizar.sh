@@ -14,7 +14,7 @@ import ast, json, os, sys, time
 src, w = sys.argv[1:3]
 tree = ast.parse(open(src, encoding="utf-8").read())
 want = {"buttons_conf", "buttons_save", "update_check_due"}
-consts = {"VISOR_BUTTONS", "BUTTON_STYLES", "UPDATE_EVERY", "BUTTON_SIZES", "BUTTON_SIZE_MIN", "BUTTON_SIZE_MAX"}
+consts = {"VISOR_BUTTONS", "BUTTON_STYLES", "UPDATE_EVERY", "UPDATE_RECHECK", "UPDATE_RECHECK_OPEN", "BUTTON_SIZES", "BUTTON_SIZE_MIN", "BUTTON_SIZE_MAX"}
 code = []
 for node in ast.walk(tree):
     if isinstance(node, ast.FunctionDef) and node.name in want:
@@ -77,6 +77,14 @@ say("actualizaciones: un fichero roto cuenta como el primero del día", due(None
 g["SIMULATE"] = True
 open(path, "w").write(time.strftime("%Y-%m-%d") + " 1\n")
 say("actualizaciones: en la simulación se busca sin apuntar nada", due(None) and open(path).read().endswith(" 1\n"))
+src = open(sys.argv[1], encoding="utf-8").read()
+say("actualizaciones del programa: siempre al abrir; los componentes, cuando toca (1.57.51)",
+    "        self.update_checked = time.time()\n        self.check_package(auto=True)\n        if self.update_check_due():" in src)
+say("actualizaciones: al volver a la ventana (icono o abrirlo otra vez) y cada pocas horas",
+    src.count("self.update_recheck()") >= 3 and "GLib.timeout_add_seconds(UPDATE_RECHECK_OPEN," in src
+    and g["UPDATE_RECHECK"] == 1800 and g["UPDATE_RECHECK_OPEN"] == 14400)
+say("actualizaciones: con la ventana escondida se guarda y se ofrece al mostrarla; la rechazada no se repite sola",
+    "self.update_pending = args" in src and "if auto and f[1] in getattr(self, \"update_declined\", set()):" in src)
 EOF
 )
 while IFS='|' read -r st name; do

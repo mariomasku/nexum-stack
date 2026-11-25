@@ -860,8 +860,8 @@ function project_update() {
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
         if [ ${#backup[@]} -gt 0 ]; then
-            copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
-            [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
+            copies=$COPIES_DIR/proyectos/$folder/antes-de-actualizar-$stamp
+            copies_in "proyectos/$folder" > /dev/null || return 1
         fi
         if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY" \
                 "$LOG_DIR/listas/$folder-$stamp"; then

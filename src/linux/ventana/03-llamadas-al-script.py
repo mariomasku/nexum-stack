@@ -185,6 +185,10 @@ BUTTON_SIZE_NAMED = 72
 BUTTONS_FILE = os.path.join(LOG_DIR, "botones-visor")
 # Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 UPDATE_EVERY = 4
+# Versión nueva del programa: otra búsqueda al volver a la ventana si hace más de esto (s) de la última, y
+# cada tanto con el programa abierto (s)
+UPDATE_RECHECK = 30 * 60
+UPDATE_RECHECK_OPEN = 4 * 3600
 # (en la simulacion no se escribe nada: lo elegido vale mientras la ventana siga abierta)
 _buttons_sim = {}
 

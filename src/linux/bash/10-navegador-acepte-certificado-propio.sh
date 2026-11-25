@@ -317,8 +317,9 @@ $block"
     s=""
     [ -w "$VHOSTS_FILE" ] || s=sudo
     if [ -f "$VHOSTS_FILE" ] && [ -f "$COPIES_FILES_FLAG" ]; then
-        run mkdir -p -m 700 "$COPIES_DIR"
-        run cp "$VHOSTS_FILE" "$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
+        local saved_dir
+        saved_dir=$(copies_in sistema/vhosts) || return 1
+        run cp "$VHOSTS_FILE" "$saved_dir/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)" || return 1
     fi
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] añadir a $VHOSTS_FILE:$block"

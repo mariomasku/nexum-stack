@@ -195,8 +195,8 @@ function edit_vhosts() {
         return 1
     fi
     if [ -f "$COPIES_FILES_FLAG" ]; then
-        backup="$COPIES_DIR/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
-        mkdir -p -m 700 "$COPIES_DIR" && cp "$real" "$backup" \
+        backup="$COPIES_DIR/sistema/vhosts/httpd-vhosts.conf-$(date +%Y%m%d-%H%M%S)"
+        copies_in sistema/vhosts > /dev/null && cp "$real" "$backup" \
             && echo "Copia de los vhosts anteriores: $backup"
     fi
     if ! sudo install -o root -g wheel -m 644 "$snap/nuevo" "$real"; then
@@ -356,7 +356,7 @@ function edit_hosts() {
         browser_trust --hosts || true
         return $rc
     fi
-    local copy=$2 backup="$COPIES_DIR/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
+    local copy=$2 backup="$COPIES_DIR/sistema/hosts/hosts-$(date +%Y%m%d-%H%M%S)" snap="" check
     # (aparte: en la misma linea, $copy aun seria el de fuera)
     check=$copy
     if [ ! -s "$copy" ]; then
@@ -420,7 +420,7 @@ sys.exit(1 if any(c < 32 and c not in (9, 10) or c == 127 for c in d) else 0)' "
         return 1
     fi
     if [ -f "$COPIES_FILES_FLAG" ]; then
-        run mkdir -p -m 700 "$COPIES_DIR"
+        copies_in sistema/hosts > /dev/null || return 1
         run cp "$HOSTS_FILE" "$backup" || return 1
         echo "Copia del $HOSTS_FILE anterior: $backup"
     fi

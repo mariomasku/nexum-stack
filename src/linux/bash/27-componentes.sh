@@ -425,7 +425,7 @@ done
 for dir in "$COPIES_DIR" "$LOG_DIR"; do
     if [ -d "$dir" ] && [ -O "$dir" ] && [ ! -L "$dir" ]; then
         chmod 700 "$dir" 2> /dev/null
-        find "$dir" -maxdepth 2 -type f -user "$(id -u)" -perm /077 -exec chmod go-rwx {} + 2> /dev/null
+        find "$dir" -maxdepth 4 -type f -user "$(id -u)" -perm /077 -exec chmod go-rwx {} + 2> /dev/null
     fi
 done
 

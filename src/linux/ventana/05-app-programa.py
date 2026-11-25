@@ -10,8 +10,15 @@ class AppPrograma:
             for f in parse_lines(out):
                 if f[0] == "N" and len(f) >= 5:
                     found = True
-                    # (si se dice que no, se vuelve a ofrecer la próxima vez que toque buscar)
-                    self.offer_package(f[1], f[2], f[3], "|".join(f[4:]))
+                    args = (f[1], f[2], f[3], "|".join(f[4:]))
+                    # (sola, la misma que ya se ha dicho que no en esta sesión no se vuelve a ofrecer hasta abrir
+                    # otra vez el programa; con la ventana escondida, se ofrece al mostrarla)
+                    if auto and f[1] in getattr(self, "update_declined", set()):
+                        continue
+                    if auto and not self.win.get_visible():
+                        self.update_pending = args
+                        continue
+                    self.offer_package(*args)
                 elif f[0] == "I" and len(f) >= 2:
                     notes.append("|".join(f[1:]))
             if manual and not found:
@@ -37,6 +44,7 @@ class AppPrograma:
                        "se vuelve a abrir. Tus versiones, proyectos y BBDD no se tocan.\n\nHuella SHA-256:\n%s"
                        % (current, version, where, sha),
                        "Actualizar a la %s" % version):
+            self.update_declined = getattr(self, "update_declined", set()) | {version}
             return False
         if SIMULATE:
             self.toast("[simulación] pkexec apt-get install -y %s" % path)

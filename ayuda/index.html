@@ -229,7 +229,7 @@
   <h3>Actualizar el programa</h3>
   <ol class="pasos-tarea">
     <li><b>Menú ☰ → «Buscar actualizaciones»</b><span data-so="mac"> (o el menú «Gestor» de la barra de menús)</span>. También lo mira
-      solo al abrir la ventana, de vez en cuando.</li>
+      solo cada vez que abres el programa.</li>
     <li><b>Si hay una versión nueva</b>, te dice cuál es y su huella, y la descarga de GitHub con su firma. La <b>huella</b> (SHA-256)
       es un código que se calcula a partir del fichero: si cambia un solo byte, sale otra huella.</li>
     <li><b>Acepta.</b> Antes de instalarla se comprueba que la firma es la del autor; si no lo es, no se instala. Tus versiones de PHP, tus
@@ -601,7 +601,7 @@
         <p>Lo que hace, paso a paso:</p>
         <ol>
           <li>Comprueba que la versión activa está en marcha y que MariaDB responde.</li>
-          <li>Con <code>--copia</code>, guarda la base <code>mysql</code> en <code>~/nexum-backups/&lt;versión&gt;-mysql-sistema-&lt;fecha&gt;.sql.gz</code>
+          <li>Con <code>--copia</code>, guarda la base <code>mysql</code> en <code>~/nexum-backups/bbdd/&lt;versión&gt;/mysql-sistema-&lt;fecha&gt;.sql.gz</code>
             con <code>mariadb-dump --databases mysql | gzip</code>.</li>
           <li>Pone al día las tablas con la herramienta de la propia versión, con el usuario dueño de los datos:
             <code data-so="linux">sudo -u mysql /opt/lampp/bin/mariadb-upgrade --no-defaults -S /opt/lampp/var/mysql/mysql.sock -uroot --upgrade-system-tables --force</code><code data-so="mac">/Applications/XAMPP/xamppfiles/mysql/bin/mariadb-upgrade --no-defaults -S /Applications/XAMPP/xamppfiles/var/mysql/mysql.sock -uroot --upgrade-system-tables --force</code>.</li>
@@ -772,7 +772,7 @@
       <li>Lee tu copia una sola vez a una carpeta temporal del administrador (<code>sudo mktemp -d /tmp/lvm-vhosts.XXXXXX</code>), para
         que lo que se comprueba sea lo mismo que se escribe.</li>
       <li>Comprueba que no lleva directivas que cambiarían todo Apache.</li>
-      <li>Con las copias encendidas, guarda el de ahora en <code>~/nexum-backups/httpd-vhosts.conf-&lt;fecha&gt;</code>.</li>
+      <li>Con las copias encendidas, guarda el de ahora en <code>~/nexum-backups/sistema/vhosts/httpd-vhosts.conf-&lt;fecha&gt;</code>.</li>
       <li>Lo escribe como del administrador:
         <code data-so="linux">sudo install -o root -g root -m 644 &lt;nuevo&gt; /opt/config/httpd-vhosts.conf</code><code data-so="mac">sudo install -o root -g wheel -m 644 &lt;nuevo&gt; /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>.</li>
       <li>Comprueba la configuración (<code data-so="linux">sudo /opt/lampp/bin/httpd -f /opt/lampp/etc/httpd.conf -t</code><code data-so="mac">sudo /Applications/XAMPP/xamppfiles/apache2/bin/httpd -t -f /Applications/XAMPP/xamppfiles/etc/httpd.conf</code>);
@@ -783,7 +783,7 @@
     <ol>
       <li>Comprueba que la copia sigue teniendo <code>127.0.0.1 localhost</code>, que no lleva caracteres raros y que las líneas nuevas
         solo llevan dominios a <code>127.*</code>, <code>::1</code> o <code>0.0.0.0</code>.</li>
-      <li>Con las copias encendidas, guarda el de ahora en <code>~/nexum-backups/hosts-&lt;fecha&gt;</code>.</li>
+      <li>Con las copias encendidas, guarda el de ahora en <code>~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt;</code>.</li>
       <li>Lo escribe: <code>sudo tee /etc/hosts &lt; &lt;copia&gt;</code>.</li>
       <li>Hace que el navegador deje de aceptar el certificado de las tiendas que hayan dejado de estar falseadas.</li>
     </ol>
@@ -794,8 +794,10 @@
 
   <h3 id="ventana-actualizar">Buscar una versión nueva del programa</h3>
   <p>Menú ☰ → <b>«Buscar actualizaciones»</b> (sale abajo «Buscando actualizaciones…»). Busca en GitHub<span data-so="linux"> y en tu
-    carpeta de Descargas</span> un paquete más nuevo y firmado. Lo mismo se hace solo al abrir la ventana, el primer arranque de cada día y
-    cada cuatro arranques.</p>
+    carpeta de Descargas</span> un paquete más nuevo y firmado. Lo mismo se hace solo <b>cada vez que abres el programa</b>,
+    también cuando estaba escondido junto al reloj y lo vuelves a abrir (si hace más de media hora que lo miró), y cada cuatro horas
+    mientras está abierto. Si la encuentra con la ventana escondida, te lo dice al mostrarla. Si dices que no, no te lo vuelve a
+    preguntar solo hasta la próxima vez que abras el programa (desde el menú, siempre).</p>
   <ul>
     <li><b>Si no hay ninguna</b>: «Tienes la última versión». <span data-so="linux">Si solo encuentra un paquete sin firma, no lo instala
       desde aquí y te da la orden para instalarlo en la terminal.</span></li>
@@ -1273,7 +1275,7 @@
       <li>Comprueba que las dos versiones existen, que no comparten las bases y que la de origen tiene esa base. Si en el destino ya
         hay una con ese nombre y no has puesto <code>--sustituir</code>, se para sin tocar nada.</li>
       <li>Con <code>--sustituir --copia</code>, guarda antes la del destino en
-        <code>~/nexum-backups/lampp-8.2-wp_panaderia_luna_8_2-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
+        <code>~/nexum-backups/bbdd/lampp-8.2/wp_panaderia_luna_8_2-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
       <li>Hace un <b>volcado</b> (un fichero <code>.sql</code> con todas las tablas y sus datos, que se puede volver a cargar) de la base
         de origen con <code>mysqldump</code>, a un fichero temporal en <code>~/.nexum</code>. Si la versión de origen no está en
         marcha, arranca su MariaDB aparte, sin red, solo para eso.</li>
@@ -1409,7 +1411,7 @@
       <li>Prepara una copia de <code>/etc/hosts</code>: con <code>si</code>, quita el <code>#</code> de la línea
         <code>#127.0.0.1 ferreteria-norte.com www.ferreteria-norte.com</code> (o la añade si no está); con <code>no</code>, le pone el
         <code>#</code> delante.</li>
-      <li>Con las copias de los ficheros encendidas, guarda el de antes en <code>~/nexum-backups/hosts-&lt;fecha&gt;</code>.</li>
+      <li>Con las copias de los ficheros encendidas, guarda el de antes en <code>~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt;</code>.</li>
       <li>Escribe la copia encima: <code>sudo tee /etc/hosts</code>.</li>
       <li data-so="linux">Corta las conexiones de los navegadores con la web real de ese dominio (la dirección que tenía antes de
         falsearlo) y con tu equipo, en los puertos de las webs: <code>sudo ss -K src 127.0.0.1:51234 dst 127.0.0.1:443</code>, una por
@@ -1489,7 +1491,7 @@
     <code>-nuevos.txt</code>, <code>-modificados.txt</code>; la del
     <code>git pull</code>, <code>-borrados-en-github.txt</code>).</div>
   <div class="nota"><b>Copias que guarda</b>Con la casilla marcada, lo que el código sustituye o borra va a
-    <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,
+    <code>~/nexum-backups/proyectos/panaderia-luna/antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,
     como <code>.sql.gz</code>. Sin ella, lo que el código sustituye o quita se borra. Si cancelas a medias, el proyecto queda con lo hecho
     hasta ese momento, y lo sustituido sigue en <code>~/nexum-backups</code> si guardaste la copia.</div>
   <details class="terminal"><summary>En la terminal</summary>
@@ -1507,7 +1509,7 @@
       <li>Con <code>--codigo</code>: abre el paquete (sin sacar nada fuera de la carpeta, ni enlaces) y copia cada fichero que cambia
         encima de <code data-so="linux">/opt/htdocs/panaderia-luna</code><code data-so="mac">htdocs/panaderia-luna</code>, sin tocar su
         <code>.git</code>. Con <code>sobrescribir</code>, además borra lo que el paquete no trae. Con <code>--copia</code>, lo que
-        sustituye o borra lo mueve antes a <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-&lt;fecha&gt;</code>.</li>
+        sustituye o borra lo mueve antes a <code>~/nexum-backups/proyectos/panaderia-luna/antes-de-actualizar-&lt;fecha&gt;</code>.</li>
       <li>Con <code>--crear-base</code> y sin <code>--bd</code>: si la base no existe, la crea vacía (<code>nexum crear-bd
         wp_panaderia_luna</code>); y la asocia al proyecto, como al cargar un volcado con su proyecto.</li>
       <li>Con <code>--bd</code>: <code>nexum importar-bd &lt;fichero&gt; wp_panaderia_luna --crear --proyecto panaderia-luna</code>
@@ -1735,7 +1737,7 @@
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Con <code>--copia</code>, primero guarda su base de Docker en
-        <code>~/nexum-backups/docker-panaderia-luna-wp_panaderia_luna-&lt;fecha&gt;.sql.gz</code>, con <code>mariadb-dump</code> dentro de su
+        <code>~/nexum-backups/bbdd/docker/docker-panaderia-luna-wp_panaderia_luna-&lt;fecha&gt;.sql.gz</code>, con <code>mariadb-dump</code> dentro de su
         MariaDB de Docker. Si la copia falla, no se borra nada.</li>
       <li>Para y borra sus contenedores y sus volúmenes (los discos de datos de Docker): <code>docker compose --project-directory
         ~/.nexum/docker/panaderia-luna down -v</code>.</li>
@@ -2064,10 +2066,24 @@
     <p>En WordPress, no: solo se piden a la web real las que faltan, mientras el proyecto está cargado. En PrestaShop se descargan a su
       carpeta <code>img</code> y se quedan allí. En ninguno de los dos casos se toca la base de datos.</p></details>
   <details><summary>¿Dónde están las copias que guarda?</summary>
-    <p>En <code>~/nexum-backups</code>, con la fecha en el nombre. Solo se guardan las que pides: al cargar una base encima de otra, al
+    <p>En <code>~/nexum-backups</code>, con la fecha en el nombre y cada clase en su carpeta (ahí solo hay copias: los registros y las
+      listas de ficheros van a <code>~/.nexum</code>):</p>
+    <pre>~/nexum-backups/
+├── bbdd/
+│   ├── lampp-8.4/        wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz, mysql-sistema-…, todas-las-bases-….tar.gz
+│   └── docker/           docker-panaderia-luna-wp_panaderia_luna-….sql.gz
+├── proyectos/
+│   └── panaderia-luna/   antes-de-actualizar-20261110-103000/, wp-config.php-…, cache-prod-…/
+└── sistema/
+    ├── hosts/            hosts-20261110-103000
+    ├── vhosts/           httpd-vhosts.conf-…
+    └── lampp-8.4/        httpd.conf-…, php.ini-…</pre>
+    <p>Solo se guardan las que pides: al cargar una base encima de otra, al
       sustituirla, al actualizar o al borrar, marcando «Guardar antes una copia en ~/nexum-backups» (viene desmarcada). Los vhosts, el
       fichero de hosts y la configuración de los proyectos se copian antes de cambiarlos si enciendes las copias de los ficheros que
-      cambia el programa, en <a href="#carpetas">Configuración → Carpetas</a>. Allí ves cuánto ocupan y las borras con «Borrar…».</p></details>
+      cambia el programa, en <a href="#carpetas">Configuración → Carpetas</a>. Allí ves cuánto ocupan y las borras con «Borrar…». Lo que
+      guardaban las versiones anteriores, todo suelto en <code>~/nexum-backups</code>, se ordena solo en esas carpetas al abrir el programa
+      (sin borrar nada).</p></details>
   <details><summary>¿Qué se borra al borrar un proyecto?</summary>
     <p>Su carpeta, sus vhosts y las líneas de sus dominios en el fichero de hosts, y sus contenedores de Docker si los tiene. Su base de
       datos de la versión activa solo si lo marcas, con copia en <code>~/nexum-backups</code> si marcas también su casilla. <b>La carpeta no se puede
@@ -2608,7 +2624,7 @@
       <li>Compila la nueva pila en una carpeta temporal, como al instalar. Mientras, la de ahora sigue funcionando.</li>
       <li>Si es la activa, la para: <code>sudo /opt/lampp-8.4/lampp stop</code>.</li>
       <li>Si la rama de MariaDB cambia y has pedido la copia, guarda las bases de ahora:
-        <code>tar -czf ~/nexum-backups/lampp-8.4-bases-&lt;fecha&gt;.tar.gz -C /opt/lampp-8.4/var mysql</code>.</li>
+        <code>tar -czf ~/nexum-backups/bbdd/lampp-8.4/todas-las-bases-&lt;fecha&gt;.tar.gz -C /opt/lampp-8.4/var mysql</code>.</li>
       <li>Aparta la de antes: <code>sudo mv /opt/lampp-8.4 /opt/lampp-8.4.anterior-&lt;fecha&gt;</code>, y copia la nueva a <code>/opt/lampp-8.4</code>.
         Si algo falla al copiar, vuelve a dejar la de antes en su sitio.</li>
       <li>Si MariaDB sigue en la misma rama, se lleva las bases:
@@ -2621,7 +2637,7 @@
         actualizado» y no hace nada.</li>
       <li>Compila la nueva pila en una carpeta temporal, como al instalar. Mientras, la de ahora sigue funcionando.</li>
       <li>Si la rama de MariaDB cambia y has pedido la copia, guarda las bases de ahora:
-        <code>tar -czf ~/nexum-backups/XAMPP-8.4-bases-&lt;fecha&gt;.tar.gz -C /Library/Nexum/XAMPP-8.4/xamppfiles/var mysql</code>.</li>
+        <code>tar -czf ~/nexum-backups/bbdd/XAMPP-8.4/todas-las-bases-&lt;fecha&gt;.tar.gz -C /Library/Nexum/XAMPP-8.4/xamppfiles/var mysql</code>.</li>
       <li>Cambia la de antes por la nueva en <code>/Library/Nexum/XAMPP-8.4</code>, llevándose las bases si MariaDB sigue en la misma rama
         (si no, crea unas vacías), y la arranca si estaba en marcha.</li>
     </ol></div>
@@ -2713,14 +2729,14 @@
       <li>Comprueba que no es la activa, que ninguna otra versión usa sus bases y que su <code>htdocs</code> es un enlace a <code>/opt/htdocs</code>.</li>
       <li>Con <code>--copia</code>: mira cuánto ocupan sus bases (<code>sudo du -sk /opt/lampp-8.2/var/mysql</code>) y cuánto sitio libre tienes
         (<code>df</code>). Si no cabe, no borra nada. Si cabe, las guarda:
-        <code>tar -czf ~/nexum-backups/lampp-8.2-bases-&lt;fecha&gt;.tar.gz -C /opt/lampp-8.2/var mysql</code>.</li>
+        <code>tar -czf ~/nexum-backups/bbdd/lampp-8.2/todas-las-bases-&lt;fecha&gt;.tar.gz -C /opt/lampp-8.2/var mysql</code>.</li>
       <li>Borra la carpeta sin seguir los enlaces (así no toca tus proyectos ni los vhosts):
         <code>sudo rm -R --one-file-system /opt/lampp-8.2</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Comprueba que no es la activa y que su <code>htdocs</code> es un enlace a la carpeta compartida.</li>
       <li>Con <code>--copia</code>: mira si cabe en tu carpeta personal y, si cabe, guarda las bases:
-        <code>tar -czf ~/nexum-backups/XAMPP-8.2-bases-&lt;fecha&gt;.tar.gz -C /Library/Nexum/XAMPP-8.2/xamppfiles/var mysql</code>.
+        <code>tar -czf ~/nexum-backups/bbdd/XAMPP-8.2/todas-las-bases-&lt;fecha&gt;.tar.gz -C /Library/Nexum/XAMPP-8.2/xamppfiles/var mysql</code>.
         Si no cabe, no borra nada.</li>
       <li>Borra la carpeta sin seguir los enlaces: <code>sudo rm -R /Library/Nexum/XAMPP-8.2</code>.</li>
     </ol></div>
@@ -2745,7 +2761,7 @@
   <details><summary>¿Cómo recupero las bases de una copia de ~/nexum-backups?</summary>
     <p>La copia es la carpeta <code>var/mysql</code> entera, comprimida. Lo más sencillo es cargar cada base desde un volcado
       (<a href="#bbdd-cargar">Cargar una base</a>). Si necesitas la carpeta tal cual, descomprímela en una carpeta tuya con
-      <code>tar -xzf ~/nexum-backups/&lt;fichero&gt;.tar.gz -C ~/restaurar</code>.</p></details>
+      <code>tar -xzf ~/nexum-backups/bbdd/lampp-&lt;versión&gt;/todas-las-bases-&lt;fecha&gt;.tar.gz -C ~/restaurar</code>.</p></details>
 </section>
 
 <!-- =========================================================================================== BBDD -->
@@ -2975,7 +2991,7 @@
   <p>Al cargar, además:</p>
   <ul>
     <li><b>La copia de antes</b>: si la has pedido y la base tenía tablas, se guarda en
-      <code>~/nexum-backups/lampp-&lt;versión&gt;-&lt;base&gt;-antes-de-cargar-&lt;fecha&gt;.sql.gz</code>. Si no se puede guardar, no se
+      <code>~/nexum-backups/bbdd/lampp-&lt;versión&gt;/&lt;base&gt;-antes-de-cargar-&lt;fecha&gt;.sql.gz</code>. Si no se puede guardar, no se
       cambia nada.</li>
     <li><b>El fichero se comprueba antes</b> de vaciar la base: si no es un <code>.zip</code> o <code>.gz</code> válido, no se toca nada.</li>
     <li><b>El administrador de pruebas</b>: en un WordPress o una tienda PrestaShop se crea o se deja al día el usuario
@@ -2996,7 +3012,7 @@
       <li>Mira qué es el fichero por sus primeros bytes (gzip, zip o texto) y comprueba que la terminación cuadra. Si no es un
         <code>.gz</code> o <code>.zip</code> válido, para sin tocar nada.</li>
       <li>Si la base tiene tablas y has pedido la copia, la guarda antes, como en <a href="#bbdd-descargar">Descargar una copia</a>, en
-        <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>. Si no se puede guardar, para.</li>
+        <code>~/nexum-backups/bbdd/lampp-8.4/wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>. Si no se puede guardar, para.</li>
       <li>Vacía la base borrándola y creándola otra vez con su mismo juego de caracteres:
         <code>/opt/lampp/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`; CREATE DATABASE `wp_panaderia_luna` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"</code></li>
       <li>Deja que el servidor acepte filas grandes, hasta 1 GB:
@@ -3017,7 +3033,7 @@
     </ol></div>
     <div data-so="mac"><ol>
       <li>Los mismos pasos que en Linux, con el cliente <code>/Applications/XAMPP/xamppfiles/bin/mysql</code>.</li>
-      <li>La copia de antes se llama <code>~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>.</li>
+      <li>La copia de antes se llama <code>~/nexum-backups/bbdd/XAMPP-8.4.27/wp_panaderia_luna-antes-de-cargar-20261110-103000.sql.gz</code>.</li>
       <li>La carga:
         <code>gzip -dc wp_panaderia_luna.sql.gz | sed -E -e 's/^(\/\*![0-9]* *)?SET GLOBAL [^;*]*/\1DO 0 /' -e 's/DEFINER=`[^`]*`@`[^`]*`//g' | /Applications/XAMPP/xamppfiles/bin/mysql -uroot --default-character-set=utf8mb4 --binary-mode --local-infile=0 --max-allowed-packet=1G wp_panaderia_luna</code></li>
       <li>Con <code>--proyecto</code>, la carpeta es <code>/Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code>.</li>
@@ -3043,7 +3059,7 @@
   <ul>
     <li><b>Si el destino no es la versión activa</b>, se arranca su MariaDB solo para la copia, sin red, y se para al acabar.</li>
     <li><b>Si el destino ya la tenía</b>, lo que tuviera se pierde. Si marcas la casilla, antes se guarda una copia suya en
-      <code>~/nexum-backups/lampp-&lt;destino&gt;-&lt;base&gt;-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>; sin ella, avisa en rojo: «Sin
+      <code>~/nexum-backups/bbdd/lampp-&lt;destino&gt;/&lt;base&gt;-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>; sin ella, avisa en rojo: «Sin
       copia, lo que se sustituya no se podrá recuperar.»</li>
     <li><b>Con otro nombre o con otra carpeta de proyecto</b>: usa, en Proyectos, el <b>+</b> de «Entorno» → «En otra versión de PHP (copiar
       su BBDD)…».</li>
@@ -3057,7 +3073,7 @@
       <li>Comprueba que las dos versiones existen, que no comparten las bases y que la base está en la de origen. Si la de destino ya la
         tiene y no hay <code>--sustituir</code>, para sin tocar nada.</li>
       <li>Con <code>--sustituir --copia</code>, guarda antes la del destino en
-        <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
+        <code>~/nexum-backups/bbdd/lampp-8.4/wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
       <li>Descarga la de origen a un fichero temporal solo tuyo, <code>~/.nexum/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>, igual que
         <a href="#bbdd-descargar">Descargar una copia</a> (con un MariaDB temporal si la de origen no está en marcha).</li>
       <li>Si el destino es la versión activa en marcha, lo carga en ella como <a href="#bbdd-cargar">Cargar una copia</a>
@@ -3072,7 +3088,7 @@
     </ol></div>
     <div data-so="mac"><ol>
       <li>Las mismas comprobaciones que en Linux, con las versiones de <code>/Library/Nexum/XAMPP-&lt;versión&gt;</code>.</li>
-      <li>Con <code>--sustituir --copia</code>: <code>~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
+      <li>Con <code>--sustituir --copia</code>: <code>~/nexum-backups/bbdd/XAMPP-8.4.27/wp_panaderia_luna-antes-de-copiar-&lt;fecha&gt;.sql.gz</code>.</li>
       <li>La descarga temporal, en <code>~/.nexum/copia-wp_panaderia_luna-XXXXXX.sql.gz</code>.</li>
       <li>El MariaDB temporal del destino:
         <code>sudo /Library/Nexum/XAMPP-8.4.27/xamppfiles/mysql/bin/mariadbd --defaults-file=/Library/Nexum/XAMPP-8.4.27/xamppfiles/etc/my.cnf --user=&lt;tu usuario&gt; --skip-networking --socket=/tmp/lvm-mysql-XXXX/mysql.sock</code>,
@@ -3219,7 +3235,7 @@
     <li><b>Pulsa «Borrar la BBDD».</b> No pide la contraseña de administrador: se borra en el MariaDB en marcha. Al acabar dice «BBDD «…» borrada» (con «(copia en
       ~/nexum-backups)» si la has guardado).</li>
   </ol>
-  <p>La copia se llama <code>~/nexum-backups/lampp-&lt;versión&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>. Si la has pedido y no se puede
+  <p>La copia se llama <code>~/nexum-backups/bbdd/lampp-&lt;versión&gt;/&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>. Si la has pedido y no se puede
     guardar, no se borra nada. Una base vacía (sin tablas) se borra sin copia.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum borrar-bd wp_panaderia_luna --copia</code> (sin <code>--copia</code>, sin copia). Antes, la
@@ -3228,15 +3244,15 @@
     <div data-so="linux"><ol>
       <li>Comprueba el nombre, que el MariaDB de la versión activa responde y que la base existe.</li>
       <li>Con <code>--copia</code>, la descarga antes como en <a href="#bbdd-descargar">Descargar una copia</a> a
-        <code>~/nexum-backups/lampp-8.4-wp_panaderia_luna-20261110-103000.sql.gz</code> (la carpeta se crea solo para ti:
-        <code>mkdir -p -m 700 ~/nexum-backups</code>). Si falla, no borra.</li>
+        <code>~/nexum-backups/bbdd/lampp-8.4/wp_panaderia_luna-20261110-103000.sql.gz</code> (la carpeta se crea solo para ti:
+        <code>mkdir -p -m 700 ~/nexum-backups/bbdd/lampp-8.4</code>). Si falla, no borra.</li>
       <li>La borra: <code>/opt/lampp/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`"</code></li>
       <li>Quita su fecha de carga de <code>~/.nexum/importaciones</code>.</li>
     </ol></div>
     <div data-so="mac"><ol>
       <li>Las mismas comprobaciones.</li>
       <li>Con <code>--copia</code>, la vuelca antes directamente:
-        <code>/Applications/XAMPP/xamppfiles/bin/mysqldump -uroot --default-character-set=utf8mb4 --single-transaction --routines --triggers --events wp_panaderia_luna | gzip &gt; ~/nexum-backups/XAMPP-8.4.27-wp_panaderia_luna-20261110-103000.sql.gz</code>.
+        <code>/Applications/XAMPP/xamppfiles/bin/mysqldump -uroot --default-character-set=utf8mb4 --single-transaction --routines --triggers --events wp_panaderia_luna | gzip &gt; ~/nexum-backups/bbdd/XAMPP-8.4.27/wp_panaderia_luna-20261110-103000.sql.gz</code>.
         Si falla, no borra.</li>
       <li>La borra: <code>/Applications/XAMPP/xamppfiles/bin/mysql -uroot -e "DROP DATABASE `wp_panaderia_luna`"</code></li>
       <li>Quita su fecha de carga de <code>~/.nexum/importaciones</code>.</li>
@@ -3325,7 +3341,7 @@
       <li>Comprueba si las tablas son antiguas: mira el tipo de las columnas <code>mysql.column_stats.min_value</code> y
         <code>mysql.innodb_table_stats.table_name</code> en <code>information_schema.COLUMNS</code>. Si ya están al día, solo lo dice.</li>
       <li>Con <code>--copia</code>, guarda la base <code>mysql</code>:
-        <code>/opt/lampp-8.4/mysql/bin/mariadb-dump --no-defaults -S /opt/lampp-8.4/var/mysql/mysql.sock -uroot --databases mysql | gzip &gt; ~/nexum-backups/lampp-8.4-mysql-sistema-&lt;fecha&gt;.sql.gz</code>
+        <code>/opt/lampp-8.4/mysql/bin/mariadb-dump --no-defaults -S /opt/lampp-8.4/var/mysql/mysql.sock -uroot --databases mysql | gzip &gt; ~/nexum-backups/bbdd/lampp-8.4/mysql-sistema-&lt;fecha&gt;.sql.gz</code>
         (en una versión XAMPP, <code>bin/mysqldump</code>).</li>
       <li>Las pone al día con el programa de la propia versión, como el dueño de los datos (nunca como root):
         <code>sudo -u &lt;dueño de los datos&gt; /opt/lampp-8.4/mysql/bin/mariadb-upgrade --no-defaults -S /opt/lampp-8.4/var/mysql/mysql.sock -uroot --upgrade-system-tables --force</code>
@@ -3337,7 +3353,7 @@
     <div data-so="mac"><ol>
       <li>Lo mismo con la versión activa del Mac: <code>/Library/Nexum/XAMPP-&lt;versión&gt;/xamppfiles/mysql/bin/mariadb-upgrade</code>
         y <code>mariadb-dump</code>, con el socket de su <code>var/mysql</code>.</li>
-      <li>La copia se llama <code>~/nexum-backups/XAMPP-&lt;versión&gt;-mysql-sistema-&lt;fecha&gt;.sql.gz</code>.</li>
+      <li>La copia se llama <code>~/nexum-backups/bbdd/XAMPP-&lt;versión&gt;/mysql-sistema-&lt;fecha&gt;.sql.gz</code>.</li>
       <li><code>mariadb-upgrade</code> se ejecuta con el dueño de los datos (normalmente, tu usuario).</li>
     </ol></div>
     <p>Para comprobarlo: <code>nexum --simular reparar-bd-sistema</code> (dice «ya estan al dia» cuando no hace falta).</p>
@@ -3882,7 +3898,7 @@
       nuevo. Te pregunta «¿Pasar … al Apache de Docker?», con la casilla «Guardar antes una copia en
       ~/nexum-backups», desmarcada (sin ella, avisa en rojo: «Sin copia, su BBDD de ahora no se podrá recuperar.»). Su base se carga en la
       MariaDB común: con la casilla, a través de una copia que se queda en
-      <code>~/nexum-backups/docker-&lt;proyecto&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>; sin ella, de un fichero temporal que se borra
+      <code>~/nexum-backups/bbdd/docker/docker-&lt;proyecto&gt;-&lt;base&gt;-&lt;fecha&gt;.sql.gz</code>; sin ella, de un fichero temporal que se borra
       al acabar. Después quita sus
       contenedores de antes, su vhost de LAMPP y su línea de <code>/etc/hosts</code>. Pulsa <b>«Pasarlo»</b>; pide la contraseña de
       administrador. Ya no necesitará LAMPP y podrás añadirle más versiones de PHP.</li>
@@ -3985,7 +4001,7 @@
       <code>nexum docker-borrar academia-flor --copia</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Con <code>--copia</code>, guarda antes su base en <code>~/nexum-backups/docker-academia-flor-academia_flor-&lt;fecha&gt;.sql.gz</code>:
+      <li>Con <code>--copia</code>, guarda antes su base en <code>~/nexum-backups/bbdd/docker/docker-academia-flor-academia_flor-&lt;fecha&gt;.sql.gz</code>:
         <code>mariadb-dump --single-transaction --routines --triggers --events academia_flor</code> dentro de
         <code>nexum-mariadb-11-8</code> (en un proyecto de antes, dentro de su propio contenedor de MariaDB), comprimido con
         <code>gzip</code>.</li>
@@ -4381,7 +4397,7 @@
         <code>127.0.0.1 panaderia-luna.com www.panaderia-luna.com</code>. Al dejar de falsear, le pone el <code>#</code> delante. Solo toca líneas
         de <code>127.0.0.1</code> con dominios de tus vhosts.</li>
       <li>Comprueba la copia (que sigue la línea de <code>localhost</code>, que no lleva ningún dominio a otro equipo) y, con las copias de los
-        ficheros encendidas, guarda el de ahora: <code>cp /etc/hosts ~/nexum-backups/hosts-&lt;fecha&gt;</code>.</li>
+        ficheros encendidas, guarda el de ahora: <code>cp /etc/hosts ~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt;</code>.</li>
       <li>La escribe encima: <code>sudo tee /etc/hosts &lt; copia</code>.<span data-so="mac"> Después vacía la caché de nombres del Mac:
         <code>sudo dscacheutil -flushcache</code> y <code>sudo killall -HUP mDNSResponder</code>.</span></li>
       <li><span data-so="linux">Pone al día qué certificados acepta el navegador: el de una tienda recién falseada pasa a aceptarse y el de una que
@@ -4501,7 +4517,7 @@ define('WP_HOME', 'https://web.local');
         y lo deja en <span data-so="linux"><code>/opt/config/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code> (como root:
         <code>sudo install -o 0 -g 0 -m 644 …</code>; la clave, con <code>-m 600</code>)</span><span
         data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code></span>.</li>
-      <li>Con las copias de los ficheros encendidas, guarda los vhosts de ahora en <code>~/nexum-backups/httpd-vhosts.conf-&lt;fecha&gt;</code>.</li>
+      <li>Con las copias de los ficheros encendidas, guarda los vhosts de ahora en <code>~/nexum-backups/sistema/vhosts/httpd-vhosts.conf-&lt;fecha&gt;</code>.</li>
       <li>Añade al final de los vhosts dos bloques <code>&lt;VirtualHost&gt;</code>, uno del puerto 80 (http) y otro del 443 (https, con
         <code>SSLEngine on</code> y el certificado), con <code>ServerName panaderia-luna.com</code>, <code>ServerAlias www.panaderia-luna.com</code> y
         <code>DocumentRoot "<span data-so="linux">/opt/lampp/htdocs</span><span data-so="mac">/Applications/XAMPP/xamppfiles/htdocs</span>/panaderia-luna"</code>:
@@ -4659,7 +4675,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li>Prepara una copia de <code>/etc/hosts</code>: en las líneas que llevan <code>web.local</code> a otra dirección, lo quita (si era lo único
         de la línea, la comenta); si no hay ninguna línea de <code>127.0.0.1</code> con <code>web.local</code>, añade
         <code>127.0.0.1 web.local</code>.</li>
-      <li>Guarda el de ahora en <code>~/nexum-backups/hosts-&lt;fecha&gt;</code> (con las copias de los ficheros encendidas) y escribe la copia:
+      <li>Guarda el de ahora en <code>~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt;</code> (con las copias de los ficheros encendidas) y escribe la copia:
         <code>sudo tee /etc/hosts &lt; copia</code>.</li>
     </ol>
     <p>Si ya estaba bien, dice «web.local ya lleva a este equipo (127.0.0.1)» y no cambia nada. Para comprobarlo:
@@ -4676,7 +4692,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
   <details><summary>¿Puedo recuperar el fichero de hosts de antes?</summary>
     <p>Sí, si tienes encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>: entonces, antes de cada
       cambio se guarda en <code>~/nexum-backups</code>, con la fecha en el nombre. Vienen apagadas; enciéndelas en Configuración →
-      Carpetas antes de hacer cambios que quieras poder deshacer. Para volver a una: <code>sudo cp ~/nexum-backups/hosts-&lt;fecha&gt; /etc/hosts</code>.</p></details>
+      Carpetas antes de hacer cambios que quieras poder deshacer. Para volver a una: <code>sudo cp ~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt; /etc/hosts</code>.</p></details>
   <details><summary>Ha salido «No se ha cambiado /etc/hosts»</summary>
     <p>No se ha podido hacer el cambio (por ejemplo, porque has cancelado la contraseña). El interruptor vuelve a como estaba.</p></details>
   <details><summary>¿Puedo poner a mano una línea que lleve un dominio a otro equipo?</summary>
@@ -5117,7 +5133,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         <li>Pide la contraseña y lee la copia una sola vez a una carpeta temporal del administrador. Comprueba que solo lleva cosas de vhost
           y que los registros y certificados van en sus carpetas.</li>
         <li>Con las copias de los ficheros encendidas:
-          <code>cp /opt/config/httpd-vhosts.conf ~/nexum-backups/httpd-vhosts.conf-</code><i>AAAAMMDD-HHMMSS</i>.</li>
+          <code>cp /opt/config/httpd-vhosts.conf ~/nexum-backups/sistema/vhosts/httpd-vhosts.conf-</code><i>AAAAMMDD-HHMMSS</i>.</li>
         <li>Escribe el fichero nuevo, del administrador y legible por todos:
           <code>sudo install -o root -g root -m 644</code> <i>copia</i> <code>/opt/config/httpd-vhosts.conf</code>.</li>
         <li>Le pide a Apache que lo revise: <code>sudo /opt/lampp/bin/httpd -f /opt/lampp/etc/httpd.conf -t</code>. Si dice que no, vuelve a
@@ -5153,7 +5169,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <li>Comprueba que sigue la línea de <code>localhost</code> (<code>127.0.0.1 localhost</code>), que no lleva caracteres de control y que
         las líneas nuevas solo llevan a este equipo (<code>127.x</code>, <code>::1</code> o <code>0.0.0.0</code>). Si no, no cambia nada y
         dice por qué.</li>
-      <li>Con las copias de los ficheros encendidas: <code>cp /etc/hosts ~/nexum-backups/hosts-</code><i>AAAAMMDD-HHMMSS</i>.</li>
+      <li>Con las copias de los ficheros encendidas: <code>cp /etc/hosts ~/nexum-backups/sistema/hosts/hosts-</code><i>AAAAMMDD-HHMMSS</i>.</li>
       <li>Escribe el nuevo encima, conservando su dueño y sus permisos: <code>sudo tee /etc/hosts &lt;</code> <i>copia</i>.</li>
       <li data-so="mac">Vacía la memoria de nombres del Mac para que lo use al momento:
         <code>sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code>.</li>
@@ -6039,7 +6055,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <p>Lo que hace «Apartar», paso a paso:</p>
       <ol>
         <li>Para el XAMPP oficial y comprueba que no queda nada suyo en marcha.</li>
-        <li>Copia cada base de datos en un <code>.zip</code> a <code>~/nexum-backups/XAMPP-oficial-</code><i>fecha</i>. Si algo falla, esa
+        <li>Copia cada base de datos en un <code>.zip</code> a <code>~/nexum-backups/xampp-oficial/XAMPP-oficial-</code><i>fecha</i>. Si algo falla, esa
           carpeta se renombra a <code>incompleta-…</code> y no se mueve nada.</li>
         <li>Copia sus proyectos a <code>/Library/Nexum/XAMPP-compartido/htdocs</code> y sus vhosts a los compartidos.</li>
         <li>Lo mueve: <code>sudo mv /Applications/XAMPP /Applications/XAMPP-oficial-</code><i>fecha</i>.</li>
@@ -7195,7 +7211,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p><b>Compruébalo:</b> <code data-so="linux">sudo /opt/lampp/bin/httpd -f /opt/lampp/etc/httpd.conf -t</code><code data-so="mac">sudo /Applications/XAMPP/xamppfiles/apache2/bin/httpd -t -f /Applications/XAMPP/xamppfiles/etc/httpd.conf</code>
       dice «Syntax OK» o la línea que falla. <b>Arréglalo:</b> corrígela con <code>nexum vhosts</code>; si falta un certificado,
       <code>nexum arreglar-certificados</code> le pone uno. Si guardas copias de los ficheros, la anterior está en
-      <code>~/nexum-backups/httpd-vhosts.conf-&lt;fecha&gt;</code>.</p></details>
+      <code>~/nexum-backups/sistema/vhosts/httpd-vhosts.conf-&lt;fecha&gt;</code>.</p></details>
   <details><summary>MariaDB no arranca o se cae</summary>
     <p>Lo normal es que el puerto 3306 lo tenga otro MariaDB o MySQL (del sistema o de otra versión), o que su disco esté lleno.</p>
     <p><b>Compruébalo:</b> el final de su registro de errores (<code data-so="linux">sudo tail -50 /opt/lampp/var/mysql/mysqld.err</code><span

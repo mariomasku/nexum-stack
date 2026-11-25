@@ -107,6 +107,10 @@ func sampleUsage() -> [String: UsagePart] {
 
 /// Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 let UPDATE_EVERY = 4
+/// Versión nueva del programa: otra búsqueda al volver a la ventana si hace más de esto de la última, y
+/// cada tanto con el programa abierto
+let UPDATE_RECHECK: TimeInterval = 30 * 60
+let UPDATE_RECHECK_OPEN: TimeInterval = 4 * 3600
 
 /// ¿Toca buscar una versión nueva al abrir? Se lleva en ~/.nexum/actualizaciones-arranques:
 /// la fecha y los arranques desde la última vez que se buscó (el mismo fichero que en Linux)

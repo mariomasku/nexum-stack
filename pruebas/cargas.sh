@@ -74,7 +74,7 @@ check "carga con --copia sobre una base con tablas: termina bien" '[ $rc -eq 0 ]
 check "... no queda la tabla que el volcado ya no trae" '[ "$(sql "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"vieja\"")" = 0 ]'
 check "... ni las filas de la carga a medias: 3 filas, con su clave primaria" '[ "$(sql "SELECT COUNT(*) FROM wpz.claims")" = 3 ] && [ "$(sql "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=\"wpz\" AND TABLE_NAME=\"claims\" AND INDEX_NAME=\"PRIMARY\"")" = 1 ]'
 check "... la base conserva su juego de caracteres" '[ "$(sql "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=\"wpz\"")" = latin1_spanish_ci ]'
-f=$(ls "$C"/*-wpz-antes-de-cargar-*.sql.gz 2> /dev/null | head -1)
+f=$(ls "$C"/bbdd/*/wpz-antes-de-cargar-*.sql.gz 2> /dev/null | head -1)
 check "... antes guarda una copia en ~/nexum-backups con lo que tenia (la tabla vieja)" '[ -n "$f" ] && gzip -dc "$f" | grep -q "CREATE TABLE \`vieja\`" && grep -qF "$f" <<< "$out"'
 check "... ~/nexum-backups es solo tuya" '[ "$(command stat -c %a "$C")" = 700 ]'
 
@@ -110,7 +110,7 @@ check "un .gz roto no vacia la base" '[ $rc -ne 0 ] && [ "$(sql "SELECT COUNT(*)
 # Volcado que falla a medias: dice donde esta la copia de lo que habia
 printf 'CREATE TABLE a (x INT);\nINSERT INTO noexiste VALUES (1);\n' > "$MDB/roto.sql"
 out=$(load "$MDB/roto.sql" wpz --copia); rc=$?
-check "si el volcado falla, dice donde esta la copia de lo que habia" '[ $rc -ne 0 ] && grep -q "Lo que tenia antes esta en .*nexum-backups/.*-wpz-antes-de-cargar-" <<< "$out"'
+check "si el volcado falla, dice donde esta la copia de lo que habia" '[ $rc -ne 0 ] && grep -q "Lo que tenia antes esta en .*nexum-backups/bbdd/[^/]*/wpz-antes-de-cargar-" <<< "$out"'
 
 # Como root (desde la 1.57.48): un volcado que toca otra base, crea usuarios o trae SQL SECURITY
 # INVOKER se carga tal cual, sin «Access denied»

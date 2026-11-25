@@ -253,8 +253,8 @@ function docker_pass() {
     task_step
     echo "Copia de su BBDD ($db)"
     if [ $copy -eq 1 ]; then
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
-        backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        copies_in bbdd/docker > /dev/null || return 1
+        backup="$COPIES_DIR/bbdd/docker/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
     else
         # (sin copia: un fichero solo tuyo en ~/.nexum, que se borra cuando ya esta cargada)
         mkdir -p -m 700 "$LOG_DIR" || return 1
@@ -417,6 +417,17 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.51 (25 nov 2026)
+- Aviso de versión nueva: se busca cada vez que se abre el programa
+  (antes, solo el primer arranque del día), también al volver a
+  abrirlo cuando estaba escondido junto al reloj (si hace más de media
+  hora) y cada cuatro horas con él abierto. Si se encuentra con la
+  ventana escondida, se ofrece al mostrarla.
+- ~/nexum-backups, por carpetas: bbdd/<versión> y bbdd/docker,
+  proyectos/<carpeta> y sistema/hosts, sistema/vhosts y
+  sistema/<versión>. Lo que había suelto se ordena solo al abrir el
+  programa, sin borrar nada.
 
 1.57.50 (25 nov 2026)
 - Registro de Actualizar proyecto: los 5 primeros ficheros nuevos (se

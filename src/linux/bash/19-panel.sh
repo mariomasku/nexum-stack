@@ -1131,6 +1131,17 @@ QUE HACE
 
 VERSIONES
 
+1.57.51 (25 nov 2026)
+- Aviso de versión nueva: se busca cada vez que se abre el programa
+  (antes, solo el primer arranque del día), también al volver a
+  abrirlo cuando estaba escondido junto al reloj (si hace más de media
+  hora) y cada cuatro horas con él abierto. Si se encuentra con la
+  ventana escondida, se ofrece al mostrarla.
+- ~/nexum-backups, por carpetas: bbdd/<versión> y bbdd/docker,
+  proyectos/<carpeta> y sistema/hosts, sistema/vhosts y
+  sistema/<versión>. Lo que había suelto se ordena solo al abrir el
+  programa, sin borrar nada.
+
 1.57.50 (25 nov 2026)
 - Registro de Actualizar proyecto: los 5 primeros ficheros nuevos (se
   copian) y, aparte, los 5 primeros modificados (se sustituyen); si

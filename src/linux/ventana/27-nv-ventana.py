@@ -28,6 +28,8 @@ class App2(NvBandeja,
     def do_activate(self):
         if getattr(self, "win", None):
             self.win.present()
+            # (abrir Nexum con la ventana escondida junto al reloj también es «abrirlo»: se busca otra vez)
+            self.update_recheck()
             return
         hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
 
@@ -157,6 +159,7 @@ class App2(NvBandeja,
         GLib.timeout_add_seconds(5, lambda: (self.np_repos_load(), False)[1])
         # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
         GLib.timeout_add_seconds(6, self.auto_check_package)
+        GLib.timeout_add_seconds(UPDATE_RECHECK_OPEN, lambda: (self.update_recheck(), True)[1])
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
         # Capturas de cada página (LVM_CAPTURA=<carpeta>: las del manual, con LVM_DEMO)

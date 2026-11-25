@@ -9,7 +9,7 @@ LINUX=$HERE/../lvm-instalador.sh
 grep -q "LVM_SWIFT" "$SRC" && grep -q "^func updateCheckDue() -> Bool {" "$SRC" || { echo "  ok    (sin la ventana 1.40 del Mac)"; exit 0; }
 
 # Actualizaciones
-check "actualizaciones: al abrir, solo si toca (y ya no se apunta la versión rechazada)" 'grep -A1 "if updateCheckDue() {" "$SRC" | grep -q "self.checkUpdates(auto: true)" && ! grep -q "declinedUpdate" "$SRC"'
+check "actualizaciones: siempre al abrir, otra vez al volver si hace rato y cada pocas horas (1.57.51)" 'grep -q "autoCheckUpdates(components: true)" "$SRC" && grep -q "if components && updateCheckDue() {" "$SRC" && grep -qF "queue: .main) { [weak self] _ in self?.updateRecheck() }" "$SRC" && grep -q "withTimeInterval: UPDATE_RECHECK_OPEN, repeats: true" "$SRC" && grep -qF "if auto && self.updateDeclined.contains(u[1]) { return }" "$SRC"' 
 check "actualizaciones: cada tantos arranques como en Linux, en el mismo fichero" '[ "$(grep -oP "^let UPDATE_EVERY = \K[0-9]+" "$SRC")" == "$(grep -oP "^UPDATE_EVERY = \K[0-9]+" "$LINUX")" ] && grep -q "\"/actualizaciones-arranques\"" "$SRC"'
 # Botones del visor
 mac_keys=$(grep -A3 "^let VISOR_BUTTONS:" "$SRC" | grep -oP '\("\K[a-z]+(?=", "[^"]+"\))' | tr '\n' ' ')

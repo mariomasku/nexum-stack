@@ -174,7 +174,7 @@ out=$(project_update proyecto --crear-base); rc=$?
 check "--crear-base sin --base: no vale" '[ $rc -ne 0 ] && grep -q "^Uso:" <<< "$out"'
 unset -f db_exists create_database import_project
 fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --bd "$W/d.sql" --base wp_x --copia); rc=$?
-check "con --copia: lo sustituido en ~/nexum-backups y la BBDD se carga con --copia" '[ $rc -eq 0 ] && [ "$(cat "$COPIES_DIR"/proyecto-antes-de-actualizar-*/index.php)" == viejo ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto --copia" "$W/orden"'
+check "con --copia: lo sustituido en ~/nexum-backups y la BBDD se carga con --copia" '[ $rc -eq 0 ] && [ "$(cat "$COPIES_DIR"/proyectos/proyecto/antes-de-actualizar-*/index.php)" == viejo ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto --copia" "$W/orden"'
 fresh; : > "$W/orden"; out=$(PULL_RC=1 project_update proyecto --codigo "$W/normal.zip" --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "si el pull falla, no se copia ni se carga nada" '[ $rc -ne 0 ] && [ "$(cat "$P/index.php")" == viejo ] && ! grep -qE "^(bd|carga)" "$W/orden" && grep -q "No se ha copiado" <<< "$out"'
 fresh; : > "$W/orden"; out=$(BD_RC=1 project_update proyecto --bd "$W/d.sql" --base wp_x); rc=$?

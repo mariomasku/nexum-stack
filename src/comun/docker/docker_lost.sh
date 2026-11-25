@@ -24,10 +24,12 @@ function docker_lost() {
     return 0
 }
 
-# La copia mas reciente de ~/nexum-backups que empieza por <prefijo> y sigue con su fecha (-AAAAMMDD-HHMMSS)
+# La copia mas reciente de ~/nexum-backups/bbdd/docker (o, de antes de la 1.57.51, suelta en ~/nexum-backups)
+# que empieza por <prefijo> y sigue con su fecha (-AAAAMMDD-HHMMSS)
 function docker_last_copy() {
     local f best="" key bkey=""
-    for f in "$COPIES_DIR/$1"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].sql.gz; do
+    for f in "$COPIES_DIR/bbdd/docker/$1"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].sql.gz \
+            "$COPIES_DIR/$1"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].sql.gz; do
         [ -f "$f" ] && [ ! -L "$f" ] || continue
         key=${f%.sql.gz}
         key=${key: -15}
@@ -46,11 +48,11 @@ function docker_backup_all() {
     local why=${1:-no se sigue} p lost v db fail=0 n=0 name stamp out skip log
     [ "$DRY" -eq 1 ] && { echo "  [simulacion] copia de todas las BBDD de Docker en ~/nexum-backups"; return 0; }
     docker_ready || { echo "Docker no responde: no se puede hacer la copia de sus BBDD"; return 1; }
-    mkdir -p -m 700 "$COPIES_DIR" || return 1
+    copies_in bbdd/docker > /dev/null || return 1
     lost=" $(docker_lost | cut -d'|' -f1 | tr '\n' ' ') "
     stamp=$(date +%Y%m%d-%H%M%S)
     log=$(mktemp "$LOG_DIR/docker-copia-XXXXXX") || return 1
-    echo "Copia de las BBDD de Docker en $COPIES_DIR"
+    echo "Copia de las BBDD de Docker en $COPIES_DIR/bbdd/docker"
     for p in $(docker_projects); do
         if [[ "$lost" == *" $p "* ]]; then
             echo "$p: su BBDD ya no está en Docker, no hay nada que copiar (recupérala con docker-recuperar)"
@@ -79,7 +81,7 @@ function docker_backup_all() {
             [[ "$skip" == *" $db "* ]] && continue
             db_valid_name "$db" > /dev/null || continue
             n=$((n + 1))
-            out="$COPIES_DIR/docker-mariadb-$v-$db-$stamp.sql.gz"
+            out="$COPIES_DIR/bbdd/docker/docker-mariadb-$v-$db-$stamp.sql.gz"
             ( umask 077
               set -o pipefail
               dk exec -i "$(docker_maria_name "$v")" sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD exec $(command -v mariadb-dump || command -v mysqldump) -uroot --single-transaction --routines --triggers --events "$0"' "$db" \
@@ -98,7 +100,7 @@ function docker_backup_all() {
         [[ "$lost" == *" postgres-$v "* ]] && { echo "PostgreSQL $v: sus BBDD ya no están en Docker, no hay nada que copiar"; continue; }
         docker_pg_up "$v" > /dev/null || { echo "La PostgreSQL $v de Docker no responde: $why"; fail=1; continue; }
         n=$((n + 1))
-        out="$COPIES_DIR/docker-postgres-$v-$stamp.sql.gz"
+        out="$COPIES_DIR/bbdd/docker/docker-postgres-$v-$stamp.sql.gz"
         ( umask 077
           set -o pipefail
           dk exec "$name" pg_dumpall -U postgres < /dev/null | gzip > "$out" )
@@ -183,9 +185,10 @@ function docker_recover() {
                     || { echo "Aviso: la carga de la BBDD ha dado errores (mira lo de arriba)"; fail=1; }
             fi
             # (lo que habia en esa MariaDB comun sin ningun proyecto, con su ultima copia)
-            for f in "$COPIES_DIR/docker-mariadb-$maria-"*.sql.gz; do
+            for f in "$COPIES_DIR/bbdd/docker/docker-mariadb-$maria-"*.sql.gz "$COPIES_DIR/docker-mariadb-$maria-"*.sql.gz; do
                 [ -f "$f" ] || continue
-                v=${f#"$COPIES_DIR/docker-mariadb-$maria-"}
+                v=$(basename "$f")
+                v=${v#"docker-mariadb-$maria-"}
                 v=${v%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].sql.gz}
                 db_valid_name "$v" > /dev/null || continue
                 [ -n "$(docker_maria_sql "$maria" -N -e "SHOW DATABASES LIKE '$v'" < /dev/null 2> /dev/null)" ] && continue

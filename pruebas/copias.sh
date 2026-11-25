@@ -41,6 +41,24 @@ if [ $MAC -eq 0 ]; then
 fi
 
 # --- copias-ficheros [si|no] ---
+# 1.57.51: ~/nexum-backups por carpetas; lo suelto de antes se ordena al arrancar, sin borrar ni sobrescribir
+extract "$SRC" copies_sort copies_in copies_dir_of || exit 1
+eval "$(sed -n "/^COPIES_SORT_PY='/,/^'\$/p" "$SRC")"
+H=$W/orden; mkdir -p "$H/nexum-backups/dob-tienda-antes-de-actualizar-20261101-101010" "$H/nexum-backups/XAMPP-oficial-20261001-090000"
+for n in hosts-20261101-101010 httpd-vhosts.conf-20261101-101010 lampp-8.4-wp_x-20261101-101010.sql.gz \
+    lampp-8.4-wp_x-antes-de-cargar-20261101-101010.sql.gz lampp-8.2.4-mysql-sistema-20261101-101010.sql.gz \
+    lampp-7.4-bases-20261101-101010.tar.gz lampp-8.4-httpd.conf-20261101-101010 docker-blog-wp_b-20261101-101010.sql.gz \
+    "wp-config.php-mi web 8.4-20261101-101010" parameters.php-dob-tienda-20261101-101010 dob-tienda-registro-20261101-101010-nuevos.txt \
+    raro.txt; do echo x > "$H/nexum-backups/$n"; done
+echo ya > "$H/nexum-backups/hosts-20261102-101010"; mkdir -p "$H/nexum-backups/sistema/hosts"; echo otro > "$H/nexum-backups/sistema/hosts/hosts-20261102-101010"
+HOME=$H COPIES_DIR=$H/nexum-backups LOG_DIR=$H/.nexum copies_sort
+B=$H/nexum-backups
+check "copias por carpetas: cada clase a la suya" '[ -f "$B/sistema/hosts/hosts-20261101-101010" ] && [ -f "$B/sistema/vhosts/httpd-vhosts.conf-20261101-101010" ] && [ -f "$B/bbdd/lampp-8.4/wp_x-20261101-101010.sql.gz" ] && [ -f "$B/bbdd/lampp-8.4/wp_x-antes-de-cargar-20261101-101010.sql.gz" ] && [ -f "$B/bbdd/lampp-8.2.4/mysql-sistema-20261101-101010.sql.gz" ] && [ -f "$B/bbdd/lampp-7.4/todas-las-bases-20261101-101010.tar.gz" ] && [ -f "$B/sistema/lampp-8.4/httpd.conf-20261101-101010" ] && [ -f "$B/bbdd/docker/docker-blog-wp_b-20261101-101010.sql.gz" ]'
+check "copias por carpetas: lo de cada proyecto (con espacios en el nombre), en proyectos/<carpeta>" '[ -f "$B/proyectos/mi web 8.4/wp-config.php-20261101-101010" ] && [ -f "$B/proyectos/dob-tienda/parameters.php-20261101-101010" ] && [ -d "$B/proyectos/dob-tienda/antes-de-actualizar-20261101-101010" ] && [ -d "$B/xampp-oficial/XAMPP-oficial-20261001-090000" ]'
+check "copias por carpetas: las listas no son copias (a ~/.nexum/listas); lo que no se reconoce o ya esta, se queda" '[ -f "$H/.nexum/listas/dob-tienda-20261101-101010-nuevos.txt" ] && [ -f "$B/raro.txt" ] && [ "$(cat "$B/hosts-20261102-101010")" = ya ] && [ "$(cat "$B/sistema/hosts/hosts-20261102-101010")" = otro ]'
+check "copias por carpetas: solo tuyas, y no se repite si no cambia nada" '[ "$(command stat -c %a "$B/bbdd")" = 700 ] && [ -f "$H/.nexum/copias-ordenadas" ] && echo x > "$B/hosts-20261103-101010" && touch -d "2000-01-01" "$B" && HOME=$H COPIES_DIR=$B LOG_DIR=$H/.nexum copies_sort && [ -f "$B/hosts-20261103-101010" ]'
+o=$(DRY=1 copies_in bbdd/lampp-8.4 "$W/nada")
+check "copies_in en simulacion: dice la carpeta y no la crea" '[ "$o" = "$W/nada/bbdd/lampp-8.4" ] && [ ! -e "$W/nada" ]'
 LOG_DIR=$W/log COPIES_FILES_FLAG=$W/log/copias-ficheros DRY=0
 o=$(copies_files_command)
 check "copias-ficheros: apagado de partida" '[ ! -e "$COPIES_FILES_FLAG" ] && grep -q ": no" <<< "$o"'
@@ -86,7 +104,7 @@ check "edit_hosts sin el ajuste: cambia el fichero sin guardar copia" '[ $rc -eq
 : > "$COPIES_FILES_FLAG"
 printf '127.0.0.1 localhost\n127.0.0.1 otra.local\n' > "$W/hosts.nuevo"
 o=$(edit_hosts --aplicar "$W/hosts.nuevo" 2>&1); rc=$?
-f=$(ls "$COPIES_DIR"/hosts-* 2> /dev/null | head -1)
+f=$(ls "$COPIES_DIR"/sistema/hosts/hosts-* 2> /dev/null | head -1)
 check "edit_hosts con el ajuste: antes guarda el anterior en ~/nexum-backups" '[ $rc -eq 0 ] && grep -q otra.local "$HOSTS_FILE" && [ -n "$f" ] && grep -q tienda.local "$f" && grep -q "Copia del" <<< "$o" && [ "$(command stat -c %a "$COPIES_DIR")" = 700 ]'
 rm -f "$COPIES_FILES_FLAG"
 
@@ -115,7 +133,7 @@ o=$(repair_db_system 2>&1); rc=$?
 OUTDATED=1
 check "reparar-bd-sistema sin --copia: las pone al dia sin guardar nada, y lo dice" '[ $rc -eq 0 ] && grep -q "Sin copia" <<< "$o" && [ ! -e "$COPIES_DIR" ] && grep -q "mysql_upgrade" "$W/mdb.log" && ! grep -q mysqldump "$W/mdb.log"'
 o=$(repair_db_system --copia 2>&1); rc=$?
-check "reparar-bd-sistema --copia: antes la copia de la base mysql en ~/nexum-backups" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/*-mysql-sistema-*.sql.gz > /dev/null 2>&1 && grep -q mysqldump "$W/mdb.log"'
+check "reparar-bd-sistema --copia: antes la copia de la base mysql en ~/nexum-backups" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/bbdd/*/mysql-sistema-*.sql.gz > /dev/null 2>&1 && grep -q mysqldump "$W/mdb.log"'
 unset -f active_dir lampp_running wait_mariadb db_error_log db_system_outdated version_name stat
 
 # --- copias [vaciar] ---

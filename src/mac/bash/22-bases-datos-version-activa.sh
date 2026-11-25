@@ -194,9 +194,9 @@ function drop_database() {
     if [ $backup -eq 1 ]; then
         # (con export_database, como en Linux: la copia no lleva el administrador de pruebas ni los cambios del
         # correo de pruebas, que son de este Mac, y la descarga es la misma que «Descargar»)
-        local dest="$COPIES_DIR/XAMPP-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local dest="$COPIES_DIR/bbdd/XAMPP-$DB_FOLDER/$db-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "Guardando copia de $db..."
-        run mkdir -p -m 700 "$COPIES_DIR"
+        copies_dir_of "$dest"
         if ! export_database "$db" "$dest" "$DB_FOLDER"; then
             rm -f "$dest"
             echo "No se ha podido guardar la copia, asi que NO se borra nada."
@@ -448,9 +448,9 @@ function copy_database() {
         echo "XAMPP-$dst ya tiene $new: se sustituye."
         echo "Sin copia: la que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
     elif [ $replace -eq 1 ]; then
-        local saved="$COPIES_DIR/XAMPP-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local saved="$COPIES_DIR/bbdd/XAMPP-$dst/$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "XAMPP-$dst ya tiene $new: antes se guarda una copia suya en $saved"
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        copies_dir_of "$saved" || return 1
         if ! export_database "$new" "$saved" "$dst"; then
             echo "No se ha podido guardar la copia de $new de XAMPP-$dst, asi que no se ha cambiado nada."
             return 1
@@ -1142,14 +1142,14 @@ function import_database() {
             return 1
         fi
         if [ "$tables" -gt 0 ] && [ $backup -eq 1 ]; then
-            saved="$COPIES_DIR/XAMPP-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
+            saved="$COPIES_DIR/bbdd/XAMPP-$DB_FOLDER/$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
             echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
             echo "Antes se guarda una copia suya en $saved"
             local dump=${LVM_BD_VOLCADO:-$(dirname "$DB_CLIENT")/mysqldump}
             if [ "$DRY" -eq 1 ]; then
                 echo "  [simulacion] mysqldump $db | gzip > $saved"
             else
-                mkdir -p -m 700 "$COPIES_DIR"
+                copies_dir_of "$saved"
                 if ! ( set -o pipefail; "${DB_SAFE[@]}" "$dump" -uroot --default-character-set=utf8mb4 --single-transaction \
                     --routines --triggers --events "$db" < /dev/null | gzip > "$saved" ); then
                     rm -f "$saved"
@@ -1324,14 +1324,14 @@ function repair_db_system() {
     if db_system_outdated; then
         echo "Las tablas del sistema de MariaDB de $name son de una version anterior: se ponen al dia"
         echo "(las bases de los proyectos no se tocan)."
-        [ $copy -eq 1 ] && backup="$COPIES_DIR/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 1 ] && backup="$COPIES_DIR/bbdd/$name/mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
         [ $copy -eq 0 ] && echo "Sin copia: las tablas del sistema de ahora no se podran recuperar (con --copia se guardan antes)"
         if [ "$DRY" -eq 1 ]; then
             [ -n "$backup" ] && echo "  [simulacion] copia de la base mysql en $backup"
             echo "  [simulacion] ${upgrade[0]##*/} --upgrade-system-tables --force"
         else
             if [ -n "$backup" ]; then
-                mkdir -p -m 700 "$COPIES_DIR" || return 1
+                copies_dir_of "$backup" || return 1
                 if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
                     rm -f "$backup"
                     echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."

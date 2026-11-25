@@ -92,6 +92,9 @@ final class AppModel: ObservableObject {
     @Published var upCreateDb = false
     /// La versión por la que ya se ha preguntado si se borran sus BBDD marcadas (una vez por carga)
     var marksAsked: String? = nil
+    /// La última búsqueda de versión nueva y las que se han dicho que no en esta sesión (solas no se vuelven a ofrecer)
+    var updateChecked: Date? = nil
+    var updateDeclined: Set<String> = []
     @Published var upSqlError = ""
     @Published var upCodeError = ""
     @Published var npRepos: [RepoItem] = []
@@ -386,21 +389,33 @@ final class AppModel: ObservableObject {
             self.usageTick()
         }
         usageTick()
-        // Al abrir: si toca (el primer arranque del día y después cada UPDATE_EVERY), si hay una versión
-        // nueva del programa (con los datos ya leídos: la versión actual)
-        autoCheckUpdates()
+        // Al abrir, siempre (1.57.51; antes, solo el primer arranque del día), si hay una versión nueva del
+        // programa (con los datos ya leídos: la versión actual). Y otra vez al volver a la ventana si hace más de
+        // UPDATE_RECHECK de la última y, con el programa abierto, cada UPDATE_RECHECK_OPEN
+        autoCheckUpdates(components: true)
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
+                                               queue: .main) { [weak self] _ in self?.updateRecheck() }
+        Timer.scheduledTimer(withTimeInterval: UPDATE_RECHECK_OPEN, repeats: true) { [weak self] _ in self?.updateRecheck() }
     }
 
-    func autoCheckUpdates() {
+    func autoCheckUpdates(components: Bool = false) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
             guard let self = self else { return }
-            if self.data == nil || self.busy { self.autoCheckUpdates(); return }
-            if updateCheckDue() {
-                self.checkUpdates(auto: true)
+            if self.data == nil || self.busy { self.autoCheckUpdates(components: components); return }
+            self.updateChecked = Date()
+            self.checkUpdates(auto: true)
+            if components && updateCheckDue() {
                 // (y los parches de los componentes, un poco después: sin juntarse con el aviso del programa)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 25) { self.autoCheckComponents() }
             }
         }
+    }
+
+    /// Otra búsqueda de versión nueva si hace rato de la última
+    func updateRecheck() {
+        guard let last = updateChecked, Date().timeIntervalSince(last) >= UPDATE_RECHECK else { return }
+        updateChecked = Date()
+        autoCheckUpdates()
     }
 
     /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), Docker Desktop

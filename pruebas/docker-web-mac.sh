@@ -248,7 +248,7 @@ printf 'CARPETA=viejo\nPHP=8.2\nMARIADB=10.11\nDOMINIO=viejo.docker.local\nBBDD=
 printf 'services:\n  db:\n    image: mariadb:10.11\n' > "$DOCKER_DIR/viejo/compose.yaml"
 reset
 o=$( docker_action() { [ "$1" == borrar ] && echo "borrar $2" >> "$W/hecho.log" && rm -rf "$DOCKER_DIR/$2"; }; docker_pass viejo --copia 2>&1 ); rc=$?
-check "pasar con --copia: la copia de su BBDD en ~/nexum-backups (solo tuya), antes de quitar nada" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/docker-viejo-wp_viejo-*.sql.gz > /dev/null 2>&1 && [ "$(stat -c %a "$(ls "$COPIES_DIR"/docker-viejo-*.sql.gz)")" == 600 ]'
+check "pasar con --copia: la copia de su BBDD en ~/nexum-backups (solo tuya), antes de quitar nada" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/bbdd/docker/docker-viejo-wp_viejo-*.sql.gz > /dev/null 2>&1 && [ "$(stat -c %a "$(ls "$COPIES_DIR"/bbdd/docker/docker-viejo-*.sql.gz)")" == 600 ]'
 check "pasar con --copia: se quita el de antes y queda en el Apache de Docker con su BBDD" 'grep -qx "borrar viejo" "$W/hecho.log" && grep -qx MODO=web "$DOCKER_DIR/viejo/proyecto.conf" && grep -qx BBDD=wp_viejo "$DOCKER_DIR/viejo/proyecto.conf" && grep -qx PHP=8.2 "$DOCKER_DIR/viejo/proyecto.conf" && grep -q "CREATE TABLE viejo" "$W/sql.log"'
 check "pasar uno que ya es del Apache de Docker: no" '! docker_pass viejo > /dev/null 2>&1'
 

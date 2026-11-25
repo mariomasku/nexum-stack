@@ -247,8 +247,8 @@ function docker_pass() {
     task_step
     echo "Copia de su BBDD ($db)"
     if [ $copy -eq 1 ]; then
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
-        backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        copies_in bbdd/docker > /dev/null || return 1
+        backup="$COPIES_DIR/bbdd/docker/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
     else
         # (sin copia: un fichero solo tuyo en ~/.nexum, que se borra cuando ya esta cargada)
         mkdir -p -m 700 "$LOG_DIR" || return 1
