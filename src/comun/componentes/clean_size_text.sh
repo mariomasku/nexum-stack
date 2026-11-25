@@ -105,7 +105,7 @@ function clean_rules() {
             # Solo estos (ninguno es un ajuste): los de las instalaciones y lo que dejan las que fallan
             # (pila-<version>-<fecha>), el de install-db, el de los proyectos sin visitas, los de los
             # proyectos de Node, el de la compilacion de la ventana del Mac y el registro de tareas de la
-            # ventana (tareas/). Lo que tenga abierto una tarea o un servidor en marcha se deja; ventana.log,
+            # ventana (tareas/) y las listas de ficheros de Actualizar proyecto (listas/). Lo que tenga abierto una tarea o un servidor en marcha se deja; ventana.log,
             # que la ventana tiene abierto mientras esta abierta (en modo de añadir), se vacia
             [ -d "$LOG_DIR" ] && [ ! -L "$LOG_DIR" ] && [ -O "$LOG_DIR" ] || return 0
             echo "registros|$LOG_DIR|ficheros|.|instalacion-*.log|uso"
@@ -115,6 +115,7 @@ function clean_rules() {
             echo "registros|$LOG_DIR|ficheros|node/proyectos|*.log|uso"
             echo "registros|$LOG_DIR|ficheros|app|compilar.log|uso"
             echo "registros|$LOG_DIR|ficheros|tareas|*.txt|uso"
+            echo "registros|$LOG_DIR|ficheros|listas|*.txt|uso"
             echo "registros|$LOG_DIR|truncar|.|ventana.log|"
             ;;
         registros-versiones)

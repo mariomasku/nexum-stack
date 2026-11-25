@@ -178,7 +178,7 @@ function repo_pull() {
 # Lo que ha traido un git pull (de <commit de antes> a HEAD), para el registro de la tarea: la lista de los
 # ficheros que ya no trae (borrados en GitHub, que alli ya no se ven) y un recuadro con las cuentas. Los
 # nuevos y modificados se ven en GitHub: solo se cuentan. Con mas de 25 borrados, cuantos hay en cada
-# carpeta y la lista entera en ~/nexum-backups. repo_pull_summary <carpeta> <commit de antes>
+# carpeta y la lista entera en ~/.nexum/listas (no es una copia: es un registro). repo_pull_summary <carpeta> <commit de antes>
 function repo_pull_summary() {
     local dir=$1 before=$2 after changes total gone n list
     after=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
@@ -204,8 +204,8 @@ function repo_pull_summary() {
             awk '{ d = $0; sub(/\/[^\/]*$/, "", d); if (d == $0) d = "(la carpeta del proyecto)"; c[d]++ }
                 END { for (d in c) printf "%d\t%s\n", c[d], d }' <<< "$gone" | sort -t$'\t' -k1,1nr -k2 | head -15 \
                 | awk -F'\t' '{ printf "  - %s%s (%d %s)\n", $2, ($2 ~ /^\(/) ? "" : "/", $1, ($1 == 1) ? "fichero" : "ficheros" }'
-            list="$COPIES_DIR/$(basename "$dir")-registro-$(date +%Y%m%d-%H%M%S)-borrados-en-github.txt"
-            if mkdir -p -m 700 "$COPIES_DIR" && { echo "Ya no los trae el git pull (borrados en GitHub, de ${before:0:9} a ${after:0:9}), en $dir"
+            list="$LOG_DIR/listas/$(basename "$dir")-$(date +%Y%m%d-%H%M%S)-borrados-en-github.txt"
+            if mkdir -p -m 700 "$LOG_DIR/listas" && { echo "Ya no los trae el git pull (borrados en GitHub, de ${before:0:9} a ${after:0:9}), en $dir"
                     echo; echo "$gone"; } > "$list"; then
                 echo "  La lista entera: $list"
             fi
@@ -325,9 +325,10 @@ sys.stdout.reconfigure(errors="replace", line_buffering=True)
 # copied: nuevos + modificados (para el avance); removed: lo quitado (una carpeta cuenta 1) y gone, sus ficheros
 counts = {"copied": 0, "new": 0, "changed": 0, "same": 0, "removed": 0, "gone": 0, "kept": 0, "skipped": 0,
           "old": 0, "packed": 0, "packed_dirs": 0, "packed_bytes": 0}
-# (para el registro, las rutas de lo que ya no esta y de lo que no viene, con sus ficheros: hasta LIST_INLINE
-# se ensenan una a una; con mas, por carpetas, y la lista entera a un fichero)
-lists = {"gone": [], "kept": []}
+# (para el registro, las rutas de cada grupo, con sus ficheros. Nuevos y modificados: los LIST_FIRST primeros.
+# Lo que no viene: hasta LIST_INLINE, uno a uno; con mas, por carpetas. Si no caben, la lista entera a un fichero)
+LIST_FIRST = 5
+lists = {"new": [], "changed": [], "gone": [], "kept": []}
 LIST_INLINE = 25
 errors, seen = [], set()
 
@@ -606,6 +607,11 @@ def show_list(title, group, mark, what):
         print("  %s %s%s (%s)" % (mark, top, "" if top.startswith("(") else "/", plural(n)))
     if len(groups) > 15:
         print("  ... y %s carpetas más" % num(len(groups) - 15))
+    save_full(title, group, what)
+
+
+def save_full(title, group, what):
+    """La lista entera de un grupo, fichero a fichero, en <informe>-<what>.txt (no en simulacion)."""
     if not report or simulate:
         return
     path = "%s-%s.txt" % (report, what)
@@ -613,12 +619,27 @@ def show_list(title, group, mark, what):
         os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
         with open(path, "w", encoding="utf-8", errors="replace") as f:
             f.write("%s: %s\nProyecto: %s\n\n" % (title, plural(counts[group]), target))
-            for _rel, _n, _folder, files in items:
+            for _rel, _n, _folder, files in lists[group]:
                 for rel in files:
                     f.write(rel + "\n")
         print("  La lista entera, fichero a fichero: %s" % path)
     except OSError as exc:
         print("  No se ha podido guardar la lista entera en %s: %s" % (path, exc))
+
+
+def show_first(title, group, mark, what):
+    """Los LIST_FIRST primeros de un grupo (nuevos, modificados), con una linea en blanco delante; si hay mas,
+    cuantos faltan y la lista entera a un fichero."""
+    items = lists[group]
+    if not items:
+        return
+    print()
+    print("%s: %s" % (title, plural(counts[group])) + (" (los %d primeros)" % LIST_FIRST if len(items) > LIST_FIRST else ""))
+    for rel, _n, _folder, _files in items[:LIST_FIRST]:
+        print("  %s %s" % (mark, rel))
+    if len(items) > LIST_FIRST:
+        print("  ... y %s más" % num(len(items) - LIST_FIRST))
+        save_full(title, group, what)
 
 
 def summary():
@@ -693,7 +714,9 @@ def main():
             shutil.rmtree(work, ignore_errors=True)
     if simulate:
         print("[simulacion] no se cambia nada: esto es lo que se haría")
-    # (de los nuevos y modificados, solo la cuenta: en la lista, solo lo que ya no esta y lo que no viene)
+    # (nuevos y modificados, cada uno con sus primeros; lo que no viene, entero o por carpetas)
+    show_first("Nuevos, " + ("se copiarían" if simulate else "se copian"), "new", "+", "nuevos")
+    show_first("Modificados, " + ("se sustituirían" if simulate else "se sustituyen"), "changed", "~", "modificados")
     # (las dos son lo mismo: lo que esta en la carpeta y no viene en el codigo; cambia lo que se hace con ello)
     if mode == "sobrescribir":
         show_list("Solo en tu carpeta (no vienen en el código), " + ("se quitarían" if simulate else "se quitan"),
@@ -841,7 +864,7 @@ function project_update() {
             [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
         fi
         if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY" \
-                "$COPIES_DIR/$folder-registro-$stamp"; then
+                "$LOG_DIR/listas/$folder-$stamp"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
         fi

@@ -418,6 +418,12 @@ QUE HACE
 
 VERSIONES
 
+1.57.50 (25 nov 2026)
+- Registro de Actualizar proyecto: los 5 primeros ficheros nuevos (se
+  copian) y, aparte, los 5 primeros modificados (se sustituyen); si
+  hay más, la lista entera de cada uno en ~/.nexum/listas. Lo que no
+  viene (se deja o se quita) sigue listado como antes.
+
 1.57.49 (25 nov 2026)
 - Actualizar phpMyAdmin (el aviso de PHP antiguo) ya no falla en cada
   versión con «/descargas.lista: Permiso denegado»: se descargaba y se
@@ -428,7 +434,7 @@ VERSIONES
   ficheros que ya no trae (borrados en GitHub); del código, solo la de
   lo que hay en tu carpeta y no viene. Los nuevos y modificados, solo
   en las cuentas. Con más de 25, por carpetas, y la lista entera en
-  ~/nexum-backups (…-registro-….txt) para mirarla con calma.
+  ~/.nexum/listas para mirarla con calma.
 - El recuadro del código de producción, en dos partes que no se
   mezclan: «Vienen en el código» (nuevos, modificados e iguales, con
   lo que se hace con cada uno) y «Solo en tu carpeta» (no vienen: al

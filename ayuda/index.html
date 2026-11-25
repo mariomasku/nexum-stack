@@ -1467,8 +1467,9 @@
   <div class="nota"><b>Lo que sale en el registro</b>Cada paso empieza con su título (<code>━━ Paso 2 de 5: …</code>) y una
     línea en blanco delante. Del <code>git pull</code>, la lista de los ficheros que ya no trae (<code>-</code>, borrados en GitHub, que allí
     ya no se ven) y un recuadro con el total de ficheros del repositorio y cuántos son nuevos, modificados, sin tocar y borrados (o «ya
-    estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que ocupan, la lista de lo que hay en la carpeta del
-    proyecto y no viene en el código, y un recuadro con dos partes que no se mezclan:
+    estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que ocupan; los 5 primeros nuevos (<code>+</code>, se copian)
+    y, aparte, los 5 primeros modificados (<code>~</code>, se sustituyen), con la lista entera de cada uno en un fichero si hay más; la
+    lista de lo que hay en la carpeta del proyecto y no viene en el código, y un recuadro con dos partes que no se mezclan:
     <pre>┌─────────────────────────────────────┐
 │ Código de producción                │
 ├─────────────────────────────────────┤
@@ -1483,7 +1484,9 @@
     <b>Vienen en el código</b>: todo lo que trae el paquete, y qué se hace con cada fichero. <b>Solo en tu carpeta</b>: lo que tienes en el
     proyecto y el paquete no trae; al fusionar se deja como está y al sobrescribir se quita («Se quitan (sobrescribir)»). Con más de 25
     ficheros, su lista se resume por carpetas (las que más tienen) y la lista entera, fichero a fichero, se guarda para mirarla con calma
-    en <code>~/nexum-backups/panaderia-luna-registro-…-no-vienen-se-dejan.txt</code> (o <code>-no-vienen-se-quitan.txt</code>; la del
+    en <code>~/.nexum/listas/panaderia-luna-…-no-vienen-se-dejan.txt</code> (son registros, no copias: van con los del programa y los
+    borra la Limpieza de «Registros del programa») (o <code>-no-vienen-se-quitan.txt</code>,
+    <code>-nuevos.txt</code>, <code>-modificados.txt</code>; la del
     <code>git pull</code>, <code>-borrados-en-github.txt</code>).</div>
   <div class="nota"><b>Copias que guarda</b>Con la casilla marcada, lo que el código sustituye o borra va a
     <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,

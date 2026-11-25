@@ -32,7 +32,7 @@ fresh; out=$(go "$W/normal.zip" fusionar); rc=$?
 check "fusionar (.zip): copia lo que trae, de dentro de public_html" '[ $rc -eq 0 ] && [ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/wp-content/tema.php")" == tema ] && [ ! -e "$P/public_html" ]'
 check "fusionar: deja lo que no trae y .git" '[ -f "$P/antiguo/solo-aqui.php" ] && [ -f "$P/wp-content/uploads/foto.jpg" ] && [ "$(cat "$P/.git/config")" == repo ]'
 check "lo sustituido queda en las copias; lo igual ni se copia" '[ "$(cat "$W/copias/index.php")" == viejo ] && [ ! -e "$W/copias/igual.txt" ] && grep -qE "│   Iguales: no se tocan +1 │" <<< "$out" && grep -q "Lo que se ha sustituido o quitado esta en" <<< "$out"'
-check "el registro: sin la lista de nuevos ni modificados, solo el recuadro con las cuentas" '! grep -q "^Modificados: " <<< "$out" && ! grep -q "^  [~+] " <<< "$out" && grep -qE "│   Modificados: se sustituyen +1 │" <<< "$out" && grep -q "Código de producción" <<< "$out" && grep -qE "│ VIENEN EN EL CÓDIGO +[0-9]+ │" <<< "$out" && grep -qE "│ SOLO EN TU CARPETA \(no vienen\) +[1-9]" <<< "$out" && grep -qE "│   Se dejan como están \(fusionar\) +[1-9]" <<< "$out"' || echo "$out" | tail -15
+check "el registro: los primeros nuevos y modificados, cada uno aparte, y el recuadro con las cuentas (1.57.50)" 'grep -q "^Modificados, se sustituyen: 1 fichero$" <<< "$out" && grep -q "^  ~ index.php$" <<< "$out" && grep -q "^Nuevos, se copian: " <<< "$out" && grep -qE "│   Modificados: se sustituyen +1 │" <<< "$out" && grep -q "Código de producción" <<< "$out" && grep -qE "│ VIENEN EN EL CÓDIGO +[0-9]+ │" <<< "$out" && grep -qE "│ SOLO EN TU CARPETA \(no vienen\) +[1-9]" <<< "$out" && grep -qE "│   Se dejan como están \(fusionar\) +[1-9]" <<< "$out"' || echo "$out" | tail -15
 # Lo que no viene: hasta 25, una a una; con mas, por carpetas y la lista entera a un fichero (1.57.49)
 check "registro: lo que no viene, uno a uno y con una linea en blanco delante" 'grep -q "^  · antiguo/ (1 fichero)$" <<< "$out" && grep -B1 "^Solo en tu carpeta (no vienen en el código), se dejan como están: " <<< "$out" | head -1 | grep -q "^$"'
 fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
@@ -41,6 +41,9 @@ check "registro: con mas de 25, por carpetas y la lista entera en un fichero" 'g
 fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
 out=$(python3 -I -c "$CODE" "$P" "$W/normal.zip" fusionar "$W/copias" "$W/tmp" 1 "$W/informes/simulado" 2>&1)
 check "registro: en simulacion no guarda la lista" '[ ! -e "$W/informes/simulado-no-vienen-se-dejan.txt" ]'
+fresh; mkdir -p "$W/muchos"; for i in $(seq 1 8); do echo n > "$W/muchos/n$i.php"; echo v > "$P/m$i.php"; echo n > "$W/muchos/m$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/muchos" fusionar "$W/copias" "$W/tmp" 0 "$W/informes/primeros" 2>&1)
+check "registro: de nuevos y modificados, los 5 primeros de cada uno y la lista entera a un fichero" '[ "$(grep -c "^  + n" <<< "$out")" = 5 ] && [ "$(grep -c "^  ~ m" <<< "$out")" = 5 ] && [ "$(grep -c "^  ... y 3 más$" <<< "$out")" = 2 ] && grep -q "^Nuevos, se copian: 8 ficheros (los 5 primeros)$" <<< "$out" && [ "$(grep -c "^n" "$W/informes/primeros-nuevos.txt")" = 8 ] && [ "$(grep -c "^m" "$W/informes/primeros-modificados.txt")" = 8 ]' || echo "$out" | head -30
 check "no quedan ficheros a medias ni el temporal" '[ -z "$(find "$P" -name ".lvm-parte-*")" ] && [ -z "$(ls -A "$W/tmp")" ]'
 
 fresh; out=$(go "$W/normal.tgz" sobrescribir); rc=$?
@@ -305,8 +308,8 @@ check "pull: solo lista los que ya no trae (borrados), con su recuadro" '! grep 
     && git rm -rq tema && git -c user.name=x -c user.email=x@x.test commit -qm 4 )
 b=$(git -C "$G/c" rev-parse HEAD); git -C "$G/c" pull -q 2> /dev/null; git -C "$G/c" pull -q 2> /dev/null
 b2=$(git -C "$G/c" rev-parse HEAD~1)
-out=$(COPIES_DIR=$W/backups repo_pull_summary "$G/c" "$b2")
-check "pull: con mas de 25 borrados, por carpetas y la lista entera en un fichero" 'grep -q "^  - tema/ (30 ficheros)$" <<< "$out" && ! grep -q "tema/t1$" <<< "$out" && f=$(ls "$W"/backups/c-registro-*-borrados-en-github.txt) && [ "$(grep -c "^tema/t" "$f")" = 30 ]' || echo "$out"
+out=$(LOG_DIR=$W/nexum repo_pull_summary "$G/c" "$b2")
+check "pull: con mas de 25 borrados, por carpetas y la lista entera en un fichero" 'grep -q "^  - tema/ (30 ficheros)$" <<< "$out" && ! grep -q "tema/t1$" <<< "$out" && f=$(ls "$W"/nexum/listas/c-*-borrados-en-github.txt) && ! ls "$W"/backups > /dev/null 2>&1 && [ "$(grep -c "^tema/t" "$f")" = 30 ]' || echo "$out"
 out=$(repo_pull_summary "$G/c" "$(git -C "$G/c" rev-parse HEAD)")
 check "pull: si ya estaba al dia, lo dice" 'grep -q "ya estaba al día" <<< "$out"'
 widths=$(summary_box "Título" "Uno|1" "Ya no están|12345" | while IFS= read -r l; do echo ${#l}; done | sort -u | wc -l)

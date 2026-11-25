@@ -422,8 +422,8 @@ class NvConfiguracion:
          "se vacía la bandeja de Mailpit", False),
         ("registros", "Registros del programa",
          "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones "
-         "(y lo que dejan las que fallan), el registro de tareas de la ventana, los de los servidores de Node "
-         "parados y el de la ventana. Están en ~/.nexum. Solo sirven para ver qué pasó en una tarea "
+         "(y lo que dejan las que fallan), el registro de tareas de la ventana, las listas de ficheros de "
+         "Actualizar proyecto, los de los servidores de Node parados y el de la ventana. Están en ~/.nexum. Solo sirven para ver qué pasó en una tarea "
          "anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un "
          "servidor en marcha: el programa y tus proyectos siguen igual.",
          "se borran los registros de ~/.nexum (no sus ajustes ni lo que esté usando una tarea o un "
