@@ -59,10 +59,21 @@ function github_disconnect() {
 }
 
 #@incluir comun/repositorios-github/github_command.sh
+#@incluir comun/repositorios-github/project_branches.sh
 function mount_project() {
-    local url=$1 folder=$2 version=$3 db=$4 file=$5 dest dir owner
-    if [ -z "$url" ] || [ -z "$folder" ] || [ -z "$version" ] || [ -z "$db" ]; then
+    local url=$1 folder=$2 version=$3 db=$4 file=$5 dest dir owner nodb=0
+    # (--sin-bd en lugar de la base: el proyecto se clona y se carga sin BBDD vinculada)
+    if [ "$db" == --sin-bd ]; then
+        nodb=1 db=""
+        if [ -n "$file" ]; then
+            echo "Sin BBDD no se sube ningun volcado: quita --sin-bd o el volcado"
+
+            return 1
+        fi
+    fi
+    if [ -z "$url" ] || [ -z "$folder" ] || [ -z "$version" ] || { [ -z "$db" ] && [ $nodb -eq 0 ]; }; then
         echo "Uso: nexum montar-proyecto <url de git> <carpeta> <version> <base de datos> [volcado]"
+        echo "     nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd"
 
         return 1
     fi
@@ -89,12 +100,14 @@ function mount_project() {
 
         return 1
     fi
-    db_valid_name "$db" || return 1
-    owner=$dir
-    if db_names "$owner" | grep -qxF "$db"; then
-        echo "Ya hay una BBDD $db en esa version: elige otro nombre"
+    if [ $nodb -eq 0 ]; then
+        db_valid_name "$db" || return 1
+        owner=$dir
+        if db_names "$owner" | grep -qxF "$db"; then
+            echo "Ya hay una BBDD $db en esa version: elige otro nombre"
 
-        return 1
+            return 1
+        fi
     fi
     if [ -n "$file" ] && { [ ! -f "$file" ] || [ -L "$file" ]; }; then
         echo "No existe el fichero $file"
@@ -112,13 +125,20 @@ function mount_project() {
         return 1
     fi
 
-    task_plan "Montando el proyecto $folder" "Clonar el repositorio" "Cargarlo en XAMPP-$version" "Preparar la BBDD $db"
+    # (sin BBDD, dos pasos: clonarlo y cargarlo)
+    local n=3 steps=("Clonar el repositorio" "Cargarlo en XAMPP-$version" "Preparar la BBDD $db")
+    [ $nodb -eq 1 ] && n=2 steps=("Clonar el repositorio" "Cargarlo en XAMPP-$version (sin BBDD)")
+    task_plan "Montando el proyecto $folder" "${steps[@]}"
     task_step
-    echo "1/3 Clonando $url en $dest..."
+    echo "1/$n Clonando $url en $dest..."
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] git clone --no-recurse-submodules -- $url $dest"
-        echo "2/3 [simulacion] cargar-proyecto $folder $version $db"
-        echo "3/3 [simulacion] BBDD $db: $([ -n "$file" ] && echo "importar-bd $file $db --crear" || echo "crear-bd $db")"
+        if [ $nodb -eq 1 ]; then
+            echo "2/2 [simulacion] cargar-proyecto $folder $version (sin BBDD)"
+        else
+            echo "2/3 [simulacion] cargar-proyecto $folder $version $db"
+            echo "3/3 [simulacion] BBDD $db: $([ -n "$file" ] && echo "importar-bd $file $db --crear" || echo "crear-bd $db")"
+        fi
 
         return 0
     fi
@@ -157,8 +177,21 @@ function mount_project() {
         || printf '%s\n' "$folder" >> "$REPO_PROJECTS_FILE"; }
 
     task_step
-    echo "2/3 Cargando $folder en XAMPP-$version..."
+    echo "2/$n Cargando $folder en XAMPP-$version$([ $nodb -eq 1 ] && echo " (sin BBDD)")..."
     load_project "$folder" "$version" "$db" || { echo "El proyecto esta clonado en $dest, pero no se ha podido cargar."; return 1; }
+    if [ $nodb -eq 1 ]; then
+        # Sin BBDD: cargado y sin ninguna vinculada. Un WordPress o una tienda no abren hasta tener la suya
+        if is_prestashop "$folder"; then
+            echo "Aviso: es una tienda PrestaShop: la web no funcionara hasta que tenga su BBDD. Subela en"
+            echo "Bases de datos (Subir o actualizar una BBDD) eligiendo el proyecto $folder."
+        elif is_wordpress "$folder"; then
+            echo "Aviso: es un WordPress: la web no funcionara hasta que tenga su BBDD. Subela en Bases de"
+            echo "datos (Subir o actualizar una BBDD) eligiendo el proyecto $folder."
+        fi
+        echo "Proyecto nuevo montado: $folder en XAMPP-$version, sin BBDD"
+
+        return 0
+    fi
 
     task_step
     echo "3/3 BBDD $db..."

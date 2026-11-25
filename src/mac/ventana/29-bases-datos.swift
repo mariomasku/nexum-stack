@@ -37,7 +37,7 @@ struct DatabasesView: View {
             Spacer(minLength: 8)
             Button(action: { openURL("http://127.0.0.1/phpmyadmin/") }) {
                 HStack(spacing: 6) {
-                    LogoShape(d: LOGO_PATHS["phpmyadmin"] ?? "").fill(brand("phpmyadmin")).frame(width: 15, height: 15)
+                    BrandLogo(name: "phpmyadmin", size: 15)
                     Text("phpMyAdmin")
                 }
             }
@@ -46,7 +46,7 @@ struct DatabasesView: View {
             .tip("phpMyAdmin de la versión activa")
             Button(action: { model.createDb() }) { Label("Nueva BBDD…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
-                .disabled(act == nil || model.busy)
+                .disabled(act == nil).busyGuard(model.busy)
                 .tip("Crear una BBDD vacía")
         }
     }
@@ -146,7 +146,7 @@ struct DatabasesView: View {
                     logoAction("phpmyadmin", "Abrir phpMyAdmin") { openURL("http://127.0.0.1/phpmyadmin/") }
                         .disabled(!d.running)
                     iconAction("plus", "Crear una BBDD vacía aquí") { model.createDb() }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
             }
             .col(0)
@@ -165,9 +165,9 @@ struct DatabasesView: View {
                 Circle().fill(GREEN).frame(width: 7, height: 7).opacity(isUsed ? 1 : 0)
                     .tip(isUsed ? "La usa el proyecto cargado (\(loaded?.name ?? ""))" : "")
                 if isPsDb(db) {
-                    LogoShape(d: LOGO_PATHS["prestashop"] ?? "").fill(brand("prestashop")).frame(width: 13, height: 13)
+                    BrandLogo(name: "prestashop", size: 13)
                 } else if db.lowercased().hasPrefix("wp_") {
-                    LogoShape(d: LOGO_PATHS["wordpress"] ?? "").fill(brand("wordpress")).frame(width: 13, height: 13)
+                    BrandLogo(name: "wordpress", size: 13)
                 }
                 Text(db).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle).tip(db)
             }
@@ -180,21 +180,21 @@ struct DatabasesView: View {
             HStack(spacing: 6) {
                 if isPsDb(db) {
                     iconAction("sparkles", "Vaciar la caché (var/cache) de la tienda de \(db)") { model.clearCache(db) }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
                 if !model.copyTargets(db, folder).isEmpty {
                     iconAction("doc.on.doc", "Copiar \(db) a otra versión de PHP (para probar el proyecto con ella)") {
                         model.copyDb(db, folder)
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 }
                 iconAction("square.and.arrow.down", "Descargar una copia de \(db) (.zip)") { model.downloadDb(db, folder) }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 iconAction("folder", "Cargar su proyecto (en XAMPP-\(folder))") { model.openProject(db, inst) }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 if active {
                     iconAction("trash", "Borrar la BBDD \(db)") { model.dropDb(db) }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
             }
             .col(0)
@@ -275,11 +275,11 @@ struct DatabasesView: View {
                                          items: (model.impDb == nil ? [("", "Elige una BBDD")] : [] as [(String, String)]) + dbs.map { ($0, $0) },
                                          width: 230)
                             IconButton(symbol: "plus", help: "Crear una BBDD nueva") { model.createDb() }
-                                .disabled(model.busy)
+                                .busyGuard(model.busy)
                             IconButton(symbol: "trash", help: "Borrar la BBDD elegida") {
                                 if let db = model.impDb { model.dropDb(db) }
                             }
-                            .disabled(model.impDb == nil || model.busy)
+                            .disabled(model.impDb == nil).busyGuard(model.busy)
                         }
                     }
                     importColumn("Proyecto (opcional)") {
@@ -292,7 +292,7 @@ struct DatabasesView: View {
                     .onAppear { if model.impProjects.isEmpty { model.refreshImpProjects() } }
                     Button("Cargar") { model.importDb() }
                         .buttonStyle(OutlineButton(kind: "primary"))
-                        .disabled(hint != nil || model.busy)
+                        .disabled(hint != nil).busyGuard(model.busy)
                         .padding(.top, 20)
                 }
             }

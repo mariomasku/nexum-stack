@@ -20,8 +20,25 @@ func certsText(_ d: AppData) -> String {
     if !d.cas.isEmpty {
         why.append("los firma una CA de confianza sin límite de dominios (\(d.cas.joined(separator: ", "))) cuya clave puede leer cualquier programa tuyo, como el PHP de una web")
     }
+    if d.certs.contains(where: { $0.why == "doble" }) {
+        why.append("están mal hechos (tienen una extensión repetida) y Chrome no los abre: dice «La conexión no es privada» (ERR_CERT_INVALID)")
+    }
+    if certsOnlyBroken(d) {
+        return "Los certificados https de estos proyectos " + why.joined(separator: "; ")
+            + ". Arreglarlos les hace uno nuevo, bien hecho, y el navegador lo acepta. Pide la contraseña de administrador."
+    }
     return "Los certificados https de estos proyectos " + why.joined(separator: "; ")
         + ". Arreglarlos les pone uno propio, que solo vale para su dominio, y quita esa confianza. Después el navegador avisará una vez en cada proyecto: acepta el aviso. Pide la contraseña de administrador."
+}
+
+/// Solo hay certificados mal hechos (con una extensión repetida), ninguno en el que confíe todo el Mac
+func certsOnlyBroken(_ d: AppData) -> Bool {
+    return d.cas.isEmpty && !d.certs.isEmpty && d.certs.allSatisfy { $0.why == "doble" }
+}
+
+/// Título del aviso de certificados
+func certsTitle(_ d: AppData) -> String {
+    return certsOnlyBroken(d) ? "Certificados que Chrome rechaza" : "Certificados en los que confía todo el Mac"
 }
 
 /// Dominios del aviso de certificados (los seis primeros)
@@ -48,23 +65,6 @@ func relaunchApp() {
 /// Muestra una carpeta en el Finder (NSWorkspace.open ejecutaría una carpeta que se llame .app)
 func showFolder(_ path: String) {
     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
-}
-
-/// El zip más reciente de Exportar proyecto en su carpeta (<carpeta>_php…_nexum.zip), señalado en el Finder; si
-/// no está, la carpeta
-func revealExport(_ dir: String, _ name: String) {
-    let fm = FileManager.default
-    var best: (path: String, when: Date)? = nil
-    for f in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where f.hasPrefix(name + "_php") && f.hasSuffix("_nexum.zip") {
-        let path = dir + "/" + f
-        let when: Date = ((try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date) ?? .distantPast
-        if best == nil || when > best!.when { best = (path: path, when: when) }
-    }
-    if let b = best {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: b.path)])
-    } else {
-        showFolder(dir)
-    }
 }
 
 /// Salida de un programa (vacía si falla o no termina bien)

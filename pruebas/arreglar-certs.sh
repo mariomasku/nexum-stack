@@ -26,17 +26,28 @@ q openssl x509 -req -in "$W/v/f.csr" -CA "$W/otra/falsa.crt" -CAkey "$W/otra/fal
 q openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=viejo.com" -addext "basicConstraints=critical,CA:TRUE" -keyout "$W/v/v.key" -out "$W/v/v.crt"
 q openssl req -x509 -nodes -newkey rsa:2048 -days 30 -subj "/CN=deconfianza.com" -addext "basicConstraints=critical,CA:TRUE" -keyout "$W/v/d.key" -out "$W/v/d.crt"
 cp "$W/v/d.crt" "$LVM_PRUEBA_CAS/d.crt"
+# doble.com: con dos basicConstraints (-addext y el OpenSSL 1.1.1 de Ubuntu 20.04): Chrome lo rechaza
+# con ERR_CERT_INVALID (1.57.22). Solo si hay un OpenSSL 1.1.1 (el de las versiones 7.4 y 8.0)
+O11=$(ls /opt/lampp-*/openssl/bin/openssl 2> /dev/null | head -1)
+[ -f /etc/ssl/openssl.cnf ] || O11=""
+[ -n "$O11" ] && LD_LIBRARY_PATH=$(dirname "$(dirname "$O11")")/lib OPENSSL_CONF=/etc/ssl/openssl.cnf q "$O11" req -x509 -nodes \
+    -newkey rsa:2048 -days 30 -subj "/CN=doble.com" -addext "basicConstraints=critical,CA:FALSE" \
+    -addext "subjectAltName=DNS:doble.com" -keyout "$W/v/b.key" -out "$W/v/b.crt"
 vh() { printf '<VirtualHost *:443>\n    ServerName %s\n    SSLEngine on\n    SSLCertificateFile "%s"\n    SSLCertificateKeyFile %s\n</VirtualHost>\n' "$1" "$2" "$3"; }
 { printf '<VirtualHost *:80>\n    ServerName tienda.com\n</VirtualHost>\n'
   vh tienda.com "$W/v/t.crt" "$W/v/t.key"; vh falsa.com "$W/v/f.crt" "$W/v/f.key"
-  vh viejo.com "$W/v/v.crt" "$W/v/v.key"; vh deconfianza.com "$W/v/d.crt" "$W/v/d.key"; } > "$VHOSTS_FILE"
+  vh viejo.com "$W/v/v.crt" "$W/v/v.key"; vh deconfianza.com "$W/v/d.crt" "$W/v/d.key"
+  [ -s "$W/v/b.crt" ] && vh doble.com "$W/v/b.crt" "$W/v/b.key"; } > "$VHOSTS_FILE"
 a=$(cert_audit)
 check "detecta el firmado por una CA local" 'grep -q "^C|tienda.com|.*|firmado$" <<< "$a" && grep -q "^A|CA de prueba|" <<< "$a"'
 check "no se fia del nombre del emisor (firma falsa)" '! grep -q "falsa.com" <<< "$a"'
 check "de CA sin confianza: no avisa" '! grep -q "viejo.com" <<< "$a"'
 check "de CA y de confianza: avisa" 'grep -q "^C|deconfianza.com|.*|ca$" <<< "$a"'
+[ -s "$W/v/b.crt" ] && check "con una extension repetida: avisa (doble)" 'grep -q "^C|doble.com|.*|doble$" <<< "$a"'
+check "sin extensiones repetidas: no es doble" '! grep -qE "^C\|(tienda|viejo|deconfianza)\.com\|.*\|doble$" <<< "$a"'
 fix_certs > "$W/out.txt" 2>&1
 check "despues, el navegador acepta los certificados propios (confiar-certificados)" '[ -f "$W/confiar.log" ]'
+[ -s "$W/v/b.crt" ] && check "doble.com pasa a un certificado propio bien hecho" 'grep -q "SSLCertificateFile \"$W/ssl/doble.com-selfsigned.crt\"" "$VHOSTS_FILE" && [ "$(openssl x509 -in "$W/ssl/doble.com-selfsigned.crt" -noout -text | grep -c "X509v3 Basic Constraints")" = 1 ]'
 check "tienda.com pasa a su certificado propio" 'grep -q "SSLCertificateFile \"$W/ssl/tienda.com-selfsigned.crt\"" "$VHOSTS_FILE" && grep -q "SSLCertificateKeyFile \"$W/ssl/tienda.com-selfsigned.key\"" "$VHOSTS_FILE"'
 check "los demas no se tocan" 'grep -q "\"$W/v/f.crt\"" "$VHOSTS_FILE" && grep -q "\"$W/v/v.crt\"" "$VHOSTS_FILE"'
 check "el nuevo no es de CA" 'openssl x509 -in "$W/ssl/tienda.com-selfsigned.crt" -noout -ext basicConstraints | grep -q CA:FALSE'

@@ -83,7 +83,10 @@ function cli_rebuild() {
         return 1
     fi
 
-    if [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] && ! php2shell_missing "$dir" "$full"; then
+    # (con alguna pieza dañada no esta al dia, aunque sus versiones sean las ultimas: se rehace)
+    local broken=$(stack_broken "$dir/xamppfiles")
+    [ -n "$broken" ] && echo "XAMPP-$version: dañado $broken (no está): se rehace"
+    if [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] && [ -z "$broken" ] && ! php2shell_missing "$dir" "$full"; then
         if [ -t 1 ]; then
             echo -e "\033[1;32mEl paquete XAMPP-$version se encuentra actualizado.\033[0m No hay nada que actualizar."
         else

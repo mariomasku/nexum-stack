@@ -121,16 +121,37 @@ eval "$github_token_antes"
 github_disconnect > /dev/null
 check "desconectar: fuera del llavero" '[ ! -e "$W/llavero" ] && [ -z "$(github_token)" ] && repos_list | grep -q "^E|GitHub no está conectado" && repos_list --cache | grep -q "^E|GitHub no está conectado"'
 
+# Linux: sin secret-tool, su paquete se instala con github-llavero-instalar (siempre el mismo, con sudo)
+if grep -q '^function github_keyring_install() {' "$SRC"; then
+    extract "$SRC" github_keyring_install || exit 1
+    GITHUB_KEYRING_PACKAGE=libsecret-tools
+    apt_install() { echo "APT $*" >> "$W/apt.log"; }
+    out=$(PATH=/nada; unset -f secret-tool; github_keyring_install 2>&1); rc=$?
+    check "llavero-instalar: sin secret-tool, instala libsecret-tools (y si sigue sin estar, falla)" '[ $rc -ne 0 ] && grep -qx "APT libsecret-tools" "$W/apt.log" && grep -q "no aparece secret-tool" <<< "$out"'
+    : > "$W/apt.log"
+    out=$(github_keyring_install 2>&1); rc=$?
+    check "llavero-instalar: con secret-tool, no se instala nada" '[ $rc -eq 0 ] && [ ! -s "$W/apt.log" ] && grep -q "ya está instalado" <<< "$out"'
+    out=$(PATH=/nada; unset -f secret-tool; DRY=1; github_keyring_install 2>&1); rc=$?
+    check "llavero-instalar: en la simulacion, solo lo dice" '[ $rc -eq 0 ] && [ ! -s "$W/apt.log" ] && grep -q "\[simulacion\] sudo apt-get install -y libsecret-tools" <<< "$out"'
+    check "llavero-instalar: es una orden de nexum" 'grep -q "^    github-llavero-instalar) github_keyring_install ;;" "$SRC"'
+fi
+
 # La ventana
 if [ $MAC -eq 1 ]; then
     check "ventana (Mac): la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")" "$SRC" && grep -q "case \"repos\": ReposView()" "$SRC" && grep -q "^            GitHubCard()$" "$SRC" && grep -q "runQuick(\[\"github-conectar\"\], input:" "$SRC"'
     check "ventana (Mac): si la cuenta no vale, se dice en una ventana y lo escrito se queda" 'grep -q "message(\"No se ha guardado\"" "$SRC"'
+    check "ventana (Mac): si no se conecta, el motivo en una ventana (no en el aviso de abajo)" 'grep -q "message(\"No se ha podido conectar con GitHub\"" "$SRC"'
     check "ventana (Mac): el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "Button(action: { openURL(\"https://github.com/\" + item.full) })" "$SRC" && grep -q ".tip(\"Abrir en GitHub\")" "$SRC"'
     check "ventana (Mac): ya clonado, se pregunta antes de traer los cambios (git pull)" 'grep -q "guard confirm(\"¿Traer los cambios de GitHub a" "$SRC" && grep -q "args.append(\"--actualizar\")" "$SRC"'
 else
     check "ventana: la pestaña, su apartado en Configuración y el token por la entrada" 'grep -q "(\"repos\", \"Repositorios\", \"logo:github\")," "$SRC" && grep -q "        self.nv_github_tools()" "$SRC" && grep -q "run_quick_input(\[\"github-conectar\"\], token" "$SRC"'
     check "ventana: si la cuenta no vale, se dice en una ventana y lo escrito se queda" 'grep -q "self.nv_github_saved))" "$SRC" && grep -q "message(self.win, \"No se ha guardado\"" "$SRC"'
+    check "ventana: sin secret-tool, una ventana con Instalarlo (github-llavero-instalar) antes de pedir el token" 'grep -q "if not installed and not shutil.which(\"secret-tool\"):" "$SRC" && grep -q "\[\"github-llavero-instalar\"\]" "$SRC" && grep -q "css(dlg.add_button(\"Instalarlo\", Gtk.ResponseType.OK), \"verde\")" "$SRC"'
+    check "ventana: si no se conecta, el motivo en una ventana (no en el aviso de abajo)" 'grep -q "message(self.win, \"No se ha podido conectar con GitHub\"" "$SRC"'
     check "ventana: el logotipo de GitHub detrás de Clonar o Traer cambios, a su repositorio" 'grep -q "gh.add(MonoLogo(\"github\", 18))" "$SRC" && grep -q "self.open_uri(\"https://github.com/%s\" % repo\[\"full\"\])" "$SRC"'
     check "ventana: ya clonado, se pregunta antes de traer los cambios (git pull)" 'grep -q "if not confirm(self.win, \"¿Traer los cambios de GitHub a" "$SRC" && grep -q "\[\"repo-traer\", repo\[\"full\"\], \"--actualizar\"\]" "$SRC"'
+    # (1.57.27) La lista de GitHub llega unos segundos después de la guardada y la página se rehace: lo escrito
+    # en el buscador, el cursor y por dónde iba la lista se quedan
+    check "ventana: al rehacer Repositorios se quedan lo escrito, el cursor y la posición de la lista" 'grep -q "search.set_text(getattr(self, \"repos_query\", \"\"))" "$SRC" && grep -q "search.connect(\"changed\", lambda e: setattr(self, \"repos_query\", e.get_text()))" "$SRC" && grep -q "search.grab_focus_without_selecting()" "$SRC" && grep -q "vadj.set_value(min(scroll," "$SRC"'
 fi
 exit $fail

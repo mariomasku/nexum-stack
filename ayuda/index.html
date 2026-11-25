@@ -358,7 +358,7 @@
   <p>El botón redondo del recuadro de arriba es la forma más rápida de encender o apagar tu entorno.</p>
   <ul>
     <li><b>▶ con una versión activa y parada</b> la arranca: Apache y MariaDB se ponen en marcha y tus proyectos vuelven a abrirse en el
-      navegador. Sale una ventana de tarea que se cierra sola: «Versión activa arrancada».</li>
+      navegador. Sale una ventana de tarea que se cierra sola y un aviso que dice cuál es: «Versión activa arrancada: <span data-so="linux">lampp-8.4</span><span data-so="mac">XAMPP-8.4</span> (PHP 8.4.14)».</li>
     <li><b>■ con la versión en marcha</b> la para y la desactiva. Desactivar quiere decir quitar el enlace
       <code data-so="linux">/opt/lampp</code><code data-so="mac">/Applications/XAMPP</code>: hasta que actives otra, la orden
       <code>php</code> de la terminal deja de responder y ninguna web local se abre. El programa recuerda cuál era para ofrecértela la
@@ -643,14 +643,18 @@
       <a href="#carpetas">copias de los ficheros que cambia el programa</a>, y los certificados viejos se guardan en una carpeta
       <code>/etc/ssl/lvm-anteriores-…</code> que solo ve el administrador. Después, el navegador avisará una vez en cada proyecto: acepta el
       aviso.
+    <li><b>«Certificados que Chrome rechaza»</b>: el certificado de algún proyecto está mal hecho (lleva una extensión repetida) y Chrome no
+      abre la web: dice «La conexión no es privada» con <code>net::ERR_CERT_INVALID</code>, y no deja continuar. Les pasaba a los creados en
+      Ubuntu 20.04. <b>«Arreglarlos»</b> les hace uno nuevo, bien hecho, y el navegador lo acepta. Pide la contraseña de administrador.</li>
       <details class="terminal"><summary>En la terminal</summary>
         <p>La orden del programa: <code>nexum arreglar-certificados</code>.</p>
         <p>Lo que hace, paso a paso:</p>
         <ol>
           <li>Busca en los vhosts los certificados que están en <code>/etc/ssl/certs</code> (donde el sistema los da por buenos para
-            cualquier web), los que son de una autoridad (CA) o los que faltan.</li>
-          <li>Crea para cada dominio uno propio que solo vale para él (<code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650
-            -subj "/CN=&lt;dominio&gt;" …</code>) y cambia su vhost para usarlo.</li>
+            cualquier web), los que son de una autoridad (CA), los que faltan o los que
+            llevan una extensión repetida.</li>
+          <li>Crea para cada dominio uno propio que solo vale para él (ver <a href="#dominios-certificados-como">Cómo se crea cada
+            certificado</a>) y cambia su vhost para usarlo.</li>
           <li>Guarda los certificados viejos en <code>/etc/ssl/lvm-anteriores-…</code> y deja de confiar en esa CA<span data-so="linux">
             (<code>sudo update-ca-certificates --fresh</code>)</span>.</li>
           <li>Comprueba la configuración de Apache y lo recarga.</li>
@@ -824,13 +828,19 @@
       y qué orden está instalada. Si no usa systemd-resolved, te lo dice y no escribe nada.</span><code data-so="mac">sudo dscacheutil
       -flushcache; sudo killall -HUP mDNSResponder</code>. Sirve cuando acabas de falsear o dejar de falsear un dominio y el navegador sigue yendo al sitio de antes. La
       contraseña te la pide la propia terminal.</li>
+    <li><b>«ping»</b>: escribe por ti <code>ping -c 3 panaderia-luna.com</code> con el dominio del proyecto cargado (uno detrás de otro, si
+      tiene varios), para saber de un vistazo adónde lleva: si contesta <code>127.0.0.1</code>, está falseado y va a tu copia; si sale otra
+      dirección, es la de la web real. Si el proyecto cargado no tiene dominio propio (solo <code>web.local</code>), o no hay ninguno cargado,
+      te lo dice y no escribe nada.</li>
     <li><b>«Proyecto cargado»</b>: escribe un <code>cd</code> (la orden para entrar en una carpeta) a la carpeta del proyecto cargado.</li>
-    <li><b>↻</b> («Terminal nueva»): cierra la de ahora y abre otra.</li>
-    <li><b>✕</b>: la esconde (sigue abierta).</li>
+    <li><b>+</b>: abre otra terminal en una pestaña nueva, en la carpeta del proyecto cargado. Las que ya tenías siguen abiertas, con lo que
+      estuvieran haciendo. Con más de una, sus pestañas («Terminal 1», «Terminal 2»…) salen debajo de los botones: pulsa una para verla
+      (los botones de arriba van a esa) y su <b>×</b> para cerrarla, con lo que tenga en marcha.</li>
+    <li><b>✕</b>: la esconde (siguen abiertas todas sus pestañas).</li>
   </ul>
   <p data-so="linux">Para copiar y pegar, como en la Terminal de GNOME: <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>C</kbd> y
     <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>V</kbd>, o el botón derecho («Copiar», «Pegar», «Seleccionar todo»). Si escribes
-    <code>exit</code>, se cierra y se esconde; la próxima vez se abre una nueva. Si falta su componente, el programa te dice cómo
+    <code>exit</code>, se cierra su pestaña; si era la última, la terminal se esconde y la próxima vez se abre una nueva. Si falta su componente, el programa te dice cómo
     instalarlo: <code>sudo apt install gir1.2-vte-2.91</code>.</p>
   <p data-so="mac">Para copiar y pegar, como en Terminal: <kbd>⌘</kbd>+<kbd>C</kbd> y <kbd>⌘</kbd>+<kbd>V</kbd>. Si escribes
     <code>exit</code>, se cierra; la próxima vez se abre una nueva.</p>
@@ -856,8 +866,10 @@
   <p>Cada tarea guarda además su registro entero (la orden de <code>nexum</code> que se ha ejecutado, toda su salida y cómo acabó), sin
     contraseñas: lo tienes después, aunque hayas cerrado su ventana, en Configuración → General, <a href="#tareas">Registro de
     tareas</a>.</p>
-  <div class="nota"><b>Solo va una tarea a la vez</b>Si lanzas otra mientras una sigue en segundo plano, te dice «Hay una tarea en marcha:
-    espera a que acabe» y te enseña la que está trabajando.</div>
+  <div class="nota"><b>Solo va una tarea a la vez</b>Mientras una sigue trabajando, lo que lanzaría otra se ve atenuado. Si lo pulsas,
+    antes de preguntarte nada sale «Hay una tarea en marcha» con el nombre de la que sigue (por ejemplo, «Actualizando los componentes» sigue en marcha), en la
+    ventana que estás mirando, aunque sea «Instalar versión». Al cerrarlo te enseña la que está trabajando: espera a que acabe y vuelve a
+    probar.</div>
 
   <h3 id="ventana-contrasena">La contraseña de administrador</h3>
   <p>Cuando una tarea necesita permisos de administrador (lo que en la terminal se hace con <code>sudo</code> delante), se abre una ventana
@@ -896,7 +908,7 @@
   <p class="entrada">La página principal: arriba, el proyecto con el que estás trabajando y todo lo que puedes hacer con él; debajo, la
     lista de todos tus proyectos.</p>
   <p>Un <b>proyecto</b> es cada carpeta de <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>: un WordPress,
-    una tienda PrestaShop, una web en PHP o en HTML. <b>Cargarlo</b> hace que <code>http://web.local/</code> lo abra, con la versión
+    una tienda PrestaShop, una web en PHP o en HTML. <b>Cargarlo</b> hace que <code>https://web.local/</code> lo abra, con la versión
     de PHP y la base de datos que elijas. Solo hay uno cargado a la vez; los demás siguen en su carpeta, sin cambiar nada.</p>
   <p>Unas palabras que salen mucho en este capítulo:</p>
   <ul>
@@ -988,7 +1000,8 @@
         si también está en Docker. Deja el ratón encima para ver la versión y la base de cada uno. Su tamaño en disco y el nombre de su base
         de datos van al lado.</span></li>
       <li data-x="91.3" data-y="76.1"><b>Cargar</b><span>Sale al pasar el ratón por una fila que no es la cargada. Carga ese proyecto; si tiene
-        base de datos en varias versiones, te pregunta cuál. Ver <a href="#cargar">Cargar un proyecto</a>.</span></li>
+        base de datos en varias versiones, te pregunta cuál. Ver <a href="#cargar">Cargar un proyecto</a>. A su izquierda, también al pasar el
+        ratón (y en la fila cargada), sus accesos directos con solo el icono: Visual Studio Code, su repositorio y phpMyAdmin.</span></li>
       <li data-x="96.0" data-y="76.1"><b>El ⋮ de la fila</b><span>También al pasar el ratón: llevar ese proyecto a otra versión o a Docker,
         importar su SQL y lo mismo que el menú Más, sin cambiar el proyecto de arriba. Ver <a href="#menu-fila">el menú de cada fila</a>.</span></li>
     </ol>
@@ -1010,7 +1023,7 @@
 
   <!-- ------------------------------------------------------------------ cargar -->
   <h3 id="cargar">Cargar un proyecto</h3>
-  <p><b>Para qué sirve:</b> para ver y trabajar en un proyecto en tu navegador. Mientras está cargado, <code>http://web.local/</code>
+  <p><b>Para qué sirve:</b> para ver y trabajar en un proyecto en tu navegador. Mientras está cargado, <code>https://web.local/</code>
     enseña ese proyecto, con su versión de PHP y su base de datos. Cuando quieras trabajar en otro, cargas el otro: no hace falta
     tocar ninguna configuración a mano.</p>
   <p><b>Cómo funciona por dentro:</b> <code>web.local</code> no es una carpeta de verdad, es un <b>enlace simbólico</b> (un acceso
@@ -1026,7 +1039,7 @@
     <li><b>Confirma, si hace falta.</b> Si hay que cambiar de versión de PHP, te lo dice antes. Puede pedirte la contraseña de
       administrador.</li>
     <li><b>Ábrelo.</b> El punto se pone verde («Proyecto cargado») y aparecen sus botones: pulsa <b>Abrir web</b> y lo verás en
-      <code>http://web.local/</code>. Abajo sale un aviso corto: «Proyecto cargado: web.local → panaderia-luna (PHP 8.4.27)».</li>
+      <code>https://web.local/</code>. Abajo sale un aviso corto: «Proyecto cargado: web.local → panaderia-luna (PHP 8.4.27)».</li>
   </ol>
   <div class="nota"><b>«Entorno» y «Cargar» no son lo mismo</b>Elegir otra versión en la lista «Entorno» <b>carga el proyecto en ese mismo
     momento</b>, con esa versión y su base de datos (lanza la misma orden que «Cargar»). El botón «Cargar», en cambio, no mira esa
@@ -1089,7 +1102,8 @@
           que PHP no siga sirviendo el proyecto anterior.</li>
         <li>Recuerda la base: escribe <code>wp_panaderia_luna@8.4=panaderia-luna</code> en <code>~/.nexum/proyectos</code>.</li>
         <li>WordPress: comprueba que <code>wp-config.php</code> usa esa base, entra en el MariaDB local y lleva <code>WP_HOME</code> y
-          <code>WP_SITEURL</code> en <code>http://web.local</code>; si no, lo rehace con la plantilla de este equipo
+          <code>WP_SITEURL</code> en <code>https://web.local</code> (o en su dominio, si es suyo y está falseado: ver
+          <a href="#dominios-wordpress">Un WordPress con su dominio</a>); si no, lo rehace con la plantilla de este equipo
           (<code>~/.nexum/wordpress/panaderia-luna.wp-config.php</code>). PrestaShop: <code>app/config/parameters.php</code>
           pasa a usar la base local y, si su dominio es suyo, crea su vhost y su certificado.</li>
         <li><code>/etc/hosts</code>: falsea el dominio de la tienda (quita el <code>#</code> de su línea o añade
@@ -1246,31 +1260,47 @@
   <p>Cuáles se ven, en qué orden y cómo se eligen en <a href="#personalizar-botones">Personalizar los botones</a>. Al dejar el ratón encima,
     cada uno dice lo que hace.</p>
   <ul>
-    <li><b>«Abrir web»</b>: abre <code>http://web.local/</code> en tu navegador. No cambia nada. En la terminal, lo mismo es
-      <code data-so="linux">xdg-open http://web.local/</code><code data-so="mac">open http://web.local/</code>.</li>
+    <li><b>«Abrir web»</b>: abre <code>https://web.local/</code> en tu navegador o, si el proyecto tiene su dominio falseado, ese
+      dominio: la misma dirección que lleva su <code>WP_HOME</code>. Va directo por https porque muchos <code>.htaccess</code> de
+      producción mandan lo que llega por http a la web real («lo que llegue por http, a https://panaderia-luna.com»). No cambia
+      nada. En la terminal, lo mismo es
+      <code data-so="linux">xdg-open https://web.local/</code><code data-so="mac">open https://web.local/</code>.</li>
     <li><b>«VS Code»</b>: abre su carpeta en Visual Studio Code (el editor de código). Si ya estaba abierta, trae su ventana delante. Solo
       sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>.</li>
+    <li><b>«GitHub»</b>: abre su repositorio en el navegador, por ejemplo <code>https://github.com/ana/panaderia-luna</code>. Solo sale si
+      la carpeta es un repositorio git con un remote <code>origin</code>; si es de otro servidor (GitLab, Bitbucket…), se llama
+      «Repositorio». La dirección sale de <code>.git/config</code> y nunca lleva el usuario ni la contraseña (o el token) que tuviera. En la
+      terminal: <code>git -C /opt/htdocs/panaderia-luna remote get-url origin</code>.</li>
     <li><b>«phpMyAdmin»</b>: abre su base de datos en phpMyAdmin, la página web para ver y cambiar las tablas de MariaDB, en
       <code>http://127.0.0.1/phpmyadmin/</code> (el de la versión activa). Sale apagado si no se sabe qué base usa. No cambia nada.</li>
     <li><b>«Panel»</b>: el escritorio de WordPress (<code>wp-admin</code>) o el back office de PrestaShop (con su logotipo). Antes deja al
-      día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>) y abre la pantalla de acceso con
-      los dos ya escritos: solo hay que pulsar Entrar. Sale apagado si el proyecto no es un WordPress ni una tienda.</li>
+      día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>, o el que pongas en
+      Configuración, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Entra por la dirección en la que el
+      panel guarda la sesión: en una tienda con su dominio falseado, por ese dominio (<code>https://tienda-luna.es/…</code>), porque su back
+      office salta allí al entrar; y por <code>https</code> si la tienda tiene SSL activado o el WordPress tiene su dirección en https, porque
+      entonces la sesión solo se guarda por https. Sale apagado si el proyecto no es un WordPress ni una tienda. Si la base ya tiene un usuario de verdad con ese correo, no lo toca: te avisa y abre el
+      panel sin él.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum usuario-pruebas wp_panaderia_luna panaderia-luna</code> (la base y la carpeta).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Entra en el MariaDB de la versión activa como root.</li>
-      <li>WordPress (cada uno que haya en la base, por su prefijo de tablas, como <code>wp_</code>): busca el usuario
-        <code>local@local.test</code> en <code>wp_users</code>; si no está, lo crea; le pone la contraseña <code>MD5('local')</code> y, en
-        <code>wp_usermeta</code>, el rol de administrador (<code>wp_capabilities</code> y <code>wp_user_level</code> = 10).</li>
-      <li>PrestaShop: copia el primer SuperAdmin de <code>ps_employee</code> con el correo <code>local@local.test</code> y la contraseña
-        <code>local</code> (cifrada como la use esa versión de la tienda) y lo da de alta en todas sus tiendas.</li>
+      <li>Lee el administrador de pruebas de <code>~/.nexum/admin-pruebas</code> (si no hay, <code>local@local.test</code> con la
+        contraseña <code>local</code>). En estos ejemplos, el de siempre.</li>
+      <li>WordPress (cada uno que haya en la base, por su prefijo de tablas, como <code>wp_</code>): busca en <code>wp_users</code> el usuario
+        <code>local@local.test</code> con la marca de Nexum (<code>user_nicename</code> <code>local-pruebas</code> y nombre «Local
+        (pruebas)»); si no está, lo crea con esa marca; le pone la contraseña en <code>MD5</code> y, en <code>wp_usermeta</code>, el rol de
+        administrador (<code>wp_capabilities</code> y <code>wp_user_level</code> = 10). Con un correo tuyo, si ya hay un usuario sin la marca
+        con ese usuario o ese correo, es de verdad: no lo toca y avisa («ya tiene un usuario de verdad con ana@local.test»).</li>
+      <li>PrestaShop: copia el primer SuperAdmin de <code>ps_employee</code> con el correo <code>local@local.test</code>, la marca (nombre
+        «Pruebas», apellido «Local») y la contraseña (cifrada como la use esa versión de la tienda) y lo da de alta en todas sus tiendas. Un
+        empleado sin la marca con ese correo, igual: no se toca.</li>
       <li>Escribe <code>A|wp|local@local.test|local</code> (o <code>A|ps|…</code>). Con eso la ventana sirve un momento, en
         <code>http://127.0.0.1</code>, una página con el formulario de acceso ya relleno y la abre en el navegador.</li>
     </ol>
     <p>Solo toca bases de este equipo, que nunca van a producción. Para comprobarlo: entra en
-      <code>http://web.local/wp-admin/</code> con <code>local@local.test</code> y <code>local</code>.</p>
+      <code>https://web.local/wp-admin/</code> con <code>local@local.test</code> y <code>local</code>.</p>
   </details>
   <ul>
     <li><b>«Docker»</b>: lo monta o lo arranca en Docker. Ver <a href="#docker-desde-proyectos">Docker desde Proyectos</a>.</li>
@@ -1280,13 +1310,13 @@
       web</a>.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (los
+    <p>La orden del programa: <code>nexum tunel-abrir https://web.local panaderia-luna --minutos 120 --admin bloquear</code> (los
       minutos que dura y si se bloquea el panel, como los elijas). Si cloudflared aún no está, antes <code>nexum tunel-instalar</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Cierra el túnel que hubiera abierto y crea una contraseña nueva al azar.</li>
       <li>Pone delante de la web un pequeño intermediario en tu equipo que pide esa contraseña, bloquea el panel de administración y
-        cambia el dominio local por el del túnel al pasar (la web no se toca).</li>
+        cambia por el del túnel, al pasar, el dominio local y los dominios reales que tengas falseados (la web no se toca).</li>
       <li>Lanza <code>cloudflared tunnel --url http://127.0.0.1:&lt;puerto del intermediario&gt;</code> y apunta la dirección que le da
         Cloudflare. Se cierra solo a las horas que hayas dicho.</li>
     </ol>
@@ -1315,6 +1345,10 @@
   <ul>
     <li><b>Encendido</b>: ese dominio lleva a tu equipo. El navegador abre tu copia local con la dirección de verdad.</li>
     <li><b>Apagado</b>: el dominio vuelve a llevar a la web real, en internet.</li>
+    <li>En un <b>WordPress</b>, cambia también adónde lleva la web: su <code>wp-config.php</code> tiene <code>WP_SITEURL</code> y
+      <code>WP_HOME</code> dos veces, con <code>https://web.local</code> y con el dominio, y solo una pareja sin comentar. Encendido, la del dominio;
+      apagado, la de <code>web.local</code>. Así, con el dominio sin falsear, tu copia local nunca te manda a la web de producción (ver
+      <a href="#dominios-wordpress">Un WordPress con su dominio</a>).</li>
     <li>No pregunta antes. Pide la contraseña de administrador y, con las <a href="#carpetas">copias de los ficheros que cambia el
       programa</a> encendidas, guarda una copia del fichero de hosts en <code>~/nexum-backups</code>.</li>
     <li>Al cargar otro proyecto, los dominios falseados de este vuelven a la web real. Lo mismo se hace en <a href="#dominios">Dominios y
@@ -1404,64 +1438,117 @@
       <li>Comprueba que la configuración ha quedado apuntando a este equipo.</li>
     </ol>
     <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna status</code> (lo que ha cambiado el código) y abre
-      <code>http://web.local/</code>.</p>
+      <code>https://web.local/</code>.</p>
   </details>
   <div class="nota cuidado"><b>El git pull no va solo</b>Solo se ofrece cuando también copias un paquete de código. Para traer cambios de
     GitHub sin más, usa la <a href="#repositorios">página Repositorios</a> o la terminal (<code>git -C /opt/htdocs/panaderia-luna pull</code>).</div>
 
   <!-- ------------------------------------------------------------------ imágenes -->
   <h3 id="imagenes-produccion">Imágenes de producción</h3>
-  <p>Las imágenes de una web (las de <code>wp-content/uploads</code> o <code>img</code>) no suelen ir en git, así que tu copia local se ve
-    sin fotos. El programa lo arregla de dos formas distintas, según el tipo de proyecto. En los dos casos se abre con el botón
-    <b>«Imágenes de producción»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
-
-  <p><b>WordPress: «Imágenes de producción…»</b>. No descarga nada: lo que falte se pide a la web real.</p>
+  <p>Las imágenes de una web (las de <code>wp-content/uploads</code> en WordPress, las de <code>img</code> en PrestaShop) no suelen ir en
+    git, así que tu copia local se ve sin fotos. El programa tiene dos formas de traerlas, y las dos sirven para WordPress y para
+    PrestaShop. Se abren con el botón <b>«Imágenes de producción»</b> o desde el <a href="#menu-mas">menú ⋮</a>.</p>
   <ul>
-    <li>Escribe el <b>dominio de producción</b> (solo el dominio, como <code>panaderia-luna.com</code>). El programa propone el de su base de
-      datos («Es el dominio de su BBDD: compruébalo antes de guardar.»). No vale un <code>.local</code> ni un <code>.test</code>.</li>
-    <li>Pulsa <b>«Guardar»</b>. Mientras el proyecto esté cargado (y también en el Apache de Docker, si está allí), cada imagen, vídeo o PDF
-      de <code>wp-content/uploads</code> que no esté en tu carpeta se pide a la web real con una <b>redirección</b> (Apache le dice al
-      navegador «esto búscalo en esta otra dirección»). Lo que ya tienes en local se sigue sirviendo desde aquí.</li>
-    <li>No cambia tu carpeta ni tu base de datos. Sí cambia el vhost de <code>web.local</code>: pide la contraseña de administrador, guarda
-      antes una copia de los vhosts en <code>~/nexum-backups</code> (si tienes encendidas las <a href="#carpetas">copias de los ficheros
-      que cambia el programa</a>) y recarga Apache.</li>
-    <li>Va con el proyecto: al cargar otro o desmontarlo, se quita sola, y vuelve al cargarlo otra vez.</li>
-    <li><b>Para quitarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (solo sale si hay un dominio guardado).</li>
+    <li><b>Al navegar</b> («Imágenes de producción…»): no se descarga nada por adelantado. Cuando la página pide una imagen que no está en
+      tu carpeta, el programa la trae en ese momento de la web real, te la enseña y <b>la guarda en la carpeta del proyecto</b>. Solo se
+      trae lo que ves: si abres la portada y dos productos, se traen esas imágenes y nada más. La siguiente vez ya salen de tu equipo.
+      Es lo más rápido para empezar a trabajar.</li>
+    <li><b>Todas de una vez</b> (solo PrestaShop: «Descargar de producción las imágenes que faltan…»): descarga ahora todas las que
+      faltan según la base de datos de la tienda, también las de productos que no vayas a abrir. Tarda más (en una tienda grande, más
+      de 100.000 ficheros entre originales y miniaturas), pero después la tienda está completa sin conexión.</li>
+  </ul>
+  <p>Las dos <b>funcionan aunque el dominio real esté falseado</b> en tu equipo (lo habitual en una tienda, que se ve con su dominio).
+    La dirección de la web real no se le pregunta al sistema, que con el dominio falseado contestaría «este mismo equipo», sino al
+    <b>DNS cifrado</b> de Cloudflare: el DNS es el servicio que traduce un nombre como <code>ferreteria-norte.com</code> a la dirección de
+    su servidor, y así se pregunta directamente por internet, sin mirar tu fichero de hosts. Si el DNS cifrado solo da direcciones de tu
+    equipo o de una red privada, no se trae nada. Siempre se comprueba el certificado real de la web. Lo que ya tienes en local no se
+    toca nunca.</p>
+
+  <p><b>«Imágenes de producción…»: traerlas al navegar</b></p>
+  <ul>
+    <li>Escribe el <b>dominio de producción</b> (solo el dominio, como <code>panaderia-luna.com</code>). El programa propone el de su base
+      de datos (en WordPress, <code>home</code> o <code>siteurl</code>; en una tienda, su <code>shop_url</code>): «Es el dominio de su
+      BBDD: compruébalo antes de guardar.». No vale un <code>.local</code> ni un <code>.test</code>.</li>
+    <li>Pulsa <b>«Guardar»</b>. Desde ese momento, en tu versión LAMPP activa, cada vez que la página pide una imagen (jpg, png, webp,
+      avif, gif, svg, ico, bmp) que no está en tu carpeta:
+      <ol>
+        <li>Apache no da un error 404: se la pasa al <b>intermediario de imágenes</b> del programa, un pequeño servidor que corre con tu
+          usuario y solo en tu equipo (<code>127.0.0.1</code>).</li>
+        <li>El intermediario la pide a la web real por https, a la dirección del DNS cifrado, con un nombre que dice quién es
+          (<code>Nexum-Dev-Stack/&lt;versión&gt; (imagenes que faltan en una copia local)</code>).</li>
+        <li>Si llega una imagen de verdad, se la da al navegador y la guarda en su sitio de la carpeta (<code>img/p/1/2/12-home_default.jpg</code>,
+          <code>wp-content/uploads/2026/03/foto.jpg</code>). Nunca fuera de <code>img</code> o de <code>wp-content/uploads</code>.</li>
+        <li>Si la web real no la tiene, el navegador recibe un 404, como si no existiera, y no se vuelve a preguntar por ella durante 5
+          minutos. Si lo que contesta no es una imagen (por ejemplo, una página de error), no se guarda nada.</li>
+      </ol>
+      La segunda vez que se pide, la imagen ya está en la carpeta y la sirve Apache directamente, sin el intermediario.</li>
+    <li>En una tienda también valen sus direcciones amigables (<code>/12-home_default/silla.jpg</code>): su <code>.htaccess</code> las traduce a
+      <code>img/p/1/2/12-home_default.jpg</code> y, si falta, se trae igual.</li>
+    <li>En WordPress, los <b>vídeos y los PDF</b> de <code>wp-content/uploads</code> no se guardan: mientras el proyecto esté cargado en
+      <code>web.local</code>, se piden a la web real con una <b>redirección</b> (Apache le dice al navegador «esto búscalo en esta otra
+      dirección»). Si el dominio real está falseado, esa redirección volvería a tu equipo: los vídeos y PDF que falten no se verán.</li>
+    <li>Las reglas van en los vhosts de la carpeta del proyecto (los suyos, con su dominio) y en el de <code>web.local</code> mientras sea el
+      proyecto cargado. Pide la contraseña de administrador, guarda antes una copia de los vhosts en <code>~/nexum-backups</code> (si tienes
+      encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>) y recarga Apache.</li>
+    <li>El intermediario arranca y se para con la versión activa, y solo si algún proyecto tiene sus imágenes de producción.</li>
+    <li><b>En el Apache de Docker</b>: un WordPress pide sus imágenes, vídeos y PDF a la web real con la redirección (no se guardan); una
+      tienda no pasa por el intermediario, así que ahí usa «Descargar de producción las imágenes que faltan…».</li>
+    <li>No cambia tu base de datos ni tus ficheros, salvo las imágenes que se van guardando.</li>
+    <li><b>Para quitarlo</b>, abre el mismo diálogo y pulsa <b>«Quitar»</b> (solo sale si hay un dominio guardado). Las imágenes que ya se
+      han guardado se quedan.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum media-proyecto panaderia-luna panaderia-luna.com</code> («Guardar») o
       <code>nexum media-proyecto panaderia-luna quitar</code> («Quitar»).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
-      <li>Comprueba que no es una tienda PrestaShop y que el dominio es válido.</li>
+      <li>Comprueba que el dominio es válido.</li>
       <li>Apunta <code>panaderia-luna|panaderia-luna.com</code> en <code>~/.nexum/media-produccion</code> (o borra su línea, con
         <code>quitar</code>).</li>
-      <li>Si es el proyecto cargado, añade al vhost de <code>web.local</code> (en <code data-so="linux">/opt/config/httpd-vhosts.conf</code><code
-        data-so="mac">/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>) un bloque que empieza por <code># nexum-media
-        panaderia-luna.com:</code> con una regla de Apache: si se pide por GET un fichero de <code>wp-content/uploads</code> o
-        <code>img</code> (jpg, png, webp, svg, mp4, pdf…) que no existe en la carpeta, <code>RewriteRule … https://panaderia-luna.com/$1
-        [R=302]</code>.</li>
+      <li>En cada vhost cuyo <code>DocumentRoot</code> es la carpeta del proyecto (y en el de <code>web.local</code>, si es el cargado),
+        dentro de <code data-so="linux">/opt/config/httpd-vhosts.conf</code><code data-so="mac">/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>,
+        pone al principio un bloque que empieza por <code># nexum-imagenes panaderia-luna panaderia-luna.com:</code>. Es una regla de Apache:
+        si se pide por GET o HEAD una imagen de <code>/wp-content/uploads/</code> (o de <code>/img/</code> en una tienda) que no existe en la
+        carpeta, <code>RewriteRule … http://127.0.0.1:47817/panaderia-luna/$1 [P]</code>, es decir, Apache se la pide al intermediario y
+        devuelve lo que este le dé. Lleva la cabecera <code>X-Nexum-Imagenes: 1</code>; el intermediario no atiende nada que no la traiga
+        ni que vaya a otro nombre que <code>127.0.0.1</code>.</li>
+      <li>En WordPress, si es el proyecto cargado, añade también al vhost de <code>web.local</code> un bloque <code># nexum-media
+        panaderia-luna.com:</code> con <code>RewriteRule … https://panaderia-luna.com/$1 [R=302]</code>, que es la redirección de los vídeos
+        y los PDF (las imágenes las atiende antes el bloque del intermediario).</li>
       <li>Aplica los vhosts: guarda el anterior en <code>~/nexum-backups</code> (con las copias de los ficheros encendidas), lo escribe con
         <code>sudo install</code>, comprueba que Apache lo acepta (<code>httpd -t</code>; si no, deja el de antes) y recarga Apache.</li>
+      <li>Arranca el intermediario si la versión activa está en marcha: <code>python3</code> con tu usuario, en
+        <code>127.0.0.1:47817</code>, con su registro en <code>~/.nexum/imagenes-intermediario.log</code>.</li>
       <li>Si el proyecto está en el Apache de Docker, rehace y recarga también sus vhosts.</li>
     </ol>
-    <p>Para comprobarlo: <code>grep -A6 nexum-media /opt/config/httpd-vhosts.conf</code> y <code>curl -I
-      http://web.local/wp-content/uploads/&lt;una que falte&gt;.jpg</code> (contesta <code>302</code> con la dirección real).</p>
+    <p>Lo que hace el intermediario con cada imagen que le llega:</p>
+    <ol>
+      <li>Pregunta la dirección de la web al DNS cifrado: <code>curl -H "accept: application/dns-json"
+        "https://cloudflare-dns.com/dns-query?name=panaderia-luna.com&amp;type=A"</code> (y <code>AAAA</code>, y lo mismo con
+        <code>www.</code>), y se queda con las públicas. Lo recuerda 10 minutos.</li>
+      <li>La pide con <code>curl --resolve panaderia-luna.com:443:&lt;dirección&gt; --proto =https --fail
+        https://panaderia-luna.com/wp-content/uploads/…</code>: <code>--resolve</code> hace que <code>curl</code> vaya a esa dirección sin
+        mirar tu fichero de hosts, y comprueba el certificado de <code>panaderia-luna.com</code>.</li>
+      <li>Si llega con <code>200</code> y es una imagen (<code>Content-Type: image/…</code>), la guarda en la carpeta y la devuelve. Si no
+        está (<code>404</code>, o <code>403</code>, que es lo que da PrestaShop cuando falta su carpeta), devuelve 404 y lo apunta en su
+        registro.</li>
+    </ol>
+    <p>Para comprobarlo: <code data-so="linux">grep -A10 nexum-imagenes /opt/config/httpd-vhosts.conf</code><code data-so="mac">grep -A10 nexum-imagenes /Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>, abre una página con imágenes que no tengas y
+      mira que aparecen en la carpeta, y <code>tail ~/.nexum/imagenes-intermediario.log</code> para las que no están en producción.</p>
   </details>
 
-  <p><b>PrestaShop: «Descargar de producción las imágenes que faltan…»</b>. Una tienda se ve con su dominio real falseado, así que una
-    redirección volvería a tu equipo: aquí <b>sí se descargan</b>.</p>
+  <p><b>PrestaShop: «Descargar de producción las imágenes que faltan…»: todas de una vez</b></p>
   <ul>
     <li>No pide nada: el dominio sale de la base de datos de la tienda. Pregunta «¿Descargar las imágenes que le faltan a ferreteria-norte?»
-      y pulsas <b>«Descargar»</b>. Si el usuario root de MariaDB tiene contraseña, te la pide.</li>
+      y pulsas <b>«Descargar»</b>.<span data-so="linux"> También está el botón <b>«Descargar todas…»</b> del diálogo «Imágenes de
+      producción».</span> Si el usuario root de MariaDB tiene contraseña, te la pide.</li>
     <li>Mira en su base qué imágenes de productos, categorías y marcas (con sus miniaturas) faltan en su carpeta <code>img</code> y las
       descarga de la web real. La base es la de la versión activa o, si no está allí, la de su proyecto del Apache de Docker.</li>
-    <li>Como el dominio está falseado en tu equipo, se busca con <b>DNS cifrado</b> (Cloudflare): el DNS es el servicio que traduce un
-      nombre como <code>ferreteria-norte.com</code> a la dirección de su servidor, y así se pregunta directamente por internet, sin
-      mirar tu fichero de hosts. Se comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local
-      no se toca.</li>
-    <li>Con muchos productos puede tardar y ocupar bastante. Es una descarga de una vez: no hay nada que apagar, las imágenes se quedan en
-      <code>img</code> (la misma carpeta para LAMPP y Docker).</li>
+    <li>La dirección de la web se pregunta una sola vez al DNS cifrado y todas las descargas van a esa dirección, aunque el dominio siga
+      falseado. Si el DNS cifrado no contesta, o solo da direcciones de tu equipo o de una red privada, no se descarga nada y lo dice. Se
+      comprueba su certificado real. Cada fichero solo se guarda si llega entero, y lo que ya está en local no se toca.</li>
+    <li>Con muchos productos puede tardar y ocupar bastante: la tarea dice cuántas lleva descargadas y revisadas. Es una descarga de una
+      vez: no hay nada que apagar, las imágenes se quedan en <code>img</code> (la misma carpeta para LAMPP y Docker).</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum ps-imagenes ferreteria-norte</code> (puedes añadir el dominio detrás si no se puede
@@ -1472,9 +1559,15 @@
         <code>config/settings.inc.php</code>) y su dominio (de la base).</li>
       <li>Saca de las tablas <code>ps_image</code>, <code>ps_image_type</code>, <code>ps_category</code> y <code>ps_manufacturer</code> la
         lista de imágenes que debería haber (<code>img/p/1/2/12.jpg</code>, <code>img/p/1/2/12-home_default.jpg</code>,
-        <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta.</li>
-      <li>Las descarga de ocho en ocho con <code>curl --doh-url https://cloudflare-dns.com/dns-query --proto =https --fail
-        --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.nexum</code>.</li>
+        <code>img/c/…</code>, <code>img/m/…</code>) y se queda con las que no están en la carpeta. De cada categoría trae también
+        su miniatura, <code>img/c/&lt;id&gt;_thumb.jpg</code> (la «imagen en miniatura» del back office): muchos temas y módulos
+        miran si está en el disco y, sin ella, enseñan la portada de la categoría, que es otra imagen.</li>
+      <li>Pregunta la dirección de la tienda al DNS cifrado: <code>curl -H "accept: application/dns-json"
+        "https://cloudflare-dns.com/dns-query?name=ferreteria-norte.com&amp;type=A"</code> (y <code>type=AAAA</code>). Se queda con las
+        direcciones públicas.</li>
+      <li>Las descarga de ocho en ocho, en tandas de 300, con <code>curl --resolve ferreteria-norte.com:443:&lt;dirección&gt; --proto =https
+        --fail --max-redirs 0 https://ferreteria-norte.com/img/p/…</code>, a una carpeta temporal en <code>~/.nexum</code>. Tras cada
+        tanda dice cuántas lleva descargadas y revisadas. Si una tanda no devuelve nada, se para y lo dice.</li>
       <li>Mueve a <code>img/</code> solo las que han llegado enteras. No usa <code>sudo</code>: va con tu usuario.</li>
     </ol>
     <p>Para comprobarlo: vuelve a lanzarla; dice «A ferreteria-norte no le falta ninguna imagen de productos, categorias ni marcas».</p>
@@ -1592,8 +1685,8 @@
   <ul>
     <li><b>«Limpiar proyecto…»</b>: su caché, sus registros y, en WordPress, los restos de las actualizaciones. Ver
       <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</li>
-    <li><b>«Descargar de producción las imágenes que faltan…»</b> (PrestaShop) o <b>«Imágenes de producción…»</b> (WordPress): ver
-      <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
+    <li><b>«Imágenes de producción…»</b> (WordPress y PrestaShop) y <b>«Descargar de producción las imágenes que faltan…»</b>
+      (PrestaShop): ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
     <li><b>«Personalizar los botones…»</b>: ver <a href="#personalizar-botones">Personalizar los botones</a>.</li>
     <li><b>«Borrar el proyecto…»</b>: ver <a href="#borrar-proyecto">Borrar un proyecto</a>.</li>
   </ul>
@@ -1661,11 +1754,14 @@
       carpeta .git)»</b> y <b>«Base de datos: wp_panaderia_luna (<span data-so="linux">lampp-8.4</span><span
       data-so="mac">XAMPP-8.4.27</span>)»</b>, la que usa el proyecto en esa versión. Si no tiene ninguna, la casilla sale apagada con
       «Sin BBDD vinculada». Desmarca lo que no quieras llevarte; con las dos desmarcadas, «Exportar» no se puede pulsar. Debajo, lo que
-      se va a hacer, numerado, con la carpeta y el nombre del zip.</li>
-    <li><b>El zip</b> va a tu carpeta de descargas (<span data-so="linux"><code>~/Descargas</code>, la de tu escritorio</span><span
-      data-so="mac"><code>~/Downloads</code>, «Descargas» en el Finder</span>) con el nombre
+      se va a hacer, numerado.</li>
+    <li><b>Dónde se guarda.</b> Al pulsar «Exportar» se abre la ventana de guardar del sistema, «Guardar el proyecto exportado», en tu
+      carpeta de descargas (<span data-so="linux"><code>~/Descargas</code>, la de tu escritorio</span><span
+      data-so="mac"><code>~/Downloads</code>, «Descargas» en el Finder</span>) y con el nombre
       <code>panaderia-luna_php8.4_20261111-1030_nexum.zip</code>: la carpeta, la rama de PHP, la fecha y la hora y, al final,
-      <code>_nexum</code>. Dentro: <code>panaderia-luna/</code> con el código (sin <code>.git</code> y con sus permisos),
+      <code>_nexum</code>. Ahí puedes cambiar la carpeta y el nombre (si le quitas el <code>.zip</code>, se le vuelve a poner). Si eliges
+      uno que ya existe, la propia ventana te pregunta si lo reemplazas. Con «Cancelar» no se exporta nada.</li>
+    <li><b>El zip</b> lleva dentro: <code>panaderia-luna/</code> con el código (sin <code>.git</code> y con sus permisos),
       <code>wp_panaderia_luna.sql</code> con la base y <code>LEEME-nexum.txt</code> (el proyecto, la versión de PHP y de MariaDB, la
       fecha y la versión de Nexum Dev Stack que lo ha exportado).</li>
     <li>La base sale como en <a href="#bbdd-descargar">Descargar una copia</a>: <b>sin el administrador de pruebas</b> ni los cambios del
@@ -1679,7 +1775,9 @@
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum exportar-proyecto panaderia-luna --bd wp_panaderia_luna</code>; sin la casilla del código,
       con <code>--sin-codigo</code>, y sin la de la base, con <code>--sin-bd</code>. Sin <code>--bd</code>, usa la base vinculada al
-      proyecto en la versión activa; con <code>--destino &lt;carpeta&gt;</code>, el zip va a otra carpeta.</p>
+      proyecto en la versión activa; con <code>--destino &lt;carpeta&gt;</code>, el zip va a otra carpeta con su nombre de siempre, y
+      con <code>--zip &lt;fichero&gt;</code>, justo a ese fichero (es lo que hace la ventana con el que eliges al guardar; con
+      <code>--sobrescribir</code>, encima del que ya hubiera, solo si es un fichero normal).</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Con el código, mira la carpeta con <code>git status --porcelain</code> (solo lee: la ventana lo pregunta antes con
@@ -1740,12 +1838,13 @@
     botones del proyecto cargado y para los del visor de un proyecto de Docker. Solo cambia cómo se ve la ventana: no toca ningún
     proyecto.</p>
   <ul>
-    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
+    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
       dice si se ve («Verlo en el visor»), y las flechas <b>«Antes»</b> y <b>«Después»</b> lo mueven.</li>
     <li><b>Estilo</b>: <b>«Con su nombre»</b> (como vienen), <b>«Solo el icono (cuadrado)»</b> o <b>«Icono y nombre (cuadrado)»</b>. Con solo
       el icono, el nombre sale al dejar el ratón encima.</li>
     <li><b>Tamaño</b>: el lado del cuadrado, de 32 a 128 píxeles (se ve al lado, como «44×44 px»). Al cambiar de estilo propone 44 o 88; con
-      «Icono y nombre», como poco 72. Con «Con su nombre» no se usa.</li>
+      «Icono y nombre», como poco 72. Con «Con su nombre» no se usa. Si en el visor no caben todos en una línea, los que no caben pasan a
+      la siguiente: la ventana no se ensancha por ellos.</li>
     <li><b>«Así quedan»</b>: una vista previa, del tamaño real, con Desmontar y ⋮.</li>
     <li><b>«Como al principio»</b>: todos visibles, en el orden de siempre y con su nombre.</li>
     <li><b>«Guardar»</b> lo aplica. «Cancelar» lo deja como estaba.</li>
@@ -1764,7 +1863,14 @@
       los vínculos que hayas guardado.</li>
     <li><b>Versiones</b>: un número por cada versión de PHP donde tiene base (8.2, 8.4…) y, en azul, «Docker 8.2» si está en Docker. Son solo
       informativos: al dejar el ratón encima dicen la versión y la base, pero no se pueden pulsar.</li>
-    <li><b>Al pasar el ratón</b> salen sus botones: «Montar en Docker» (si ya está en Docker), «Cargar» y ⋮ (si no es la cargada).</li>
+    <li><b>Al pasar el ratón</b> salen sus botones: «Montar en Docker» (si ya está en Docker), sus accesos directos, «Cargar» y ⋮ (estos dos,
+      si no es la cargada). Los accesos directos llevan solo el icono, y cada uno sale si se puede usar:
+      <ul>
+        <li><b>Visual Studio Code</b>: abre su carpeta (si lo tienes instalado).</li>
+        <li><b>GitHub</b> (o un globo, si es de otro servidor): abre su repositorio en el navegador (si la carpeta tiene un
+          <code>remote origin</code>).</li>
+        <li><b>phpMyAdmin</b>: abre su base de datos, solo si tiene una en la versión de PHP que está activa.</li>
+      </ul></li>
     <li><b>El buscador</b> («Buscar proyecto») encuentra por el nombre de la carpeta <b>y por el de sus bases de datos</b>: «panaderia» encuentra
       el proyecto aunque solo su base se llame así.</li>
     <li><b>El filtro</b>: «Todos», «WordPress», «PrestaShop» u «Otros».</li>
@@ -1790,7 +1896,10 @@
     <li><b>Paso 2 de 4: versión de PHP.</b> Elige en cuál se crea. Viene marcada la activa.</li>
     <li><b>Paso 3 de 4: BBDD nueva.</b> Su nombre (se propone <code>wp_</code> y el de la carpeta, como <code>wp_panaderia_luna</code>) y, si
       quieres, el volcado que se le carga (<code>.sql</code>, <code>.sql.gz</code> o <code>.zip</code>). Sin volcado, se crea vacía. No puede
-      existir ya en esa versión.</li>
+      existir ya en esa versión. Si el proyecto no lleva base de datos (o aún no la tienes), marca <b>«Sin base de datos»</b>: el nombre y el
+      volcado se apagan, el paso pasa a llamarse «Paso 3 de 4: sin BBDD» y el proyecto se clona y se carga sin ninguna base vinculada. Si es
+      un WordPress o una tienda PrestaShop, el asistente avisa de que la web no funcionará hasta que tenga su base (te deja seguir): súbela
+      después en <a href="#bbdd">Bases de datos</a>, «Subir o actualizar una BBDD», eligiendo el proyecto, y queda vinculada.</li>
     <li><b>Paso 4 de 4: dominio de producción.</b> Enciende «¿Falsear su dominio de producción en este equipo?» y escribe el dominio (como
       <code>panaderia-luna.com</code>) para que el navegador abra tu copia local con su dirección de verdad. Lo necesitan las tiendas
       PrestaShop y los WordPress con el dominio en su base. Si no, se abre en <code>web.local</code>. Si el repositorio de GitHub tiene su
@@ -1798,11 +1907,31 @@
       dice en rojo y «Montar proyecto» no se puede pulsar: apágalo o cambia ese vhost. Si lleva a la carpeta del proyecto, se usa.</li>
   </ol>
   <p>Al pulsar <b>«Montar proyecto»</b>: clona el repositorio, lo carga en esa versión (pide la contraseña de administrador) y crea la base
-    o carga el volcado. Después, si lo has pedido, falsea el dominio. Al acabar, queda como proyecto cargado.</p>
+    o carga el volcado (con «Sin base de datos», ninguna de las dos). Después, si lo has pedido, falsea el dominio. Al acabar, queda como
+    proyecto cargado.</p>
+  <p id="nuevo-proyecto-rama">Al acabar bien, sale <b>«¿En qué rama empiezas a trabajar?»</b>, para dejarlo listo y abrirlo en Visual Studio
+    Code:</p>
+  <ul>
+    <li>Arriba, la rama en la que ha quedado el clon (la predeterminada del repositorio, como <code>main</code>).</li>
+    <li><b>«Una rama que ya existe»</b>: el desplegable con las ramas del repositorio, las tuyas y las de <code>origin</code> (el servidor
+      del que se ha clonado), cada una una sola vez. La actual va la primera; si eliges una que solo está en <code>origin</code>, se crea
+      en tu equipo siguiendo a la del servidor.</li>
+    <li><b>«Una rama nueva a partir de main»</b>: escribe su nombre (como <code>nueva-portada</code>). Si no vale para git (con espacios,
+      <code>..</code>, <code>~</code>, <code>:</code>…) o ya existe, lo dice en rojo y no deja seguir.</li>
+    <li><b>«Abrir en Visual Studio Code»</b>: marcada si lo tienes instalado; si no, apagada y con lo que falta.</li>
+    <li>Debajo, «Qué se va a realizar», que cambia con lo que elijas.</li>
+  </ul>
+  <p><b>«Empezar a trabajar»</b> cambia de rama (con tu usuario, sin contraseña de administrador) y luego abre la carpeta en VS Code.
+    <b>«Más tarde»</b> lo deja en la rama predeterminada y no hace nada más. Si no es un repositorio git, solo ofrece abrirlo en VS Code; si
+    no tiene más ramas que la actual, puedes crear una nueva. Si la carpeta tiene cambios sin commit (ficheros de git cambiados), no se
+    puede cambiar de rama: lo dice y se queda en la que está.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum montar-proyecto git@github.com:usuario/panaderia-luna.git panaderia-luna 8.4
       wp_panaderia_luna ~/Descargas/wp_panaderia_luna.sql.gz</code> (la dirección, la carpeta, la versión, la base y, si lo pones, el
-      volcado). Con el paso 4 encendido, después: <code>nexum nuevo-dominio panaderia-luna.com panaderia-luna</code>.</p>
+      volcado). Sin base de datos: <code>nexum montar-proyecto git@github.com:usuario/panaderia-luna.git panaderia-luna 8.4 --sin-bd</code>.
+      Con el paso 4 encendido, después: <code>nexum nuevo-dominio panaderia-luna.com panaderia-luna</code>. Y la rama de trabajo:
+      <code>nexum rama-proyecto panaderia-luna nueva-portada --nueva</code> (una nueva) o <code>nexum rama-proyecto panaderia-luna
+      desarrollo</code> (una que ya existe); la lista, <code>nexum gui-ramas-proyecto panaderia-luna</code>, que no cambia nada.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Comprueba la dirección (solo <code>https://</code> o SSH), que la carpeta no existe, que la versión existe y que la base no está
@@ -1814,12 +1943,18 @@
       <li>La carga: <code>nexum cargar-proyecto panaderia-luna 8.4 wp_panaderia_luna</code>.</li>
       <li>La base: con volcado, <code>nexum importar-bd &lt;volcado&gt; wp_panaderia_luna --crear</code>; sin él,
         <code>nexum crear-bd wp_panaderia_luna</code> (vacía, <code>utf8mb4_general_ci</code>). Con volcado, vuelve a ajustar
-        su <code>wp-config.php</code> o la configuración de la tienda.</li>
+        su <code>wp-config.php</code> o la configuración de la tienda. Con <code>--sin-bd</code> son dos pasos: lo carga con
+        <code>nexum cargar-proyecto panaderia-luna 8.4</code>, sin base, y no crea ni vincula ninguna.</li>
       <li><code>nuevo-dominio</code>: crea el vhost http y https del dominio con su certificado, apunta
         <code>panaderia-luna.com=panaderia-luna</code> en <code>~/.nexum/dominios</code> y lo falsea en <code>/etc/hosts</code>
         (los demás dominios dejan de estarlo). Si ese dominio ya tiene un vhost, se para y te dice que uses su interruptor.</li>
+      <li><code>rama-proyecto</code>: con tu usuario (el dueño de la carpeta; nunca como root) y sin ganchos, comprueba que no hay cambios
+        sin commit y que el nombre vale (<code>git check-ref-format --branch</code>), y cambia con <code>git switch nueva-portada</code>. Una
+        que solo está en <code>origin</code>: <code>git switch -c desarrollo --track origin/desarrollo</code>; una nueva (<code>--nueva</code>),
+        <code>git switch -c nueva-portada</code>, a partir de la actual.</li>
     </ol>
-    <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna log -1</code> (el último commit) y <code>readlink
+    <p>Para comprobarlo: <code>git -C /opt/htdocs/panaderia-luna branch -vv</code> (la rama en la que está y a cuál sigue),
+      <code>git -C /opt/htdocs/panaderia-luna log -1</code> (el último commit) y <code>readlink
       /opt/htdocs/web.local</code>.</p>
   </details>
   <div class="nota"><b>Una tienda clonada no se falsea sola</b>La base y el nombre de la carpeta vienen con el repositorio, así que el
@@ -1829,7 +1964,7 @@
   <!-- ------------------------------------------------------------------ preguntas -->
   <h3>Preguntas</h3>
   <details><summary>¿Por qué web.local?</summary>
-    <p>Es la dirección del proyecto cargado, y siempre es la misma: cargues el que cargues, lo abres en <code>http://web.local/</code>.
+    <p>Es la dirección del proyecto cargado, y siempre es la misma: cargues el que cargues, lo abres en <code>https://web.local/</code>.
       Así no hace falta crear un dominio para cada proyecto ni cambiar la configuración de ninguno.</p></details>
   <details><summary>He pulsado otro proyecto de la lista y arriba sigue el de antes</summary>
     <p>Es así a propósito: arriba se ve siempre el cargado. Para cambiar, pasa el ratón por la fila del otro y pulsa «Cargar».</p></details>
@@ -1912,12 +2047,16 @@
   <h3>Conectar GitHub (la primera vez)</h3>
   <ol class="pasos-tarea">
     <li><b>Ve a Configuración → GitHub</b> y pulsa <b>«Conectar con un token…»</b>. Si tienes instalada la herramienta <code>gh</code> y ya
-      has entrado con <code>gh auth login</code>, también tienes <b>«Usar la sesión de gh»</b>, que no necesita token.</li>
+      has entrado con <code>gh auth login</code>, también tienes <b>«Usar la sesión de gh»</b>, que no necesita token.<span data-so="linux">
+      Si en el equipo falta <code>secret-tool</code> (el paquete <code>libsecret-tools</code>, con el que se guarda el token en el llavero),
+      antes sale la ventana «Hace falta secret-tool para guardar el token»: <b>«Instalarlo»</b> lo instala (pide la contraseña de
+      administrador) y luego se abre el diálogo del token; <b>«Copiar la orden»</b> copia <code>sudo apt install libsecret-tools</code>
+      para pegarla en una terminal.</span></li>
     <li><b>Crea el token.</b> En el diálogo «Conectar con GitHub», el enlace <b>«Crear un token en GitHub»</b> abre GitHub con los permisos ya
       marcados: <code>repo</code> (para ver también los privados) y <code>read:org</code> (para los de una organización). Cópialo y pégalo en
       el campo (empieza por <code>ghp_…</code> o <code>github_pat_…</code>; mientras lo escribes no se ve).</li>
     <li><b>Pulsa «Conectar».</b> Se activa cuando el campo tiene al menos 20 caracteres. Abajo sale «Comprobando el token con GitHub…» y,
-      si vale, «Conectado a GitHub como …». El token se guarda en el <b>llavero</b> de tu sesión (el almacén cifrado de contraseñas
+      si vale, «Conectado a GitHub como …». Si no vale, el motivo sale en una ventana que se queda hasta que la cierras. El token se guarda en el <b>llavero</b> de tu sesión (el almacén cifrado de contraseñas
       del sistema<span data-so="linux">, el mismo que usa el navegador</span><span data-so="mac">: la app Acceso a Llaveros</span>), nunca en un fichero.</li>
     <li><b>Elige de quién ves los repositorios.</b> Si aún no habías puesto ninguna, se pone tu propia cuenta. Para otra, en «Organización o
       cuenta» escribe su nombre (por ejemplo, <code>mi-empresa</code>; también vale su dirección, <code>https://github.com/mi-empresa</code>)
@@ -1936,7 +2075,8 @@
         <code>curl -fsS -H "Authorization: Bearer &lt;token&gt;" https://api.github.com/user</code>. Si GitHub no lo acepta, no guarda nada.</li>
       <li data-so="linux">Lo guarda en el llavero de la sesión, también por la entrada:
         <code>secret-tool store --label="Nexum Dev Stack (GitHub)" service nexum-dev-stack account github</code> (hace falta el paquete
-        <code>libsecret-tools</code>). Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
+        <code>libsecret-tools</code>; lo instala <code>nexum github-llavero-instalar</code>, que hace
+        <code>sudo apt-get install -y libsecret-tools</code> si falta). Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
       <li data-so="mac">Lo guarda en el Llavero, también por la entrada:
         <code>security -i</code> con <code>add-generic-password -U -a github -s nexum-dev-stack -l "Nexum Dev Stack (GitHub)" -w &lt;token&gt;</code>.
         Con <code>--gh</code> no guarda el token: lo pide a <code>gh</code> cada vez.</li>
@@ -2098,7 +2238,8 @@
         fallo grave y no lleva el arreglo. Debajo, en azul, <b>«PHP x.y.z disponible»</b> y su fecha, si su rama tiene un parche más nuevo.
         Las dos se arreglan desde el menú ⋮.</span></li>
       <li data-x="69.5" data-y="39"><b>Último parche</b><span><b>Actualizado</b> si tiene el último parche de su rama. Una versión vulnerable
-        nunca sale como actualizada.</span></li>
+        nunca sale como actualizada, y tampoco una con alguna pieza dañada: sale en rojo, como <b>«MariaDB dañado»</b> (su programa no
+        está<span data-so="linux"> o no responde</span>), y se repara desde el menú ⋮.</span></li>
       <li data-x="82" data-y="39"><b>Bases de datos</b><span>Cuántas bases de datos tiene esa versión. Si una versión antigua usa las de otra,
         pone «→ lampp-…» con la versión dueña.</span></li>
       <li data-x="91" data-y="45"><b>Activa / Activar</b><span>En la activa pone «Activa». En las demás, al pasar el ratón por la fila aparece
@@ -2217,7 +2358,9 @@
     <li><b>Pulsa el botón de abajo</b>, que dice cuántas has marcado: «Instalar 1 versión», «Instalar 2 versiones»…<span data-so="linux"> (sin ninguna marcada
       pone «Marca una o más versiones»)</span>. Te enseña la lista («Se instala PHP 8.4.27.») y te pide la contraseña de administrador.</li>
     <li><b>Espera.</b> Cada versión se descarga (comprobando su firma) y se compila. Las que ya tienes no se tocan. Con
-      «Seguir en segundo plano», la tarea sigue mientras usas el resto de la ventana.</li>
+      «Seguir en segundo plano», la tarea sigue mientras usas el resto de la ventana. Compilar PHP, Apache o Perl tarda varios minutos en
+      cada paso: mientras tanto, el registro de la tarea escribe cada 30 segundos por dónde va («[ 41%] Compilando... sigue (2 min 30 s)»).
+      Si cancelas, la versión que tenías se queda como estaba: solo se sustituye al terminar.</li>
     <li><b>Actívala si quieres.</b> Si has instalado una sola, al acabar la ventana de la tarea te ofrece «Activar <span data-so="linux">lampp</span><span data-so="mac">XAMPP</span>-…».
       La versión activa no cambia sola.</li>
   </ol>
@@ -2436,7 +2579,11 @@
 
   <h3>El resto del menú ⋮</h3>
   <ul>
-    <li><b>«Componentes…»</b>: la tabla de componentes, solo de esa versión.</li>
+    <li><b>«Componentes…»</b>: la tabla de componentes, solo de esa versión. Una pieza dañada sale en rojo, con «· dañado».</li>
+    <li><b>«Reparar (… dañado)»</b>: solo sale si alguna pieza de la versión está dañada. Vuelve a compilar la versión entera con lo último
+      de su rama (sus piezas se compilan juntas) y conserva sus bases de datos; la de ahora sigue como está mientras tanto, varios minutos.
+      Pide la contraseña. En la terminal, <code>nexum actualizar 8.4</code> (dice «dañado MariaDB… se rehace»), y
+      <code>nexum piezas-danadas</code> dice cuáles lo están.</li>
     <li><b>«Actualizar phpMyAdmin»</b>: solo sale si su phpMyAdmin (la web para ver y tocar las bases de datos) tiene fallos de seguridad ya
       corregidos. No pregunta: descarga el más nuevo que admite su PHP (comprobando su firma), conserva la configuración y deja el anterior
       en la carpeta <code>phpmyadmin.anterior</code> de la versión. Pide la contraseña.</li>
@@ -2744,7 +2891,7 @@
       cambia nada.</li>
     <li><b>El fichero se comprueba antes</b> de vaciar la base: si no es un <code>.zip</code> o <code>.gz</code> válido, no se toca nada.</li>
     <li><b>El administrador de pruebas</b>: en un WordPress o una tienda PrestaShop se crea o se deja al día el usuario
-      <code>local@local.test</code> con la contraseña <code>local</code>, para el botón «Panel».</li>
+      <code>local@local.test</code> con la contraseña <code>local</code> (o el de <a href="#admin-pruebas-config">Administrador de pruebas</a>), para el botón «Panel».</li>
     <li><b>El correo</b>: lo que mande la web va al correo de pruebas (Mailpit), no a gente de verdad.</li>
   </ul>
   <div class="nota cuidado"><b>Si cancelas la carga</b>Te pregunta «¿Cancelar la carga?»: la base se queda a medias, con lo que se haya cargado
@@ -2779,7 +2926,7 @@
       <li>Al acabar, corta las conexiones de ese usuario, borra los eventos del volcado (tareas programadas dentro de la base) y bloquea el
         usuario (<code>ACCOUNT LOCK</code>): ya no puede entrar, pero las vistas y disparadores siguen funcionando.</li>
       <li>Apunta la fecha de la carga en <code>~/.nexum/importaciones</code> (la «· importada» de la lista).</li>
-      <li>Crea o deja al día el administrador de pruebas <code>local@local.test</code> (lo mismo que
+      <li>Crea o deja al día el administrador de pruebas, <code>local@local.test</code> o el de Configuración (lo mismo que
         <code>nexum usuario-pruebas wp_panaderia_luna</code>) y pone la base en el correo de pruebas (lo mismo que
         <code>nexum correo bd wp_panaderia_luna</code>).</li>
       <li>Con <code>--proyecto</code>: apunta la base como la de esa carpeta en <code>~/.nexum/proyectos</code> y, en un WordPress, rehace su
@@ -2870,8 +3017,9 @@
       administrador. Si está en marcha, no la pide.</li>
     <li><b>Qué lleva</b>: las tablas, los datos, las funciones y los disparadores<span data-so="linux">, sin los eventos</span><span data-so="mac"> y
       los eventos</span>. Se puede volver a cargar aquí mismo.</li>
-    <li><b>Qué no lleva</b>: el administrador de pruebas (<code>local@local.test</code>) ni los cambios del correo de pruebas. La copia lleva el
-      correo como estaba antes.</li>
+    <li><b>Qué no lleva</b>: el administrador de pruebas (<code>local@local.test</code>, el de <a href="#admin-pruebas-config">Administrador de pruebas</a> y los que hayas puesto
+      antes, solo los que llevan la marca de Nexum) ni los cambios del correo de pruebas. Un usuario de verdad con el mismo correo sí va. La
+      copia lleva el correo como estaba antes.</li>
     <li><b>Si la cancelas</b> («¿Cancelar la descarga?»), no se guarda nada.</li>
   </ul>
   <details class="terminal"><summary>En la terminal</summary>
@@ -2890,7 +3038,8 @@
         <code>/opt/lampp-8.4/mysql/bin/mariadb-dump --no-defaults -S /tmp/lvm-mysql-XXXX/mysql.sock -uroot …</code> (o su <code>bin/mysqldump</code>).
         <code>--single-transaction</code> saca una foto coherente sin parar la web.</li>
       <li>Deja fuera al administrador de pruebas: las tablas de usuarios (<code>wp_users</code>, <code>wp_usermeta</code>, <code>ps_employee</code>…)
-        se vuelcan aparte con <code>--where</code>, sin las filas de <code>local@local.test</code>.</li>
+        se vuelcan aparte con <code>--where</code>, sin las filas de <code>local@local.test</code> ni las que llevan la marca de Nexum con un
+        correo de <code>~/.nexum/admin-pruebas</code> (el de ahora y los de antes), con sus permisos y sus tiendas.</li>
       <li>Deja fuera lo que cambió el correo de pruebas: la tabla <code>lvm_correo_original</code> no va y, al final del volcado, se añade lo que
         había antes (los plugins de correo y la configuración de correo de la tienda como estaban).</li>
       <li>Escribe el resultado comprimido (<code>gzip -6</code> para <code>.sql.gz</code>, o un <code>.zip</code> con el <code>.sql</code> dentro) en
@@ -3102,8 +3251,8 @@
   <details><summary>¿Por qué una versión dice «usa las de lampp-…»?</summary>
     <p>Porque comparte las bases de datos de otra versión. Sus bases salen en la fila de esa otra versión.</p></details>
   <details><summary>¿Qué usuario y contraseña pongo en el panel de mi WordPress o mi tienda?</summary>
-    <p><code>local@local.test</code> con la contraseña <code>local</code>. Se crea solo al cargar una copia. El botón «Panel» del proyecto entra
-      con él sin que lo escribas.</p></details>
+    <p><code>local@local.test</code> con la contraseña <code>local</code>, o el que pongas en <a href="#admin-pruebas-config">Administrador de pruebas</a>. Se crea solo al cargar
+      una copia. El botón «Panel» del proyecto entra con él sin que lo escribas.</p></details>
 </section>
 
 <!-- =========================================================================================== DOCKER -->
@@ -3372,10 +3521,11 @@
     <li><b>«Compartir»</b>: abre un túnel de Cloudflare para que otra persona vea la web (ver <a href="#compartir">Compartir una web</a>). Si ya la
       estás compartiendo, dice «Compartiendo» y enseña la dirección y la contraseña.</li>
     <li><b>«Panel»</b>: abre el panel de WordPress o de PrestaShop <b>ya con la sesión iniciada</b>. Antes crea o deja al día en su base de datos
-      el administrador de pruebas, <code>local@local.test</code> con la contraseña <code>local</code>. Si el proyecto no tiene panel, no se
-      puede pulsar.</li>
+      el administrador de pruebas, <code>local@local.test</code> con la contraseña <code>local</code> (o el de <a href="#admin-pruebas-config">Administrador de pruebas</a>). Si el
+      proyecto no tiene panel, no se puede pulsar.</li>
     <li><b>«phpMyAdmin»</b>: copia la contraseña de <code>root</code> y abre phpMyAdmin. Pega la contraseña con el usuario <code>root</code>.</li>
     <li><b>«VS Code»</b>: abre la carpeta en Visual Studio Code (si lo tienes instalado).</li>
+    <li><b>«GitHub»</b>: abre su repositorio en el navegador (solo si la carpeta tiene un remote <code>origin</code>).</li>
     <li><b>«Log»</b>: los últimos errores de PHP de la web, en una ventana con <b>«Copiar todo»</b> y <b>«Actualizar»</b>. Solo con su
       contenedor de PHP en marcha.</li>
     <li><b>«Imágenes de producción»</b> (WordPress y PrestaShop): trae de producción las imágenes que falten. Ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
@@ -3391,8 +3541,9 @@
       <li>Lee su base de datos en <code>~/.nexum/docker/academia-flor/proyecto.conf</code>.</li>
       <li>Entra como <code>root</code> en la MariaDB común, sin poner la contraseña en ninguna orden (la toma dentro del contenedor):
         <code>docker exec -i nexum-mariadb-11-8 sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD mariadb -uroot'</code>.</li>
-      <li>Crea o pone al día el usuario <code>local@local.test</code> con la contraseña <code>local</code> en las tablas de usuarios de WordPress
-        (o de empleados de PrestaShop), como administrador.</li>
+      <li>Crea o pone al día el administrador de pruebas (<code>local@local.test</code> con la contraseña <code>local</code>, o el de
+        Configuración) en las tablas de usuarios de WordPress (o de empleados de PrestaShop), como administrador y con la marca de Nexum. Uno
+        de verdad con ese correo no se toca.</li>
     </ol>
     <p>Después la ventana abre el panel con la sesión ya iniciada. Para comprobarlo: entra en <code>https://academia-flor-php84.docker.local/wp-admin</code>
       con <code>local@local.test</code> y <code>local</code>.</p>
@@ -3562,7 +3713,7 @@
         salvo con el DNS de Docker activado.</li>
       <li>Arranca el Apache de Docker con el vhost nuevo y su PHP: <code>docker compose up -d php84</code> en la carpeta del proyecto.</li>
       <li>Hace que el navegador acepte el certificado de <code>*.docker.local</code>:
-        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>
+        <span data-so="linux"><code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>
           (y lo mismo en cada perfil de Firefox).</span>
         <span data-so="mac"><code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db ~/.nexum/docker/web/certs/docker.local.crt</code>
           (el Mac te pide la contraseña en una ventana).</span></li>
@@ -3746,7 +3897,8 @@
     <p>El usuario es <code>root</code>, y la contraseña la copia la llave del proyecto (o el botón «phpMyAdmin» de su visor, que además lo
       abre). En los del Apache de Docker es la de su MariaDB común.</p></details>
   <details><summary>¿Qué usuario y contraseña pongo en el panel de WordPress o de la tienda?</summary>
-    <p>No hace falta: el botón «Panel» del visor entra solo con <code>local@local.test</code> y la contraseña <code>local</code>.</p></details>
+    <p>No hace falta: el botón «Panel» del visor entra solo con <code>local@local.test</code> y la contraseña <code>local</code> (o con el de
+      <a href="#admin-pruebas-config">Administrador de pruebas</a>).</p></details>
   <details><summary>¿Por qué en la captura las direcciones acaban en .docker.test?</summary>
     <p>Porque ese equipo tiene activado el DNS de Docker en Configuración. De partida acaban en <code>.docker.local</code>.</p></details>
 </section>
@@ -4022,9 +4174,54 @@
         deja de estarlo, a no aceptarse (ver <a href="#dominios-certificados">Los certificados</a>).</span><span data-so="mac">Deja de aceptar en
         el navegador el certificado de una tienda que deja de estar falseada; para aceptar el de una recién falseada, pulsa «Confiar» en
         Versiones (ver <a href="#dominios-certificados">Los certificados</a>).</span></li>
+      <li>En cada WordPress con dominio propio, deja sin comentar en su <code>wp-config.php</code> la pareja de <code>WP_SITEURL</code> y
+        <code>WP_HOME</code> que toca: la del dominio si está falseado y la de <code>web.local</code> si no (ver
+        <a href="#dominios-wordpress">Un WordPress con su dominio</a>).</li>
     </ol>
     <p>Para comprobarlo: <code>grep panaderia-luna /etc/hosts</code> (sin <code>#</code> delante: falseado) o <code>ping -c1 panaderia-luna.com</code>
       (falseado, contesta <code>127.0.0.1</code>).</p>
+  </details>
+
+  <h3 id="dominios-wordpress">Un WordPress con su dominio</h3>
+  <p>WordPress lleva siempre a la dirección de <code>WP_HOME</code>: si en tu copia local esa dirección es la del dominio y el dominio no
+    está falseado, al abrir <code>web.local</code> acabas en la web de <b>producción</b>, sin darte cuenta, y lo que cambies (entradas, ajustes,
+    pedidos) se cambia allí. Por eso el <code>wp-config.php</code> de un WordPress con dominio propio lleva las dos parejas, y solo una sin
+    comentar:</p>
+  <ul>
+    <li><b>Dominio falseado</b>: sin comentar, la del dominio. La web se abre con su dirección de verdad, en tu equipo.</li>
+    <li><b>Sin falsear</b>: sin comentar, la de <code>web.local</code>. El dominio es la web de producción, y la copia local no te lleva a él.</li>
+  </ul>
+  <p>Las cambia el programa cada vez que cambia el fichero de hosts: con el interruptor, al cargar un proyecto y al crear uno con su dominio.
+    Si en tu <code>wp-config.php</code> hay otra <code>WP_SITEURL</code> o <code>WP_HOME</code> sin comentar (por ejemplo, la de producción al
+    pegar su código encima), se cambia por estas: solo puede haber una de cada. Las comentadas con otra dirección no se tocan.</p>
+  <p>Además, nada de lo que tu copia local responde con un dominio real se queda guardado en el navegador: Apache le dice que no lo guarde
+    (<code>Cache-Control: no-store</code>). Si se guardara, por ejemplo una redirección a <code>web.local</code> de cuando estaba falseado, al
+    dejar de falsearlo el dominio seguiría abriendo <code>web.local</code> en lugar de la web de producción. Los <code>.local</code>, los
+    <code>.test</code> y <code>localhost</code> no llevan esa cabecera.</p>
+  <div class="nota cuidado"><b>Si un dominio sin falsear sigue abriendo web.local</b>El navegador guardó una redirección antes de tener esta
+    protección. Bórrala una vez: en Chrome, Configuración → Privacidad y seguridad → Borrar datos de navegación → «Archivos e imágenes
+    almacenados en caché». Comprueba también que has aplicado la seguridad nueva a las versiones de PHP (el aviso «Protegerlas» de
+    <a href="#versiones">Versiones</a>).</div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>No tiene orden propia: lo hace <code>nexum hosts-falsear</code> (y la carga de un proyecto) después de cambiar el fichero de hosts.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Busca los WordPress con dominio propio: el que guardaste en «Nuevo proyecto con dominio falseado» o el de un vhost que apunta a su
+        carpeta.</li>
+      <li>Mira si el dominio está falseado: una línea sin <code>#</code> en el fichero de hosts con <code>127.0.0.1</code> y el dominio.</li>
+      <li>Quita del <code>wp-config.php</code> las <code>WP_SITEURL</code> y <code>WP_HOME</code> sin comentar y las de las dos parejas, y pone en su
+        sitio (si no había, delante de los datos de la base) las cuatro líneas, con <code>// </code> delante de las que no tocan. Con
+        <code>panaderia-luna.com</code> sin falsear:
+        <pre><code>// nexum: WP_SITEURL y WP_HOME: la pareja sin comentar es la del dominio mientras esta falseado …
+define('WP_SITEURL', 'https://web.local');
+define('WP_HOME', 'https://web.local');
+// define('WP_SITEURL', 'https://panaderia-luna.com');
+// define('WP_HOME', 'https://panaderia-luna.com');</code></pre></li>
+      <li>Si cambia algo, lo escribe encima, sin tocar el resto del fichero (ni sus finales de línea), y dice adónde lleva ahora.</li>
+    </ol>
+    <p>Para comprobarlo: <code>grep -n "WP_HOME" <span data-so="linux">/opt/htdocs</span><span
+      data-so="mac">/Library/Nexum/XAMPP-compartido/htdocs</span>/panaderia-luna/wp-config.php</code>: la que no lleva <code>//</code> delante es la que
+      vale.</p>
   </details>
 
   <h3 id="dominios-local">Los dominios .local</h3>
@@ -4085,7 +4282,8 @@
         <code>sudo chown</code> a tu usuario si la carpeta de proyectos no es tuya)</span><span
         data-so="mac"><code>mkdir -p /Library/Nexum/XAMPP-compartido/htdocs/panaderia-luna</code></span>.</li>
       <li>Si no tiene certificado, crea uno autofirmado para el dominio y su <code>www</code>, válido diez años y que no es de autoridad:
-        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=panaderia-luna.com" -addext "basicConstraints=critical,CA:FALSE" -addext "subjectAltName=DNS:panaderia-luna.com,DNS:www.panaderia-luna.com" -keyout … -out …</code>,
+        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config … -keyout … -out …</code> (ver
+        <a href="#dominios-certificados-como">Cómo se crea cada certificado</a>),
         y lo deja en <span data-so="linux"><code>/opt/config/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code> (como root:
         <code>sudo install -o 0 -g 0 -m 644 …</code>; la clave, con <code>-m 600</code>)</span><span
         data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code> y <code>.key</code></span>.</li>
@@ -4130,16 +4328,69 @@
       <li>Lee los vhosts <code>https</code> y el fichero de hosts para saber qué certificados se pueden aceptar (los propios de cada proyecto, y los
         de un dominio real solo si está falseado) y cuáles ya no.</li>
       <li data-so="linux">Quita los que ya no se deben aceptar de los almacenes de certificados de Chrome (<code>~/.pki/nssdb</code>), del Chromium
-        de snap y de cada perfil de Firefox: <code>certutil -D -d sql:$HOME/.pki/nssdb -n "nexum panaderia-luna.com"</code>.</li>
+        de snap y de cada perfil de Firefox: <code>certutil -D -d sql:$HOME/.pki/nssdb -n "lvm-instalador panaderia-luna.com"</code>.</li>
       <li data-so="linux">Añade los que faltan, con confianza de servidor («P»), no de autoridad:
-        <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum panaderia-luna.com" -t "P,," -i /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code>.
+        <code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador panaderia-luna.com" -t "P,," -i /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code>.
         Si no tienes <code>certutil</code>, te dice que lo instales: <code>sudo apt install libnss3-tools</code>.</li>
       <li data-so="mac">Quita los que ya no se deben aceptar de tu llavero: <code>security delete-certificate -Z &lt;huella&gt; ~/Library/Keychains/login.keychain-db</code>.</li>
       <li data-so="mac">Añade los que faltan a tus ajustes de confianza, solo para webs (el Mac te pide la contraseña en una ventana):
         <code>security add-trusted-cert -r trustRoot -p ssl -k ~/Library/Keychains/login.keychain-db /Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code>.</li>
     </ol>
-    <p>Para comprobarlo: <span data-so="linux"><code>certutil -L -d sql:$HOME/.pki/nssdb</code> enseña los <code>nexum …</code></span><span
+    <p>Para comprobarlo: <span data-so="linux"><code>certutil -L -d sql:$HOME/.pki/nssdb</code> enseña los <code>lvm-instalador …</code></span><span
       data-so="mac">abre el proyecto en Safari o Chrome: no avisa</span>.</p>
+  </details>
+
+  <h3 id="dominios-certificados-como">Cómo se crea cada certificado</h3>
+  <p>El programa crea solo el certificado de cada dominio con <code>https</code>: el de <code>web.local</code> al cargar el primer proyecto, el
+    de un dominio al crear su vhost (en «Nuevo dominio» o al cargar una tienda) y uno nuevo al pulsar «Arreglarlos». No hay que hacerlo a mano.
+    Todos son <b>autofirmados</b> (no los firma ninguna autoridad), duran <b>diez años</b>, sirven para el dominio y su <code>www</code>, y
+    <b>no son de autoridad</b> (<code>CA:FALSE</code>): con su clave no se puede firmar el certificado de ninguna otra web.</p>
+  <p>El comando de siempre de los manuales de XAMPP,
+    <code>sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/dominio-selfsigned.key -out /etc/ssl/certs/dominio-selfsigned.crt</code>,
+    no se usa, porque da un certificado que no sirve o que es peligroso:</p>
+  <ul>
+    <li><b>Chrome lo rechaza.</b> No lleva el dominio en <code>subjectAltName</code>, y Chrome solo mira ahí (no se fía del nombre del
+      sujeto, el <code>CN</code>): avisa con «La conexión no es privada» aunque lo aceptes.</li>
+    <li><b>Es de autoridad.</b> Sin decir otra cosa, OpenSSL le pone las extensiones de autoridad de su configuración
+      (<code>CA:TRUE</code>). Si el equipo se fía de él, quien tenga su clave puede fabricar un certificado válido para cualquier web, también la
+      de tu banco.</li>
+    <li><b>El sistema lo da por bueno para cualquier web.</b> <code>/etc/ssl/certs</code> es la carpeta de las autoridades en las que confía
+      todo el equipo: lo que se deja ahí vale para todo, no solo para su dominio.</li>
+    <li>Caduca al año, y el navegador vuelve a avisar.</li>
+  </ul>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>Lo que hace, paso a paso (con <code>panaderia-luna.com</code>):</p>
+    <ol>
+      <li>Comprueba que el dominio es válido y que el certificado y la clave van en la carpeta de certificados del programa,
+        <span data-so="linux"><code>/opt/config/ssl</code></span><span data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl</code></span>, con un nombre
+        acabado en <code>.crt</code> y <code>.key</code>. En cualquier otro sitio no lo crea.</li>
+      <li>Escribe en una carpeta temporal<span data-so="linux"> (de root, si la carpeta de certificados es de root)</span> un fichero de configuración
+        propio con lo único que lleva el certificado:
+        <pre><code>[req]
+distinguished_name = dn
+x509_extensions = ext
+prompt = no
+[dn]
+CN = panaderia-luna.com
+[ext]
+basicConstraints = critical,CA:FALSE
+subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
+        Va en un fichero y no con <code>-addext</code>: con <code>-addext</code>, el OpenSSL de Ubuntu 20.04 le añade además las extensiones de su
+        configuración, el certificado sale con dos <code>basicConstraints</code> y Chrome no lo abre (<code>net::ERR_CERT_INVALID</code>).</li>
+      <li>Crea el certificado y su clave con ese fichero:
+        <code>openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config cnf -keyout key -out crt</code><span data-so="linux"> (como root, con
+        <code>sudo</code>, si la carpeta es de root)</span><span data-so="mac"> (con tu usuario y el OpenSSL de Homebrew, si lo tienes)</span>.</li>
+      <li>Los deja en su sitio, de root, el certificado que lo puede leer todo el mundo y la clave solo root:
+        <span data-so="linux"><code>sudo install -o 0 -g 0 -m 644 crt /opt/config/ssl/panaderia-luna.com-selfsigned.crt</code> y
+        <code>sudo install -o 0 -g 0 -m 600 key /opt/config/ssl/panaderia-luna.com-selfsigned.key</code></span><span
+        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/panaderia-luna.com-selfsigned.crt</code> (644) y <code>.key</code> (600), de
+        <code>root:wheel</code></span>. El de <code>web.local</code> se llama <code>web.local.crt</code> y <code>web.local.key</code>.</li>
+      <li>Borra la carpeta temporal y le dice al navegador que acepte ese certificado para ese dominio (ver
+        <a href="#dominios-certificados">Los certificados</a>).</li>
+    </ol>
+    <p>Para comprobarlo:
+      <code>openssl x509 -in <span data-so="linux">/opt/config/ssl</span><span data-so="mac">/Library/Nexum/XAMPP-compartido/ssl</span>/panaderia-luna.com-selfsigned.crt -noout -ext basicConstraints,subjectAltName</code>
+      dice una sola vez <code>CA:FALSE</code> y los dos nombres.</p>
   </details>
 
   <h3 id="dominios-imagenes">Ver las imágenes de producción en un .local</h3>
@@ -4233,6 +4484,7 @@
     <li><a href="#vhosts">Vhosts y hosts</a></li>
     <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
     <li><a href="#correo">Correo de pruebas</a></li>
+    <li><a href="#admin-pruebas-config">Administrador de pruebas</a></li>
     <li><a href="#docker-config">Docker</a></li>
     <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
     <li><a href="#github-config">GitHub</a></li>
@@ -4244,7 +4496,7 @@
     <li><a href="#informacion">Información</a></li>
   </ul>
   <p>Arriba de cada apartado van su nombre y una frase que dice para qué sirve. Mientras hay una tarea en marcha, los botones que cambian algo
-    se quedan apagados hasta que acabe.</p>
+    se ven atenuados hasta que acabe. Se pueden pulsar: en vez de hacer lo suyo, te dicen qué tarea sigue en marcha.</p>
 
   <h3 id="configuracion-antes">Antes de empezar: tres ideas que salen en todo el capítulo</h3>
   <ul>
@@ -4346,7 +4598,7 @@
     </div>
     <ol class="puntos">
       <li data-x="45" data-y="23"><b>Cada tarea</b><span>Su título, la fecha y la hora en que empezó y cómo acabó: con el check verde, «Terminada bien»; con la señal roja, «Ha fallado (código N)»; también «Cancelada» o, mientras sigue, «En marcha». Deja el ratón encima para ver su orden.</span></li>
-      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta».</span></li>
+      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta». Una tarea en marcha guarda lo que va diciendo cada 3 segundos y su ventana se actualiza sola, como una consola: abajo del todo ves lo último que está haciendo, hasta que acaba.</span></li>
       <li data-x="70" data-y="33"><b>La lista</b><span>Se ven 4 tareas, la más nueva arriba. Si hay más, la lista se desplaza dentro de su recuadro, con su barra a la derecha: baja con la rueda del ratón para ver las anteriores.</span></li>
       <li data-x="82" data-y="47"><b>Vaciar el registro…</b><span>Te pregunta antes «¿Vaciar el registro de tareas?», con cuántas se borran, y pulsa «Vaciar», en rojo. Borra los registros de las tareas que ya han acabado; el de una tarea que sigue en marcha se queda. No toca nada más: ni tus proyectos, ni los demás registros. Apagado si no hay ninguna acabada. Es lo mismo que «Registros del programa» en <a href="#limpieza">Limpieza</a>, pero solo con el registro de tareas.</span></li>
       <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.nexum/tareas</code>, donde está cada una en su fichero de texto.</span></li>
@@ -4416,6 +4668,11 @@
         una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
       <li data-so="mac">Para cada <code>/Library/Nexum/XAMPP-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y
         escribe una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
+      <li>Mira también que cada pieza de la versión esté entera: que estén los programas de PHP, PHP-FPM, Apache, MariaDB (su servidor
+        y su cliente), ProFTPD y Perl, y el <code>index.php</code> de phpMyAdmin<span data-so="linux">, y que respondan
+        (<code>--version</code>)</span>. Una que falta<span data-so="linux"> o no responde</span> sale como dañada aunque esté en lo último
+        de su rama, <code>L|8.4|MariaDB|dañado|11.8.10</code> («<span data-so="linux">lampp</span><span data-so="mac">XAMPP</span>-8.4: MariaDB dañado → 11.8.10»), y al actualizar se rehace la
+        versión entera (sus piezas se compilan juntas) conservando sus bases de datos.</li>
       <li>Si Docker está en marcha, compara cada imagen que usas (<code>mariadb:</code><i>versión</i>, la de phpMyAdmin y la base de cada
         imagen de PHP, <code>php:</code><i>versión</i><code>-fpm</code>) con Docker Hub: <code>K|mariadb:11.4|…</code>.</li>
       <li>Compara Mailpit y cloudflared con los que trae el programa: <code>X|Mailpit|1.21.0|1.22.0</code>.</li>
@@ -4463,8 +4720,8 @@
   </details>
 
   <h3 id="programa">General › Programa</h3>
-  <p>El propio programa: sus actualizaciones, su icono y la bandeja. <span data-so="mac">En el Mac, aquí solo está «Dejar en la barra de
-    menús al cerrar»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
+  <p>El propio programa: sus actualizaciones, su icono, la bandeja y si se abre al iniciar sesión. <span data-so="mac">En el Mac, aquí
+    están «Dejar en la barra de menús al cerrar» y «Abrir al iniciar sesión»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
   <figure class="pantalla">
     <div class="barra">
       <span class="tenue">Pulsa un número o empieza el recorrido</span>
@@ -4480,6 +4737,10 @@
       <li data-x="41.5" data-y="93"><b>Dejar en la bandeja al cerrar</b><span>Encendido, cerrar la ventana la esconde en un icono junto al reloj, con lo básico: abrirla, arrancar o parar, web.local y salir.</span></li>
     </ol>
   </figure>
+  <p><b>Abrir al iniciar sesión.</b> Debajo de «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
+    menús</span> al cerrar», un interruptor: encendido, Nexum Dev Stack se abre solo cada vez que entras en tu sesión. Si también está
+    puesto el icono <span data-so="linux">junto al reloj</span><span data-so="mac">de la barra de menús</span>, arranca escondido en él,
+    sin abrir la ventana: la abres desde su menú cuando la necesites. Apagado, deja de abrirse.</p>
   <p><b>Si hay una versión nueva</b></p>
   <ol class="pasos-tarea">
     <li><b>Lee el aviso</b> «Hay una versión nueva de Nexum Dev Stack»: de qué versión a cuál, de dónde viene y su huella SHA-256 (el código
@@ -4493,7 +4754,8 @@
     terminal (<code>sudo apt install</code> con la ruta del paquete); después, abre de nuevo el programa.</div>
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
-      <li><b>De partida:</b> con el icono junto al reloj.</li>
+      <li><b>De partida:</b> con el icono junto al reloj, y sin abrirse al iniciar sesión.</li>
+      <li data-so="linux"><b>Si lo quitas en «Aplicaciones al inicio»</b> de Ubuntu, el interruptor sale apagado.</li>
       <li data-so="linux"><b>Si falta su componente</b>, el interruptor sale apagado y la fila dice cómo instalarlo: <code>sudo apt install gir1.2-ayatanaappindicator3-0.1</code>.</li>
     </ul>
   </div>
@@ -4549,6 +4811,20 @@
       <li>Pone o quita el icono junto al reloj al momento.</li>
     </ol>
     <p>Para comprobarlo: <code>cat ~/.nexum/ventana-bandeja</code>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. El interruptor «Abrir al iniciar sesión» lo guarda la propia ventana, sin contraseña.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li data-so="linux">Encendido, escribe el acceso de inicio de tu sesión, <code>~/.config/autostart/nexum.desktop</code> (el mismo sitio
+        que usa «Aplicaciones al inicio»), que abre la ventana con <code>nexum ventana --al-iniciar</code>.</li>
+      <li data-so="mac">Encendido, escribe <code>~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>, que abre la
+        aplicación con <code>--al-iniciar</code> al entrar en tu sesión.</li>
+      <li>Con <code>--al-iniciar</code> y el icono puesto, la ventana se queda escondida en él.</li>
+      <li>Apagado, borra ese fichero. Solo si es el de Nexum Dev Stack: uno tuyo con el mismo nombre (o un enlace) no se toca, y te lo dice.</li>
+    </ol>
+    <p>Para comprobarlo: <code data-so="linux">cat ~/.config/autostart/nexum.desktop</code><code data-so="mac">cat
+      ~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>.</p>
   </details>
 
   <h3 id="vhosts">Vhosts y hosts</h3>
@@ -4683,7 +4959,12 @@
     <ul>
       <li><b>De partida:</b> encendida.</li>
       <li><b>Qué bloquea:</b> desde otra web solo se puede abrir una página de tus proyectos con un enlace normal; un formulario o una petición
-        que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»).</li>
+        que llegue desde otra web se rechaza («Otra web ha intentado mandar algo a esta: no se ha hecho nada»). La única excepción es el
+        formulario de acceso al panel (la pantalla de entrada de WordPress o del back office de PrestaShop): es lo que envía la página del
+        botón «Panel», y sin la contraseña no deja entrar a nadie.</li>
+      <li><b>Con Docker:</b> un proyecto y su copia en Docker se pueden pedir entre sí tipografías, imágenes y CSS, y nada más. Elementor
+        guarda en sus CSS la dirección de la web que los generó, y la copia de Docker usa la misma carpeta: así las dos webs se ven con sus
+        tipografías y sus imágenes de fondo.</li>
       <li><b>Cuándo apagarla:</b> solo mientras pruebas una pasarela de pago (Redsys, PayPal, Stripe…), que vuelve a tu tienda mandando un
         formulario desde su web. Enciéndela al acabar.</li>
       <li><b>Dónde vale:</b> en todas tus versiones: localhost, web.local, los dominios falseados y los vhosts de los proyectos.</li>
@@ -4734,6 +5015,54 @@
   <p>Encenderlo o apagarlo, qué hacer con los plugins de correo de WordPress, instalar o actualizar Mailpit y la bandeja: en
     <a href="#correo">Correo de pruebas</a>.</p>
 
+  <h3 id="admin-pruebas-config">Administrador de pruebas</h3>
+  <p>La cuenta con la que el botón «Panel» entra en el panel de WordPress y en el back office de PrestaShop de tus proyectos, con rol de
+    administrador. Nexum la crea al cargar una BBDD (y la deja al día al pulsar «Panel»), solo en las bases de tu equipo, y nunca va en las
+    copias que descargas ni en las que exportas. Si no pones ninguna, es <code>local@local.test</code> con la contraseña <code>local</code>.</p>
+  <ul>
+    <li><b>Ahora</b>: el que se usa, el tuyo o el de siempre.</li>
+    <li><b>Correo (usuario)</b>: el correo es también el usuario (WordPress lo usa para entrar y como correo; PrestaShop, como correo). Mejor
+      uno que no sea de verdad, como <code>ana@local.test</code>. Solo letras sin tildes, números y <code>. _ % + -</code>, con forma de
+      correo y hasta 60 caracteres.</li>
+    <li><b>Contraseña</b>: de 4 a 64 letras sin tildes, números o <code>. _ - @ % + = : , ! # * ?</code>; sin espacios, comillas,
+      <code>\</code>, <code>$</code> ni <code>`</code>. El ojo la enseña mientras la escribes.</li>
+    <li><b>Guardar</b>: se enciende cuando el correo y la contraseña valen; si no, dice qué falla debajo. <b>Volver a
+      local@local.test</b>: deja el de siempre.</li>
+  </ul>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> <code>local@local.test</code> con la contraseña <code>local</code>.</li>
+      <li><b>Las BBDD ya cargadas no cambian solas:</b> el nuevo se crea la próxima vez que cargues una BBDD o al pulsar «Panel» en el
+        proyecto (lo crea en su base). El de antes se queda en esas bases, pero tampoco va en las copias.</li>
+      <li><b>Una cuenta de verdad no se toca:</b> Nexum solo crea, cambia o quita la cuenta que lleva su marca (en WordPress,
+        <code>local-pruebas</code> y «Local (pruebas)»; en PrestaShop, «Pruebas Local»). Si la base ya tiene un usuario de verdad con ese
+        correo (por ejemplo, porque has puesto el tuyo de producción), no le cambia ni la contraseña ni el rol, no crea el de pruebas ahí y te
+        avisa: elige otro correo.</li>
+      <li><b>Fuera de las copias:</b> al descargar una BBDD, copiarla a otra versión o exportar un proyecto se quitan
+        <code>local@local.test</code>, el de ahora y los que hayas puesto antes, solo si llevan la marca. Un usuario de verdad con el mismo
+        correo sí va.</li>
+      <li><b>La contraseña no va a ningún registro:</b> la ventana se la pasa a nexum por la entrada, no en la orden, así que no sale en el
+        registro de tareas ni en la lista de procesos. Se guarda en <code>~/.nexum/admin-pruebas</code>, solo para ti (600).</li>
+      <li><b>En simulación</b> (<code>--simular</code>) no se guarda nada: lo avisa.</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum admin-pruebas ana@local.test</code> (te pide la contraseña sin enseñarla) o
+      <code>printf '%s\n' 'Prueba.2026' | nexum admin-pruebas ana@local.test -</code>. Sin nada detrás, <code>nexum admin-pruebas</code> dice
+      cuál se usa (con <code>--clave</code>, también su contraseña); <code>nexum admin-pruebas --quitar</code> vuelve a
+      <code>local@local.test</code>. No pide la contraseña de administrador.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Comprueba el correo y la contraseña. Si no valen, no cambia nada («Correo no válido…», «Contraseña no válida…»).</li>
+      <li>Hace la huella bcrypt de la contraseña (la que usa PrestaShop 1.7 o posterior).</li>
+      <li>Escribe <code>~/.nexum/admin-pruebas</code> de nuevo, solo para ti (600): <code>correo=</code>, <code>clave=</code>,
+        <code>bcrypt=</code> y una línea <code>antes=</code> por cada correo que hayas puesto antes. Con <code>--quitar</code>, sin las tres
+        primeras.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum admin-pruebas</code> («Administrador de pruebas: ana@local.test») y, después de cargar una BBDD,
+      <code>https://web.local/wp-admin/</code> con <code>ana@local.test</code> y su contraseña.</p>
+  </details>
+
   <h3 id="docker-config">Docker</h3>
   <p>Cómo se sirven tus proyectos de Docker: en qué dirección, con qué dominios y cuándo se paran solos. Van con su propio Apache, en otra
     dirección de tu equipo (nunca abierta a la red): funcionan sin LAMPP y a la vez que él, con las mismas reglas de seguridad.</p>
@@ -4747,7 +5076,7 @@
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="26"><b>Dirección y puertos</b><span>Dónde escucha el Apache de Docker: 127.0.0.2, con 80 y 443, de partida. Cambia los campos «Dirección», «HTTP» y «HTTPS» y pulsa «Guardar». Con 80 y 443, las direcciones van sin puerto; con otro HTTPS, lo llevan (<code>https://…:8443</code>). HTTP lleva siempre a https.</span></li>
@@ -4755,6 +5084,7 @@
       <li data-x="77" data-y="38"><b>Certificado de Docker</b><span>«Confiar» hace que el navegador acepte los <code>https://</code> de Docker sin aviso. Solo vale para esos dominios: no es de una autoridad de certificación. <span data-so="linux">No pide la contraseña de administrador: va a los navegadores de tu usuario.</span><span data-so="mac">El Mac te pide tu contraseña en su propio aviso (va a tu llavero).</span></span></li>
       <li data-x="42" data-y="55"><b>Parar los proyectos sin visitas</b><span>Cuántas horas sin visitas tiene que estar un proyecto para pararse solo, con lo común que no use nadie (su MariaDB, el Apache de Docker). Debajo, «Lo último: …» dice qué pasó la última vez.</span></li>
       <li data-x="91" data-y="58"><b>Cuándo</b><span>«Nunca», «A la hora sin visitas», o «A las 2, 3, 4, 6, 8, 12 o 24 h sin visitas». Se aplica al momento, sin contraseña.</span></li>
+      <li data-x="40" data-y="69"><b>WP-CLI en los contenedores de PHP</b><span>Apagado de serie. Puesto, los contenedores de PHP de Docker traen <code>wp</code>, que trabaja con la base de datos de Docker del proyecto. Vale para todos los proyectos de Docker, porque la imagen de una versión de PHP es la misma para todos.</span></li>
     </ol>
   </figure>
   <div class="se-configura"><b>Qué se puede configurar</b>
@@ -4785,6 +5115,11 @@
         abrirlo.</li>
       <li data-so="mac"><b>«Confiar»</b> lo añade a tu llavero de macOS; el Mac te pide tu contraseña en su propia ventana. Vale para Safari y
         Chrome (y Firefox, si usa los certificados del Mac).</li>
+      <li><b>WP-CLI</b> (la herramienta de WordPress para la terminal: <code>wp plugin list</code>, <code>wp search-replace</code>…) te pregunta
+        antes «¿Poner WP-CLI en los contenedores de PHP?» o «¿Quitar WP-CLI de los contenedores de PHP?». La casilla «Rehacer ya las imágenes
+        de PHP que tienes» viene marcada: las rehace al momento (unos minutos cada una) y vuelve a crear los proyectos en marcha; sus bases de
+        datos y su configuración no cambian. Sin marcarla, cada imagen cambia la próxima vez que se rehaga (Componentes o «Actualizar la
+        imagen»). No pide la contraseña de administrador. Si lo quitas, las imágenes que ya lo traen lo pierden al rehacerse.</li>
       <li><b>Sin visitas:</b> 3 horas de partida. Se mira cada 15 minutos, también con la ventana cerrada, y las visitas por el túnel cuentan.
         Al entrar en uno parado, la web lo dice: se arranca en la página Docker.</li>
     </ul>
@@ -4888,7 +5223,7 @@
         <li>Busca el certificado del Apache de Docker: <code>~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
         <li>Lo añade a cada almacén de certificados de tus navegadores: el de Chrome (<code>~/.pki/nssdb</code>), el de Chromium instalado como
           snap y el de cada perfil de Firefox. Si ya estaba uno viejo, lo quita antes. Para cada uno:
-          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "nexum docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
+          <code>certutil -A -d sql:$HOME/.pki/nssdb -n "lvm-instalador docker.local" -t "P,," -i ~/.nexum/docker/web/certs/docker.local.crt</code>.</li>
       </ol>
       <p>Para comprobarlo: <code>certutil -L -d sql:$HOME/.pki/nssdb | grep docker</code>.</p>
     </div>
@@ -4920,6 +5255,27 @@
     </ol>
     <p>Para comprobarlo: <code>nexum docker-reposo estado</code> (<code>Q|</code>horas<code>|</code>1 si el temporizador está
       puesto<code>|</code>lo último)<span data-so="linux">, o <code>systemctl --user list-timers nexum-reposo.timer</code></span>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum docker-wp-cli si --rehacer</code> (la del interruptor, con la casilla marcada; sin marcarla, sin
+      <code>--rehacer</code>; para quitarlo, <code>no</code>).</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Puesto, crea el fichero vacío <code>~/.nexum/docker/wp-cli</code>; quitado, lo borra.</li>
+      <li>Desde entonces, el <code>Dockerfile</code> de cada imagen de PHP (<code>~/.nexum/docker/imagenes/php-8.4</code>) lleva estas
+        líneas: descarga WP-CLI de su publicación en GitHub, comprueba su huella (si alguien cambiara ese fichero, la imagen no se construye) y
+        pone la orden <code>wp</code>:
+        <code>RUN curl -fsSL -o /usr/local/lib/wp-cli.phar https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar &amp;&amp; echo "ce34dd…  /usr/local/lib/wp-cli.phar" | sha256sum -c -</code>.
+        La imagen lleva la etiqueta <code>nexum.wp-cli="2.12.0"</code>.</li>
+      <li>Con <code>--rehacer</code>, rehace las imágenes de PHP que tienes y que aún no están así, con lo que ya tienen descargado (solo cambia
+        WP-CLI): <code>docker build -t nexum-php:8.4 ~/.nexum/docker/imagenes/php-8.4</code>.</li>
+      <li>Vuelve a crear los contenedores en marcha de los proyectos que las usan: <code>docker compose up -d php84</code> en su carpeta, y
+        borra las imágenes viejas: <code>docker image prune -f</code>.</li>
+    </ol>
+    <p>Para usarlo, con el nombre del contenedor de PHP del proyecto (lo ves en la página Docker, en sus contenedores):
+      <code>docker exec nexum-academia-flor-php84 wp plugin list --path=<span data-so="linux">/opt/lampp/htdocs</span><span data-so="mac">/Applications/XAMPP/xamppfiles/htdocs</span>/academia-flor</code>. Lee el
+      <code>wp-config.php</code> del contenedor, el que apunta a su base de datos de Docker. Para comprobarlo:
+      <code>docker image inspect --format '{{index .Config.Labels "nexum.wp-cli"}}' nexum-php:8.4</code> (sale <code>2.12.0</code>).</p>
   </details>
 
   <h3 id="tunel-config">Túnel de Cloudflare</h3>
@@ -5075,18 +5431,24 @@
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-apariencia.png" data-linux="img/linux/config-apariencia.png" data-mac="img/mac/config-apariencia.png" alt="Configuración, Apariencia" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-apariencia.png" data-linux="img/linux/config-apariencia.png" data-mac="img/mac/config-apariencia.png" alt="Configuración, Apariencia" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="38" data-y="26"><b>Iconos en color</b><span>Cada apartado del menú lateral con su color; apagado, de un color, como el texto.</span></li>
       <li data-x="42" data-y="32"><b>Logotipos de Docker, Node y PHP</b><span>En el menú lateral, Docker y Node con su icono y, al lado, su logotipo de letras en lugar del nombre; con los iconos en color, Versiones de PHP con el logotipo de PHP.</span></li>
-      <li data-x="40" data-y="40"><b>Apartados del menú lateral</b><span>Un interruptor por página, en dos columnas: Repositorios, Versiones de PHP, Bases de datos, Docker, Node y Dominios y hosts. Apaga las que no uses. Proyectos y Configuración se ven siempre.</span></li>
-      <li data-x="92.5" data-y="72"><b>Personalizar…</b><span>Los botones del visor de los proyectos (la parte de arriba de la página Proyectos, con el proyecto cargado). A su izquierda, «Botones» dice cuáles se ven y con qué estilo.</span></li>
+      <li data-x="94" data-y="47"><b>Tamaño de la ventana</b><span>80, 90, 100 o 110 %: letras, márgenes y botones cambian a la vez, al momento.
+        Más pequeña, cabe más en la pantalla. 100 % es el tamaño de siempre.</span></li>
+      <li data-x="95.3" data-y="53.4"><b>Cristal</b><span>En Linux, las columnas y los paneles se ven translúcidos sobre un
+        fondo de color difuminado (azul, violeta y verde). En el Mac, la ventana es translúcida y deja ver el escritorio desenfocado detrás;
+        lo pinta macOS. En los dos, la cabecera del visor queda sólida: azul oscuro con el tema oscuro y blanca con el claro. Viene apagado. Mientras no cambia nada en la ventana no gasta; al redibujarla gasta algo más que sin él, muy
+        poco.</span></li>
+      <li data-x="40" data-y="60.5"><b>Apartados del menú lateral</b><span>Un interruptor por página, en dos columnas: Repositorios, Versiones de PHP, Bases de datos, Docker, Node y Dominios y hosts. Apaga las que no uses. Proyectos y Configuración se ven siempre.</span></li>
+      <li data-x="92.5" data-y="92.3"><b>Personalizar…</b><span>Los botones del visor de los proyectos (la parte de arriba de la página Proyectos, con el proyecto cargado). A su izquierda, «Botones» dice cuáles se ven y con qué estilo.</span></li>
     </ol>
   </figure>
   <p><b>El diálogo «Botones del proyecto»</b></p>
   <ul>
-    <li><b>La lista</b>: Abrir web, VS Code, phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
+    <li><b>La lista</b>: Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
       oculta en el visor; las flechas «Antes» y «Después» lo mueven.</li>
     <li><b>«Estilo»</b>: «Con su nombre», «Solo el icono (cuadrado)» o «Icono y nombre (cuadrado)».</li>
     <li><b>«Tamaño»</b>: el lado del cuadrado, de 32 a 128 px, con su medida al lado. Con «Con su nombre» no se usa. De partida, 44 px solo con el
@@ -5630,7 +5992,8 @@
     y una contraseña.</p>
   <p>Usa un <b>túnel de Cloudflare</b>: no hace falta cuenta ni abrir puertos en el router. La dirección
     (<code>https://….trycloudflare.com</code>) cambia cada vez y lleva una <b>contraseña nueva al azar</b>, de tres grupos de cuatro letras y
-    números (por ejemplo, <code>abcd-2345-wxyz</code>). La web no se toca: su dominio local se cambia por el del túnel al pasar. En Proyectos y
+    números (por ejemplo, <code>abcd-2345-wxyz</code>). La web no se toca: su dominio local, y el real si lo tienes falseado, se cambian por el del túnel al pasar. Así quien lo abre ve lo mismo
+    que tú, nunca la web real. En Proyectos y
     en Docker, lo que cambies en tu equipo se ve al momento; en Node se comparte la versión compilada. Solo se pueden compartir webs de tu
     equipo.</p>
   <p>Un <b>túnel</b> es una conexión que tu equipo abre hacia fuera, hacia Cloudflare (una empresa que da este servicio gratis y sin
@@ -5672,7 +6035,7 @@
     <li><b>Cuando acabe</b>, se cierra solo a su hora, aunque cierres la ventana. Para cerrarlo antes: «Cerrar el túnel».</li>
   </ol>
   <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum tunel-abrir http://web.local panaderia-luna --minutos 120 --admin bloquear</code> (la dirección local
+    <p>La orden del programa: <code>nexum tunel-abrir https://web.local panaderia-luna --minutos 120 --admin bloquear</code> (la dirección local
       de la web, su carpeta, los minutos del desplegable y el interruptor: <code>--admin permitir</code> si lo apagas). En Docker la dirección es
       la del contenedor (como <code>https://panaderia-luna-php84.docker.local</code>) y en Node, <code>http://127.0.0.1:&lt;puerto&gt;</code>.
       Si aún no está cloudflared, la ventana lanza antes <code>nexum tunel-instalar</code>.</p>
@@ -5696,8 +6059,11 @@
         <code>/etc/hosts</code>). Si no, no comparte nada.</li>
       <li>Saca una contraseña nueva al azar, de 12 letras y números sin los que se confunden (sin <code>0</code>, <code>o</code>, <code>1</code>,
         <code>l</code>, <code>i</code>), en tres grupos: <code>abcd-2345-wxyz</code>.</li>
-      <li>En una tienda PrestaShop, añade su dominio de producción a los que se cambian por el del túnel (la tienda va con su dominio
-        falseado).</li>
+      <li>Añade a los dominios que se cambian por el del túnel los del proyecto que estén falseados en tu equipo (que lleven a
+        <code>127.x</code>): el de producción de su base (<code>home</code> o <code>siteurl</code> en WordPress, <code>shop_url</code> en
+        PrestaShop), los <code>ServerName</code> y <code>ServerAlias</code> de sus vhosts y, si es el proyecto cargado, los de
+        <code>web.local</code>. Así los enlaces, las imágenes y las redirecciones al dominio real llevan al túnel, y no a la web real. Uno que
+        no esté falseado no se cambia: el túnel nunca lleva a una web de fuera.</li>
       <li>Cierra el túnel que hubiera abierto.</li>
       <li>Arranca, aparte de la ventana (<span data-so="linux">con <code>setsid</code></span><span data-so="mac">con <code>nohup</code></span>, para
         que siga abierto aunque la cierres), el proxy de Nexum en
@@ -5715,7 +6081,7 @@
       <li>Pasada la hora, cierra cloudflared y borra el estado.</li>
     </ol>
     <p>No usa <code>sudo</code> para nada del túnel: todo va con tu usuario.</p>
-    <p>Para comprobarlo: <code>nexum tunel</code> (con uno abierto, una línea <code>T|https://….trycloudflare.com|http://web.local|…</code>)
+    <p>Para comprobarlo: <code>nexum tunel</code> (con uno abierto, una línea <code>T|https://….trycloudflare.com|https://web.local|…</code>)
       y <code>tail ~/.nexum/tunel/registro</code>.</p>
   </details>
 
@@ -5851,11 +6217,24 @@
   <h3 id="seguridad-barrera">Barrera entre webs</h3>
   <p>Cuando tienes abierta una web cualquiera en el navegador, esa web podría intentar enviar algo a tus proyectos locales (un formulario o una
     petición a <code>https://tienda-luna.local/admin/…</code>), y el navegador lo mandaría con tus sesiones abiertas. La barrera lo impide: desde
-    otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. Va encendida de partida, en
+    otro sitio solo se puede abrir una página con un enlace; un envío (un POST) solo vale si viene de la propia web. La excepción es el
+    formulario de acceso al panel (<code>wp-login.php</code> o <code>index.php?controller=AdminLogin</code>, enviado como página entera): es
+    lo que manda la página del botón «Panel», que no es del proyecto, y sin la contraseña no deja entrar a nadie. Tampoco frena lo que se
+    piden un proyecto y su copia en Docker (<code>*.docker.test</code> o <code>*.docker.local</code>): tipografías, imágenes y CSS, por GET y
+    solo si el navegador los pide como tales. Las tipografías llevan además la cabecera <code>Access-Control-Allow-Origin</code>, sin la
+    que el navegador no las usa desde otra web. Un formulario, una petición o un PHP siguen sin pasar. Va encendida de partida, en
     todas las versiones. El Apache de Docker la lleva también: al cambiarla, se rehace su configuración y, si está en marcha, se recarga
     al momento.</p>
   <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración
     → Seguridad entre webs</a>, con el interruptor «Barrera entre webs», y vuelve a encenderla al acabar. Pide la contraseña de administrador.</p>
+  <p>La barrera está en la configuración de Apache de cada versión de PHP, que es de root. Al actualizar Nexum no se toca: la
+    primera vez que abres la ventana tras actualizar, si a las versiones les falta lo de la nueva, te pregunta si se aplica ya (pide
+    la contraseña de administrador y reinicia Apache si está en marcha). Si lo dejas para luego, está en Versiones › «Protegerlas», o
+    en la terminal: <code>nexum asegurar --todas</code>.</p>
+  <p>Escribir la configuración no basta: Apache la lee al arrancar o al recargarse. Si su configuración es más nueva que la última vez
+    que la cargó (lo mira en su registro, <code>logs/error_log</code>, por la línea «resuming normal operations» que escribe en cada
+    arranque y recarga), la ventana avisa de que sigue con la de antes y ofrece reiniciarlo; el aviso queda también en Versiones (en el
+    Mac, en los avisos). En la terminal: <code>nexum servicio apache reiniciar</code>.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum barrera-web no</code> (apagar), <code>nexum barrera-web si</code> (encender) o
       <code>nexum barrera-web</code> (cómo está).</p>
@@ -5880,16 +6259,19 @@
     los proyectos (en <code>/etc/ssl/certs</code>, de CA o firmados por una CA local). Si el programa encuentra alguno, en <b>Versiones</b> sale
     «Certificados en los que confía todo el equipo», con el botón <b>«Arreglarlos»</b>. Después el navegador avisará una vez en cada proyecto:
     acepta el aviso (o pulsa «Confiar»; ver <a href="#dominios-certificados">Los certificados</a>). Pide la contraseña de administrador.</p>
+  <p>Con el mismo botón se arreglan los certificados <b>mal hechos</b>, los que llevan una extensión repetida: Chrome no abre esas webs
+    («La conexión no es privada», <code>net::ERR_CERT_INVALID</code>). Entonces el aviso se llama «Certificados que Chrome rechaza».</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum arreglar-certificados</code>.</p>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Revisa los certificados de los vhosts <code>https</code>: los que están en <code>/etc/ssl/certs</code>, los que son de CA, los firmados por
-        una CA local sin límite de dominios y los que faltan.</li>
+        una CA local sin límite de dominios, los que faltan y los que llevan una extensión repetida (por ejemplo, dos
+        <code>basicConstraints</code>).</li>
       <li>A cada uno de esos dominios le crea un certificado autofirmado propio, solo para él, en
         <span data-so="linux"><code>/opt/config/ssl/&lt;dominio&gt;-selfsigned.crt</code></span><span
-        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/&lt;dominio&gt;-selfsigned.crt</code></span> (con <code>openssl req -x509 …
-        -addext "basicConstraints=critical,CA:FALSE"</code>).</li>
+        data-so="mac"><code>/Library/Nexum/XAMPP-compartido/ssl/&lt;dominio&gt;-selfsigned.crt</code></span> (con <code>openssl req -x509 … -config</code>
+        y un fichero de configuración propio que solo lleva <code>basicConstraints = critical,CA:FALSE</code> y los nombres del dominio).</li>
       <li>Cambia en una copia de los vhosts sus líneas <code>SSLCertificateFile</code> y <code>SSLCertificateKeyFile</code> para que usen los nuevos,
         y la aplica como siempre: comprobada, con copia en <code>~/nexum-backups</code> si tienes las copias encendidas, escrita con
         <code>sudo install</code>, <code>httpd -t</code> y recarga de Apache.</li>
@@ -6108,6 +6490,17 @@
       desde un repositorio (GitHub u otro): lo clona (lo descarga con su historial) en esa carpeta con tu usuario, lo carga en esa versión,
       crea su base y, si le das un volcado, lo carga en ella. Solo direcciones https o ssh. Ejemplo: <code>nexum montar-proyecto
       git@github.com:mi-organizacion/portfolio-estudio.git portfolio-estudio 8.4 wp_portfolio_estudio</code>.</dd>
+    <dt><code>montar-proyecto &lt;url de git&gt; &lt;carpeta&gt; &lt;versión&gt; --sin-bd</code></dt><dd>Lo mismo, sin base de datos: lo
+      clona y lo carga sin ninguna base vinculada (un WordPress o una tienda no abren hasta que tengan la suya). Ejemplo: <code>nexum
+      montar-proyecto git@github.com:mi-organizacion/panaderia-luna.git panaderia-luna 8.4 --sin-bd</code>.</dd>
+    <dt><code>rama-proyecto &lt;carpeta&gt; &lt;rama&gt; [--nueva]</code></dt><dd>Cambia el proyecto a esa rama de git, con tu usuario (el
+      dueño de la carpeta) y sin contraseña de administrador. Una que solo está en <code>origin</code> se crea en tu equipo siguiendo a la
+      del servidor; con <code>--nueva</code>, una rama nueva a partir de la actual (no puede existir ya). Con cambios sin commit, o con un
+      nombre que no vale para git, no cambia nada. Es lo que hace «Empezar a trabajar» al montar un proyecto (ver <a
+      href="#nuevo-proyecto-rama">Nuevo proyecto</a>). Ejemplo: <code>nexum rama-proyecto panaderia-luna nueva-portada --nueva</code>.</dd>
+    <dt><code>gui-ramas-proyecto &lt;carpeta&gt;</code></dt><dd>Solo lee: la rama actual (<code>A|main</code>), los cambios sin commit
+      (<code>N|0</code>) y una línea por rama, con si está en tu equipo y en <code>origin</code> (<code>R|desarrollo|0|1</code>). Es lo que
+      pide la ventana para el diálogo de la rama. Ejemplo: <code>nexum gui-ramas-proyecto panaderia-luna</code>.</dd>
     <dt><code>actualizar-proyecto &lt;carpeta&gt; [--codigo &lt;zip, tar.gz o carpeta&gt;] [--modo fusionar|sobrescribir] [--pull] [--bd &lt;fichero&gt;] [--base &lt;base&gt;] [--copia]</code></dt>
     <dd>Trae lo de producción (la web de verdad, la publicada) al proyecto: <code>--pull</code> trae los cambios de git, <code>--codigo</code>
       pone encima el código de un fichero o carpeta (<code>fusionar</code> añade y cambia; <code>sobrescribir</code> además quita lo que no
@@ -6119,15 +6512,21 @@
       si es el cargado, lo quita de Docker, borra su base de la versión activa si la dices (con <code>--copia</code>, antes un volcado),
       quita sus vhosts y sus líneas de <code>/etc/hosts</code>, y por último su carpeta. Si un paso falla, no sigue. Las bases de otras
       versiones no se tocan. Ejemplo: <code>nexum borrar-proyecto moda-verde --bd wp_moda_verde --copia</code>.</dd>
-    <dt><code>exportar-proyecto &lt;carpeta&gt; [--sin-codigo] [--sin-bd] [--bd &lt;base&gt;] [--destino &lt;carpeta&gt;]</code></dt>
+    <dt><code>exportar-proyecto &lt;carpeta&gt; [--sin-codigo] [--sin-bd] [--bd &lt;base&gt;] [--destino &lt;carpeta&gt; | --zip &lt;fichero&gt; [--sobrescribir]]</code></dt>
     <dd>Un zip del proyecto en tu carpeta de descargas, <code>&lt;carpeta&gt;_php&lt;rama&gt;_&lt;fecha&gt;_nexum.zip</code>: su código
       (sin <code>.git</code>), su base de la versión activa (la vinculada, u otra con <code>--bd</code>; sin el administrador de pruebas)
-      y un <code>LEEME-nexum.txt</code>. Si es un repositorio git con cambios sin commit, no exporta nada. Si falla o se cancela, no queda
-      nada a medias. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>. Ejemplo: <code>nexum exportar-proyecto
+      y un <code>LEEME-nexum.txt</code>. Con <code>--zip</code>, en el fichero que digas. Si es un repositorio git con cambios sin commit,
+      no exporta nada. Si falla o se cancela, no queda nada a medias. Ver <a href="#proyectos-exportar">Exportar un proyecto</a>. Ejemplo: <code>nexum exportar-proyecto
       panaderia-luna</code>.</dd>
     <dt><code>usuario-pruebas &lt;base&gt; [carpeta]</code></dt><dd>Crea o pone al día el administrador de pruebas del panel de WordPress o
-      PrestaShop: usuario <code>local@local.test</code> con contraseña <code>local</code>. Se hace solo al cargar una base. Ejemplo:
+      PrestaShop: el de <code>admin-pruebas</code> o, si no has puesto ninguno, usuario <code>local@local.test</code> con contraseña
+      <code>local</code>. Se hace solo al cargar una base. Un usuario de verdad con ese correo no se toca. Ejemplo:
       <code>nexum usuario-pruebas wp_panaderia_luna</code>.</dd>
+    <dt><code>admin-pruebas [--clave | &lt;correo&gt; [&lt;contraseña&gt;|-] | --quitar]</code></dt><dd>El administrador de pruebas de los
+      paneles (<a href="#admin-pruebas-config">Administrador de pruebas</a>), sin contraseña de administrador. Sin nada, el de ahora (con <code>--clave</code>, también su
+      contraseña); con un correo, lo cambia (sin contraseña o con <code>-</code>, te la pide o la lee de la entrada, para que no quede en el
+      historial de la terminal); <code>--quitar</code> vuelve a <code>local@local.test</code>. Las BBDD ya cargadas no cambian. Ejemplo:
+      <code>nexum admin-pruebas ana@local.test</code>.</dd>
     <dt><code>wp-config &lt;carpeta&gt; [base]</code></dt><dd>En un WordPress, comprueba que <code>wp-config.php</code> (su fichero de
       configuración) usa la base del proyecto y entra en el MariaDB de tu equipo. Si no (porque has pegado encima el de producción), lo
       rehace con la plantilla de este equipo y la dirección local. Cargar el proyecto lo hace solo. Ejemplo: <code>nexum wp-config
@@ -6161,8 +6560,9 @@
       <code>.local</code>. Con <code>quitar</code>, deja de hacerlo. Ejemplo: <code>nexum media-produccion academia-flor.local
       academia-flor.com</code>.</dd>
     <dt><code>media-proyecto &lt;carpeta&gt; &lt;dominio de producción&gt;|quitar</code></dt><dd>Lo mismo para un WordPress que se abre en
-      <code>web.local</code>, mientras esté cargado. Ejemplo: <code>nexum media-proyecto panaderia-luna
-      panaderia-luna.com</code>.</dd>
+      <code>web.local</code>, mientras esté cargado, y para cualquier WordPress o tienda PrestaShop en sus propios vhosts: las imágenes que
+      le falten se traen de la web real al pedirlas la página, por el intermediario de imágenes, y se guardan en su carpeta (también con
+      el dominio real falseado). Ejemplo: <code>nexum media-proyecto panaderia-luna panaderia-luna.com</code>.</dd>
     <dt><code>vhosts</code></dt><dd>Edita los vhosts: abre una copia en tu editor de la terminal (<code>nano</code>, si no tienes otro
       configurado), pregunta «¿Aplicar los cambios?», la comprueba, la escribe con <code>sudo</code> y recarga Apache. Si Apache no la
       acepta, deja la de antes. Con <code>copias-ficheros si</code>, guarda antes la anterior en <code>~/nexum-backups</code>. Ejemplo:
@@ -6257,7 +6657,7 @@
     <dt><code>docker-imagen &lt;nombre&gt;</code></dt><dd>Rehace su imagen de PHP con lo último de Docker Hub (con los parches de
       seguridad). Ejemplo: <code>nexum docker-imagen academia-flor</code>.</dd>
     <dt><code>docker-usuario-pruebas &lt;nombre&gt;</code></dt><dd>Pone el administrador de pruebas (<code>local@local.test</code>, contraseña
-      <code>local</code>) en la base de su contenedor. Ejemplo: <code>nexum docker-usuario-pruebas academia-flor</code>.</dd>
+      <code>local</code>, o el de <code>admin-pruebas</code>) en la base de su contenedor. Ejemplo: <code>nexum docker-usuario-pruebas academia-flor</code>.</dd>
     <dt><code>docker-contenedor arrancar|parar|reiniciar|registros|borrar &lt;contenedor&gt;</code></dt><dd>Un solo contenedor, por su nombre
       (lo ves en la página Docker). Ejemplo: <code>nexum docker-contenedor reiniciar nexum-web</code>.</dd>
     <dt data-so="mac"><code>docker-clave &lt;nombre&gt;</code></dt><dd data-so="mac">El usuario y la contraseña de su phpMyAdmin. Ejemplo:
@@ -6540,8 +6940,10 @@
     <p>Ábrela desde una terminal para ver qué dice: <code>nexum ventana</code>.<span data-so="linux"> Si falta GTK para Python, te
       dice cómo instalarlo (<code>sudo apt install python3-gi gir1.2-gtk-3.0</code>); los errores de cuando se abre desde el menú quedan en
       <code>~/.nexum/ventana.log</code>.</span> Mientras tanto, todo se puede hacer desde el panel: <code>nexum</code>.</p></details>
-  <details><summary>«Hay una tarea en marcha: espera a que acabe»</summary>
-    <p>Solo va una tarea a la vez. Pulsa la flecha verde de arriba para ver la que está trabajando, y espera a que acabe o cancélala.</p></details>
+  <details><summary>«Hay una tarea en marcha»: no me deja instalar ni crear nada</summary>
+    <p>Solo va una tarea a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los componentes y compilar otra versión de PHP). El
+      aviso dice cuál sigue en marcha. Pulsa la flecha verde de arriba para verla, y espera a que acabe o cancélala; luego vuelve a
+      pulsar.</p></details>
   <details><summary>Una orden dice que MariaDB «no responde o root tiene contraseña»</summary>
     <p>Las órdenes de bases de datos entran en MariaDB como <code>root</code> sin contraseña. Si se la has puesto, pásasela delante.</p>
     <p><b>En la terminal:</b> <code>MYSQL_PWD=tu_contraseña nexum list-db</code>. Si es que no está en marcha:

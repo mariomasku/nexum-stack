@@ -39,6 +39,8 @@ NEW_CSS = """
 headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
 /* El aviso de abajo (toast): grande, con el logotipo de Nexum. La píldora (el fondo y el borde con los colores
    de su icono) la pinta toast_paint: aquí, solo sus márgenes */
+/* Lo que lanza una tarea, con otra en marcha: atenuado, pero se puede pulsar (dice cuál sigue) */
+.nv-espera { opacity: 0.5; }
 .nv-toast { padding: 15px 40px 15px 34px; }
 .nv-toast-texto { font-size: 1.15em; font-weight: 600; }
 .nv-pastilla { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
@@ -60,6 +62,8 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
                box-shadow: inset 0 2px 7px alpha(black, 0.45), inset 0 0 0 1px alpha(black, 0.15); margin: 12px 14px 12px 14px;
                padding: 10px 10px 10px 10px; }
 .nv-terminal-vte { border-radius: 8px; }
+/* Los botones del visor: en varias líneas si no caben (nv_button_flow), sin el relleno ni el resaltado de FlowBox */
+.nv-botonera flowboxchild { padding: 0; background: none; }
 .nv-sep { background-color: alpha(@theme_fg_color, 0.15); min-width: 1px; margin: 6px 2px; }
 .nv-verde { color: %(g)s; }
 .nv-gris { color: alpha(@theme_fg_color, 0.3); }
@@ -70,8 +74,11 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
    y los desplegables; no los de cerrar, maximizar y minimizar). El principal, en azul */
 button { border-radius: 8px; }
 button:not(.titlebutton) { border-color: alpha(@theme_fg_color, 0.22); }
+/* (al pasar el raton, un relleno azul solido, mezclado con el fondo: con solo un 8 por ciento de azul
+   transparente se perdia el gris del boton y parecia desactivado) */
 button:not(.titlebutton):hover, button:not(.titlebutton):checked:hover {
-    border-color: %(b)s; background-image: none; background-color: alpha(%(b)s, 0.08); }
+    border-color: %(b)s; background-image: none; background-color: mix(@theme_bg_color, %(b)s, 0.22);
+    box-shadow: none; }
 button.flat:not(.titlebutton):hover { border: 1px solid %(b)s; }
 button.verde, button.suggested-action, .nv-azul { background-image: none; background-color: %(b)s; color: white; border-color: transparent; box-shadow: none; }
 button.verde:hover, .nv-azul:hover { background-color: shade(%(b)s, 1.12); border-color: shade(%(b)s, 1.35); }
@@ -212,6 +219,24 @@ button.pildora { border-radius: 8px; padding: 6px 20px; }
 .nv-consola-marco { border-radius: 10px; background-color: #1d2228; border: 1px solid alpha(black, 0.25); }
 textview.nv-consola, textview.nv-consola text { background-color: #1d2228; color: #d7dee6; font-size: 9.5pt; }
 expander title > arrow { min-width: 14px; }
+/* Apariencia, cristal (.nv-cristal en la ventana): encima del fondo de color difuminado (glass_css),
+   las columnas y los paneles translúcidos, con un borde claro y un brillo arriba, como un cristal. Mientras no
+   cambia nada no gasta; al redibujar, poco más que sin él (la sombra de los paneles, corta) */
+/* (la cabecera, la del visor, sólida: azul oscuro con el tema oscuro y blanca con el claro) */
+.nv-cristal headerbar.nv-cabecera, .nv-cristal headerbar.nv-cabecera:backdrop { background-image: none;
+    background-color: #14213d; border-bottom: 1px solid alpha(white, 0.08); box-shadow: none; }
+.nv-cristal.nv-claro headerbar.nv-cabecera, .nv-cristal.nv-claro headerbar.nv-cabecera:backdrop {
+    background-color: #ffffff; border-bottom: 1px solid alpha(black, 0.10); }
+.nv-cristal .nv-lateral { background-color: alpha(@theme_bg_color, 0.42); border-right: 1px solid alpha(white, 0.10); }
+.nv-cristal .nv-subnav-lateral { background-color: alpha(@theme_bg_color, 0.30); border-right: 1px solid alpha(white, 0.08); }
+.nv-cristal list.caja, .nv-cristal .nv-grupo, .nv-cristal .nv-tarjeta, .nv-cristal .nv-mosaico, .nv-cristal .nv-stat,
+.nv-cristal .nv-subnav-caja, .nv-cristal .nv-hundido, .nv-cristal .nv-pastilla, .nv-cristal .nv-selectores {
+    background-color: alpha(@theme_base_color, 0.42); border: 1px solid alpha(white, 0.13);
+    box-shadow: inset 0 1px alpha(white, 0.10), 0 2px 8px alpha(black, 0.14); }
+.nv-cristal.nv-claro list.caja, .nv-cristal.nv-claro .nv-grupo, .nv-cristal.nv-claro .nv-tarjeta,
+.nv-cristal.nv-claro .nv-mosaico, .nv-cristal.nv-claro .nv-stat, .nv-cristal.nv-claro .nv-subnav-caja {
+    background-color: alpha(white, 0.55); border: 1px solid alpha(white, 0.75);
+    box-shadow: inset 0 1px alpha(white, 0.9), 0 2px 8px alpha(black, 0.08); }
 """ % {"b": BLUE, "g": NEW_GREEN}
 
 KIND_TEXT = {"wp": "WordPress", "ps": "PrestaShop"}
@@ -230,6 +255,70 @@ def tray_lib():
             return getattr(__import__("gi.repository", fromlist=[name]), name)
         except (ValueError, ImportError, AttributeError):
             continue
+    return None
+
+
+# Abrir al iniciar sesión: el acceso de inicio de la sesión (el de «Aplicaciones al inicio» de Ubuntu), que
+# abre la ventana con --al-iniciar. Solo se toca si es nuestro (lleva AUTOSTART_MARK) y un fichero normal
+AUTOSTART_FILE = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config"),
+                              "autostart", "nexum.desktop")
+AUTOSTART_MARK = "X-Nexum-Inicio=true"
+# Abierta al iniciar sesión: con el icono junto al reloj, se queda en él sin enseñar la ventana
+START_HIDDEN = os.environ.get("LVM_AL_INICIAR") == "1"
+
+
+def autostart_read():
+    """El acceso de inicio, si es un fichero normal (sin seguir enlaces); None si no está o no se puede leer."""
+    try:
+        fd = os.open(AUTOSTART_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return None
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            return None
+        return f.read(65536).decode("utf-8", "replace")
+
+
+def autostart_on():
+    """¿Se abre al iniciar sesión? Solo con nuestro acceso, y sin apagar a mano (Hidden o
+    X-GNOME-Autostart-enabled=false, que es lo que hace «Aplicaciones al inicio» al desmarcarlo)."""
+    text = autostart_read()
+    if text is None or AUTOSTART_MARK not in text.splitlines():
+        return False
+    lines = [ln.strip().lower() for ln in text.splitlines()]
+    return "hidden=true" not in lines and "x-gnome-autostart-enabled=false" not in lines
+
+
+def autostart_text(script):
+    """El acceso de inicio: abre la ventana de este script (con comillas si su ruta lleva espacios)."""
+    exe = script if re.fullmatch(r"[A-Za-z0-9/._+-]+", script) else '"%s"' % re.sub(r'(["`$\\])', r"\\\1", script)
+    return "\n".join(["[Desktop Entry]", "Type=Application", "Name=Nexum Dev Stack",
+                      "Comment=Abre Nexum Dev Stack al iniciar sesión (en Configuración, General)",
+                      "Exec=%s ventana --al-iniciar" % exe, "Icon=nexum", "Terminal=false",
+                      "X-GNOME-Autostart-enabled=true", "X-GNOME-Autostart-Delay=5", AUTOSTART_MARK, ""])
+
+
+def autostart_set(on, script):
+    """Enciende (escribe nuestro acceso, 644) o apaga (borra el nuestro; uno que no sea nuestro no se toca).
+    Devuelve un texto de error o None."""
+    text = autostart_read()
+    if os.path.lexists(AUTOSTART_FILE) and (text is None or AUTOSTART_MARK not in text.splitlines()):
+        return "%s no es de Nexum Dev Stack (o es un enlace): no se toca. Quítalo o cámbialo a mano." % AUTOSTART_FILE
+    try:
+        if not on:
+            if text is not None:
+                os.unlink(AUTOSTART_FILE)
+            return None
+        os.makedirs(os.path.dirname(AUTOSTART_FILE), mode=0o700, exist_ok=True)
+        tmp = AUTOSTART_FILE + ".nuevo"
+        if os.path.lexists(tmp):
+            os.unlink(tmp)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(autostart_text(script))
+        os.replace(tmp, AUTOSTART_FILE)
+    except OSError as exc:
+        return str(exc)
     return None
 
 
@@ -264,12 +353,39 @@ def new_page(width=860):
     sw.add(content)
 
     def fit(_w, alloc):
-        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        side = page_side(alloc.width, [content])
         if content.get_margin_start() != side:
             content.set_margin_start(side)
             content.set_margin_end(side)
     sw.connect("size-allocate", fit)
     return sw, content
+
+
+def page_side(width, boxes):
+    """Margen a cada lado de una página de ancho width: lo que sobra hasta PAGE_MAX, contando con lo que pide su
+    contenido (sin los márgenes de ahora). Si no se contara, un contenido más ancho que PAGE_MAX hacía crecer la
+    ventana, con ella el margen y con el margen otra vez la ventana, sin parar."""
+    need = PAGE_MAX
+    for box in boxes:
+        least = box.get_preferred_width()[0] - box.get_margin_start() - box.get_margin_end()
+        need = max(need, least)
+    return max(26, (width - need) // 2)
+
+
+def nv_button_flow():
+    """Caja de los botones del visor: en una línea si caben y, si no, en varias. Así nunca pide más ancho que el
+    de su botón más ancho (con los botones grandes, una fila pedía más que la pantalla)."""
+    f = css(Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=False, column_spacing=8, row_spacing=8,
+                        min_children_per_line=1, max_children_per_line=40, valign=Gtk.Align.CENTER, hexpand=True),
+            "nv-botonera")
+    return f
+
+
+def nv_flow_add(flow, w):
+    flow.add(w)
+    child = w.get_parent()
+    if child is not None:
+        child.set_can_focus(False)
 
 
 def new_split_page(width=860):
@@ -286,7 +402,7 @@ def new_split_page(width=860):
     page.pack_start(sw, True, True, 0)
 
     def fit(_w, alloc):
-        side = max(26, (alloc.width - PAGE_MAX) // 2)
+        side = page_side(alloc.width, [top, bottom])
         for box in (top, bottom):
             if box.get_margin_start() != side:
                 box.set_margin_start(side)

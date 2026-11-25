@@ -58,6 +58,8 @@ extension AppModel {
                 p.link = f[1]
                 p.current = f[2]
                 p.create = f.count >= 4 && f[3] == "N"
+            case "W" where f.count >= 2 && f[1].range(of: "^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?/$", options: .regularExpression) != nil:
+                p.web = f[1]
             case "P" where f.count >= 4:
                 p.list.append(Project(name: f[1], db: f[2], php: f[3], kind: field(f, 4)))
             case "R" where f.count >= 3:

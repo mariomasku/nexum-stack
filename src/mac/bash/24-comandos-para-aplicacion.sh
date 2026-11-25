@@ -48,6 +48,9 @@ function gui_data() {
     # Versiones a las que les falta algo para ser solo de este Mac
     local open_versions=$(unsecured_versions)
     [ -n "$open_versions" ] && echo "U|$open_versions"
+    # K|version: su Apache en marcha con la configuracion de antes (escrita despues de su ultima carga)
+    [ -n "$active" ] && pgrep -f "^$active/xamppfiles/apache2/bin/httpd( |$)" > /dev/null \
+        && apache_stale "$active/xamppfiles" && echo "K|$(version_name "$active")"
     # Tablas del sistema de MariaDB antiguas en la version montada (llenan su registro de errores)
     if db_system_outdated; then
         local err_log=$(db_error_log "$active")
@@ -302,6 +305,8 @@ function tunnel_duration_text() {
     fi
 }
 
+#@incluir comun/tunel/tunnel_domains.sh
+
 function tunnel_open() {
     local url=$1 folder="" scheme host port ip clave minutos=120 admin=bloquear params dir="" domains n url_t
     shift
@@ -351,13 +356,10 @@ print(socket.getaddrinfo(sys.argv[1], None, socket.AF_INET)[0][4][0])' "$host" 2
 
         return 1
     fi
-    # Los dominios de la web que se cambian por el del tunel: el suyo y, en una tienda, el de su BBDD
-    # (va con el dominio real falseado: la direccion local lleva a el)
-    domains=$host
-    if [ -n "$dir" ] && is_prestashop "$(basename "$dir")" 2> /dev/null; then
-        n=$(ps_domain "$(basename "$dir")" 2> /dev/null)
-        valid_domain "$n" && domains+=" $n"
-    fi
+    # Los dominios de la web que se cambian por el del tunel: el suyo y los falseados de su proyecto
+    domains=$(tunnel_domains "$host" "$dir" | tr '\n' ' ')
+    [ -n "$domains" ] || domains=$host
+    [ "${domains% }" != "$host" ] && echo "Quien lo abra vera tambien por el tunel (no la web real): ${domains#"$host" }"
     echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
     echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $(tunnel_duration_text "$minutos"))"
     if [ "$DRY" -eq 1 ]; then

@@ -507,7 +507,9 @@ function docker_install() {
 # las extensiones de DOCKER_PHP_EXT (con install-php-extensions, que sabe instalarlas tambien en las
 # versiones antiguas). PHP-FPM escucha en un socket de /run/nexum (docker_run_dir del proyecto) y corre
 # como el root del contenedor, que en Docker sin root eres tu: asi escribe en el proyecto con tu usuario
-# Con --nueva se rehace aunque ya exista (Actualizar imagen: con lo ultimo de Docker Hub, sin cache).
+# Con --nueva se rehace aunque ya exista (Actualizar imagen: con lo ultimo de Docker Hub, sin cache);
+# con --rehacer, tambien, pero con lo ya descargado (al poner o quitar WP-CLI). Con la opcion de
+# Configuracion > Docker, lleva WP-CLI (docker_wp_cli_dockerfile): wp con la BBDD y el wp-config de Docker
 # El php.ini es el de produccion, con las mitigaciones de PHP2Shell (PHP_SECURE_INI), y cada proceso
 # de PHP-FPM se renueva cada 50 peticiones
 # (install-php-extensions, fijado por su huella: la etiqueta 2 la puede mover cualquiera que llegue a
@@ -517,23 +519,27 @@ function docker_php_image() {
     local php=$1 dir=$DOCKER_DIR/imagenes/php-$1 fresh=() ini
     if [ "$2" == "--nueva" ]; then
         fresh=(--pull --no-cache)
-    elif [ "$DRY" -eq 0 ] && dk image inspect "nexum-php:$php" > /dev/null 2>&1; then
+    elif [ "$2" != --rehacer ] && [ "$DRY" -eq 0 ] && dk image inspect "nexum-php:$php" > /dev/null 2>&1 \
+            && ! docker_php_needs_wp_cli "$php"; then
+        # (con WP-CLI puesto, la que no lo trae se rehace)
         return 0
     fi
     mkdir -p -m 700 "$dir" || return 1
     ini=$(printf 'memory_limit = 512M\nmax_execution_time = 300\n%s' "$PHP_SECURE_INI")
     php_85_or_later "$php" && ini+=$'\n'$PHP_SECURE_INI_85
     ini=${ini//$'\n'/\\n}
-    cat > "$dir/Dockerfile" << EOF
-FROM php:$php-fpm
-COPY --from=$DOCKER_EXT_INSTALLER /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions $DOCKER_PHP_EXT
+    {
+        printf 'FROM php:%s-fpm\nCOPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\nRUN install-php-extensions %s\n' \
+            "$php" "$DOCKER_EXT_INSTALLER" "$DOCKER_PHP_EXT"
+        docker_wp_cli_dockerfile
+        cat << EOF
 RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \\
  && printf '[global]\\nerror_log = /proc/self/fd/2\\ndaemonize = no\\n[www]\\nuser = root\\ngroup = root\\nlisten = /run/nexum/php.sock\\nlisten.mode = 0660\\nclear_env = no\\ncatch_workers_output = yes\\npm.max_requests = 50\\n' > /usr/local/etc/php-fpm.d/zz-nexum.conf \\
  && cp "\$PHP_INI_DIR/php.ini-production" "\$PHP_INI_DIR/php.ini" \\
  && printf '$ini\\n' > "\$PHP_INI_DIR/conf.d/zz-nexum.ini"
 CMD ["php-fpm", "-R", "-F"]
 EOF
+    } > "$dir/Dockerfile" || return 1
     echo "Preparando la imagen de PHP $php (${fresh:+de nuevo, }tarda unos minutos)..."
     run dk build "${fresh[@]}" -t "nexum-php:$php" "$dir"
 }
@@ -755,7 +761,7 @@ function docker_create() {
             local admin
             admin=$(docker_test_admin "$slug")
             grep -v '^A|' <<< "$admin" | grep .
-            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+            grep -q '^A|' <<< "$admin" && test_admin_note
         fi
     fi
     task_step
@@ -815,6 +821,7 @@ function docker_test_admin() {
 }
 
 #@incluir comun/docker/docker_db_backup.sh
+#@incluir comun/docker/docker_wp_cli.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

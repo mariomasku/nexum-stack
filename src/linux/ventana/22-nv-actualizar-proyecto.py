@@ -283,10 +283,10 @@ class NvActualizarProyecto:
                 "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", x["name"]],
                 done_text="Caché vaciada", auto_close=True)))
         items.append(("Limpiar proyecto…", lambda: self.nv_clean_project(x)))
+        if x["kind"] in ("ps", "wp"):
+            items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
-        elif x["kind"] == "wp":
-            items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
@@ -382,8 +382,9 @@ class NvActualizarProyecto:
             if with_db:
                 steps.append("Se descarga la BBDD %s de %s en %s.sql, como «Descargar»: sin el administrador de "
                              "pruebas ni los cambios del correo de pruebas." % (db, v[2], db))
-            steps.append("Se escribe el zip en %s/%s, con un LEEME-nexum.txt. Si falla o lo cancelas, no queda "
-                         "nada." % (dest, zip_name))
+            steps.append("Se escribe el zip con un LEEME-nexum.txt donde elijas (al pulsar «Exportar», la ventana "
+                         "de guardar, en %s y con el nombre %s, que puedes cambiar). Si falla o lo cancelas, no "
+                         "queda nada." % (dest, zip_name))
             for child in holder.get_children():
                 holder.remove(child)
             holder.pack_start(steps_box(steps), False, False, 0)
@@ -398,16 +399,20 @@ class NvActualizarProyecto:
         dlg.destroy()
         if resp != Gtk.ResponseType.ACCEPT or not (with_code or with_db):
             return
-        args = ["exportar-proyecto", name, "--destino", dest] + ([] if with_code else ["--sin-codigo"]) + \
-            (["--bd", db] if with_db else ["--sin-bd"])
+        path, overwrite = self.nv_export_where(name, dest, zip_name)
+        if not path:
+            return
+        args = ["exportar-proyecto", name, "--zip", path] + (["--sobrescribir"] if overwrite else []) + \
+            ([] if with_code else ["--sin-codigo"]) + (["--bd", db] if with_db else ["--sin-bd"])
+        folder = os.path.dirname(path)
 
         def done(success, task, _p):
             if success:
-                task.offer("Mostrar en la carpeta", lambda: self.open_uri(GLib.filename_to_uri(dest)))
+                task.offer("Mostrar en la carpeta", lambda: self.open_uri(GLib.filename_to_uri(folder)))
 
         def start(_pwd=None):
             self.run_task("Exportando %s" % name, args, progress=True, env=self.db_env() if with_db else None,
-                          on_done=done, done_text="«%s» exportado en %s" % (name, dest),
+                          on_done=done, done_text="«%s» exportado en %s" % (name, path),
                           cancel_text=("¿Cancelar la exportación?", "No se guarda nada: el zip a medias se borra.",
                                        "Cancelar la exportación"))
         if with_db:
@@ -415,18 +420,53 @@ class NvActualizarProyecto:
         else:
             start()
 
+    def nv_export_where(self, name, dest, zip_name):
+        """La ventana de guardar del sistema: dónde va el zip y con qué nombre (de partida, en descargas y con su
+        nombre de siempre). Devuelve (ruta, si se escribe encima de uno que ya existe) o (None, False)."""
+        dlg = Gtk.FileChooserDialog(title="Guardar el proyecto exportado «%s»" % name, transient_for=self.win,
+                                    action=Gtk.FileChooserAction.SAVE, do_overwrite_confirmation=True)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Guardar", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        zips = Gtk.FileFilter()
+        zips.set_name("Zip (*.zip)")
+        zips.add_pattern("*.zip")
+        zips.add_pattern("*.ZIP")
+        dlg.add_filter(zips)
+        dlg.set_current_folder(dest if os.path.isdir(dest) else os.path.expanduser("~"))
+        if zip_name and "…" not in zip_name:
+            dlg.set_current_name(zip_name)
+        else:
+            dlg.set_current_name("%s_nexum.zip" % name)
+        path = dlg.get_filename() if run_dialog(dlg) == Gtk.ResponseType.ACCEPT else None
+        dlg.destroy()
+        if not path:
+            return None, False
+        # (sin .zip, se le pone; si así ya existe, la ventana de guardar no lo ha preguntado: se pregunta aquí)
+        if not path.lower().endswith(".zip"):
+            path += ".zip"
+            if os.path.lexists(path) and not confirm(
+                    self.win, "¿Reemplazar «%s»?" % os.path.basename(path),
+                    "Ya existe en %s. Si lo reemplazas, se pierde lo que tenía." % os.path.dirname(path),
+                    "Reemplazar", destructive=True):
+                return None, False
+        return path, os.path.lexists(path)
+
     def nv_images_button(self, x):
-        """Imágenes de producción: un WordPress las pide a su web real; una tienda las descarga."""
+        """Imágenes de producción: las que falten se traen de su web real al pedirlas la página (WordPress y tiendas)."""
         b = nv_button(logo("imagenes", 18), "Imágenes de producción",
                       "Traer de producción las imágenes que falten",
-                      lambda *_: self.nv_wp_media(x) if x["kind"] == "wp" else self.nv_ps_images(x), "nv-proyecto-btn")
-        b.set_sensitive(not self.busy)
+                      lambda *_: self.nv_wp_media(x), "nv-proyecto-btn")
+        busy_guard(b, self.busy).set_sensitive(True)
         return b
 
     def nv_wp_media(self, x):
-        """media-proyecto: lo que le falte a un WordPress de wp-content/uploads se pide a su web real
-        mientras esté cargado (por web.local). Se propone el dominio de su base (home o siteurl)."""
+        """media-proyecto: las imágenes que le falten a un WordPress (wp-content/uploads) o a una tienda (img) se
+        traen de su web real al pedirlas la página, por el intermediario de imágenes, y se quedan en su carpeta.
+        Se propone el dominio de su base (home o siteurl; en una tienda, su shop_url). En una tienda, además,
+        «Descargar todas…» (ps-imagenes)."""
         name = x["name"]
+        shop = x["kind"] == "ps"
 
         def got(rc, out):
             f = {l[0]: l[1] for l in parse_lines(out) if len(l) >= 2}
@@ -435,11 +475,17 @@ class NvActualizarProyecto:
             dlg.set_default_size(520, -1)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
             box.pack_start(label("Imágenes de producción de %s" % name, "nv-titulo", wrap=True), False, False, 0)
-            box.pack_start(label("Mientras esté cargado (y, si está en el Apache de Docker, también allí), lo que "
-                                 "falte en su carpeta wp-content/uploads (imágenes, vídeos y PDF) se pide a su web "
-                                 "real: no hace falta descargarlo. Lo que ya está en local se sigue sirviendo desde "
-                                 "aquí.", "nv-tenue", wrap=True,
-                                 max_width_chars=60), False, False, 0)
+            text = ("No se descarga nada por adelantado. Cuando la tienda pide una imagen que no está en su carpeta img, "
+                    "Nexum la trae en ese momento de su web real, te la enseña y la deja guardada en img: solo se trae "
+                    "lo que ves, y la siguiente vez ya sale de tu equipo. Funciona aunque su dominio esté falseado en "
+                    "este equipo (pregunta su dirección al DNS cifrado y comprueba su certificado real). Con LAMPP; en "
+                    "el Apache de Docker, no." if shop else
+                    "No se descarga nada por adelantado. Cuando la web pide una imagen de wp-content/uploads que no "
+                    "está en tu carpeta, Nexum la trae en ese momento de su web real, te la enseña y la deja guardada: "
+                    "solo se trae lo que ves, y la siguiente vez ya sale de tu equipo. Funciona aunque su dominio esté "
+                    "falseado en este equipo. Los vídeos y los PDF no se guardan: se piden a la web real con una "
+                    "redirección (mientras esté cargado y en el Apache de Docker, donde las imágenes también van así).")
+            box.pack_start(label(text, "nv-tenue", wrap=True, max_width_chars=60), False, False, 0)
             entry = Gtk.Entry(text=saved or guess, placeholder_text="ejemplo.com", max_length=80,
                               activates_default=True)
             box.pack_start(entry, False, False, 0)
@@ -449,6 +495,8 @@ class NvActualizarProyecto:
             dlg.get_content_area().add(box)
             if saved:
                 css(dlg.add_button("Quitar", Gtk.ResponseType.REJECT), "destructive-action")
+            if shop:
+                dlg.add_button("Descargar todas…", Gtk.ResponseType.APPLY)
             dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
             ok = css(dlg.add_button("Guardar", Gtk.ResponseType.OK), "nv-azul")
             dlg.set_default_response(Gtk.ResponseType.OK)
@@ -466,12 +514,14 @@ class NvActualizarProyecto:
             resp = run_dialog(dlg)
             prod = clean()
             dlg.destroy()
-            if resp == Gtk.ResponseType.REJECT:
+            if resp == Gtk.ResponseType.APPLY:
+                self.nv_ps_images(x)
+            elif resp == Gtk.ResponseType.REJECT:
                 self.run_task("Quitando las imágenes de producción de %s" % name, ["media-proyecto", name, "quitar"],
                               done_text="%s ya no pide nada a producción" % name, auto_close=True)
             elif resp == Gtk.ResponseType.OK:
                 self.run_task("Imágenes de producción de %s" % name, ["media-proyecto", name, prod],
-                              done_text="%s pide a %s las imágenes que le faltan" % (name, prod), auto_close=True)
+                              done_text="%s trae de %s las imágenes que le faltan" % (name, prod), auto_close=True)
             return False
         run_quick(["gui-wp-produccion", name], got, env=self.db_env())
 

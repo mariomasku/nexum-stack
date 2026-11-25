@@ -251,9 +251,10 @@ class AppPrograma:
         folder = self.loaded_project_folder()
         return project_admin(folder) if folder is not None else ("", "")
 
-    def open_project_pma(self):
-        """phpMyAdmin con la BBDD del proyecto cargado (en http://127.0.0.1/phpmyadmin/)."""
-        db = self.loaded_project_db()
+    def open_project_pma(self, db=None):
+        """phpMyAdmin con la BBDD del proyecto cargado, u otra de la versión activa (en http://127.0.0.1/phpmyadmin/)."""
+        db = db if db is not None and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db) else \
+            "" if db is not None else self.loaded_project_db()
         if not db:
             return
         act = next((i for i in self.installs() if i["folder"] == self.data.get("active")), None)
@@ -271,10 +272,10 @@ class AppPrograma:
         if not (admin and self.projects and self.projects["link"]):
             return
         db, folder = self.loaded_project_db(), self.loaded_project_folder()
-        self.open_admin_login(kind, admin, "http://%s" % self.projects["link"], os.path.basename(folder or ""),
-                              ["usuario-pruebas", db, os.path.basename(folder or "")] if db else None)
+        self.open_admin_login(kind, admin, self.project_web().rstrip("/"), os.path.basename(folder or ""),
+                              ["usuario-pruebas", db, os.path.basename(folder or "")] if db else None, local=True)
 
-    def open_admin_login(self, kind, admin, site, name, cmd):
+    def open_admin_login(self, kind, admin, site, name, cmd, local=False):
         """Panel (wp-admin o el de la tienda) de la web <site> (http://web.local, https://x.docker.local)
         con el administrador de pruebas: cmd lo deja al día (usuario-pruebas o docker-usuario-pruebas,
         que dicen A|tipo|usuario|contraseña) y se abre una página con el usuario y la contraseña ya
@@ -287,22 +288,35 @@ class AppPrograma:
         def done(rc, out):
             mine = [l.split("|") for l in out.splitlines() if l.startswith("A|%s|" % kind)]
             if rc != 0 or not mine or len(mine[0]) < 4:
+                # (ya hay un usuario de verdad con el correo del administrador de pruebas: no se ha tocado)
+                if any("de verdad con" in l for l in out.splitlines()):
+                    self.toast("Ya hay un usuario de verdad con %s: no se cambia. Elige otro correo en "
+                               "Configuración › Administrador de pruebas" % test_admin_conf()[0])
                 self.open_uri(base)
                 return False
             user, password = mine[0][2], mine[0][3]
+            # (en LAMPP, local, usuario-pruebas dice si el acceso no puede ir por http: https, porque
+            # sus cookies de sesión son secure y por http no se guardan, o la dirección de la tienda
+            # con su dominio falseado, porque su back office salta allí al entrar; en Docker, no)
+            web, extra = site, mine[0][4] if len(mine[0]) > 4 else ""
+            if local and site.startswith("http://") and extra == "https":
+                web = "https://" + site[len("http://"):]
+            elif local and re.match(r"^https?://[a-z0-9.-]+(/[A-Za-z0-9._/-]*)?$", extra):
+                web = extra.rstrip("/")
+            panel = "%s/%s/" % (web, admin)
             if kind == "wp":
-                action = "%s/wp-login.php" % site
+                action = "%s/wp-login.php" % web
                 fields = [("log", user, "Usuario o correo"), ("pwd", password, "Contraseña"),
-                          ("rememberme", "forever", None), ("redirect_to", base, None)]
+                          ("rememberme", "forever", None), ("redirect_to", panel, None)]
                 title = "Panel de WordPress"
             else:
-                action = base + "index.php?controller=AdminLogin"
+                action = panel + "index.php?controller=AdminLogin"
                 fields = [("email", user, "Correo"), ("passwd", password, "Contraseña"),
                           ("stay_logged_in", "1", None), ("submitLogin", "1", None),
                           ("redirect", "AdminDashboard", None)]
                 title = "Back office de PrestaShop"
-            url = serve_once(login_page(title, name, action, fields, base))
-            self.open_uri(url) if url else self.open_uri(base)
+            url = serve_once(login_page(title, name, action, fields, panel, kind))
+            self.open_uri(url) if url else self.open_uri(panel)
             return False
         run_quick(cmd, done)
 
@@ -403,7 +417,7 @@ class AppPrograma:
              "unregistered": False, "native": True, "launcher": True,
              "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
-             "stray": "", "orphans": [], "exposed": "", "unsecured": [], "certs": [], "cas": [], "untrusted": [], "stale": [],
+             "stray": "", "orphans": [], "exposed": "", "unsecured": [], "apache_old": "", "certs": [], "cas": [], "untrusted": [], "stale": [],
              "dbsys": None, "php2shell": {},
              "mail": {"installed": False, "on": True, "wp": "mailpit", "running": False, "version": "",
                       "url": "http://127.0.0.1:8025/", "offer": ""}}
@@ -434,6 +448,9 @@ class AppPrograma:
                 d["exposed"] = "|".join(f[1:])
             elif f[0] == "U" and len(f) >= 2:
                 d["unsecured"] = f[1].split()
+            elif f[0] == "K" and len(f) >= 2:
+                # (su Apache sigue con la configuración de antes: escrita después de su última carga)
+                d["apache_old"] = f[1]
             elif f[0] == "Y" and len(f) >= 3:
                 d["dbsys"] = (f[1], int(f[2]) if f[2].isdigit() else 0)
             elif f[0] == "C" and len(f) >= 3:

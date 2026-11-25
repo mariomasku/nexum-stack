@@ -48,8 +48,8 @@ class AppServicios:
         # (en la ventana nueva, arrancar o parar la version entera: lo que hacia el boton Encendidos)
         if hasattr(self, "nv_power"):
             on = d["running"]
-            b = Gtk.Button(label="Parar y desactivar" if on else "Arrancar lampp-%s" % d["active"],
-                           valign=Gtk.Align.CENTER, sensitive=not self.busy)
+            b = busy_guard(Gtk.Button(label="Parar y desactivar" if on else "Arrancar lampp-%s" % d["active"],
+                           valign=Gtk.Align.CENTER), self.busy)
             if not on:
                 css(b, "verde")
             b.connect("clicked", lambda *_: (self.services_pop.popdown(), self.nv_power()))
@@ -134,8 +134,13 @@ class AppServicios:
                       done_text="phpMyAdmin actualizado", auto_close=True)
 
     def on_secure_all(self, *_):
-        self.run_task("Protegiendo las versiones", ["asegurar", "--todas"],
+        # (con sus pasos: revisar todo htdocs tarda, y sin ellos parecía congelada)
+        self.run_task("Protegiendo las versiones", ["asegurar", "--todas"], progress=True,
                       done_text="Todas las versiones son solo para este equipo", auto_close=True)
+
+    def on_apache_reload(self, *_):
+        self.run_task("Reiniciando Apache", ["servicio", "apache", "reiniciar"],
+                      done_text="Apache ya usa su configuración de ahora", auto_close=True)
 
     def on_secure(self, *_):
         self.run_task("Cerrando a la red", ["asegurar"],

@@ -100,8 +100,10 @@ for version, release in json.load(sys.stdin)["releases"].items():
     if sys.argv[1] == "fuente":
         files = [f for f in release["files"] if f["file_name"] == "mariadb-%s.tar.gz" % version]
     else:
-        files = [f for f in release["files"] if f["file_name"].endswith("-x86_64.tar.gz")
-                 and "linux" in f["file_name"] and "debug" not in f["file_name"]]
+        # (solo el de MariaDB: con el mismo final van tambien sus plugins, como
+        # mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz, de 1 MB y sin servidor)
+        name = re.compile(r"mariadb-%s-linux(-systemd)?-x86_64[.]tar[.]gz" % re.escape(version))
+        files = [f for f in release["files"] if name.fullmatch(f["file_name"])]
     files.sort(key=lambda f: "systemd" not in f["file_name"])
     if files:
         url = files[0]["file_download_url"].replace("http://", "https://", 1)
@@ -1801,6 +1803,8 @@ function no_tty() {
     ( set -o pipefail; /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" < /dev/null 2>&1 | cat )
 }
 
+#@incluir comun/pila-propia-version-php/step_watch.sh
+
 function step() {
     local part=$1 from=$2 to=$3 lines=$4 desc=$5 log=$6
     shift 6
@@ -1814,7 +1818,8 @@ function step() {
     # Sin terminal (en su propia sesion): lo que se compila esta en una carpeta tuya y lo puede cambiar
     # cualquier programa tuyo; con la terminal de la tarea podria usar el permiso de sudo que ya se ha
     # dado (sudo -n). Sin ella, sudo le pediria la contraseña y falla
-    if ! /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" > "$log" 2>&1 < /dev/null; then
+    # (mientras dura, por donde va: step_watch)
+    if ! step_watch "$(bar_pct "$from" "$part")" "$(bar_pct "$to" "$part")" "$lines" "$desc" "$log" /usr/bin/python3 -I -c "$NO_TTY_PY" "$@"; then
         echo "  ERROR: $desc. Ultimas lineas de $(basename "$log"):"
         tail -25 "$log" | sed 's/^/    /'
         # Compilando en paralelo, el error real queda lejos del final (tapado por avisos de otros
@@ -2015,9 +2020,11 @@ Alias /phpmyadmin "$target/phpmyadmin"
 </Directory>
 EOF
 
-    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=localhost" \
-        -addext "basicConstraints=critical,CA:FALSE" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+    # (las extensiones en un fichero propio y no con -addext: ver make_selfsigned)
+    printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = localhost\n[ext]\nbasicConstraints = critical,CA:FALSE\nsubjectAltName = DNS:localhost,IP:127.0.0.1\n' > "$S/tmp/server-cert.cnf"
+    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config "$S/tmp/server-cert.cnf" \
         -keyout "$S/etc/ssl.key/server.key" -out "$S/etc/ssl.crt/server.crt" > /dev/null 2>&1
+    rm -f "$S/tmp/server-cert.cnf"
 
     # --- PHP ---
     cat > "$S/php/etc/conf.d/99-lampp.ini" <<EOF
@@ -2250,6 +2257,8 @@ function reload_apache() {
 
 function start_mysql() {
     running "$MYSQL_PID" && { echo "MariaDB ya estaba arrancado."; return 0; }
+    # (sin su servidor no hay nada que esperar: se dice al momento, en vez de 60 s esperando)
+    [ -x "$ROOT/mysql/bin/mariadbd-safe" ] || { echo "MariaDB no esta instalada en esta version (falta mysql/bin/mariadbd-safe): actualizala en Componentes"; return 1; }
 
     # mariadbd-safe busca sus herramientas desde la carpeta de MariaDB
     (cd "$ROOT/mysql" && nohup ./bin/mariadbd-safe --defaults-file="$ROOT/etc/my.cnf" > /dev/null 2>&1 &)
@@ -2337,7 +2346,11 @@ running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2> /dev/null; }
 
 case "$1" in
     start)
-        running || env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin "$FPM" --fpm-config "$CONF"
+        # (sin la salida de quien lo arranca: PHP-FPM se queda en segundo plano con ella abierta, y
+        # si es una tuberia, como la de «| tee» al instalar, esta no se cerraria nunca y la
+        # instalacion se quedaria esperando. Sus avisos van a su log, php-fpm.log)
+        running || env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin "$FPM" --fpm-config "$CONF" \
+            < /dev/null >> @ROOT@/logs/php-fpm.log 2>&1
         ;;
     stop)
         running && kill -QUIT "$(cat "$PID")"
@@ -2477,6 +2490,15 @@ function build_user_ready() {
 }
 
 # Borra la carpeta de la compilacion (la de root con la de BUILD_USER dentro, o la tuya en las pruebas)
+# Los paquetes de la salida de «LC_ALL=C dpkg -S»: «paquete[:arq][, otro...]: /ruta». Las lineas
+# de los ficheros desviados («diversion by X from: ...», «diversion by X to: ...») no son paquetes
+function stack_dpkg_packages() {
+    awk '/^diversion by / { next }
+         { i = index($0, ": /"); if (i == 0) next
+           n = split(substr($0, 1, i - 1), p, ", ")
+           for (k = 1; k <= n; k++) { sub(/:.*/, "", p[k]); if (p[k] ~ /^[a-z0-9][a-z0-9.+-]+$/) print p[k] } }'
+}
+
 function stack_rm_build() {
     if [ -n "$build_top" ]; then
         [[ "$build_top" == /tmp/lvm-pila-* ]] && sudo rm -rf "$build_top"
@@ -2686,6 +2708,14 @@ function stack_build_phase() {
         mkdir -p "$S/mysql"
         step 6 93 96 0 "Descomprimiendo" "$build/mariadb-extract.log" tar -xzf mariadb.tar.gz -C "$S/mysql" --strip-components=1 \
             --exclude='*/mariadb-test' --exclude='*/mysql-test' --exclude='*/sql-bench' || stack_fail
+    fi
+    # (el servidor y el cliente tienen que estar: un fichero que no es MariaDB, como uno de sus plugins,
+    # pasa su comprobacion y no lleva ninguno. Fuera de la cache, para no volver a usarlo)
+    if [ ! -x "$S/mysql/bin/mariadbd" ] || [ ! -x "$S/mysql/bin/mariadb" ]; then
+        echo "  La descarga de MariaDB $mariadb no trae su servidor (bin/mariadbd): no es MariaDB. Se cancela."
+        [ -f "$DL_CACHE_DIR/$mariadb_name" ] && $SUDO rm -f "$DL_CACHE_DIR/$mariadb_name" "$DL_CACHE_DIR/$mariadb_name.sha256" \
+            && echo "  Se quita de la cache de descargas: la proxima vez se descarga de nuevo."
+        stack_fail
     fi
     # Sin simbolos de depuracion ocupa unos 600 MB menos
     find "$S/mysql/bin" "$S/mysql/lib" -type f \( -perm -u+x -o -name '*.so*' \) \
@@ -2979,17 +3009,26 @@ function install_stack() {
         local pkgs=$(ldd "$target/php/sbin/php-fpm" "$target/apache2/bin/httpd" "$target/apache2/modules/"*.so \
             "$target/proftpd/sbin/proftpd" "$target/mysql/bin/mariadbd" 2> /dev/null | awk '/=> \//{print $3}' | sort -u \
             | while read -r lib; do
-                dpkg -S "$lib" 2> /dev/null || dpkg -S "${lib#/usr}" 2> /dev/null || dpkg -S "/usr$lib" 2> /dev/null
-            done | cut -d: -f1 | sort -u)
+                LC_ALL=C dpkg -S "$lib" 2> /dev/null || LC_ALL=C dpkg -S "${lib#/usr}" 2> /dev/null \
+                    || LC_ALL=C dpkg -S "/usr$lib" 2> /dev/null
+            done | stack_dpkg_packages | sort -u)
         [ -n "$pkgs" ] && sudo apt-mark manual $pkgs > /dev/null
     fi
 
     [ -n "$aside" ] && $SUDO rm -R --one-file-system "$aside"
     stack_cache_store
+    # (fuera de la carpeta de la compilacion antes de borrarla: si no, lo que viene despues se
+    # ejecuta en una carpeta que ya no existe y bash avisa con «getcwd: no se puede acceder...»)
+    cd / || true
     stack_rm_build
 
     if [ $was_running -eq 1 ]; then
-        $SUDO "$target/lampp" start
+        # La salida, por un fichero: los servicios que se quedan en segundo plano no se quedan con
+        # la tuberia de la instalacion (| tee), que si no no acabaria nunca
+        local started
+        started=$(mktemp) || started=/dev/null
+        $SUDO "$target/lampp" start < /dev/null > "$started" 2>&1
+        [ "$started" != /dev/null ] && { cat "$started"; rm -f "$started"; }
     fi
 
     echo ""

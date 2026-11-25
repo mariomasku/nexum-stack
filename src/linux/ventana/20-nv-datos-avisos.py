@@ -12,8 +12,60 @@ class NvDatosAvisos:
             self.nv_power_state()
             self.nv_projects_refresh()
             self.nv_mail_header()
+            GLib.idle_add(self.nv_secure_after_update)
+            GLib.idle_add(self.nv_apache_old_check)
         self.nv_tray_update()
         return res
+
+    def nv_secure_after_update(self):
+        """Tras actualizar Nexum, una vez por versión: si a las versiones de PHP les falta lo que pone esta
+        (la barrera entre webs de ahora, las reglas de Apache...), se pregunta si se aplica ya. Al
+        actualizar no se toca su configuración (es de root y pide la contraseña); sin esto, seguirían
+        con lo de la versión de antes hasta pulsar Protegerlas en Versiones."""
+        d = self.data or {}
+        version = d.get("version") or ""
+        if SIMULATE or not version or getattr(self, "_secure_asked", False):
+            return False
+        try:
+            with open(SECURED_FOR_FILE) as fh:
+                done = fh.read().strip()
+        except OSError:
+            done = ""
+        if done == version:
+            return False
+        self._secure_asked = True
+        try:
+            os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+            with open(SECURED_FOR_FILE, "w") as fh:
+                fh.write(version + "\n")
+        except OSError:
+            pass
+        # (la primera vez que se abre, sin versión anterior apuntada, también: es lo mismo)
+        if d.get("unsecured") and confirm(
+                self.win, "Aplicar la seguridad de la %s" % version,
+                "Nexum se ha actualizado, pero las versiones de PHP siguen con la configuración de Apache "
+                "de antes (%s): les falta lo de esta versión, como la barrera entre webs de ahora. "
+                "Aplicarlo pide la contraseña de administrador y reinicia Apache si está en marcha. Si lo "
+                "dejas para luego, está en Versiones › Protegerlas."
+                % ", ".join("lampp-%s" % v for v in d["unsecured"]), "Aplicar ahora"):
+            self.on_secure_all()
+        return False
+
+    def nv_apache_old_check(self):
+        """Una vez por sesión de la ventana: si el Apache en marcha sigue con la configuración de antes
+        (se ha escrito y no se ha recargado), se pregunta si se reinicia. No a la vez que el aviso de
+        aplicar la seguridad: ese ya reinicia Apache."""
+        d = self.data or {}
+        if SIMULATE or not d.get("apache_old") or d.get("unsecured") or getattr(self, "_apache_old_asked", False):
+            return False
+        self._apache_old_asked = True
+        if confirm(self.win, "Apache sigue con la configuración de antes",
+                   "La configuración de Apache de lampp-%s ha cambiado (la seguridad, la barrera entre webs...) "
+                   "y Apache no se ha recargado: hasta reiniciarlo, sigue con lo de antes. Reiniciarlo pide la "
+                   "contraseña de administrador. Si lo dejas para luego, está en Versiones." % d["apache_old"],
+                   "Reiniciar Apache"):
+            self.on_apache_reload()
+        return False
 
     def on_services_data(self, rc, out):
         res = super().on_services_data(rc, out)
@@ -145,7 +197,37 @@ class NvDatosAvisos:
             self.nv_build_versions()
         return res
 
+    def nv_broken_load(self):
+        """Las piezas dañadas de cada versión (piezas-danadas: D|versión|piezas), para la tabla, su menú ⋮ y
+        Componentes. Se piden al abrir, al entrar en Versiones de PHP y al acabar de reparar una."""
+        def got(_rc, out):
+            new = {f[1]: f[2].split() for f in parse_lines(out) if f[0] == "D" and len(f) >= 3 and f[2].strip()}
+            if new != getattr(self, "broken", {}):
+                self.broken = new
+                if self.data:
+                    self.nv_build_versions()
+            return False
+        run_quick(["piezas-danadas"], got)
+
+    def nv_repair(self, inst, bad):
+        """Reparar una versión con alguna pieza dañada: se rehace entera (sus piezas se compilan juntas),
+        con sus BBDD si su MariaDB sigue en la misma rama, como Actualizar."""
+        folder = inst["folder"]
+        extra = copy_check(UPDATE_COPY_WARN)
+        if not confirm(self.win, "¿Reparar lampp-%s?" % folder,
+                       "Está dañado: %s (su programa no está o no responde). Se vuelve a compilar la versión entera "
+                       "con lo último de su rama, conservando sus BBDD. La de ahora sigue como está mientras se compila "
+                       "(varios minutos)." % ", ".join(bad), "Reparar", extra=extra):
+            return
+        self.run_task("Reparando lampp-%s" % folder, ["actualizar", folder] + (["--copia"] if extra.wanted else []),
+                      progress=True, reload_branches=True, done_text="lampp-%s reparada" % folder,
+                      on_done=lambda *_: self.nv_broken_load())
+
     def nv_build_versions(self):
+        # (las piezas dañadas, la primera vez: luego, al entrar en la pestaña)
+        if not getattr(self, "_broken_asked", False):
+            self._broken_asked = True
+            self.nv_broken_load()
         clear(self.vers_page)
         d = self.data
         head = Gtk.Box(spacing=12)
@@ -244,6 +326,17 @@ class NvDatosAvisos:
                 for w in patch.get_children():
                     if isinstance(w, Gtk.Label) and w.get_text() == "Actualizado":
                         patch.remove(w)
+            # Piezas dañadas (piezas-danadas): en rojo, como PHP2Shell, y se reparan en su menú ⋮
+            bad = getattr(self, "broken", {}).get(folder)
+            if bad:
+                dmg = label("%s dañado" % ", ".join(bad), "nv-chico", "error")
+                dmg.set_halign(Gtk.Align.START)
+                dmg.set_tooltip_text("Su programa no está o no responde: repárala en el menú ⋮")
+                patch.pack_start(dmg, False, False, 0)
+                patch.reorder_child(dmg, 0)
+                for w in patch.get_children():
+                    if isinstance(w, Gtk.Label) and w.get_text() == "Actualizado":
+                        patch.remove(w)
             php_cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
             php_cell.pack_start(label(inst["php"], "nv-mono"), False, False, 0)
             if p2s == "parche":
@@ -255,7 +348,7 @@ class NvDatosAvisos:
                 b = css(Gtk.Button(label="Activa", sensitive=False), "nv-activa")
             else:
                 # (como «Cargar» en Proyectos: solo en la version con el raton encima)
-                b = css(Gtk.Button(label="Activar", sensitive=not self.busy), "nv-azul")
+                b = css(busy_guard(Gtk.Button(label="Activar"), self.busy), "nv-azul")
                 b.connect("clicked", self.on_activate_version, folder)
                 b.set_opacity(0)
             b.set_size_request(96, -1)
@@ -278,6 +371,9 @@ class NvDatosAvisos:
         pop = Gtk.Popover(relative_to=m)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=4)
         items = [("Componentes…", lambda: self.nv_components_dialog(inst))]
+        bad = getattr(self, "broken", {}).get(folder)
+        if bad:
+            items.append(("Reparar (%s dañado)" % ", ".join(bad), lambda: self.nv_repair(inst, bad)))
         # Actualizar solo si hay un parche mas nuevo y la version se pone al dia en su carpeta (las
         # lampp-X.Y de antes); sin datos de php.net, se comprueba al pulsar
         updatable = inst["kind"] != "XAMPP" and inst["php"].rsplit(".", 1)[0] == folder
@@ -418,9 +514,17 @@ class NvDatosAvisos:
             if pma_outdated(inst["php"], inst["pma"]):
                 pma.get_style_context().add_class("error")
                 pma.set_tooltip_text("phpMyAdmin antiguo: actualízalo en ⋮")
-            row([label("lampp-%s" % inst["folder"], "nv-mono"), label(inst["php"], "nv-mono"),
-                 label(inst["apache"], "nv-mono", "nv-chico"), label(inst["mariadb"], "nv-mono", "nv-chico"),
-                 label(inst["ftp"], "nv-mono", "nv-chico"), label(inst["perl"], "nv-mono", "nv-chico"), pma])
+            cells = [label(inst["php"], "nv-mono"), label(inst["apache"], "nv-mono", "nv-chico"),
+                     label(inst["mariadb"], "nv-mono", "nv-chico"), label(inst["ftp"], "nv-mono", "nv-chico"),
+                     label(inst["perl"], "nv-mono", "nv-chico"), pma]
+            # (las dañadas, en rojo y con «dañado»: se reparan en el menú ⋮ de la versión)
+            bad = getattr(self, "broken", {}).get(inst["folder"], [])
+            for n, part in enumerate(("PHP", "Apache", "MariaDB", "ProFTPD", "Perl", "phpMyAdmin")):
+                if part in bad:
+                    cells[n].set_text(cells[n].get_text() + " · dañado")
+                    cells[n].get_style_context().add_class("error")
+                    cells[n].set_tooltip_text("Su programa no está o no responde: repárala en el menú ⋮ de la versión")
+            row([label("lampp-%s" % inst["folder"], "nv-mono")] + cells)
         box.pack_start(lb, False, False, 0)
         dlg.add_button("Cerrar", Gtk.ResponseType.CLOSE)
         box.show_all()

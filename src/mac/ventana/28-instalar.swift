@@ -27,7 +27,8 @@ struct InstallSection: View {
                         model.install()
                     }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(model.selected.isEmpty || model.busy)
+                    // (con otra tarea en marcha se puede pulsar: lo dice, nombrándola)
+                    .disabled(model.selected.isEmpty)
                     Text("La versión activa no cambia. Las nuevas se activan en la tabla de Versiones de PHP.")
                         .font(.callout).foregroundColor(.secondary)
                 }
@@ -54,7 +55,7 @@ struct InstallSection: View {
                                  items: [("", "Elige una rama")] + list.map { b in
                                      (b.branch, "PHP \(b.branch)" + (names[b.phpState].map { "  (\($0))" } ?? ""))
                                  }, width: 240)
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     Spacer(minLength: 8)
                 }
                 if !marked.isEmpty {
@@ -114,7 +115,7 @@ struct InstallSection: View {
                                              if on { model.selected.insert(p.version) } else { model.selected.remove(p.version) }
                                          }))
                     .labelsHidden()
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
             }
         }
         .padding(.horizontal, 14)
@@ -163,7 +164,7 @@ struct InstallSection: View {
                                          if on { model.selected.insert(b.branch) } else { model.selected.remove(b.branch) }
                                      }))
                 .labelsHidden()
-                .disabled(model.busy)
+                .busyGuard(model.busy)
         case "instalada":
             Text("Instalada").foregroundColor(.secondary)
         default:

@@ -8,6 +8,7 @@ W=$(mktemp -d "$TMPBASE/w-web.XXXX")
 getvar() { ( eval "$(sed -n "/^$1='/,/^'\$/p" "$SRC")"; printf '%s.' "${!1}" ); }
 VH=$(getvar UNKNOWN_HOST_VHOST); VH=${VH%.}
 printf '%s' "$VH" | sed 's#<VirtualHost \*:80>#<VirtualHost *:28471 *:28472>#' > "$W/unk.conf"
+printf '<VirtualHost *:28471>\n    ServerName panaderia-luna.com\n    DocumentRoot "%s/htdocs"\n    Redirect 301 /redir-301 https://web.local/\n</VirtualHost>\n' "$W" >> "$W/unk.conf"
 # httpd.conf de la 8.2.4 (solo se lee) con los puertos, registros, htdocs, vhosts y phpMyAdmin de prueba
 python3 -I "$HERE/apache-temporal.py" /opt/lampp-8.2.4/etc/httpd.conf "$W" "$W/unk.conf" \
     || { echo "no se ha podido preparar el Apache"; rm -rf "$W"; exit 1; }
@@ -20,6 +21,15 @@ for f in /.env /.ENV /.env.local /.git /copia.sql /copia.SQL.gz /b.sql.xz /d.dum
          /w.php.orig /w.php~ /w.php.save /error_log /auth.json /.npmrc /debug.log /.htpasswd; do
     check "403 en $f" '[ "$(code "$f")" = 403 ]'
 done
+# Dominio real (1.57.23): lo que se recibe de la copia local con su nombre no se guarda en el navegador
+# (un 301 a web.local guardado llevaba alli el dominio de verdad despues de dejar de falsearlo)
+cc() { curl -s -o /dev/null -D - -H "Host: $1" "http://127.0.0.1:28471${2:-/no-existe}" | tr -d '\r' | grep -i '^cache-control:'; }
+check "dominio real: Cache-Control no-store" 'cc panaderia-luna.com | grep -qi "no-store"'
+check "dominio real con www y puerto: no-store" 'cc www.panaderia-luna.com:28471 | grep -qi "no-store"'
+check "un .local, localhost y 127.0.0.1: sin no-store" '! cc tienda-luna.local | grep -qi no-store && ! cc localhost | grep -qi no-store && ! cc 127.0.0.1:28471 | grep -qi no-store'
+r=$(curl -s -o /dev/null -D - -H "Host: panaderia-luna.com" "http://127.0.0.1:28471/redir-301" | tr -d '\r')
+check "301 con un dominio real (como el de WordPress a web.local): no-store" 'grep -q "^HTTP/1.1 301" <<< "$r" && grep -qi "^location: https://web.local/" <<< "$r" && grep -qi "^cache-control: no-store" <<< "$r"'
+check "un dominio que solo acaba en local (milocal.com): no-store" 'cc milocal.com | grep -qi "no-store"'
 check "un fichero normal inexistente da 404" '[ "$(code /index-no-existe.php)" = 404 ]'
 check "un .zip no se bloquea (descargas de las webs)" '[ "$(code /plugin.zip)" = 404 ]'
 check "dominio desconocido en 28472 (otro puerto): 403" '[ "$(code / evil.com 28472)" = 403 ]'

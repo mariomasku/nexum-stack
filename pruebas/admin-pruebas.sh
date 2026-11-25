@@ -23,10 +23,15 @@ extract "$SRC" test_admin wp_table_prefixes ps_table_prefix || exit 1
 grep -q '^function db_root_sql() {' "$SRC" && { extract "$SRC" db_root_sql || exit 1; DB_ROOT_CLIENT=(); }
 # (la carpeta de la base: linked_folder desde la 1.51; antes, una linea de awk dentro de test_admin)
 grep -q "^function linked_folder" "$SRC" && { extract "$SRC" linked_folder || exit 1; active_name() { :; }; }
+# (1.57.15: el administrador de pruebas de Configuracion, en LOG_DIR/admin-pruebas)
+grep -q '^function test_admin_local_domain() {' "$SRC" && { extract "$SRC" test_admin_local_domain || exit 1; }
+HOSTS_FILE=$MDB/hosts; : > "$HOSTS_FILE"
+grep -q '^function test_admin_load() {' "$SRC" && { extract "$SRC" test_admin_load test_admin_mail_ok test_admin_pass_ok \
+    test_admin_md5 test_admin_bcrypt test_admin_note test_admin_write test_admin_config || exit 1; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
-DRY=0 HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos
+DRY=0 HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos LOG_DIR=$MDB/nexum
 m() { "$DB_CLIENT" -uroot -N "$@"; }
 php() { LD_LIBRARY_PATH=/opt/lampp-8.4/lib /opt/lampp-8.4/bin/php -n "$@"; }
 
@@ -75,6 +80,34 @@ hash=$(cut -f8 <<< "$row")
 check "PrestaShop 1.7: la contraseña «local» vale (password_verify)" '[ "$(php -r "echo password_verify(\"local\", \$argv[1]) ? 1 : 0;" "$hash")" = 1 ]'
 check "PrestaShop 1.7: en las dos tiendas" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee_shop s JOIN ps_employee e USING (id_employee) WHERE e.email = '"'"'local@local.test'"'"'")" = 2 ]'
 check "PrestaShop 1.7: los de verdad no se tocan" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee WHERE passwd = '"'"'\$2y\$10\$hashdeverdad'"'"'")" = 2 ]'
+
+# (1.57.18) A donde va el acceso del boton Panel: el back office salta al dominio de la tienda
+# (shop_url) al entrar, y con SSL activado sus cookies son secure
+if grep -q '^function test_admin_local_domain() {' "$SRC"; then
+    m ps17 -e "CREATE TABLE ps_configuration (id_configuration INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, id_shop INT, name VARCHAR(254), value TEXT);
+ALTER TABLE ps_shop_url ADD domain_ssl VARCHAR(150), ADD physical_uri VARCHAR(64) DEFAULT '/', ADD main TINYINT DEFAULT 1;
+UPDATE ps_shop_url SET domain_ssl = 'Tienda.com';
+INSERT INTO ps_configuration (name, value) VALUES ('PS_SHOP_DEFAULT', '1'), ('PS_SSL_ENABLED', '0');"
+    check "panel: tienda sin SSL ni dominio falseado, nada mas (web.local)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local" ]'
+    m ps17 -e "UPDATE ps_configuration SET value = '1' WHERE name = 'PS_SSL_ENABLED'"
+    check "panel: con SSL activado, por https" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https" ]'
+    printf '127.0.0.1\tlocalhost\n# 127.0.0.1 tienda.com\n1.2.3.4 tienda.com\n' > "$HOSTS_FILE"
+    check "panel: con el dominio en /etc/hosts pero no a este equipo (o comentado), igual" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https" ]'
+    printf '127.0.0.1\tlocalhost\n127.0.0.1 www.tienda.com TIENDA.com # lvm\n' > "$HOSTS_FILE"
+    check "panel: con el dominio falseado a este equipo, la direccion de la tienda (https)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|https://tienda.com" ]'
+    m ps17 -e "UPDATE ps_configuration SET value = '0' WHERE name = 'PS_SSL_ENABLED'; UPDATE ps_shop_url SET physical_uri = '/es/'"
+    check "panel: sin SSL, por http y con su carpeta (physical_uri)" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local|http://tienda.com/es" ]'
+    m ps17 -e "UPDATE ps_shop_url SET domain = 'tienda.com\" onload=x', physical_uri = '/'"
+    check "panel: un dominio raro en la base no sale" '[ "$(test_admin ps17)" = "A|ps|local@local.test|local" ]'
+    m wp1 -e "INSERT INTO xy_options (option_name, option_value) VALUES ('siteurl', 'HTTPS://blog.es')"
+    check "panel: WordPress con su direccion en https, por https" '[ "$(test_admin wp1)" = "A|wp|local@local.test|local|https" ]'
+    m wp1 -e "UPDATE xy_options SET option_value = 'http://blog.es' WHERE option_name = 'siteurl'"
+    mkdir -p "$MDB/htdocs/blog" && printf "<?php\ndefine( 'FORCE_SSL_ADMIN', true );\n" > "$MDB/htdocs/blog/wp-config.php"
+    check "panel: WordPress con FORCE_SSL_ADMIN, por https; sin el, nada mas" '[ "$(test_admin wp1 blog)" = "A|wp|local@local.test|local|https" ] && [ "$(test_admin wp1)" = "A|wp|local@local.test|local" ]'
+    m wp1 -e "DELETE FROM xy_options WHERE option_name = 'siteurl'"
+    m ps17 -e "DROP TABLE ps_configuration; ALTER TABLE ps_shop_url DROP domain_ssl, DROP physical_uri, DROP main; UPDATE ps_shop_url SET domain = 'tienda.com'"
+    : > "$HOSTS_FILE"
+fi
 test_admin ps17 > /dev/null
 check "PrestaShop 1.7: otra vez, sin duplicar" '[ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee WHERE email = '"'"'local@local.test'"'"'")" = 1 ]'
 
@@ -100,6 +133,71 @@ check "nombre de base no valido: no se hace nada" '[ $rc -ne 0 ] && [ "$(m -e "S
 m -e "CREATE DATABASE wpv; USE wpv; CREATE TABLE wp_options (a INT); CREATE TABLE real_users (ID INT); CREATE VIEW wp_users AS SELECT * FROM real_users; CREATE TABLE wp_usermeta (a INT)"
 test_admin wpv > /dev/null; rc=$?
 check "WordPress con wp_users vista: no se toca" '[ $rc -eq 1 ]'
+# --- 1.57.15: un administrador de pruebas propio (Configuracion > Administrador de pruebas; nexum
+# admin-pruebas). Sin el ajuste, el de siempre; con el, ese, solo en lo que lleva la marca de Nexum
+if declare -F test_admin_config > /dev/null; then
+    F=$LOG_DIR/admin-pruebas
+    out=$(test_admin_config)
+    check "sin ajuste: local@local.test con la contraseña local" 'grep -q "local@local.test" <<< "$out" && [ ! -e "$F" ] && test_admin_load && [ "$TEST_ADMIN_USER|$TEST_ADMIN_PASS|$TEST_ADMIN_SET" = "local@local.test|local|0" ]'
+    # Lo que no vale: no se guarda nada
+    bad_in=0
+    for args in "ana'@local.test|Prueba.2026" "ana@local.test' OR 1=1 -- x|Prueba.2026" 'ana@local.test`id`|Prueba.2026' \
+            "añá@local.test|Prueba.2026" "ana@local|Prueba.2026" "$(printf 'a%.0s' {1..60})@local.test|Prueba.2026" \
+            "ana@local.test|abc" "ana@local.test|Prue ba" "ana@local.test|x'); DROP DATABASE wp1; --" 'ana@local.test|pa$$word' \
+            'ana@local.test|clave\x' 'ana@local.test|cla"ve' "ana@local.test|$(printf 'b%.0s' {1..65})" "--raro|Prueba.2026"; do
+        test_admin_config "${args%%|*}" "${args#*|}" > /dev/null 2>&1 && bad_in=1
+        [ -e "$F" ] && bad_in=1
+    done
+    check "correo o contraseña que no valen (comillas, inyección SQL, tildes, espacios, \$, de más): no se guarda" '[ $bad_in -eq 0 ] && [ "$(m -e "SHOW DATABASES LIKE '"'"'wp1'"'"'")" = wp1 ]'
+    out=$(DRY=1 test_admin_config ana@local.test Prueba.2026)
+    check "--simular: lo dice y no escribe nada" 'grep -q "simulacion" <<< "$out" && [ ! -e "$F" ]'
+    # Se guarda con la contraseña por la entrada (como la ventana): solo tuyo y sin decir la contraseña
+    out=$(printf 'Prueba.2026\n' | test_admin_config ana@local.test -)
+    check "se guarda: fichero 600, con el correo y la huella bcrypt" '[ "$(stat -c %a "$F")" = 600 ] && grep -qx "correo=ana@local.test" "$F" && [ "$(php -r "echo password_verify(\"Prueba.2026\", \$argv[1]) ? 1 : 0;" "$(sed -n "s/^bcrypt=//p" "$F")")" = 1 ]'
+    check "la salida al guardar y al verlo no lleva la contraseña (con --clave, si)" '! grep -q "Prueba.2026" <<< "$out$(test_admin_config)$(test_admin_note)" && test_admin_config --clave | grep -q "Prueba.2026"'
+    mv "$F" "$MDB/guardado"; ln -s "$MDB/guardado" "$F"
+    test_admin_load
+    check "el fichero del ajuste, si es un enlace, no se lee" '[ "$TEST_ADMIN_USER" = local@local.test ]'
+    rm -f "$F"; mv "$MDB/guardado" "$F"
+    # (en WordPress, ahora el de antes, local@local.test, sigue ahi: las BBDD ya cargadas no cambian solas)
+    out=$(test_admin wp1)
+    check "WordPress con el ajuste: A|wp con el correo y la contraseña propios" '[ "$out" = "A|wp|ana@local.test|Prueba.2026" ]'
+    check "WordPress: ana@local.test con la marca, md5 de su contraseña y rol de administrador" '[ "$(m wp1 -e "SELECT CONCAT(user_pass, user_nicename, user_email) FROM xy_users WHERE user_login = '"'"'ana@local.test'"'"'")" = "$(printf Prueba.2026 | md5sum | cut -d" " -f1)local-pruebasana@local.test" ] && [ "$(m wp1 -e "SELECT COUNT(*) FROM xy_usermeta u JOIN xy_users s ON s.ID = u.user_id WHERE s.user_login = '"'"'ana@local.test'"'"' AND u.meta_key = '"'"'xy_capabilities'"'"' AND u.meta_value LIKE '"'"'%administrator%'"'"'")" = 1 ]'
+    check "WordPress: el jefe de verdad y el local@local.test de antes, sin tocar" '[ "$(m wp1 -e "SELECT CONCAT(user_pass, user_email) FROM xy_users WHERE user_login = '"'"'jefe'"'"'")" = "\$P\$Brealjefe@cliente.es" ] && [ "$(m wp1 -e "SELECT COUNT(*) FROM xy_users WHERE user_login = '"'"'local@local.test'"'"'")" = 1 ]'
+    out=$(test_admin ps17)
+    row=$(m ps17 -e "SELECT id_profile, active, firstname, lastname, passwd FROM ps_employee WHERE email = 'ana@local.test'")
+    check "PrestaShop 1.7 con el ajuste: SuperAdmin ana@local.test con la marca y su contraseña (password_verify), en las dos tiendas" '[ "$out" = "A|ps|ana@local.test|Prueba.2026" ] && [ "$(cut -f1-4 <<< "$row" | tr "\t" " ")" = "1 1 Pruebas Local" ] && [ "$(php -r "echo password_verify(\"Prueba.2026\", \$argv[1]) ? 1 : 0;" "$(cut -f5 <<< "$row")")" = 1 ] && [ "$(m ps17 -e "SELECT COUNT(*) FROM ps_employee_shop s JOIN ps_employee e USING (id_employee) WHERE e.email = '"'"'ana@local.test'"'"'")" = 2 ]'
+    test_admin ps16 > /dev/null
+    check "PrestaShop 1.6 con el ajuste: md5 de _COOKIE_KEY_ y su contraseña" '[ "$(m ps16 -e "SELECT passwd FROM ps_employee WHERE email = '"'"'ana@local.test'"'"'")" = "$(printf K3yDePrueba1234Prueba.2026 | md5sum | cut -d" " -f1)" ]'
+    # Un usuario de verdad con ese correo (sin la marca): no se toca y se avisa
+    before_wp=$(m wp1 -e "CHECKSUM TABLE xy_users, xy_usermeta") before_ps=$(m ps17 -e "CHECKSUM TABLE ps_employee, ps_employee_shop")
+    test_admin_config jefe@cliente.es 'Otra.Clave1' > /dev/null
+    out=$(test_admin wp1); rc=$?
+    check "WordPress con un usuario de verdad con ese correo: no se cambia nada y se avisa" '[ $rc -ne 0 ] && ! grep -q "^A|" <<< "$out" && grep -q "usuario de verdad" <<< "$out" && [ "$(m wp1 -e "CHECKSUM TABLE xy_users, xy_usermeta")" = "$before_wp" ]'
+    test_admin_config jefe@tienda.com 'Otra.Clave1' > /dev/null
+    out=$(test_admin ps17); rc=$?
+    check "PrestaShop con un empleado de verdad con ese correo: no se cambia nada y se avisa" '[ $rc -ne 0 ] && grep -q "empleado de verdad" <<< "$out" && [ "$(m ps17 -e "CHECKSUM TABLE ps_employee, ps_employee_shop")" = "$before_ps" ]'
+    check "historial: los correos de antes se quedan en el fichero" 'grep -qx "antes=ana@local.test" "$F" && grep -qx "antes=jefe@cliente.es" "$F" && grep -qx "correo=jefe@tienda.com" "$F"'
+    out=$(test_admin_config --quitar)
+    test_admin_load
+    check "--quitar: vuelve a local@local.test / local y guarda los de antes" '[ "$TEST_ADMIN_USER|$TEST_ADMIN_PASS" = "local@local.test|local" ] && ! grep -q "^correo=" "$F" && grep -qx "antes=jefe@tienda.com" "$F" && [ ${#TEST_ADMIN_MAILS[@]} -eq 4 ]'
+    # Un fichero cambiado a mano con algo que no vale: no cuenta
+    printf "correo=x'@local.test\nclave=Prueba.2026\nantes=y@local.test' OR '1'='1\nantes=bea@local.test\n" > "$F"
+    test_admin_load
+    check "fichero a mano con comillas: no cuenta (local@local.test y solo los correos que valen)" '[ "$TEST_ADMIN_USER" = local@local.test ] && [ "${TEST_ADMIN_MAILS[*]}" = "local@local.test bea@local.test" ]'
+    rm -f "$F"
+    # La ventana guarda con la contraseña por la entrada: no va en la orden (ni en ps, ni en «Orden:» del
+    # registro de tareas, que solo lleva las tareas) y en simulacion no guarda nada
+    if grep -q "^let SCRIPT" "$SRC"; then
+        check "ventana: Configuración › Administrador de pruebas, con la contraseña por la entrada" 'grep -qF "(\"admin\", \"Administrador de pruebas\", " "$SRC" && grep -qF "runQuick([\"admin-pruebas\", mail.trimmingCharacters(in: .whitespaces), \"-\"], input: password + \"\\n\")" "$SRC" && grep -qF "SecureField(\"Contraseña\", text: \$password)" "$SRC"'
+        check "ventana: ninguna tarea (registro de tareas) con admin-pruebas" '! grep -qE "runTask\(.*\"admin-pruebas\"" "$SRC"'
+    else
+        check "ventana: Configuración › Administrador de pruebas, con la contraseña por la entrada" 'grep -qF "(\"Administrador de pruebas\", \"Administrador de pruebas\", " "$SRC" && grep -qF "run_quick_input([\"admin-pruebas\", entry_mail.get_text().strip(), \"-\"], entry_pass.get_text() + \"\\n\", done)" "$SRC" && grep -qF "e.set_visibility(on)" "$SRC"'
+        check "ventana: ninguna tarea (registro de tareas) con admin-pruebas" '! grep -qE "run_task\(.*\"admin-pruebas\"" "$SRC"'
+    fi
+    check "ventana: en simulación no guarda (lo avisa)" '[ "$(grep -c "Simulación: no se guarda nada (el administrador de pruebas sigue igual)" "$SRC")" -ge 2 ]'
+    check "orden admin-pruebas, sin contraseña de administrador" 'grep -q "^    admin-pruebas) shift; test_admin_config \"\$@\" ;;" "$SRC" && grep -q "^        admin-pruebas) ;;" "$SRC"'
+fi
 check "el gestor lo llama al acabar de cargar un volcado" 'sed -n "/^function import_database() {/,/^}/p" "$SRC" | grep -q "admin=\$(test_admin \"\$db\" \"\$project\")"'
 check "orden usuario-pruebas" 'grep -q "^    usuario-pruebas) test_admin \"\$2\" \"\$3\" ;;" "$SRC"'
 exit $fail

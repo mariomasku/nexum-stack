@@ -203,8 +203,7 @@ class AppHosts:
                    "Espera a que acabe la tarea en marcha" if self.busy else
                    "https://%s → /opt/htdocs/%s" % (f["domain"].lower(), f["folder"]))
             row.subtitle.set_label(why)
-            btn.set_sensitive(bool(DOMAIN_RX.match(f["domain"])) and bool(f["folder"])
-                              and not self.busy)
+            busy_guard(btn, self.busy).set_sensitive(bool(DOMAIN_RX.match(f["domain"])) and bool(f["folder"]))
         self.newdom_update = update
         update()
         return box
@@ -328,8 +327,8 @@ class AppHosts:
                 "%s://%s" % ("https" if h["https"] else "http", h["name"])))
             row.add_suffix(b)
         if h["name"].lower().endswith(".local"):
-            b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                           tooltip_text="Imágenes de producción" + (": %s" % h["media"] if h.get("media") else ""))
+            b = busy_guard(Gtk.Button(valign=Gtk.Align.CENTER,
+                           tooltip_text="Imágenes de producción" + (": %s" % h["media"] if h.get("media") else "")), self.busy)
             b.add(icon("image-x-generic-symbolic"))
             b.connect("clicked", lambda *_: self.on_media_proxy(h))
             row.add_suffix(b)

@@ -59,7 +59,7 @@ class NvConfiguracion:
         on = not os.path.exists(os.path.join(LOG_DIR, "sin-barrera-entre-webs"))
         row = ActionRow("Barrera entre webs", "Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos"
                         if on else "Apagada: enciéndela cuando acabes de probar los pagos")
-        sw = Gtk.Switch(active=on, valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        sw = busy_guard(Gtk.Switch(active=on, valign=Gtk.Align.CENTER), self.busy)
         sw.connect("notify::active", self.on_cross_site)
         row.add_suffix(sw)
         lb.add(row)
@@ -82,6 +82,7 @@ class NvConfiguracion:
         self.nv_docker_tools()
         self.nv_tunnel_tools()
         self.nv_mail_tools()
+        self.nv_admin_tools()
         self.nv_github_tools()
         self.nv_look_tools()
         self.nv_clean_tools()
@@ -96,6 +97,7 @@ class NvConfiguracion:
                       ("Configuración", "Vhosts y hosts", "network-workgroup-symbolic"),
                       ("Seguridad entre webs", "Seguridad entre webs", "security-high-symbolic"),
                       ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
+                      ("Administrador de pruebas", "Administrador de pruebas", "avatar-default-symbolic"),
                       ("Docker", "Docker", "logo:docker"),
                       ("Túnel de Cloudflare", "Túnel de Cloudflare", "network-transmit-receive-symbolic"),
                       ("GitHub (Repositorios)", "GitHub", "logo:github"),
@@ -247,6 +249,129 @@ class NvConfiguracion:
             tl.pack_start(c, False, False, 0)
             c.show_all()
 
+    # Administrador de pruebas (nexum admin-pruebas): la cuenta con la que el botón Panel entra en WordPress y
+    # PrestaShop. La ventana lee el ajuste (test_admin_conf) y lo guarda con la orden, con la contraseña por la
+    # entrada: así no sale en la línea de órdenes, ni en ps ni en el registro de tareas
+    def nv_admin_who(self):
+        """El administrador de pruebas de ahora, para los textos: su correo (y la contraseña, si es local)."""
+        mail, _password, own = test_admin_conf()
+        return "%s, con tu contraseña de Configuración" % mail if own else "local@local.test, contraseña local"
+
+    def nv_admin_tools(self):
+        """Configuración, Administrador de pruebas: su correo (que es también el usuario) y su contraseña, con un
+        ojo para verla, «Guardar» y «Volver a local@local.test»."""
+        mail, password, own = test_admin_conf()
+        box, lb = tile_group("Administrador de pruebas",
+                             "La cuenta con la que el botón «Panel» entra en el panel de WordPress y en el de "
+                             "PrestaShop de tus proyectos. Nexum la crea, con rol de administrador, al cargar una "
+                             "BBDD, y nunca va en las copias que descargas ni en las que exportas.")
+        self.tools_box.pack_start(box, False, False, 0)
+        now = ActionRow("Ahora", "%s (el tuyo)" % mail if own else
+                        "local@local.test con la contraseña local (el de siempre: no has puesto otro)")
+        now.add_prefix(symbol("avatar-default-symbolic", 18))
+        lb.add(now)
+        row = ActionRow("Correo (usuario)", "Mejor uno que no sea de verdad, como ana@local.test")
+        entry_mail = Gtk.Entry(text=mail if own else "", width_chars=26, placeholder_text="ana@local.test",
+                               input_purpose=Gtk.InputPurpose.EMAIL)
+        row.add_suffix(entry_mail)
+        lb.add(row)
+        row = ActionRow("Contraseña", "De 4 a 64 letras sin tildes, números o %s" % TEST_ADMIN_PASS_CHARS)
+        entry_pass = Gtk.Entry(text=password if own else "", width_chars=26, visibility=False,
+                               input_purpose=Gtk.InputPurpose.PASSWORD, placeholder_text="Contraseña")
+        entry_pass.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "view-reveal-symbolic")
+        entry_pass.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY, "Mostrar la contraseña")
+
+        def peek(e, _pos, _ev):
+            on = not e.get_visibility()
+            e.set_visibility(on)
+            e.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY,
+                                      "view-conceal-symbolic" if on else "view-reveal-symbolic")
+            e.set_icon_tooltip_text(Gtk.EntryIconPosition.SECONDARY,
+                                    "Ocultar la contraseña" if on else "Mostrar la contraseña")
+        entry_pass.connect("icon-press", peek)
+        row.add_suffix(entry_pass)
+        lb.add(row)
+        row = ActionRow("Guardar los cambios", "Sin espacios, comillas, \\, $ ni `. Las BBDD ya cargadas no cambian: se pone al "
+                        "cargar una BBDD o al pulsar «Panel» en el proyecto")
+        row.subtitle.set_ellipsize(0)
+        row.subtitle.set_line_wrap(True)
+        save = css(Gtk.Button(label="Guardar", sensitive=False), "verde")
+        reset = Gtk.Button(label="Volver a local@local.test", sensitive=own,
+                           tooltip_text="Vuelve a local@local.test con la contraseña local (los correos de antes "
+                                        "tampoco van en las copias)")
+        row.add_suffix(reset)
+        row.add_suffix(save)
+        lb.add(row)
+        warn = label("", "nv-chico", "nv-correo-aviso", wrap=True, margin_top=6)
+        warn.set_no_show_all(True)
+        box.pack_start(warn, False, False, 0)
+        notes = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, margin_top=14), "caja")
+        for ic, title, text in (
+                ("security-high-symbolic", "Una cuenta de verdad no se toca",
+                 "Si una BBDD ya tiene un usuario de verdad con ese correo (sin la marca de Nexum), no se cambia ni "
+                 "su contraseña ni su rol: ahí no se crea el de pruebas y se avisa. Elige otro correo."),
+                ("document-save-symbolic", "Fuera de las copias",
+                 "Al descargar una BBDD o exportar un proyecto se quita el de ahora, local@local.test y los que "
+                 "hayas puesto antes, solo si llevan la marca de Nexum.")):
+            r = ActionRow(title, text)
+            r.add_prefix(symbol(ic, 18))
+            r.subtitle.set_ellipsize(0)
+            r.subtitle.set_line_wrap(True)
+            r.subtitle.set_xalign(0)
+            notes.add(r)
+        box.pack_start(notes, False, False, 0)
+
+        def problem():
+            m, pw = entry_mail.get_text().strip(), entry_pass.get_text()
+            if not m and not pw:
+                return "Escribe el correo y la contraseña"
+            if not test_admin_mail_ok(m):
+                return "El correo no vale: solo letras sin tildes, números y . _ % + - con forma de correo " \
+                       "(ana@local.test), hasta 60 caracteres"
+            if m.lower() == "local@local.test":
+                return "local@local.test es el de siempre: para volver a él, «Volver a local@local.test»"
+            if not test_admin_pass_ok(pw):
+                return "La contraseña no vale: de 4 a 64 letras sin tildes, números o " + TEST_ADMIN_PASS_CHARS
+            return ""
+
+        def changed(*_):
+            m, pw = entry_mail.get_text().strip(), entry_pass.get_text()
+            bad = problem() if (m or pw) else ""
+            warn.set_label(bad)
+            warn.set_visible(bool(bad) and bool(m and pw))
+            busy_guard(save, self.busy).set_sensitive(not bad and (m, pw) != ((mail, password) if own else ("", "")))
+        entry_mail.connect("changed", changed)
+        entry_pass.connect("changed", changed)
+
+        def done(rc, out):
+            lines = [l for l in out.strip().splitlines() if l.strip() and not l.startswith("  [")]
+            if rc != 0:
+                warn.set_label(lines[-1] if lines else "No se ha podido guardar")
+                warn.set_visible(True)
+                return False
+            self.toast(lines[0] if lines else "Guardado")
+            self.build_tools()
+            return False
+
+        def on_save(*_):
+            if problem():
+                return
+            if SIMULATE:
+                self.toast("Simulación: no se guarda nada (el administrador de pruebas sigue igual)")
+                return
+            run_quick_input(["admin-pruebas", entry_mail.get_text().strip(), "-"], entry_pass.get_text() + "\n", done)
+
+        def on_reset(*_):
+            if SIMULATE:
+                self.toast("Simulación: no se guarda nada (el administrador de pruebas sigue igual)")
+                return
+            run_quick(["admin-pruebas", "--quitar"], done)
+        save.connect("clicked", on_save)
+        reset.connect("clicked", on_reset)
+        entry_mail.connect("activate", lambda *_: save.get_sensitive() and on_save())
+        entry_pass.connect("activate", lambda *_: save.get_sensitive() and on_save())
+        box.show_all()
+
     # Limpieza (nexum gui-limpieza y limpiar <clave>...): cada cosa, con su título, qué es, dónde está, para qué
     # servía y qué pasa si se limpia, lo que se hace (en la confirmación) y si va marcada de partida. Nada de
     # esto lo necesita un proyecto para funcionar
@@ -333,7 +458,7 @@ class NvConfiguracion:
 
         def update():
             keys = picked()
-            btn.set_sensitive(bool(keys) and not self.busy)
+            busy_guard(btn, self.busy).set_sensitive(bool(keys))
             if sizes:
                 all_b = sum(b for b, n in sizes.values() if n)
                 sel = sum(sizes[k][0] for k in keys)
@@ -370,7 +495,7 @@ class NvConfiguracion:
             for key, (size, chk) in rows.items():
                 b, n = sizes.get(key, (0, 0))
                 size.set_label("%s · %s" % (fmt_size(b), plural(n, "fichero", "ficheros")) if n else "Vacío")
-                chk.set_sensitive(n > 0 and not self.busy)
+                busy_guard(chk, self.busy).set_sensitive(n > 0)
             if not sizes:
                 total.subtitle.set_label("No se ha podido medir: %s" % (out.strip().splitlines() or ["sin respuesta"])[-1])
             update()
@@ -529,6 +654,7 @@ class NvConfiguracion:
             message(self.win, "No se ha podido leer el registro de la tarea", path, Gtk.MessageType.ERROR)
             return
         head, text = got
+        shown = {"text": text}
         dlg = Gtk.Dialog(title=head.get("Tarea", "Tarea"), transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(980, 640)
         hb = dlg.get_header_bar()
@@ -536,7 +662,7 @@ class NvConfiguracion:
         copy = Gtk.Button(label="Copiar")
 
         def on_copy(*_):
-            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(text, -1)
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(shown["text"], -1)
             copy.set_label("Copiado")
             GLib.timeout_add(2000, lambda: copy.set_label("Copiar") and False)
         copy.connect("clicked", on_copy)
@@ -550,6 +676,27 @@ class NvConfiguracion:
         sw = css(Gtk.ScrolledWindow(vexpand=True), "nv-consola-marco")
         sw.add(view)
         dlg.get_content_area().add(sw)
+
+        # Una tarea en marcha va guardando su salida: se vuelve a leer cada pocos segundos (abajo del
+        # todo si se estaba viendo el final) hasta que acaba o se cierra esta ventana
+        def refresh():
+            if not dlg.get_visible():
+                return False
+            got = task_log_read(path)
+            if got is None:
+                return False
+            head, text = got
+            hb.set_subtitle("%s  ·  %s" % (head.get("Fecha", ""), head.get("Resultado", "")))
+            if text != shown["text"]:
+                adj = sw.get_vadjustment()
+                at_end = adj.get_value() >= adj.get_upper() - adj.get_page_size() - 40
+                shown["text"] = text
+                view.get_buffer().set_text(text)
+                if at_end:
+                    GLib.idle_add(lambda: adj.set_value(adj.get_upper() - adj.get_page_size()) and False)
+            return head.get("Resultado", "").startswith("En marcha")
+        if head.get("Resultado", "").startswith("En marcha"):
+            GLib.timeout_add_seconds(TASK_LOG_LIVE, refresh)
         dlg.show_all()
         run_dialog(dlg)
         dlg.destroy()
@@ -609,12 +756,11 @@ class NvConfiguracion:
         row.subtitle.set_label(text)
         for ch in row.suffix.get_children():
             row.suffix.remove(ch)
-        b = Gtk.Button(label="Buscar de nuevo", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(label="Buscar de nuevo", valign=Gtk.Align.CENTER), self.busy)
         b.connect("clicked", lambda *_: (setattr(self, "components", None), self.build_tools()))
         row.add_suffix(b)
         if res["items"]:
-            b = css(Gtk.Button(label="Actualizar todo (%d)" % len(res["items"]), valign=Gtk.Align.CENTER,
-                               sensitive=not self.busy), "verde")
+            b = css(busy_guard(Gtk.Button(label="Actualizar todo (%d)" % len(res["items"]), valign=Gtk.Align.CENTER), self.busy), "verde")
             b.connect("clicked", lambda *_: self.nv_components_update(res))
             row.add_suffix(b)
         row.suffix.show_all()
@@ -674,7 +820,7 @@ class NvConfiguracion:
             later.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), updates_ignore(res["items"]),
                                                  self.nv_warn_refresh()))
             row.add_suffix(later)
-            go = css(Gtk.Button(label="Actualizar todo", valign=Gtk.Align.CENTER, sensitive=not self.busy), "verde")
+            go = css(busy_guard(Gtk.Button(label="Actualizar todo", valign=Gtk.Align.CENTER), self.busy), "verde")
             go.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), self.nv_components_update(res)))
             row.add_suffix(go)
             lb.add(row)

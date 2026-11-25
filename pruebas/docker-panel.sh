@@ -32,11 +32,14 @@ extract "$SRC" docker_test_admin docker_valid_slug docker_conf db_valid_name db_
 [ $MAC -eq 1 ] && { extract "$SRC" docker_sql || exit 1; }
 # (desde la 1.40 del Mac, docker_test_admin mira si es del Apache de Docker)
 grep -q "^function docker_web_project() {" "$SRC" && { extract "$SRC" docker_web_project || exit 1; }
+# (1.57.15: el administrador de pruebas de Configuracion, en LOG_DIR/admin-pruebas)
+grep -q '^function test_admin_load() {' "$SRC" && { extract "$SRC" test_admin_load test_admin_mail_ok test_admin_pass_ok \
+    test_admin_md5 test_admin_bcrypt test_admin_note test_admin_write test_admin_config || exit 1; }
 eval "$(grep -m1 '^DB_SAFE=(' "$SRC")"
 eval "$(grep -m1 '^TEST_ADMIN_USER=' "$SRC")"; eval "$(grep -m1 '^TEST_ADMIN_PASS=' "$SRC")"
 eval "$(grep -m1 "^TEST_ADMIN_BCRYPT=" "$SRC")"
 DB_SYSTEM="information_schema|mysql|performance_schema|phpmyadmin|sys|test"
-DRY=0 HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos DOCKER_DIR=$MDB/docker DB_ROOT_CLIENT=()
+DRY=0 HTDOCS_DIR=$MDB/htdocs PROJECTS_FILE=$MDB/proyectos DOCKER_DIR=$MDB/docker DB_ROOT_CLIENT=() LOG_DIR=$MDB/nexum
 # (el cliente de LAMPP no existe: todo tiene que ir por el del contenedor)
 DB_CLIENT=$MDB/no-existe
 active_name() { :; }
@@ -76,6 +79,14 @@ check "la contraseña la toma el cliente de dentro (MYSQL_PWD de MARIADB_ROOT_PA
 ROOT_PASS=""
 check "otra vez: sin duplicarlo" '[ "$(m wp_web -e "SELECT COUNT(*) FROM wp_users WHERE user_login = '"'"'local@local.test'"'"'")" = 1 ]'
 check "DB_ROOT_CLIENT vuelve a estar vacio (solo dentro de docker_test_admin)" '[ ${#DB_ROOT_CLIENT[@]} -eq 0 ]'
+# (1.57.15) Con el administrador de pruebas de Configuracion: ese, tambien en la BBDD del contenedor
+if declare -F test_admin_config > /dev/null; then
+    printf 'Prueba.2026\n' | test_admin_config ana@local.test - > /dev/null
+    out=$(docker_test_admin web); rc=$?
+    check "con el ajuste: el Panel del contenedor entra con ana@local.test" '[ $rc -eq 0 ] && [ "$out" = "A|wp|ana@local.test|Prueba.2026" ] && [ "$(m wp_web -e "SELECT user_nicename FROM wp_users WHERE user_login = '"'"'ana@local.test'"'"'")" = local-pruebas ]'
+    check "la contraseña del administrador de pruebas no va en ninguna orden" '! grep -q "Prueba.2026" "$MDB/dk.log"'
+    test_admin_config --quitar > /dev/null
+fi
 
 # --- PrestaShop 1.7 (bcrypt)
 m -e "CREATE DATABASE ps_tienda; USE ps_tienda;

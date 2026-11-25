@@ -9,6 +9,10 @@ TASK_LOG_RX = re.compile(r"\d{8}-\d{6}-\d+\.txt")
 # (el registro de una tarea muy larga, como mucho esto: se guarda el final)
 TASK_LOG_MAX = 8 * 1024 * 1024
 TASK_LOG_SEP = "=" * 72
+# Resultado de una tarea que no ha acabado: su registro se va guardando mientras tanto (cada
+# TASK_LOG_LIVE segundos, con lo que lleva escrito la consola), para revisar qué está haciendo
+TASK_RUNNING = "En marcha (o la ventana se cerró antes de que acabara)"
+TASK_LOG_LIVE = 3
 # Nada de secretos en el registro: el valor de las variables de la tarea que lo parecen (MYSQL_PWD…), lo
 # que va detrás de «contraseña:», «token=»…, los tokens de GitHub y la contraseña de una dirección
 SECRET_NAME_RX = re.compile(r"(?i)pass|pwd|token|secret|clave|key|auth")
@@ -258,7 +262,7 @@ class Task:
         if task_log_dir():
             self.log_path = os.path.join(TASKS_DIR, "%s-%d%03d.txt" % (time.strftime("%Y%m%d-%H%M%S", time.localtime(
                 self.started)), os.getpid(), int(self.started * 1000) % 1000))
-            self.save_log("En marcha (o la ventana se cerró antes de que acabara)")
+            self.save_log(TASK_RUNNING)
             task_log_prune()
             if hasattr(self.app, "nv_tasks_fill"):
                 self.app.nv_tasks_fill()
@@ -417,7 +421,20 @@ class Task:
             self.pct.set_label("")
             self.info.set_label("Tiempo: %s  ·  sin porcentaje: esta tarea no dice cuánto le queda"
                                 % fmt_clock(time.time() - self.started))
+        self.save_live()
         return True
+
+    def save_live(self):
+        """Mientras la tarea sigue, su registro con lo que lleva la consola (cada TASK_LOG_LIVE s y
+        solo si ha cambiado): en Configuración se ve qué está haciendo sin esperar a que acabe."""
+        now = time.time()
+        if not self.log_path or now - getattr(self, "live_saved", 0) < TASK_LOG_LIVE:
+            return
+        self.live_saved = now
+        text = self.log_text()
+        if text and len(text) != getattr(self, "live_len", 0):
+            self.live_len = len(text)
+            self.save_log(TASK_RUNNING, text)
 
     def set_pct(self, pct, left):
         self.pct.set_label("%d %%" % pct + ("   ·   %s" % left if left else ""))
@@ -662,6 +679,6 @@ class Task:
                 "¿Cancelar la instalación?",
                 "Se pierde lo descargado y compilado. Las versiones instaladas no se tocan.",
                 "Cancelar la instalación")
-            if not confirm(self.dlg, title, text, ok, destructive=True):
+            if not confirm(self.dlg, title, text, ok, destructive=True, task=False):
                 return
         self.cancel()

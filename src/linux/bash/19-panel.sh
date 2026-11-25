@@ -1131,12 +1131,293 @@ QUE HACE
 
 VERSIONES
 
+1.57.37 (19 nov 2026)
+- Docker: «WP-CLI en los contenedores de PHP», en Configuración >
+  Docker, apagado de serie. Puesto, las imágenes de PHP traen wp (2.12.0,
+  comprobado por su huella) para trabajar con la base de datos de Docker
+  de cada proyecto: docker exec <contenedor> wp ... Como la imagen es la
+  de todos los proyectos de esa versión, vale para todos. Al cambiarlo
+  pregunta si rehacer ya las imágenes; en la terminal, nexum docker-wp-cli
+  si|no [--rehacer].
+
+1.57.36 (19 nov 2026)
+- Cristal: la cabecera del visor ya no es translúcida. Queda sólida,
+  azul oscuro con el tema oscuro y blanca con el claro; el fondo
+  difuminado sigue en el resto de la ventana.
+
+1.57.35 (19 nov 2026)
+- Apariencia: «Tamaño de la ventana», al 80, 90, 100 o 110 %, para ver
+  todo más pequeño (o más grande): letras, márgenes y botones, al
+  momento. Y «Cristal»: en Linux, paneles translúcidos sobre un fondo de
+  color difuminado; en el Mac, la ventana translúcida con el escritorio
+  desenfocado detrás. Apagado de serie. En Linux, el fondo se pinta una
+  sola vez, así que pintar la ventana con cristal cuesta unos 2,6 ms frente
+  a 0,9 ms sin él, y nada mientras no cambia.
+
+1.57.34 (19 nov 2026)
+- Con una tarea en marcha, los botones que lanzarían otra ya no se
+  apagan: se ven atenuados y se pueden pulsar, y en vez de hacer lo suyo
+  dicen qué tarea sigue en marcha. Vale para botones, interruptores y
+  desplegables de todas las páginas.
+
+1.57.33 (19 nov 2026)
+- Con una tarea en marcha (como actualizar los componentes), lo que
+  lanza otra avisa antes de preguntar nada: «Hay una tarea en marcha»,
+  con el nombre de la que sigue, y te la enseña para que esperes a que
+  acabe. En Linux, el aviso sale en la ventana que estás mirando (como
+  «Instalar versión», que tapaba el de abajo).
+
+1.57.32 (19 nov 2026)
+- Versiones de PHP: una versión con alguna pieza dañada ya no sale como
+  «Actualizado»: lo dice en rojo («MariaDB dañado»), y su menú ⋮ trae
+  «Reparar», que la rehace con sus bases de datos. En «Componentes…» la
+  pieza dañada sale en rojo. Hasta ahora solo se veía en Configuración,
+  Parches nuevos.
+
+1.57.31 (19 nov 2026)
+- Componentes mira también que cada pieza de una versión esté entera
+  (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin): que estén sus
+  programas y que respondan. Una dañada sale como «MariaDB dañado →
+  11.8.10» aunque ya esté en lo último de su rama, y al actualizar se
+  rehace la versión con sus bases de datos. La versión que se quedó sin
+  servidor de MariaDB salía en la lista, pero al actualizarla decía que
+  ya estaba al día y no la rehacía.
+- Si una versión no tiene servidor de MariaDB, al arrancarla lo dice al
+  momento: esperaba 60 segundos antes de rendirse.
+- Protegerlas: la ventana enseña sus pasos (proteger cada versión,
+  revisar los permisos de /opt/htdocs, dominios y vhosts, reiniciar la
+  activa) y avisa antes de revisar htdocs, que con muchos proyectos
+  tarda un minuto. Parecía congelada.
+
+1.57.30 (19 nov 2026)
+- Al instalar o actualizar una versión de PHP, el registro de la tarea
+  escribe cada 30 segundos por dónde va la compilación («[ 41%]
+  Compilando... sigue (2 min 30 s)»). Se quedaba minutos en la misma
+  línea y parecía congelado.
+
+1.57.29 (19 nov 2026)
+- Instalar o actualizar una versión de PHP con MariaDB 11.8.10 (o
+  12.3.4) ponía uno de sus plugins (TidesDB, de 1 MB) en lugar de
+  MariaDB: la versión se quedaba sin servidor de bases de datos
+  («MariaDB no ha arrancado») y sin su cliente (bin/mysql). Ahora se
+  descarga MariaDB, y si lo descargado no trae su servidor, se cancela
+  y se quita de la caché de descargas.
+- Una versión que se quedó así sale en Componentes con su MariaDB
+  pendiente: al actualizarla se rehace con la buena y conserva sus
+  bases de datos.
+
+1.57.28 (18 nov 2026)
+- Docker: las webs de Docker volvían a avisar de que la conexión no es
+  privada (y salían sin estilos) después de cargar cualquier proyecto.
+  Al cargarlo se quitaba del navegador el certificado de *.docker.test
+  y *.docker.local, como si sobrara. Ya no se toca.
+- Barrera entre webs: un proyecto y su copia en Docker se pueden pedir
+  entre sí tipografías, imágenes y CSS (las tipografías, con su
+  cabecera CORS). Elementor guarda en sus CSS la dirección de la web
+  que los generó: la copia de Docker salía sin sus tipografías ni sus
+  imágenes de fondo. Lo demás que llega de otra web sigue frenado.
+  Tras actualizar, la ventana pregunta si se aplica a las versiones.
+
+1.57.27 (18 nov 2026)
+- Repositorios: lo que escribías en el buscador se borraba a los pocos
+  segundos de entrar. La lista se enseña al momento con la de la última
+  vez y, al llegar la de GitHub, se rehacía la página entera. Ahora se
+  quedan lo escrito, el cursor y por dónde ibas en la lista.
+
+1.57.26 (18 nov 2026)
+- «Abrir web» abre el proyecto cargado por la misma dirección que su
+  WP_HOME: https://web.local o, con el dominio falseado, el dominio. Por
+  http://web.local, un .htaccess de producción («lo que llegue por http,
+  a https://midominio.es») se llevaba la visita a la web real. También
+  la bandeja, el panel de administración y Compartir.
+
+1.57.25 (18 nov 2026)
+- Con los botones del proyecto a su tamaño máximo, la ventana crecía a
+  lo ancho sin parar. Ahora los botones que no caben en una línea pasan
+  a la siguiente, y la ventana se queda en su ancho (también en el
+  visor de Docker).
+- phpMyAdmin, con su logotipo de siempre en color: las velas naranjas y
+  el casco azul (en morado no se distinguía).
+- Todos los logotipos con el mismo tamaño: cada uno ocupa lo mismo que
+  uno cuadrado que llena su recuadro (los apaisados, como el velero de
+  phpMyAdmin o la nube de Compartir, un poco más anchos). La bola del
+  mundo de «Abrir web» salía más pequeña que el círculo de WordPress.
+
+1.57.24 (18 nov 2026)
+- Terminal de abajo: botón «ping». Escribe ping -c 3 con el dominio del
+  proyecto cargado (uno detrás de otro, si tiene varios): con
+  127.0.0.1 está falseado y lleva a tu copia; con otra dirección, a la
+  web real. Sin dominio propio, lo dice y no escribe nada.
+- Lista de proyectos: al lado de «Cargar», al pasar el ratón (también
+  en la fila cargada), los accesos directos de cada proyecto con solo
+  el icono: Visual Studio Code (si está instalado), su repositorio (si
+  tiene remote origin) y phpMyAdmin con su base, si tiene una en la
+  versión de PHP activa.
+- Terminal de abajo: el botón «+» abre otra terminal en una pestaña
+  nueva, en la carpeta del proyecto cargado, sin cerrar las que ya
+  tenías (antes, «Terminal nueva» cerraba la de ahora). Con más de una
+  salen sus pestañas: se pasa de una a otra pulsándolas, y cada una se
+  cierra con su × o con exit.
+
+1.57.23 (18 nov 2026)
+- WordPress con su dominio: al dejar de falsear el dominio, la copia
+  local ya no lleva a la web de producción. Su wp-config.php lleva
+  WP_SITEURL y WP_HOME dos veces, con https://web.local y con el
+  dominio, y solo una pareja sin comentar: la del dominio mientras está
+  falseado y la de web.local cuando no. Las cambia el interruptor del
+  dominio, y también cargar un proyecto o crearlo con su dominio. Antes
+  se quedaba la del dominio aunque ya no estuviera falseado: al abrir
+  web.local se acababa en producción sin darse cuenta.
+- Dominio real que, sin falsear, seguía abriendo web.local en vez de
+  la web de producción: era una redirección (301) de la copia local
+  guardada en el navegador mientras estaba falseado. Ahora tu Apache
+  le dice al navegador que no guarde nada de lo que recibe con un
+  dominio real (Cache-Control: no-store; los .local, .test y localhost
+  siguen como antes). Al actualizar, la ventana pide aplicar la
+  seguridad nueva a las versiones de PHP: hazlo. Si el navegador ya
+  tenía guardada una de esas redirecciones, bórrala una vez: en Chrome,
+  Configuración, Privacidad, Borrar datos de navegación, «Archivos e
+  imágenes almacenados en caché».
+
+1.57.22 (17 nov 2026)
+- En Ubuntu 20.04, Chrome no abría web.local ni los proyectos con
+  https: «La conexión no es privada», net::ERR_CERT_INVALID, sin
+  dejar continuar. Su OpenSSL hacía los certificados con una extensión
+  repetida, y Chrome los rechaza. Ahora salen bien en todas las
+  versiones de Ubuntu. Los que ya estaban mal hechos los avisa
+  Versiones, «Certificados que Chrome rechaza»: «Arreglarlos» les hace
+  uno nuevo y el navegador lo acepta. También el de *.docker.local, que
+  se rehace solo al montar un proyecto en Docker, y el de localhost de
+  las versiones que se instalan desde ahora.
+
+1.57.21 (17 nov 2026)
+- Conectar GitHub con un token: si en el equipo falta secret-tool (el
+  paquete libsecret-tools, con el que se guarda el token en el
+  llavero), sale una ventana que lo explica, con «Instalarlo» (pide la
+  contraseña de administrador y luego pide el token) y «Copiar la
+  orden». Antes solo lo decía un aviso abajo que se iba enseguida.
+- Si GitHub no acepta el token o no se puede conectar, el motivo sale
+  en una ventana que se queda hasta que la cierras.
+- Descargar las imágenes que faltan (PrestaShop): de cada categoría
+  trae también su miniatura (img/c/<id>_thumb.jpg, la «imagen en
+  miniatura» del back office). Muchos temas y módulos miran si está en
+  la carpeta antes de pedirla y, sin ella, enseñaban la portada de la
+  categoría: en la home salía otra imagen que en producción.
+
+1.57.20 (17 nov 2026)
+- La ventana avisa si Apache sigue con la configuración de antes: si
+  se ha escrito su seguridad (por ejemplo, la barrera entre webs nueva)
+  y Apache no se ha recargado, seguía con la vieja en memoria sin que
+  nada lo dijera. Ahora lo mira en su registro y ofrece reiniciarlo
+  (también en Versiones; en el Mac, en los avisos).
+
+1.57.19 (17 nov 2026)
+- Al actualizar Nexum, la ventana pregunta una vez si se aplica ya la
+  seguridad nueva a las versiones de PHP (pide la contraseña). Antes
+  seguían con la configuración de Apache de la versión anterior hasta
+  pulsar «Protegerlas»: por eso, con la 1.57.18 instalada, la barrera
+  entre webs seguía cortando la entrada al panel.
+- La página de acceso del botón «Panel» lleva el logo de Nexum encima
+  del cuadro y el de WordPress o PrestaShop junto al título.
+
+1.57.18 (17 nov 2026)
+- Barrera entre webs: el botón «Panel» ya entra en el panel de
+  WordPress o de PrestaShop con la barrera encendida. Antes salía
+  «Otra web ha intentado mandar algo a esta» y había que apagarla. La
+  página de acceso del botón no es del proyecto, y la barrera la
+  cortaba. Ahora deja pasar ese envío del formulario de acceso y nada
+  más; sin la contraseña no entra nadie.
+- «Panel»: al pulsar Entrar ya no vuelve a pedir los datos en el
+  WordPress o en la tienda. La tienda con su dominio falseado salta a
+  ese dominio al entrar y la sesión se quedaba en web.local; y con SSL
+  activado (o un WordPress en https) la sesión solo se guarda por
+  https. Ahora el acceso va directamente a esa dirección.
+
+1.57.17 (17 nov 2026)
+- Imágenes de producción, también en las tiendas PrestaShop: las que
+  falten ya no hay que descargarlas antes. Cuando la página pide una
+  imagen que no está en tu carpeta (img en una tienda, wp-content/
+  uploads en WordPress), Nexum la trae en ese momento de su web real,
+  la enseña y la deja guardada en la carpeta: solo se trae lo que ves,
+  y la siguiente vez ya sale de tu equipo. Funciona aunque el dominio
+  real esté falseado (la dirección sale del DNS cifrado y se comprueba
+  su certificado). Se activa con el botón «Imágenes de producción» o
+  en el menú ⋮, y va con la versión activa. Los vídeos y los PDF de
+  WordPress siguen con la redirección, y en el Apache de Docker todo
+  sigue como antes. «Descargar de producción las imágenes que
+  faltan…» sigue estando para tener todas de una vez.
+
+1.57.16 (17 nov 2026)
+- Descargar de producción las imágenes que faltan (PrestaShop): ya no
+  se queda en «Descargadas 0 de …» sin avanzar. El dominio se resuelve
+  una sola vez con DNS cifrado y la descarga va a esa dirección, aunque
+  el dominio siga falseado en tu equipo (nunca a este mismo equipo), y
+  más rápido. Si el DNS cifrado no contesta, o solo da direcciones de
+  tu equipo o de una red privada, no descarga nada y lo dice. Si una
+  tanda no avanza, se para y lo dice en lugar de seguir. Además dice
+  cuántas lleva revisadas.
+
 1.57.15 (12 nov 2026)
 - Centro de aplicaciones de Ubuntu: Nexum Dev Stack sale con su
   logotipo, su nombre, su descripción y su versión (el paquete lleva su
   ficha AppStream). Esta versión se instala una vez a mano, en la
   terminal: sudo apt install ./nexum_1.57.15_all.deb. Las siguientes
   se vuelven a actualizar desde la ventana.
+- Registro de tareas: una tarea en marcha (actualizar componentes,
+  instalar una versión...) guarda lo que va diciendo su consola cada 3
+  segundos, y al abrirla con «Ver» se actualiza sola hasta que acaba.
+- Actualizar o rehacer una versión que estaba en marcha ya no se queda
+  esperando al final: PHP-FPM, al volver a arrancar, se quedaba con la
+  salida de la instalación. Tampoco salen los «E: No se ha podido
+  localizar el paquete desviado» (ahora sí se marcan las librerías que
+  usa cada versión para que apt autoremove no las quite) ni los avisos
+  de «getcwd».
+- Configuración, General, Programa: «Abrir al iniciar sesión». Nexum
+  Dev Stack se abre solo al entrar en tu sesión (con el icono junto al
+  reloj, se queda en él sin abrir la ventana). Va en
+  ~/.config/autostart/nexum.desktop, como «Aplicaciones al inicio».
+- Exportar proyecto: al pulsar «Exportar» se abre la ventana de
+  guardar del sistema, en Descargas y con el nombre de siempre, para
+  elegir dónde va el zip y cómo se llama. Si ya existe, pregunta si
+  reemplazarlo; con «Cancelar» no se crea nada. En la terminal:
+  exportar-proyecto --zip <fichero> [--sobrescribir].
+- Visor del proyecto (el cargado y los de Docker): botón «GitHub», que
+  abre su repositorio en el navegador (o «Repositorio», si es de otro
+  servidor). Solo sale si la carpeta tiene un remote origin. Se ordena o
+  se esconde como los demás, en Apariencia; si ya tenías tu orden,
+  sale detrás de VS Code.
+- Nuevo proyecto: en el paso de la BBDD, la casilla «Sin base de
+  datos». Marcada, el proyecto se clona y se carga sin ninguna BBDD
+  vinculada (sin nombre ni volcado). Si es un WordPress o una tienda
+  PrestaShop, el asistente avisa de que la web no funcionará hasta que
+  tenga su BBDD, sin impedirlo. En la terminal: montar-proyecto <url>
+  <carpeta> <version> --sin-bd.
+- Nuevo proyecto: al acabar de montarlo, «¿En qué rama empiezas a
+  trabajar?». Sale la rama en la que ha quedado el clon y las demás
+  del repositorio (locales y de origin): elige una o crea una nueva a
+  partir de la actual, y con «Abrir en Visual Studio Code» marcado
+  (si está instalado) se abre ya para trabajar. «Más tarde» lo deja en
+  la rama predeterminada. Con cambios sin commit no cambia de rama. En
+  la terminal: rama-proyecto <carpeta> <rama> [--nueva], sin
+  contraseña de administrador.
+- Configuración, apartado «Administrador de pruebas»: el correo (que
+  es también el usuario) y la contraseña de la cuenta con la que
+  «Panel» entra en WordPress y PrestaShop. Sin ponerlo, sigue siendo
+  local@local.test con la contraseña local. La contraseña se ve con el
+  ojo y no va a ningún registro. Si una BBDD ya tiene un usuario de
+  verdad con ese correo, no se toca (ni su contraseña ni su rol) y se
+  avisa. Las BBDD ya cargadas no cambian solas: el nuevo se crea al
+  cargar una BBDD o al pulsar «Panel». Las copias que se descargan o se
+  exportan no llevan ni el de ahora, ni local@local.test, ni los que
+  pusiste antes (solo los que tienen la marca de Nexum). En la
+  terminal: admin-pruebas [<correo> [-] | --clave | --quitar], sin
+  contraseña de administrador.
+- Compartir con el túnel: quien lo abre ve lo mismo que tú, también con
+  el dominio real falseado. Sus enlaces, imágenes y redirecciones (el
+  de la base de un WordPress o de una tienda y los de sus vhosts) ya no
+  llevan a la web real, sino al túnel.
+- Arrancar o reiniciar la versión activa: el aviso dice cuál es, con
+  su PHP.
 
 1.57.14 (11 nov 2026)
 - Compartir (túnel de Cloudflare): también 15 y 30 minutos. Se elige en

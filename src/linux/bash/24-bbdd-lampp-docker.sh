@@ -402,6 +402,8 @@ function tunnel_duration_text() {
     fi
 }
 
+#@incluir comun/tunel/tunnel_domains.sh
+
 function tunnel_open() {
     local url=$1 folder="" scheme host port ip clave minutos=120 admin=bloquear params dir="" domains n url_t
     shift
@@ -450,13 +452,10 @@ function tunnel_open() {
 
         return 1
     fi
-    # Los dominios de la web que se cambian por el del tunel: el suyo y, en una tienda, el de su BBDD
-    # (va con el dominio real falseado: la direccion local lleva a el)
-    domains=$host
-    if [ -n "$dir" ] && is_prestashop "$(basename "$dir")" 2> /dev/null; then
-        n=$(ps_domain "$(basename "$dir")" 2> /dev/null)
-        valid_domain "$n" && domains+=" $n"
-    fi
+    # Los dominios de la web que se cambian por el del tunel: el suyo y los falseados de su proyecto
+    domains=$(tunnel_domains "$host" "$dir" | tr '\n' ' ')
+    [ -n "$domains" ] || domains=$host
+    [ "${domains% }" != "$host" ] && echo "Quien lo abra vera tambien por el tunel (no la web real): ${domains#"$host" }"
     echo "Abriendo un tunel de Cloudflare a $scheme://$host$([[ "$port" =~ ^(80|443)$ ]] || echo ":$port")/"
     echo "(con contraseña, el admin $([ "$admin" == bloquear ] && echo bloqueado || echo "SIN bloquear") y se cierra solo en $(tunnel_duration_text "$minutos"))"
     if [ "$DRY" -eq 1 ]; then
@@ -564,8 +563,10 @@ function gui_up_to_date() {
     if [ -z "$full" ]; then
         echo "error"
     elif is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] \
-            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; }; then
-        # (7.4.33, 8.0.30 y 8.1.34 sin el parche de seguridad no estan al dia: se vuelven a compilar)
+            && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; } \
+            && [ -z "$(stack_broken "$dir")" ]; then
+        # (7.4.33, 8.0.30 y 8.1.34 sin el parche de seguridad no estan al dia: se vuelven a compilar. Tampoco
+        # una con alguna pieza dañada: stack_broken)
         echo "si|$full"
     else
         echo "no|$full"

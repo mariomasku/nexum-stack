@@ -725,15 +725,22 @@ function exposed_summary() {
 function secure_command() {
     local version=$1 dir changed=1 rc moved=0
     if [ "$version" == "--todas" ]; then
+        # (sus pasos, para la ventana: con muchos proyectos, revisar htdocs tarda un minuto sin decir nada)
+        task_plan "Protegiendo las versiones" "Proteger cada versión" "Revisar los permisos de $HTDOCS_DIR" "Dominios y vhosts" "Reiniciar la versión activa"
+        task_step
         # Las de antes de la 1.39.3, primero a /Library/Nexum (si no, no se pueden arrancar como root)
         stacks_migrate || moved=1
         secure_all
         rc=$?
         [ $moved -eq 1 ] && rc=2
+        task_step
+        echo "Revisando los permisos de todo $HTDOCS_DIR (con muchos proyectos, puede tardar un minuto)..."
         htdocs_close_world "$HTDOCS_DIR" --otros
+        task_step
         hosts_fake locales
         vhosts_root
         [ $rc -eq 2 ] && return 1
+        task_step
         dir=$(active_dir)
         if [ -n "$dir" ] && lampp_running && { [ $rc -eq 0 ] || [ -n "$(exposed_ports)" ]; }; then
             echo "Reiniciando $(basename "$dir") para aplicarlo..."

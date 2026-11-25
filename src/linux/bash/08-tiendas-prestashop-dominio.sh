@@ -41,9 +41,13 @@ function make_selfsigned() {
     else
         tmp=$(mktemp -d "${TMPDIR:-/tmp}/lvm-cert.XXXXXX") || return 1
     fi
-    if ! $s sh -c 'umask 077; exec openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=$2" \
-            -addext "basicConstraints=critical,CA:FALSE" -addext "subjectAltName=$3" \
-            -keyout "$1/key" -out "$1/crt"' sh "$tmp" "$cn" "DNS:$cn${alt:+,DNS:$alt}" > /dev/null 2>&1; then
+    # Las extensiones van en un fichero de configuracion propio y no con -addext: el OpenSSL 1.1.1 de
+    # Ubuntu 20.04 las añade a las de su openssl.cnf (v3_ca, CA:TRUE) y el certificado sale con dos
+    # basicConstraints, que Chrome rechaza (ERR_CERT_INVALID)
+    if ! $s sh -c 'umask 077
+            printf "[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = %s\n[ext]\nbasicConstraints = critical,CA:FALSE\nsubjectAltName = %s\n" "$2" "$3" > "$1/cnf" \
+                && exec openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -config "$1/cnf" \
+                -keyout "$1/key" -out "$1/crt"' sh "$tmp" "$cn" "DNS:$cn${alt:+,DNS:$alt}" > /dev/null 2>&1; then
         $s rm -rf "$tmp"
         echo "No se ha podido crear el certificado de $cn"
         return 1

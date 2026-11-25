@@ -54,7 +54,7 @@ class AppDocker:
                             "Se instala Docker de Ubuntu en modo sin root (el Docker del sistema, con "
                             "root, se deja apagado). Pide la contraseña de administrador.")
             row.add_prefix(label("●", "punto-gris"))
-            b = css(Gtk.Button(label="Instalar Docker", sensitive=not self.busy), "verde")
+            b = css(busy_guard(Gtk.Button(label="Instalar Docker"), self.busy), "verde")
             b.connect("clicked", lambda *_: self.run_task(
                 "Instalando Docker sin root", ["docker-instalar"], done_text="Docker sin root instalado",
                 on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
@@ -65,7 +65,7 @@ class AppDocker:
                             "Está instalado, pero su servicio (el de tu usuario) no está en marcha o no "
                             "se ha preparado. Prepararlo lo deja listo; no cambia los contenedores.")
             row.add_prefix(label("●", "punto-gris"))
-            b = css(Gtk.Button(label="Prepararlo", sensitive=not self.busy), "verde")
+            b = css(busy_guard(Gtk.Button(label="Prepararlo"), self.busy), "verde")
             b.connect("clicked", lambda *_: self.run_task(
                 "Preparando Docker sin root", ["docker-instalar"], progress=True, done_text="Docker sin root listo",
                 on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
@@ -82,7 +82,7 @@ class AppDocker:
                                 "no hace falta y quien lo use puede hacerse con el equipo. Apágalo salvo que lo uses "
                                 "fuera de este programa (pide la contraseña; tus proyectos no se tocan).")
                 row.add_prefix(css(icon("dialog-warning-symbolic"), "error"))
-                b = css(Gtk.Button(label="Apagarlo", sensitive=not self.busy), "verde")
+                b = css(busy_guard(Gtk.Button(label="Apagarlo"), self.busy), "verde")
                 b.connect("clicked", lambda *_: self.run_task(
                     "Apagando el Docker del sistema", ["docker-instalar"], done_text="Docker del sistema apagado",
                     auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
@@ -116,8 +116,8 @@ class AppDocker:
             dot.set_tooltip_text({"marcha": "En marcha", "parado": "Parado",
                                   "parcial": "Algún contenedor está parado"}.get(p["state"], p["state"]))
             row.add_prefix(dot)
-            php = Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                             tooltip_text="Cambiar la versión de PHP de %s" % p["folder"])
+            php = busy_guard(Gtk.Button(label="PHP %s" % p["php"], valign=Gtk.Align.CENTER,
+                             tooltip_text="Cambiar la versión de PHP de %s" % p["folder"]), self.busy)
             php.connect("clicked", lambda *_, p=p: self.on_docker_php(p))
             row.add_suffix(php)
             for ic, tip, fn, ok in [
@@ -139,8 +139,8 @@ class AppDocker:
                      True),
                     ("user-trash-symbolic", "Borrar el proyecto en Docker",
                      lambda *_, p=p: self.on_docker_delete(p), True)]:
-                b = Gtk.Button(tooltip_text=tip, relief=Gtk.ReliefStyle.NONE,
-                               sensitive=ok and not self.busy)
+                b = busy_guard(Gtk.Button(tooltip_text=tip, relief=Gtk.ReliefStyle.NONE,
+                               sensitive=ok), self.busy)
                 b.add(icon(ic))
                 b.connect("clicked", fn)
                 row.add_suffix(b)
@@ -276,7 +276,7 @@ class AppDocker:
             row = ActionRow("Dominio", "Con el Apache de Docker (sin LAMPP), por https: " + dom)
             lb.add(row)
         row = ActionRow("")
-        b = css(Gtk.Button(label="Crear en Docker", sensitive=bool(folders) and not self.busy), "verde")
+        b = css(busy_guard(Gtk.Button(label="Crear en Docker", sensitive=bool(folders)), self.busy), "verde")
         b.connect("clicked", lambda *_: self.on_docker_create())
         row.add_suffix(b)
         lb.add(row)

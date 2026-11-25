@@ -55,7 +55,7 @@ class NvBandeja:
         else:
             it["state"].set_label("● lampp-%s en marcha" % act if d.get("running") else "○ lampp-%s parada" % act)
             it["power"].set_label("Parar y desactivar" if d.get("running") else "Arrancar lampp-%s" % act)
-        it["power"].set_sensitive(bool(d) and not self.busy)
+        busy_guard(it["power"], self.busy).set_sensitive(bool(d))
         link = (self.projects or {}).get("link") or ""
         it["web"].set_label("Abrir %s" % (link or "web.local"))
         it["web"].set_sensitive(bool(link) and bool(d.get("running")))
@@ -79,9 +79,8 @@ class NvBandeja:
         self.nv_power()
 
     def nv_tray_web(self):
-        link = (self.projects or {}).get("link")
-        if link:
-            self.open_uri("http://%s/" % link)
+        if self.project_web():
+            self.open_uri(self.project_web())
 
     def nv_tray_quit(self):
         self.nv_tray_remove()
@@ -100,6 +99,23 @@ class NvBandeja:
             self.nv_tray_setup()
         else:
             self.nv_tray_remove()
+
+    def nv_autostart_toggle(self, sw, _p):
+        """Configuración, Programa: abrir al iniciar sesión (en simulación no se escribe nada)."""
+        on = sw.get_active()
+        if on == autostart_on():
+            return
+        if SIMULATE:
+            self.toast("[simulación] %s %s" % ("Se escribiría" if on else "Se quitaría", AUTOSTART_FILE))
+            return
+        err = autostart_set(on, SCRIPT)
+        if err:
+            message(self.win, "No se ha podido cambiar el inicio de sesión", err, Gtk.MessageType.ERROR)
+            sw.handler_block_by_func(self.nv_autostart_toggle)
+            sw.set_active(autostart_on())
+            sw.handler_unblock_by_func(self.nv_autostart_toggle)
+            return
+        self.toast("Se abrirá al iniciar sesión" if on else "Ya no se abre al iniciar sesión")
 
     def nv_exit(self):
         """Al cerrar la última ventana: se sale y, si algo lo retuviera (un bucle, un hilo, una orden que

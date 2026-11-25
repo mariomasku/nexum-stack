@@ -9,12 +9,14 @@ trap 'rm -rf "$W"' EXIT
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: General, el primero, con errores, tareas, parches y programa" 'grep -qF "(\"general\", \"General\", \"slider.horizontal.3\")," "$SRC" && ! grep -qF "(\"parches\", \"Parches nuevos\"" "$SRC" && ! grep -qF "(\"errores\", \"Registro de errores\"" "$SRC" && ! grep -qF "(\"programa\", \"Programa\"" "$SRC" && grep -qF "generalBlock(\"Registro de tareas\"" "$SRC" && grep -qF "@Published var toolsSection = \"general\"" "$SRC"'
     check "Mac: Ayuda en General lleva a su capítulo" 'grep -qF "let sections = [\"general\": \"general\"," "$SRC"'
-    check "Mac: cada tarea guarda su registro al empezar y al acabar (con la orden y sin secretos)" 'grep -qF "saveLog(\"En marcha" "$SRC" && grep -qF "saveLog(cancelled ? \"Cancelada\"" "$SRC" && grep -qF "taskLogWrite(path, taskLogRedact(all, env: env))" "$SRC" && grep -qF "O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, mode_t(0o600)" "$SRC"'
+    check "Mac: cada tarea guarda su registro al empezar y al acabar (con la orden y sin secretos)" 'grep -qF "saveLog(TASK_RUNNING)" "$SRC" && grep -qF "saveLog(cancelled ? \"Cancelada\"" "$SRC" && grep -qF "taskLogWrite(path, taskLogRedact(all, env: env))" "$SRC" && grep -qF "O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, mode_t(0o600)" "$SRC"'
+    check "Mac: con la tarea en marcha, su registro lleva la consola (cada 3 s) y «Ver» se actualiza solo" 'grep -qF "let TASK_LOG_LIVE: TimeInterval = 3" "$SRC" && grep -qF "saveLog(TASK_RUNNING, log)" "$SRC" && grep -qF "        saveLive()" "$SRC" && grep -qF "RunLoop.main.add(t, forMode: .common)" "$SRC" && grep -qF "NSPasteboard.general.setString(shown, forType: .string)" "$SRC"'
     check "Mac: se quedan las 200 últimas" 'grep -qx "let TASKS_KEEP = 200" "$SRC" && grep -qF "func taskLogPrune()" "$SRC"'
     exit $fail
 fi
 check "Linux: General, el primero, con errores, tareas, parches y programa" 'grep -qF "TOOLS_SECTIONS = [(\"General\", \"General\"," "$SRC" && grep -qF "GENERAL_PARTS = [\"Registro de errores\", \"Registro de tareas\", \"Parches nuevos\", \"Programa\"]" "$SRC" && ! grep -qF "(\"Parches nuevos\", \"Parches nuevos\"," "$SRC"'
 check "Linux: Ayuda en General lleva a su capítulo; un bloque de General abre General" 'grep -qF "HELP_SECTIONS = {\"General\": \"general\"," "$SRC" && grep -qF "part = section if section in self.GENERAL_PARTS else None" "$SRC"'
+check "Linux: con la tarea en marcha, su registro lleva la consola (cada 3 s) y «Ver» se actualiza solo" 'grep -qx "TASK_LOG_LIVE = 3" "$SRC" && grep -qF "self.save_log(TASK_RUNNING, text)" "$SRC" && grep -qF "        self.save_live()" "$SRC" && grep -qF "GLib.timeout_add_seconds(TASK_LOG_LIVE, refresh)" "$SRC"'
 check "Linux: Apariencia, los apartados del menú lateral en dos columnas" 'grep -qF "for chunk in (names[:half], names[half:]):" "$SRC"'
 
 # Las funciones del registro, de la ventana del script

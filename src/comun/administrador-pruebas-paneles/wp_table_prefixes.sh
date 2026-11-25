@@ -20,21 +20,154 @@ function db_login_ok() {
     db_base_table "$user" "$pass" "$db" "$table"
 }
 
-# URL con la que se ve un proyecto en este equipo: su dominio propio (pestaña Hosts) o el vhost de
-# los proyectos (el ServerName que tenga: web.local, localhost...), con https si tiene certificado
+# URL con la que se ve un proyecto en este equipo: la de su dominio propio mientras esta falseado (o
+# siempre, si es un .local, que no existe fuera) y, si no tiene o no lo esta, la del vhost de los
+# proyectos. Sin falsear, el dominio es el de produccion: la copia local nunca debe llevar alli
 function wp_local_url() {
-    local domain link
-    domain=$(custom_domain "$1")
-    if [ -n "$domain" ]; then
+    local domain
+    domain=$(wp_folder_domain "$1")
+    if [ -n "$domain" ] && domain_faked "$domain"; then
         echo "https://$domain"
 
         return 0
     fi
+    wp_link_url
+}
+
+# URL del vhost de los proyectos (el ServerName que tenga: web.local, localhost...), con https si
+# tiene certificado
+function wp_link_url() {
+    local link
     link=$(project_link)
     vhosts_info | awk -F'|' -v l="${link:-$PROJECT_VHOST}" '
         $2 == l && $5 != "" && https == "" { https = "https://" $3 ($1 == 443 ? "" : ":" $1) }
         $2 == l && $5 == "" && http == "" { http = "http://" $3 ($1 == 80 ? "" : ":" $1) }
         END { print (https != "" ? https : http != "" ? http : "https://" l) }'
+}
+
+# Dominio propio de una carpeta: el guardado en la pestaña Hosts o el de un vhost suyo (que no sea el
+# de los proyectos ni localhost). Nada si no tiene
+function wp_folder_domain() {
+    local d link
+    d=$(custom_domain "$1")
+    if [ -z "$d" ]; then
+        link=$(project_link)
+        d=$(vhosts_info | awk -F'|' -v f="$1" -v l="${link:-$PROJECT_VHOST}" -v p="$PROJECT_VHOST" '
+            $2 == f && f != "" && $3 != l && $3 != p && $3 != "localhost" && $3 !~ /^www\./ { print $3; exit }')
+    fi
+    [ -n "$d" ] && valid_domain "$d" && echo "$d"
+    return 0
+}
+
+# ¿Lleva el dominio a este equipo? (una linea sin comentar de HOSTS_FILE con 127.0.0.1 o ::1)
+function domain_faked() {
+    awk -v d="$1" 'BEGIN { d = tolower(d) } { sub(/#.*/, "") }
+        $1 == "127.0.0.1" || $1 == "::1" { for (i = 2; i <= NF; i++) if (tolower($i) == d) f = 1 }
+        END { exit !f }' "$HOSTS_FILE" 2> /dev/null
+}
+
+# wp-config.php de un WordPress con dominio propio: lleva las dos parejas de WP_SITEURL y WP_HOME,
+# la del vhost de los proyectos (web.local) y la del dominio, y solo una sin comentar: la del
+# dominio mientras esta falseado, y la de web.local cuando no (entonces el dominio es la web de
+# produccion, y la copia local no debe llevar a ella). Nada si no es un WordPress o no tiene dominio
+# propio. Con --callado, solo dice algo si cambia el fichero
+function wp_urls_sync() {
+    local folder=${1%/} file domain link_url on tmp out
+    valid_project "$folder" > /dev/null 2>&1 || return 0
+    file=$HTDOCS_DIR/$folder/wp-config.php
+    [ -f "$file" ] || return 0
+    domain=$(wp_folder_domain "$folder")
+    [ -n "$domain" ] || return 0
+    if ! project_path_ok "$HTDOCS_DIR/$folder" "$file"; then
+        echo "Aviso: wp-config.php de $folder es un enlace o esta fuera de la carpeta: no se toca"
+
+        return 0
+    fi
+    link_url=$(wp_link_url)
+    domain_faked "$domain" && on=domain || on=local
+    tmp=$(mktemp "${TMPDIR:-/tmp}/lvm-wpurl.XXXXXX") || return 1
+    out=$(python3 -I - "$file" "$tmp" "$link_url" "https://$domain" "$on" <<'EOF'
+import re, sys
+src, dst, local, dom, on = sys.argv[1:6]
+local, dom = local.rstrip("/"), dom.rstrip("/")
+# newline="": se conservan los finales de linea (CRLF en muchos wp-config.php)
+with open(src, encoding="utf-8", errors="surrogateescape", newline="") as f:
+    text = f.read()
+nl = "\r\n" if "\r\n" in text else "\n"
+q = r"""(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")"""
+rx = re.compile(r"""^[ \t]*(//+|#+)?[ \t]*define\(\s*['"](WP_SITEURL|WP_HOME)['"]\s*,\s*""" + q + r"""\s*\)\s*;?[ \t]*(?://[^\r\n]*)?$""")
+MARK = "// nexum: WP_SITEURL y WP_HOME"
+lines = text.splitlines(keepends=True)
+out, at = [], None
+for line in lines:
+    body = line.rstrip("\r\n")
+    m = rx.match(body)
+    drop = body.strip().startswith(MARK)
+    if m:
+        url = (m.group(3) if m.group(3) is not None else m.group(4)).rstrip("/")
+        # Las sin comentar se cambian siempre (solo puede ir una de cada); las comentadas, solo
+        # si son una de las dos parejas (las demas son del proyecto)
+        drop = not m.group(1) or url in (local, dom)
+    if drop:
+        if at is None:
+            at = len(out)
+        continue
+    out.append(line)
+def php(v):
+    return "'%s'" % v.replace("\\", "\\\\").replace("'", "\\'")
+def pair(url, active):
+    c = "" if active else "// "
+    return "".join("%sdefine('%s', %s);%s" % (c, n, php(url), nl) for n in ("WP_SITEURL", "WP_HOME"))
+block = ("%s: la pareja sin comentar es la del dominio mientras esta falseado en hosts (la web de "
+         "este equipo) y la de %s cuando no (el dominio es el de produccion). Lo cambia el interruptor "
+         "del dominio%s" % (MARK, local, nl)) + pair(local, on == "local") + pair(dom, on == "domain")
+text2 = "".join(out)
+if at is None:
+    # Delante de los datos de la base, como en la plantilla del equipo; si no, detras de <?php
+    m = re.search(r"""(?m)^[ \t]*(?://[^\r\n]*Database settings|define\(\s*['"]DB_NAME['"])""", text2)
+    if m:
+        text2 = text2[:m.start()] + block + nl + text2[m.start():]
+    else:
+        m = re.search(r"<\?php[^\n]*\n", text2)
+        p = m.end() if m else 0
+        text2 = text2[:p] + nl + block + text2[p:]
+else:
+    pos = sum(len(l) for l in out[:at])
+    text2 = text2[:pos] + block + text2[pos:]
+if text2 != text:
+    with open(dst, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+        f.write(text2)
+    print("cambia")
+EOF
+) || { rm -f "$tmp"; echo "No se ha podido preparar el wp-config.php de $folder"; return 1; }
+    if [ "$out" == cambia ]; then
+        if [ "$DRY" -eq 1 ]; then
+            echo "  [simulacion] wp-config.php de $folder: WP_SITEURL y WP_HOME en $([ $on == domain ] && echo "https://$domain" || echo "$link_url")"
+        elif project_write "$tmp" "$file"; then
+            if [ $on == domain ]; then
+                echo "WordPress de $folder: WP_SITEURL y WP_HOME en https://$domain (falseado: la web de este equipo)"
+            else
+                echo "WordPress de $folder: WP_SITEURL y WP_HOME en $link_url ($domain sin falsear es produccion)"
+            fi
+        else
+            echo "No se ha podido escribir $file"
+        fi
+    elif [ "$2" != --callado ]; then
+        echo "WordPress de $folder: WP_SITEURL y WP_HOME ya en $([ $on == domain ] && echo "https://$domain" || echo "$link_url")"
+    fi
+    rm -f "$tmp"
+    return 0
+}
+
+# Despues de cambiar hosts: el wp-config.php de cada WordPress con dominio propio, a la pareja que
+# toca (wp_urls_sync)
+function wp_urls_sync_all() {
+    local folder
+    { [ -f "$CUSTOM_DOMAINS_FILE" ] && cut -d= -f2- "$CUSTOM_DOMAINS_FILE"
+      vhosts_info | cut -d'|' -f2; } | sort -u | while IFS= read -r folder; do
+        [ -n "$folder" ] && [ -f "$HTDOCS_DIR/$folder/wp-config.php" ] && wp_urls_sync "$folder" --callado
+    done
+    return 0
 }
 
 # Si el wp-config.php define WP_SITEURL y WP_HOME con la direccion dada (fuera de comentarios)
@@ -104,6 +237,7 @@ function wp_config() {
     # Funciona en este equipo con la base asociada y con WP_SITEURL y WP_HOME en su direccion local
     # (sin ellas WordPress redirige al dominio de produccion): es la plantilla para la proxima vez
     url=$(wp_local_url "$folder")
+    [ "$DRY" -eq 1 ] || wp_urls_sync "$folder" --callado
     if [ "$name" == "$db" ] && grep -qxF -- "$prefix" <<< "$prefixes" && db_login_ok "$user" "$pass" "$host" "$db" "${prefix}options" \
         && wp_config_has_url "$file" "$url"; then
         if [ "$DRY" -eq 0 ] && ! cmp -s "$file" "$saved"; then
@@ -235,7 +369,9 @@ with open(dst, "w", encoding="utf-8", errors="surrogateescape", newline="") as f
     f.write(text)
 EOF
     project_write "$WP_CONFIG_DIR/.nuevo" "$file" || { rm -f "$WP_CONFIG_DIR/.nuevo"; echo "No se ha podido escribir $file"; return 1; }
-    mv "$WP_CONFIG_DIR/.nuevo" "$saved"
+    wp_urls_sync "$folder" --callado
+    { [ -f "$file" ] && cp "$file" "$saved"; } || mv "$WP_CONFIG_DIR/.nuevo" "$saved"
+    rm -f "$WP_CONFIG_DIR/.nuevo"
     echo "wp-config.php de $folder listo: base $db (plantilla guardada en $saved)"
 }
 

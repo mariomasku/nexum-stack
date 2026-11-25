@@ -279,13 +279,13 @@ class NvProyectos:
             row = ActionRow("PHP %s" % v, (self.dk_url(p["domain"]) + ("  ·  la elegida" if on else ""))
                             if ps else self.dk_url(docker_web_domain(p, v)))
             if ps and not on:
-                b = Gtk.Button(label="Elegir", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b = busy_guard(Gtk.Button(label="Elegir", valign=Gtk.Align.CENTER), self.busy)
                 b.connect("clicked", lambda *_, v=v: act(["docker-php-elegir", p["slug"], v], "%s con PHP %s" % (p["folder"], v),
                                                           "%s ya va con PHP %s" % (p["folder"], v)))
                 row.add_suffix(b)
             if len(p["versions"]) > 1:
-                b = Gtk.Button(valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Quitar PHP %s" % v)
+                b = busy_guard(Gtk.Button(valign=Gtk.Align.CENTER,
+                               tooltip_text="Quitar PHP %s" % v), self.busy)
                 b.add(icon("user-trash-symbolic"))
                 b.connect("clicked", lambda *_, v=v: act(["docker-php-quitar", p["slug"], v], "Quitando PHP %s de %s" % (v, p["folder"]),
                                                           "PHP %s quitado de %s" % (v, p["folder"])))
@@ -299,7 +299,7 @@ class NvProyectos:
                 c.append(v, "PHP %s" % v)
             c.set_active(0)
             row.add_suffix(c)
-            b = css(Gtk.Button(label="Añadir", valign=Gtk.Align.CENTER, sensitive=not self.busy), "nv-azul")
+            b = css(busy_guard(Gtk.Button(label="Añadir", valign=Gtk.Align.CENTER), self.busy), "nv-azul")
             b.connect("clicked", lambda *_: c.get_active_id() and act(
                 ["docker-php-añadir", p["slug"], c.get_active_id()], "Añadiendo PHP %s a %s" % (c.get_active_id(), p["folder"]),
                 "%s con PHP %s" % (p["folder"], c.get_active_id())))
@@ -510,19 +510,26 @@ class NvProyectos:
         hover, dk = [], None
         if self.nv_docker_of(x["name"]):
             dk = nv_button(logo("docker", 16), "Montar en Docker", "Arrancar %s en Docker" % x["name"], lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
-            dk.set_sensitive(not self.busy)
+            busy_guard(dk, self.busy).set_sensitive(True)
             hover.append(dk)
+        # (al lado de Cargar: VS Code, su repositorio y phpMyAdmin con su BBDD de la version activa)
+        quick = self.nv_row_quick(x, pairs)
         if is_loaded:
             box.pack_end(label("Cargado", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER, margin_end=6), False, False, 0)
+            for w in reversed(quick):
+                box.pack_end(w, False, False, 0)
+            hover += quick
         else:
-            b = css(Gtk.Button(label="Cargar", sensitive=not self.busy), "nv-azul")
+            b = css(busy_guard(Gtk.Button(label="Cargar"), self.busy), "nv-azul")
             b.connect("clicked", lambda *_: self.on_load_folder(x))
             menu = self.nv_row_menu(x)
             menu.set_valign(Gtk.Align.CENTER)
-            menu.set_sensitive(not self.busy)
+            busy_guard(menu, self.busy).set_sensitive(True)
             box.pack_end(menu, False, False, 0)
             box.pack_end(b, False, False, 0)
-            hover += [b, menu]
+            for w in reversed(quick):
+                box.pack_end(w, False, False, 0)
+            hover += quick + [b, menu]
         if dk is not None:
             box.pack_end(dk, False, False, 0)
         if not hover:
@@ -539,6 +546,33 @@ class NvProyectos:
         ev.add(box)
         row.add(ev)
         return row
+
+    def nv_row_quick(self, x, pairs):
+        """Los accesos directos de la fila de un proyecto, solo con su icono: VS Code (si está instalado), su
+        repositorio (si tiene remote origin) y phpMyAdmin con su BBDD (si tiene una en la versión de PHP activa)."""
+        out, folder = [], os.path.join(HTDOCS, x["name"])
+        code = vscode_app()
+        if code is not None:
+            img = None
+            if code.get_icon() is not None:
+                img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                img.set_pixel_size(16)
+            out.append(nv_button(img or "text-editor-symbolic", None, "Abrir %s en Visual Studio Code" % x["name"],
+                                 lambda *_: self.open_in_vscode(folder), flat=True))
+        got = project_repo_url(folder)
+        if got:
+            url, host = got
+            github = host == "github.com" or host.endswith(".github.com")
+            out.append(nv_button(logo("github" if github else "globo", 16), None,
+                                 "Abrir su repositorio: %s" % url, lambda *_: self.open_uri(url), flat=True))
+        active = (self.data or {}).get("active")
+        db = next((d for inst, d in pairs if inst["folder"] == active), "")
+        if active and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,63}", db or ""):
+            out.append(nv_button(logo("phpmyadmin", 16), None, "Abrir su BBDD (%s) en phpMyAdmin (lampp-%s)" % (db, active),
+                                 lambda *_: self.open_project_pma(db), flat=True))
+        for w in out:
+            w.set_valign(Gtk.Align.CENTER)
+        return out
 
     def nv_hero(self, x, loaded):
         clear(self.hero_box)
@@ -597,7 +631,7 @@ class NvProyectos:
             env.append_text("Sin entornos")
         current = next((n for n, (k, o, _d) in enumerate(envs) if k == "lampp" and o["folder"] == self.data["active"]), 0)
         env.set_active(current if is_loaded else 0)
-        env.set_sensitive(bool(envs) and not self.busy)
+        busy_guard(env, self.busy).set_sensitive(bool(envs))
         dbl = label("", "nv-mono", valign=Gtk.Align.CENTER)
         dbl.set_size_request(180, -1)
 
@@ -634,8 +668,9 @@ class NvProyectos:
             kind, admin = self.loaded_project_admin()
             # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
             # (los que se ven, su orden y su estilo, como se haya elegido: nv_place_buttons)
-            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir http://%s/" % p["link"],
-                                     lambda *_: self.open_uri("http://%s/" % p["link"]), "nv-proyecto-btn")}
+            web = self.project_web()
+            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir %s" % web,
+                                     lambda *_: self.open_uri(web), "nv-proyecto-btn")}
             code = vscode_app()
             if code is not None:
                 img = None
@@ -645,6 +680,10 @@ class NvProyectos:
                 btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
                                            "Abrir en Visual Studio Code", lambda *_: self.open_in_vscode(),
                                            "nv-proyecto-btn")
+            # (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+            repo = repo_button(os.path.join(HTDOCS, x["name"]), self.open_uri)
+            if repo is not None:
+                btns["repo"] = repo
             pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
             pma.set_sensitive(bool(self.loaded_project_db()))
             btns["pma"] = pma
@@ -656,7 +695,7 @@ class NvProyectos:
             btns["panel"] = adm
             btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
                                        lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
-            btns["compartir"] = self.nv_share_button("http://%s" % p["link"], os.path.join(HTDOCS, x["name"]), x["name"])
+            btns["compartir"] = self.nv_share_button(web.rstrip("/"), os.path.join(HTDOCS, x["name"]), x["name"])
             # El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
             has_log = os.path.isfile(APACHE_ERROR_LOG)
             logb = nv_button(logo("log", 18), "Log", "Ver el log de Apache" if has_log else "Aún no hay log de Apache",
@@ -665,13 +704,16 @@ class NvProyectos:
             btns["log"] = logb
             btns["actualizar"] = nv_button(logo("actualizar", 18), "Actualizar", "Actualizar proyecto",
                                            lambda *_: self.nv_update_project(x), "nv-proyecto-btn")
-            btns["actualizar"].set_sensitive(not self.busy)
+            busy_guard(btns["actualizar"], self.busy).set_sensitive(True)
             if x["kind"] in ("wp", "ps"):
                 btns["imagenes"] = self.nv_images_button(x)
             eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",
                               lambda *_: self.on_unload_project(), flat=True)
-            self.nv_place_buttons(acts, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
-            acts.pack_start(eject, False, False, 0)
+            # (en varias líneas si no caben: con los botones grandes, la fila pedía más que la ventana)
+            flow = nv_button_flow()
+            self.nv_place_buttons(flow, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
+            nv_flow_add(flow, eject)
+            acts.pack_start(flow, True, True, 0)
         else:
             acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
                                       lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)

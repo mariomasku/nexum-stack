@@ -22,10 +22,14 @@ function mailpit_stop() {
 # Mailpit en marcha solo con el correo de pruebas encendido, instalado y la version activa en marcha
 # (--suave: lo pasa a mailpit_start)
 function mailpit_sync() {
+    local rc=0
     if mail_on && mailpit_installed && lampp_running; then
-        mailpit_start "$1"
+        mailpit_start "$1" || rc=$?
     else
-        mailpit_stop
+        mailpit_stop || rc=$?
     fi
+    # (con la version, tambien el intermediario de imagenes de produccion)
+    declare -F media_local_run_sync > /dev/null && media_local_run_sync
+    return $rc
 }
 

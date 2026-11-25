@@ -13,7 +13,7 @@
 #   S|cuantos componentes tienen parche nuevo
 function components_check() {
     local dir name full cur new i n=0 names=(PHP Apache MariaDB ProFTPD Perl phpMyAdmin) releases img v
-    local a b
+    local a b broken
     releases=$(php_releases)
     [ -z "$releases" ] && echo "E|php.net (las versiones de PHP)"
     for dir in $(lampp_dirs); do
@@ -27,7 +27,14 @@ function components_check() {
         new=$(stack_versions "$full")
         IFS='|' read -r -a a <<< "$cur"
         IFS='|' read -r -a b <<< "$new"
+        # (las piezas dañadas, aunque esten en lo ultimo de su rama: la version se rehace con ellas bien)
+        broken=" $(is_stack_install "$dir" && stack_broken "$dir") "
         for i in 0 1 2 3 4 5; do
+            if [[ "$broken" == *" ${names[$i]} "* ]]; then
+                echo "L|$name|${names[$i]}|dañado|$( [ -n "${b[$i]}" ] && [[ "${b[$i]}" != *.x ]] && echo "${b[$i]}" || echo "${a[$i]}")"
+                n=$((n + 1))
+                continue
+            fi
             # (lo que no se ha podido consultar sale como su rama seguida de .x: no cuenta)
             [ -z "${b[$i]}" ] || [[ "${b[$i]}" == *.x ]] && continue
             if [ "${a[$i]}" != "${b[$i]}" ] && [ "$(printf '%s\n%s\n' "${a[$i]}" "${b[$i]}" | sort -V | tail -1)" == "${b[$i]}" ]; then
@@ -48,7 +55,12 @@ function components_check() {
         for v in $DOCKER_PHP_VERSIONS; do
             dk image inspect "nexum-php:$v" > /dev/null 2>&1 || continue
             img=php:$v-fpm
-            docker_image_outdated "$img" && { echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1)); }
+            # (o, con WP-CLI puesto en Configuracion > Docker, sin el: al rehacerla lo trae)
+            if docker_php_needs_wp_cli "$v"; then
+                echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v), para que traiga WP-CLI"; n=$((n + 1))
+            elif docker_image_outdated "$img"; then
+                echo "K|$img|la imagen de PHP $v de Docker (nexum-php:$v)"; n=$((n + 1))
+            fi
         done
     fi
     if mailpit_installed && [ "$(mailpit_installed_version)" != "$MAILPIT_VERSION" ]; then
@@ -63,11 +75,24 @@ function components_check() {
 }
 
 #@incluir comun/componentes/docker_image_outdated.sh
+#@incluir comun/componentes/stack_broken.sh
 # componentes-actualizar: pone al dia todo lo que diga components_check. Las versiones de PHP se rehacen
 # (la de ahora sigue funcionando mientras se compila); las MariaDB comunes, phpMyAdmin y las imagenes de
 # PHP se descargan de nuevo y sus contenedores en marcha se rehacen (unos segundos sin servicio: su BBDD
 # y su configuracion no cambian); Mailpit y cloudflared se instalan con su version. --copia: a cada
 # version que se rehace (como actualizar --copia)
+# piezas-danadas: para la ventana (Versiones de PHP), D|version|piezas por cada version de pila propia con
+# alguna dañada (stack_broken). Sin consultar nada de fuera: cerca de un segundo
+function gui_broken() {
+    local dir b
+    for dir in $(lampp_dirs); do
+        is_stack_install "$dir" || continue
+        b=$(stack_broken "$dir")
+        [ -n "$b" ] && echo "D|${dir#/opt/lampp-}|$b"
+    done
+    return 0
+}
+
 function components_update() {
     local out line f cf folders="" imgs="" progs="" fail=0 v slug dir running
     [ "$1" == "--copia" ] && STACK_DB_COPY=1

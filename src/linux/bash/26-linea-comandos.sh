@@ -88,7 +88,10 @@ function cli_rebuild() {
         return 1
     fi
 
-    if is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] \
+    # (con alguna pieza dañada no esta al dia, aunque sus versiones sean las ultimas: se rehace)
+    local broken=$(is_stack_install "$dir" && stack_broken "$dir")
+    [ -n "$broken" ] && echo "lampp-$version: dañado $broken (no está o no responde): se rehace"
+    if is_stack_install "$dir" && [ "$(stack_fields "$dir")" == "$(stack_versions "$full")" ] && [ -z "$broken" ] \
             && { ! php2shell_backport "$full" > /dev/null || [ -f "$dir/$PHP2SHELL_MARK" ]; }; then
         if [ -t 1 ]; then
             echo -e "\033[1;32mEl paquete lampp-$version se encuentra actualizado.\033[0m No hay nada que actualizar."

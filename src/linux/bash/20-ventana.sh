@@ -243,6 +243,8 @@ function gui_data() {
     # Versiones que, si se arrancan a mano, quedarian abiertas a la red (o con el FTP de fabrica)
     local open_versions=$(unsecured_versions)
     [ -n "$open_versions" ] && echo "U|$open_versions"
+    # K|version: su Apache en marcha con la configuracion de antes (escrita despues de su ultima carga)
+    [ -n "$active" ] && service_running apache && apache_stale "$active" && echo "K|${active#/opt/lampp-}"
     # Tablas del sistema de MariaDB antiguas en la version montada (llenan su registro de errores)
     if db_system_outdated; then
         local err_log=$(db_error_log "$active")

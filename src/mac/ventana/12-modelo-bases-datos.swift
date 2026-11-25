@@ -423,6 +423,7 @@ extension AppModel {
             npVersion = data?.active ?? ""
             npDb = ""
             npFile = nil
+            npNoDb = false
             npStep = 1
             projQuery = ""
             npRepoQuery = ""

@@ -35,7 +35,7 @@ struct UpdateProjectSheet: View {
 
     var body: some View {
         let dbOk = validDbName(model.upDb.trimmingCharacters(in: .whitespaces))
-        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk) && !model.busy
+        let can = (!model.upSql.isEmpty || !model.upCode.isEmpty) && (model.upSql.isEmpty || dbOk)
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Actualizar proyecto").font(.headline)
@@ -77,7 +77,7 @@ struct UpdateProjectSheet: View {
                 Button("Cancelar") { model.upShown = false }.buttonStyle(OutlineButton(big: true))
                 Button("Actualizar…") { model.upAsk() }
                     .buttonStyle(OutlineButton(kind: "primary", big: true))
-                    .disabled(!can)
+                    .disabled(!can).busyGuard(model.busy)
             }
         }
         .padding(22)
@@ -248,13 +248,13 @@ struct ProjectsView: View {
                 Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
                 Button("En Docker…") { model.openDockerForm(folder: x.name) }
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             .tip("Añadir entorno")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Entorno (versión de PHP)").font(.caption).foregroundColor(.secondary)
                 SearchPicker(selection: Binding(get: { current }, set: { model.chooseEnv(x, $0) }),
                              items: envs.isEmpty ? [("", "Sin entornos")] as [(String, String)] : envs.map { ($0.0, $0.1) })
-                .disabled(envs.isEmpty || model.busy)
+                .disabled(envs.isEmpty).busyGuard(model.busy)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("BBDD").font(.caption).foregroundColor(.secondary)
@@ -265,7 +265,7 @@ struct ProjectsView: View {
             }
             Button(action: { model.linkProject(x) }) { Image(systemName: "link") }
                 .buttonStyle(LinkHoverButton())
-                .disabled(model.busy || model.data == nil)
+                .disabled(model.data == nil).busyGuard(model.busy)
                 .tip("Opciones de la BBDD…")
           }
         }
@@ -281,7 +281,7 @@ struct ProjectsView: View {
             } else {
                 Button(action: { model.loadFolder(x) }) { Label("Cargar", systemImage: "play.fill") }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Cargar \(x.name)")
             }
             Spacer(minLength: 8)
@@ -297,7 +297,7 @@ struct ProjectsView: View {
                         }
                         Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
                             .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
-                            .disabled(model.busy)
+                            .busyGuard(model.busy)
                     }
                     .padding(.trailing, 6)
                     .tip(h.fake ? "Host falseado" : "Falsear Host")
@@ -322,11 +322,11 @@ struct ProjectsView: View {
                         tip: "Desmontar el proyecto") {
                 model.unloadProject()
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
         } else {
             Button(action: { model.unloadProject() }) { Image(systemName: "eject.fill") }
                 .buttonStyle(LinkHoverButton())
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip("Desmontar el proyecto")
         }
     }
@@ -336,15 +336,23 @@ struct ProjectsView: View {
         let folder = loadedProjectFolder(p.current)
         let db = cleanDbName(model.loadedDb(x))
         let admin = folder.map { projectAdmin($0) } ?? ("", "")
-        let link = p.link
+        let web = p.webURL
         var items: [String: AnyView] = [:]
         items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
-                                           tip: "Abrir http://\(link)/") { openURL("http://\(link)/") })
+                                           tip: "Abrir \(web)") { openURL(web) })
         if let code = vscodeURL(), let f = folder {
             items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
                                                   tip: "Abrir en Visual Studio Code") {
                 openInVSCode(f)
             })
+        }
+        // (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+        if let f = folder, let repo = projectRepoURL(f) {
+            let url = repo.0, host = repo.1
+            let github = host == "github.com" || host.hasSuffix(".github.com")
+            items["repo"] = AnyView(VisorButton(conf: c, name: github ? "GitHub" : "Repositorio",
+                                                icon: github ? .logo("github") : .symbol("globe", Color.blue),
+                                                tip: "Abrir el repositorio: \(url)") { openURL(url) })
         }
         items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
                                            tip: db.isEmpty ? "Sin BBDD" : "Abrir \(db) en phpMyAdmin") {
@@ -353,15 +361,15 @@ struct ProjectsView: View {
         items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
                                              tip: admin.1.isEmpty ? "No tiene panel de administración"
                                                 : "Abrir el panel de administración") {
-            openProjectAdmin(kind: admin.0, admin: admin.1, link: link, db: db, folder: folder)
+            openProjectAdmin(kind: admin.0, admin: admin.1, site: String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), db: db, folder: folder)
         }.disabled(admin.1.isEmpty))
         items["docker"] = AnyView(VisorButton(conf: c, name: "Docker", icon: .logo("docker"),
                                               tip: model.dockerOf(x.name).isEmpty ? "Montar en Docker"
                                                 : "Arrancar en Docker") {
             model.dockerForLoaded(x)
-        }.disabled(model.busy))
-        items["compartir"] = AnyView(model.shareButton("http://\(link)", folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
-            .disabled(model.busy))
+        }.busyGuard(model.busy))
+        items["compartir"] = AnyView(model.shareButton(String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
+            .busyGuard(model.busy))
         // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
         let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)
         items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
@@ -371,12 +379,12 @@ struct ProjectsView: View {
         items["actualizar"] = AnyView(VisorButton(conf: c, name: "Actualizar", icon: .logo("actualizar"),
                                                   tip: "Actualizar proyecto") {
             model.upOpen(x)
-        }.disabled(model.busy))
+        }.busyGuard(model.busy))
         if x.kind == "wp" || x.kind == "ps" {
             items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
                                                     tip: "Traer de producción las imágenes que falten") {
                 model.importImages(x)
-            }.disabled(model.busy))
+            }.busyGuard(model.busy))
         }
         return items
     }
@@ -398,10 +406,11 @@ struct ProjectsView: View {
             items.append(("Vaciar la caché de la tienda", { model.clearCache(folder: x.name, db: db) }))
         }
         items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
+        if x.kind == "ps" || x.kind == "wp" {
+            items.append(("Imágenes de producción…", { model.wpMedia(x) }))
+        }
         if x.kind == "ps" {
             items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
-        } else if x.kind == "wp" {
-            items.append(("Imágenes de producción…", { model.wpMedia(x) }))
         }
         items.append(("Personalizar los botones…", { model.panel = .buttons }))
         items.append(("Borrar el proyecto…", { model.deleteProject(x) }))
@@ -419,14 +428,14 @@ struct ProjectsView: View {
             VisorButton(conf: model.visorConf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: moreTip) {
                 popMenu(items)
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
         } else {
             OutlineMenu(nil, symbol: "ellipsis") {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                     Button(it.0) { it.1() }
                 }
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             .tip(moreTip)
         }
     }
@@ -456,7 +465,7 @@ struct ProjectsView: View {
             // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
             Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
                 .buttonStyle(OutlineButton(kind: "primary"))
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 .tip("Clonar y montar un repositorio")
         }
         .padding(.top, 10)
@@ -526,23 +535,25 @@ struct ProjectsView: View {
                 if !dockers.isEmpty {
                     Button(action: { model.dockerForLoaded(x) }) {
                         HStack(spacing: 5) {
-                            LogoShape(d: LOGO_PATHS["docker"] ?? "").fill(brand("docker")).frame(width: 14, height: 14)
+                            BrandLogo(name: "docker", size: 14)
                             Text("Montar en Docker").lineLimit(1)
                         }
                     }
                     .buttonStyle(OutlineButton(compact: true))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Arrancar \(x.name) en Docker")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
                 }
+                // (al lado de Cargar: VS Code, su repositorio y phpMyAdmin con su BBDD de la versión activa)
+                rowQuick(x, pairs).opacity(hover ? 1 : 0).allowsHitTesting(hover)
                 if isLoaded {
                     SmallTag(text: "Cargado", blue: true)
                 } else {
                     // «Cargar» solo al pasar el ratón por el proyecto (el hueco se guarda: la fila no salta)
                     Button("Cargar") { model.loadFolder(x) }
                         .buttonStyle(OutlineButton(kind: "primary", compact: true))
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .opacity(hover ? 1 : 0)
                         .allowsHitTesting(hover)
                     // (lo que antes solo se hacía arriba con el proyecto elegido, sin cambiar el de arriba)
@@ -559,20 +570,54 @@ struct ProjectsView: View {
                             Button("Vaciar la caché de la tienda") { model.clearCache(folder: x.name, db: model.projectBase(x)) }
                         }
                         Button("Limpiar proyecto…") { model.cleanProject(x) }
+                        if x.kind == "ps" || x.kind == "wp" {
+                            Button("Imágenes de producción…") { model.wpMedia(x) }
+                        }
                         if x.kind == "ps" {
                             Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
-                        } else if x.kind == "wp" {
-                            Button("Imágenes de producción…") { model.wpMedia(x) }
                         }
                         Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip(hover ? moreTip : "")
                     .opacity(hover ? 1 : 0)
                     .allowsHitTesting(hover)
                 }
             }
-            .frame(width: anyDocker ? 270 : 130)
+            .frame(width: (anyDocker ? 270 : 130) + 110)
+        }
+    }
+
+    /// Los accesos directos de la fila de un proyecto, solo con su icono: VS Code (si está instalado), su
+    /// repositorio (si tiene remote origin) y phpMyAdmin con su BBDD (si tiene una en la versión activa)
+    func rowQuick(_ x: Project, _ pairs: [(Install, String)]) -> some View {
+        let folder = HTDOCS + "/" + x.name
+        let active = model.data?.active ?? ""
+        let db = cleanDbName(pairs.first(where: { $0.0.folder == active })?.1 ?? "")
+        let repo = projectRepoURL(folder)
+        let github = repo.map { $0.1 == "github.com" || $0.1.hasSuffix(".github.com") } ?? false
+        return HStack(spacing: 4) {
+            if let code = vscodeURL() {
+                Button(action: { openInVSCode(folder) }) {
+                    VisorIconView(icon: .image(NSWorkspace.shared.icon(forFile: code.path)), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir \(x.name) en Visual Studio Code")
+            }
+            if let r = repo {
+                Button(action: { openURL(r.0) }) {
+                    VisorIconView(icon: github ? .logo("github") : .symbol("globe", Color.blue), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir su repositorio: \(r.0)")
+            }
+            if !active.isEmpty && !db.isEmpty {
+                Button(action: { openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)") }) {
+                    VisorIconView(icon: .logo("phpmyadmin"), size: 16)
+                }
+                .buttonStyle(OutlineButton(compact: true))
+                .tip("Abrir su BBDD (\(db)) en phpMyAdmin (XAMPP-\(active))")
+            }
         }
     }
 }

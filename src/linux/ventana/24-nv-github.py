@@ -29,17 +29,17 @@ class NvGithub:
                             "Sin conectar: hace falta para ver la lista de repositorios (también los privados)")
             row.add_prefix(logo("github", 18))
             row.wide = True
-            b = css(Gtk.Button(label="Conectar con un token…", valign=Gtk.Align.CENTER, sensitive=not self.busy),
+            b = css(busy_guard(Gtk.Button(label="Conectar con un token…", valign=Gtk.Align.CENTER), self.busy),
                     *(() if gh["on"] else ("verde",)))
             b.connect("clicked", lambda *_: self.nv_github_token())
             row.add_suffix(b)
             if shutil.which("gh") and gh["source"] != "gh":
-                b = Gtk.Button(label="Usar la sesión de gh", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                               tooltip_text="Usar la sesión de gh auth login")
+                b = busy_guard(Gtk.Button(label="Usar la sesión de gh", valign=Gtk.Align.CENTER,
+                               tooltip_text="Usar la sesión de gh auth login"), self.busy)
                 b.connect("clicked", lambda *_: run_quick(["github-conectar", "--gh"], self.nv_github_done))
                 row.add_suffix(b)
             if gh["source"]:
-                b = Gtk.Button(label="Desconectar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b = busy_guard(Gtk.Button(label="Desconectar", valign=Gtk.Align.CENTER), self.busy)
                 b.connect("clicked", lambda *_: run_quick(["github-desconectar"], self.nv_github_done))
                 row.add_suffix(b)
             lb.add(row)
@@ -68,7 +68,15 @@ class NvGithub:
 
     def nv_github_done(self, rc, out):
         lines = [l for l in out.strip().splitlines() if l.strip()]
-        self.toast(lines[-1] if lines else ("Hecho" if rc == 0 else "No se ha podido"))
+        if rc == 0:
+            self.toast(lines[-1] if lines else "Hecho")
+        elif "secret-tool" in out:
+            # (falta el paquete del llavero: se ofrece instalarlo y, luego, pegar el token otra vez)
+            self.nv_github_keyring()
+        else:
+            # (un error se queda en una ventana hasta que se cierra: en el aviso de abajo no da tiempo a leerlo)
+            message(self.win, "No se ha podido conectar con GitHub",
+                    "\n".join(lines[-6:]) if lines else "No se ha podido", Gtk.MessageType.WARNING)
         # (la lista de antes puede ser de otra cuenta o con otros prefijos)
         self.repos, self.github_out = None, None
         self.build_tools()
@@ -82,7 +90,44 @@ class NvGithub:
             return False
         return self.nv_github_done(rc, out)
 
-    def nv_github_token(self):
+    def nv_github_keyring(self):
+        """Sin secret-tool no se puede guardar el token en el llavero: se explica en una ventana (que no se va
+        sola), con un botón para instalar su paquete (pide la contraseña de administrador) y, al acabar, se
+        vuelve a pedir el token."""
+        cmd = "sudo apt install libsecret-tools"
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.INFO,
+                                buttons=Gtk.ButtonsType.NONE,
+                                text="Hace falta secret-tool para guardar el token")
+        dlg.format_secondary_text(
+            "El token de GitHub se guarda en el llavero de la sesión (el almacén cifrado de contraseñas de "
+            "Ubuntu), no en un fichero. Para eso hace falta secret-tool, del paquete libsecret-tools, que "
+            "no viene instalado en este equipo.\n\n"
+            "«Instalarlo» lo instala ahora (pide la contraseña de administrador) y vuelve a pedir el token. "
+            "También puedes instalarlo tú en una terminal:\n\n%s" % cmd)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        dlg.add_button("Copiar la orden", 1)
+        css(dlg.add_button("Instalarlo", Gtk.ResponseType.OK), "verde")
+        dlg.set_default_response(Gtk.ResponseType.OK)
+        widen(dlg)
+        resp = run_dialog(dlg)
+        dlg.destroy()
+        if resp == 1:
+            Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(cmd, -1)
+            self.toast("Orden copiada: pégala en la terminal")
+        elif resp == Gtk.ResponseType.OK:
+            def done(ok, *_):
+                # (en la simulación no se instala nada: se sigue igual, para ver el paso del token)
+                if ok and (SIMULATE or shutil.which("secret-tool")):
+                    GLib.idle_add(self.nv_github_token, True)
+            self.run_task("Instalando secret-tool (libsecret-tools)", ["github-llavero-instalar"],
+                          done_text="secret-tool instalado: ya puedes pegar el token", auto_close=True,
+                          on_done=done)
+
+    def nv_github_token(self, installed=False):
+        # (sin secret-tool no se podría guardar: se ofrece instalarlo antes de pedir el token)
+        if not installed and not shutil.which("secret-tool"):
+            self.nv_github_keyring()
+            return False
         dlg = Gtk.Dialog(title="Conectar con GitHub", transient_for=self.win, modal=True, use_header_bar=True)
         dlg.set_default_size(520, -1)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
@@ -113,6 +158,7 @@ class NvGithub:
         if resp == Gtk.ResponseType.OK and token:
             self.toast("Comprobando el token con GitHub…")
             run_quick_input(["github-conectar"], token + "\n", self.nv_github_done)
+        return False
 
     def nv_node_load(self):
         """Pestaña Node: los proyectos de htdocs con su package.json y cómo están."""
@@ -161,7 +207,8 @@ class NvGithub:
 
         def add(image, text, tip, cb, *classes, task=True):
             b = nv_button(image, text, tip, lambda *_: cb(), "nv-proyecto-btn", *classes)
-            b.set_sensitive(not (task and self.busy))
+            if task:
+                busy_guard(b, self.busy)
             row.add_suffix(b)
         # (los de siempre, solo con su icono: el proyecto en el editor, en su carpeta y lo que dice su servidor)
         code = vscode_app()
@@ -266,6 +313,14 @@ class NvGithub:
 
     def nv_repos_render(self, loading=False):
         box = self.repos_page
+        # (se rehace entera al llegar la lista de GitHub, unos segundos después de la guardada: lo
+        # escrito en el buscador, el cursor si se estaba escribiendo y por dónde iba la lista se quedan)
+        old = getattr(self, "repos_search", None)
+        typing = old is not None and old.is_focus()
+        pos = old.get_position() if typing else -1
+        vadj = self.page_repos.get_vadjustment()
+        scroll = vadj.get_value()
+        self.repos_search = None
         clear(box)
         head = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         tl = Gtk.Box(spacing=10)
@@ -289,6 +344,8 @@ class NvGithub:
             return
         bar = Gtk.Box(spacing=10)
         search = Gtk.SearchEntry(placeholder_text="Buscar por nombre, descripción o web", width_chars=36)
+        search.set_text(getattr(self, "repos_query", ""))
+        self.repos_search = search
         bar.pack_start(search, False, False, 0)
         bar.pack_start(label("Mostrar todos", "nv-tenue", valign=Gtk.Align.CENTER), False, False, 0)
         sw = Gtk.Switch(active=self.repos_all, valign=Gtk.Align.CENTER,
@@ -315,9 +372,14 @@ class NvGithub:
             q = search.get_text().strip().lower()
             return not q or q in getattr(row, "haystack", "")
         lb.set_filter_func(match)
+        search.connect("changed", lambda e: setattr(self, "repos_query", e.get_text()))
         search.connect("search-changed", lambda *_: lb.invalidate_filter())
         box.pack_start(lb, False, False, 0)
         box.show_all()
+        if typing:
+            search.grab_focus_without_selecting()
+            search.set_position(pos)
+        GLib.idle_add(lambda: (vadj.set_value(min(scroll, vadj.get_upper() - vadj.get_page_size())), False)[1])
 
     def nv_repo_row(self, repo):
         bits = [b for b in (("clonado en %s" % repo["folder"]) if repo["state"] == "clonado" else "", repo["desc"], repo["web"],
@@ -327,15 +389,15 @@ class NvGithub:
         row.add_prefix(logo(kind, 20) if kind else MonoLogo("github", 20))
         row.haystack = " ".join((repo["full"], repo["desc"], repo["web"])).lower()
         if repo["state"] == "clonado":
-            b = Gtk.Button(label="Traer cambios", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                           tooltip_text="Actualizar con git pull")
+            b = busy_guard(Gtk.Button(label="Traer cambios", valign=Gtk.Align.CENTER,
+                           tooltip_text="Actualizar con git pull"), self.busy)
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
         elif repo["state"] == "ocupado":
             b = Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=False,
                            tooltip_text="Ya hay una carpeta con ese nombre")
         else:
-            b = css(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER, sensitive=not self.busy,
-                                               tooltip_text="Clonar en /opt/htdocs con tu conexión de GitHub"), "verde")
+            b = css(busy_guard(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER,
+                               tooltip_text="Clonar en /opt/htdocs con tu conexión de GitHub"), self.busy), "verde")
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
         row.add_suffix(b)
         # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así
@@ -427,15 +489,15 @@ class NvGithub:
                           done_text="Apache de Docker en %s (%s y %s)" % (ip, http, https), auto_close=True,
                           on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools()))
         if not ports_ok:
-            b = Gtk.Button(label="Permitir", sensitive=not self.busy,
+            b = busy_guard(Gtk.Button(label="Permitir",
                            tooltip_text="Permitir puertos desde el %s"
-                           % min(int(w["HTTP"]), int(w["HTTPS"])))
+                           % min(int(w["HTTP"]), int(w["HTTPS"]))), self.busy)
             b.connect("clicked", lambda *_: self.run_task(
                 "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
                 done_text="Docker ya puede usar sus puertos",
                 on_done=lambda *a: (run_quick(["gui-docker"], self.on_docker_data), self.build_tools())))
             buttons.pack_start(b, False, False, 0)
-        b = css(Gtk.Button(label="Guardar", sensitive=not self.busy), "verde")
+        b = css(busy_guard(Gtk.Button(label="Guardar"), self.busy), "verde")
         b.connect("clicked", save)
         buttons.pack_start(b, False, False, 0)
         lb.add(row)
@@ -453,13 +515,13 @@ class NvGithub:
                         "Puesto: los dominios de Docker (<proyecto>-php83.docker.test) no van en /etc/hosts ni piden la contraseña"
                         if dns else "Los dominios de Docker pasan a .docker.test y dejan de ir en /etc/hosts: sin contraseña al "
                         "añadir proyectos o versiones. web.local, los proyectos de siempre y las tiendas falseadas, igual")
-        b = Gtk.Button(label="Quitar" if dns else "Activar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(label="Quitar" if dns else "Activar", valign=Gtk.Align.CENTER), self.busy)
         b.connect("clicked", lambda *_: self.nv_docker_dns(not dns))
         row.add_suffix(b)
         lb.add(row)
         row = ActionRow("Certificado de *.docker.local y *.docker.test",
                         "Chrome y Firefox lo aceptan sin aviso: solo vale para esos dominios (no es de una CA)")
-        b = Gtk.Button(label="Confiar", valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(label="Confiar", valign=Gtk.Align.CENTER), self.busy)
         b.connect("clicked", lambda *_: self.run_task("Certificado de Docker en el navegador", ["docker-web", "confiar"],
                                                       done_text="El navegador acepta el certificado de Docker", auto_close=True))
         row.add_suffix(b)
@@ -482,7 +544,7 @@ class NvGithub:
                          "Apagado: los proyectos de Docker siguen en marcha hasta que se paren a mano")
                         + ("\nLo último: %s" % last if last and idle != "0" else ""))
         row.wide = True
-        combo = Gtk.ComboBoxText(valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        combo = busy_guard(Gtk.ComboBoxText(valign=Gtk.Align.CENTER), self.busy)
         for h in ("0", "1", "2", "3", "4", "6", "8", "12", "24"):
             combo.append(h, "Nunca" if h == "0" else "A la hora sin visitas" if h == "1" else "A las %s h sin visitas" % h)
         if not combo.set_active_id(idle):
@@ -492,6 +554,17 @@ class NvGithub:
             ["docker-reposo", "horas", c.get_active_id()],
             lambda rc, out: (self.toast((out.strip().splitlines() or ["Hecho"])[-1]), self.build_tools(), False)[2]))
         row.add_suffix(combo)
+        lb.add(row)
+        # WP-CLI en las imágenes de PHP (docker-wp-cli): apagado de serie, la imagen es la de todos los proyectos
+        wp_on = os.path.exists(os.path.join(LOG_DIR, "docker", "wp-cli"))
+        row = ActionRow("WP-CLI en los contenedores de PHP",
+                        "Puesto: wp dentro de los contenedores, con la base de datos de Docker (docker exec <contenedor> wp …). "
+                        "Vale para todos los proyectos de Docker" if wp_on else
+                        "Apagado: los contenedores de PHP no traen wp. Al ponerlo, vale para todos los proyectos de Docker")
+        row.wide = True
+        sw = busy_guard(Gtk.Switch(active=wp_on, valign=Gtk.Align.CENTER), self.busy)
+        sw.connect("notify::active", lambda s, _p: s.get_active() != wp_on and self.nv_docker_wp_cli(s.get_active()))
+        row.add_suffix(sw)
         lb.add(row)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.reorder_child(box, 2)
@@ -513,8 +586,8 @@ class NvGithub:
             row = ActionRow("cloudflared", "Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)"
                             if not info or info[1] != "1" else "Versión %s, en ~/.nexum/tunel" % info[2])
             if info and (info[1] != "1" or info[2] != info[3]):
-                b = Gtk.Button(label="Instalar" if info[1] != "1" else "Actualizar a la %s" % info[3],
-                               valign=Gtk.Align.CENTER, sensitive=not self.busy)
+                b = busy_guard(Gtk.Button(label="Instalar" if info[1] != "1" else "Actualizar a la %s" % info[3],
+                               valign=Gtk.Align.CENTER), self.busy)
                 b.connect("clicked", lambda *_: self.run_task("Instalando cloudflared", ["tunel-instalar"], progress=True, auto_close=True,
                                                               done_text="cloudflared instalado",
                                                               on_done=lambda *a: self.build_tools()))
@@ -554,7 +627,10 @@ class NvGithub:
                 b = btns[key]
                 self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else specs[key],
                                 dict((k, n) for k, n, _i in VISOR_BUTTONS)[key])
-                acts.pack_start(b, False, False, 0)
+                if isinstance(acts, Gtk.FlowBox):
+                    nv_flow_add(acts, b)
+                else:
+                    acts.pack_start(b, False, False, 0)
         for b, spec, name in fixed:
             self.nv_restyle(b, conf, spec, name)
 
@@ -888,6 +964,24 @@ class NvGithub:
                 fn()
             except Exception:  # noqa: BLE001 - una pestaña aún sin datos
                 pass
+
+    def nv_docker_wp_cli(self, on):
+        """docker-wp-cli si|no [--rehacer]: pregunta si se rehacen ya las imágenes de PHP que hay."""
+        now = Gtk.CheckButton(label="Rehacer ya las imágenes de PHP que tienes (unos minutos cada una)", active=True)
+        if not confirm(self.win, "¿Poner WP-CLI en los contenedores de PHP?" if on else "¿Quitar WP-CLI de los contenedores de PHP?",
+                       ("Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, "
+                        "con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que "
+                        "vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y "
+                        "su configuración no cambian.") if on else
+                       ("Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en "
+                        "marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."),
+                       "Poner" if on else "Quitar", extra=now):
+            self.build_tools()
+            return
+        args = ["docker-wp-cli", "si" if on else "no"] + (["--rehacer"] if now.get_active() else [])
+        self.run_task("Poniendo WP-CLI en Docker" if on else "Quitando WP-CLI de Docker", args,
+                      done_text="WP-CLI en Docker " + ("puesto" if on else "quitado"), auto_close=not now.get_active(),
+                      on_done=lambda *a: self.build_tools())
 
     def nv_docker_dns(self, on):
         """docker-web dns activar|quitar"""

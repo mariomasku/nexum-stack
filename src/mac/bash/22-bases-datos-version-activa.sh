@@ -961,48 +961,10 @@ function mail_export_filter() {
     return 0
 }
 
-
 # exportar-bd <base> <fichero .zip, .sql o .sql.gz> [version]: descarga una copia de la base
 # (estructura, datos, rutinas, disparadores y eventos) que se puede volver a cargar con importar-bd.
 # Sin version, de la activa. Si es la activa y esta en marcha se usa su MariaDB; si no, uno
 # temporal (pide la contraseña de administrador).
-# Tablas del administrador de pruebas en una base (para exportar-bd): deja en skip los --ignore-table
-# del volcado de siempre y en only/wheres cada tabla con su condicion (sin las filas de
-# local@local.test). Solo las tablas de verdad que lo tienen. Usa query (el cliente de la base)
-function test_admin_filter() {
-    local db=$1 t c p n
-    local -A cols=()
-    while IFS=$'\t' read -r t c; do
-        [[ "$t" =~ ^[A-Za-z0-9_]+$ ]] && cols[$t]=$c
-    done < <("${query[@]}" -e "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c
-        JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
-        WHERE c.TABLE_SCHEMA = '$db' AND t.TABLE_TYPE = 'BASE TABLE' AND (
-            (c.TABLE_NAME LIKE '%users' AND c.COLUMN_NAME = 'user_login')
-            OR (c.TABLE_NAME LIKE '%employee' AND c.COLUMN_NAME = 'email'))" < /dev/null 2> /dev/null)
-    for t in "${!cols[@]}"; do
-        if [ "${cols[$t]}" == user_login ]; then
-            p=${t%users}
-            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
-            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
-            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (user_login <=> '$TEST_ADMIN_USER')")
-            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}usermeta' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
-                skip+=(--ignore-table="$db.${p}usermeta") only+=("${p}usermeta")
-                wheres+=("user_id IS NULL OR user_id NOT IN (SELECT ID FROM \`$t\` WHERE user_login = '$TEST_ADMIN_USER')")
-            fi
-        else
-            p=${t%employee}
-            n=$("${query[@]}" "$db" -e "SELECT COUNT(*) FROM \`$t\` WHERE email = '$TEST_ADMIN_USER'" < /dev/null 2> /dev/null)
-            [ "${n:-0}" -gt 0 ] 2> /dev/null || continue
-            skip+=(--ignore-table="$db.$t") only+=("$t") wheres+=("NOT (email <=> '$TEST_ADMIN_USER')")
-            if [ "$("${query[@]}" -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$db' AND TABLE_NAME = '${p}employee_shop' AND TABLE_TYPE = 'BASE TABLE'" < /dev/null 2> /dev/null)" == 1 ]; then
-                skip+=(--ignore-table="$db.${p}employee_shop") only+=("${p}employee_shop")
-                wheres+=("id_employee IS NULL OR id_employee NOT IN (SELECT id_employee FROM \`$t\` WHERE email = '$TEST_ADMIN_USER')")
-            fi
-        fi
-    done
-    return 0
-}
-
 function export_database() {
     local db=$1 dest=$2 folder=$3
     if [ -z "$db" ] || [ -z "$dest" ]; then
@@ -1057,7 +1019,7 @@ function export_database() {
     # se toca). Esas tablas van aparte, con --where
     local skip=() only=() wheres=() mail_sql=""
     test_admin_filter "$db"
-    [ ${#only[@]} -gt 0 ] && echo "El administrador de pruebas ($TEST_ADMIN_USER) no va en la copia"
+    [ ${#only[@]} -gt 0 ] && echo "El administrador de pruebas ($TEST_ADMIN_USER$([ ${#TEST_ADMIN_MAILS[@]} -gt 1 ] && echo " y los de antes")) no va en la copia"
     # Lo que cambio el correo de pruebas (plugins de WordPress, correo de PrestaShop) tampoco: la copia
     # lleva lo que habia antes (al final del volcado) y sin la tabla donde se apunto
     mail_export_filter "$db"
@@ -1361,7 +1323,7 @@ function import_database() {
     local admin
     admin=$(test_admin "$db" "$project")
     grep -v '^A|' <<< "$admin" | grep .
-    grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+    grep -q '^A|' <<< "$admin" && test_admin_note
     # Correo de pruebas: lo que mande la web (sus plugins de correo, la configuracion de la tienda) va a
     # Mailpit (o, apagado, se deshace lo que traiga hecho)
     mail_db "$db"

@@ -89,6 +89,9 @@
 #       prefijos, o --todos), leidos con un token (por la entrada; se guarda en el llavero) o con la
 #       sesion de gh. repo-traer lo clona por SSH en htdocs o, si ya esta, trae sus cambios (git pull)
 #
+#   nexum github-llavero-instalar
+#       Instala (con sudo) libsecret-tools, el paquete de secret-tool, para guardar el token en el llavero
+#
 #   nexum docker-reposo [estado] | horas <0-24> | comprobar
 #       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
@@ -206,7 +209,8 @@
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
 #       direccion https://<algo>.trycloudflare.com, con su contraseña (nueva al azar en cada
 #       tunel), el admin bloqueado y que se cierra solo (2 h si no se dice; desde 15 minutos). La web no
-#       se toca: el dominio local se cambia por el del tunel al pasar
+#       se toca: el dominio local y los reales falseados del proyecto se cambian por el del tunel
+#       al pasar (quien lo abre ve lo mismo que tu, nunca la web real)
 #   nexum docker-crear <carpeta> <php> <mariadb> [--bd <base> --desde <version>] [--dominio <d>] [--nombre <n>]
 #   nexum docker-php <nombre> <version de PHP>
 #   nexum docker-arrancar | docker-parar | docker-registros | docker-borrar <nombre>
@@ -219,6 +223,9 @@
 #       docker-usuario-pruebas pone el administrador de pruebas en la BBDD de su contenedor
 #   nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>
 #       Uno solo de los contenedores de un proyecto en Docker
+#   nexum docker-wp-cli si|no [--rehacer]
+#       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
+#       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
 #   nexum docker-imagenes borrar <ID|imagen:etiqueta> | descargar <imagen:etiqueta>
 #   nexum docker-volumen-borrar <volumen>
 #       Las imagenes y los volumenes de tu Docker: borrar una que no use ningun contenedor, volver
@@ -249,10 +256,23 @@
 #       carpeta
 #
 #   nexum montar-proyecto <url de git> <carpeta> <version> <base> [volcado]
+#   nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd
 #       Proyecto nuevo desde GitHub (u otro repositorio): lo clona en /opt/htdocs/<carpeta>
 #       con tu usuario (solo https o ssh, sin submodulos), lo carga en esa version, crea su
 #       base y, si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga
-#       protegida
+#       protegida.
+#       Con --sin-bd, sin base: se clona y se carga sin BBDD vinculada (un WordPress o una
+#       tienda no abren hasta que tengan la suya: se sube en Bases de datos)
+#
+#   nexum rama-proyecto <carpeta> <rama> [--nueva]
+#       Cambia el proyecto a esa rama con git switch y con tu usuario (el dueño de la carpeta):
+#       una que solo esta en origin se crea en local siguiendo a la de origin; con --nueva, una
+#       rama nueva a partir de la actual. Con cambios sin commit no cambia nada. Ejemplo:
+#       nexum rama-proyecto panaderia-luna nueva-portada --nueva
+#
+#   nexum gui-ramas-proyecto <carpeta>
+#       Solo lee: la rama actual (A|rama), los cambios sin commit (N|n) y las ramas, locales y
+#       de origin (R|rama|local 1/0|origin 1/0), para el dialogo de la ventana
 #
 #   nexum desmontar-proyecto
 #       web.local deja de apuntar al proyecto cargado y enseña una pagina vacia; los dominios
@@ -264,8 +284,21 @@
 #       dominios de /etc/hosts y, lo ultimo, su carpeta. Si un paso falla, no se sigue
 #
 #   nexum usuario-pruebas <base> [carpeta]
-#       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop):
-#       local@local.test con contraseña local. Se hace solo al cargar una BBDD
+#       Crea o deja al dia el administrador de pruebas del panel (WordPress o PrestaShop): el
+#       de admin-pruebas o, si no se ha puesto, local@local.test con contraseña local. Se hace
+#       solo al cargar una BBDD. Una cuenta de verdad con ese correo no se toca (se avisa)
+#
+#   nexum admin-pruebas [--clave]
+#   nexum admin-pruebas <correo> [<contraseña>|-]
+#   nexum admin-pruebas --quitar
+#       El administrador de pruebas de los paneles (Configuracion > Administrador de pruebas):
+#       sin nada, el de ahora (con --clave, tambien su contraseña); con un correo (que es el
+#       usuario; mejor uno que no sea de verdad, como ana@local.test), lo cambia: la contraseña,
+#       de 4 a 64 letras sin tildes, numeros o . _ - @ % + = : , ! # * ? (sin ella o con -, se
+#       pide o se lee de la entrada, para que no quede en el historial de la terminal); --quitar
+#       vuelve a local@local.test. Se guarda en ~/.nexum/admin-pruebas con los correos de antes,
+#       que tampoco van en las copias. Las BBDD ya cargadas no cambian: se pone al cargar una
+#       BBDD o con usuario-pruebas <base>
 #
 #   nexum wp-config <carpeta> [base]
 #       WordPress: comprueba que wp-config.php usa la base de la carpeta (la indicada o la
@@ -290,11 +323,14 @@
 #       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
 #       y la BBDD de antes, en ~/nexum-backups
 #
-#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>] [--destino <carpeta>]
+#   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>]
+#                           [--destino <carpeta> | --zip <fichero> [--sobrescribir]]
 #       Un zip del proyecto en la carpeta de descargas (xdg-user-dir, ~/Descargas o ~/Downloads):
 #       <carpeta>_php<rama>_<fecha>_nexum.zip, con su codigo (sin .git), su BBDD de la version activa
 #       (la vinculada o --bd; como exportar-bd, sin el administrador de pruebas) y un LEEME-nexum.txt.
-#       Si es un repositorio git con cambios sin commit, no se exporta. Si falla, no queda nada
+#       Si es un repositorio git con cambios sin commit, no se exporta. Con --zip, justo en ese fichero
+#       (el que se elige en la ventana de guardar); con --sobrescribir, encima del que ya hubiera. Si
+#       falla, no queda nada
 #
 #   nexum hosts-falsear <dominio> si|no
 #       Falsea (127.0.0.1) o deja de falsear el dominio de un vhost
@@ -874,7 +910,7 @@ PROGRESS=""
 SIGNATURE="By M.Mascuñano"
 
 # Version del instalador: sale debajo de la firma y en "Acerca de", con la lista de cambios
-APP_VERSION="1.57.15"
+APP_VERSION="1.57.37"
 
 # Actualizaciones: la ultima publicacion (Release) del repositorio de GitHub. Cada una lleva el
 # nexum_<version>_all.deb y su firma (.sig), hecha con la clave de UPDATE_KEY_FPR; su parte

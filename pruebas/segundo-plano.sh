@@ -16,7 +16,7 @@ else
     check "Linux: Esc o cerrarla la lleva al segundo plano" 'grep -qF "dlg.connect(\"delete-event\", self.on_delete)" "$SRC"'
     check "Linux: el aviso al lado del visor" 'grep -qF "center.pack_start(self.task_badge, False, False, 0)" "$SRC" && grep -q "^\.nv-tarea-flecha { animation: nv-baja" "$SRC"'
     check "Linux: el aviso dice lo que hace" 'grep -qF "verb = (task.dlg.get_title() or \"En marcha\").split()[0]" "$SRC"'
-    check "Linux: no van dos tareas a la vez" 'grep -A6 "    def run_task(self, title, args, \*\*kw):" "$SRC" | grep -qF "bg.to_front()"'
+    check "Linux: no van dos tareas a la vez" 'grep -A3 "    def run_task(self, title, args, \*\*kw):" "$SRC" | grep -qF "self.refuse_task()" && grep -qF "            cur.to_front()" "$SRC"'
     # El comportamiento de verdad, con la clase Task del script y una ventana falsa
     python3 -I - "$SRC" > "$TMPBASE/segundo-plano.$$" << 'PY'
 import re, sys, types

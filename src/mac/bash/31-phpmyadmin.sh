@@ -229,8 +229,12 @@ function node_log() {
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
         gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
-        # (el tunel y los repositorios, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|borrar-bd) ;;
+        # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        # (el administrador de pruebas: solo un ajuste de ~/.nexum)
+        admin-pruebas) ;;
+        # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker Desktop)
+        docker-wp-cli) ;;
         # (confiar: el certificado va a tu llavero, y el Mac pide la contraseña en su propio aviso)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -324,6 +328,7 @@ case "$1" in
     docker-volumen-borrar) docker_volume_remove "$2" ;;
     docker-migrar) docker_migrate_command "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
+    docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
     docker-clave) docker_db_password "$2" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     actualizar-proyecto) shift; project_update "$@" ;;
@@ -334,7 +339,10 @@ case "$1" in
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;
     usuario-pruebas) test_admin "$2" "$3" ;;
+    admin-pruebas) shift; test_admin_config "$@" ;;
     montar-proyecto) mount_project "$2" "$3" "$4" "$5" "$6" ;;
+    rama-proyecto) project_branch "$2" "$3" "$4" ;;
+    gui-ramas-proyecto) gui_project_branches "$2" ;;
     vaciar-cache)
         if [ "$2" == "--bd" ]; then ps_clear_cache_db "$3"; else ps_clear_cache "$2"; fi
         ;;
@@ -379,6 +387,7 @@ case "$1" in
     docker-reposo) shift; docker_idle_command "$@" ;;
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     componentes) components_check "$2" ;;
+    piezas-danadas) gui_broken ;;
     componentes-actualizar) components_update "$2" ;;
     descargas) downloads_command "$2" ;;
     version|--version|-v) echo "$APP_NAME $APP_VERSION" ;;

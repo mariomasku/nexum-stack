@@ -10,7 +10,7 @@ if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: la columna de apartados, fuera de la página" 'sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF ".frame(width: 220)" && sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF "Text(\"CONFIGURACIÓN\")"'
     check "Mac: en filas salvo con tiles" 'grep -qF "if !tiles {" "$SRC" && grep -qF ".environment(\\.tileRow, !tiles)" "$SRC"'
     check "Mac: Docker y el correo, en tarjetas" 'grep "TileCard(\"Docker\"" "$SRC" | grep -qF "tiles: true" && grep -qF "TileCard(tiles: true) {" "$SRC" && grep -A1 "TileCard(\"Correo de pruebas (Mailpit)\"" "$SRC" | grep -qF "tiles: true"'
-    check "Mac: el interruptor del correo, en su título (sin su tarjeta)" '! grep -qF "Tile(\"Correo de pruebas\", m.on ?" "$SRC" && grep -qF "lead: AnyView(LogoShape(d: LOGO_PATHS[\"mailpit\"]" "$SRC"'
+    check "Mac: el interruptor del correo, en su título (sin su tarjeta)" '! grep -qF "Tile(\"Correo de pruebas\", m.on ?" "$SRC" && grep -qF "lead: AnyView(BrandLogo(name: \"mailpit\"" "$SRC"'
     check "Mac: Guardar debajo de los campos" 'grep -B1 "HStack(spacing: 8) {" "$SRC" | grep -qF "VStack(alignment: .trailing, spacing: 10) {" && ! grep -q "underCaption" "$SRC"'
     check "Mac: aviso de parches con Ahora no" 'grep -qF "Button(\"Ahora no\") { model.ignoreUpdates(c) }" "$SRC" && grep -qF "(model.updatesPending != nil ? 1 : 0)" "$SRC"'
     check "Mac: al abrir ya no pregunta" '! sed -n "/^    func autoCheckComponents/,/^    }/p" "$SRC" | grep -q "updateComponents"'

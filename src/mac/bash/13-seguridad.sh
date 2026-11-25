@@ -94,6 +94,26 @@ UNKNOWN_HOST_VHOST='# lvm-instalador: dominios que no tienen ningun vhost (va an
         Header unset Access-Control-Allow-Credentials
         Header always unset Access-Control-Allow-Credentials
     </If>
+    # Las tipografias de un proyecto, para su copia en Docker y al reves (las de Elementor llevan la
+    # direccion de la web que genero sus CSS: la de LAMPP o la de Docker). Solo tipografias, y solo con
+    # una de las dos webs en Docker (*.docker.test, *.docker.local), como lo que deja pasar la barrera
+    <If "%{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot)$#i && %{HTTP:Origin} =~ m#^https?://[a-z0-9.-]+(:[0-9]+)?$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i)">
+        Header always set Access-Control-Allow-Origin "expr=%{HTTP:Origin}"
+        Header always merge Vary Origin
+    </If>
+</IfModule>
+
+# Dominios reales (los que no son .local, .test ni localhost): sin falsear son la web de produccion.
+# Lo que el navegador reciba de tu copia con ese nombre mientras esta falseado (una redireccion 301 a
+# web.local, una pagina) no lo guarda: si no, al dejar de falsearlo seguiria yendo a tu copia (o a
+# web.local) en vez de a la web de verdad
+<IfModule headers_module>
+    <If "%{HTTP_HOST} !~ /(^|\.)(local|localhost|test)(:[0-9]+)?$/ && %{HTTP_HOST} !~ /^(127\.0\.0\.1|\[::1\])(:[0-9]+)?$/">
+        Header set Cache-Control "no-store"
+        Header always set Cache-Control "no-store"
+        Header unset Expires
+        Header always unset Expires
+    </If>
 </IfModule>
 TraceEnable Off
 # Peticiones de como mucho 64 MB (PHP2Shell, CVE-2026-109618/109619: cuerpos enormes para PHP).
@@ -104,7 +124,13 @@ LimitRequestBody 67108864
 # HEAD de la pagina entera); un formulario, un fetch, un iframe o una imagen de otra web no llega.
 # Y un POST (o PUT, DELETE...) con el Origin de otra web, tampoco. Ojo: la vuelta de una pasarela de
 # pago que hace un POST desde su web se corta mientras este puesta
-<If "(%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})">
+# Lo unico que pasa de otra web ademas: enviar el formulario de acceso (POST de pagina entera a
+# /wp-login.php o a index.php?controller=AdminLogin), que es lo que hace la pagina del boton Panel
+# (un fichero: Origin null); sin la contraseña no entra nadie
+# Y lo que se piden un proyecto y su copia en Docker: tipografias, imagenes y CSS (GET o HEAD, de un
+# fichero con esa extension y que el navegador pide como tal), con una de las dos webs en Docker
+# (*.docker.test, *.docker.local). Elementor guarda en sus CSS la direccion de la web que los genero
+<If "((%{HTTP:Sec-Fetch-Site} =~ /^cross-site$/i && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Mode} =~ /^(navigate)?$/i && %{HTTP:Sec-Fetch-Dest} =~ /^(document)?$/i)) || (%{REQUEST_METHOD} !~ /^(GET|HEAD)$/ && -n %{HTTP:Origin} && %{HTTP:Origin} != '"'"'http://'"'"' . %{HTTP_HOST} && %{HTTP:Origin} != '"'"'https://'"'"' . %{HTTP_HOST})) && !(%{REQUEST_METHOD} =~ /^POST$/ && %{HTTP:Sec-Fetch-Mode} =~ /^navigate$/i && %{HTTP:Sec-Fetch-Dest} =~ /^document$/i && ((%{REQUEST_URI} =~ m#/wp-login\.php$# && -z %{QUERY_STRING}) || (%{REQUEST_URI} =~ m#/index\.php$# && %{QUERY_STRING} =~ /^controller=AdminLogin$/))) && !(%{REQUEST_METHOD} =~ /^(GET|HEAD)$/ && %{HTTP:Sec-Fetch-Dest} =~ /^(font|image|style)$/i && %{REQUEST_URI} =~ m#\.(woff2?|ttf|otf|eot|css|png|jpe?g|gif|webp|avif|svg|ico)$#i && (%{HTTP:Origin} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?$#i || %{HTTP_REFERER} =~ m#^https://[a-z0-9.-]+\.docker\.(test|local)(:[0-9]+)?/#i || %{HTTP_HOST} =~ m#\.docker\.(test|local)(:[0-9]+)?$#i))">
     Require all denied
     ErrorDocument 403 "Otra web ha intentado mandar algo a este proyecto: no se ha hecho nada (barrera entre webs de lvm-instalador; se apaga en Configuracion)."
 </If>

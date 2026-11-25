@@ -96,6 +96,7 @@ PHP
 )
 
 #@incluir comun/correo-pruebas/mail_on.sh
+#@incluir comun/seguridad-apache/apache_stale.sh
 # Numero del proceso de Mailpit: el de su .pid si es tuyo y es el del gestor o, si se ha perdido, el
 # que este en marcha con su binario
 function mailpit_pid() {
@@ -1109,16 +1110,23 @@ function cross_site_command() {
 function secure_command() {
     local version=$1 dir changed=1 rc
     if [ "$version" == "--todas" ]; then
+        # (sus pasos, para la ventana: con muchos proyectos, revisar htdocs tarda un minuto sin decir nada)
+        task_plan "Protegiendo las versiones" "Proteger cada versión" "Revisar los permisos de $HTDOCS_DIR" "Dominios y vhosts" "Reiniciar la versión activa"
+        task_step
         secure_all
         rc=$?
+        task_step
+        echo "Revisando los permisos de todo $HTDOCS_DIR (con muchos proyectos, puede tardar un minuto)..."
         htdocs_close_world "$HTDOCS_DIR" --otros
+        task_step
         hosts_fake locales
         vhosts_root
         [ $rc -eq 2 ] && return 1
+        task_step
         dir=$(active_dir)
         if [ -n "$dir" ] && lampp_running && { [ $rc -eq 0 ] || [ -n "$(exposed_ports)" ]; }; then
             echo "Reiniciando $(basename "$dir") para aplicarlo..."
-            run sudo /opt/lampp/lampp restart > /dev/null || { echo "No se ha podido reiniciar"; return 1; }
+            run sudo /opt/lampp/lampp restart || { echo "No se ha podido reiniciar"; return 1; }
         fi
         lampp_running && wait_mariadb && secure_mariadb
         echo "Todas las versiones son solo para este equipo"

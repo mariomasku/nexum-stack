@@ -74,7 +74,7 @@ struct IdleStopCard: View {
                 }), items: (choices + (choices.contains(hours) ? [] : [hours])).map { h in
                     (h, h == "0" ? "Nunca" : h == "1" ? "A la hora sin visitas" : "A las \(h) h sin visitas")
                 }, width: 210)
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .onAppear { read() }
@@ -86,6 +86,43 @@ struct IdleStopCard: View {
         hours = v.range(of: "^([0-9]|1[0-9]|2[0-4])$", options: .regularExpression) != nil ? v : "3"
         last = ((try? String(contentsOfFile: LOG_DIR + "/docker-reposo.log", encoding: .utf8)) ?? "")
             .split(separator: "\n").last.map(String.init) ?? ""
+    }
+}
+
+/// Configuración, Docker: WP-CLI en los contenedores de PHP (docker-wp-cli), apagado de serie. La imagen de una
+/// versión de PHP es la de todos sus proyectos: al cambiarlo pregunta si se rehacen ya las que hay
+struct WpCliCard: View {
+    @EnvironmentObject var model: AppModel
+    @State private var on = false
+
+    var body: some View {
+        TileCard(wide: true) {
+            Tile("WP-CLI en los contenedores de PHP",
+                 on ? "Puesto: wp dentro de los contenedores, con la base de datos de Docker (docker exec <contenedor> wp …). Vale para todos los proyectos de Docker"
+                    : "Apagado: los contenedores de PHP no traen wp. Al ponerlo, vale para todos los proyectos de Docker") {
+                Toggle("", isOn: Binding(get: { on }, set: { v in if v != on { change(v) } }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden()
+                    .busyGuard(model.busy)
+            }
+        }
+        .onAppear { read() }
+    }
+
+    func read() {
+        on = FileManager.default.fileExists(atPath: LOG_DIR + "/docker/wp-cli")
+    }
+
+    func change(_ v: Bool) {
+        if let guardTask = TASK_GUARD, guardTask() { return }
+        let r = runDialog(title: v ? "¿Poner WP-CLI en los contenedores de PHP?" : "¿Quitar WP-CLI de los contenedores de PHP?",
+                          text: v ? "Las imágenes de PHP de Docker traerán WP-CLI: podrás ejecutar wp en el contenedor de cada proyecto, con su base de datos de Docker. La imagen de una versión de PHP es la de todos sus proyectos, así que vale para todos. Los proyectos en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian."
+                                  : "Las imágenes de PHP de Docker dejarán de traer WP-CLI, en todos los proyectos. Los que estén en marcha se vuelven a crear con la imagen nueva; sus bases de datos y su configuración no cambian.",
+                          okLabel: v ? "Poner" : "Quitar", style: .informational, destructive: false,
+                          checkbox: "Rehacer ya las imágenes de PHP que tienes (unos minutos cada una)", checked: true)
+        guard r.ok else { return }
+        _ = model.runTask(v ? "Poniendo WP-CLI en Docker" : "Quitando WP-CLI de Docker",
+                          ["docker-wp-cli", v ? "si" : "no"] + (r.checked ? ["--rehacer"] : []),
+                          doneText: "WP-CLI en Docker " + (v ? "puesto" : "quitado"), autoClose: !r.checked) { _, _, _ in read() }
     }
 }
 
@@ -106,26 +143,26 @@ struct GitHubCard: View {
                  : "Sin conectar: hace falta para ver la lista de repositorios (también los privados)") {
                 Button("Conectar con un token…") { model.githubToken() }
                     .buttonStyle(OutlineButton(kind: g?.on == true ? "" : "primary"))
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                 if g?.source != "gh" && ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].contains(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
                     Button("Usar la sesión de gh") { runQuick(["github-conectar", "--gh"]) { rc, out in model.githubDone(rc, out) } }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                         .tip("Usar la sesión de gh auth login")
                 }
                 if !(g?.source ?? "").isEmpty {
                     Button("Desconectar") { runQuick(["github-desconectar"]) { rc, out in model.githubDone(rc, out) } }
-                        .disabled(model.busy)
+                        .busyGuard(model.busy)
                 }
             }
             Tile("Organización o cuenta", "La de los repositorios que se ven (por ejemplo, mi-empresa)") {
                 TextField("", text: $account).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 170)
                 Button("Guardar") { model.githubSet("cuenta", account.trimmingCharacters(in: .whitespaces)) }
-                    .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "") || model.busy)
+                    .disabled(account.trimmingCharacters(in: .whitespaces) == (g?.account ?? "")).busyGuard(model.busy)
             }
             Tile("Prefijos de los repositorios", "Separados por espacios (wordpress- tienda- …); vacío: todos") {
                 TextField("", text: $prefixes).textFieldStyle(RoundedBorderTextFieldStyle()).frame(width: 240)
                 Button("Guardar") { model.githubSet("prefijos", prefixes.trimmingCharacters(in: .whitespaces)) }
-                    .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "") || model.busy)
+                    .disabled(prefixes.trimmingCharacters(in: .whitespaces) == (g?.prefixes ?? "")).busyGuard(model.busy)
             }
         }
         .onAppear { if model.github == nil { model.reloadGithub() } else { fill() } }
@@ -206,22 +243,22 @@ struct NodeView: View {
             iconButton(.logo("log"), "Registro: lo último que ha dicho su servidor") {
                 model.runTask("Registro de \(p.folder)", ["node-registro", p.folder])
             }
-            .disabled(model.busy)
+            .busyGuard(model.busy)
             if p.running {
                 iconButton(.symbol("arrow.clockwise", Color.primary), p.mode == "compilado" ? "Volver a compilar y arrancar" : "Reiniciar su servidor") {
                     model.startNode(p, mode: p.mode)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue), tip: "Abrir \(p.url)") { openURL(p.url) }
             } else {
                 VisorButton(conf: c, name: "Arrancar", icon: .symbol("play.fill", Color.green), tip: "En desarrollo: los cambios se ven al momento") {
                     model.startNode(p, mode: "desarrollo")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
                 VisorButton(conf: c, name: "Compilar", icon: .symbol("hammer.fill", Color.primary), tip: "Compilar y arrancar, como en producción") {
                     model.startNode(p, mode: "compilado")
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
             if sharing {
                 VisorButton(conf: c, name: "Compartiendo", icon: .logo("cloudflare"), tip: "Ver dirección y contraseña del túnel", kind: "compartiendo") {
@@ -232,13 +269,13 @@ struct NodeView: View {
                             tip: p.running && p.mode == "compilado" ? "Compartir con un túnel de Cloudflare" : "Compilar, arrancar y compartir con un túnel de Cloudflare") {
                     model.shareNode(p)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
             if p.running {
                 VisorButton(conf: c, name: "Parar", icon: .symbol("stop.fill", Color.red), tip: "Parar su servidor (y su túnel, si se está compartiendo)") {
                     model.stopNode(p)
                 }
-                .disabled(model.busy)
+                .busyGuard(model.busy)
             }
         }
         .padding(.horizontal, 14)
@@ -330,7 +367,7 @@ struct ReposView: View {
             if item.state == "clonado" {
                 Button("Traer cambios") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton())
-                    .disabled(model.busy)
+                    .busyGuard(model.busy)
                     .tip("Actualizar con git pull")
             } else if item.state == "ocupado" {
                 Button("Clonar") {}
@@ -340,8 +377,8 @@ struct ReposView: View {
             } else {
                 Button("Clonar") { model.fetchRepo(item) }
                     .buttonStyle(OutlineButton(kind: "primary"))
-                    .disabled(model.busy)
-                                        .tip("Clonar en htdocs con tu conexión de GitHub")
+                    .busyGuard(model.busy)
+                    .tip("Clonar en htdocs con tu conexión de GitHub")
             }
             // (para pegarlo en Nuevo proyecto)
             Button(action: {

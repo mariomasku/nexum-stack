@@ -343,7 +343,9 @@ function docker_install() {
 # host.docker.internal, otro contenedor) podia ejecutar PHP con PHP_VALUE. Ahora no hay FastCGI:
 # solo responde la web del contenedor, y solo a quien trae la clave del proyecto (la pone el Apache
 # del Mac). PHP corre como www-data dentro del contenedor.
-# docker_php_image <version> [--nueva]: con --nueva, se rehace descargando otra vez la de Docker Hub
+# docker_php_image <version> [--nueva|--rehacer]: con --nueva, se rehace descargando otra vez la de Docker
+# Hub; con --rehacer, con lo ya descargado (al poner o quitar WP-CLI). Con la opcion de Configuracion >
+# Docker, lleva WP-CLI (docker_wp_cli_dockerfile): wp con la BBDD y la configuracion de Docker
 DOCKER_IMAGE_SCHEMA=2
 # (install-php-extensions, fijado por su huella, como en Linux: la etiqueta 2 la puede mover cualquiera que
 # llegue a esa cuenta de Docker Hub. Es la 2.12.3, del 20/10/2026, para amd64 y arm64; para otra: docker
@@ -351,9 +353,10 @@ DOCKER_IMAGE_SCHEMA=2
 DOCKER_EXT_INSTALLER="mlocati/php-extension-installer:2.12.3@sha256:ac4b252c153a9f6de5578ff2c417790aba836bb49855543144606033eceda253"
 function docker_php_image() {
     local php=$1 fresh=$2 dir=$DOCKER_DIR/imagenes/php-$1 have
-    if [ "$DRY" -eq 0 ] && [ "$fresh" != --nueva ]; then
+    if [ "$DRY" -eq 0 ] && [ "$fresh" != --nueva ] && [ "$fresh" != --rehacer ]; then
         have=$(dk image inspect --format '{{index .Config.Labels "nexum.esquema"}}' "nexum-php:$php" 2> /dev/null)
-        [ "$have" == "$DOCKER_IMAGE_SCHEMA" ] && return 0
+        # (con WP-CLI puesto, la que no lo trae se rehace)
+        [ "$have" == "$DOCKER_IMAGE_SCHEMA" ] && ! docker_php_needs_wp_cli "$php" && return 0
     fi
     mkdir -p -m 700 "$dir" || return 1
     # (con la version de PHP en el nombre del FROM y en las extensiones, nada mas del exterior)
@@ -361,6 +364,7 @@ function docker_php_image() {
         printf 'FROM php:%s-apache\nLABEL nexum.esquema="%s"\n' "$php" "$DOCKER_IMAGE_SCHEMA"
         printf 'COPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\n' "$DOCKER_EXT_INSTALLER"
         printf 'RUN install-php-extensions %s\n' "$DOCKER_PHP_EXT"
+        docker_wp_cli_dockerfile
         cat << 'EOF'
 COPY nexum-web.conf /etc/apache2/sites-available/000-default.conf
 COPY nexum.ini /usr/local/etc/php/conf.d/zz-nexum.ini
@@ -674,7 +678,7 @@ function docker_create() {
             local admin
             admin=$(docker_test_admin "$slug")
             grep -v '^A|' <<< "$admin" | grep .
-            grep -q '^A|' <<< "$admin" && echo "Administrador de pruebas del panel: $TEST_ADMIN_USER, contraseña $TEST_ADMIN_PASS"
+            grep -q '^A|' <<< "$admin" && test_admin_note
         fi
     fi
     task_step
@@ -878,6 +882,7 @@ function docker_test_admin() {
 }
 
 #@incluir comun/docker/docker_db_backup.sh
+#@incluir comun/docker/docker_wp_cli.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

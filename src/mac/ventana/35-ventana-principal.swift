@@ -4,10 +4,14 @@
 /// SISTEMA); a la derecha, el elegido
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         VStack(spacing: 0) {
             TopBar()
+                // (con el cristal, la barra del visor sólida: azul oscuro con el tema oscuro y blanca con el claro)
+                .background(model.look.cristal ? (scheme == .dark ? Color(red: 0.078, green: 0.129, blue: 0.239)
+                                                                  : Color.white) : Color.clear)
             Divider()
             HStack(spacing: 0) {
                 Sidebar()
@@ -30,7 +34,11 @@ struct ContentView: View {
                              set: { t in if t == nil && !model.taskHidden { model.task = nil } })) { t in
             TaskView(task: t).buttonStyle(PointerButtonStyle())
         }
+        // (Apariencia, cristal: el escritorio desenfocado detrás de la ventana)
+        .background(GlassBackground(on: model.look.cristal))
         .onAppear { model.applyTheme() }
+        // (abierta al iniciar sesión con el icono puesto: se esconde nada más salir)
+        .background(StartHiddenWindow())
     }
 
     @ViewBuilder
@@ -113,6 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "ptrace") {
             _ = unsafeBitCast(sym, to: Ptrace.self)(31, 0, nil, 0)
         }
+        // Abierta al iniciar sesión (el LaunchAgent, con --al-iniciar): con el icono de la barra de menús
+        // puesto, sin ventana, solo el icono; sin él, la ventana de siempre
+        startHidden = CommandLine.arguments.contains(LOGIN_ARG) && trayWanted()
     }
     // Al cerrar la ventana (el boton rojo) la aplicacion se cierra del todo: sin procesos que sigan
     // gastando sin ventana. Con una tarea en marcha (instalar, cargar...) espera a que acabe y se cierra
@@ -135,6 +146,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Apariencia, tamaño: lo de dentro se coloca en una ventana 1/zoom más grande (o más pequeña) y se pinta a
+/// escala, así todo (letras, márgenes, iconos) cambia a la vez y los clics van donde se ve. Al 100 %, tal cual
+struct ZoomBox<Content: View>: View {
+    let zoom: CGFloat
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if zoom == 1 {
+            content()
+        } else {
+            GeometryReader { g in
+                content()
+                    .frame(width: g.size.width / zoom, height: g.size.height / zoom)
+                    .scaleEffect(zoom, anchor: .topLeading)
+            }
+        }
+    }
+}
+
+/// Apariencia, cristal: detrás de todo, el material de macOS que deja ver el escritorio desenfocado (lo
+/// calcula el sistema con la tarjeta gráfica). La ventana deja de ser opaca mientras está puesto
+struct GlassBackground: NSViewRepresentable {
+    let on: Bool
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .underWindowBackground
+        v.blendingMode = .behindWindow
+        v.state = .active
+        return v
+    }
+
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {
+        v.isHidden = !on
+        let apply = { [weak v] in
+            guard let w = v?.window else { return }
+            w.isOpaque = !on
+            w.backgroundColor = on ? .clear : .windowBackgroundColor
+        }
+        if v.window != nil { apply() } else { DispatchQueue.main.async(execute: apply) }
+    }
+}
+
 @main
 struct GestorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
@@ -147,9 +201,13 @@ struct GestorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(model)
-                .frame(minWidth: model.minWindowWidth, minHeight: 680)
+            // (Apariencia, tamaño: la ventana entera a escala; el mínimo, también)
+            ZoomBox(zoom: CGFloat(model.look.zoom) / 100) {
+                ContentView()
+                    .environmentObject(model)
+            }
+            .frame(minWidth: model.minWindowWidth * CGFloat(model.look.zoom) / 100,
+                   minHeight: 680 * CGFloat(model.look.zoom) / 100)
         }
         .commands {
             CommandGroup(replacing: .appInfo) {

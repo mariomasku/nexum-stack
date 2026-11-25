@@ -753,6 +753,8 @@ function no_tty() {
     ( set -o pipefail; /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" < /dev/null 2>&1 | cat )
 }
 
+#@incluir comun/pila-propia-version-php/step_watch.sh
+
 function step() {
     local part=$1 from=$2 to=$3 lines=$4 desc=$5 log=$6
     shift 6
@@ -766,7 +768,8 @@ function step() {
     # Sin terminal (en su propia sesion): lo que se compila esta en una carpeta tuya y lo puede cambiar
     # cualquier programa tuyo; con la terminal de la tarea podria usar el permiso de sudo que ya se ha
     # dado (sudo -n). Sin ella, sudo le pediria la contraseña y falla
-    if ! /usr/bin/python3 -I -c "$NO_TTY_PY" "$@" > "$log" 2>&1 < /dev/null; then
+    # (mientras dura, por donde va: step_watch)
+    if ! step_watch "$from" "$to" "$lines" "$desc" "$log" /usr/bin/python3 -I -c "$NO_TTY_PY" "$@"; then
         echo "  ERROR: $desc. Ultimas lineas de $(basename "$log"):"
         tail -25 "$log" | sed 's/^/    /'
         STEP_LOG=$log STEP_DESC=$desc
@@ -1363,6 +1366,8 @@ function reload_apache() {
 
 function start_mysql() {
     running "$MYSQL_PID" && { echo "MariaDB ya estaba arrancado."; return 0; }
+    # (sin su servidor no hay nada que esperar: se dice al momento, en vez de 60 s esperando)
+    [ -x "$ROOT/mysql/bin/mariadbd-safe" ] || { echo "MariaDB no esta instalada en esta version (falta mysql/bin/mariadbd-safe): actualizala en Componentes"; return 1; }
 
     # mariadbd-safe busca sus herramientas desde la carpeta de MariaDB
     (cd "$ROOT/mysql" && as_web /usr/bin/nohup ./bin/mariadbd-safe --defaults-file="$ROOT/etc/my.cnf" < /dev/null > /dev/null 2>&1 &)

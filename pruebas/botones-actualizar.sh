@@ -41,8 +41,11 @@ open(g["BUTTONS_FILE"], "w").write("{roto")
 say("botones: un fichero roto no rompe nada", g["buttons_conf"]()["order"] == keys)
 json.dump({"order": ["log", "inventado", "web"], "hidden": ["pma", "otro"], "style": "raro"}, open(g["BUTTONS_FILE"], "w"))
 c = g["buttons_conf"]()
-say("botones: lo que no se conoce se ignora y los que faltan van al final",
-    c["order"][:2] == ["log", "web"] and sorted(c["order"]) == sorted(keys) and c["hidden"] == {"pma"} and c["style"] == "nombre")
+o = c["order"]
+say("botones: lo que no se conoce se ignora, lo guardado sigue en su orden y los que faltan van detrás del que les precede",
+    o.index("log") < o.index("web") and o.index("vscode") == o.index("web") + 1
+    and o.index("actualizar") == o.index("log") + 1 and sorted(o) == sorted(keys) and c["hidden"] == {"pma"}
+    and c["style"] == "nombre")
 g["buttons_save"]({"order": list(reversed(keys)), "hidden": {"vscode"}, "style": "grande", "size": 96})
 c = g["buttons_conf"]()
 say("botones: se guarda el orden, los ocultos y el estilo", c["order"] == list(reversed(keys)) and c["hidden"] == {"vscode"} and c["style"] == "grande")
@@ -84,7 +87,13 @@ check "ventana: «Personalizar los botones…» en el menú ⋮ y en Configuraci
 check "ventana: Desmontar, ⋮ y los fijos de Docker, del mismo estilo y tamaño" 'grep -q "\[(eject, (\"icono\", \"media-eject-symbolic\"), \"Desmontar\")\]" "$SRC" && grep -q "self.nv_restyle(more, buttons_conf()" "$SRC" && grep -q "self.nv_restyle(power, conf" "$SRC" && grep -q "self.nv_restyle(vb, conf" "$SRC"'
 check "ventana: sin nombre, el cuadrado mide lo mismo de alto que de ancho" 'grep -q "b.set_size_request(side, side)" "$SRC"'
 check "ventana: al cargar un proyecto, la lista sube sola (el visor, fijo arriba)" 'grep -qF "smooth_scroll(getattr(self, \"proj_scroll\", self.page_projects))" "$SRC" && grep -qF "self.proj_list_page.pack_start(self.nv_list" "$SRC"'
-check "ventana: los dos visores colocan sus botones con lo elegido" '[ "$(grep -c "self.nv_place_buttons(acts, btns" "$SRC")" -eq 2 ]'
+# (1.57.25) Con los botones grandes, la fila del visor pedía más que la ventana y el margen de la página, que
+# crecía con ella, la hacía crecer sin parar: en varias líneas (FlowBox) y el margen contando con el contenido
+check "ventana: los botones de los dos visores, en varias líneas si no caben" '[ "$(grep -c "flow = nv_button_flow()" "$SRC")" -eq 2 ] && grep -q "Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE" "$SRC"'
+check "ventana: el margen de la página cuenta con lo que pide su contenido (sin bucle)" '[ "$(grep -c "side = page_side(alloc.width, " "$SRC")" -eq 2 ] && grep -q "need = max(need, least)" "$SRC" && ! grep -q "side = max(26, (alloc.width - PAGE_MAX) // 2)" "$SRC"'
+check "ventana: cada logotipo, ajustado a su contorno (la bola del mundo como el círculo de WordPress)" 'grep -q "\"globo\": (2, 2, 20, 20)" "$SRC" && grep -q "\"phpmyadmin\": (0.05, 3.5, 23.9, 17.05)" "$SRC" && grep -q "extra = min(LOGO_OVER, (max(w, h) / max(0.1, min(w, h))) \*\* 0.5)" "$SRC"'
+check "ventana: phpMyAdmin en dos colores (velas naranjas, casco azul)" 'grep -q "^LOGO_PARTS = {\"phpmyadmin\": \[" "$SRC" && grep -q "(\"#F39C12\", \"#FBB040\")" "$SRC"'
+check "ventana: los dos visores colocan sus botones con lo elegido" '[ "$(grep -c "self.nv_place_buttons(flow, btns" "$SRC")" -eq 2 ]'
 check "configuración: sus apartados en tarjetas de dos en dos (Docker: dirección y puertos juntos, a lo ancho)" '[ "$(grep -c "tile_group(\"" "$SRC")" -ge 10 ] && grep -q "^class TileGrid(Gtk.Grid):" "$SRC" && grep -q "row = ActionRow(\"Dirección y puertos\"," "$SRC"'
 check "botones: el configurador en horizontal (cabe en un portátil)" 'grep -q "cols = Gtk.Box(spacing=26)" "$SRC" && grep -q "side.pack_start(preview, False, False, 0)" "$SRC"'
 exit $fail

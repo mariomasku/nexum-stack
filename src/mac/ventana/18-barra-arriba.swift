@@ -111,7 +111,7 @@ struct TopBar: View {
         let running = d?.running ?? false
         let svc = Dictionary((model.services ?? []).map { ($0.name, $0.running) }, uniquingKeysWith: { a, _ in a })
         return HStack(spacing: 9) {
-            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 22, height: 22)
+            BrandLogo(name: "php", size: 22)
             VStack(alignment: .leading, spacing: 0) {
                 // (siempre en una línea: el visor se ensancha antes que partir «XAMPP-8.5»)
                 Text(act.map { "PHP \($0.php)" } ?? "Ninguna versión activa").font(.system(size: 13, weight: .semibold))
@@ -191,7 +191,7 @@ struct TopBar: View {
                 ForEach(c.installs) { i in
                     Button(action: { powerOpen = false; model.activate(i.folder) }) {
                         HStack(spacing: 10) {
-                            LogoShape(d: LOGO_PATHS["php"] ?? "").fill(brand("php")).frame(width: 16, height: 16)
+                            BrandLogo(name: "php", size: 16)
                             Text("PHP \(i.php)").font(.system(size: 13))
                             Text("XAMPP-\(i.folder)").font(.system(size: 11, design: .monospaced)).foregroundColor(.secondary)
                             Spacer(minLength: 12)
@@ -238,7 +238,7 @@ struct TopBar: View {
         if let m = model.data?.mail, m.on {
             Button(action: { model.openMail() }) {
                 HStack(spacing: 6) {
-                    LogoShape(d: LOGO_PATHS["mailpit"] ?? "").fill(brand("mailpit")).frame(width: 15, height: 15)
+                    BrandLogo(name: "mailpit", size: 15)
                     Text("Correo")
                     if let n = model.mailUnread, n > 0 {
                         Text(n > 99 ? "99+" : "\(n)")
@@ -358,7 +358,7 @@ struct WarningsView: View {
                             Button("Ahora no") { model.ignoreUpdates(c) }
                             Button("Actualizar todo") { model.updateComponents(c) }
                                 .buttonStyle(OutlineButton(kind: "primary"))
-                                .disabled(model.busy)
+                                .busyGuard(model.busy)
                         })
                 }
             }
@@ -370,7 +370,7 @@ struct WarningsView: View {
                     Card("Hay un XAMPP oficial en /Applications/XAMPP",
                          "Este gestor necesita que /Applications/XAMPP sea un enlace a la versión activa. Al apartarlo se copian sus BBDD, sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>, sin borrar nada.") {
                         Row("XAMPP oficial") {
-                            Button("Apartar…") { model.setAside() }.disabled(model.busy)
+                            Button("Apartar…") { model.setAside() }.busyGuard(model.busy)
                         }
                     }
                 }
@@ -382,7 +382,7 @@ struct WarningsView: View {
                             Row("MariaDB de XAMPP-\(d.dbsysVersion)", "Registro de errores: \(fmtSize(d.dbsysLog))", trailing: {
                                 Button("Repararlas") { model.repairDbSystem() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -394,28 +394,40 @@ struct WarningsView: View {
                                 oldPma.map { "XAMPP-\($0.folder) (\($0.pma))" }.joined(separator: ", "), trailing: {
                                 Button("Actualizarlos") { model.updatePma("--todas") }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
-                    if !d.unsecured.isEmpty {
-                        Card("A algunas versiones les faltan protecciones",
-                             "Les falta algo de lo que pone el gestor: solo para este Mac, phpMyAdmin cerrado a otras webs, MariaDB sin acceso a los ficheros del Mac... (o su carpeta no es de root y no se arrancarían). Protegerlas lo pone, como en la activa; pide la contraseña de administrador.") {
-                            Row("Versiones sin proteger", d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "), trailing: {
-                                Button("Protegerlas") { model.secureAll() }
-                                    .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
-                            })
+                    Group {
+                        if !d.unsecured.isEmpty {
+                            Card("A algunas versiones les faltan protecciones",
+                                 "Les falta algo de lo que pone el gestor: solo para este Mac, phpMyAdmin cerrado a otras webs, MariaDB sin acceso a los ficheros del Mac... (o su carpeta no es de root y no se arrancarían). Protegerlas lo pone, como en la activa; pide la contraseña de administrador.") {
+                                Row("Versiones sin proteger", d.unsecured.map { "XAMPP-" + $0 }.joined(separator: ", "), trailing: {
+                                    Button("Protegerlas") { model.secureAll() }
+                                        .buttonStyle(OutlineButton(kind: "primary"))
+                                        .busyGuard(model.busy)
+                                })
+                            }
+                        }
+                        if !d.apacheOld.isEmpty {
+                            Card("Apache sigue con la configuración de antes",
+                                 "Se ha cambiado su configuración (la seguridad, la barrera entre webs...) y Apache no se ha recargado: hasta reiniciarlo, sigue con lo de antes.") {
+                                Row("XAMPP-\(d.apacheOld)", "Reiniciar Apache para que la use", trailing: {
+                                    Button("Reiniciar Apache") { model.reloadApacheConfig() }
+                                        .buttonStyle(OutlineButton(kind: "primary"))
+                                        .busyGuard(model.busy)
+                                })
+                            }
                         }
                     }
                 }
                 Group {
                     if !d.certs.isEmpty || !d.cas.isEmpty {
-                        Card("Certificados en los que confía todo el Mac", certsText(d)) {
+                        Card(certsTitle(d), certsText(d)) {
                             Row("Proyectos con https", certsNames(d), trailing: {
                                 Button("Arreglarlos") { model.fixCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -429,7 +441,7 @@ struct WarningsView: View {
                                 trailing: {
                                 Button("Confiar") { model.trustCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -443,7 +455,7 @@ struct WarningsView: View {
                                 trailing: {
                                 Button("Quitar") { model.untrustCerts() }
                                     .buttonStyle(OutlineButton(kind: "primary"))
-                                    .disabled(model.busy)
+                                    .busyGuard(model.busy)
                             })
                         }
                     }
@@ -462,7 +474,7 @@ struct WarningsView: View {
                         Card("Hay procesos de otras versiones en memoria",
                              "Solo debería estar en memoria la versión montada\(d.active.isEmpty ? "" : " (XAMPP-\(d.active))"). Ocupan memoria y pueden bloquear los puertos 80, 443 y 3306.") {
                             Row("Procesos que sobran", d.stray) {
-                                Button("Cerrarlos") { model.closeStray() }.disabled(model.busy)
+                                Button("Cerrarlos") { model.closeStray() }.busyGuard(model.busy)
                             }
                         }
                     }
@@ -473,7 +485,7 @@ struct WarningsView: View {
                                 Row(o.folder, o.domains.isEmpty ? "sin dominio" : o.domains)
                             }
                             Row("Quitar sus vhosts", "Pide la contraseña de administrador") {
-                                Button("Quitarlos") { model.removeOrphanVhosts() }.disabled(model.busy)
+                                Button("Quitarlos") { model.removeOrphanVhosts() }.busyGuard(model.busy)
                             }
                         }
                     }

@@ -119,7 +119,9 @@ for row in os.environ.get("LVM_INFO", "").splitlines():
     print("T|%s|%s|%s|%d|%d" % (dom, crt, s, s in trusted, real))
 # Los nuestros que acepta el navegador y en los que ya no se puede confiar (una tienda que ya no esta
 # falseada, un vhost que ya no esta...). Linux: por su nombre (lvm-instalador <dominio>) en cada
-# almacen. Mac: por las copias que se guardan al confiar (<dominio>.<sha1>.crt)
+# almacen. Mac: por las copias que se guardan al confiar (<dominio>.<sha1>.crt). El de Docker
+# (lvm-instalador docker.local, el de *.docker.local y *.docker.test) no es de ningun vhost de LAMPP:
+# lo pone y lo cambia docker_web_trust, y aqui no se toca (se quitaba al cargar cualquier proyecto)
 if osname == "linux":
     gone = set()
     for db in [os.path.join(HOME, ".pki/nssdb"), os.path.join(HOME, "snap/chromium/current/.pki/nssdb")] \
@@ -128,7 +130,7 @@ if osname == "linux":
             continue
         for line in run(["certutil", "-L", "-d", "sql:" + db]).splitlines()[4:]:
             m = re.match(r"^lvm-instalador ([a-z0-9.-]+)\s+[CcTtPpu]*,[CcTtPpu]*,[CcTtPpu]*\s*$", line)
-            if m and m.group(1) not in good and (not only or m.group(1) == only):
+            if m and m.group(1) not in good and m.group(1) != "docker.local" and (not only or m.group(1) == only):
                 gone.add(m.group(1))
     for d in sorted(gone):
         print("U|" + d)
@@ -438,6 +440,13 @@ EOF
     if ! cmp -s "$copy" "$HOSTS_FILE"; then
         edit_hosts --aplicar "$copy" || { rm -f "$copy"; return 1; }
     fi
+    # Los WordPress con dominio propio, a la direccion que toca: la del dominio si esta falseado y la
+    # de web.local si no (en simulacion, con el hosts que quedaria)
+    if [ "$DRY" -eq 1 ]; then
+        HOSTS_FILE=$copy wp_urls_sync_all
+    else
+        wp_urls_sync_all
+    fi
     rm -f "$copy"
 }
 
@@ -657,10 +666,20 @@ EOF
 # aplica al vhost de los proyectos (web.local) mientras ese proyecto este cargado (media_sync)
 MEDIA_PROJECTS_FILE="$LOG_DIR/media-produccion"
 #@incluir comun/navegador-acepte-certificado-propio/media_saved.sh
+#@incluir comun/navegador-acepte-certificado-propio/media_local.sh
 # Regla de imagenes del vhost de los proyectos (web.local) segun el proyecto cargado: la de su
 # dominio de produccion (media-proyecto) si es un WordPress que lo tiene, si no ninguna. Solo cambia
 # los vhosts si hace falta
 function media_sync() {
+    local rc=0
+    media_sync_link || rc=1
+    # (y las reglas del intermediario de imagenes, en los vhosts de cada proyecto que las tiene)
+    media_local_vhosts || rc=1
+    return $rc
+}
+
+# La regla de web.local (redireccion de media-produccion) del WordPress cargado
+function media_sync_link() {
     local link folder name want="" now
     link=$(project_link) || return 0
     folder=$(readlink "$HTDOCS_DIR/$link" 2> /dev/null | sed 's:/*$::')

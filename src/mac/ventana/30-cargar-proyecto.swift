@@ -11,11 +11,20 @@ struct ProjectsData: Equatable {
     var link = "", current = ""
     /// No hay vhost para cargar proyectos: cargar-proyecto crea web.local
     var create = false
+    /// Dirección con la que se abre el proyecto cargado, con la barra del final: la W de gui-proyectos
+    /// (la misma que su WP_HOME: su dominio si está falseado y, si no, el vhost de los proyectos con
+    /// https). Vacía si no la hay
+    var web = ""
     var list: [Project] = []
     /// Base -> carpeta recordada (en todas las versiones, como se guardaba hasta la 1.36)
     var saved: [String: String] = [:]
     /// "base@versión" -> carpeta vinculada en esa versión ("" = desvinculada en ella)
     var vlinks: [String: String] = [:]
+}
+
+extension ProjectsData {
+    /// La dirección del proyecto cargado: la de gui-proyectos o, sin ella, http://<enlace>/ como antes
+    var webURL: String { !web.isEmpty ? web : (link.isEmpty ? "" : "http://\(link)/") }
 }
 
 struct ProjectRequest: Identifiable {

@@ -218,8 +218,12 @@ function node_log() {
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
         gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
-        # (el tunel y los repositorios, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|borrar-bd) ;;
+        # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        # (el administrador de pruebas: solo un ajuste de ~/.nexum)
+        admin-pruebas) ;;
+        # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker sin root)
+        docker-wp-cli) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -264,7 +268,8 @@ case "$1" in
     status|estado) echo -e "$(status_text)" ;;
     disable) disable_lampp ;;
     remove|desinstalar) cli_remove "$2" "$3" ;;
-    ventana|gui|ventana-nueva) gui_open ;;
+    # (--al-iniciar: la abre el acceso de inicio de la sesion; con el icono junto al reloj, se queda en el)
+    ventana|gui|ventana-nueva) [ "$2" == --al-iniciar ] && export LVM_AL_INICIAR=1; gui_open ;;
     arrancar|start) control_lampp start ;;
     parar|stop) control_lampp stop ;;
     reiniciar|restart) control_lampp restart ;;
@@ -296,6 +301,7 @@ case "$1" in
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
+    docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
     docker-volumen-borrar) docker_volume_remove "$2" ;;
@@ -322,7 +328,10 @@ case "$1" in
     desmontar-proyecto) unload_project ;;
     borrar-proyecto) shift; delete_project "$@" ;;
     usuario-pruebas) test_admin "$2" "$3" ;;
+    admin-pruebas) shift; test_admin_config "$@" ;;
     montar-proyecto) mount_project "$2" "$3" "$4" "$5" "$6" ;;
+    rama-proyecto) project_branch "$2" "$3" "$4" ;;
+    gui-ramas-proyecto) gui_project_branches "$2" ;;
     vaciar-cache)
         if [ "$2" == "--bd" ]; then ps_clear_cache_db "$3"; else ps_clear_cache "$2"; fi
         ;;
@@ -367,11 +376,13 @@ case "$1" in
     github) shift; github_command "$@" ;;
     github-conectar) github_connect "$2" ;;
     github-desconectar) github_disconnect ;;
+    github-llavero-instalar) github_keyring_install ;;
     repos) shift; repos_list "$@" ;;
     repo-traer) repo_fetch "$2" "$3" ;;
     docker-bd) docker_db_mode "$2" "$3" "$4" ;;
     docker-reposo) shift; docker_idle_command "$@" ;;
     componentes) components_check "$2" ;;
+    piezas-danadas) gui_broken ;;
     componentes-actualizar) components_update "$2" ;;
     actualizar-a) upgrade_to "$2" "$3" "$4" ;;
     descargas) downloads_command "$2" ;;

@@ -25,7 +25,11 @@ if [ $MAC -eq 1 ]; then
 else
     lampp_dirs() { echo /opt/lampp-7.4.33 /opt/lampp-8.1 /opt/lampp-8.3 /opt/lampp-8.4; }
     is_fpm_install() { [ "$1" != /opt/lampp-8.1 ]; }
+    # (ninguna es de una pila propia: su MariaDB no se mira; las de este equipo no cuentan)
+    is_stack_install() { false; }
 fi
+# (sus piezas, bien: las dañadas se prueban aparte, al final)
+stack_broken() { :; }
 # Docker: la MariaDB 11.8 y la imagen de PHP 8.4 tienen una nueva en Docker Hub
 docker_ready() { true; }
 docker_maria_versions() { echo 11.8; }
@@ -48,6 +52,58 @@ check "Docker: las imagenes con una nueva en Docker Hub (solo las que estan)" 'g
 check "Mailpit con una version nueva; cloudflared al dia" 'grep -qx "X|Mailpit|1.32.0|1.33.0" <<< "$out" && ! grep -q "^X|cloudflared" <<< "$out"'
 check "el total" 'grep -qx "S|5" <<< "$out"'
 check "sin Docker: no se pregunta a Docker" ': > "$W/dk.log"; components_check --sin-docker | grep -qx "S|3" && [ ! -s "$W/dk.log" ]'
+# (1.57.31) Una pieza dañada (su programa no esta o no responde), aunque este en lo ultimo de su rama: se rehace
+stack_broken() { [[ "$1" == */8.3* || "$1" == */lampp-8.3 || "$1" == */XAMPP-8.3/xamppfiles ]] && echo "MariaDB Perl"; }
+[ $MAC -eq 0 ] && is_stack_install() { [ "$1" == /opt/lampp-8.3 ]; }
+out=$(components_check --sin-docker)
+check "pieza dañada: sale como dañado con lo ultimo de su rama, aunque su version ya sea esa" 'grep -qx "L|8.3|MariaDB|dañado|11.4.13" <<< "$out" && grep -qx "L|8.3|Perl|dañado|5.40.5" <<< "$out"'
+check "pieza dañada: las demas de esa version, como siempre" '! grep -q "^L|8.3|PHP\|^L|8.3|Apache" <<< "$out"'
+stack_broken() { :; }
+[ $MAC -eq 0 ] && is_stack_install() { false; }
+# stack_broken de verdad, con una version falsa: cada programa responde o no
+extract "$SRC" stack_broken || exit 1
+V=$W/pila; mkdir -p "$V/php/bin" "$V/php/sbin" "$V/apache2/bin" "$V/mysql/bin" "$V/proftpd/sbin" "$V/perl/bin" "$V/phpmyadmin"
+for f in php/bin/php php/sbin/php-fpm apache2/bin/httpd mysql/bin/mariadbd mysql/bin/mariadb mysql/bin/mariadbd-safe proftpd/sbin/proftpd perl/bin/perl; do
+    printf '#!/bin/sh\nexit 0\n' > "$V/$f"; chmod +x "$V/$f"
+done
+: > "$V/phpmyadmin/index.php"
+check "stack_broken: todo bien, nada" '[ -z "$(OSTYPE=linux-gnu stack_broken "$V")" ]'
+rm "$V/mysql/bin/mariadbd"; printf '#!/bin/sh\nexit 1\n' > "$V/perl/bin/perl"
+check "stack_broken: lo que falta y lo que no responde" '[ "$(OSTYPE=linux-gnu stack_broken "$V")" == "MariaDB Perl" ]'
+check "stack_broken: en el Mac solo que esten (Perl esta, aunque no responda)" '[ "$(OSTYPE=darwin24 stack_broken "$V")" == "MariaDB" ]'
+rm "$V/phpmyadmin/index.php" "$V/apache2/bin/httpd"
+check "stack_broken: phpMyAdmin sin su index.php y Apache sin su programa" '[ "$(OSTYPE=linux-gnu stack_broken "$V")" == "Apache MariaDB Perl phpMyAdmin" ]'
+check "stack_broken: lo usan Componentes, actualizar y la ventana" '[ "$(grep -c "stack_broken \"\$dir" "$SRC")" -ge 3 ]'
+# piezas-danadas (1.57.32): para la ventana, D|version|piezas de las pilas propias con alguna dañada
+extract "$SRC" gui_broken || exit 1
+stack_broken() { [[ "$1" == */lampp-8.4 || "$1" == */XAMPP-8.4/xamppfiles ]] && echo "MariaDB"; }
+[ $MAC -eq 0 ] && is_stack_install() { [ "$1" != /opt/lampp-8.1 ]; }
+check "piezas-danadas: solo las versiones con alguna dañada" '[ "$(gui_broken)" == "D|8.4|MariaDB" ]'
+check "piezas-danadas: es una orden de nexum" 'grep -q "^    piezas-danadas) gui_broken ;;" "$SRC"'
+if [ $MAC -eq 1 ]; then
+    check "ventana (Mac): Versiones en rojo, Reparar en su menú y Componentes, con piezas-danadas" 'grep -q "runQuick(\[\"piezas-danadas\"\])" "$SRC" && grep -q "Button(\"Reparar (" "$SRC" && grep -q "joined(separator: \", \") + \" dañado\")" "$SRC" && grep -q "\.onAppear { model.loadBroken() }" "$SRC"'
+else
+    check "ventana: Versiones en rojo, Reparar en su menú y Componentes, con piezas-danadas" 'grep -q "run_quick(\[\"piezas-danadas\"\], got)" "$SRC" && grep -q "(\"Reparar (%s dañado)\" %" "$SRC" && grep -q "dmg = label(\"%s dañado\" %" "$SRC" && grep -q "cells\[n\].set_text(cells\[n\].get_text() + \" · dañado\")" "$SRC" && grep -q "elif row.tab_name == \"versiones\":" "$SRC"'
+fi
+stack_broken() { :; }
+[ $MAC -eq 0 ] && is_stack_install() { false; }
+stack_broken() { :; }
+if [ $MAC -eq 0 ]; then
+    # mariadb_release: de lo que publica MariaDB, solo su binario (con el mismo final van sus plugins)
+    extract "$SRC" mariadb_release || exit 1
+    native_binaries() { true; }
+    fetch() { printf '%s' '{"releases":{"11.8.10":{"files":[
+      {"file_name":"mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/p.tar.gz","checksum":{"sha256sum":"'"$(printf 'a%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10-linux-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/b.tar.gz","checksum":{"sha256sum":"'"$(printf 'c%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10-linux-systemd-x86_64.tar.gz","file_download_url":"http://downloads.mariadb.org/m.tar.gz","checksum":{"sha256sum":"'"$(printf 'b%.0s' $(seq 64))"'"}},
+      {"file_name":"mariadb-11.8.10.tar.gz","file_download_url":"https://downloads.mariadb.org/s.tar.gz","checksum":{"sha256sum":"'"$(printf 'd%.0s' $(seq 64))"'"}}]}}}'; }
+    check "mariadb_release: el binario de MariaDB (con systemd), no uno de sus plugins" '[ "$(mariadb_release 11.8 | cut -d"|" -f1,2)" == "11.8.10|https://downloads.mariadb.org/m.tar.gz" ]'
+    native_binaries() { false; }
+    check "mariadb_release: sin binarios, su codigo fuente" '[ "$(mariadb_release 11.8 | cut -d"|" -f2)" == "https://downloads.mariadb.org/s.tar.gz" ]'
+    fetch() { printf '%s' '{"releases":{"11.8.10":{"files":[{"file_name":"mariadb-plugin-tidesdb-11.8.10-5.2.1-linux-systemd-x86_64.tar.gz","file_download_url":"https://downloads.mariadb.org/p.tar.gz","checksum":{"sha256sum":"'"$(printf 'a%.0s' $(seq 64))"'"}}]}}}'; }
+    native_binaries() { true; }
+    check "mariadb_release: si solo hay plugins, nada (no se instala uno de ellos como MariaDB)" '[ -z "$(mariadb_release 11.8)" ]'
+fi
 
 # Ponerlo al dia: cada cosa con lo suyo
 mkdir -p "$DOCKER_DIR/mariadb-11.8"

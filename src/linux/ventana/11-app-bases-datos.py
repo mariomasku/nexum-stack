@@ -79,8 +79,8 @@ class AppBasesDatos:
 
     def cache_button(self, db):
         """Vaciar var/cache de la tienda PrestaShop de la base (la carpeta la busca el script)."""
-        b = Gtk.Button(tooltip_text="Vaciar la caché de %s" % db,
-                       relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(tooltip_text="Vaciar la caché de %s" % db,
+                       relief=Gtk.ReliefStyle.NONE), self.busy)
         b.add(icon("edit-clear-all-symbolic"))
         b.connect("clicked", lambda *_: self.run_task(
             "Vaciando la caché de la tienda de %s" % db, ["vaciar-cache", "--bd", db],
@@ -99,8 +99,8 @@ class AppBasesDatos:
         """Copiar la base a otra versión de PHP que no la tenga (para probar el proyecto con ella)."""
         if not self.copy_targets(db, inst):
             return None
-        b = Gtk.Button(tooltip_text="Copiar %s a otra versión de PHP" % db,
-                       relief=Gtk.ReliefStyle.NONE, sensitive=not self.busy)
+        b = busy_guard(Gtk.Button(tooltip_text="Copiar %s a otra versión de PHP" % db,
+                       relief=Gtk.ReliefStyle.NONE), self.busy)
         b.add(icon("edit-copy-symbolic"))
         b.connect("clicked", lambda *_: self.on_copy_db(db, inst))
         return b
@@ -426,9 +426,9 @@ class AppBasesDatos:
                            tooltip_text="Elegirla para subir una BBDD")
             b.connect("clicked", lambda *_: self.use_as_destination(db))
             row.add_suffix(b)
-        load = Gtk.Button(label="Cargar proyecto", sensitive=not self.busy,
+        load = busy_guard(Gtk.Button(label="Cargar proyecto",
                           tooltip_text="Cargar en lampp-%s (PHP %s)"
-                                       % (folder, inst["php"]))
+                                       % (folder, inst["php"])), self.busy)
         load.connect("clicked", lambda *_: self.on_load_project(db, inst))
         row.add_suffix(load)
         return row

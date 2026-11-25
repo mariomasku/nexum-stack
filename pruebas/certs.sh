@@ -12,6 +12,18 @@ check "crea certificado y clave en la carpeta del gestor" '[ -f "$W/ssl/tienda.c
 check "la clave queda en 600" '[ "$(stat -c %a "$W/ssl/tienda.com-selfsigned.key")" = 600 ]'
 check "no es de CA (CA:FALSE)" 'openssl x509 -in "$W/ssl/tienda.com-selfsigned.crt" -noout -ext basicConstraints | grep -q "CA:FALSE"'
 check "lleva los dos nombres" 'openssl x509 -in "$W/ssl/tienda.com-selfsigned.crt" -noout -ext subjectAltName | grep -q "DNS:tienda.com, DNS:www.tienda.com"'
+# Una extension repetida (dos basicConstraints, como con -addext y el OpenSSL 1.1.1 de Ubuntu 20.04)
+# hace que Chrome lo rechace con ERR_CERT_INVALID (1.57.22)
+exts() { openssl x509 -in "$1" -noout -text | grep -E '^ {12}[^ ].*:( critical)? *$' | sort | uniq -d; }
+check "ninguna extension repetida" '[ -z "$(exts "$W/ssl/tienda.com-selfsigned.crt")" ]'
+O11=$(ls /opt/lampp-*/openssl/bin/openssl 2> /dev/null | head -1)
+if [ -n "$O11" ] && [ -f /etc/ssl/openssl.cnf ]; then
+    mkdir -p "$W/o11"
+    printf '#!/bin/sh\nLD_LIBRARY_PATH=%s OPENSSL_CONF=/etc/ssl/openssl.cnf exec %s "$@"\n' "$(dirname "$(dirname "$O11")")/lib" "$O11" > "$W/o11/openssl"
+    chmod +x "$W/o11/openssl"
+    PATH=$W/o11:$PATH make_selfsigned viejo.com www.viejo.com "$W/ssl/viejo.com-selfsigned.crt" "$W/ssl/viejo.com-selfsigned.key" > /dev/null
+    check "con OpenSSL 1.1.1 (Ubuntu 20.04): un solo basicConstraints, CA:FALSE" '[ -s "$W/ssl/viejo.com-selfsigned.crt" ] && [ -z "$(exts "$W/ssl/viejo.com-selfsigned.crt")" ] && ! openssl x509 -in "$W/ssl/viejo.com-selfsigned.crt" -noout -text | grep -q "CA:TRUE"'
+fi
 out=$(make_selfsigned tienda.com www.tienda.com "$W/otra/x.crt" "$W/otra/x.key"); rc=$?
 check "rechaza rutas fuera de la carpeta del gestor" '[ $rc -ne 0 ] && [ ! -e "$W/otra/x.crt" ] && echo "$out" | grep -q "no se crea"'
 out=$(make_selfsigned tienda.com x "$W/ssl/../otra/y.crt" "$W/ssl/y.key"); rc=$?
@@ -43,7 +55,7 @@ sudo() {
 make_selfsigned ro.com www.ro.com "$RO/ro.com-selfsigned.crt" "$RO/ro.com-selfsigned.key" > /dev/null
 if grep -q "exec openssl req" "$SRC"; then
     # Linux (1.41.0): openssl como root en su carpeta y copia con install
-    check "carpeta de root: crea con sudo" '[ -s "$RO/ro.com-selfsigned.crt" ] && [ "$(stat -c %a "$RO/ro.com-selfsigned.key")" = 600 ] && grep -q "SUDO sh -c umask 077; exec openssl" "$W/sudo2.log"'
+    check "carpeta de root: crea con sudo" '[ -s "$RO/ro.com-selfsigned.crt" ] && [ "$(stat -c %a "$RO/ro.com-selfsigned.key")" = 600 ] && grep -q "^SUDO sh -c umask 077" "$W/sudo2.log" && grep -q "exec openssl req" "$W/sudo2.log"'
     check "carpeta de root: openssl escribe en una carpeta de root (sudo mktemp) y copia con install" 'grep -q "^SUDO mktemp -d /tmp/lvm-cert" "$W/sudo2.log" && grep -q "^SUDO install -o 0 -g 0 -m 600" "$W/sudo2.log"'
     check "carpeta de root: el certificado lleva los dos nombres" 'openssl x509 -in "$RO/ro.com-selfsigned.crt" -noout -ext subjectAltName | grep -q "DNS:ro.com, DNS:www.ro.com"'
 else

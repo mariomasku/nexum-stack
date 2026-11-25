@@ -65,6 +65,9 @@ struct AppData: Equatable {
     var exposed = ""
     /// Versiones a las que les falta algo para ser solo de este Mac (asegurar --todas)
     var unsecured: [String] = []
+    /// Versión montada cuyo Apache en marcha sigue con la configuración de antes (escrita después de su
+    /// última carga: se ha cambiado la seguridad y no se ha recargado)
+    var apacheOld = ""
     /// Versión montada con las tablas del sistema de MariaDB antiguas y el tamaño de su registro de
     /// errores (reparar-bd-sistema)
     var dbsysVersion = ""
