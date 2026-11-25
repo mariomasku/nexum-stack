@@ -190,7 +190,7 @@ class Task:
         self.expander = Gtk.Expander(label="Ver registro", expanded=not self.progress)
         self.log = css(Gtk.TextView(editable=False, monospace=True, cursor_visible=False,
                                     wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=14, right_margin=14,
-                                    top_margin=10, bottom_margin=10, pixels_below_lines=2), "log", "nv-consola")
+                                    top_margin=10, bottom_margin=10, pixels_below_lines=3), "log", "nv-consola")
         self.console = Console(self.log.get_buffer())
         self.log_sw = css(Gtk.ScrolledWindow(min_content_height=220 if self.progress else 180, margin_top=8),
                           "nv-consola-marco")

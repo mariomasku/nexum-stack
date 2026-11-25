@@ -1464,22 +1464,27 @@
     <li>Vacía la base y carga el volcado como <code>root</code>, con todos los permisos.</li>
     <li>Vuelve a cargar el proyecto, para que su configuración apunte otra vez a la base y al dominio locales, y lo comprueba.</li>
   </ol>
-  <div class="nota"><b>Lo que sale en el registro</b>Del <code>git pull</code>, lo que ha traído: los ficheros nuevos (<code>+</code>),
-    modificados (<code>~</code>) y borrados (<code>-</code>), y un recuadro con el total de ficheros del repositorio y cuántos son
-    nuevos, modificados, sin tocar y borrados (o «ya estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que
-    ocupan, la lista de nuevos, modificados y que ya no están (los 200 primeros de cada uno), y un recuadro con sus cuentas:
+  <div class="nota"><b>Lo que sale en el registro</b>Cada paso empieza con su título (<code>━━ Paso 2 de 5: …</code>) y una
+    línea en blanco delante. Del <code>git pull</code>, la lista de los ficheros que ya no trae (<code>-</code>, borrados en GitHub, que allí
+    ya no se ven) y un recuadro con el total de ficheros del repositorio y cuántos son nuevos, modificados, sin tocar y borrados (o «ya
+    estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que ocupan, la lista de lo que hay en la carpeta del
+    proyecto y no viene en el código, y un recuadro con dos partes que no se mezclan:
     <pre>┌─────────────────────────────────────┐
 │ Código de producción                │
 ├─────────────────────────────────────┤
-│ Ficheros del código (total)   4.812 │
-│ Nuevos                           12 │
-│ Modificados                     340 │
-│ Sin tocar (iguales)           4.460 │
-│ Ya no están                       0 │
-│ No vienen y se dejan             35 │
+│ VIENEN EN EL CÓDIGO           4.812 │
+│   Nuevos: se copian              12 │
+│   Modificados: se sustituyen    340 │
+│   Iguales: no se tocan        4.460 │
+├─────────────────────────────────────┤
+│ SOLO EN TU CARPETA (no vienen)   35 │
+│   Se dejan como están (fusionar) 35 │
 └─────────────────────────────────────┘</pre>
-    «No vienen y se dejan» sale al fusionar: lo que hay en la carpeta y no trae el código. Al sobrescribir, eso es «Ya no están
-    (quitados)».</div>
+    <b>Vienen en el código</b>: todo lo que trae el paquete, y qué se hace con cada fichero. <b>Solo en tu carpeta</b>: lo que tienes en el
+    proyecto y el paquete no trae; al fusionar se deja como está y al sobrescribir se quita («Se quitan (sobrescribir)»). Con más de 25
+    ficheros, su lista se resume por carpetas (las que más tienen) y la lista entera, fichero a fichero, se guarda para mirarla con calma
+    en <code>~/nexum-backups/panaderia-luna-registro-…-no-vienen-se-dejan.txt</code> (o <code>-no-vienen-se-quitan.txt</code>; la del
+    <code>git pull</code>, <code>-borrados-en-github.txt</code>).</div>
   <div class="nota"><b>Copias que guarda</b>Con la casilla marcada, lo que el código sustituye o borra va a
     <code>~/nexum-backups/panaderia-luna-antes-de-actualizar-…</code>, y la base de antes (si tenía tablas) a <code>~/nexum-backups</code>,
     como <code>.sql.gz</code>. Sin ella, lo que el código sustituye o quita se borra. Si cancelas a medias, el proyecto queda con lo hecho

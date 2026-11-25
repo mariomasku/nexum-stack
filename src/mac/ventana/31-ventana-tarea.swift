@@ -154,7 +154,7 @@ struct TaskConsole: View {
                     Text(log)
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundColor(CONSOLE_TEXT)
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)

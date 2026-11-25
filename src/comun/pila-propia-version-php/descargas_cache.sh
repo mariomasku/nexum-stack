@@ -48,8 +48,10 @@ function dl_from_cache() {
     DL_SUM=$sum
 }
 
-# dl_note <archivo> <nombre> <sha256>: apunta una descarga ya comprobada, para guardarla en la cache
+# dl_note <archivo> <nombre> <sha256>: apunta una descarga ya comprobada, para guardarla en la cache.
+# Solo en una instalacion (con su carpeta $build): fuera (actualizar phpMyAdmin...) no hay donde apuntarla
 function dl_note() {
+    [ -n "$build" ] && [ -d "$build" ] || return 0
     printf '%s|%s|%s\n' "$1" "$2" "$3" >> "$build/descargas.lista"
 }
 

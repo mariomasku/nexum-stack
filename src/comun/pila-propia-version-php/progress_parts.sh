@@ -29,6 +29,9 @@ function task_step() {
     [ -n "$LVM_PROGRESO" ] && [ "$TASK_OWNER" == "${FUNCNAME[1]}" ] && [ "$TASK_CUR" -lt "${#TASK_NAMES[@]}" ] || return 0
     TASK_CUR=$(( TASK_CUR + 1 ))
     local what=${TASK_NAMES[TASK_CUR - 1]}
+    # (en el registro, cada paso con su titulo y una linea en blanco delante: que no quede todo junto)
+    [ "$TASK_CUR" -gt 1 ] && echo
+    echo "━━ Paso $TASK_CUR de ${#TASK_NAMES[@]}: $what"
     task_detail "${what//[|$'\n']/ }" "" "" 0 "$(date +%s)"
 }
 # El avance por dentro del paso de ahora: task_detail <texto> <modo> <fichero> <total> <inicio>

@@ -175,11 +175,12 @@ function repo_pull() {
     repo_pull_summary "$dir" "$before"
 }
 
-# Lo que ha traido un git pull (de <commit de antes> a HEAD), para el registro de la tarea: la lista de
-# ficheros nuevos (+), modificados (~) y borrados (-), las 200 primeras de cada uno, y un recuadro con
-# las cuentas. repo_pull_summary <carpeta> <commit de antes>
+# Lo que ha traido un git pull (de <commit de antes> a HEAD), para el registro de la tarea: la lista de los
+# ficheros que ya no trae (borrados en GitHub, que alli ya no se ven) y un recuadro con las cuentas. Los
+# nuevos y modificados se ven en GitHub: solo se cuentan. Con mas de 25 borrados, cuantos hay en cada
+# carpeta y la lista entera en ~/nexum-backups. repo_pull_summary <carpeta> <commit de antes>
 function repo_pull_summary() {
-    local dir=$1 before=$2 after changes total
+    local dir=$1 before=$2 after changes total gone n list
     after=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
     if [ -z "$before" ] || [ -z "$after" ]; then
         return 0
@@ -191,22 +192,29 @@ function repo_pull_summary() {
     changes=$(git -C "$dir" -c core.quotePath=false diff --no-renames --name-status "$before" "$after" 2> /dev/null)
     total=$(git -C "$dir" ls-files 2> /dev/null | wc -l)
     echo "git pull: de ${before:0:9} a ${after:0:9} ($(git -C "$dir" rev-list --count "$before..$after" 2> /dev/null) commits)"
-    awk -F'\t' '
-        { k = substr($1, 1, 1); g = (k == "A") ? "a" : (k == "D") ? "d" : "m"; n[g]++
-          if (n[g] <= 200) list[g] = list[g] "  " ((g == "a") ? "+" : (g == "d") ? "-" : "~") " " $2 "\n" }
-        END {
-            t["a"] = "Nuevos"; t["m"] = "Modificados"; t["d"] = "Borrados"
-            for (i = 1; i <= 3; i++) {
-                g = (i == 1) ? "a" : (i == 2) ? "m" : "d"
-                if (n[g] > 0) {
-                    printf "%s con el pull: %d %s\n%s", t[g], n[g], (n[g] == 1) ? "fichero" : "ficheros", list[g]
-                    if (n[g] > 200) printf "  ... y %d más\n", n[g] - 200
-                }
-            }
-        }' <<< "$changes"
+    gone=$(awk -F'\t' 'substr($1, 1, 1) == "D" { print $2 }' <<< "$changes")
+    n=$(grep -c . <<< "$gone")
+    if [ "$n" -gt 0 ]; then
+        echo
+        echo "Ya no los trae (borrados en GitHub): $n $([ "$n" -eq 1 ] && echo fichero || echo ficheros)"
+        if [ "$n" -le 25 ]; then
+            sed 's/^/  - /' <<< "$gone"
+        else
+            echo "  Son muchos para verlos aquí: por carpetas, las que más tienen"
+            awk '{ d = $0; sub(/\/[^\/]*$/, "", d); if (d == $0) d = "(la carpeta del proyecto)"; c[d]++ }
+                END { for (d in c) printf "%d\t%s\n", c[d], d }' <<< "$gone" | sort -t$'\t' -k1,1nr -k2 | head -15 \
+                | awk -F'\t' '{ printf "  - %s%s (%d %s)\n", $2, ($2 ~ /^\(/) ? "" : "/", $1, ($1 == 1) ? "fichero" : "ficheros" }'
+            list="$COPIES_DIR/$(basename "$dir")-registro-$(date +%Y%m%d-%H%M%S)-borrados-en-github.txt"
+            if mkdir -p -m 700 "$COPIES_DIR" && { echo "Ya no los trae el git pull (borrados en GitHub, de ${before:0:9} a ${after:0:9}), en $dir"
+                    echo; echo "$gone"; } > "$list"; then
+                echo "  La lista entera: $list"
+            fi
+        fi
+    fi
+    echo
     summary_box "git pull" "Ficheros del repositorio (total)|$total" \
         "Nuevos|$(grep -c '^A' <<< "$changes")" "Modificados|$(grep -c '^[^AD]' <<< "$changes")" \
-        "Sin tocar|$(( total - $(grep -c '^[^D]' <<< "$changes") ))" "Ya no están (borrados)|$(grep -c '^D' <<< "$changes")"
+        "Sin tocar|$(( total - $(grep -c '^[^D]' <<< "$changes") ))" "Borrados en GitHub (ya no los trae)|$(grep -c '^D' <<< "$changes")"
 }
 
 # Un recuadro con un titulo y sus filas (texto|numero), para el registro de una tarea (que va en letra de
@@ -238,7 +246,7 @@ function repo_fetch() {
     [[ "$full" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._][A-Za-z0-9._-]*$ ]] && [[ "$full" != *..* ]] || { echo "Repositorio no válido: $full (dueño/repositorio)"; return 1; }
     command -v git > /dev/null || { echo "Hace falta git para clonar el repositorio"; return 1; }
     name=${full#*/} ssh_url="git@github.com:$full.git"
-    folder=$(repo_clones | awk -v r="${full,,}" '$1 == r { print $2; exit }')
+    folder=$(repo_clones | awk -v r="${full,,}" '!n && $1 == r { print $2; n = 1 }')
     known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
     printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
     if [ -n "$folder" ]; then
@@ -301,6 +309,7 @@ function gui_project_git() {
 
 # Copia el codigo de produccion (.zip, .tar.gz o carpeta) en un proyecto:
 #   python3 -c "$PROJECT_CODE_PY" <carpeta del proyecto> <origen> <fusionar|sobrescribir> <copias> <temporal> <simular 1/0>
+#   [<informe>: con mas de LIST_INLINE que ya no estan o que no vienen, su lista entera va a <informe>-<que>.txt]
 # Fusionar copia lo que trae y deja lo demas; sobrescribir ademas quita lo que no trae. .git no se toca
 # nunca. Lo sustituido o quitado se mueve antes a <copias>, y lo que no cambia no se escribe. De un
 # paquete no se saca nada fuera de la carpeta (rutas con .. o absolutas) ni enlaces ni dispositivos: el
@@ -309,16 +318,17 @@ PROJECT_CODE_PY='
 import filecmp, os, shutil, signal, stat, sys, tarfile, tempfile, zipfile
 
 target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
+report = sys.argv[7] if len(sys.argv) > 7 else ""
 simulate = simulate == "1"
 SKIP = {".git", "__MACOSX", ".DS_Store"}
 sys.stdout.reconfigure(errors="replace", line_buffering=True)
 # copied: nuevos + modificados (para el avance); removed: lo quitado (una carpeta cuenta 1) y gone, sus ficheros
 counts = {"copied": 0, "new": 0, "changed": 0, "same": 0, "removed": 0, "gone": 0, "kept": 0, "skipped": 0,
           "old": 0, "packed": 0, "packed_dirs": 0, "packed_bytes": 0}
-# (las rutas de cada grupo, para el registro: se ensenan las primeras LIST_MAX de cada uno)
-lists = {"new": [], "changed": [], "gone": [], "kept": []}
-listed = {"new": 0, "changed": 0, "gone": 0, "kept": 0}
-LIST_MAX = 200
+# (para el registro, las rutas de lo que ya no esta y de lo que no viene, con sus ficheros: hasta LIST_INLINE
+# se ensenan una a una; con mas, por carpetas, y la lista entera a un fichero)
+lists = {"gone": [], "kept": []}
+LIST_INLINE = 25
 errors, seen = [], set()
 
 
@@ -431,11 +441,22 @@ def save_old(path, rel):
             os.unlink(path)
 
 
-def note(group, rel, count=1):
+def note(group, rel, count=1, path=None):
     counts[group] += count
-    listed[group] += 1
-    if len(lists[group]) < LIST_MAX:
-        lists[group].append(rel)
+    if group in lists:
+        lists[group].append((rel, count, path is not None and is_real_dir(path), files_list(path, rel)))
+
+
+def files_list(path, rel):
+    """Los ficheros (rutas del proyecto) de una carpeta que ya no esta o no viene, para la lista entera."""
+    if path is None or not is_real_dir(path):
+        return [rel]
+    found = []
+    for r, dirs, files in os.walk(path):
+        dirs.sort()
+        for f in sorted(files):
+            found.append(os.path.join(rel, os.path.relpath(os.path.join(r, f), path)))
+    return found
 
 
 def files_in(path):
@@ -519,7 +540,7 @@ def remove_rest(dst, rel):
                 else:
                     counts["removed"] += 1
                     n = files_in(e.path)
-                    note("gone", sub + ("/ (%s)" % plural(n) if is_real_dir(e.path) else ""), n)
+                    note("gone", sub, n, e.path)
                     save_old(e.path, sub)
             elif is_real_dir(e.path):
                 remove_rest(e.path, sub)
@@ -539,7 +560,7 @@ def count_rest(dst, rel):
         if e.name in SKIP or e.name.startswith(".lvm-parte-"):
             continue
         if sub not in seen:
-            note("kept", sub, files_in(e.path))
+            note("kept", sub, files_in(e.path), e.path)
         elif is_real_dir(e.path):
             count_rest(e.path, sub)
 
@@ -559,34 +580,75 @@ def plural(n):
     return "%s %s" % (num(n), "fichero" if n == 1 else "ficheros")
 
 
-def show_list(title, group, mark):
+def entry_text(rel, n, folder):
+    return rel + ("/ (%s)" % plural(n) if folder else "")
+
+
+def show_list(title, group, mark, what):
+    """Una lista del registro, con una linea en blanco delante. Hasta LIST_INLINE ficheros, uno a uno; con mas,
+    cuantos hay en cada carpeta (las que mas tienen) y la lista entera, fichero a fichero, en
+    <informe>-<what>.txt, para mirarla con calma."""
     items = lists[group]
     if not items:
         return
+    print()
     print("%s: %s" % (title, plural(counts[group])))
-    for rel in items:
-        print("  %s %s" % (mark, rel))
-    rest = listed[group] - len(items)
-    if rest > 0:
-        print("  ... y %s más" % num(rest))
+    if counts[group] <= LIST_INLINE and len(items) <= LIST_INLINE:
+        for rel, n, folder, _files in items:
+            print("  %s %s" % (mark, entry_text(rel, n, folder)))
+        return
+    groups = {}
+    for rel, n, folder, _files in items:
+        top = rel if folder else (os.path.dirname(rel) or "(la carpeta del proyecto)")
+        groups[top] = groups.get(top, 0) + n
+    print("  Son muchos para verlos aquí: por carpetas, las que más tienen")
+    for top, n in sorted(groups.items(), key=lambda g: (-g[1], g[0]))[:15]:
+        print("  %s %s%s (%s)" % (mark, top, "" if top.startswith("(") else "/", plural(n)))
+    if len(groups) > 15:
+        print("  ... y %s carpetas más" % num(len(groups) - 15))
+    if not report or simulate:
+        return
+    path = "%s-%s.txt" % (report, what)
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
+            f.write("%s: %s\nProyecto: %s\n\n" % (title, plural(counts[group]), target))
+            for _rel, _n, _folder, files in items:
+                for rel in files:
+                    f.write(rel + "\n")
+        print("  La lista entera, fichero a fichero: %s" % path)
+    except OSError as exc:
+        print("  No se ha podido guardar la lista entera en %s: %s" % (path, exc))
 
 
 def summary():
-    """El recuadro con las cuentas, para el registro de la tarea (que va en letra de ancho fijo)."""
-    total = counts["new"] + counts["changed"] + counts["same"]
-    rows = [("Ficheros del código (total)", total), ("Nuevos", counts["new"]), ("Modificados", counts["changed"]),
-            ("Sin tocar (iguales)", counts["same"]),
-            ("Ya no están (quitados)" if mode == "sobrescribir" else "Ya no están", counts["gone"])]
-    if mode == "fusionar":
-        rows.append(("No vienen y se dejan", counts["kept"]))
-    title = "Código de producción" + (" (simulación)" if simulate else "")
-    width = max(len(title), max(len(t) + 2 + len(num(n)) for t, n in rows))
-    print("\u250c" + "\u2500" * (width + 2) + "\u2510")
+    """El recuadro con las cuentas, para el registro de la tarea (que va en letra de ancho fijo). Dos partes que no
+    se mezclan: lo que viene en el codigo (y que se hace con ello) y lo que solo esta en la carpeta del proyecto
+    (no viene: al fusionar se deja; al sobrescribir se quita)."""
+    sim = simulate
+    came = counts["new"] + counts["changed"] + counts["same"]
+    only = counts["gone"] if mode == "sobrescribir" else counts["kept"]
+    rows = [("VIENEN EN EL CÓDIGO", came),
+            ("  Nuevos: " + ("se copiarían" if sim else "se copian"), counts["new"]),
+            ("  Modificados: " + ("se sustituirían" if sim else "se sustituyen"), counts["changed"]),
+            ("  Iguales: no se tocan", counts["same"]),
+            None,
+            ("SOLO EN TU CARPETA (no vienen)", only),
+            (("  Se quitarían" if sim else "  Se quitan") + " (sobrescribir)" if mode == "sobrescribir"
+             else "  Se dejan como están (fusionar)", only)]
+    title = "Código de producción" + (" (simulación)" if sim else "")
+    width = max(len(title), max(len(r[0]) + 2 + len(num(r[1])) for r in rows if r))
+    line = "\u2500" * (width + 2)
+    print("\u250c" + line + "\u2510")
     print("\u2502 " + title.ljust(width) + " \u2502")
-    print("\u251c" + "\u2500" * (width + 2) + "\u2524")
-    for t, n in rows:
+    print("\u251c" + line + "\u2524")
+    for r in rows:
+        if r is None:
+            print("\u251c" + line + "\u2524")
+            continue
+        t, n = r
         print("\u2502 " + t + " " * (width - len(t) - len(num(n))) + num(n) + " \u2502")
-    print("\u2514" + "\u2500" * (width + 2) + "\u2518")
+    print("\u2514" + line + "\u2518")
 
 
 def main():
@@ -631,12 +693,14 @@ def main():
             shutil.rmtree(work, ignore_errors=True)
     if simulate:
         print("[simulacion] no se cambia nada: esto es lo que se haría")
-    show_list("Nuevos" + (" (se copiarían)" if simulate else ""), "new", "+")
-    show_list("Modificados" + (" (se sustituirían)" if simulate else ""), "changed", "~")
-    show_list("Ya no están" + (" (se quitarían)" if simulate else ""), "gone", "-")
-    if mode == "fusionar" and counts["kept"]:
-        print("En la carpeta y no en el código: %s (al fusionar se dejan; con Sobrescribir se quitarían)"
-              % plural(counts["kept"]))
+    # (de los nuevos y modificados, solo la cuenta: en la lista, solo lo que ya no esta y lo que no viene)
+    # (las dos son lo mismo: lo que esta en la carpeta y no viene en el codigo; cambia lo que se hace con ello)
+    if mode == "sobrescribir":
+        show_list("Solo en tu carpeta (no vienen en el código), " + ("se quitarían" if simulate else "se quitan"),
+                  "gone", "-", "no-vienen-se-quitan")
+    else:
+        show_list("Solo en tu carpeta (no vienen en el código), se dejan como están", "kept", "·", "no-vienen-se-dejan")
+    print()
     summary()
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
@@ -756,7 +820,7 @@ function project_update() {
         if [ "$DRY" -eq 1 ]; then
             echo "  [simulacion] git pull en $dir"
         else
-            full=$(repo_clones | awk -v f="$folder" '$2 == f { print $1; exit }')
+            full=$(repo_clones | awk -v f="$folder" '!n && $2 == f { print $1; n = 1 }')
             [ -n "$full" ] && ssh_url="git@github.com:$full.git"
             known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
             printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
@@ -776,7 +840,8 @@ function project_update() {
             copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
             [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
         fi
-        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY"; then
+        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY" \
+                "$COPIES_DIR/$folder-registro-$stamp"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
         fi

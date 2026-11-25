@@ -138,4 +138,7 @@ check "vaciar en simulacion no borra nada" '[ -f "$DL_CACHE_DIR/php-8.4.28.tar.x
 downloads_command vaciar > /dev/null
 check "vaciar la deja vacia" '[ -z "$(ls -A "$DL_CACHE_DIR")" ]'
 check "se guarda tambien al fallar, y MariaDB no se borra antes" 'grep -q "stack_cache_store -n" "$SRC" && ! grep -q "rm -f mariadb.tar.gz" "$SRC"'
+# Fuera de una instalacion (actualizar phpMyAdmin) no hay $build: no se apunta nada y no falla (1.57.49)
+( build=""; cd "$W" && dl_note "$W/x" x.tar.xz "$(printf '0%.0s' {1..64})" ) 2> "$W/err"; rc=$?
+check "dl_note sin instalacion: no falla ni escribe en /descargas.lista" '[ $rc -eq 0 ] && [ ! -s "$W/err" ]'
 exit $fail

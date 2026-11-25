@@ -31,13 +31,21 @@ printf '#!/bin/sh\n' > "$W/src/public_html/run.sh"; chmod 755 "$W/src/public_htm
 fresh; out=$(go "$W/normal.zip" fusionar); rc=$?
 check "fusionar (.zip): copia lo que trae, de dentro de public_html" '[ $rc -eq 0 ] && [ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/wp-content/tema.php")" == tema ] && [ ! -e "$P/public_html" ]'
 check "fusionar: deja lo que no trae y .git" '[ -f "$P/antiguo/solo-aqui.php" ] && [ -f "$P/wp-content/uploads/foto.jpg" ] && [ "$(cat "$P/.git/config")" == repo ]'
-check "lo sustituido queda en las copias; lo igual ni se copia" '[ "$(cat "$W/copias/index.php")" == viejo ] && [ ! -e "$W/copias/igual.txt" ] && grep -qE "Sin tocar \(iguales\) +1 " <<< "$out" && grep -q "Lo que se ha sustituido o quitado esta en" <<< "$out"'
-check "el registro: la lista de nuevos y modificados y el recuadro con las cuentas" 'grep -q "^Modificados: 1 fichero" <<< "$out" && grep -q "^  ~ index.php" <<< "$out" && grep -q "Código de producción" <<< "$out" && grep -qE "Ficheros del código \(total\) +[0-9]+ " <<< "$out" && grep -qE "No vienen y se dejan +[1-9]" <<< "$out"' || echo "$out" | tail -15
+check "lo sustituido queda en las copias; lo igual ni se copia" '[ "$(cat "$W/copias/index.php")" == viejo ] && [ ! -e "$W/copias/igual.txt" ] && grep -qE "│   Iguales: no se tocan +1 │" <<< "$out" && grep -q "Lo que se ha sustituido o quitado esta en" <<< "$out"'
+check "el registro: sin la lista de nuevos ni modificados, solo el recuadro con las cuentas" '! grep -q "^Modificados: " <<< "$out" && ! grep -q "^  [~+] " <<< "$out" && grep -qE "│   Modificados: se sustituyen +1 │" <<< "$out" && grep -q "Código de producción" <<< "$out" && grep -qE "│ VIENEN EN EL CÓDIGO +[0-9]+ │" <<< "$out" && grep -qE "│ SOLO EN TU CARPETA \(no vienen\) +[1-9]" <<< "$out" && grep -qE "│   Se dejan como están \(fusionar\) +[1-9]" <<< "$out"' || echo "$out" | tail -15
+# Lo que no viene: hasta 25, una a una; con mas, por carpetas y la lista entera a un fichero (1.57.49)
+check "registro: lo que no viene, uno a uno y con una linea en blanco delante" 'grep -q "^  · antiguo/ (1 fichero)$" <<< "$out" && grep -B1 "^Solo en tu carpeta (no vienen en el código), se dejan como están: " <<< "$out" | head -1 | grep -q "^$"'
+fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/normal.zip" fusionar "$W/copias" "$W/tmp" 0 "$W/informes/proyecto-registro-1" 2>&1)
+check "registro: con mas de 25, por carpetas y la lista entera en un fichero" 'grep -q "^  · viejos/ (30 ficheros)$" <<< "$out" && ! grep -q "viejos/f1.php" <<< "$out" && grep -q "La lista entera, fichero a fichero: $W/informes/proyecto-registro-1-no-vienen-se-dejan.txt" <<< "$out" && [ "$(grep -c "^viejos/f" "$W/informes/proyecto-registro-1-no-vienen-se-dejan.txt")" = 30 ]' || echo "$out" | tail -25
+fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/normal.zip" fusionar "$W/copias" "$W/tmp" 1 "$W/informes/simulado" 2>&1)
+check "registro: en simulacion no guarda la lista" '[ ! -e "$W/informes/simulado-no-vienen-se-dejan.txt" ]'
 check "no quedan ficheros a medias ni el temporal" '[ -z "$(find "$P" -name ".lvm-parte-*")" ] && [ -z "$(ls -A "$W/tmp")" ]'
 
 fresh; out=$(go "$W/normal.tgz" sobrescribir); rc=$?
 check "sobrescribir (.tar.gz): quita lo que no trae, a las copias" '[ $rc -eq 0 ] && [ ! -e "$P/antiguo" ] && [ ! -e "$P/wp-content/uploads" ] && [ -f "$W/copias/antiguo/solo-aqui.php" ] && [ -f "$W/copias/wp-content/uploads/foto.jpg" ]'
-check "sobrescribir: lo quitado sale en el registro, con los ficheros de cada carpeta" 'grep -q "^  - antiguo/ (1 fichero)" <<< "$out" && grep -qE "Ya no están \(quitados\) +[1-9]" <<< "$out"' || echo "$out" | tail -15
+check "sobrescribir: lo quitado sale en el registro, con los ficheros de cada carpeta" 'grep -q "^  - antiguo/ (1 fichero)" <<< "$out" && grep -qE "│   Se quitan \(sobrescribir\) +[1-9]" <<< "$out" && grep -q "^Solo en tu carpeta (no vienen en el código), se quitan: " <<< "$out"' || echo "$out" | tail -15
 check "sobrescribir: .git no se toca" '[ "$(cat "$P/.git/config")" == repo ] && [ ! -e "$W/copias/.git" ]'
 check "sobrescribir: lo que trae se queda" '[ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/igual.txt")" == igual ] && [ -x "$P/run.sh" ]'
 
@@ -284,7 +292,7 @@ else
     check "Linux: el boton Log abre el error_log general de Apache" 'grep -q "^APACHE_ERROR_LOG = \"/opt/lampp/logs/error_log\"$" "$SRC" && grep -q "lambda \*_: self.show_log_tail(APACHE_ERROR_LOG), \"nv-proyecto-btn\"" "$SRC" && ! grep -q "loaded_project_log" "$SRC"'
 fi
 check "Imagenes de produccion: solo en WordPress y PrestaShop, en los dos visores" 'if grep -q "^let ERROR_LOG = " "$SRC"; then [ "$(grep -c "items\[\"imagenes\"\] = AnyView" "$SRC")" = 2 ] && grep -q "x.kind == \"wp\" || x.kind == \"ps\"" "$SRC" && grep -q "(\"imagenes\", \"Imágenes de producción\")" "$SRC" && [ "$(grep -c "name: \"Imágenes de producción\", icon: .logo(\"imagenes\")" "$SRC")" = 2 ] && grep -q "tip: \"Traer de producción las imágenes que falten\") {" "$SRC" && grep -q "tip.hasPrefix(name) ? tip" "$SRC" && ! grep -q "name: \"Importar\"" "$SRC"; else [ "$(grep -c "btns\[\"imagenes\"\] = self.nv_images_button" "$SRC")" = 2 ] && grep -q "if x\[\"kind\"\] in (\"wp\", \"ps\"):" "$SRC" && grep -q "(\"imagenes\", \"Imágenes de producción\", (\"logo\", \"imagenes\"))" "$SRC" && grep -q "nv_button(logo(\"imagenes\", 18), \"Imágenes de producción\"," "$SRC" && grep -q "\"Traer de producción las imágenes que falten\"," "$SRC"; fi'
-# Lo que trae el git pull, en el registro (1.57.48): la lista y el recuadro
+# Lo que trae el git pull, en el registro (1.57.49): la lista de lo que ya no trae y el recuadro
 extract "$SRC" repo_pull_summary summary_box || exit 1
 G=$W/git; mkdir -p "$G"
 ( cd "$G" && git init -q o && cd o && for f in a b c; do echo $f > $f; done && git add . \
@@ -292,7 +300,13 @@ G=$W/git; mkdir -p "$G"
     && echo d > d && git add -A && git -c user.name=x -c user.email=x@x.test commit -qm 2 )
 b=$(git -C "$G/c" rev-parse HEAD); git -C "$G/c" pull -q 2> /dev/null
 out=$(repo_pull_summary "$G/c" "$b")
-check "pull: dice los nuevos, modificados y borrados, con su recuadro" 'grep -q "^  + d$" <<< "$out" && grep -q "^  ~ b$" <<< "$out" && grep -q "^  - c$" <<< "$out" && grep -qE "│ Sin tocar +1 │" <<< "$out" && grep -qE "Ficheros del repositorio \(total\) +3 │" <<< "$out"' || echo "$out"
+check "pull: solo lista los que ya no trae (borrados), con su recuadro" '! grep -q "^  + d$" <<< "$out" && ! grep -q "^  ~ b$" <<< "$out" && grep -q "^  - c$" <<< "$out" && grep -q "^Ya no los trae (borrados en GitHub): 1 fichero$" <<< "$out" && grep -qE "│ Nuevos +1 │" <<< "$out" && grep -qE "│ Sin tocar +1 │" <<< "$out" && grep -qE "Ficheros del repositorio \(total\) +3 │" <<< "$out"' || echo "$out"
+( cd "$G/o" && mkdir -p tema && for i in $(seq 1 30); do echo $i > tema/t$i; done && git add -A && git -c user.name=x -c user.email=x@x.test commit -qm 3 \
+    && git rm -rq tema && git -c user.name=x -c user.email=x@x.test commit -qm 4 )
+b=$(git -C "$G/c" rev-parse HEAD); git -C "$G/c" pull -q 2> /dev/null; git -C "$G/c" pull -q 2> /dev/null
+b2=$(git -C "$G/c" rev-parse HEAD~1)
+out=$(COPIES_DIR=$W/backups repo_pull_summary "$G/c" "$b2")
+check "pull: con mas de 25 borrados, por carpetas y la lista entera en un fichero" 'grep -q "^  - tema/ (30 ficheros)$" <<< "$out" && ! grep -q "tema/t1$" <<< "$out" && f=$(ls "$W"/backups/c-registro-*-borrados-en-github.txt) && [ "$(grep -c "^tema/t" "$f")" = 30 ]' || echo "$out"
 out=$(repo_pull_summary "$G/c" "$(git -C "$G/c" rev-parse HEAD)")
 check "pull: si ya estaba al dia, lo dice" 'grep -q "ya estaba al día" <<< "$out"'
 widths=$(summary_box "Título" "Uno|1" "Ya no están|12345" | while IFS= read -r l; do echo ${#l}; done | sort -u | wc -l)

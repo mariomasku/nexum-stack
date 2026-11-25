@@ -1131,6 +1131,24 @@ QUE HACE
 
 VERSIONES
 
+1.57.49 (25 nov 2026)
+- Actualizar phpMyAdmin (el aviso de PHP antiguo) ya no falla en cada
+  versión con «/descargas.lista: Permiso denegado»: se descargaba y se
+  comprobaba bien, pero no se cambiaba.
+- Actualizar proyecto: ya no sale «BrokenPipeError: Broken pipe» antes
+  del git pull.
+- Registro de Actualizar proyecto: del git pull, solo la lista de los
+  ficheros que ya no trae (borrados en GitHub); del código, solo la de
+  lo que hay en tu carpeta y no viene. Los nuevos y modificados, solo
+  en las cuentas. Con más de 25, por carpetas, y la lista entera en
+  ~/nexum-backups (…-registro-….txt) para mirarla con calma.
+- El recuadro del código de producción, en dos partes que no se
+  mezclan: «Vienen en el código» (nuevos, modificados e iguales, con
+  lo que se hace con cada uno) y «Solo en tu carpeta» (no vienen: al
+  fusionar se dejan, al sobrescribir se quitan).
+- Ver registro: cada paso de la tarea con su título y una línea en
+  blanco delante, y algo más de espacio entre líneas.
+
 1.57.48 (24 nov 2026)
 - Bases de datos: los volcados se cargan como root, con todos los
   permisos (antes, con un usuario que solo podía tocar esa base). Un

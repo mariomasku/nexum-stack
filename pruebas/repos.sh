@@ -154,4 +154,6 @@ else
     # en el buscador, el cursor y por dónde iba la lista se quedan
     check "ventana: al rehacer Repositorios se quedan lo escrito, el cursor y la posición de la lista" 'grep -q "search.set_text(getattr(self, \"repos_query\", \"\"))" "$SRC" && grep -q "search.connect(\"changed\", lambda e: setattr(self, \"repos_query\", e.get_text()))" "$SRC" && grep -q "search.grab_focus_without_selecting()" "$SRC" && grep -q "vadj.set_value(min(scroll," "$SRC"'
 fi
+# Buscar el clon de una carpeta no corta la lista a medias (sin «BrokenPipeError» de Python) (1.57.49)
+check "repo_clones no se corta con awk exit (Broken pipe)" '! grep -qE "repo_clones \| awk .*exit" "$SRC"'
 exit $fail

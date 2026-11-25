@@ -25,7 +25,8 @@ externa() {
     task_step
     task_step
 }
-LVM_PROGRESO=$P externa
+LVM_PROGRESO=$P externa > "$W/salida"
+check "en el registro, cada paso con su titulo y una linea en blanco entre pasos (1.57.49)" '[ "$(sed -n 1p "$W/salida")" = "━━ Paso 1 de 3: Uno; con punto y coma" ] && [ "$(sed -n 2p "$W/salida")" = "" ] && [ "$(sed -n 3p "$W/salida")" = "━━ Paso 2 de 3: Dos|con barra" ] && [ "$(grep -c "^━━ Paso" "$W/salida")" = 3 ]' || cat "$W/salida"
 check "un plan: I y C, con ; y | de los textos quitados" 'grep -qxE "I\|1\|1\|Actualizar; mi web\|[0-9]+" "$P" && grep -qx "C|Uno, con punto y coma;Dos con barra;Tres" "$P"'
 check "lo de dentro no cambia la lista ni avanza" '[ "$(grep -c "^I|" "$P")" = 1 ] && [ "$(grep -c "^C|" "$P")" = 1 ] && ! grep -q "^S|.*|X|" "$P"'
 check "cada paso con su tramo de la barra" 'grep -qE "^S\|1\|0\|33\|Uno, |^S\|1\|0\|33\|Uno; " "$P" && grep -q "^S|2|33|66|Dos con barra|" "$P" && grep -q "^S|3|66|100|Tres|" "$P"'
