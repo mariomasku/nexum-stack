@@ -57,7 +57,8 @@ if grep -q "VALIDSIG $FPR " "$W/act.sh"; then ok "el ayudante exige la huella de
 build() {
     local n=$1; shift
     rm -rf "$W/tree/$n"; cp -a "$W/tree/base" "$W/tree/$n"
-    T=$W/tree/$n fakeroot sh -c "$*; dpkg-deb --build -Zxz \"\$T\" \"$W/out/nexum_9.9.9_all.deb.$n\"" > /dev/null 2>&1
+    # (xz, como el de verdad, pero con la compresión más rápida: son 20 paquetes y con la de serie tardaban un minuto)
+    T=$W/tree/$n fakeroot sh -c "$*; dpkg-deb --build -Zxz -z1 \"\$T\" \"$W/out/nexum_9.9.9_all.deb.$n\"" > /dev/null 2>&1
     mkdir -p "$W/dl/$n"; mv "$W/out/nexum_9.9.9_all.deb.$n" "$W/dl/$n/nexum_9.9.9_all.deb"
     sign "$W/dl/$n/nexum_9.9.9_all.deb"
     echo "$W/dl/$n/nexum_9.9.9_all.deb"

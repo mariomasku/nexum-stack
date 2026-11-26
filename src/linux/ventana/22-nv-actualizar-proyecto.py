@@ -76,11 +76,15 @@ class NvActualizarProyecto:
         dlg.get_header_bar().set_subtitle(folder)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=22)
         state = {"sql": "", "code": ""}
+        # ¿Tiene BBDD? La suya (vinculada o de su configuración) y que exista en la versión activa
+        known_db = self.loaded_project_db() or ""
+        active_dbs = (self.data or {}).get("dbs", {}).get((self.data or {}).get("active"), [])
+        no_db = not known_db or known_db not in active_dbs
 
         def set_sql(path):
             why = ""
             if path and not (os.path.isfile(path) and path.lower().endswith((".sql", ".gz", ".zip"))):
-                why, path = "Tiene que ser .sql, .sql.gz o .zip", ""
+                why, path = "Tiene que ser .sql, .gz o .zip", ""
             state["sql"] = path
             update()
             return why
@@ -95,16 +99,30 @@ class NvActualizarProyecto:
             update()
             return why
 
-        zone, _put = self.nv_drop_zone("Base de datos de producción", ".sql, .sql.gz o .zip", "drive-multidisk-symbolic",
+        # Sin BBDD: se dice y se puede crear desde aquí (vacía, o con el volcado que se elija debajo)
+        create = Gtk.CheckButton(label="Crear la BBDD para este proyecto")
+        if no_db:
+            nodb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            nodb.pack_start(label("Este proyecto no tiene base de datos" if not known_db else
+                                  "La BBDD de este proyecto, %s, no existe en la versión activa" % known_db,
+                                  "aviso", halign=Gtk.Align.START, wrap=True), False, False, 0)
+            nodb.pack_start(create, False, False, 0)
+            nodb.pack_start(label("Se crea vacía o, si eliges un volcado debajo, con él, y queda como la suya (su "
+                                  "configuración pasa a usarla).", "dim-label", wrap=True,
+                                  halign=Gtk.Align.START), False, False, 0)
+            box.pack_start(nodb, False, False, 0)
+            create.set_active(True)
+        zone, _put = self.nv_drop_zone("Base de datos de producción", ".sql, .gz o .zip", "drive-multidisk-symbolic",
                                        [("Elegir fichero…", False)], set_sql)
         box.pack_start(zone, False, False, 0)
         line = Gtk.Box(spacing=8)
         db_text = label("", "dim-label")
         line.pack_start(db_text, False, False, 0)
-        # (su nombre, como texto; solo si el proyecto no tiene ninguna hay que escribirlo)
-        known_db = self.loaded_project_db() or ""
-        db_entry = Gtk.Entry(text=known_db, width_chars=28, max_length=64)
-        line.pack_start(label(known_db, "nv-bbdd", selectable=True) if known_db else db_entry, False, False, 0)
+        # (su nombre, como texto; si el proyecto no tiene ninguna hay que escribirlo: se propone uno)
+        base = re.sub(r"[^a-z0-9_]", "_", folder.lower()).strip("_")[:40]
+        guess = known_db or (("wp_" if x.get("kind") == "wp" else "ps_" if x.get("kind") == "ps" else "") + base)
+        db_entry = Gtk.Entry(text=guess if no_db else known_db, width_chars=28, max_length=64)
+        line.pack_start(db_entry if no_db else label(known_db, "nv-bbdd", selectable=True), False, False, 0)
         db_copy = label("(al confirmar, puedes guardar antes una copia de la actual)", "dim-label")
         line.pack_start(db_copy, False, False, 0)
         box.pack_start(line, False, False, 0)
@@ -127,28 +145,37 @@ class NvActualizarProyecto:
 
         def update(*_):
             db_ok = bool(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", db_entry.get_text().strip()))
-            go.set_sensitive(bool(state["sql"] or state["code"]) and (not state["sql"] or db_ok))
+            making = no_db and create.get_active()
+            go.set_sensitive(bool(state["sql"] or state["code"] or making)
+                             and (not (state["sql"] or making) or db_ok))
+            go.set_label("Crear la BBDD…" if making and not (state["sql"] or state["code"]) else "Actualizar…")
             modes.set_sensitive(bool(state["code"]))
             # (sin fichero de BBDD no se toca: se sigue usando la misma)
-            db_text.set_label("Se carga en la BBDD" if state["sql"] else "Se sigue usando la BBDD")
-            db_copy.set_visible(bool(state["sql"]))
-            line.set_visible(bool(known_db or state["sql"]))
-            if not known_db:
-                db_entry.set_sensitive(bool(state["sql"]))
+            db_text.set_label("Se crea la BBDD y se carga en ella" if making and state["sql"] else
+                              "Se crea la BBDD, vacía" if making else
+                              "Se carga en la BBDD" if state["sql"] else "Se sigue usando la BBDD")
+            db_copy.set_visible(bool(state["sql"]) and not making)
+            line.set_visible(bool((known_db and not no_db) or state["sql"] or making))
+            if no_db:
+                db_entry.set_sensitive(bool(state["sql"]) or making)
         db_entry.connect("changed", update)
+        create.connect("toggled", update)
         dlg.show_all()
         update()
         resp = run_dialog(dlg)
         db = db_entry.get_text().strip()
         mode = "sobrescribir" if over.get_active() else "fusionar"
+        making = no_db and create.get_active()
         dlg.destroy()
         if resp == Gtk.ResponseType.ACCEPT:
-            self.nv_update_project_ask(folder, state["sql"], db, state["code"], mode)
+            self.nv_update_project_ask(folder, state["sql"], db, state["code"], mode, making)
 
-    def nv_update_project_ask(self, folder, sql, db, code, mode):
-        """Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido."""
+    def nv_update_project_ask(self, folder, sql, db, code, mode, making=False):
+        """Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido.
+        making: el proyecto no tiene BBDD y se crea (actualizar-proyecto --crear-base)."""
         def start(pull, backup):
-            args = ["actualizar-proyecto", folder] + (["--copia"] if backup else [])
+            args = ["actualizar-proyecto", folder] + (["--copia"] if backup else []) + \
+                (["--crear-base"] if making else [])
             if code:
                 args += ["--codigo", code, "--modo", mode] + (["--pull"] if pull else [])
             if sql:
@@ -164,18 +191,23 @@ class NvActualizarProyecto:
                                            "El proyecto se queda a medias, con lo hecho hasta ahora."
                                            + (" Lo sustituido sigue en ~/nexum-backups." if backup else ""),
                                            "Cancelar la actualización"))
-            if sql:
+            if sql or making:
                 self.check_db_access(run)
             else:
                 run()
 
         what = []
+        if making:
+            what.append("Se crea la BBDD %s%s y queda como la de %s." % (db, " con el volcado" if sql else ", vacía",
+                                                                       folder))
         if code:
             what.append(("Se fusiona «%s» con %s/%s." if mode == "fusionar" else
                          "Se sobrescribe la carpeta con «%s» en %s/%s: se borra lo que no traiga.")
                         % (os.path.basename(code), HTDOCS, folder))
-        if sql:
+        if sql and not making:
             what.append("La BBDD %s se vacía y se carga «%s»." % (db, os.path.basename(sql)))
+        elif sql:
+            what.append("Se carga «%s» en ella." % os.path.basename(sql))
 
         def got(_rc, out):
             f = next((x for x in parse_lines(out) if x[0] == "G" and len(x) >= 6), None)
@@ -287,9 +319,28 @@ class NvActualizarProyecto:
             items.append(("Imágenes de producción…", lambda: self.nv_wp_media(x)))
         if x["kind"] == "ps":
             items.append(("Descargar de producción las imágenes que faltan…", lambda: self.nv_ps_images(x)))
+        if self.project_hosts(x["name"]):
+            items.append(("Vaciar la caché de Chrome…", lambda: self.nv_browser_cache()))
         items.append(("Personalizar los botones…", lambda: self.nv_buttons_dialog()))
         items.append(("Borrar el proyecto…", lambda: self.nv_delete_project(x)))
         return items
+
+    def nv_browser_cache(self):
+        """Más, «Vaciar la caché de Chrome…» (de un proyecto con dominio): tras falsear o dejar de falsear su
+        dominio, Chrome puede seguir un rato en la otra web, con su caché de DNS y las conexiones que ya tenía
+        abiertas. Chrome no deja que otro programa abra sus páginas internas ni pulse sus botones: se copia
+        la dirección y se dice qué pulsar."""
+        Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(BROWSER_SOCKETS_URL, -1)
+        message(self.win, "Vaciar la caché de Chrome",
+                "Si después de falsear o dejar de falsear un dominio Chrome sigue en la otra web (la real o la "
+                "de este equipo), es por las conexiones que tenía abiertas y su caché de DNS. Nexum ya corta "
+                "esas conexiones al cambiar hosts; si aun así sigue, en Chrome:\n\n"
+                "1. Pega en la barra de direcciones %s (ya está copiada) y pulsa Intro.\n"
+                "2. Pulsa «Flush socket pools».\n"
+                "3. A la izquierda, en «DNS», pulsa «Clear host cache».\n"
+                "4. Recarga la pestaña del proyecto con Ctrl+Mayús+R.\n\n"
+                "Chrome no deja que otro programa abra esa página ni pulse sus botones. En Firefox: "
+                "about:networking#dns y «Clear DNS Cache»." % BROWSER_SOCKETS_URL)
 
     # --- Exportar proyecto: un zip con su código y su BBDD (gui-exportar-proyecto y exportar-proyecto) ---
 

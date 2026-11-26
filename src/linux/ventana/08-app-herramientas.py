@@ -54,6 +54,7 @@ class AppHerramientas:
         sw.connect("notify::active", self.on_copies_files)
         row.add_suffix(sw)
         lb.add(row)
+        self.vscode_ws_row(lb)
         add_row(lb, "Registros de instalaciones", "~/.nexum: logs de las instalaciones "
                 "y de la ventana", "Abrir", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))
         # Caché de descargas de las pilas propias: lo que ocupa y vaciarla
@@ -88,6 +89,49 @@ class AppHerramientas:
         add_row(lb, "Acerca de", "%s %s" % (d["name"], d["version"]), "Ver", self.on_about)
         self.tools_box.pack_start(box, False, False, 0)
         self.tools_box.show_all()
+
+    def vscode_ws_row(self, lb):
+        """Carpetas: la de los espacios de trabajo de VS Code (vscode_workspace)."""
+        wsdir = vscode_ws_dir()
+        row = ActionRow("Espacios de trabajo de VS Code",
+                        "%s: cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no "
+                        "tiene, se le crea uno aquí)" % wsdir
+                        if wsdir else
+                        "Sin elegir: los proyectos se abren como carpeta. Elige dónde guardas tus .code-workspace "
+                        "para abrir cada uno con el suyo")
+        row.subtitle.set_ellipsize(0)
+        row.subtitle.set_line_wrap(True)
+        row.subtitle.set_xalign(0)
+        if wsdir and os.path.isdir(wsdir):
+            b = Gtk.Button(label="Abrir", valign=Gtk.Align.CENTER)
+            b.connect("clicked", lambda *_: self.open_uri(GLib.filename_to_uri(wsdir)))
+            row.add_suffix(b)
+        b = Gtk.Button(label="Cambiar…" if wsdir else "Elegir…", valign=Gtk.Align.CENTER)
+        b.connect("clicked", lambda *_: self.on_vscode_ws())
+        row.add_suffix(b)
+        if wsdir:
+            b = Gtk.Button(label="Quitar", valign=Gtk.Align.CENTER)
+            b.connect("clicked", lambda *_: (vscode_ws_save(""), self.build_tools(),
+                                             self.toast("Los proyectos vuelven a abrirse en VS Code como carpeta")))
+            row.add_suffix(b)
+        lb.add(row)
+
+    def on_vscode_ws(self):
+        dlg = Gtk.FileChooserDialog(title="Carpeta de los espacios de trabajo de VS Code", transient_for=self.win,
+                                    modal=True, action=Gtk.FileChooserAction.SELECT_FOLDER)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        css(dlg.add_button("Elegir", Gtk.ResponseType.ACCEPT), "verde")
+        dlg.set_default_response(Gtk.ResponseType.ACCEPT)
+        cur = vscode_ws_dir()
+        dlg.set_current_folder(cur if cur and os.path.isdir(cur) else os.path.expanduser("~"))
+        resp = run_dialog(dlg)
+        path = dlg.get_filename()
+        dlg.destroy()
+        if resp != Gtk.ResponseType.ACCEPT or not path:
+            return
+        vscode_ws_save(path)
+        self.build_tools()
+        self.toast("Los proyectos se abren en VS Code con su espacio de trabajo de %s" % path)
 
     def nv_tray_row(self, lb):
         """Configuración, Programa: el icono junto al reloj (solo en la ventana nueva)."""

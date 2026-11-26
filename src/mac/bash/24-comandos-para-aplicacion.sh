@@ -27,8 +27,8 @@ function gui_data() {
     echo "M|$APP_NAME|$APP_VERSION|$SIGNATURE"
     echo "A|$([ -n "$active" ] && version_name "$active")|$(lampp_running && echo 1 || echo 0)|$(official_xampp && echo 1 || echo 0)"
     echo "H|$ACTIVE_VHOSTS|$HOSTS_FILE"
-    # T|barrera entre webs puesta (1) o apagada (0)
-    echo "T|$(web_barrier_on && echo 1 || echo 0)"
+    # T|barrera entre webs puesta (1) o apagada (0)|webs permitidas (separadas por espacios)
+    echo "T|$(web_barrier_on && echo 1 || echo 0)|$(web_barrier_allowed | paste -sd ' ' -)"
     # Correo de pruebas: E|Mailpit instalado (1/0)|encendido (1/0)|modo de WordPress|Mailpit en marcha
     # (1/0)|version instalada|direccion de su web|version que instala el gestor. Si la version activa
     # esta en marcha y Mailpit no (se ha cerrado la sesion, por ejemplo), se arranca
@@ -62,7 +62,7 @@ function gui_data() {
     cert_audit | awk -F'|' '$1 == "C" { print "C|" $2 "|" $5 } $1 == "A" && !seen[$2]++ { print "W|" $2 }
         $1 == "T" && $5 == "0" { print "G|" $2 } $1 == "U" && !gone[$2]++ { print "Q|" $2 }'
     # O|carpeta con las copias de las bases del XAMPP oficial|numero de copias
-    for dir in "$COPIES_DIR"/XAMPP-oficial-*/; do
+    for dir in "$COPIES_DIR"/xampp-oficial/XAMPP-oficial-*/ "$COPIES_DIR"/XAMPP-oficial-*/; do
         [ -d "$dir" ] || continue
         set -- "$dir"*.zip
         [ -e "$1" ] && echo "O|${dir%/}|$#"
@@ -83,6 +83,8 @@ function gui_data() {
     done
     # (las fechas de las BBDD de todas las versiones en un solo python3)
     [ ${#dates[@]} -gt 0 ] && db_dates --varias "${dates[@]}"
+    # (las marcadas para borrar al cargar su version)
+    gui_db_marks
     return 0
 }
 

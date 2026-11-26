@@ -87,6 +87,41 @@ func dialogOptions(_ views: [NSView], spacing: CGFloat = 10) -> NSStackView {
     return stack
 }
 
+/// Contenedor con el origen arriba: dentro de un NSScrollView, lo primero que se ve es el principio
+final class FlippedView: NSView {
+    override var isFlipped: Bool { return true }
+}
+
+/// Alto que puede ocupar una lista dentro de un aviso: lo que deja la pantalla (quitando el título,
+/// los textos y los botones del aviso), entre 160 y maxHeight
+func dialogListHeight(_ maxHeight: CGFloat = 360) -> CGFloat {
+    let screen: CGFloat = (NSScreen.main?.visibleFrame.height) ?? 800
+    let room: CGFloat = screen - 340
+    return Swift.min(maxHeight, Swift.max(160, room))
+}
+
+/// La vista tal cual si cabe en maxHeight; si no, dentro de un recuadro con scroll de ese alto (sin
+/// que el aviso crezca hasta salirse de la pantalla)
+func dialogScroll(_ view: NSView, maxHeight: CGFloat = dialogListHeight()) -> NSView {
+    let size: NSSize = view.fittingSize
+    if size.height <= maxHeight { return view }
+    let width: CGFloat = size.width
+    let doc = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: size.height))
+    view.translatesAutoresizingMaskIntoConstraints = true
+    view.frame = NSRect(x: 0, y: 0, width: width, height: size.height)
+    doc.addSubview(view)
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width + 18, height: maxHeight))
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = false
+    scroll.drawsBackground = false
+    scroll.borderType = .noBorder
+    scroll.documentView = doc
+    scroll.translatesAutoresizingMaskIntoConstraints = false
+    scroll.widthAnchor.constraint(equalToConstant: width + 18).isActive = true
+    scroll.heightAnchor.constraint(equalToConstant: maxHeight).isActive = true
+    return scroll
+}
+
 /// Botones de opción que van en columnas distintas y aun así se excluyen entre sí
 final class RadioGroup: NSObject {
     var buttons: [NSButton] = []
@@ -411,14 +446,20 @@ func message(_ title: String, _ text: String = "", error: Bool = false) {
 
 /// steps: los cambios que se van a hacer (numerados, con «Qué se va a realizar»); text va entonces
 /// debajo, como nota. warning: un aviso en rojo debajo de todo
-/// Con otra tarea en marcha, lo dice (nombrándola) y devuelve true: lo que se iba a confirmar no se pregunta,
-/// porque no van dos tareas a la vez (tocarían lo mismo). Lo pone el modelo al arrancar
-var TASK_GUARD: (() -> Bool)? = nil
+/// task: lo que se confirma es una tarea; con otra en marcha, se dice que va a la cola (TASK_NOTE: lo que se
+/// añade, o nil si no hay ninguna). Lo pone el modelo al arrancar
+var TASK_NOTE: (() -> String?)? = nil
+
+/// El texto de la pregunta de una tarea, con la nota de la cola si hay otra en marcha
+func withTaskNote(_ text: String) -> String {
+    guard let note = TASK_NOTE?() else { return text }
+    return text.isEmpty ? note : text + "\n\n" + note
+}
 
 func confirm(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
              steps: [String] = [], warning: String? = nil, task: Bool = true) -> Bool {
-    if task, let guardTask = TASK_GUARD, guardTask() { return false }
-    return runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+    return runDialog(title: title, text: task ? withTaskNote(text) : text, okLabel: okLabel,
+                     style: destructive ? .warning : .informational,
                      destructive: destructive, steps: steps, warning: warning).ok
 }
 
@@ -446,8 +487,7 @@ func copyCheckViews(warning: String = COPY_WARNING) -> (box: NSButton, note: NST
 /// esté, el aviso en rojo (warning). copy: si se ha marcado (se pasa --copia)
 func confirmCopy(_ title: String, _ text: String, _ okLabel: String, destructive: Bool = false,
                  steps: [String] = [], warning: String = COPY_WARNING) -> (ok: Bool, copy: Bool) {
-    if let guardTask = TASK_GUARD, guardTask() { return (false, false) }
-    let r = runDialog(title: title, text: text, okLabel: okLabel, style: destructive ? .warning : .informational,
+    let r = runDialog(title: title, text: withTaskNote(text), okLabel: okLabel, style: destructive ? .warning : .informational,
                       destructive: destructive, checkbox: COPY_CHECKBOX, checked: false, steps: steps,
                       copyWarning: warning)
     return (r.ok, r.ok && r.checked)

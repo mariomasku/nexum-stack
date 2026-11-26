@@ -152,7 +152,7 @@ VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", 
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
                  ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
                  ("imagenes", "Imágenes de producción", ("logo", "imagenes"))]
-# Configuración, Seguridad entre webs: qué es, en cuatro puntos (el mismo texto en el Mac)
+# Configuración, Seguridad entre webs: qué es, en cinco puntos (el mismo texto en el Mac)
 CROSS_SITE_HELP = [
     ("dialog-warning-symbolic", "El problema",
      "Mientras trabajas, el navegador tiene abierta tu sesión en tus proyectos (el panel de WordPress, el de "
@@ -166,6 +166,10 @@ CROSS_SITE_HELP = [
      "Al probar una pasarela de pago (Redsys, PayPal, Stripe…): al acabar el pago, el banco te devuelve a la "
      "tienda mandando un formulario desde su web, y la barrera lo para (sale «Otra web ha intentado mandar algo a "
      "esta»). Apágala mientras pruebas los pagos y vuelve a encenderla al acabar."),
+    ("emblem-ok-symbolic", "Webs permitidas",
+     "Las de confianza, como el ERP de tu empresa, que te lleva a tu back office o a tu tienda con un formulario: "
+     "añádelas en «Webs permitidas» y la barrera las deja pasar (también sus iframes y sus peticiones) sin "
+     "apagarla. *.empresa.com vale para todos sus subdominios. Pon solo webs tuyas o de confianza."),
     ("network-workgroup-symbolic", "Dónde se aplica",
      "En todas tus versiones de PHP (localhost, web.local, los dominios falseados y los vhosts de los proyectos) y en "
      "el Apache de Docker. Al cambiarla se recargan, si están en marcha."),
@@ -181,6 +185,10 @@ BUTTON_SIZE_NAMED = 72
 BUTTONS_FILE = os.path.join(LOG_DIR, "botones-visor")
 # Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 UPDATE_EVERY = 4
+# Versión nueva del programa: otra búsqueda al volver a la ventana si hace más de esto (s) de la última, y
+# cada tanto con el programa abierto (s)
+UPDATE_RECHECK = 30 * 60
+UPDATE_RECHECK_OPEN = 4 * 3600
 # (en la simulacion no se escribe nada: lo elegido vale mientras la ventana siga abierta)
 _buttons_sim = {}
 

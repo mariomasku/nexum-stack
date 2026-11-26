@@ -28,15 +28,23 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var task: TaskRunner? = nil {
-        // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea)
+        // (si se cerró la ventana con una tarea en marcha, la aplicación se cierra al acabar la tarea y las de la
+        // cola. Al cerrarse la hoja de una, la siguiente de la cola: después, por si su botón lanza otra, que va antes)
         didSet {
             if task == nil && taskHidden { taskHidden = false }
-            if task == nil && oldValue != nil && !TrayIcon.shared.on
+            if task == nil, let old = oldValue {
+                DispatchQueue.main.async { [weak self] in self?.taskClosed(old) }
+            }
+            if task == nil && oldValue != nil && taskQueue.isEmpty && !TrayIcon.shared.on
                 && !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
                 DispatchQueue.main.async { NSApp.terminate(nil) }
             }
         }
     }
+    /// La cola de tareas: las que se piden con otra en marcha (runTask), en orden
+    @Published var taskQueue: [QueuedTask] = []
+    /// Si la última tarea acabó bien (si no, antes de seguir con la cola se pregunta)
+    var lastTaskOk = true
     /// El modelo de la aplicación, para el delegado (que no lo ve de otro modo)
     static weak var current: AppModel?
     @Published var toastText: String? = nil
@@ -76,6 +84,17 @@ final class AppModel: ObservableObject {
     @Published var upMode = "fusionar"
     @Published var upDb = ""
     var upDbKnown = false
+    /// El proyecto no tiene BBDD (ni vinculada ni en su configuración, o la suya no existe en la versión activa)
+    /// y, si se marca, se crea al actualizar (actualizar-proyecto --crear-base)
+    var upNoDb = false
+    /// (la suya, si tiene nombre pero no existe en la versión activa: para decirlo)
+    var upDbGone = ""
+    @Published var upCreateDb = false
+    /// La versión por la que ya se ha preguntado si se borran sus BBDD marcadas (una vez por carga)
+    var marksAsked: String? = nil
+    /// La última búsqueda de versión nueva y las que se han dicho que no en esta sesión (solas no se vuelven a ofrecer)
+    var updateChecked: Date? = nil
+    var updateDeclined: Set<String> = []
     @Published var upSqlError = ""
     @Published var upCodeError = ""
     @Published var npRepos: [RepoItem] = []
@@ -308,6 +327,10 @@ final class AppModel: ObservableObject {
     @Published var repos: ReposData? = nil
     /// Proyectos de Node (pestaña Node)
     @Published var nodeItems: [NodeItem]? = nil
+    /// Nginx (pestaña Nginx y Configuración, Nginx)
+    @Published var nginx: NginxInfo? = nil
+    /// Nginx, apagado de serie: su pestaña solo sale encendido (Configuración, Nginx)
+    @Published var nginxUsed = FileManager.default.fileExists(atPath: LOG_DIR + "/nginx/usar")
     @Published var reposAll = false
     @Published var reposLoading = false
     @Published var github: GitHubState? = nil
@@ -336,11 +359,7 @@ final class AppModel: ObservableObject {
 
     init() {
         AppModel.current = self
-        TASK_GUARD = { [weak self] in
-            guard let self = self, let cur = self.runningTask else { return false }
-            self.refuseTask(cur)
-            return true
-        }
+        TASK_NOTE = { [weak self] in self?.taskNote }
         reload(branches: true)
         // Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
         // vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub
@@ -370,25 +389,37 @@ final class AppModel: ObservableObject {
             self.usageTick()
         }
         usageTick()
-        // Al abrir: si toca (el primer arranque del día y después cada UPDATE_EVERY), si hay una versión
-        // nueva del programa (con los datos ya leídos: la versión actual)
-        autoCheckUpdates()
+        // Al abrir, siempre (1.57.51; antes, solo el primer arranque del día), si hay una versión nueva del
+        // programa (con los datos ya leídos: la versión actual). Y otra vez al volver a la ventana si hace más de
+        // UPDATE_RECHECK de la última y, con el programa abierto, cada UPDATE_RECHECK_OPEN
+        autoCheckUpdates(components: true)
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil,
+                                               queue: .main) { [weak self] _ in self?.updateRecheck() }
+        Timer.scheduledTimer(withTimeInterval: UPDATE_RECHECK_OPEN, repeats: true) { [weak self] _ in self?.updateRecheck() }
     }
 
-    func autoCheckUpdates() {
+    func autoCheckUpdates(components: Bool = false) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
             guard let self = self else { return }
-            if self.data == nil || self.busy { self.autoCheckUpdates(); return }
-            if updateCheckDue() {
-                self.checkUpdates(auto: true)
+            if self.data == nil || self.busy { self.autoCheckUpdates(components: components); return }
+            self.updateChecked = Date()
+            self.checkUpdates(auto: true)
+            if components && updateCheckDue() {
                 // (y los parches de los componentes, un poco después: sin juntarse con el aviso del programa)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 25) { self.autoCheckComponents() }
             }
         }
     }
 
-    /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), las
-    /// imágenes de Docker, Mailpit y cloudflared
+    /// Otra búsqueda de versión nueva si hace rato de la última
+    func updateRecheck() {
+        guard let last = updateChecked, Date().timeIntervalSince(last) >= UPDATE_RECHECK else { return }
+        updateChecked = Date()
+        autoCheckUpdates()
+    }
+
+    /// Lo que tiene un parche nuevo: cada versión de PHP (PHP, Apache, MariaDB, phpMyAdmin…), Docker Desktop
+    /// y las imágenes de Docker, Node, Mailpit, cloudflared y Nginx
     func reloadComponents(_ then: ((ComponentsState) -> Void)? = nil) {
         runQuick(["componentes"]) { _, out in
             let c = parseComponents(out)

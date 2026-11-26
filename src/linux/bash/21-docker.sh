@@ -112,6 +112,8 @@ function docker_projects() {
 #   C|contenedor|imagen|estado (running, exited...)|estado en texto|puertos|proyecto de compose
 #     (todos los contenedores de tu Docker, para la consola de la pestaña)
 #   I|imagen:etiqueta|tamaño|creada  y  O|volumen|driver   (imagenes y volumenes de tu Docker)
+#   Z|nombre|su ultima copia en ~/nexum-backups (o nada)   lo que ha perdido su BBDD (docker_lost: Docker
+#     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" p
     [ -x "$DOCKER_BIN" ] && installed=1
@@ -145,6 +147,7 @@ function gui_docker() {
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
         dk volume ls --format '{{.Name}}|{{.Driver}}' 2> /dev/null \
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "O|" $0 }'
+        docker_lost | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "Z|" $0 }'
     fi
     return 0
 }
@@ -520,8 +523,8 @@ function docker_php_image() {
     if [ "$2" == "--nueva" ]; then
         fresh=(--pull --no-cache)
     elif [ "$2" != --rehacer ] && [ "$DRY" -eq 0 ] && dk image inspect "nexum-php:$php" > /dev/null 2>&1 \
-            && ! docker_php_needs_wp_cli "$php"; then
-        # (con WP-CLI puesto, la que no lo trae se rehace)
+            && ! docker_php_needs_wp_cli "$php" && ! docker_php_needs_pgsql "$php"; then
+        # (con WP-CLI puesto, la que no lo trae se rehace; con alguna PostgreSQL, la que no trae pgsql)
         return 0
     fi
     mkdir -p -m 700 "$dir" || return 1
@@ -530,8 +533,9 @@ function docker_php_image() {
     ini=${ini//$'\n'/\\n}
     {
         printf 'FROM php:%s-fpm\nCOPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\nRUN install-php-extensions %s\n' \
-            "$php" "$DOCKER_EXT_INSTALLER" "$DOCKER_PHP_EXT"
+            "$php" "$DOCKER_EXT_INSTALLER" "$(docker_php_ext)"
         docker_wp_cli_dockerfile
+        docker_pg_dockerfile
         cat << EOF
 RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \\
  && printf '[global]\\nerror_log = /proc/self/fd/2\\ndaemonize = no\\n[www]\\nuser = root\\ngroup = root\\nlisten = /run/nexum/php.sock\\nlisten.mode = 0660\\nclear_env = no\\ncatch_workers_output = yes\\npm.max_requests = 50\\n' > /usr/local/etc/php-fpm.d/zz-nexum.conf \\
@@ -822,6 +826,8 @@ function docker_test_admin() {
 
 #@incluir comun/docker/docker_db_backup.sh
 #@incluir comun/docker/docker_wp_cli.sh
+#@incluir comun/docker/docker_pg_name.sh
+#@incluir comun/docker/docker_lost.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

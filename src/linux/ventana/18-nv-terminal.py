@@ -340,9 +340,12 @@ class NvTerminal:
         m = re.search(r"\d+ ?%", task.pct.get_label() or "")
         # (lo que hace, con la primera palabra del título: «Actualizando…», «Instalando…»)
         verb = (task.dlg.get_title() or "En marcha").split()[0].rstrip(".,:")
-        self.task_badge_lbl.set_label("%s…%s" % (verb, "  " + m.group(0) if m else ""))
-        self.task_badge.set_tooltip_text("%s\n%s\nPulsa para ver la ventana" % (
-            task.dlg.get_title(), task.what.get_label() or "En marcha"))
+        queue = getattr(self, "task_queue", [])
+        self.task_badge_lbl.set_label("%s…%s%s" % (verb, "  " + m.group(0) if m else "",
+                                                   "  · %d en la cola" % len(queue) if queue else ""))
+        self.task_badge.set_tooltip_text("%s\n%s%s\nPulsa para ver la ventana" % (
+            task.dlg.get_title(), task.what.get_label() or "En marcha",
+            "\nDespués: " + ", ".join(q["title"] for q in queue) if queue else ""))
         return True
 
     def nv_sidebar(self):
@@ -363,7 +366,8 @@ class NvTerminal:
                 w.destroy()
         self.tabs, self.tab_lists = {}, []
         for group_name, items in SIDEBAR:
-            items = [it for it in items if it[0] in SIDEBAR_FIXED or it[0] not in look["ocultos"]]
+            items = [it for it in items if (it[0] in SIDEBAR_FIXED or it[0] not in look["ocultos"])
+                     and (it[0] != "nginx" or nginx_used())]
             if not items:
                 continue
             box.pack_start(label(group_name, "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2), False, False, 0)
@@ -485,7 +489,8 @@ class NvTerminal:
         b.remove(lb)
         cols = Gtk.Box(spacing=12, homogeneous=True, margin_top=8)
         b.pack_start(cols, False, False, 0)
-        names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED]
+        names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED
+                 and (name != "nginx" or nginx_used())]
         half = (len(names) + 1) // 2
         for chunk in (names[:half], names[half:]):
             col = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
@@ -532,6 +537,8 @@ class NvTerminal:
             self.nv_broken_load()
         elif row.tab_name == "node":
             self.nv_node_load()
+        elif row.tab_name == "nginx":
+            self.nv_nginx_load()
 
     def on_tick(self):
         res = super().on_tick()

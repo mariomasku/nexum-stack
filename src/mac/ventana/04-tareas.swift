@@ -187,6 +187,20 @@ func showTaskLog(_ path: String) {
     }
 }
 
+/// Una tarea de la cola (runTask con otra en marcha): lo que hace falta para lanzarla cuando le toque
+struct QueuedTask: Identifiable {
+    let id = UUID()
+    let title: String
+    let args: [String]
+    let progress: Bool
+    let doneText: String
+    let autoClose: Bool
+    let env: [String: String]
+    let cancelText: (String, String, String)?
+    let reloadBranches: Bool
+    let onDone: ((Bool, TaskRunner, InstallProgress?) -> Void)?
+}
+
 final class TaskRunner: ObservableObject, Identifiable {
     let id = UUID()
     /// El título con que se lanzó (head cambia al acabar)

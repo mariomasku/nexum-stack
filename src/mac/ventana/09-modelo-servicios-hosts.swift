@@ -121,6 +121,24 @@ extension AppModel {
         return (hosts ?? []).filter { $0.folder == name && !$0.name.lowercased().hasSuffix(".local") }
     }
 
+    /// Más, «Vaciar la caché de Chrome…» (de un proyecto con dominio): tras falsear o dejar de falsear su
+    /// dominio, Chrome puede seguir un rato en la otra web, con su caché de DNS y las conexiones que ya tenía
+    /// abiertas. Chrome no deja que otro programa abra sus páginas internas ni pulse sus botones: se copia la
+    /// dirección y se dice qué pulsar
+    func browserCacheHelp() {
+        let url = "chrome://net-internals/#sockets"
+        copyText(url)
+        message("Vaciar la caché de Chrome",
+                "Si después de falsear o dejar de falsear un dominio Chrome sigue en la otra web (la real o la de "
+                + "este Mac), es por las conexiones que tenía abiertas y su caché de DNS. En Chrome:\n\n"
+                + "1. Pega en la barra de direcciones \(url) (ya está copiada) y pulsa Intro.\n"
+                + "2. Pulsa «Flush socket pools».\n"
+                + "3. A la izquierda, en «DNS», pulsa «Clear host cache».\n"
+                + "4. Recarga la pestaña del proyecto con Cmd+Mayús+R.\n\n"
+                + "Chrome no deja que otro programa abra esa página ni pulse sus botones. En Firefox: "
+                + "about:networking#dns y «Clear DNS Cache».")
+    }
+
     /// El fichero de hosts, solo para verlo (para cambiarlo: Editar, en Configuración), con los dominios
     /// que se pueden falsear delante: un dominio con vhost no sale en él hasta falsearlo
     func viewHostsFile() {

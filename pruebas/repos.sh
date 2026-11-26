@@ -8,7 +8,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 W=$(mktemp -d "$TMPBASE/w-repos.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
 grep -q '^function repos_list() {' "$SRC" || { echo "  ok    (sin la pestaña Repositorios)"; exit 0; }
-extract "$SRC" github_conf github_conf_set github_token gh_token github_api github_connect github_disconnect repo_pull \
+extract "$SRC" github_conf github_conf_set github_token gh_token github_api github_connect github_disconnect repo_pull repo_pull_summary summary_box \
     github_command repo_clones repos_list repos_rows repo_fetch repo_github_helper || exit 1
 MAC=0
 grep -q "LVM_SWIFT" "$SRC" && MAC=1
@@ -154,4 +154,6 @@ else
     # en el buscador, el cursor y por dónde iba la lista se quedan
     check "ventana: al rehacer Repositorios se quedan lo escrito, el cursor y la posición de la lista" 'grep -q "search.set_text(getattr(self, \"repos_query\", \"\"))" "$SRC" && grep -q "search.connect(\"changed\", lambda e: setattr(self, \"repos_query\", e.get_text()))" "$SRC" && grep -q "search.grab_focus_without_selecting()" "$SRC" && grep -q "vadj.set_value(min(scroll," "$SRC"'
 fi
+# Buscar el clon de una carpeta no corta la lista a medias (sin «BrokenPipeError» de Python) (1.57.49)
+check "repo_clones no se corta con awk exit (Broken pipe)" '! grep -qE "repo_clones \| awk .*exit" "$SRC"'
 exit $fail

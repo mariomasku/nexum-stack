@@ -40,7 +40,7 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 /* El aviso de abajo (toast): grande, con el logotipo de Nexum. La píldora (el fondo y el borde con los colores
    de su icono) la pinta toast_paint: aquí, solo sus márgenes */
 /* Lo que lanza una tarea, con otra en marcha: atenuado, pero se puede pulsar (dice cuál sigue) */
-.nv-espera { opacity: 0.5; }
+.nv-espera { opacity: 0.7; }
 .nv-toast { padding: 15px 40px 15px 34px; }
 .nv-toast-texto { font-size: 1.15em; font-weight: 600; }
 .nv-pastilla { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
@@ -66,8 +66,16 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 .nv-botonera flowboxchild { padding: 0; background: none; }
 .nv-sep { background-color: alpha(@theme_fg_color, 0.15); min-width: 1px; margin: 6px 2px; }
 .nv-verde { color: %(g)s; }
+/* La barra de estado, abajo a lo ancho: a dónde apunta web.local */
+.nv-estado { background-color: alpha(@theme_fg_color, 0.035); border-top: 1px solid alpha(@theme_fg_color, 0.08);
+             padding: 5px 16px; }
 .nv-gris { color: alpha(@theme_fg_color, 0.3); }
-.nv-aviso-num { background-color: #ff453a; color: white; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
+/* El botón de Avisos, en amarillo (avisa, no es un error): el triángulo y su número */
+.nv-aviso-num { background-color: #ffd60a; color: #1d1d1f; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
+.nv-aviso-icono { color: #ffd60a; }
+.nv-claro .nv-aviso-icono { color: #d4a300; }
+.nv-permitida { color: #30d158; }
+.nv-claro .nv-permitida { color: #1e9e45; }
 .nv-correo-num { background-color: %(b)s; color: white; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
 .nv-correo-aviso { color: #ff9f0a; }
 /* Botones: redondeados, con borde gris y, al pasar el raton, borde azul (todos, tambien los planos
@@ -122,6 +130,7 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-mosaico-titulo { font-weight: 600; }
 .nv-etiqueta { font-size: 0.78em; padding: 1px 8px; border-radius: 10px; background-color: alpha(@theme_fg_color, 0.07); color: alpha(@theme_fg_color, 0.75); }
 .nv-etiqueta-azul { background-color: alpha(%(b)s, 0.16); color: %(b)s; }
+.nv-etiqueta-roja { background-color: alpha(#e01b24, 0.16); color: #e5484d; }
 .nv-chip { font-size: 0.8em; padding: 3px 10px; border-radius: 7px; background-color: alpha(@theme_fg_color, 0.06); }
 .nv-chip-docker { background-color: alpha(#1d63ed, 0.16); color: #4c8dff; }
 .nv-selectores { background-color: alpha(@theme_fg_color, 0.05); border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 12px;
@@ -453,4 +462,70 @@ class Hamburger(Gtk.DrawingArea):
             cr.move_to(1, round(y) + 0.5)
             cr.line_to(w - 1, round(y) + 0.5)
         cr.stroke()
+        return False
+
+
+class LinkChevrons(Gtk.DrawingArea):
+    """Los chevrones de la barra de estado (web.local >>>>> proyecto): enlazado, en verde, con una onda de
+    luz que va de izquierda a derecha; sin enlace, grises y quietos. El paso de uno a otro, fundido."""
+
+    COUNT, STEP, PERIOD, FADE = 5, 9, 1.6, 0.45
+    DIM, BRIGHT = (0.10, 0.45, 0.25), (0.19, 0.82, 0.35)
+
+    def __init__(self):
+        super().__init__(valign=Gtk.Align.CENTER)
+        self.set_size_request((self.COUNT - 1) * self.STEP + 10, 14)
+        self.linked, self.level, self.last, self.drawn, self.tick = False, 0.0, None, 0, None
+
+    def set_linked(self, linked):
+        if linked != self.linked:
+            self.linked = linked
+            self.start()
+
+    def start(self):
+        if self.tick is None:
+            self.last = None
+            self.tick = self.add_tick_callback(self.on_tick)
+
+    def on_tick(self, _w, clock):
+        now = clock.get_frame_time() / 1e6
+        dt = 0 if self.last is None else min(now - self.last, 0.1)
+        self.last = now
+        goal = 1.0 if self.linked else 0.0
+        step = dt / self.FADE
+        self.level = min(goal, self.level + step) if self.level < goal else max(goal, self.level - step)
+        # (unos 30 dibujos por segundo bastan para la onda; quieto y sin enlace, se deja de contar)
+        if now - self.drawn >= 1 / 30 or self.level == goal:
+            self.drawn = now
+            self.queue_draw()
+        if not self.linked and self.level == 0.0:
+            self.tick = None
+            return GLib.SOURCE_REMOVE
+        return GLib.SOURCE_CONTINUE
+
+    def do_map(self):
+        Gtk.DrawingArea.do_map(self)
+        if self.linked or self.level > 0:
+            self.start()
+
+    def do_draw(self, cr):
+        fg = self.get_style_context().get_color(self.get_state_flags())
+        gray = (fg.red, fg.green, fg.blue)
+        h = self.get_allocated_height()
+        t = GLib.get_monotonic_time() / 1e6
+        cr.set_line_width(2.2)
+        cr.set_line_cap(1)
+        cr.set_line_join(1)
+        for i in range(self.COUNT):
+            # (la onda: cada chevrón, algo después que el de su izquierda)
+            wave = 0.5 + 0.5 * math.sin(2 * math.pi * (t / self.PERIOD - i / self.COUNT))
+            green = [d + (b - d) * wave for d, b in zip(self.DIM, self.BRIGHT)]
+            rgb = [g * (1 - self.level) + c * self.level for g, c in zip(gray, green)]
+            alpha = 0.35 + (0.65 * (0.55 + 0.45 * wave) - 0.35) * self.level
+            cr.set_source_rgba(rgb[0], rgb[1], rgb[2], alpha)
+            x = 3 + i * self.STEP
+            cr.move_to(x, h / 2 - 4.5)
+            cr.line_to(x + 4.5, h / 2)
+            cr.line_to(x, h / 2 + 4.5)
+            cr.stroke()
         return False

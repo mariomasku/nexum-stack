@@ -9,7 +9,7 @@ LINUX=$HERE/../lvm-instalador.sh
 grep -q "LVM_SWIFT" "$SRC" && grep -q "^func updateCheckDue() -> Bool {" "$SRC" || { echo "  ok    (sin la ventana 1.40 del Mac)"; exit 0; }
 
 # Actualizaciones
-check "actualizaciones: al abrir, solo si toca (y ya no se apunta la versión rechazada)" 'grep -A1 "if updateCheckDue() {" "$SRC" | grep -q "self.checkUpdates(auto: true)" && ! grep -q "declinedUpdate" "$SRC"'
+check "actualizaciones: siempre al abrir, otra vez al volver si hace rato y cada pocas horas (1.57.51)" 'grep -q "autoCheckUpdates(components: true)" "$SRC" && grep -q "if components && updateCheckDue() {" "$SRC" && grep -qF "queue: .main) { [weak self] _ in self?.updateRecheck() }" "$SRC" && grep -q "withTimeInterval: UPDATE_RECHECK_OPEN, repeats: true" "$SRC" && grep -qF "if auto && self.updateDeclined.contains(u[1]) { return }" "$SRC"' 
 check "actualizaciones: cada tantos arranques como en Linux, en el mismo fichero" '[ "$(grep -oP "^let UPDATE_EVERY = \K[0-9]+" "$SRC")" == "$(grep -oP "^UPDATE_EVERY = \K[0-9]+" "$LINUX")" ] && grep -q "\"/actualizaciones-arranques\"" "$SRC"'
 # Botones del visor
 mac_keys=$(grep -A3 "^let VISOR_BUTTONS:" "$SRC" | grep -oP '\("\K[a-z]+(?=", "[^"]+"\))' | tr '\n' ' ')
@@ -34,4 +34,6 @@ check "Docker: XAMPP-X parado solo avisa con proyectos de antes" 'grep -q "if !k
 check "Docker: el DNS de *.docker.test en Configuración y los dominios con su final (docker.local o docker.test)" 'grep -q "model.dockerDNS(!w.dns)" "$SRC" && grep -q "\[\"docker-web\", \"dns\", on ? \"activar\" : \"quitar\"\]" "$SRC" && grep -q "tld: field(f, 6) == \"docker.test\" ? \"docker.test\" : \"docker.local\", dns: field(f, 7) == \"1\")" "$SRC" && ! grep -q "\"pma.docker.local\"" "$SRC"'
 check "configuración: página ancha y sus apartados en tarjetas de dos en dos" 'grep -q "^struct TileCard<Content: View>: View {" "$SRC" && [ "$(grep -c "TileCard(" "$SRC")" -ge 10 ] && grep -q "Tile(\"Dirección y puertos\"" "$SRC"'
 check "botones: el panel en horizontal (cabe en un portátil)" 'grep -q "case .buttons: return 900" "$SRC" && grep -q "HStack(alignment: .top, spacing: 24) {" "$SRC"'
+# (1.57.51) openFolder es de ToolsView: fuera de ella no existe y la ventana no compila (VS Code, Abrir)
+check "openFolder solo dentro de ToolsView; fuera, showFolder" '[ -z "$(awk "/^struct ToolsView: View/ {t=1; next} /^(struct|final class|class|extension|func) / {t=0} !t && /openFolder\\(/ {print NR}" "$SRC")" ] && grep -q "Button(\"Abrir\") { showFolder(dir) }" "$SRC"'
 exit $fail

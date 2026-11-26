@@ -212,18 +212,79 @@ function node_log() {
     fi
 }
 
+# Nginx (pestaña Nginx): lo de Linux. El PHP-FPM de la versión activa (/opt/lampp), lo que hace falta
+# para compilarlo (paquetes de apt: con sudo, solo si falta alguno) y la confianza del navegador
+NGINX_PHP_SOCK=$LAMPP_LINK/var/run/php-fpm.sock
+NGINX_BUILD_DEPS="gcc make libpcre2-dev libssl-dev zlib1g-dev"
+
+# ¿Falta algún paquete para compilar Nginx? (entonces nginx-instalar pide la contraseña)
+function nginx_deps_missing() {
+    local p
+    for p in $NGINX_BUILD_DEPS; do
+        dpkg-query -W -f='${Status}' "$p" 2> /dev/null | grep -q "install ok installed" || return 0
+    done
+    return 1
+}
+
+function nginx_build_deps() {
+    echo "Lo que hace falta para compilar Nginx ($NGINX_BUILD_DEPS)"
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] apt-get install de los que falten"; return 0; }
+    nginx_deps_missing || { echo "  Ya estan todas instaladas"; return 0; }
+    # shellcheck disable=SC2086
+    apt_install $NGINX_BUILD_DEPS
+}
+
+# (en Linux, con las librerías del sistema)
+function nginx_build_flags() {
+    return 0
+}
+
+# Chrome, Chromium y Firefox aceptan sin aviso el certificado de <nombre>.localhost: va a sus almacenes
+# con confianza P (la de un servidor, no la de una CA), como el de *.docker.local
+function nginx_trust() {
+    local host=$1 crt=$NGINX_DIR/certs/$1.crt nick="lvm-instalador nginx $1" d i n=0
+    # (en las pruebas, nunca en los navegadores de verdad)
+    [ -n "$TEST_DIR" ] && return 0
+    [ -f "$crt" ] || [ "$DRY" -eq 1 ] || return 0
+    if ! command -v certutil > /dev/null; then
+        echo "Para que Chrome y Firefox acepten $host sin aviso falta certutil: sudo apt install libnss3-tools"
+        return 0
+    fi
+    for d in "$HOME/.pki/nssdb" "$HOME"/snap/chromium/current/.pki/nssdb "$HOME"/.mozilla/firefox/*/ \
+             "$HOME"/snap/firefox/common/.mozilla/firefox/*/; do
+        d=${d%/}
+        [ -f "$d/cert9.db" ] || continue
+        for i in 1 2 3 4 5; do
+            no_tty certutil -L -d "sql:$d" -n "$nick" > /dev/null 2>&1 || break
+            run no_tty certutil -D -d "sql:$d" -n "$nick" || break
+            [ "$DRY" -eq 0 ] || break
+        done
+        run no_tty certutil -A -d "sql:$d" -n "$nick" -t "P,," -i "$crt" && n=$((n + 1))
+    done
+    [ $n -gt 0 ] && echo "El navegador acepta el certificado de $host (si Chrome estaba abierto, cierralo y vuelve a abrirlo)"
+    return 0
+}
+#@incluir comun/phpmyadmin/nginx_get.sh
+
 # Tareas de la ventana (LVM_TAREA=1): lo que cambia algo pide la contraseña de administrador antes de
 # empezar, no a mitad. Si se cancela, no se ha hecho nada (antes, lo hecho hasta el primer sudo se
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual|nginx-usar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;
         # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd|borrar-bd-marcadas|marcar-bd) ;;
         # (el administrador de pruebas: solo un ajuste de ~/.nexum)
         admin-pruebas) ;;
+        # (Nginx: con tu usuario; instalarlo, solo si en Linux falta algun paquete para compilarlo)
+        nginx-instalar) nginx_deps_missing && { sudo_first || exit 130; } ;;
         # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker sin root)
         docker-wp-cli) ;;
+        # (PostgreSQL y Nginx de Docker: Docker sin root y ficheros de ~/.nexum)
+        docker-postgres) ;;
+        # (la copia de las BBDD de Docker: Docker sin root (o Docker Desktop) y ~/nexum-backups)
+        docker-copia) ;;
+        docker-nginx) ;;
         # (confiar: solo los almacenes de certificados de tus navegadores)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -298,10 +359,16 @@ case "$1" in
     node-parar) node_stop "$2" ;;
     node-registro) node_log "$2" ;;
     gui-node) gui_node ;;
+    gui-nginx) gui_nginx ;;
+    nginx-usar|nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command "$@" ;;
     docker-php) docker_set_php "$2" "$3" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
     docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
+    docker-postgres) shift; docker_pg_command "$@" ;;
+    docker-copia) docker_backup_all ;;
+    docker-recuperar) shift; docker_recover "$@" ;;
+    docker-nginx) shift; docker_nginx_command "$@" ;;
     docker-contenedor) docker_container_action "$2" "$3" ;;
     docker-imagenes) docker_image_action "$2" "$3" ;;
     docker-volumen-borrar) docker_volume_remove "$2" ;;
@@ -315,6 +382,8 @@ case "$1" in
     importar-bd) import_database "$2" "$3" "${@:4}" ;;
     crear-bd) create_database "$2" ;;
     borrar-bd) drop_database "$2" "$3" ;;
+    marcar-bd) db_mark_drop "$2" "$3" "$4" ;;
+    borrar-bd-marcadas) drop_marked_databases "$2" ;;
     exportar-bd|descargar-bd) export_database "$2" "$3" "$4" ;;
     copiar-bd) shift; copy_database "$@" ;;
     gui-bd-info) gui_db_info "$2" ;;
@@ -353,7 +422,7 @@ case "$1" in
         STEP_LOG="" STEP_DESC=""
         stack_build_phase
         ;;
-    barrera-web|barrera-webs) cross_site_command "$2" ;;
+    barrera-web|barrera-webs) cross_site_command "$2" "$3" ;;
     correo) mail_command "$2" "$3" ;;
     reparar-bd-sistema) repair_db_system "$2" ;;
     arreglar-certificados) fix_certs ;;

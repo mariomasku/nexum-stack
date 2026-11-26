@@ -906,8 +906,8 @@ function secure_lampp() {
         fi
         # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia; los demas, solo con
         # el ajuste copias-ficheros)
-        [ -f "$dir/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
-            && cp "$dir/$rel" "$COPIES_DIR/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
+        [ -f "$dir/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && copies_in "sistema/$name" > /dev/null \
+            && cp "$dir/$rel" "$COPIES_DIR/sistema/$name/$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
         sudo sh -c 'cat "$1" > "$2"' sh "$src" "$dir/$rel" || { sudo rm -rf "$tmp"; return 2; }
         [[ "$rel" == *.key ]] && sudo chmod 600 "$dir/$rel"
     done <<< "$list"
@@ -1055,9 +1055,10 @@ function ftp_autostart() {
 
 # barrera-web [si|no]: enciende o apaga la barrera entre webs. Al cambiarla se rehace el
 # lvm-dominio-desconocido.conf de todas las versiones (como asegurar --todas, pide la contraseña) y
-# se recarga el Apache de la montada si esta en marcha. Sin argumento, dice como esta
+# se recarga el Apache de la montada si esta en marcha. Sin argumento, dice como esta.
+# barrera-web permitir|quitar <dominio>: las webs permitidas (CROSS_SITE_ALLOW), que la barrera deja pasar;
+# barrera-web permitidas: la lista
 function cross_site_command() {
-    local rc
     case $1 in
         "")
             if cross_site_on; then
@@ -1065,10 +1066,13 @@ function cross_site_command() {
             else
                 echo "La barrera entre webs esta apagada (nexum barrera-web si para encenderla)"
             fi
+            [ -n "$(cross_site_allowed)" ] && echo "Webs permitidas: $(cross_site_allowed | paste -sd ' ')"
             return 0 ;;
         si|on) cross_site_on && { echo "La barrera entre webs ya estaba encendida"; return 0; } ;;
         no|off) cross_site_on || { echo "La barrera entre webs ya estaba apagada"; return 0; } ;;
-        *) echo "Uso: nexum barrera-web [si|no]"; return 1 ;;
+        permitidas) cross_site_allowed; return 0 ;;
+        permitir|quitar) cross_site_allow_command "$1" "$2"; return ;;
+        *) echo "Uso: nexum barrera-web [si|no] | permitir <dominio> | quitar <dominio> | permitidas"; return 1 ;;
     esac
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] barrera entre webs $([ "$1" == si ] || [ "$1" == on ] && echo encendida || echo apagada) en todas las versiones"
@@ -1081,28 +1085,79 @@ function cross_site_command() {
     else
         : > "$CROSS_SITE_OFF" || return 1
     fi
-    secure_all
-    rc=$?
-    if [ $rc -eq 2 ]; then
+    if ! cross_site_apply; then
         # (no se ha podido aplicar: el interruptor vuelve a como estaba)
         if [ "$1" == si ] || [ "$1" == on ]; then : > "$CROSS_SITE_OFF"; else rm -f "$CROSS_SITE_OFF"; fi
         secure_all > /dev/null 2>&1
         echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
         return 1
     fi
+    if cross_site_on; then
+        echo "Barrera entre webs encendida: otra web no puede mandar nada a tus proyectos"
+    else
+        echo "Barrera entre webs apagada: enciendela cuando acabes de probar la pasarela de pago"
+    fi
+}
+
+# barrera-web permitir|quitar <dominio>: añade o quita una web de las permitidas y lo aplica en todas las
+# versiones (y en el Apache de Docker), como al encender o apagar la barrera
+function cross_site_allow_command() {
+    local d list old
+    d=$(cross_site_domain "$2")
+    if [ -z "$d" ]; then
+        echo "«$2» no es un dominio: escribe uno como erp.empresa.com (o *.empresa.com para todos sus subdominios)"
+        return 1
+    fi
+    list=$(cross_site_allowed)
+    if [ "$1" == permitir ]; then
+        grep -qxF -- "$d" <<< "$list" && { echo "$d ya estaba entre las webs permitidas"; return 0; }
+    else
+        grep -qxF -- "$d" <<< "$list" || { echo "$d no estaba entre las webs permitidas"; return 0; }
+    fi
+    if [ "$DRY" -eq 1 ]; then
+        echo "  [simulacion] $d $([ "$1" == permitir ] && echo "pasa a estar permitida" || echo "deja de estar permitida") en todas las versiones"
+        return 0
+    fi
+    sudo_first || return 1
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    old=$list
+    {
+        if [ "$1" == permitir ]; then
+            printf '%s\n' "$list" "$d"
+        else
+            grep -vxF -- "$d" <<< "$list"
+        fi
+    } | grep -E "$CROSS_SITE_ALLOW_RE" | LC_ALL=C sort -u > "$CROSS_SITE_ALLOW.nuevo" && mv -f "$CROSS_SITE_ALLOW.nuevo" "$CROSS_SITE_ALLOW" || return 1
+    if ! cross_site_apply; then
+        # (no se ha podido aplicar: la lista vuelve a como estaba)
+        printf '%s\n' "$old" | grep -E "$CROSS_SITE_ALLOW_RE" > "$CROSS_SITE_ALLOW"
+        secure_all > /dev/null 2>&1
+        echo "No se ha podido cambiar en todas las versiones: se deja como estaba"
+        return 1
+    fi
+    if [ "$1" == permitir ]; then
+        echo "$d, permitida: la barrera entre webs la deja pasar (formularios, su vuelta a tus proyectos, iframes)"
+    else
+        echo "$d ya no esta permitida: la barrera entre webs la para como a cualquier otra web"
+    fi
+}
+
+# Lo que cambia la barrera o sus webs permitidas, en todas las versiones: su lvm-dominio-desconocido.conf,
+# el Apache de la montada (recargado si esta en marcha) y el de Docker. 1 si no se ha podido escribir
+function cross_site_apply() {
+    local rc
+    secure_all
+    rc=$?
+    [ $rc -eq 2 ] && return 1
     if [ $rc -eq 0 ] && lampp_running; then
-        run sudo /opt/lampp/lampp reloadapache > /dev/null || { echo "No se ha podido recargar Apache"; return 1; }
+        run sudo /opt/lampp/lampp reloadapache > /dev/null || echo "No se ha podido recargar Apache: reinicia la version activa"
     fi
     # (y el Apache de Docker, si lo hay: lleva las mismas reglas de seguridad. Se rehace su configuracion y,
     # si esta en marcha, se recarga sin cortar las conexiones; parado, la toma al arrancar)
     if [ -f "$DOCKER_WEB_DIR/conf/httpd.conf" ]; then
         docker_web_reload || echo "Aviso: el Apache de Docker no se ha podido poner al dia; la tomara al arrancar"
     fi
-    if cross_site_on; then
-        echo "Barrera entre webs encendida: otra web no puede mandar nada a tus proyectos"
-    else
-        echo "Barrera entre webs apagada: enciendela cuando acabes de probar la pasarela de pago"
-    fi
+    return 0
 }
 
 # asegurar [version]: lo que falte para que solo se pueda entrar desde este equipo. Si es la version

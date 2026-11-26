@@ -10,7 +10,7 @@ if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: con pasos, la nota a la izquierda" 'grep -qF "steps.isEmpty ? dialogLabel(text) : dialogLabel(text, color: .secondaryLabelColor, align: .left)" "$SRC"'
     check "Mac: crear dominio, copiar, replicar, cargar, actualizar, instalar y Actualizar todo, con pasos" '[ "$(grep -cE "steps: (steps|notes|what|c\.items|list\.map|notes \+ )" "$SRC")" -ge 7 ]'
     check "Mac: git pull antes de copiar, con los pasos" 'grep -qF "let steps = dialogSteps(what)" "$SRC"'
-    check "Mac: con otra tarea en marcha, lo dice nombrándola (antes de preguntar y al lanzarla)" 'grep -qF "if task, let guardTask = TASK_GUARD, guardTask() { return false }" "$SRC" && grep -qF "TASK_GUARD = { [weak self] in" "$SRC" && grep -qF "sigue en marcha. Espera a que acabe y vuelve a probar." "$SRC" && grep -qF "            refuseTask(cur)" "$SRC"'
+    check "Mac: con otra tarea en marcha, la pregunta dice que va a la cola, nombrándola" 'grep -qF "    return runDialog(title: title, text: task ? withTaskNote(text) : text, okLabel: okLabel," "$SRC" && grep -qF "        TASK_NOTE = { [weak self] in self?.taskNote }" "$SRC" && grep -qF "sigue en marcha: esta se pone en la cola y empieza cuando acabe." "$SRC"'
     check "Mac: Instalar versiones se puede pulsar con otra tarea (y lo dice)" 'grep -qF ".disabled(model.selected.isEmpty)" "$SRC" && ! grep -qF ".disabled(model.selected.isEmpty || model.busy)" "$SRC"'
     check "Mac: ya no hay listas con viñetas en los diálogos" '! grep -qE "confirm\(.*map \{ \"• \" \+" "$SRC"'
 else
@@ -19,8 +19,8 @@ else
     check "Linux: el centrado de los diálogos no toca los pasos" 'grep -qF "or getattr(w, \"nv_pasos\", False):" "$SRC"'
     check "Linux: crear dominio, copiar, replicar, cargar, actualizar, instalar y Actualizar todo, con pasos" '[ "$(grep -cE "steps=(steps|notes|what|res\[\"items\"\]|\[\"Se instala|notes \+)" "$SRC")" -ge 7 ]'
     check "Linux: git pull antes de copiar, con los pasos" 'grep -qF "pack_start(steps_box(what," "$SRC"'
-    check "Linux: con otra tarea en marcha, lo dice nombrándola en la ventana que se mira" 'grep -qF "TASK_GUARD[0] = lambda check=False: bool(self.task_running()) and (check or self.refuse_task() or True)" "$SRC" && grep -qF "sigue en marcha. Espera a que acabe y vuelve a probar.\" % (cur.title" "$SRC" && grep -qF "if w.is_active() and w.get_visible()), self.win)" "$SRC"'
-    check "Linux: la tarea en marcha se mira aunque no esté en segundo plano" 'grep -qF "        self.cur_task = Task(self, title, args, on_done=done, **kw)" "$SRC" && ! grep -qF "if self.busy and bg is not None and not bg.finished:" "$SRC"'
+    check "Linux: con otra tarea en marcha, la pregunta dice que va a la cola, nombrándola" 'grep -qF "        TASK_GUARD[0] = self.task_note" "$SRC" && grep -qF "sigue en marcha: esta se pone en la cola y empieza cuando acabe.\" % (cur.title" "$SRC"'
+    check "Linux: la tarea en marcha se mira aunque no esté en segundo plano" 'grep -qF "        task = Task(self, title, args, on_done=done, **kw)" "$SRC" && grep -qF "        self.cur_task = task" "$SRC" && ! grep -qF "if self.busy and bg is not None and not bg.finished:" "$SRC"'
     check "Linux: cancelar la propia tarea sí se pregunta" 'grep -qF "destructive=True, task=False):" "$SRC"'
     check "Linux: ya no hay listas con viñetas en los diálogos" '! grep -qE "confirm\(.*\"• \" \+ x" "$SRC"'
     # Que se pinte: un diálogo con pasos, sin pantalla de verdad no; con ella, se abre y se cierra solo
@@ -55,17 +55,19 @@ def look():
 GLib.timeout_add(600, look)
 ns["confirm"](None, "¿Crear a.test?", "Se pide la contraseña de sudo.", "Crear", steps=["Uno.", "Dos."])
 print("\n".join(seen))
-# (1.57.33) con otra tarea en marcha no se pregunta: la guarda lo dice y confirm devuelve False sin diálogo
-said = []
-ns["TASK_GUARD"][0] = lambda: said.append(1) or True
+# (1.57.40) con otra tarea en marcha se pregunta igual, con la nota de la cola (salvo lo de la propia tarea)
+ns["TASK_GUARD"][0] = lambda: "«Uno» sigue en marcha: esta se pone en la cola y empieza cuando acabe."
 seen.clear()
 GLib.timeout_add(600, look)
-r = ns["confirm"](None, "¿Instalar?", "", "Instalar")
-r2 = ns["confirm"](None, "¿Cancelar la tarea?", "", "Cancelar", task=False)
-print("guarda|%s|%s|%d|%s" % (r, r2, len(said), any(x.startswith("¿Cancelar") for x in seen) and not any(x.startswith("¿Instalar") for x in seen)))
+ns["confirm"](None, "¿Instalar?", "Se instala.", "Instalar")
+GLib.timeout_add(600, look)
+ns["confirm"](None, "¿Cancelar la tarea?", "Se para.", "Cancelar", task=False)
+note = [x for x in seen if "se pone en la cola" in x]
+print("guarda|%s|%d|%s" % (any(x.startswith("¿Instalar") for x in seen), len(note),
+                           any(x.startswith("Se instala.") and "cola" in x for x in seen)))
 PY
         check "Linux (pintado): «Qué se va a realizar» y los pasos 1. y 2., a la izquierda" 'grep -qx "Qué se va a realizar|0.0" "$W/out" && grep -qx "1.|1.0" "$W/out" && grep -qx "Uno.|0.0" "$W/out" && grep -qx "2.|1.0" "$W/out" && grep -qx "Se pide la contraseña de sudo.|0.0" "$W/out"'
-        check "Linux (pintado): con otra tarea en marcha, confirm no pregunta (salvo lo de la propia tarea)" 'grep -qx "guarda|False|False|1|True" "$W/out"'
+        check "Linux (pintado): con otra tarea en marcha, confirm pregunta con la nota de la cola (salvo lo de la propia tarea)" 'grep -qx "guarda|True|1|True" "$W/out"'
     fi
 fi
 exit $fail

@@ -309,8 +309,8 @@ function wp_config() {
     mkdir -p -m 700 "$WP_CONFIG_DIR" || return 1
     # (el anterior, en ~/nexum-backups solo con el ajuste copias-ficheros)
     if [ -f "$file" ] && ! cmp -s "$file" "$saved" && [ -f "$COPIES_FILES_FLAG" ]; then
-        mkdir -p -m 700 "$COPIES_DIR" && cp "$file" "$COPIES_DIR/wp-config.php-$folder-$(date +%Y%m%d-%H%M%S)" \
-            && echo "  El anterior queda en ~/nexum-backups"
+        copies_in "proyectos/$folder" > /dev/null && cp "$file" "$COPIES_DIR/proyectos/$folder/wp-config.php-$(date +%Y%m%d-%H%M%S)" \
+            && echo "  El anterior queda en ~/nexum-backups/proyectos/$folder"
     fi
     LVM_WP_CLAVE=${MYSQL_PWD:-} python3 -I - "$src" "$WP_CONFIG_DIR/.nuevo" "$db" "$new_prefix" "$local_db" "$url" <<'EOF' || { echo "No se ha podido preparar el wp-config.php"; return 1; }
 import os, re, secrets, string, sys
@@ -461,8 +461,8 @@ function ps_set_db() {
     mkdir -p -m 700 "$PS_PARAMS_DIR" || return 1
     # (el anterior, en ~/nexum-backups solo con el ajuste copias-ficheros)
     if [ -f "$COPIES_FILES_FLAG" ]; then
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
-        cp "$file" "$COPIES_DIR/$(basename "$rel")-$folder-$(date +%Y%m%d-%H%M%S)" && echo "  El anterior queda en ~/nexum-backups"
+        copies_in "proyectos/$folder" > /dev/null || return 1
+        cp "$file" "$COPIES_DIR/proyectos/$folder/$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" && echo "  El anterior queda en ~/nexum-backups/proyectos/$folder"
     fi
     LVM_PS_CLAVE=${MYSQL_PWD:-} python3 -I - "$file" "$PS_PARAMS_DIR/.nuevo" "$db" "$new_prefix" "$local_db" <<'EOF' || { echo "No se ha podido preparar $rel"; return 1; }
 import os, re, sys

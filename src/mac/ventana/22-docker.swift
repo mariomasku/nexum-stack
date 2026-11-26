@@ -82,8 +82,37 @@ struct DockerView: View {
             .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
+    /// El aviso de Docker vacío: su título y por qué pasa
+    func lostTitle(_ lost: [DockerLost]) -> String {
+        let who: String = lost.count == 1 ? lost[0].label : "\(lost.count) proyectos"
+        return "Docker se ha quedado sin las BBDD de " + who
+    }
+
+    func lostText(_ lost: [DockerLost]) -> String {
+        let names: String = lost.map { $0.label }.joined(separator: ", ")
+        let have: Int = lost.filter { !$0.copy.isEmpty }.count
+        let copies: String = have == lost.count ? "la tienen todos" : "la tienen \(have) de \(lost.count)"
+        return "Docker no tiene las BBDD de \(names). Pasa cuando Docker Desktop cambia de almacén de imágenes (Settings, General, «Use containerd for pulling and storing images»: al volver a como estaba, lo de antes vuelve a verse) o empieza con un disco nuevo de su máquina virtual. No hagas «Reset to factory defaults». «Recuperar…» rehace sus contenedores y les carga su última copia de ~/nexum-backups (\(copies))."
+    }
+
     func ready(_ k: DockerData) -> some View {
         VStack(alignment: .leading, spacing: 18) {
+            // (Docker vacío: lo de antes sigue en el disco, pero no se ve; o Docker Desktop ha empezado con un disco nuevo)
+            if !k.lost.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(lostTitle(k.lost))
+                        Text(lostText(k.lost))
+                            .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button("Recuperar…") { model.dockerRecover(k.lost) }.buttonStyle(OutlineButton(kind: "primary")).busyGuard(model.busy)
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.yellow.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.yellow.opacity(0.35), lineWidth: 1))
+            }
             // (solo con proyectos de antes: los del Apache de Docker no necesitan XAMPP-X)
             if !k.xampp && k.projects.contains(where: { !$0.isWeb }) {
                 HStack(spacing: 10) {
@@ -331,7 +360,7 @@ struct DockerView: View {
                     .busyGuard(model.busy)
                     iconAction("doc.text", "Ver los registros de sus contenedores") { model.dockerLogs(p) }
                         .busyGuard(model.busy)
-                    if p.isWeb && p.kind == "wp" {
+                    if p.isWeb && (p.kind == "wp" || p.kind == "ps") {
                         iconAction("arrow.left.arrow.right", "BBDD: la de XAMPP-X en vivo (la misma que web.local) o su copia de Docker") {
                             model.dockerDbMode(p)
                         }

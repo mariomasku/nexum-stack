@@ -57,6 +57,8 @@ struct AppData: Equatable {
     var dbs: [String: [String]] = [:]
     /// Fecha de cada base («versión|base»): la de su importación o la del último cambio de sus tablas
     var dbDates: [String: DbDate] = [:]
+    /// Las marcadas para borrar al cargar su versión («versión|base»: marcar-bd)
+    var marks: Set<String> = []
     /// Procesos de XAMPP en memoria que no son de la versión montada (resumen)
     var stray = ""
     /// Vhosts de proyectos cuya carpeta ya no está en htdocs
@@ -83,8 +85,9 @@ struct AppData: Equatable {
     /// Estado de cada versión frente a PHP2Shell (X|carpeta|estado): ok, parche, parcheable,
     /// actualizable o sin-arreglo
     var php2shell: [String: String] = [:]
-    /// Barrera entre webs puesta (T|1) o apagada (T|0)
+    /// Barrera entre webs puesta (T|1) o apagada (T|0), y sus webs permitidas (T|1|erp.empresa.com *.grupo.es)
     var barrier = true
+    var barrierAllowed: [String] = []
     /// Correo de pruebas (E|…): nil si el script no lo trae
     var mail: MailState? = nil
 }

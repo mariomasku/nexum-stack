@@ -179,6 +179,8 @@ final class TrayIcon: NSObject, NSMenuDelegate {
     }
 
     @objc func quit() {
+        // (con tareas en la cola, que no se harían, antes se pregunta)
+        if let m = AppModel.current, !m.taskQueueQuit() { return }
         NSApp.terminate(nil)
     }
 }

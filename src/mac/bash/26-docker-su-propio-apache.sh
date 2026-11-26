@@ -116,6 +116,7 @@ function docker_web_site() {
         printf '    ErrorDocument 502 "%s"\n    ErrorDocument 503 "%s"\n' "$DOCKER_STOPPED_MSG" "$DOCKER_STOPPED_MSG"
         # (antes que ProxyPass: mod_rewrite va primero)
         [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_media "$folder"
+        docker_web_ps_live "$slug" "$dom"
         printf '    ProxyPreserveHost On\n    ProxyPass / http://%s/\n    ProxyPassReverse / http://%s/\n' \
             "$(docker_web_container "$slug" "$v")" "$(docker_web_container "$slug" "$v")"
         printf '    RequestHeader set X-Forwarded-Proto "https"\n    RequestHeader set X-Nexum-Key "%s"\n' "$key"
@@ -124,6 +125,7 @@ function docker_web_site() {
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_media.sh
+#@incluir comun/docker-su-propio-apache/docker_web_ps_live.sh
 function docker_web_write() {
     local d=$DOCKER_WEB_DIR p tmp pma_hosts="" v
     [ "$DRY" -eq 1 ] && return 0
@@ -159,6 +161,7 @@ LoadModule setenvif_module modules/mod_setenvif.so
 LoadModule headers_module modules/mod_headers.so
 LoadModule expires_module modules/mod_expires.so
 LoadModule filter_module modules/mod_filter.so
+LoadModule substitute_module modules/mod_substitute.so
 LoadModule deflate_module modules/mod_deflate.so
 LoadModule rewrite_module modules/mod_rewrite.so
 LoadModule dir_module modules/mod_dir.so
@@ -257,6 +260,9 @@ function docker_web_up() {
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_reload.sh
+# Nginx de Docker (en el Mac, el PHP de cada proyecto va con su Apache: Nginx lo tiene delante)
+DOCKER_NGINX_FASTCGI=0
+#@incluir comun/docker-su-propio-apache/docker_nginx_get.sh
 # docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
 function docker_web_command() {
@@ -555,7 +561,7 @@ function docker_web_config() {
 # misma ruta que en el Mac, su configuracion de solo lectura encima de la del proyecto y, en PrestaShop
 # 1.7 o posterior, su cache en un volumen propio de cada version
 function docker_web_compose() {
-    local slug=$1 dir=$DOCKER_DIR/$1 folder rel v vv vols="" root
+    local slug=$1 dir=$DOCKER_DIR/$1 folder rel v vv vols="" root host
     folder=$(docker_conf "$slug" CARPETA) rel=$(docker_conf "$slug" CONFIG)
     root=$LINK/xamppfiles/htdocs/$folder
     docker_prefork_conf | cmp -s - "$DOCKER_PREFORK_CONF" || ( umask 077; docker_prefork_conf > "$DOCKER_PREFORK_CONF" ) || return 1
@@ -563,7 +569,13 @@ function docker_web_compose() {
       for v in $(docker_conf "$slug" PHP); do
           vv=${v//./}
           printf '  php%s:\n    image: nexum-php:%s\n    container_name: %s\n    restart: "no"\n' "$vv" "$v" "$(docker_web_container "$slug" "$v")"
-          printf '    environment:\n      NEXUM_KEY: ${WEB_KEY}\n      NEXUM_DOMAIN: "%s"\n      NEXUM_ROOT: "%s"\n' "$(docker_web_domain "$slug" "$v")" "$root"
+          # (una tienda en vivo le llega con su dominio de verdad: docker_web_ps_live)
+          host=$(docker_web_domain "$slug" "$v")
+          if [ "$(docker_conf "$slug" TIPO)" == ps ] && [ -n "$(docker_conf "$slug" LAMPP_BD)" ] \
+              && valid_domain "$(docker_conf "$slug" DOMINIO_TIENDA)"; then
+              host=$(docker_conf "$slug" DOMINIO_TIENDA)
+          fi
+          printf '    environment:\n      NEXUM_KEY: ${WEB_KEY}\n      NEXUM_DOMAIN: "%s"\n      NEXUM_ROOT: "%s"\n' "$host" "$root"
           printf '    volumes:\n      - "%s:%s"\n' "$HTDOCS_DIR/$folder" "$root"
           printf '      - "%s:/etc/apache2/mods-available/mpm_prefork.conf:ro"\n' "$DOCKER_PREFORK_CONF"
           [ -n "$rel" ] && [ -f "$dir/config-$vv.php" ] && printf '      - "./config-%s.php:%s/%s:ro"\n' "$vv" "$root" "$rel"
@@ -642,7 +654,8 @@ function docker_web_create() {
     # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
     if [ $live -eq 1 ]; then
-        [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version XAMPP-X (--bd y --desde)"; return 1; }
+        [ "$tipo" == wp ] || [ "$tipo" == ps ] || { echo "--en-vivo: solo con un WordPress o una tienda PrestaShop"; return 1; }
+        [ -n "$from" ] || { echo "--en-vivo: con su BBDD de una version XAMPP-X (--bd y --desde)"; return 1; }
     fi
     dbname=${db:-$(tr '-' '_' <<< "$slug")}
     user=$(cut -c1-32 <<< "nx_$dbname")
@@ -662,7 +675,7 @@ function docker_web_create() {
     # se toca /etc/hosts: no hace falta
     docker_dns_on || sudo_first || return 1
     if [ $live -eq 1 ]; then
-        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
+        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir" "$tipo"
         return
     fi
     task_plan "Montando $folder en Docker" "MariaDB $maria común" "Imagen de PHP $php" "BBDD $dbname" "Apache de Docker" "Certificado en el navegador"
@@ -731,16 +744,22 @@ EOF
 }
 
 # docker-nuevo ... --en-vivo: el proyecto sin BBDD en Docker, con la de esa version XAMPP-X en vivo (con el
-# usuario y la contraseña de su wp-config.php)
+# usuario y la contraseña de su wp-config.php o, en una tienda, de su parameters.php o settings.inc.php). Una
+# tienda sigue en su dominio de verdad (su BBDD no se toca): se lee de ella y lo cambia el Apache de Docker
+# (docker_web_ps_live)
 function docker_web_create_live() {
-    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 creds owner
-    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base del wp-config.php de $folder"; return 1; }
+    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 tipo=${7:-wp} creds owner rel shop
+    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base de la configuracion de $folder"; return 1; }
+    for rel in wp-config.php app/config/parameters.php config/settings.inc.php; do
+        [ -f "$HTDOCS_DIR/$folder/$rel" ] && [ ! -L "$HTDOCS_DIR/$folder/$rel" ] && break
+        rel=""
+    done
     owner=$(lampp_bd_owner "$from")
     mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
     ( umask 077
       printf 'DB_PASS=%s\n' "$(sed -n 2p <<< "$creds")" > "$dir/.env"
-      printf 'MODO=web\nCARPETA=%s\nTIPO=wp\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=wp-config.php\nLAMPP_BD=%s\n' \
-          "$folder" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$owner" > "$dir/proyecto.conf"
+      printf 'MODO=web\nCARPETA=%s\nTIPO=%s\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=%s\nLAMPP_BD=%s\n' \
+          "$folder" "$tipo" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$rel" "$owner" > "$dir/proyecto.conf"
       docker_fpm_conf > "$dir/fpm.conf" ) || return 1
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
@@ -751,6 +770,9 @@ function docker_web_create_live() {
     task_step
     echo "2/4 BBDD $(docker_conf "$slug" BBDD) de XAMPP-$owner, en vivo (la misma que web.local)"
     lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    if [ "$tipo" == ps ]; then
+        lampp_bd_shop_live "$slug" || return 1
+    fi
     task_step
     echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
@@ -786,7 +808,7 @@ function docker_web_add() {
         return
     fi
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
-    docker_maria_up "$(docker_conf "$slug" MARIADB)" && docker_web_up || return 1
+    docker_web_db_up "$slug" && docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
     echo "Listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php)"
 }
@@ -805,7 +827,7 @@ function docker_web_switch() {
     docker_ready || { echo "Docker Desktop no esta en marcha"; return 1; }
     docker_conf_set "$slug" ACTIVA "$php" || return 1
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
-    docker_maria_up "$(docker_conf "$slug" MARIADB)" && docker_web_compose "$slug" || return 1
+    docker_web_db_up "$slug" && docker_web_compose "$slug" || return 1
     if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}"; then
         echo "No arranca con PHP $php: sigue con PHP $old"
         docker_conf_set "$slug" ACTIVA "$old"

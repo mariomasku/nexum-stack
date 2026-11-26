@@ -17,9 +17,11 @@ function docker_conf_set() {
         "$f" > "$f.nuevo" && chmod 600 "$f.nuevo" && mv -f "$f.nuevo" "$f"
 }
 
-# Tienda PrestaShop en la MariaDB comun: su dominio pasa a ser el de Docker (la BBDD es una copia)
+# Tienda PrestaShop en la MariaDB comun: su dominio pasa a ser el de Docker (la BBDD es una copia). Nunca
+# con la BBDD de una version en vivo (LAMPP_BD): esa no se toca
 function docker_web_ps_domain() {
     local slug=$1 v db dom prefix
+    [ -z "$(docker_conf "$slug" LAMPP_BD)" ] || return 0
     v=$(docker_conf "$slug" MARIADB) db=$(docker_conf "$slug" BBDD)
     dom=$(docker_web_domain "$slug" "")
     [ "$(docker_web_get HTTPS)" == 443 ] || dom+=":$(docker_web_get HTTPS)"

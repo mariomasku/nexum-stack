@@ -82,7 +82,7 @@ extension AppModel {
             return row
         }
         // (desde 15 minutos; de partida, 2 horas)
-        let hours = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 130, height: 26), pullsDown: false)
+        let hours = DropDownButton(frame: NSRect(x: 0, y: 0, width: 130, height: 26), pullsDown: false)
         hours.addItems(withTitles: TUNNEL_TIMES.map { $0.1 })
         hours.selectItem(at: TUNNEL_TIMES.firstIndex(where: { $0.0 == 120 }) ?? 0)
         let block = NSButton(checkboxWithTitle: "Bloquear el panel de administración (tus BBDD llevan el administrador de pruebas)",
@@ -325,7 +325,7 @@ extension AppModel {
             }
         }
         let rest = k.php.filter { !p.versions.contains($0) }
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 160, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 160, height: 26), pullsDown: false)
         pop.addItems(withTitles: rest.map { "PHP \($0)" })
         if !rest.isEmpty {
             let b = NSButton(radioButtonWithTitle: "Añadir otra:", target: group, action: #selector(RadioGroup.pick(_:)))
@@ -399,7 +399,7 @@ struct DockerNewPanel: View {
             formRow("Carpeta") {
                 SearchPicker(selection: Binding(get: { model.dkForm.folder }, set: { v in
                     model.dkForm.folder = v
-                    model.dkForm.source = ""
+                    model.dkForm.source = model.dockerDefaultSource(v)
                     if !model.dkForm.domainSet { model.dkForm.domain = dockerSlug(v) + ".docker.local" }
                 }), items: folders.map { ($0, $0) }, width: wide)
             }
@@ -419,7 +419,7 @@ struct DockerNewPanel: View {
                              items: [("", "— Ninguna: vacía —")] + pairs.map { pr in ("\(pr.0.folder)|\(pr.1)", "\(pr.1) (XAMPP-\(pr.0.folder))") },
                              width: wide)
             }
-            if !model.dkForm.source.isEmpty && x?.kind == "wp" {
+            if !model.dkForm.source.isEmpty && (x?.kind == "wp" || x?.kind == "ps") {
                 formRow("Cómo") {
                     SearchPicker(selection: Binding(get: { model.dkForm.live ? "vivo" : "copia" },
                                                     set: { model.dkForm.live = $0 == "vivo" }),

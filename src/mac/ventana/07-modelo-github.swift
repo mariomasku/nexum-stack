@@ -52,6 +52,57 @@ extension AppModel {
         }
     }
 
+    // MARK: Nginx (pestaña Nginx)
+    func reloadNginx() {
+        runQuick(["gui-nginx"]) { _, out in
+            let n = parseNginx(out)
+            if n != self.nginx { self.nginx = n }
+        }
+    }
+
+    /// Encender o apagar Nginx: su pestaña sale o se oculta (apagarlo lo para, sin borrar nada)
+    func nginxUse(_ on: Bool) {
+        runTask("Nginx: \(on ? "encendiendo" : "apagando")", ["nginx-usar", on ? "si" : "no"],
+                doneText: "Nginx \(on ? "encendido" : "apagado")", autoClose: true) { _, _, _ in
+            self.nginxUsed = FileManager.default.fileExists(atPath: LOG_DIR + "/nginx/usar")
+            if !self.nginxUsed && self.tab == "nginx" { self.openTab("config") }
+            self.reloadNginx()
+        }
+    }
+
+    func nginxDo(_ cmd: String, _ title: String, _ done: String) {
+        runTask(title, [cmd], doneText: done, autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxInstall() {
+        runTask("Instalando Nginx \(nginx?.latest ?? "")", ["nginx-instalar"], progress: true, doneText: "Nginx instalado",
+                autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxAdd(_ folder: String, _ sub: String) {
+        runTask("Añadiendo \(folder) a Nginx", ["nginx-anadir", folder] + (sub.isEmpty ? [] : [sub]),
+                doneText: "\(folder) en Nginx", autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxRemove(_ p: NginxProject) {
+        guard confirm("¿Quitar \(p.folder) de Nginx?",
+                      "Deja de servirse en \(p.host). Su carpeta y sus BBDD no se tocan, y Apache lo sigue sirviendo.",
+                      "Quitar", destructive: true) else { return }
+        runTask("Quitando \(p.folder) de Nginx", ["nginx-quitar", p.folder], doneText: "\(p.folder) ya no está en Nginx",
+                autoClose: true) { _, _, _ in self.reloadNginx() }
+    }
+
+    func nginxPorts(_ http: String, _ https: String) {
+        let h = http.trimmingCharacters(in: .whitespaces), s = https.trimmingCharacters(in: .whitespaces)
+        guard let a = Int(h), let b = Int(s), (1024...65535).contains(a), (1024...65535).contains(b), a != b else {
+            message("Puertos no válidos", "Dos números distintos, de 1024 a 65535 (como 8080 y 8443).", error: true)
+            return
+        }
+        runTask("Puertos de Nginx", ["nginx-puertos", h, s], doneText: "Nginx en los puertos \(h) y \(s)", autoClose: true) { _, _, _ in
+            self.reloadNginx()
+        }
+    }
+
     func startNode(_ p: NodeItem, mode: String) {
         runTask("Arrancando \(p.folder)", ["node-arrancar", p.folder, mode], progress: true,
                 doneText: "\(p.folder) en marcha", autoClose: true) { _, _, _ in self.reloadNode() }
@@ -116,12 +167,18 @@ extension AppModel {
     func fetchRepo(_ r: RepoItem) {
         var args = ["repo-traer", r.full]
         var title = "Clonando \(r.name)"
+        // (solo con git, en su carpeta y sin sudo: va ya, al lado de la que siga, si no es de la misma carpeta)
+        let free = task != nil && taskFree(r.folder)
         if r.state == "clonado" {
             guard confirm("¿Traer los cambios de GitHub a \(r.folder)?",
                           "Este repositorio ya está clonado en \(HTDOCS)/\(r.folder). Se traen sus cambios de GitHub (git pull) y se juntan con los tuyos. Si chocan con lo que tienes sin subir o sin guardar, no se toca nada y se dice.",
-                          "Traer los cambios") else { return }
+                          "Traer los cambios", task: !free) else { return }
             args.append("--actualizar")
             title = "Trayendo los cambios de \(r.name)"
+        }
+        if free {
+            runFree(title, args, doneText: "Hecho") { [weak self] _ in self?.reloadRepos(cache: true) }
+            return
         }
         _ = runTask(title, args, doneText: "Hecho", autoClose: true) { ok, _, _ in
             self.reloadRepos(cache: true)
@@ -130,7 +187,7 @@ extension AppModel {
     }
 
     func updateComponents(_ c: ComponentsState) {
-        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian.",
+        let r = confirmCopy("¿Actualizar todo?", "Las versiones de PHP se rehacen con lo último de su rama (varios minutos; la de ahora sigue funcionando mientras se compila). Los contenedores de Docker en marcha se rehacen en unos segundos: sus BBDD y su configuración no cambian." + (c.docker ? " Docker Desktop se instala a mano: antes se copian todas las BBDD de Docker en ~/nexum-backups y luego se abre su descarga." : ""),
                             "Actualizar todo", steps: c.items, warning: UPDATE_COPY_WARNING)
         if !r.ok { return }
         components = nil
@@ -209,6 +266,8 @@ extension AppModel {
                 if f.count >= 5, let when = Int(f[3]) {
                     d.dbDates[f[1] + "|" + f[2]] = DbDate(when: when, imported: f[4] == "i")
                 }
+            case "J" where f.count >= 3:
+                d.marks.insert(f[1] + "|" + f[2])
             case "H" where f.count >= 3:
                 d.vhosts = f[1]
                 d.hosts = f[2]
@@ -237,6 +296,7 @@ extension AppModel {
                 d.php2shell[f[1]] = f[2]
             case "T" where f.count >= 2:
                 d.barrier = f[1] != "0"
+                d.barrierAllowed = f.count >= 3 ? f[2].split(separator: " ").map(String.init) : []
             case "E" where f.count >= 8:
                 var m = MailState()
                 m.installed = f[1] == "1"
@@ -266,6 +326,8 @@ extension AppModel {
         }
         if let db = impDb, !(d.dbs[d.active] ?? []).contains(db) { impDb = nil }
         if d != data { data = d }
+        // (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
+        dbMarksCheck()
         // (los correos sin leer, solo con Mailpit en marcha)
         pollMail()
         if !sized {

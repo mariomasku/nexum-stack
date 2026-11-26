@@ -31,8 +31,8 @@ function docker_db_backup() {
         done
         cl=("${c[@]}" exec -T db)
     fi
-    mkdir -p -m 700 "$COPIES_DIR" || return 1
-    backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+    copies_in bbdd/docker > /dev/null || return 1
+    backup="$COPIES_DIR/bbdd/docker/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
     ( umask 077
       set -o pipefail
       "${cl[@]}" sh -c "$dump" "$db" < /dev/null | gzip > "$backup" )

@@ -60,26 +60,15 @@ extension View {
     func hoverPointer() -> some View { modifier(HoverPointer()) }
     /// En vez de .help(): el mensaje al dejar el ratón encima con el aspecto de la ventana
     func tip(_ text: String) -> some View { modifier(Tip(text: text)) }
-    /// Lo que lanza una tarea, con otra en marcha (busy): atenuado, pero se puede pulsar; en vez de hacer lo suyo
-    /// dice cuál sigue y la enseña. (Dentro de un menú no hay capa que valga: allí lo para runTask o confirm)
+    /// Lo que lanza una tarea, con otra en marcha (busy): algo atenuado, pero hace lo suyo igual (su tarea va a la
+    /// cola y empieza cuando acabe la de ahora)
     func busyGuard(_ busy: Bool) -> some View { modifier(BusyGuard(busy: busy)) }
 }
 
 struct BusyGuard: ViewModifier {
     let busy: Bool
     func body(content: Content) -> some View {
-        content
-            .opacity(busy ? 0.5 : 1)
-            .allowsHitTesting(!busy)
-            .overlay(Group {
-                if busy {
-                    Color.white.opacity(0.001)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if let m = AppModel.current, let cur = m.runningTask { m.refuseTask(cur) }
-                        }
-                }
-            })
+        content.opacity(busy ? 0.7 : 1)
     }
 }
 
@@ -314,6 +303,8 @@ let LOGO_PATHS: [String: String] = [
     // (bases de datos: discos apilados; Node: su hexágono)
     "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
     "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
+    // (Nginx: su hexágono con la N recortada, como su logotipo)
+    "nginx": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z M 8.2 16.5 L 9.9 16.5 L 9.9 10.8 L 14.1 16.5 L 15.8 16.5 L 15.8 7.5 L 14.1 7.5 L 14.1 13.2 L 9.9 7.5 L 8.2 7.5 Z",
     "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
     "imagenes": "M 9 10 C 10.105 10 11 9.105 11 8 C 11 6.895 10.105 6 9 6 C 7.895 6 7 6.895 7 8 C 7 9.105 7.895 10 9 10 Z M 13 2 L 9 2 C 4 2 2 4 2 9 L 2 15 C 2 20 4 22 9 22 L 15 22 C 20 22 22 20 22 15 L 22 10 M 18 2 L 18 8 L 20 6 M 18 8 L 16 6 M 2.67 18.95 L 7.6 15.64 C 8.39 15.11 9.53 15.17 10.24 15.78 L 10.57 16.07 C 11.35 16.74 12.61 16.74 13.39 16.07 L 17.55 12.5 C 18.33 11.83 19.59 11.83 20.37 12.5 L 22 13.9",
     // (el del botón Log: un folio con «LOG» en hueco, dibujado para Nexum)
@@ -362,7 +353,7 @@ let LOGO_COLORS: [String: Color] = [
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
     "wordpress": hexColor(0x21759B), "prestashop": hexColor(0xDF0067), "mailpit": hexColor(0x00A87B), "docker": hexColor(0x2496ED),
     "cloudflare": hexColor(0xF38020), "github": hexColor(0x181717),
-    "bbdd": hexColor(0x0284C7), "node": hexColor(0x5FA04E),
+    "bbdd": hexColor(0x0284C7), "node": hexColor(0x5FA04E), "nginx": hexColor(0x009639),
 ]
 
 /// Los que se dibujan con trazo, no rellenos
@@ -410,6 +401,7 @@ let LOGO_BOX: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
     "mailpit": (0, 0.95, 24, 22.1),
     "mariadb": (0.05, 4.25, 23.95, 15.5),
     "node": (3.35, 2.2, 17.35, 19.6),
+    "nginx": (3.35, 2.2, 17.35, 19.6),
     "perl": (2.65, 0, 18.7, 24),
     "php": (0, 5.7, 24, 12.65),
     "phpmyadmin": (0.05, 3.5, 23.9, 17.05),
@@ -564,6 +556,7 @@ let ROW_ICONS: [(String, String, Color)] = [
     ("Hosts del sistema", "server.rack", .gray),
     ("Copias de seguridad", "externaldrive.fill", .gray),
     ("Copias de los ficheros", "doc.on.doc.fill", .gray),
+    ("Espacios de trabajo de VS Code", "chevron.left.forwardslash.chevron.right", .blue),
     ("Registros de instalaciones", "clock.arrow.circlepath", .gray),
     ("Caché de descargas", "arrow.down.circle.fill", .gray),
     ("error_log de ", "logo:apache", brand("apache")),
@@ -704,6 +697,38 @@ struct Row<Leading: View, Trailing: View>: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .frame(minHeight: 44)
+    }
+}
+
+/// Una fila de más de dos líneas: el texto entero con todo el ancho y sus botones debajo, a la derecha (al
+/// lado, el texto se quedaba en una columna estrecha)
+struct WideRow<Trailing: View>: View {
+    let title: String
+    let subtitle: String
+    let trailing: Trailing
+    init(_ title: String, _ subtitle: String, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if let ic = rowIcon(title) {
+                ColorIcon(symbol: ic.0, color: ic.1, size: 20)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(subtitle).font(.caption).foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    trailing
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }
 

@@ -13,9 +13,10 @@ extension AppModel {
             let notes = lines.filter { $0[0] == "I" && $0.count >= 2 }.map { $0[1...].joined(separator: "|") }
             if let u = lines.first(where: { $0[0] == "U" && $0.count >= 5 }) {
                 let path = u[4...].joined(separator: "|")
+                if auto && self.updateDeclined.contains(u[1]) { return }
                 guard confirm("Hay una versión nueva de Nexum Dev Stack",
                               "Tienes la \(current); en GitHub está la \(u[1]) (\(u[2])), firmada por quien hace el programa. Huella SHA-256:\n\(u[3])\n\nSe cambia el gestor y la ventana se vuelve a abrir. Tus versiones de PHP, proyectos y BBDD no se tocan.",
-                              "Actualizar a la \(u[1])") else { return }
+                              "Actualizar a la \(u[1])") else { self.updateDeclined.insert(u[1]); return }
                 self.runTask("Actualizando Nexum Dev Stack a la \(u[1])", ["actualizar-gestor", path], progress: true,
                              doneText: "Instalada la \(u[1])", autoClose: true) { ok, _, _ in
                     if !ok { self.toast("No se ha actualizado"); return }

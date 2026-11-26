@@ -54,7 +54,7 @@ class AppSubirBajarBD:
             # Otra version activa: sus bases son otras
             self.imp.update(db=None, folder=act["folder"])
         box, lb = group("Subir o actualizar una BBDD",
-                        "Carga una copia .sql, .sql.gz o .zip en el MariaDB de la versión activa%s. "
+                        "Carga una copia .sql, .gz o .zip en el MariaDB de la versión activa%s. "
                         "Antes se borran todas las tablas de la BBDD de destino (si quieres, con una copia "
                         "en ~/nexum-backups), para que no quede nada de lo anterior. Los .zip se "
                         "descomprimen solos."
@@ -154,8 +154,8 @@ class AppSubirBajarBD:
         css(dlg.add_button("Elegir", Gtk.ResponseType.ACCEPT), "verde")
         dlg.set_default_response(Gtk.ResponseType.ACCEPT)
         flt = Gtk.FileFilter()
-        flt.set_name("Copias SQL (.sql, .sql.gz, .zip)")
-        for pat in ("*.sql", "*.SQL", "*.sql.gz", "*.SQL.GZ", "*.zip", "*.ZIP"):
+        flt.set_name("Copias SQL (.sql, .gz, .zip)")
+        for pat in ("*.sql", "*.SQL", "*.gz", "*.GZ", "*.zip", "*.ZIP"):
             flt.add_pattern(pat)
         dlg.add_filter(flt)
         flt = Gtk.FileFilter()
@@ -308,6 +308,10 @@ class AppSubirBajarBD:
                 message(self.win, "No se ha podido crear la BBDD", out.strip()[-600:],
                         Gtk.MessageType.ERROR)
             return False
+        # (con una tarea en marcha, no: puede estar reiniciando MariaDB; espera a que acabe)
+        if self.task_running():
+            self.refuse_task()
+            return
         run_quick(["crear-bd", name], created, env=self.db_env())
 
     def on_drop_db(self, db):

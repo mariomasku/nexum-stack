@@ -30,6 +30,9 @@ class AppDocker:
                                                    "created": f[5]})
             elif f[0] == "O" and len(f) >= 3:
                 d.setdefault("volumes", []).append({"name": f[1], "driver": f[2]})
+            elif f[0] == "Z" and len(f) >= 3 and re.fullmatch(r"[a-z0-9-]{1,40}", f[1]):
+                # (lo que ha perdido su BBDD en Docker, con su última copia: docker-recuperar)
+                d.setdefault("lost", []).append({"name": f[1], "copy": f[2]})
         if d != self.docker:
             self.docker = d
             self.build_docker()
@@ -267,9 +270,18 @@ class AppDocker:
         # BBDD de LAMPP que se copia: las vinculadas a la carpeta en cada versión
         x = next((p for p in (self.projects or {}).get("list", []) if p["name"] == f.get("folder")), None)
         pairs = self.project_pairs(x) if x and self.data else []
+        # (de partida, la de la carpeta en la versión activa o, si no está en ella, la primera que tenga en otra;
+        # vacía solo si no tiene ninguna: si no, una tienda se montaba sin sus tablas y daba error 500)
+        if not f.get("source") and pairs:
+            i, db = next(((i, db) for i, db in pairs if i["folder"] == self.data["active"]), pairs[0])
+            f["source"] = "%s|%s" % (i["folder"], db)
         combo_row("BBDD que se copia", [("@vacia", "— Ninguna: vacía —")] +
                   [("%s|%s" % (i["folder"], db), "%s (lampp-%s)" % (db, i["folder"])) for i, db in pairs],
                   "source")
+        # (un WordPress o una tienda con su BBDD de LAMPP: en vivo, la misma que web.local, o una copia; de
+        # partida, en vivo. Sin BBDD que copiar, no cuenta)
+        if pairs and project_kind(f.get("folder") or "") in ("wp", "ps"):
+            combo_row("Cómo", [("vivo", "En vivo: la misma que web.local (sin copias)"), ("copia", "Una copia en Docker")], "mode")
         # (el dominio sale solo: el de la tienda o el de la version de PHP)
         if f.get("folder"):
             dom = docker_web_domain({"slug": docker_slug(f["folder"]), "kind": project_kind(f["folder"])}, f.get("php") or "")
@@ -301,7 +313,11 @@ class AppDocker:
         if src and src != "@vacia" and "|" in src:
             ver, db = src.split("|", 1)
             args += ["--bd", db, "--desde", ver]
-            text += " Con una copia de %s de lampp-%s (esa no se toca)." % (db, ver)
+            if f.get("mode", "vivo") == "vivo" and project_kind(folder) in ("wp", "ps"):
+                args.append("--en-vivo")
+                text += " Con %s de lampp-%s en vivo: la misma que web.local, sin copias." % (db, ver)
+            else:
+                text += " Con una copia de %s de lampp-%s (esa no se toca)." % (db, ver)
         else:
             text += " La BBDD empieza vacía."
         text += " La primera vez con cada PHP se prepara su imagen (unos minutos)."

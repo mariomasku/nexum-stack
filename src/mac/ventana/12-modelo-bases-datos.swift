@@ -53,6 +53,11 @@ extension AppModel {
                           })
         if !r.ok { return }
         let name = r.text
+        // (con una tarea en marcha, no: puede estar reiniciando MariaDB; espera a que acabe)
+        if let cur = runningTask {
+            refuseTask(cur)
+            return
+        }
         runQuick(["crear-bd", name], env: dbEnv()) { rc, out in
             if rc == 0 {
                 self.impDb = name
@@ -61,6 +66,73 @@ extension AppModel {
             } else {
                 message("No se ha podido crear la BBDD", String(out.suffix(600)), error: true)
             }
+        }
+    }
+
+    /// Marca (o desmarca) una BBDD para borrarla al cargar su versión (marcar-bd)
+    func markDb(_ folder: String, _ db: String, _ on: Bool, _ then: (() -> Void)? = nil) {
+        if var d = data {
+            if on { d.marks.insert(folder + "|" + db) } else { d.marks.remove(folder + "|" + db) }
+            data = d
+        }
+        runQuick(["marcar-bd", folder, db] + (on ? [] : ["--quitar"])) { rc, out in
+            if rc != 0 {
+                message("No se ha podido " + (on ? "marcar " : "desmarcar ") + db, String(out.suffix(600)), error: true)
+            }
+            if let next = then { next() } else { self.reload() }
+        }
+    }
+
+    /// Al cargar una versión (o arrancar su MariaDB) con BBDD marcadas para borrar: se pregunta una vez
+    func dbMarksCheck() {
+        guard let d = data, d.running, !d.active.isEmpty else {
+            marksAsked = nil
+            return
+        }
+        let act: String = d.active
+        let marked: [String] = (d.dbs[act] ?? []).filter { d.marks.contains(act + "|" + $0) }
+        if marked.isEmpty || marksAsked == act || busy { return }
+        marksAsked = act
+        DispatchQueue.main.async { self.dbMarksAsk() }
+    }
+
+    func dbMarksAsk() {
+        guard let d = data, d.running else { return }
+        let act: String = d.active
+        let marked: [String] = (d.dbs[act] ?? []).filter { d.marks.contains(act + "|" + $0) }
+        if marked.isEmpty { return }
+        let alert = NSAlert()
+        alert.messageText = "XAMPP-" + act + " tiene " + plural(marked.count, "BBDD marcada", "BBDD marcadas") + " para borrar"
+        alert.informativeText = "Las marcaste para borrarlas al cargar esta versión. ¿Se borran ahora? No se puede deshacer, salvo que guardes antes una copia."
+        let go = alert.addButton(withTitle: marked.count == 1 ? "Borrar la BBDD" : "Borrar las \(marked.count) BBDD")
+        go.hasDestructiveAction = true
+        alert.addButton(withTitle: "Desmarcarlas")
+        alert.addButton(withTitle: "Más tarde")
+        let names: String = marked.map { "•  " + $0 }.joined(separator: "\n")
+        let list = dialogLabel(names, font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), align: .left)
+        let box = NSButton(checkboxWithTitle: "Guardar antes una copia de cada una en ~/nexum-backups", target: nil, action: nil)
+        box.state = .off
+        alert.accessoryView = dialogStack([dialogScroll(list), box], spacing: 12)
+        let resp = alert.runStyled()
+        let copy: Bool = box.state == .on
+        if resp == .alertFirstButtonReturn {
+            checkDbAccess {
+                self.runTask("Borrando las BBDD marcadas de XAMPP-" + act, ["borrar-bd-marcadas"] + (copy ? ["--copia"] : []),
+                             doneText: "BBDD marcadas borradas" + (copy ? " (con copia en ~/nexum-backups)" : ""),
+                             autoClose: true, env: self.dbEnv())
+            }
+        } else if resp == .alertSecondButtonReturn {
+            // (una detrás de otra: todas escriben en el mismo fichero)
+            var left: [String] = marked
+            func nextOne() {
+                if left.isEmpty {
+                    reload()
+                    return
+                }
+                let db = left.removeFirst()
+                markDb(act, db, false) { nextOne() }
+            }
+            nextOne()
         }
     }
 
@@ -311,7 +383,7 @@ extension AppModel {
         for i in installs {
             let dbs = (d.dbs[i.folder] ?? []).sorted { $0.lowercased() < $1.lowercased() }
             let mine = pairs.filter { $0.0.folder == i.folder }.map { $0.1 }
-            let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26), pullsDown: false)
+            let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 260, height: 26), pullsDown: false)
             pop.addItem(withTitle: "— Ninguna —")
             for db in dbs {
                 let other = linkOf(db, i.folder)

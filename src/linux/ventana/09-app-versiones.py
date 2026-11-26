@@ -53,6 +53,9 @@ class AppVersiones:
             # (y el menú del icono junto al reloj, su web.local)
             if hasattr(self, "nv_tray_update"):
                 self.nv_tray_update()
+            # (y la barra de estado de abajo)
+            if hasattr(self, "nv_status_update"):
+                self.nv_status_update()
         return False
 
     def build_project_box(self):
@@ -237,18 +240,18 @@ class AppVersiones:
         w["db"] = Gtk.Entry(placeholder_text="wp_proyecto")
         w["db"].connect("changed", lambda *_: self.new_project_check())
         p3.pack_start(w["db"], False, False, 0)
-        p3.pack_start(label("Volcado que se sube a la BBDD (.sql, .sql.gz o .zip):"), False, False, 0)
+        p3.pack_start(label("Volcado que se sube a la BBDD (.sql, .gz o .zip):"), False, False, 0)
         w["file"] = Gtk.FileChooserButton(title="Elige el volcado de la BBDD",
                                           action=Gtk.FileChooserAction.OPEN)
         flt = Gtk.FileFilter()
-        flt.set_name("Volcados (.sql, .sql.gz, .zip)")
-        for pat in ("*.sql", "*.sql.gz", "*.zip", "*.SQL", "*.GZ", "*.ZIP"):
+        flt.set_name("Volcados (.sql, .gz, .zip)")
+        for pat in ("*.sql", "*.gz", "*.zip", "*.SQL", "*.GZ", "*.ZIP"):
             flt.add_pattern(pat)
         w["file"].add_filter(flt)
         w["file"].connect("file-set", lambda *_: self.new_project_check())
         p3.pack_start(w["file"], False, False, 0)
-        p3.pack_start(label("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga con "
-                            "la carga protegida (con el usuario de la BBDD y sin DEFINER).",
+        p3.pack_start(label("Si no eliges ninguno, la BBDD se crea vacía. El volcado se carga como root "
+                            "(con todos los permisos) y sin DEFINER.",
                             "dim-label", wrap=True), False, False, 0)
         w["nodb_note"] = label("", "aviso", wrap=True)
         p3.pack_start(w["nodb_note"], False, False, 0)
@@ -1459,8 +1462,8 @@ class AppVersiones:
         return cur if self.busy and cur is not None and not cur.finished else None
 
     def refuse_task(self):
-        """No van dos tareas a la vez, que tocarían lo mismo: lo dice nombrando la que sigue, en la ventana
-        que se está mirando (como «Instalar versión», que tapa la principal), y la enseña."""
+        """Lo poco que no va a la cola (crear una BBDD vacía, que no es una tarea): lo dice nombrando la que sigue, en
+        la ventana que se está mirando (como «Instalar versión», que tapa la principal), y la enseña."""
         cur = self.task_running()
         top = next((w for w in Gtk.Window.list_toplevels() if w.is_active() and w.get_visible()), self.win)
         message(top, "Hay una tarea en marcha",
@@ -1468,21 +1471,117 @@ class AppVersiones:
         if cur is not None:
             cur.to_front()
 
-    def run_task(self, title, args, **kw):
-        if self.task_running():
-            self.refuse_task()
+    def task_note(self):
+        """Lo que se añade a la pregunta de una tarea con otra en marcha: que va a la cola (None si no hay)."""
+        cur = self.task_running()
+        if cur is None and not getattr(self, "task_hold", False):
             return None
+        return "«%s» sigue en marcha: esta se pone en la cola y empieza cuando acabe." % (cur.title if cur else "La anterior")
+
+    def task_free(self, folder):
+        """¿Puede ir ya, al lado de la que sigue? Solo lo que no toca nada de lo de las tareas (la pila, los ficheros
+        de root, apt, Docker), como traer los cambios de un repositorio, y si la que sigue no es de esa carpeta."""
+        cur = self.task_running()
+        return cur is None or not any(folder in a for a in cur.args + [cur.title])
+
+    def run_task(self, title, args, free=False, **kw):
+        """Lanza una tarea del script en su ventana. Con otra en marcha no van las dos a la vez (tocarían lo mismo):
+        va a la cola y empieza cuando acabe la anterior. free: lo que puede ir a su lado (task_free), sin cola."""
+        if free:
+            user_done = kw.pop("on_done", None)
+            kw.pop("reload_branches", None)
+            return Task(self, title, args, free=True, on_done=lambda ok, t, p: user_done and user_done(ok, t, p), **kw)
+        if self.task_running() or getattr(self, "task_hold", False) or getattr(self, "task_queue", None):
+            return self.task_enqueue(title, args, kw)
+        return self.task_launch(title, args, kw)
+
+    def task_launch(self, title, args, kw):
         self.busy = True
+        kw = dict(kw)
         user_done = kw.pop("on_done", None)
+        kw_reload = kw.pop("reload_branches", False)
 
         def done(ok, task, p):
-            self.busy = False
+            # (con la cola, hasta que se cierre su ventana no empieza la siguiente: su botón, si lo pone, va antes)
+            self.task_hold = True
+            self.busy = bool(self.task_queue)
             if user_done:
                 user_done(ok, task, p)
             self.reload(branches=kw_reload)
-        kw_reload = kw.pop("reload_branches", False)
-        self.cur_task = Task(self, title, args, on_done=done, **kw)
-        return self.cur_task
+            GLib.idle_add(self.task_after, task)
+        task = Task(self, title, args, on_done=done, **kw)
+        task.dlg.connect("destroy", lambda *_: GLib.idle_add(self.task_closed, task))
+        self.cur_task = task
+        self.nv_queue_show()
+        return task
+
+    def task_enqueue(self, title, args, kw):
+        """A la cola (la que lanza el botón de la ventana de la que acaba de terminar va la primera: la sigue)."""
+        item = {"title": title, "args": list(args), "kw": dict(kw)}
+        if getattr(self, "task_from_offer", False):
+            self.task_queue.insert(0, item)
+        else:
+            self.task_queue.append(item)
+            cur = self.task_running()
+            self.toast("En la cola: «%s». Empieza cuando acabe «%s»" % (title, cur.title if cur else "la anterior"))
+        self.busy = True
+        self.nv_queue_show()
+        return item
+
+    def task_after(self, task):
+        """Al acabar bien con más en la cola, su ventana se cierra sola (sigue la siguiente), salvo si ofrece algo."""
+        if task.ok and self.task_queue and not task.closed and not task.extra_btn.get_visible():
+            task.dlg.destroy()
+            self.toast(task.done_text or "Terminado")
+        return False
+
+    def task_closed(self, task):
+        """Cerrada la ventana de la que ha acabado: la siguiente de la cola. Si no ha acabado bien, antes se pregunta."""
+        if task is not getattr(self, "cur_task", None) or not task.finished:
+            return False
+        self.task_hold = False
+        if not self.task_queue:
+            self.busy = False
+            self.nv_queue_show()
+            return False
+        if not task.ok:
+            names = ", ".join("«%s»" % q["title"] for q in self.task_queue)
+            if not confirm(self.win, "¿Seguir con la cola?",
+                           "«%s» no ha terminado bien. Quedan en la cola: %s. Mira antes lo que ha pasado: si sigues, "
+                           "cada una comprueba lo suyo al empezar; si no, se quitan de la cola sin hacer nada."
+                           % (task.title, names), "Seguir con la cola", task=False):
+                self.task_queue_clear()
+                return False
+        item = self.task_queue.pop(0)
+        self.task_launch(item["title"], item["args"], item["kw"])
+        return False
+
+    def task_queue_clear(self, *_):
+        n = len(self.task_queue)
+        self.task_queue.clear()
+        if not self.task_running() and not self.task_hold:
+            self.busy = False
+            self.reload()
+        self.nv_queue_show()
+        if n:
+            self.toast("Cola vaciada: %s sin hacer" % plural(n, "tarea", "tareas"))
+
+    def task_queue_quit(self):
+        """Al cerrar el programa con tareas en la cola (que no se harían): ¿cerrar igual? True: se cierra."""
+        if not self.task_queue:
+            return True
+        names = ", ".join("«%s»" % q["title"] for q in self.task_queue)
+        return confirm(self.win, "¿Cerrar con tareas en la cola?",
+                       "Quedan en la cola: %s. Si cierras ahora no se hacen (la que está en marcha sigue hasta acabar)."
+                       % names, "Cerrar sin hacerlas", destructive=True, task=False)
+
+    def nv_queue_show(self):
+        """Lo que hay en la cola, en la ventana de la tarea en marcha y en su aviso de segundo plano."""
+        cur = getattr(self, "cur_task", None)
+        if cur is not None and not cur.closed:
+            cur.queue_show(self.task_queue)
+        if getattr(self, "bg_task", None) is not None:
+            self.nv_task_badge_tick(self.bg_task)
 
     def on_control(self, _btn, cmd, what):
         folder = self.data["active"]

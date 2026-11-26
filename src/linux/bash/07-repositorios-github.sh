@@ -323,9 +323,10 @@ EOF
             continue
         fi
         if [ -f "$COPIES_FILES_FLAG" ]; then
-            mkdir -p -m 700 "$COPIES_DIR"
-            mv "$root/var/cache/$env" "$COPIES_DIR/$1-cache-$env-$(date +%Y%m%d-%H%M%S)" \
-                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/nexum-backups, se rehace sola"
+            local aside
+            aside=$(copies_in "proyectos/$1") \
+                && mv "$root/var/cache/$env" "$aside/cache-$env-$(date +%Y%m%d-%H%M%S)" \
+                && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): apartada en ~/nexum-backups/proyectos/$1, se rehace sola"
         else
             rm -rf "$root/var/cache/$env" \
                 && echo "La cache de la tienda (var/cache/$env) era de otra BBDD (de Docker o de produccion): borrada, se rehace sola"

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Parches nuevos de los componentes (Linux 1.56.8, Mac 1.40.1): lo que tiene un parche publicado (cada
 # version de PHP frente a lo ultimo de su rama, las imagenes de Docker frente a Docker Hub, Mailpit y
-# cloudflared) y ponerlo todo al dia. Sin Internet: lo de fuera, falso. Uso: componentes.sh <lvm-instalador.sh>
+# cloudflared; desde la 1.57.43, Docker, Node y lo publicado de Mailpit, cloudflared y Nginx) y ponerlo
+# todo al dia; Docker vacio (docker_lost). Sin Internet: lo de fuera, falso. Uso: componentes.sh <lvm-instalador.sh>
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-componentes.XXXX") || exit 1
@@ -33,12 +34,16 @@ stack_broken() { :; }
 # Docker: la MariaDB 11.8 y la imagen de PHP 8.4 tienen una nueva en Docker Hub
 docker_ready() { true; }
 docker_maria_versions() { echo 11.8; }
+docker_pg_versions() { :; }; docker_php_needs_pgsql() { false; }; docker_php_needs_wp_cli() { false; }
 dk() { echo "$*" >> "$W/dk.log"; [ "$1 $2" == "image inspect" ] && [[ "$3" == nexum-php:8.4 || "$3" == phpmyadmin:5.2 ]] && return 0; [ "$1 $2" == "image inspect" ] && return 1; return 0; }
 docker_image_outdated() { [[ "$1" == mariadb:11.8 || "$1" == php:8.4-* ]]; }
 mailpit_installed() { true; }
 mailpit_installed_version() { echo 1.32.0; }
 tunnel_installed() { true; }
 tunnel_installed_version() { echo 2026.10.0; }
+# (lo de la 1.57.43, aparte: al final)
+docker_apt_outdated() { :; }; docker_desktop_outdated() { :; }; node_outdated() { :; }; components_upstream() { :; }
+nginx_installed() { false; }
 
 out=$(components_check)
 check "una version con parches nuevos: cada componente, con la suya y la nueva" 'grep -qx "L|8.4|Apache|2.4.69|2.4.70" <<< "$out" && grep -qx "L|8.4|MariaDB|11.8.8|11.8.9" <<< "$out"'
@@ -137,6 +142,96 @@ check "si algo falla, se dice (y lo demas se hace)" '[ $rc -ne 0 ] && grep -q "A
 php_releases() { :; }; docker_ready() { false; }; mailpit_installed_version() { echo 1.33.0; }
 components_update > "$W/o" 2>&1; rc=$?
 check "nada que actualizar: lo dice (y lo que no se ha podido consultar)" '[ $rc -eq 0 ] && grep -q "Todo está al día" "$W/o" && grep -q "no se ha podido consultar: php.net" "$W/o"'
+
+# (1.57.43) Docker (sus paquetes de Ubuntu o Docker Desktop), Node y lo publicado de Mailpit, cloudflared y Nginx
+extract "$SRC" node_outdated node_update upstream_latest components_upstream || exit 1
+php_releases() { echo "8.4.27 8.3.30"; }; docker_ready() { false; }; mailpit_installed_version() { echo 1.32.0; }
+lampp_dirs() { :; }; version_dirs() { :; }
+NODE_DIR=$W/node TEST_DIR=$W LVM_NODE_BASE=file://$W/nodejs
+mkdir -p "$NODE_DIR/v22.11.0/bin" "$NODE_DIR/v22.9.0/bin" "$NODE_DIR/v24.3.0/bin" "$NODE_DIR/proyectos" "$W/nodejs/latest-v22.x" "$W/nodejs/latest-v24.x"
+for d in v22.11.0 v22.9.0 v24.3.0; do printf '#!/bin/sh\n' > "$NODE_DIR/$d/bin/node"; chmod +x "$NODE_DIR/$d/bin/node"; done
+echo "abc  node-v22.12.0-linux-x64.tar.gz" > "$W/nodejs/latest-v22.x/SHASUMS256.txt"
+echo "abc  node-v24.3.0-linux-x64.tar.gz" > "$W/nodejs/latest-v24.x/SHASUMS256.txt"
+check "Node: la rama con uno nuevo (frente al más nuevo de los suyos), la otra no" '[ "$(node_outdated)" == "X|Node|22.11.0|22.12.0" ]'
+node_install() { echo "node_install $1" >> "$W/hecho.log"; mkdir -p "$NODE_DIR/v22.12.0/bin"; }
+: > "$W/hecho.log"
+node_update > /dev/null
+check "Node: se pone al día su rama y se quitan sus anteriores (la otra rama se queda)" 'grep -qx "node_install 22" "$W/hecho.log" && [ -d "$NODE_DIR/v22.12.0" ] && [ ! -d "$NODE_DIR/v22.11.0" ] && [ ! -d "$NODE_DIR/v22.9.0" ] && [ -d "$NODE_DIR/v24.3.0" ]'
+rm -rf "$W/nodejs/latest-v24.x"
+check "Node: sin respuesta de nodejs.org, se dice" 'node_outdated | grep -qx "E|nodejs.org (Node 24)"'
+unset TEST_DIR LVM_NODE_BASE
+upstream_latest() { case $1 in Mailpit) echo 1.34.0 ;; cloudflared) echo 2026.10.0 ;; Nginx) echo 1.30.7 ;; esac; }
+mailpit_installed() { true; }; tunnel_installed() { true; }; nginx_installed() { true; }
+MAILPIT_VERSION=1.32.0 NGINX_VERSION=1.30.7
+check "publicadas: solo lo que es más nuevo que lo que pone Nexum" '[ "$(components_upstream)" == "N|Mailpit|1.32.0|1.34.0" ]'
+nginx_installed_version() { echo 1.30.7; }
+node_outdated() { echo "X|Node|22.11.0|22.12.0"; }
+if [ $MAC -eq 1 ]; then
+    docker_desktop_outdated() { echo "M|Docker Desktop|4.99.0|4.100.0|https://www.docker.com/products/docker-desktop/"; }
+else
+    DOCKER_APT_PACKAGES="docker.io docker-compose-v2 rootlesskit"
+    docker_apt_outdated() { echo "X|docker.io|29.1.3-0ubuntu3~24.04.2|29.1.4-0ubuntu1~24.04.1"; }
+fi
+out=$(components_check)
+check "Docker y Node cuentan como parche; lo publicado (N), no" 'grep -qx "S|2" <<< "$out" && grep -q "^N|Mailpit|" <<< "$out" && grep -qx "X|Node|22.11.0|22.12.0" <<< "$out"'
+node_update() { echo node_update >> "$W/hecho.log"; }
+docker_apt_update() { echo "docker_apt_update$1" >> "$W/hecho.log"; }
+docker_desktop_update() { echo "docker_desktop_update $1" >> "$W/hecho.log"; }
+: > "$W/hecho.log"
+components_update > "$W/o" 2>&1
+if [ $MAC -eq 1 ]; then
+    check "Docker Desktop: la copia y su descarga (se instala a mano); Node, al día" 'grep -qx "docker_desktop_update 4.100.0" "$W/hecho.log" && grep -qx node_update "$W/hecho.log" && grep -q "se instala a mano" "$W/o"'
+else
+    check "Docker: con apt, sus paquetes (lo primero); Node, al día" '[ "$(head -1 "$W/hecho.log")" == "docker_apt_update docker.io" ] && grep -qx node_update "$W/hecho.log" && grep -q "Mailpit 1.34.0 publicado" "$W/o"'
+    # docker_apt_update de verdad: sin la copia de las BBDD, Docker no se toca
+    extract "$SRC" docker_apt_update || exit 1
+    docker_ready() { true; }; docker_backup_all() { echo "copia" >> "$W/hecho.log"; return 1; }
+    run() { echo "run $*" >> "$W/hecho.log"; }
+    : > "$W/hecho.log"
+    docker_apt_update " docker.io" > /dev/null 2>&1; rc=$?
+    check "Docker: si la copia de sus BBDD falla, no se actualiza" '[ $rc -ne 0 ] && grep -qx copia "$W/hecho.log" && ! grep -q "^run sudo" "$W/hecho.log"'
+    docker_backup_all() { echo "copia" >> "$W/hecho.log"; }; docker_store_pin() { echo pin >> "$W/hecho.log"; }
+    systemctl() { return 1; }; docker_lost() { echo "blog|"; }; dk() { echo 29.1.4; }
+    : > "$W/hecho.log"
+    docker_apt_update " docker.io" > "$W/o" 2>&1; rc=$?
+    check "Docker: copia, almacén fijado, apt y el tuyo de nuevo; avisa de lo que ha perdido su BBDD" '[ $rc -eq 0 ] && [ "$(head -2 "$W/hecho.log" | tr "\n" " ")" == "copia pin " ] && grep -q "^run sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade docker.io" "$W/hecho.log" && grep -q "^run systemctl --user restart docker.service" "$W/hecho.log" && grep -q "nexum docker-recuperar" "$W/o"'
+    unset -f systemctl run
+fi
+# Docker vacío (docker_lost) y la última copia de cada uno
+extract "$SRC" docker_lost docker_last_copy || exit 1
+COPIES_DIR=$W/copias; mkdir -p "$COPIES_DIR"
+for f in docker-blog-wp_blog-20261101-100000 docker-blog-wp_blog-20261120-090000 docker-blog-wp_blog2-20261121-090000 docker-postgres-18-20261119-080000; do echo x | gzip > "$COPIES_DIR/$f.sql.gz"; done
+docker_projects() { printf '%s\n' blog tienda vivo; }
+docker_conf() { case "$1 $2" in "blog BBDD") echo wp_blog ;; "tienda BBDD") echo ps ;; "tienda MARIADB") echo 11.8 ;; "vivo LAMPP_BD") echo 8.4 ;; "vivo MARIADB") echo 11.8 ;; esac; }
+docker_web_project() { [ "$1" != blog ]; }
+docker_maria_name() { echo "nexum-mariadb-${1//./-}"; }
+docker_pg_versions() { echo 18; }; docker_pg_name() { echo "nexum-postgres-$1"; }
+dk() { printf '%s\n' nexum-mariadb-11-8 otro; }
+check "Docker vacío: el de antes sin su volumen, con su última copia (no la de otra BBDD); el que va en vivo, no" '[ "$(docker_lost)" == "blog|$COPIES_DIR/docker-blog-wp_blog-20261120-090000.sql.gz
+postgres-18|$COPIES_DIR/docker-postgres-18-20261119-080000.sql.gz" ]'
+dk() { echo otro; }
+check "Docker vacío: sin su MariaDB común, los del Apache de Docker también (sin copia: vacío)" 'docker_lost | grep -qx "tienda|"'
+dk() { return 1; }
+check "Docker vacío: si Docker no responde, nada" '[ -z "$(docker_lost)" ]'
+# docker-copia: la de cada proyecto; si falla una, error (y quien la pide no sigue)
+extract "$SRC" docker_backup_all || exit 1
+LOG_DIR=$W/log; mkdir -p "$LOG_DIR"; DRY=0
+docker_ready() { true; }; docker_maria_versions() { :; }; docker_pg_versions() { :; }; docker_lost() { :; }
+docker_db_backup() { echo "Copia de su BBDD de Docker (x)"; echo "Copia de x: $COPIES_DIR/docker-$1-x.sql.gz"; }
+out=$(docker_backup_all "Docker no se actualiza"); rc=$?
+check "docker-copia: la de cada proyecto, y dice dónde" '[ $rc -eq 0 ] && grep -q "docker-tienda-x.sql.gz" <<< "$out" && grep -q "Copia de las BBDD de Docker hecha" <<< "$out"'
+docker_db_backup() { [ "$1" == tienda ] && { echo "No se ha podido copiar su BBDD de Docker (ps): no se borra nada"; return 1; }; echo "Copia de x: y"; }
+out=$(docker_backup_all "Docker no se actualiza"); rc=$?
+check "docker-copia: si falla una, error, con lo que no se hace" '[ $rc -ne 0 ] && grep -qx "No se ha podido copiar su BBDD de Docker (ps): Docker no se actualiza" <<< "$out"'
+docker_lost() { echo "tienda|"; }
+out=$(docker_backup_all "x"); rc=$?
+check "docker-copia: lo que ya no está en Docker no se puede copiar: se dice y se sigue" '[ $rc -eq 0 ] && grep -q "^tienda: su BBDD ya no está en Docker" <<< "$out"'
+check "gui-docker: Z por cada uno; docker-copia y docker-recuperar son órdenes de nexum" 'grep -q "print \"Z|\" \$0" "$SRC" && grep -q "^    docker-copia) docker_backup_all ;;" "$SRC" && grep -q "^    docker-recuperar) shift; docker_recover \"\$@\" ;;" "$SRC"'
+if [ $MAC -eq 1 ]; then
+    check "ventana (Mac): el aviso de Docker vacío con «Recuperar…» y M y N en Parches nuevos" 'grep -q "Button(\"Recuperar…\") { model.dockerRecover(k.lost) }" "$SRC" && grep -q "case \"M\" where f.count >= 4:" "$SRC" && grep -q "case \"N\" where f.count >= 4:" "$SRC"'
+else
+    check "ventana: el aviso de Docker vacío con «Recuperar…» y lo publicado en Parches nuevos" 'grep -q "self.nv_docker_lost_warning(d\[\"lost\"\])" "$SRC" && grep -q "\[\"docker-recuperar\"\]" "$SRC" && grep -q "elif f\[0\] == \"N\" and len(f) >= 4:" "$SRC"'
+fi
 
 # La ventana
 if [ $MAC -eq 1 ]; then

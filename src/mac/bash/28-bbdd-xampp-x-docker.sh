@@ -1,13 +1,15 @@
 # ===========================================================================
 # BBDD de XAMPP-X en Docker (en vivo)
 # ===========================================================================
-# Un WordPress de Docker puede usar la BBDD de una version XAMPP-X en vivo: la misma que web.local, sin
-# copias. Su MariaDB (si no esta en marcha, solo ella, con tu usuario y en otro puerto de 127.0.0.1: no
+# Un WordPress o una tienda PrestaShop de Docker puede usar la BBDD de una version XAMPP-X en vivo: la
+# misma que web.local, sin copias. Su MariaDB (si no esta en marcha, solo ella, con tu usuario y en otro puerto de 127.0.0.1: no
 # choca con la de la version activa en el 3306) y, en la red de Docker, un puente hasta su puerto en el
 # Mac (socat, de la imagen de MariaDB, por host.docker.internal: Docker Desktop no llega a los sockets
 # del Mac). Si cambia el puerto (al activar esa version, pasa al 3306), se rehace el puente: la
 # configuracion del proyecto no cambia. El proyecto entra con el usuario y la contraseña de su
-# wp-config.php, los mismos que con web.local. PrestaShop no: guarda su dominio en la BBDD
+# wp-config.php (o de su parameters.php o settings.inc.php), los mismos que con web.local. Una tienda
+# guarda su dominio en la BBDD, que no se toca: sigue en el suyo de verdad, y el Apache de Docker se lo
+# cambia por el de Docker en lo que entra y en lo que sale (docker_web_ps_live)
 LAMPP_BD_BRIDGE_IMAGE=mariadb:11.8
 LAMPP_BD_MARK_DIR=$DOCKER_DIR/lampp-bd
 LAMPP_BD_PORTS="3310 3399"
@@ -160,23 +162,35 @@ function lampp_bd_keep() {
 # version XAMPP-X (la misma que web.local) o su copia en la MariaDB comun de Docker (la de antes, que no
 # se borra al pasar a LAMPP)
 function docker_db_mode() {
-    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was
+    local slug=$1 mode=$2 v=$3 dir creds user db pass owner was shop=""
     docker_web_project "$slug" || { echo "No hay ningun proyecto en Docker (con el Apache de Docker) con el nombre $slug"; return 1; }
     dir=$DOCKER_DIR/$slug
     case $mode in
         lampp)
-            [ "$(docker_conf "$slug" TIPO)" == wp ] || { echo "Solo WordPress: una tienda guarda su dominio en la BBDD y no puede servir a web.local y a Docker a la vez"; return 1; }
+            [ "$(docker_conf "$slug" TIPO)" == wp ] || [ "$(docker_conf "$slug" TIPO)" == ps ] \
+                || { echo "Solo un WordPress o una tienda PrestaShop"; return 1; }
             valid_version_name "$v" && [ -d "$BASE_DIR/XAMPP-$v" ] || { echo "No existe la version XAMPP-$v"; return 1; }
             owner=$(lampp_bd_owner "$v")
-            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base del wp-config.php de $(docker_conf "$slug" CARPETA)"; return 1; }
+            creds=$(lampp_bd_creds "$(docker_conf "$slug" CARPETA)") || { echo "No se puede leer el usuario y la base de la configuracion de $(docker_conf "$slug" CARPETA)"; return 1; }
             user=${creds%%|*} db=$(head -1 <<< "$creds" | cut -d'|' -f2) pass=$(sed -n 2p <<< "$creds")
             echo "$slug: BBDD $db de XAMPP-$owner, en vivo (la misma que web.local; la copia de Docker se queda)"
             [ "$DRY" -eq 1 ] && return 0
+            # (una tienda sigue en su dominio de verdad: se lee de su BBDD antes de cambiar nada)
+            if [ "$(docker_conf "$slug" TIPO)" == ps ]; then
+                lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+                shop=$(lampp_bd_shop_domain "$owner" "$db" "$user" "$pass")
+                [ -n "$shop" ] || { echo "No se ha podido leer el dominio de la tienda en $db (tabla shop_url): mira su usuario y su contraseña"; return 1; }
+                echo "Tienda en vivo: sigue en $shop en su BBDD (no se toca); el Apache de Docker la enseña en $(docker_web_url "$(docker_conf "$slug" DOMINIO)")"
+            fi
             # (los de Docker de antes, para volver: BBDD y usuario de su copia)
             [ -z "$(docker_conf "$slug" LAMPP_BD)" ] && docker_conf_set "$slug" BBDD_DOCKER "$(docker_conf "$slug" BBDD)" \
                 && docker_conf_set "$slug" USUARIO_DOCKER "$(docker_conf "$slug" USUARIO)" \
                 && { grep -q '^DB_PASS_DOCKER=' "$dir/.env" || ( umask 077; sed -n 's/^DB_PASS=/DB_PASS_DOCKER=/p' "$dir/.env" >> "$dir/.env" ); }
             docker_conf_set "$slug" LAMPP_BD "$owner" && docker_conf_set "$slug" BBDD "$db" && docker_conf_set "$slug" USUARIO "$user" || return 1
+            if [ -n "$shop" ]; then
+                docker_conf_set "$slug" DOMINIO_TIENDA "$shop" || return 1
+                [[ "$shop" != *.local && "$shop" != *.docker.test && "$shop" != *.docker.local ]] && docker_conf_set "$slug" PRODUCCION "${shop#www.}"
+            fi
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; printf 'DB_PASS=%s\n' "$pass"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
         docker)
             owner=$(docker_conf "$slug" LAMPP_BD)
@@ -185,16 +199,24 @@ function docker_db_mode() {
             echo "$slug: vuelve a su copia de Docker ($(docker_conf "$slug" BBDD_DOCKER))"
             [ "$DRY" -eq 1 ] && return 0
             docker_conf_set "$slug" BBDD "$(docker_conf "$slug" BBDD_DOCKER)" && docker_conf_set "$slug" USUARIO "$(docker_conf "$slug" USUARIO_DOCKER)" \
-                && docker_conf_set "$slug" LAMPP_BD "" || return 1
+                && docker_conf_set "$slug" LAMPP_BD "" && docker_conf_set "$slug" DOMINIO_TIENDA "" || return 1
             ( umask 077; { grep -v '^DB_PASS=' "$dir/.env"; sed -n 's/^DB_PASS_DOCKER=/DB_PASS=/p' "$dir/.env"; } > "$dir/.env.nuevo" ) && mv -f "$dir/.env.nuevo" "$dir/.env" || return 1 ;;
         *) echo "Uso: nexum docker-bd <nombre> lampp <version> | docker"; return 1 ;;
     esac
     # (su configuracion con la BBDD nueva; si estaba en marcha, se arranca de nuevo con ella)
     was=$(dk ps --format '{{.Names}}' 2> /dev/null | grep -cE "^nexum-$slug-php[0-9]{2}\$")
     for v in $(docker_conf "$slug" PHP); do docker_web_config "$slug" "$v" > /dev/null || return 1; done
+    # (una tienda: su vhost del Apache de Docker cambia, con su dominio de verdad o sin el, y su compose.yaml)
+    if [ "$(docker_conf "$slug" TIPO)" == ps ]; then
+        docker_web_compose "$slug" || return 1
+        if [ "$(docker_web_state)" == marcha ]; then docker_web_up > /dev/null || return 1; fi
+    fi
     if [ "$was" -gt 0 ]; then
         docker_web_action arrancar "$slug" || return 1
         [ "$mode" == docker ] && lampp_bd_release "$owner" "$slug"
+    elif [ "$mode" == lampp ] && [ -n "$shop" ]; then
+        # (el puente para leer su dominio: fuera, si no lo usa nadie en marcha)
+        lampp_bd_release "$owner" "$slug"
     fi
     echo "Listo"
 }
@@ -231,8 +253,8 @@ function docker_pass() {
     task_step
     echo "Copia de su BBDD ($db)"
     if [ $copy -eq 1 ]; then
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
-        backup="$COPIES_DIR/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        copies_in bbdd/docker > /dev/null || return 1
+        backup="$COPIES_DIR/bbdd/docker/docker-$slug-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
     else
         # (sin copia: un fichero solo tuyo en ~/.nexum, que se borra cuando ya esta cargada)
         mkdir -p -m 700 "$LOG_DIR" || return 1
@@ -395,6 +417,196 @@ QUE HACE
   contraseñas) va a Mailpit y no llega a nadie.
 
 VERSIONES
+
+1.57.51 (25 nov 2026)
+- Mac: la ventana vuelve a compilar (el botón Abrir de los espacios de
+  trabajo de VS Code llamaba a algo que no existía en esa vista, y se
+  quedaba solo el Terminal).
+- Aviso de versión nueva: se busca cada vez que se abre el programa
+  (antes, solo el primer arranque del día), también al volver a
+  abrirlo cuando estaba escondido junto al reloj (si hace más de media
+  hora) y cada cuatro horas con él abierto. Si se encuentra con la
+  ventana escondida, se ofrece al mostrarla.
+- ~/nexum-backups, por carpetas: bbdd/<versión> y bbdd/docker,
+  proyectos/<carpeta> y sistema/hosts, sistema/vhosts y
+  sistema/<versión>. Lo que había suelto se ordena solo al abrir el
+  programa, sin borrar nada.
+
+1.57.50 (25 nov 2026)
+- Registro de Actualizar proyecto: los 5 primeros ficheros nuevos (se
+  copian) y, aparte, los 5 primeros modificados (se sustituyen); si
+  hay más, la lista entera de cada uno en ~/.nexum/listas. Lo que no
+  viene (se deja o se quita) sigue listado como antes.
+
+1.57.49 (25 nov 2026)
+- Actualizar phpMyAdmin (el aviso de PHP antiguo) ya no falla en cada
+  versión con «/descargas.lista: Permiso denegado»: se descargaba y se
+  comprobaba bien, pero no se cambiaba.
+- Actualizar proyecto: ya no sale «BrokenPipeError: Broken pipe» antes
+  del git pull.
+- Registro de Actualizar proyecto: del git pull, solo la lista de los
+  ficheros que ya no trae (borrados en GitHub); del código, solo la de
+  lo que hay en tu carpeta y no viene. Los nuevos y modificados, solo
+  en las cuentas. Con más de 25, por carpetas, y la lista entera en
+  ~/.nexum/listas para mirarla con calma.
+- El recuadro del código de producción, en dos partes que no se
+  mezclan: «Vienen en el código» (nuevos, modificados e iguales, con
+  lo que se hace con cada uno) y «Solo en tu carpeta» (no vienen: al
+  fusionar se dejan, al sobrescribir se quitan).
+- Ver registro: cada paso de la tarea con su título y una línea en
+  blanco delante, y algo más de espacio entre líneas.
+
+1.57.48 (24 nov 2026)
+- Bases de datos: los volcados se cargan como root, con todos los
+  permisos (antes, con un usuario que solo podía tocar esa base). Un
+  volcado que toca otras bases, crea usuarios o trae SET GLOBAL ya no
+  falla con «Access denied». Solo los SET GLOBAL no se ejecutan: se
+  cambian por DO 0, para no tocar el MariaDB de todas tus webs.
+- Bases de datos: se pueden cargar ficheros .gz con cualquier nombre, no
+  solo los .sql comprimidos; los selectores de fichero ya los enseñan.
+- Actualizar proyecto: si el proyecto no tiene base de datos (o la suya
+  no existe en la versión activa), lo dice y deja crearla desde ahí:
+  vacía o con el volcado que elijas, y queda como la suya
+  (nexum actualizar-proyecto <carpeta> --crear-base --base <base>).
+- Registro de Actualizar proyecto: lo que hace la extracción del código (ficheros y carpetas del paquete, su tamaño), la
+  lista de ficheros nuevos, modificados y que ya no están, y un recuadro
+  con las cuentas: ficheros en total, nuevos, modificados, sin tocar y
+  quitados. El git pull dice también lo que ha traído, con su recuadro.
+- VS Code: el espacio de trabajo de cada proyecto se busca también en
+  las subcarpetas de la carpeta elegida (por si los tienes clasificados
+  por tipo de proyecto); los nuevos se siguen creando en la elegida.
+- Al cargar un volcado que falla a medias ya no sale un error de Python
+  (BrokenPipeError) en el registro.
+- Bases de datos: las de versiones que no están cargadas se pueden
+  marcar para borrar; al cargar esa versión, la ventana dice cuántas
+  tiene marcadas y pregunta si se borran (nexum marcar-bd y
+  nexum borrar-bd-marcadas).
+- Desplegables: se abren justo debajo del botón (o encima, si no hay
+  sitio) y con el alto que cabe; ya no se cortan ni salen lejos.
+- Copiar una BBDD a otra versión: con muchas versiones, la lista va
+  con barra de desplazamiento y el diálogo cabe en la pantalla.
+
+1.57.46 (23 nov 2026)
+- Tiendas en Docker, en vivo: como con WordPress, al montarla en Docker
+  puedes elegir «En vivo: la misma que web.local (sin copias)», que es
+  la de partida, o «Una copia en Docker». En vivo, su BBDD no se toca:
+  sigue en su dominio de verdad, y el Apache de Docker la enseña en el
+  de Docker. Puedes entrar en su back office por
+  https://<carpeta>.docker.test sin falsear el dominio, y lo que cambies
+  se ve también en web.local. Se puede cambiar después con el botón de
+  la BBDD de su fila (nexum docker-bd <nombre> lampp <versión> |
+  docker).
+- Nuevo proyecto en Docker (pestaña Docker): también tiene «Cómo», para
+  WordPress y tiendas.
+
+1.57.45 (23 nov 2026)
+- Docker, Nuevo proyecto en Docker: «BBDD que se copia» trae de partida
+  la de la carpeta en la versión activa (o, si no está en ella, la
+  primera que tenga en otra). Antes empezaba en «Ninguna: vacía», y una
+  tienda montada así daba error 500 por no tener sus tablas.
+
+1.57.44 (23 nov 2026)
+- Barra de estado, con el dominio falseado: si el dominio del proyecto
+  cargado está falseado, lo dice (web.local >>>>> dominio falseado ·
+  tienda.com): sus visitas van a esta copia y no a la web real. Al dejar
+  el ratón encima, la carpeta del proyecto.
+
+1.57.43 (23 nov 2026)
+- Barra de estado, abajo en la ventana: a dónde apunta web.local, con
+  unos chevrones en verde que se iluminan como una onda (web.local >>>>>
+  proyecto). Sin proyecto cargado, en gris: web.local >>>>> sin enlace.
+- Parches nuevos, también de Docker: en Linux, sus paquetes de Ubuntu
+  (docker.io, docker-compose-v2 y rootlesskit); en el Mac, Docker
+  Desktop, frente a la versión que ofrece su actualizador. Antes de
+  ponerlo al día se copian todas las BBDD de Docker en ~/nexum-backups,
+  y si la copia falla Docker no se toca. En Linux, además, el almacén de
+  imágenes se fija para que no cambie al actualizar. En el Mac, Docker
+  Desktop se instala a mano: «Actualizar todo» hace la copia y abre su
+  descarga.
+- Node, al día: los Node que ha descargado Nexum salen en Parches nuevos
+  cuando hay un parche de su rama; al ponerlo, se quitan los anteriores
+  de esa rama que no estén en marcha.
+- Mailpit, cloudflared y Nginx: si se publica una versión más nueva que
+  la que pone Nexum, Parches nuevos lo dice (solo para saberlo: no
+  cuenta como parche y llega con una versión de Nexum).
+- Docker sin las BBDD de tus proyectos: si Docker cambia de almacén de
+  imágenes o Docker Desktop empieza con un disco nuevo, la pestaña
+  Docker lo avisa y «Recuperar…» rehace los contenedores con la última
+  copia de cada proyecto. En la terminal: nexum docker-copia y nexum
+  docker-recuperar.
+
+1.57.42 (23 nov 2026)
+- Más, «Vaciar la caché de Chrome…» (en los proyectos con dominio): si
+  tras falsear o dejar de falsear un dominio Chrome sigue en la otra web
+  (por las conexiones que tenía abiertas y su caché de DNS), copia
+  chrome://net-internals/#sockets y dice qué pulsar. Chrome no deja que
+  otro programa abra esa página ni pulse sus botones.
+- Versiones de PHP: la que instalas o rehaces (también al poner sus
+  parches nuevos) queda protegida al acabar, con el correo de pruebas y
+  el https de la seguridad. Antes se quedaba «sin proteger» hasta pulsar
+  Protegerlas, y por eso, tras actualizar Nexum, casi siempre salía la
+  pregunta de aplicar la seguridad aunque esa versión de Nexum no trajera
+  nada nuevo para Apache.
+
+1.57.41 (20 nov 2026)
+- Barrera entre webs, con webs permitidas (Configuración > Seguridad entre
+  webs, «Añadir…»): las de confianza, como el ERP de tu empresa, pueden
+  llevarte a tu back office o a tu tienda con un formulario, abrirlos en
+  un iframe o hacerles peticiones (fetch) sin apagar la barrera; la
+  cabecera CORS que les dé tu proyecto ya no se quita. Se escribe el
+  dominio o se pega la dirección; *.empresa.com vale también para sus
+  subdominios. Las demás webs siguen frenadas, y phpMyAdmin no es para
+  ninguna. En la terminal, nexum barrera-web permitir|quitar <dominio> y
+  nexum barrera-web permitidas.
+- VS Code con espacios de trabajo (Configuración > Carpetas, «Espacios de
+  trabajo de VS Code»): elige la carpeta de tus .code-workspace y «VS Code»
+  abre cada proyecto con el suyo (<carpeta>.code-workspace, o el que ya
+  lleve su carpeta). Un proyecto que aún no tiene el suyo, al abrirlo, se
+  le crea. Sin elegir, se abre la carpeta, como siempre.
+
+1.57.40 (20 nov 2026)
+- Cola de tareas: con una tarea en marcha, lo que lanzaría otra se puede
+  pulsar y va a la cola; empieza sola cuando acaba la de ahora. La
+  ventana de la tarea dice cuáles vienen después, con «Vaciar la cola»,
+  y la flecha verde de arriba, cuántas esperan. Si una falla, al cerrar
+  su ventana pregunta si sigue; al cerrar el programa con tareas en la
+  cola, también.
+- Traer los cambios o clonar un repositorio va ya, al lado de la tarea
+  en marcha, si no es de su misma carpeta. En el
+  Mac, sin ventana: al acabar lo dice abajo.
+- Avisos, en amarillo (avisan, no son errores).
+- Configuración > General, Registro de tareas: el alto de la lista se
+  mide con sus filas ya colocadas en la ventana, para que se vean las 4
+  últimas (nunca menos de 3).
+- Pestaña Nginx: de título, el logotipo de NGINX con sus letras.
+
+1.57.39 (19 nov 2026)
+- Nginx (pestaña Nginx), apagado de serie: su pestaña no sale hasta que
+  enciendes «Usar Nginx» en Configuración > Nginx. Apagarlo lo para y la
+  oculta, sin borrar sus proyectos ni sus ajustes (nexum nginx-usar si|no).
+- Docker: PostgreSQL común, como las MariaDB (Configuración > Docker, la
+  18, la 17 o la 16). Desde los PHP de Docker, nexum-postgres-18:5432;
+  desde este Mac, 127.0.0.1:54318, con el usuario postgres y su
+  contraseña al azar («Copiar contraseña»). Con alguna, las imágenes de
+  PHP de Docker traen pgsql y pdo_pgsql. En la terminal, nexum
+  docker-postgres arrancar|parar|borrar <versión>.
+- Docker: Nginx común, al lado del Apache de Docker, para los proyectos de
+  Docker que marques (Configuración > Docker): con sus mismos dominios, en
+  los puertos 8081 y 8444, delante del Apache del PHP de cada versión (en
+  el Mac, las imágenes de PHP de Docker llevan Apache). En la terminal, nexum docker-nginx arrancar|parar|anadir|quitar|puertos.
+
+1.57.38 (19 nov 2026)
+- Pestaña Nginx, nueva: otro servidor web, aparte de Apache, para los
+  proyectos que le añadas (Laravel, Symfony, PHP...). Uno para todo el
+  Mac, con tu usuario y solo en este Mac, en los puertos 8080 y 8443 (en
+  Configuración > Nginx). Cada proyecto, por su nombre:
+  http://<carpeta>.localhost:8080 y https://<carpeta>.localhost:8443, con
+  el PHP de la versión activa y sus BBDD. Se compila de su código (Nginx
+  1.30.7, comprobado por su huella, con pcre2 y openssl@3 de Homebrew) al
+  pulsar «Instalar», en menos de un minuto. Apache sigue igual. En la
+  terminal, nexum nginx-instalar, nginx-anadir <carpeta>, nginx-arrancar...
+- Avisos: el de los parches nuevos enseña la lista entera (se cortaba en
+  dos líneas), con sus botones debajo, a la derecha.
 
 1.57.37 (19 nov 2026)
 - Docker: «WP-CLI en los contenedores de PHP», en Configuración >

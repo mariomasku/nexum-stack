@@ -950,8 +950,8 @@ function secure_version() {
         fi
         # (los ficheros nuevos, como lvm-dominio-desconocido.conf, no tienen copia; los demas, solo con
         # el ajuste copias-ficheros)
-        [ -f "$base/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && mkdir -p -m 700 "$COPIES_DIR" \
-            && cp "$base/$rel" "$COPIES_DIR/$name-$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
+        [ -f "$base/$rel" ] && [ -f "$COPIES_FILES_FLAG" ] && copies_in "sistema/$name" > /dev/null \
+            && cp "$base/$rel" "$COPIES_DIR/sistema/$name/$(basename "$rel")-$(date +%Y%m%d-%H%M%S)" 2> /dev/null
         $SUDO sh -c 'cat "$1" > "$2"' sh "$src" "$base/$rel" || { $SUDO rm -rf "$tmp"; return 2; }
         [[ "$rel" == *.key ]] && $SUDO chmod 600 "$base/$rel"
     done <<< "$list"

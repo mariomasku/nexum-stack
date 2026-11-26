@@ -150,6 +150,8 @@ function docker_free_port() {
 #     (todos los contenedores de Docker Desktop, para la consola de la pestaña)
 #   I|imagen|etiqueta|ID corto|tamaño|creada  y  O|volumen|driver   (imagenes y volumenes; hasta la
 #     1.39.4, I|imagen:etiqueta|tamaño|creada)
+#   Z|nombre|su ultima copia en ~/nexum-backups (o nada)   lo que ha perdido su BBDD (docker_lost: Docker
+#     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" app=0 p
     docker_bin > /dev/null && installed=1
@@ -187,6 +189,7 @@ function gui_docker() {
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 5 && $3 ~ /^[0-9a-f]+$/ { print "I|" $0 }'
         dk volume ls --format '{{.Name}}|{{.Driver}}' 2> /dev/null \
             | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "O|" $0 }'
+        docker_lost | tr -d '\000-\010\013-\037' | awk -F'|' 'NF == 2 { print "Z|" $0 }'
     fi
     return 0
 }
@@ -355,16 +358,17 @@ function docker_php_image() {
     local php=$1 fresh=$2 dir=$DOCKER_DIR/imagenes/php-$1 have
     if [ "$DRY" -eq 0 ] && [ "$fresh" != --nueva ] && [ "$fresh" != --rehacer ]; then
         have=$(dk image inspect --format '{{index .Config.Labels "nexum.esquema"}}' "nexum-php:$php" 2> /dev/null)
-        # (con WP-CLI puesto, la que no lo trae se rehace)
-        [ "$have" == "$DOCKER_IMAGE_SCHEMA" ] && ! docker_php_needs_wp_cli "$php" && return 0
+        # (con WP-CLI puesto, la que no lo trae se rehace; con alguna PostgreSQL, la que no trae pgsql)
+        [ "$have" == "$DOCKER_IMAGE_SCHEMA" ] && ! docker_php_needs_wp_cli "$php" && ! docker_php_needs_pgsql "$php" && return 0
     fi
     mkdir -p -m 700 "$dir" || return 1
     # (con la version de PHP en el nombre del FROM y en las extensiones, nada mas del exterior)
     {
         printf 'FROM php:%s-apache\nLABEL nexum.esquema="%s"\n' "$php" "$DOCKER_IMAGE_SCHEMA"
         printf 'COPY --from=%s /usr/bin/install-php-extensions /usr/local/bin/\n' "$DOCKER_EXT_INSTALLER"
-        printf 'RUN install-php-extensions %s\n' "$DOCKER_PHP_EXT"
+        printf 'RUN install-php-extensions %s\n' "$(docker_php_ext)"
         docker_wp_cli_dockerfile
+        docker_pg_dockerfile
         cat << 'EOF'
 COPY nexum-web.conf /etc/apache2/sites-available/000-default.conf
 COPY nexum.ini /usr/local/etc/php/conf.d/zz-nexum.ini
@@ -883,6 +887,8 @@ function docker_test_admin() {
 
 #@incluir comun/docker/docker_db_backup.sh
 #@incluir comun/docker/docker_wp_cli.sh
+#@incluir comun/docker/docker_pg_name.sh
+#@incluir comun/docker/docker_lost.sh
 # docker-arrancar|docker-parar|docker-registros|docker-borrar <nombre> (docker-borrar <nombre> --copia: antes,
 # una copia de su BBDD de Docker en ~/nexum-backups; si falla, no se borra nada)
 function docker_action() {

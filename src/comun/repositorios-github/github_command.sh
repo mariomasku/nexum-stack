@@ -152,7 +152,7 @@ for r, pre in shown:
 # git pull seguro de un clon: repo_pull <carpeta> <direccion SSH o nada> <fichero de servidores conocidos>.
 # Si no se puede (sin conexion, o choca con lo que no se ha subido o guardado), no se toca nada
 function repo_pull() {
-    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up token="" auth=()
+    local dir=$1 ssh_url=$2 known=$3 branch origin from=() up before token="" auth=()
     branch=$(git -C "$dir" symbolic-ref --short -q HEAD) || { echo "$dir no está en una rama (HEAD suelto): no se toca"; return 1; }
     origin=$(git -C "$dir" config --get remote.origin.url)
     # (un origin por https de un privado no se puede leer sin preguntar: se trae por SSH, su rama)
@@ -165,6 +165,7 @@ function repo_pull() {
         token=$(github_token)
         [ -n "$token" ] && auth=(-c "credential.helper=$(repo_github_helper)")
     fi
+    before=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
     # (sin terminal, sin preguntar nada y solo con servidores conocidos, como repo_clone)
     if ! NEXUM_GIT_TOKEN="$token" GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false SSH_ASKPASS=/bin/false GIT_LFS_SKIP_SMUDGE=1 \
             GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o 'UserKnownHostsFile=~/.ssh/known_hosts $known'" \
@@ -175,6 +176,70 @@ function repo_pull() {
         echo "No se ha tocado nada. Guarda o sube tus cambios (git status) y vuelve a probar."
         return 1
     fi
+    repo_pull_summary "$dir" "$before"
+}
+
+# Lo que ha traido un git pull (de <commit de antes> a HEAD), para el registro de la tarea: la lista de los
+# ficheros que ya no trae (borrados en GitHub, que alli ya no se ven) y un recuadro con las cuentas. Los
+# nuevos y modificados se ven en GitHub: solo se cuentan. Con mas de 25 borrados, cuantos hay en cada
+# carpeta y la lista entera en ~/.nexum/listas (no es una copia: es un registro). repo_pull_summary <carpeta> <commit de antes>
+function repo_pull_summary() {
+    local dir=$1 before=$2 after changes total gone n list
+    after=$(git -C "$dir" rev-parse -q --verify HEAD 2> /dev/null)
+    if [ -z "$before" ] || [ -z "$after" ]; then
+        return 0
+    fi
+    if [ "$before" == "$after" ]; then
+        echo "git pull: ya estaba al día, no ha traído ningún fichero"
+        return 0
+    fi
+    changes=$(git -C "$dir" -c core.quotePath=false diff --no-renames --name-status "$before" "$after" 2> /dev/null)
+    total=$(git -C "$dir" ls-files 2> /dev/null | wc -l)
+    echo "git pull: de ${before:0:9} a ${after:0:9} ($(git -C "$dir" rev-list --count "$before..$after" 2> /dev/null) commits)"
+    gone=$(awk -F'\t' 'substr($1, 1, 1) == "D" { print $2 }' <<< "$changes")
+    n=$(grep -c . <<< "$gone")
+    if [ "$n" -gt 0 ]; then
+        echo
+        echo "Ya no los trae (borrados en GitHub): $n $([ "$n" -eq 1 ] && echo fichero || echo ficheros)"
+        if [ "$n" -le 25 ]; then
+            sed 's/^/  - /' <<< "$gone"
+        else
+            echo "  Son muchos para verlos aquí: por carpetas, las que más tienen"
+            awk '{ d = $0; sub(/\/[^\/]*$/, "", d); if (d == $0) d = "(la carpeta del proyecto)"; c[d]++ }
+                END { for (d in c) printf "%d\t%s\n", c[d], d }' <<< "$gone" | sort -t$'\t' -k1,1nr -k2 | head -15 \
+                | awk -F'\t' '{ printf "  - %s%s (%d %s)\n", $2, ($2 ~ /^\(/) ? "" : "/", $1, ($1 == 1) ? "fichero" : "ficheros" }'
+            list="$LOG_DIR/listas/$(basename "$dir")-$(date +%Y%m%d-%H%M%S)-borrados-en-github.txt"
+            if mkdir -p -m 700 "$LOG_DIR/listas" && { echo "Ya no los trae el git pull (borrados en GitHub, de ${before:0:9} a ${after:0:9}), en $dir"
+                    echo; echo "$gone"; } > "$list"; then
+                echo "  La lista entera: $list"
+            fi
+        fi
+    fi
+    echo
+    summary_box "git pull" "Ficheros del repositorio (total)|$total" \
+        "Nuevos|$(grep -c '^A' <<< "$changes")" "Modificados|$(grep -c '^[^AD]' <<< "$changes")" \
+        "Sin tocar|$(( total - $(grep -c '^[^D]' <<< "$changes") ))" "Borrados en GitHub (ya no los trae)|$(grep -c '^D' <<< "$changes")"
+}
+
+# Un recuadro con un titulo y sus filas (texto|numero), para el registro de una tarea (que va en letra de
+# ancho fijo): summary_box <titulo> <texto|numero>...
+function summary_box() {
+    local title=$1 row text n width=${#1} line i
+    shift
+    for row in "$@"; do
+        text=${row%|*} n=${row##*|}
+        (( ${#text} + 2 + ${#n} > width )) && width=$(( ${#text} + 2 + ${#n} ))
+    done
+    line=""
+    for (( i = 0; i < width + 2; i++ )); do line+="─"; done
+    echo "┌$line┐"
+    printf '│ %s%*s │\n' "$title" $(( width - ${#title} )) ""
+    echo "├$line┤"
+    for row in "$@"; do
+        text=${row%|*} n=${row##*|}
+        printf '│ %s%*s%s │\n' "$text" $(( width - ${#text} - ${#n} )) "" "$n"
+    done
+    echo "└$line┘"
 }
 
 # repo-traer <dueño/repo> [--actualizar]: lo clona por SSH (con tu clave) en htdocs, en una carpeta con
@@ -188,7 +253,7 @@ function repo_fetch() {
     if [ -n "$(github_token)" ]; then
         ssh_url="https://github.com/$full.git"
     fi
-    folder=$(repo_clones | awk -v r="${full,,}" '$1 == r { print $2; exit }')
+    folder=$(repo_clones | awk -v r="${full,,}" '!n && $1 == r { print $2; n = 1 }')
     known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
     printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
     if [ -n "$folder" ]; then
@@ -259,6 +324,7 @@ function gui_project_git() {
 
 # Copia el codigo de produccion (.zip, .tar.gz o carpeta) en un proyecto:
 #   python3 -c "$PROJECT_CODE_PY" <carpeta del proyecto> <origen> <fusionar|sobrescribir> <copias> <temporal> <simular 1/0>
+#   [<informe>: con mas de LIST_INLINE que ya no estan o que no vienen, su lista entera va a <informe>-<que>.txt]
 # Fusionar copia lo que trae y deja lo demas; sobrescribir ademas quita lo que no trae. .git no se toca
 # nunca. Lo sustituido o quitado se mueve antes a <copias>, y lo que no cambia no se escribe. De un
 # paquete no se saca nada fuera de la carpeta (rutas con .. o absolutas) ni enlaces ni dispositivos: el
@@ -267,10 +333,18 @@ PROJECT_CODE_PY='
 import filecmp, os, shutil, signal, stat, sys, tarfile, tempfile, zipfile
 
 target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
+report = sys.argv[7] if len(sys.argv) > 7 else ""
 simulate = simulate == "1"
 SKIP = {".git", "__MACOSX", ".DS_Store"}
 sys.stdout.reconfigure(errors="replace", line_buffering=True)
-counts = {"copied": 0, "same": 0, "removed": 0, "skipped": 0, "old": 0}
+# copied: nuevos + modificados (para el avance); removed: lo quitado (una carpeta cuenta 1) y gone, sus ficheros
+counts = {"copied": 0, "new": 0, "changed": 0, "same": 0, "removed": 0, "gone": 0, "kept": 0, "skipped": 0,
+          "old": 0, "packed": 0, "packed_dirs": 0, "packed_bytes": 0}
+# (para el registro, las rutas de cada grupo, con sus ficheros. Nuevos y modificados: los LIST_FIRST primeros.
+# Lo que no viene: hasta LIST_INLINE, uno a uno; con mas, por carpetas. Si no caben, la lista entera a un fichero)
+LIST_FIRST = 5
+lists = {"new": [], "changed": [], "gone": [], "kept": []}
+LIST_INLINE = 25
 errors, seen = [], set()
 
 
@@ -318,8 +392,11 @@ def extract_zip(path, root):
             if out is None or kind not in (0, stat.S_IFREG, stat.S_IFDIR):
                 counts["skipped"] += 1
             elif m.is_dir():
+                counts["packed_dirs"] += 1
                 os.makedirs(out, mode=0o755, exist_ok=True)
             else:
+                counts["packed"] += 1
+                counts["packed_bytes"] += m.file_size
                 with z.open(m) as data:
                     write_member(out, data, (m.external_attr >> 16) & 0o111)
 
@@ -331,8 +408,11 @@ def extract_tar(path, root):
             if out is None or not (m.isreg() or m.isdir()):
                 counts["skipped"] += 1
             elif m.isdir():
+                counts["packed_dirs"] += 1
                 os.makedirs(out, mode=0o755, exist_ok=True)
             else:
+                counts["packed"] += 1
+                counts["packed_bytes"] += m.size
                 write_member(out, t.extractfile(m), m.mode & 0o111)
 
 
@@ -375,6 +455,31 @@ def save_old(path, rel):
         else:
             shutil.copy2(path, dest, follow_symlinks=False)
             os.unlink(path)
+
+
+def note(group, rel, count=1, path=None):
+    counts[group] += count
+    if group in lists:
+        lists[group].append((rel, count, path is not None and is_real_dir(path), files_list(path, rel)))
+
+
+def files_list(path, rel):
+    """Los ficheros (rutas del proyecto) de una carpeta que ya no esta o no viene, para la lista entera."""
+    if path is None or not is_real_dir(path):
+        return [rel]
+    found = []
+    for r, dirs, files in os.walk(path):
+        dirs.sort()
+        for f in sorted(files):
+            found.append(os.path.join(rel, os.path.relpath(os.path.join(r, f), path)))
+    return found
+
+
+def files_in(path):
+    """Los ficheros de lo que se quita (una carpeta: los de dentro; un fichero o un enlace: 1)."""
+    if not is_real_dir(path):
+        return 1
+    return sum(len(files) for _r, _d, files in os.walk(path)) or 0
 
 
 def tick():
@@ -420,6 +525,7 @@ def copy_file(e, out, sub):
         counts["same"] += 1
         return
     counts["copied"] += 1
+    note("changed" if exists else "new", sub)
     if simulate:
         return
     # (primero la copia nueva y luego se aparta la de antes: si no cabe, el proyecto sigue como estaba)
@@ -449,12 +555,136 @@ def remove_rest(dst, rel):
                     remove_rest(e.path, sub)
                 else:
                     counts["removed"] += 1
+                    n = files_in(e.path)
+                    note("gone", sub, n, e.path)
                     save_old(e.path, sub)
             elif is_real_dir(e.path):
                 remove_rest(e.path, sub)
             tick()
         except OSError as exc:
             errors.append("%s: %s" % (sub, exc.strerror or exc))
+
+
+def count_rest(dst, rel):
+    """Al fusionar: lo que hay en la carpeta y no viene en el codigo (se deja como esta)."""
+    try:
+        found = sorted(os.scandir(dst), key=lambda x: x.name)
+    except OSError:
+        return
+    for e in found:
+        sub = os.path.join(rel, e.name)
+        if e.name in SKIP or e.name.startswith(".lvm-parte-"):
+            continue
+        if sub not in seen:
+            note("kept", sub, files_in(e.path), e.path)
+        elif is_real_dir(e.path):
+            count_rest(e.path, sub)
+
+
+def size_text(n):
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return ("%d %s" % (n, unit)) if unit == "B" else ("%.1f %s" % (n, unit)).replace(".", ",")
+        n /= 1024.0
+
+
+def num(n):
+    return "{:,}".format(n).replace(",", ".")
+
+
+def plural(n):
+    return "%s %s" % (num(n), "fichero" if n == 1 else "ficheros")
+
+
+def entry_text(rel, n, folder):
+    return rel + ("/ (%s)" % plural(n) if folder else "")
+
+
+def show_list(title, group, mark, what):
+    """Una lista del registro, con una linea en blanco delante. Hasta LIST_INLINE ficheros, uno a uno; con mas,
+    cuantos hay en cada carpeta (las que mas tienen) y la lista entera, fichero a fichero, en
+    <informe>-<what>.txt, para mirarla con calma."""
+    items = lists[group]
+    if not items:
+        return
+    print()
+    print("%s: %s" % (title, plural(counts[group])))
+    if counts[group] <= LIST_INLINE and len(items) <= LIST_INLINE:
+        for rel, n, folder, _files in items:
+            print("  %s %s" % (mark, entry_text(rel, n, folder)))
+        return
+    groups = {}
+    for rel, n, folder, _files in items:
+        top = rel if folder else (os.path.dirname(rel) or "(la carpeta del proyecto)")
+        groups[top] = groups.get(top, 0) + n
+    print("  Son muchos para verlos aquí: por carpetas, las que más tienen")
+    for top, n in sorted(groups.items(), key=lambda g: (-g[1], g[0]))[:15]:
+        print("  %s %s%s (%s)" % (mark, top, "" if top.startswith("(") else "/", plural(n)))
+    if len(groups) > 15:
+        print("  ... y %s carpetas más" % num(len(groups) - 15))
+    save_full(title, group, what)
+
+
+def save_full(title, group, what):
+    """La lista entera de un grupo, fichero a fichero, en <informe>-<what>.txt (no en simulacion)."""
+    if not report or simulate:
+        return
+    path = "%s-%s.txt" % (report, what)
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        with open(path, "w", encoding="utf-8", errors="replace") as f:
+            f.write("%s: %s\nProyecto: %s\n\n" % (title, plural(counts[group]), target))
+            for _rel, _n, _folder, files in lists[group]:
+                for rel in files:
+                    f.write(rel + "\n")
+        print("  La lista entera, fichero a fichero: %s" % path)
+    except OSError as exc:
+        print("  No se ha podido guardar la lista entera en %s: %s" % (path, exc))
+
+
+def show_first(title, group, mark, what):
+    """Los LIST_FIRST primeros de un grupo (nuevos, modificados), con una linea en blanco delante; si hay mas,
+    cuantos faltan y la lista entera a un fichero."""
+    items = lists[group]
+    if not items:
+        return
+    print()
+    print("%s: %s" % (title, plural(counts[group])) + (" (los %d primeros)" % LIST_FIRST if len(items) > LIST_FIRST else ""))
+    for rel, _n, _folder, _files in items[:LIST_FIRST]:
+        print("  %s %s" % (mark, rel))
+    if len(items) > LIST_FIRST:
+        print("  ... y %s más" % num(len(items) - LIST_FIRST))
+        save_full(title, group, what)
+
+
+def summary():
+    """El recuadro con las cuentas, para el registro de la tarea (que va en letra de ancho fijo). Dos partes que no
+    se mezclan: lo que viene en el codigo (y que se hace con ello) y lo que solo esta en la carpeta del proyecto
+    (no viene: al fusionar se deja; al sobrescribir se quita)."""
+    sim = simulate
+    came = counts["new"] + counts["changed"] + counts["same"]
+    only = counts["gone"] if mode == "sobrescribir" else counts["kept"]
+    rows = [("VIENEN EN EL CÓDIGO", came),
+            ("  Nuevos: " + ("se copiarían" if sim else "se copian"), counts["new"]),
+            ("  Modificados: " + ("se sustituirían" if sim else "se sustituyen"), counts["changed"]),
+            ("  Iguales: no se tocan", counts["same"]),
+            None,
+            ("SOLO EN TU CARPETA (no vienen)", only),
+            (("  Se quitarían" if sim else "  Se quitan") + " (sobrescribir)" if mode == "sobrescribir"
+             else "  Se dejan como están (fusionar)", only)]
+    title = "Código de producción" + (" (simulación)" if sim else "")
+    width = max(len(title), max(len(r[0]) + 2 + len(num(r[1])) for r in rows if r))
+    line = "\u2500" * (width + 2)
+    print("\u250c" + line + "\u2510")
+    print("\u2502 " + title.ljust(width) + " \u2502")
+    print("\u251c" + line + "\u2524")
+    for r in rows:
+        if r is None:
+            print("\u251c" + line + "\u2524")
+            continue
+        t, n = r
+        print("\u2502 " + t + " " * (width - len(t) - len(num(n))) + num(n) + " \u2502")
+    print("\u2514" + line + "\u2518")
 
 
 def main():
@@ -481,17 +711,35 @@ def main():
                     fail("%s no es un .zip, un .tar.gz ni una carpeta" % os.path.basename(source))
             except (OSError, zipfile.BadZipFile, tarfile.TarError, EOFError) as exc:
                 fail("No se ha podido abrir %s: %s" % (os.path.basename(source), exc))
+            print("Abierto: %s y %s carpetas (%s sin comprimir)"
+                  % (plural(counts["packed"]), num(counts["packed_dirs"]), size_text(counts["packed_bytes"])))
+        else:
+            print("Se copia de la carpeta %s" % source)
         root = inner_root(root)
         if not any(True for _ in entries(root)):
             fail("No trae ningun fichero: no se ha tocado nada")
+        print("Comparando con %s..." % target)
         sync(root, target, "")
         if mode == "sobrescribir":
             remove_rest(target, "")
+        else:
+            count_rest(target, "")
     finally:
         if work:
             shutil.rmtree(work, ignore_errors=True)
-    print("%s%d copiados, %d iguales (no se tocan), %d quitados"
-          % ("[simulacion] " if simulate else "", counts["copied"], counts["same"], counts["removed"]))
+    if simulate:
+        print("[simulacion] no se cambia nada: esto es lo que se haría")
+    # (nuevos y modificados, cada uno con sus primeros; lo que no viene, entero o por carpetas)
+    show_first("Nuevos, " + ("se copiarían" if simulate else "se copian"), "new", "+", "nuevos")
+    show_first("Modificados, " + ("se sustituirían" if simulate else "se sustituyen"), "changed", "~", "modificados")
+    # (las dos son lo mismo: lo que esta en la carpeta y no viene en el codigo; cambia lo que se hace con ello)
+    if mode == "sobrescribir":
+        show_list("Solo en tu carpeta (no vienen en el código), " + ("se quitarían" if simulate else "se quitan"),
+                  "gone", "-", "no-vienen-se-quitan")
+    else:
+        show_list("Solo en tu carpeta (no vienen en el código), se dejan como están", "kept", "·", "no-vienen-se-dejan")
+    print()
+    summary()
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
     if backup and os.path.isdir(backup):
@@ -543,14 +791,17 @@ function project_config_local() {
 }
 
 # actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull]
-#                     [--bd <fichero>] [--base <base>] [--copia]
+#                     [--bd <fichero>] [--base <base>] [--crear-base] [--copia]
 # El proyecto con lo de produccion, en este orden: git pull (si se pide), el codigo, la BBDD (con la carga
-# protegida de importar-bd) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
+# de importar-bd, como root) y volver a cargarlo (su configuracion vuelve a la base y al dominio locales),
 # comprobando que ha quedado asi. Si un paso falla, los siguientes no se hacen. --base sin --bd: la BBDD
 # que usa (si no, la asociada a la carpeta o la de su configuracion antes de copiar). Con --copia, lo
-# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no
+# sustituido o quitado del codigo y la BBDD de antes se guardan en ~/nexum-backups; sin ella, no.
+# --crear-base (para un proyecto que no tiene BBDD): si la de --base no existe, se crea (vacia, o con el
+# volcado de --bd) y queda como la del proyecto; vale tambien sin codigo ni volcado
 function project_update() {
     local folder=${1%/} source="" mode=fusionar pull=0 file="" db="" dir stamp copies="" full ssh_url="" known load_db
+    local create=0
     local backup=()
     shift
     while [ $# -gt 0 ]; do
@@ -560,13 +811,15 @@ function project_update() {
             --pull) pull=1 ;;
             --bd) file=$2; shift ;;
             --base) db=$2; shift ;;
+            --crear-base) create=1 ;;
             --copia) backup=(--copia) ;;
             *) folder="" ;;
         esac
         shift
     done
-    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ]; } || [[ "$mode" != fusionar && "$mode" != sobrescribir ]]; then
-        echo "Uso: nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]"
+    if [ -z "$folder" ] || { [ -z "$source" ] && [ -z "$file" ] && [ $create -eq 0 ]; } \
+            || [[ "$mode" != fusionar && "$mode" != sobrescribir ]] || { [ $create -eq 1 ] && [ -z "$db" ]; }; then
+        echo "Uso: nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--crear-base] [--copia]"
         return 1
     fi
     valid_project "$folder" || return 1
@@ -578,6 +831,8 @@ function project_update() {
     [ -z "$source" ] || [ -r "$source" ] || { echo "No se puede leer $source"; return 1; }
     if [ -n "$file" ]; then
         [ -f "$file" ] && [ -r "$file" ] || { echo "No se puede leer el fichero $file"; return 1; }
+    fi
+    if [ -n "$file" ] || [ $create -eq 1 ]; then
         db_connect || return $?
     fi
     { [ -z "$file" ] && [ -z "$db" ]; } || db_valid_name "$db" || return 1
@@ -593,6 +848,7 @@ function project_update() {
     local steps=()
     [ -n "$source" ] && [ "$pull" -eq 1 ] && steps+=("Traer los cambios con git pull")
     [ -n "$source" ] && steps+=("Copiar el código de producción")
+    [ -z "$file" ] && [ $create -eq 1 ] && steps+=("Crear la BBDD $db")
     [ -n "$file" ] && steps+=("Cargar la BBDD $db")
     steps+=("Volver a cargar el proyecto" "Comprobar su configuración")
     task_plan "Actualizando $folder" "${steps[@]}"
@@ -602,7 +858,7 @@ function project_update() {
         if [ "$DRY" -eq 1 ]; then
             echo "  [simulacion] git pull en $dir"
         else
-            full=$(repo_clones | awk -v f="$folder" '$2 == f { print $1; exit }')
+            full=$(repo_clones | awk -v f="$folder" '!n && $2 == f { print $1; n = 1 }')
             [ -n "$full" ] && ssh_url="git@github.com:$full.git"
             known=$(mktemp /tmp/lvm-conocidos.XXXXXX) || return 1
             printf '%s\n' "$GIT_KNOWN_HOSTS" > "$known"
@@ -619,18 +875,31 @@ function project_update() {
         echo "== Codigo de produccion ($([ "$mode" == sobrescribir ] && echo "sobrescribiendo" || echo "fusionando") en $dir)"
         stamp=$(date +%Y%m%d-%H%M%S)
         if [ ${#backup[@]} -gt 0 ]; then
-            copies=$COPIES_DIR/$folder-antes-de-actualizar-$stamp
-            [ "$DRY" -eq 1 ] || mkdir -p -m 700 "$COPIES_DIR"
+            copies=$COPIES_DIR/proyectos/$folder/antes-de-actualizar-$stamp
+            copies_in "proyectos/$folder" > /dev/null || return 1
         fi
-        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY"; then
+        if ! python3 -I -c "$PROJECT_CODE_PY" "$dir" "$source" "$mode" "$copies" "$LOG_DIR/temporal" "$DRY" \
+                "$LOG_DIR/listas/$folder-$stamp"; then
             echo "No se ha cargado la BBDD: revisa lo anterior."
             return 1
         fi
         htdocs_close_world "$dir"
     fi
+    if [ -z "$file" ] && [ $create -eq 1 ]; then
+        task_step
+        echo "== BBDD del proyecto"
+        if db_exists "$db"; then
+            echo "Ya hay una base de datos $db: no se crea, se asocia al proyecto"
+        else
+            echo "$folder no tenía BBDD: se crea $db, vacía"
+            create_database "$db" || return 1
+        fi
+        import_project "$db" "$folder" || return 1
+    fi
     if [ -n "$file" ]; then
         task_step
         echo "== BBDD de produccion"
+        [ $create -eq 1 ] && ! db_exists "$db" && echo "$folder no tenía BBDD: se crea $db con el volcado"
         import_database "$file" "$db" --crear --proyecto "$folder" "${backup[@]}" || return 1
     fi
     task_step
@@ -655,7 +924,7 @@ function git_url_ok() {
 
 # montar-proyecto <url de git> <carpeta> <version> <base> [volcado]: proyecto nuevo desde un
 # repositorio (GitHub u otro). Lo clona en htdocs, lo carga en esa version de PHP, crea su BBDD y,
-# si se indica, carga en ella el volcado (con la carga protegida de importar-bd). El clon va con tu
+# si se indica, carga en ella el volcado (con importar-bd, como root). El clon va con tu
 # usuario (sin sudo), sin submodulos ni ganchos y solo por https o ssh; sin preguntas: un
 # repositorio privado por https falla (se usa la direccion SSH con tu clave)
 # Clona un repositorio con tu usuario: repo_clone <direccion> <carpeta> <known_hosts de mas>. Sin

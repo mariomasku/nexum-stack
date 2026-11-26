@@ -8,7 +8,7 @@ Preview para **Windows 11 con WSL2** en [`windows/`](windows/README.md): instala
 ventana GTK, motor Linux compartido e integración de hosts y certificados. Mantiene
 los proyectos y las bases dentro del disco Linux; la paridad completa sigue en validación.
 
-**Versión actual: 1.57.37** · [Novedades de todas las versiones](CHANGELOG.md)
+**Versión actual: 1.57.51** · [Novedades de todas las versiones](CHANGELOG.md)
 
 ## Por qué existe
 

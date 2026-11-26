@@ -125,6 +125,9 @@ class AppBasesDatos:
                              "Proyectos, el + de «Entorno»: «En otra versión de PHP (copiar su BBDD)…»." % inst["folder"],
                              "dim-label", wrap=True, max_width_chars=60), False, False, 0)
         first, radios = None, []
+        # (con muchas versiones, la lista va con scroll: el diálogo no crece hasta salirse de la pantalla)
+        opts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.pack_start(scroll_list(opts, self.win), False, False, 0)
         # (primero las que no la tienen; dentro, de la más nueva a la más antigua)
         for i in sorted(targets, key=lambda i: (not self.has_db(i["folder"], db), ver_tuple(i["php"])),
                         reverse=True):
@@ -141,7 +144,7 @@ class AppBasesDatos:
             if rb is first:
                 css(opt, "elegida")
             radios.append((rb, i))
-            box.pack_start(opt, False, False, 0)
+            opts.pack_start(opt, False, False, 0)
         box.show_all()
         resp = run_dialog(dlg)
         chosen = next((i for rb, i in radios if rb.get_active()), None)
@@ -522,6 +525,8 @@ class AppBasesDatos:
             if self.projects is not None:
                 self.projects = dict(self.projects, link=link, current=folder, create=False)
                 self.selected_project = folder
+                if hasattr(self, "nv_status_update"):
+                    self.nv_status_update()
             if self.data is not None and target != self.data["active"]:
                 self.data = dict(self.data, active=target)
             self.update_project_search()

@@ -87,11 +87,12 @@ function remove_blocker() {
 function backup_databases() {
     local version=$1 dir=${2:-/opt/lampp-$1}
     local user=${SUDO_USER:-$USER}
-    local dest_dir=$(getent passwd "$user" | cut -d: -f6)/${COPIES_DIR##*/}
-    local dest="$dest_dir/lampp-$version-bases-$(date +%Y%m%d-%H%M%S).tar.gz"
+    local copies=$(getent passwd "$user" | cut -d: -f6)/${COPIES_DIR##*/}
+    local dest_dir=$copies/bbdd/lampp-$version
+    local dest="$dest_dir/todas-las-bases-$(date +%Y%m%d-%H%M%S).tar.gz"
 
     echo "Guardando copia de las bases de datos en $dest..."
-    run mkdir -p -m 700 "$dest_dir" || return 1
+    copies_in "bbdd/lampp-$version" "$copies" > /dev/null || return 1
     if [ "$DRY" -eq 1 ]; then
         echo "  [simulacion] tar -czf $dest -C $dir/var mysql"
 
@@ -244,9 +245,9 @@ function register_lampp() {
         # (sus vhosts, por si tenia alguno propio: una copia en ~/nexum-backups, porque se quitan)
         if [ "$DRY" -eq 0 ] && [ -f /opt/lampp/etc/extra/httpd-vhosts.conf ] \
                 && grep -qvE '^[[:space:]]*(#|$)' /opt/lampp/etc/extra/httpd-vhosts.conf; then
-            mkdir -p -m 700 "$COPIES_DIR" \
-                && cp /opt/lampp/etc/extra/httpd-vhosts.conf "$COPIES_DIR/httpd-vhosts-de-lampp-$version-$stamp.conf" \
-                && echo "Sus vhosts estan en ~/nexum-backups/httpd-vhosts-de-lampp-$version-$stamp.conf (copialos con Editar vhosts)"
+            copies_in sistema/vhosts > /dev/null \
+                && cp /opt/lampp/etc/extra/httpd-vhosts.conf "$COPIES_DIR/sistema/vhosts/httpd-vhosts-de-lampp-$version-$stamp.conf" \
+                && echo "Sus vhosts estan en ~/nexum-backups/sistema/vhosts/httpd-vhosts-de-lampp-$version-$stamp.conf (copialos con Editar vhosts)"
         fi
         run sudo rm /opt/lampp/etc/extra/httpd-vhosts.conf
     fi

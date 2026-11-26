@@ -86,14 +86,18 @@
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
 #
 #   nexum docker-bd <nombre> lampp <version> | docker
-#       Un WordPress de Docker con la BBDD de esa version XAMPP-X en vivo, la misma que web.local (sin
-#       copias; su MariaDB se arranca sola en otro puerto si no esta en marcha). docker: vuelve a su
+#       Un WordPress o una tienda de Docker con la BBDD de esa version XAMPP-X en vivo, la misma que
+#       web.local (sin copias; su MariaDB se arranca sola en otro puerto si no esta en marcha; una tienda
+#       sigue en su dominio en la BBDD y el Apache de Docker se lo cambia por el suyo). docker: vuelve a su
 #       copia en la MariaDB comun de Docker. Al crearlo: docker-nuevo ... --bd <base> --desde <v> --en-vivo
 #
 #   nexum componentes | componentes-actualizar [--copia]
 #       Los parches nuevos de todo: cada version de PHP (PHP, Apache, MariaDB, phpMyAdmin...),
-#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Mailpit y cloudflared; y
-#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar)
+#       las imagenes de Docker (MariaDB comunes, phpMyAdmin, PHP), Docker Desktop (frente a la que ofrece
+#       su actualizador: se instala a mano; antes, una copia de las BBDD de Docker),
+#       los Node descargados por Nexum (frente al ultimo de su rama), Mailpit, cloudflared y Nginx; y
+#       ponerlo todo al dia (--copia, a cada version que se rehace, como en actualizar). Ademas, sin
+#       contar como parche: Mailpit, cloudflared o Nginx publicados mas nuevos que los que pone Nexum
 #
 #   nexum descargas [vaciar]
 #       La cache de descargas de las pilas propias (/Library/Nexum/descargas): el codigo de cada
@@ -163,7 +167,7 @@
 #       Crea una base vacia (utf8mb4_general_ci)
 #
 #   nexum importar-bd <fichero> <base> [--crear] [--copia] [--proyecto <carpeta>]
-#       Carga un .sql, .sql.gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
+#       Carga un .sql, .gz o .zip; --crear crea la base si no existe. Si ya existe, antes se
 #       borran todas sus tablas (con --copia, antes se guarda una copia en ~/nexum-backups si tenia
 #       alguna; sin ella, no se podran recuperar); --proyecto la deja como base de esa carpeta: WordPress, rehace su wp-config.php
 #       con la plantilla; PrestaShop, su parameters.php pasa a usarla
@@ -184,6 +188,14 @@
 #
 #   nexum borrar-bd <base> [--copia]
 #       Borra una base; --copia guarda antes una copia en ~/nexum-backups
+#
+#   nexum marcar-bd <version> <base> [--quitar]
+#       La marca para borrarla mas adelante (aunque su version no este en marcha): al cargar esa
+#       version, se dice cuantas tiene marcadas y la ventana pregunta si se borran. --quitar la desmarca
+#
+#   nexum borrar-bd-marcadas [--copia]
+#       Borra las marcadas de la version activa (las que ya no estan, solo se desmarcan); --copia
+#       guarda antes una copia de cada una en ~/nexum-backups
 #
 #   nexum reparar-bd-sistema [--copia]
 #       Pone al dia las tablas del sistema de MariaDB de la version montada (las bases de los
@@ -206,7 +218,7 @@
 #   nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd
 #       Proyecto nuevo desde GitHub (u otro repositorio): lo clona en htdocs/<carpeta> con tu
 #       usuario (solo https o ssh, sin submodulos), lo carga en esa version, crea su base y,
-#       si se indica, carga en ella el volcado (.sql, .sql.gz o .zip) con la carga protegida.
+#       si se indica, carga en ella el volcado (.sql, .gz o .zip) con importar-bd (como root).
 #       Con --sin-bd, sin base: se clona y se carga sin BBDD vinculada (un WordPress o una
 #       tienda no abren hasta que tengan la suya: se sube en Bases de datos)
 #
@@ -264,10 +276,11 @@
 #       Proyecto nuevo con su dominio de produccion falseado: carpeta (la usa si existe),
 #       vhost con certificado, base vacia con ese nombre en la version activa (si no existe)
 #
-#   nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--copia]
+#   nexum actualizar-proyecto <carpeta> [--codigo <zip, tar.gz o carpeta>] [--modo fusionar|sobrescribir] [--pull] [--bd <fichero>] [--base <base>] [--crear-base] [--copia]
 #       El proyecto con lo de produccion: git pull (si se pide), su codigo, su BBDD (con la carga
-#       protegida de importar-bd) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
-#       y la BBDD de antes, en ~/nexum-backups
+#       de importar-bd, como root) y lo vuelve a cargar. --copia: lo sustituido o quitado del codigo
+#       y la BBDD de antes, en ~/nexum-backups. --crear-base: si el proyecto no tiene BBDD, se crea la
+#       de --base (vacia o con el volcado de --bd) y queda como la suya
 #
 #   nexum exportar-proyecto <carpeta> [--sin-codigo] [--sin-bd] [--bd <base>]
 #                           [--destino <carpeta> | --zip <fichero> [--sobrescribir]]
@@ -322,6 +335,10 @@
 #       Barrera entre webs: otra web no puede mandar formularios ni peticiones a tus proyectos
 #       en ninguna version (puesta de serie). Corta la vuelta por POST de una pasarela de pago:
 #       apagala mientras la pruebes. Sin si/no, dice como esta
+#
+#   nexum barrera-web permitir|quitar <dominio> | permitidas
+#       Webs permitidas: las de confianza (el ERP de la empresa) que la barrera deja pasar: sus
+#       formularios, su vuelta a tus proyectos, sus iframes. *.empresa.com, con sus subdominios
 #
 #   nexum arreglar-certificados
 #       Los vhosts https con certificados en los que confia todo el equipo (en /etc/ssl/certs,
@@ -380,6 +397,14 @@
 #   nexum node-arrancar <carpeta> [desarrollo|compilado]   proyecto de Node (Astro, Next, Vite...) en 127.0.0.1
 #   nexum node-parar <carpeta>        lo para, y su tunel si se estaba compartiendo
 #   nexum node-registro <carpeta>     lo ultimo que ha dicho su servidor
+#   nexum nginx-usar si|no            Nginx (pestaña Nginx): apagado de serie; encendido, sale su pestaña
+#   nexum nginx-instalar              Nginx (pestaña Nginx), compilado con tu usuario en ~/.nexum/nginx
+#   nexum nginx-anadir <carpeta> [subcarpeta]   lo sirve en http://<carpeta>.localhost:8080 y https://...:8443
+#   nexum nginx-quitar <carpeta>      deja de servirlo
+#   nexum nginx-arrancar|nginx-parar|nginx-reiniciar   Nginx, solo en este equipo, con el PHP de la version activa
+#   nexum nginx-puertos <http> <https>   sus puertos (8080 y 8443 de serie)
+#   nexum nginx-registro              lo ultimo que ha dicho (sus errores)
+#   nexum nginx-confiar               que el navegador acepte sin aviso el certificado de cada proyecto
 #   nexum tunel-abrir <direccion local> [carpeta] [--minutos 15-720 | --horas 1-12] [--admin bloquear|permitir]
 #   nexum tunel-cerrar | tunel | tunel-instalar
 #       Tunel de Cloudflare (sin cuenta): una web de este equipo, a la vista de otros con una
@@ -413,6 +438,13 @@
 #       Uno solo de los contenedores de un proyecto en Docker
 #
 #   nexum docker-wp-cli si|no [--rehacer]
+#   nexum docker-postgres [estado] | arrancar|parar|borrar <18|17|16>   PostgreSQL comun de Docker
+#   nexum docker-copia | docker-recuperar [nombre...]
+#       Copia de todas las BBDD de Docker en ~/nexum-backups (la de cada proyecto, las de las MariaDB
+#       comunes sin proyecto y cada PostgreSQL entera). Si Docker se queda sin ellas (cambia de almacen
+#       de imagenes o Docker Desktop empieza con un disco nuevo), docker-recuperar rehace los
+#       contenedores de los que las han perdido y les carga su ultima copia
+#   nexum docker-nginx [estado] | arrancar | parar | anadir|quitar <proyecto> | puertos <http> <https>   Nginx comun de Docker
 #       WP-CLI en las imagenes de PHP de Docker (apagado de serie): docker exec <contenedor> wp ...
 #       Con --rehacer, las imagenes que hay se rehacen ya; sin el, la proxima vez que se rehagan
 #

@@ -2,6 +2,8 @@
 
 struct TaskView: View {
     @ObservedObject var task: TaskRunner
+    /// (la cola: las que empiezan cuando acabe esta)
+    @EnvironmentObject var model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -28,6 +30,15 @@ struct TaskView: View {
             if !task.info.isEmpty {
                 Text(task.info).font(.callout).foregroundColor(.secondary).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
+            }
+            if !model.taskQueue.isEmpty {
+                HStack(spacing: 8) {
+                    Text("Después, en la cola: " + model.taskQueue.map { "«\($0.title)»" }.joined(separator: ", "))
+                        .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Vaciar la cola") { model.clearTaskQueue() }
+                        .buttonStyle(OutlineButton())
+                }
             }
             if !task.parts.isEmpty {
                 Card {
@@ -143,7 +154,7 @@ struct TaskConsole: View {
                     Text(log)
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundColor(CONSOLE_TEXT)
-                        .lineSpacing(2)
+                        .lineSpacing(3)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -9,6 +9,10 @@ extract() {
     for f in "$@"; do
         eval "$(awk -v n="$f" '$0 ~ "^function "n"\\(\\) \\{" {p=1} p {print} p && /^}/ {exit}' "$src")"
         declare -F "$f" > /dev/null || { echo "no esta la funcion $f"; return 1; }
+        # (las copias van a su carpeta de ~/nexum-backups con copies_in: con lo que la use, tambien ella)
+        if [ "$f" != copies_in ] && declare -f "$f" | grep -qE "copies_(in|dir_of) " && ! declare -F copies_dir_of > /dev/null; then
+            extract "$src" copies_in copies_dir_of || return 1
+        fi
     done
 }
 fail=0

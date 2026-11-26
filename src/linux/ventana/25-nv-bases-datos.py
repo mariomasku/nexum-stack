@@ -98,7 +98,7 @@ class NvBasesDatos:
         head = Gtk.Box(spacing=8)
         head.pack_start(symbol("document-send-symbolic", 16), False, False, 0)
         head.pack_start(label("Subir o actualizar una BBDD", "nv-hundido-titulo"), False, False, 0)
-        head.pack_start(info_icon("Carga una copia .sql, .sql.gz o .zip en el MariaDB de la versión activa. Antes se "
+        head.pack_start(info_icon("Carga una copia .sql, .gz o .zip en el MariaDB de la versión activa. Antes se "
                                   "borran todas las tablas de la BBDD de destino (si quieres, con una copia en ~/nexum-backups), para "
                                   "que no quede nada de lo anterior. Los .zip se descomprimen solos."), False, False, 0)
         if act:
@@ -230,6 +230,83 @@ class NvBasesDatos:
         users = [x["name"] for x in (self.projects or {}).get("list", []) if x["db"] == db]
         return users[0] if len(users) == 1 else ""
 
+    def nv_db_mark(self, folder, db, on):
+        """Marca (o desmarca) una BBDD para borrarla al cargar su versión (marcar-bd)."""
+        marks = self.data.setdefault("marks", set())
+        (marks.add if on else marks.discard)((folder, db))
+        self.nv_db_table()
+
+        def done(rc, out):
+            if rc != 0:
+                message(self.win, "No se ha podido %s %s" % ("marcar" if on else "desmarcar", db),
+                        out.strip()[-600:], Gtk.MessageType.ERROR)
+            self.reload()
+            return False
+        run_quick(["marcar-bd", folder, db] + ([] if on else ["--quitar"]), done)
+
+    def nv_db_marks_check(self):
+        """Al cargar una versión (o arrancar su MariaDB) con BBDD marcadas para borrar: se pregunta una vez."""
+        d = self.data
+        act = d["active"] if d["running"] else ""
+        if not act:
+            self.marks_asked = None
+            return
+        marked = [db for db in d["dbs"].get(act, []) if (act, db) in d.get("marks", set())]
+        if not marked or getattr(self, "marks_asked", None) == act or self.busy:
+            return
+        self.marks_asked = act
+        GLib.idle_add(lambda: (self.nv_db_marks_ask(), False)[1])
+
+    def nv_db_marks_ask(self):
+        d = self.data
+        act = d["active"]
+        marked = [db for db in d["dbs"].get(act, []) if (act, db) in d.get("marks", set())]
+        if not marked or not d["running"]:
+            return
+        dlg = Gtk.MessageDialog(transient_for=self.win, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                buttons=Gtk.ButtonsType.NONE,
+                                text="lampp-%s tiene %s para borrar" % (act, plural(len(marked), "BBDD marcada", "BBDD marcadas")))
+        dlg.format_secondary_text("Las marcaste para borrarlas al cargar esta versión. ¿Se borran ahora? "
+                                  "No se puede deshacer, salvo que guardes antes una copia.")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                                max_content_height=220)
+        sw.add(label("\n".join("•  " + db for db in marked), "nv-mono", xalign=0, selectable=True))
+        box.pack_start(sw, False, False, 0)
+        copy = Gtk.CheckButton(label="Guardar antes una copia de cada una en ~/nexum-backups", active=False)
+        box.pack_start(copy, False, False, 0)
+        dlg.get_message_area().pack_start(box, False, False, 0)
+        dlg.add_button("Más tarde", Gtk.ResponseType.CANCEL)
+        dlg.add_button("Desmarcarlas", Gtk.ResponseType.REJECT)
+        css(dlg.add_button("Borrar la BBDD" if len(marked) == 1 else "Borrar las %d BBDD" % len(marked),
+                           Gtk.ResponseType.ACCEPT), "destructive-action")
+        dlg.set_default_response(Gtk.ResponseType.CANCEL)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        with_copy = copy.get_active()
+        dlg.destroy()
+        if resp == Gtk.ResponseType.REJECT:
+            # (una detrás de otra: todas escriben en el mismo fichero)
+            marks = d.setdefault("marks", set())
+            left = list(marked)
+
+            def next_one(*_):
+                if not left:
+                    self.reload()
+                    return False
+                db = left.pop(0)
+                marks.discard((act, db))
+                run_quick(["marcar-bd", act, db, "--quitar"], next_one)
+                return False
+            next_one()
+            self.nv_db_table()
+        elif resp == Gtk.ResponseType.ACCEPT:
+            self.check_db_access(lambda _pwd: self.run_task(
+                "Borrando las BBDD marcadas de lampp-%s" % act,
+                ["borrar-bd-marcadas"] + (["--copia"] if with_copy else []),
+                env=self.db_env(), auto_close=True,
+                done_text="BBDD marcadas borradas" + (" (con copia en ~/nexum-backups)" if with_copy else "")))
+
     def nv_db_toggle(self, key):
         """Pliega o despliega una versión en Bases de datos: solo una desplegada a la vez (al abrir
         otra, se cierra la anterior)."""
@@ -318,7 +395,15 @@ class NvBasesDatos:
                 name.pack_start(label("Activa", "nv-etiqueta", "nv-etiqueta-azul", valign=Gtk.Align.CENTER), False, False, 0)
             sub = "PHP %s · MariaDB %s" % (inst["php"], inst["mariadb"])
             count = plural(len(dbs), "BBDD", "BBDD") if inst["owner"] == folder else "usa las de lampp-%s" % inst["owner"]
+            marked = [db for db in dbs if (folder, db) in d.get("marks", set())]
+            if marked:
+                count += " · %d para borrar" % len(marked)
             grp_acts = []
+            if active and marked:
+                b = nv_button("user-trash-full-symbolic", None, "Borrar las %s marcadas" % plural(len(marked), "BBDD", "BBDD"),
+                              lambda *_: self.nv_db_marks_ask(), flat=True)
+                busy_guard(b, self.busy).set_sensitive(d["running"])
+                grp_acts.append(b)
             if active:
                 b = nv_button("drive-multidisk-symbolic", None, "Abrir phpMyAdmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/"), flat=True)
                 b.set_sensitive(d["running"])
@@ -347,6 +432,11 @@ class NvBasesDatos:
                 elif db.lower().startswith("wp_"):
                     n.pack_start(logo("wordpress", 14), False, False, 0)
                 n.pack_start(label(db, "nv-mono", "nv-chico", ellipsize=3, tooltip_text=db), False, False, 0)
+                is_marked = (folder, db) in d.get("marks", set())
+                if is_marked:
+                    tag = label("Para borrar", "nv-etiqueta", "nv-etiqueta-roja", valign=Gtk.Align.CENTER)
+                    tag.set_tooltip_text("Marcada para borrar: se pregunta al cargar lampp-%s" % folder)
+                    n.pack_start(tag, False, False, 0)
                 pl = label(proj or "—", "nv-chico", "nv-tenue" if not proj else "", ellipsize=3)
                 # (la fecha del cambio: la de su carga con el gestor o la del ultimo cambio de sus tablas)
                 ch = label(("%s %s" % (time.strftime("%d/%m/%Y %H:%M", time.localtime(when)),
@@ -369,6 +459,13 @@ class NvBasesDatos:
                     rm = nv_button("user-trash-symbolic", None, "Borrar la BBDD %s" % db, lambda *_, db=db: self.on_drop_db(db), flat=True)
                     busy_guard(rm, self.busy).set_sensitive(True)
                     acts.append(rm)
+                # (en las otras versiones no se puede borrar ya: se marca y se pregunta al cargarla)
+                if not active or is_marked:
+                    tip = ("Desmarcar: ya no se borra al cargar lampp-%s" % folder if is_marked
+                           else "Marcar para borrar al cargar lampp-%s" % folder)
+                    mk = nv_button("edit-undo-symbolic" if is_marked else "user-trash-full-symbolic", None, tip,
+                                   lambda *_, db=db, f=folder, m=is_marked: self.nv_db_mark(f, db, not m), flat=True)
+                    acts.append(mk)
                 row([n, pl, size_label(inst["owner"], db), ch, actions(acts)], indent=26)
         if not shown:
             r = Gtk.ListBoxRow(activatable=False)

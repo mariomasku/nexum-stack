@@ -57,5 +57,6 @@ check "cada registro, solo tuyo (600)" 'grep -qx "MODO=600" "$W/o"'
 check "se quedan las 200 últimas (las viejas se borran)" 'grep -qx "QUEDAN=200" "$W/o" && grep -qx "BORRADA_LA_VIEJA=True" "$W/o"'
 check "la lista, la más nueva primero, con cómo acabó; un enlace no se lee" 'grep -qx "PRIMERA=t204 error" "$W/o" && grep -qx "ENLACE=None" "$W/o"' || cat "$W/o"
 check "Limpieza: los registros del programa incluyen el registro de tareas" 'grep -qF "echo \"registros|\$LOG_DIR|ficheros|tareas|*.txt|uso\"" "$SRC"'
+check "Limpieza: y las listas de ficheros de Actualizar proyecto, que van con los registros y no en las copias (1.57.50)" 'grep -qF "echo \"registros|\$LOG_DIR|ficheros|listas|*.txt|uso\"" "$SRC" && grep -qF "\"\$LOG_DIR/listas/\$folder-\$stamp\"; then" "$SRC" && ! grep -qF "COPIES_DIR/\$folder-registro" "$SRC"'
 check "ventana.log en modo de añadir (Limpieza lo vacía con la ventana abierta)" 'grep -qF "exec 2>> \"\$LOG_DIR/ventana.log\"" "$SRC"'
 exit $fail

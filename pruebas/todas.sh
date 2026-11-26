@@ -35,10 +35,12 @@ suite() {
     n=$((n + 1)) f=$LVM_TMP/grupo.$n
     items+=("s|$n|$name")
     while [ "$(jobs -rp | wc -l)" -ge "$N" ]; do wait -n; done
-    # (los que arrancan una MariaDB de verdad, de uno en uno: a la vez se quedan sin recursos al crearla)
+    # (los que arrancan una MariaDB de verdad, pocos a la vez: todos juntos se quedan sin recursos al crearla,
+    # y de uno en uno hacian cola casi dos minutos. Por turnos: LVM_PRUEBAS_MARIADB, por defecto 3)
     local a lock=()
     for a in "$@"; do
-        [[ "$a" == *.sh ]] && [ -f "$a" ] && grep -q "mysql_install_db" "$a" && lock=(flock "$LVM_TMP/mariadb.lock")
+        [[ "$a" == *.sh ]] && [ -f "$a" ] && grep -q "mysql_install_db" "$a" \
+            && lock=(flock "$LVM_TMP/mariadb.$((mdb_turn++ % ${LVM_PRUEBAS_MARIADB:-3})).lock")
     done
     # (sin entrada: una prueba que se pusiera a leer del teclado se quedaria esperando para siempre)
     ( t0=$(date +%s%N); "${lock[@]}" "$@" > "$f.out" 2>&1 < /dev/null; echo $? > "$f.rc"; echo $(( ($(date +%s%N) - t0) / 1000000 )) > "$f.ms" ) &
@@ -117,6 +119,7 @@ suite "actualizar proyecto (1.56.27)" "$HERE/actualizar-proyecto.sh" "$L"
 suite "pasos de las tareas (1.56.32)" "$HERE/pasos-tareas.sh" "$L"
 suite "bandeja de correo en la ventana (1.56.33)" "$HERE/correo-visor.sh" "$L"
 suite "proyectos de Node (1.57.0)" "$HERE/node.sh" "$L"
+suite "Nginx, aparte de Apache (1.57.38)" "$HERE/nginx.sh" "$L"
 suite "tareas en segundo plano (1.57.1)" "$HERE/segundo-plano.sh" "$L"
 suite "apariencia (1.57.1)" "$HERE/apariencia.sh" "$L"
 suite "apariencia: tamaño y cristal (1.57.35)" "$HERE/apariencia-tamano.sh" "$L"
@@ -125,6 +128,7 @@ suite "descargas: suma de ProFTPD y motivo del error (1.57.3)" "$HERE/descargas.
 suite "cache de descargas (1.57.6)" "$HERE/cache-descargas.sh" "$L"
 suite "copias de seguridad opcionales y ~/nexum-backups (1.57.7)" "$HERE/copias.sh" "$L"
 suite "MariaDB temporal: esperar a que arranque (1.57.8)" "$HERE/mariadb-temporal.sh" "$L"
+suite "BBDD marcadas para borrar (1.57.48)" "$HERE/marcas-bd.sh" "$L"
 suite "desplegables con buscador y ▶ / ■ en el visor (1.57.9)" "$HERE/buscador-visor.sh" "$L"
 suite "limpieza (1.57.9)" "$HERE/limpieza.sh" "$L"
 suite "el manual dentro del programa (1.57.10)" "$HERE/manual.sh" "$L"
@@ -134,6 +138,11 @@ suite "rama de trabajo y proyecto sin BBDD (1.57.15)" "$HERE/rama-proyecto.sh" "
 suite "la carpeta de los ajustes: ~/.nexum (1.57.14)" "$HERE/carpeta-nexum.sh" "$L"
 suite "barrera en Docker, imagen fijada y copias del Mac (1.57.12)" "$HERE/seguridad-docker.sh" "$L"
 suite "WP-CLI en las imagenes de PHP de Docker (1.57.37)" "$HERE/docker-wp-cli.sh" "$L"
+suite "PostgreSQL y Nginx comunes de Docker (1.57.39)" "$HERE/docker-postgres-nginx.sh" "$L"
+suite "avisos largos con sus botones debajo (1.57.38)" "$HERE/avisos-largos.sh" "$L"
+suite "cola de tareas, Avisos en amarillo, registro y logotipo de NGINX (1.57.40)" "$HERE/cola-tareas.sh" "$L"
+suite "webs permitidas de la barrera y espacios de trabajo de VS Code (1.57.41)" "$HERE/webs-permitidas.sh" "$L"
+suite "una versión nueva o rehecha, ya protegida (1.57.42)" "$HERE/proteger-al-instalar.sh" "$L"
 suite "Apache con la configuracion de antes (1.57.20)" "$HERE/apache-recargado.sh" "$L"
 suite "diálogos con los cambios numerados (1.57.4)" "$HERE/dialogos.sh" "$L"
 suite "con una tarea en marcha, se puede pulsar y avisa (1.57.34)" "$HERE/tarea-ocupada.sh" "$L"
@@ -203,6 +212,7 @@ suite "actualizar proyecto (1.40.9)" "$HERE/actualizar-proyecto.sh" "$M"
 suite "pasos de las tareas (1.40.13)" "$HERE/pasos-tareas.sh" "$M"
 suite "bandeja de correo en la ventana (1.40.14)" "$HERE/correo-visor.sh" "$M"
 suite "proyectos de Node (1.41.0)" "$HERE/node.sh" "$M"
+suite "Nginx, aparte de Apache (1.57.38)" "$HERE/nginx.sh" "$M"
 suite "tareas en segundo plano (1.41.0)" "$HERE/segundo-plano.sh" "$M"
 suite "apariencia (1.41.0)" "$HERE/apariencia.sh" "$M"
 suite "apariencia: tamaño y cristal (1.57.35)" "$HERE/apariencia-tamano.sh" "$M"
@@ -211,6 +221,7 @@ suite "descargas: suma de ProFTPD y motivo del error (1.41.2)" "$HERE/descargas.
 suite "cache de descargas (1.57.6)" "$HERE/cache-descargas.sh" "$M"
 suite "copias de seguridad opcionales y ~/nexum-backups (1.57.7)" "$HERE/copias.sh" "$M"
 suite "MariaDB temporal: esperar a que arranque (1.57.8)" "$HERE/mariadb-temporal.sh" "$M"
+suite "BBDD marcadas para borrar (1.57.48)" "$HERE/marcas-bd.sh" "$M"
 suite "desplegables con buscador y ▶ / ■ en el visor (1.57.9)" "$HERE/buscador-visor.sh" "$M"
 suite "limpieza (1.57.9)" "$HERE/limpieza.sh" "$M"
 suite "el manual dentro del programa (1.57.10)" "$HERE/manual.sh" "$M"
@@ -220,6 +231,11 @@ suite "rama de trabajo y proyecto sin BBDD (1.57.15)" "$HERE/rama-proyecto.sh" "
 suite "la carpeta de los ajustes: ~/.nexum (1.57.14)" "$HERE/carpeta-nexum.sh" "$M"
 suite "barrera en Docker, imagen fijada y copias del Mac (1.57.12)" "$HERE/seguridad-docker.sh" "$M"
 suite "WP-CLI en las imagenes de PHP de Docker (1.57.37)" "$HERE/docker-wp-cli.sh" "$M"
+suite "PostgreSQL y Nginx comunes de Docker (1.57.39)" "$HERE/docker-postgres-nginx.sh" "$M"
+suite "avisos largos con sus botones debajo (1.57.38)" "$HERE/avisos-largos.sh" "$M"
+suite "cola de tareas, Avisos en amarillo, registro y logotipo de NGINX (1.57.40)" "$HERE/cola-tareas.sh" "$M"
+suite "webs permitidas de la barrera y espacios de trabajo de VS Code (1.57.41)" "$HERE/webs-permitidas.sh" "$M"
+suite "una versión nueva o rehecha, ya protegida (1.57.42)" "$HERE/proteger-al-instalar.sh" "$M"
 suite "Apache con la configuracion de antes (1.57.20)" "$HERE/apache-recargado.sh" "$M"
 suite "diálogos con los cambios numerados (1.41.3)" "$HERE/dialogos.sh" "$M"
 suite "con una tarea en marcha, se puede pulsar y avisa (1.57.34)" "$HERE/tarea-ocupada.sh" "$M"

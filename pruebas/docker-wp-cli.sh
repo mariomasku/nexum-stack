@@ -7,10 +7,11 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 W=$(mktemp -d "$TMPBASE/w-wpcli.XXXX") || exit 1
 trap 'rm -rf "$W"' EXIT
-extract "$SRC" docker_wp_cli_on docker_wp_cli_dockerfile docker_php_has_wp_cli docker_php_needs_wp_cli docker_wp_cli_command docker_php_image || exit 1
+extract "$SRC" docker_wp_cli_on docker_wp_cli_dockerfile docker_php_has_wp_cli docker_php_needs_wp_cli docker_wp_cli_command docker_php_image \
+    docker_php_ext docker_pg_dockerfile docker_php_needs_pgsql docker_pg_versions || exit 1
 # (el Mac: las reglas de la web del contenedor van en la imagen)
 grep -q "^function docker_web_rules() {" "$SRC" && { extract "$SRC" docker_web_rules || exit 1; }
-eval "$(grep -E '^(WP_CLI_VERSION|WP_CLI_SHA256|DOCKER_EXT_INSTALLER|DOCKER_IMAGE_SCHEMA)=' "$SRC")"
+eval "$(grep -E '^(WP_CLI_VERSION|WP_CLI_SHA256|DOCKER_EXT_INSTALLER|DOCKER_IMAGE_SCHEMA|DOCKER_PG_VERSIONS)=' "$SRC")"
 php_85_or_later() { [ "$(printf '%s\n' 8.5 "$1" | sort -V | head -1)" == 8.5 ]; }
 PHP_SECURE_INI="expose_php = Off" PHP_SECURE_INI_85="fatal_error_backtraces = 0" DOCKER_PHP_EXT="mysqli gd"
 DOCKER_DIR=$W/docker DRY=0

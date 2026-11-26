@@ -10,8 +10,15 @@ class AppPrograma:
             for f in parse_lines(out):
                 if f[0] == "N" and len(f) >= 5:
                     found = True
-                    # (si se dice que no, se vuelve a ofrecer la próxima vez que toque buscar)
-                    self.offer_package(f[1], f[2], f[3], "|".join(f[4:]))
+                    args = (f[1], f[2], f[3], "|".join(f[4:]))
+                    # (sola, la misma que ya se ha dicho que no en esta sesión no se vuelve a ofrecer hasta abrir
+                    # otra vez el programa; con la ventana escondida, se ofrece al mostrarla)
+                    if auto and f[1] in getattr(self, "update_declined", set()):
+                        continue
+                    if auto and not self.win.get_visible():
+                        self.update_pending = args
+                        continue
+                    self.offer_package(*args)
                 elif f[0] == "I" and len(f) >= 2:
                     notes.append("|".join(f[1:]))
             if manual and not found:
@@ -37,6 +44,7 @@ class AppPrograma:
                        "se vuelve a abrir. Tus versiones, proyectos y BBDD no se tocan.\n\nHuella SHA-256:\n%s"
                        % (current, version, where, sha),
                        "Actualizar a la %s" % version):
+            self.update_declined = getattr(self, "update_declined", set()) | {version}
             return False
         if SIMULATE:
             self.toast("[simulación] pkexec apt-get install -y %s" % path)
@@ -322,7 +330,9 @@ class AppPrograma:
 
     def open_in_vscode(self, folder=None):
         """Abre el proyecto cargado (u otra carpeta de htdocs) en Visual Studio Code. Si ya tiene una
-        ventana con esa carpeta, VS Code la trae delante en lugar de abrir otra."""
+        ventana con esa carpeta, VS Code la trae delante en lugar de abrir otra. Con la carpeta de los
+        espacios de trabajo elegida (Configuración, Carpetas), con el .code-workspace del proyecto: el suyo
+        o, si no tiene, uno nuevo con su carpeta."""
         folder, app = folder or self.loaded_project_folder(), vscode_app()
         if folder is None:
             message(self.win, "No se encuentra la carpeta del proyecto cargado",
@@ -337,7 +347,17 @@ class AppPrograma:
             # (con el contexto de la ventana, el escritorio deja que VS Code se ponga delante)
             ctx = self.win.get_display().get_app_launch_context()
             ctx.set_timestamp(Gtk.get_current_event_time())
-            app.launch([Gio.File.new_for_path(folder)], ctx)
+            target, wsdir = folder, vscode_ws_dir()
+            if wsdir:
+                had = vscode_workspace(folder, create=False)
+                ws = had or vscode_workspace(folder)
+                if ws is None:
+                    self.toast("No se ha podido crear su espacio de trabajo en %s: se abre la carpeta" % wsdir)
+                else:
+                    target = ws
+                    if had is None:
+                        self.toast("Espacio de trabajo nuevo: %s" % os.path.basename(ws))
+            app.launch([Gio.File.new_for_path(target)], ctx)
         except GLib.Error as exc:
             message(self.win, "No se ha podido abrir Visual Studio Code", exc.message, Gtk.MessageType.ERROR)
 
@@ -413,7 +433,7 @@ class AppPrograma:
         return False
 
     def on_data(self, rc, out):
-        d = {"installs": [], "dbs": {}, "dbdate": {}, "active": "", "running": False,
+        d = {"installs": [], "dbs": {}, "dbdate": {}, "marks": set(), "active": "", "running": False,
              "unregistered": False, "native": True, "launcher": True,
              "name": "Nexum Dev Stack", "version": "", "signature": "",
              "vhosts": "/opt/lampp/etc/extra/httpd-vhosts.conf", "hosts": "/etc/hosts",
@@ -437,6 +457,9 @@ class AppPrograma:
                 d["dbs"].setdefault(f[1], []).append(f[2])
                 if len(f) >= 5 and f[3].isdigit():
                     d["dbdate"][(f[1], f[2])] = (int(f[3]), f[4])
+            elif f[0] == "J" and len(f) >= 3:
+                # (marcada para borrar al cargar su versión: marcar-bd)
+                d["marks"].add((f[1], f[2]))
             elif f[0] == "H" and len(f) >= 3:
                 d["vhosts"], d["hosts"] = f[1], f[2]
             elif f[0] == "Z" and len(f) >= 2:
@@ -492,6 +515,8 @@ class AppPrograma:
         self.build_tools()
         if self.branches is not None:
             self.build_install()
+        # (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
+        self.nv_db_marks_check()
         return False
 
     def on_branches(self, rc, out):

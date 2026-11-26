@@ -22,6 +22,9 @@ struct TaskBadge: View {
                 if let r = task.pctText.range(of: "%") {
                     Text(String(task.pctText[..<r.upperBound])).font(.system(size: 11.5, weight: .semibold).monospacedDigit())
                 }
+                if !model.taskQueue.isEmpty {
+                    Text("· \(model.taskQueue.count) en la cola").font(.system(size: 11.5, weight: .semibold))
+                }
             }
             .foregroundColor(.green)
             .padding(.horizontal, 9)
@@ -269,7 +272,8 @@ struct TopBar: View {
         if model.data != nil, n > 0 {
             Button(action: { warnOpen.toggle() }) {
                 HStack(spacing: 5) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+                    // (en amarillo: avisa, no es un error)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow)
                     Text("\(n)").font(.system(size: 12, weight: .bold))
                 }
             }
@@ -352,14 +356,13 @@ struct WarningsView: View {
             if let c = model.updatesPending {
                 Card("Hay parches nuevos (\(c.items.count))",
                      "Lo de ahora sigue funcionando mientras se actualiza (se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta que salga otro parche; siguen en Configuración, General, Parches nuevos.") {
-                    Row("Conviene ponerlos: son parches de seguridad",
-                        (c.items.prefix(6).map { "• " + $0 } + (c.items.count > 6 ? ["…y \(c.items.count - 6) más"] : [])).joined(separator: "\n"),
-                        trailing: {
+                    WideRow("Conviene ponerlos: son parches de seguridad",
+                        (c.items.prefix(6).map { "• " + $0 } + (c.items.count > 6 ? ["…y \(c.items.count - 6) más"] : [])).joined(separator: "\n")) {
                             Button("Ahora no") { model.ignoreUpdates(c) }
                             Button("Actualizar todo") { model.updateComponents(c) }
                                 .buttonStyle(OutlineButton(kind: "primary"))
                                 .busyGuard(model.busy)
-                        })
+                        }
                 }
             }
             if let d = model.data {

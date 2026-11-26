@@ -20,7 +20,14 @@ extract "$SRC" docker_sock dk docker_config_dir docker_ready docker_slug docker_
     docker_web_ps_domain docker_web_create docker_web_add docker_web_remove docker_web_switch docker_web_action \
     docker_test_admin gui_docker docker_fix_restart docker_fix_pma docker_fix_cache docker_pass db_valid_name \
     valid_version_name cross_site_on php_85_or_later || exit 1
+# (1.57.41: las webs permitidas, en el hueco de la barrera; sin la lista, el de siempre)
+grep -q '^function cross_site_fill() {' "$SRC" && { extract "$SRC" cross_site_fill cross_site_allow_regex cross_site_allowed || exit 1
+    eval "$(grep -E '^CROSS_SITE_ALLOW_(SLOT|RE)=' "$SRC")"; CROSS_SITE_ALLOW=$W/sin-lista; }
 grep -q '^function docker_web_media() {' "$SRC" && { extract "$SRC" docker_web_media media_saved || exit 1; }
+# (1.57.46: tiendas en vivo y la BBDD de cada proyecto, la comun o la de su version en vivo)
+grep -q '^function docker_web_ps_live() {' "$SRC" && { extract "$SRC" docker_web_ps_live docker_web_db_up valid_domain || exit 1; }
+# (Docker sin las BBDD de sus proyectos, en gui-docker: aqui no falta ninguna)
+grep -q '^function docker_lost() {' "$SRC" && docker_lost() { :; }
 MEDIA_PROJECTS_FILE=$W/media-produccion
 docker_idle_ensure() { :; }
 custom_domain() { [ "$1" == blog ] && echo blog.test; }
@@ -240,7 +247,7 @@ printf 'CARPETA=viejo\nPHP=8.2\nMARIADB=10.11\nDOMINIO=viejo.docker.local\nBBDD=
 printf 'services:\n  db:\n    image: mariadb:10.11\n' > "$DOCKER_DIR/viejo/compose.yaml"
 reset
 o=$( docker_action() { [ "$1" == borrar ] && echo "borrar $2" >> "$W/hecho.log" && rm -rf "$DOCKER_DIR/$2"; }; docker_pass viejo --copia 2>&1 ); rc=$?
-check "pasar con --copia: la copia de su BBDD en ~/nexum-backups (solo tuya), antes de quitar nada" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/docker-viejo-wp_viejo-*.sql.gz > /dev/null 2>&1 && [ "$(stat -c %a "$(ls "$COPIES_DIR"/docker-viejo-*.sql.gz)")" == 600 ]'
+check "pasar con --copia: la copia de su BBDD en ~/nexum-backups (solo tuya), antes de quitar nada" '[ $rc -eq 0 ] && ls "$COPIES_DIR"/bbdd/docker/docker-viejo-wp_viejo-*.sql.gz > /dev/null 2>&1 && [ "$(stat -c %a "$(ls "$COPIES_DIR"/bbdd/docker/docker-viejo-*.sql.gz)")" == 600 ]'
 check "pasar con --copia: se quita el de antes y queda en el Apache de Docker con su BBDD" 'grep -qx "borrar viejo" "$W/hecho.log" && grep -qx MODO=web "$DOCKER_DIR/viejo/proyecto.conf" && grep -qx BBDD=wp_viejo "$DOCKER_DIR/viejo/proyecto.conf" && grep -qx PHP=8.2 "$DOCKER_DIR/viejo/proyecto.conf" && grep -q "CREATE TABLE viejo" "$W/sql.log"'
 check "pasar uno que ya es del Apache de Docker: no" '! docker_pass viejo > /dev/null 2>&1'
 
@@ -322,17 +329,28 @@ if declare -F docker_dns_activate > /dev/null; then
     check "dns: quitarlo: fuera el servicio y los dominios .docker.test vuelven a /etc/hosts" '[ $rc -eq 0 ] && [ ! -e "$DOCKER_DNS_UNIT" ] && [ ! -e "$DOCKER_DNS_RESOLVED" ] && ! docker_dns_on && grep -qE "^127\.0\.0\.5 .*nuevo-php83\.docker\.test" "$HOSTS_FILE" && grep -qE "^127\.0\.0\.5 .*pma\.docker\.test" "$HOSTS_FILE"'
     # El DNS de verdad, con tu usuario en un puerto alto: *.docker.test a la direccion, lo demas rechazado
     printf '%s\n' "$DOCKER_DNS_PY" > "$W/nexum-dns.py"
-    PORT=$(python3 -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
-    python3 -I "$W/nexum-dns.py" 127.0.0.1 "$PORT" docker.test 127.0.0.5 & DNSP=$!
-    sleep 0.6
     ask() { python3 -c '
 import socket, struct, sys
-name, qtype, port = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+name, qtype, port, wait = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), float(sys.argv[4])
 q = struct.pack(">HHHHHH", 0x1234, 0x0100, 1, 0, 0, 0) + b"".join(bytes([len(l)]) + l.encode() for l in name.split(".")) + b"\0" + struct.pack(">HH", qtype, 1)
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(2); s.sendto(q, ("127.0.0.1", port))
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(wait); s.sendto(q, ("127.0.0.1", port))
 r = s.recv(512)
 rcode, an = struct.unpack(">H", r[2:4])[0] & 15, struct.unpack(">H", r[6:8])[0]
-print(rcode, an, socket.inet_ntoa(r[-4:]) if an else "-")' "$1" "$2" "$PORT"; }
+print(rcode, an, socket.inet_ntoa(r[-4:]) if an else "-")' "$1" "$2" "$PORT" "${ASK_WAIT:-2}" 2> /dev/null; }
+    # (los grupos van en paralelo: entre buscar un puerto libre y arrancar el DNS, otro grupo puede
+    # quedarse con el. Si no arranca, otro puerto; y se espera a que conteste, no un tiempo fijo)
+    DNSP="" PORT=""
+    for _ in $(seq 20); do
+        PORT=$(python3 -c 'import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; t = socket.socket(); t.bind(("127.0.0.1", p)); print(p)' 2> /dev/null) || continue
+        python3 -I "$W/nexum-dns.py" 127.0.0.1 "$PORT" docker.test 127.0.0.5 2> /dev/null & DNSP=$!
+        for _ in $(seq 50); do
+            [ "$(ASK_WAIT=0.1 ask ping.docker.test 1)" == "0 1 127.0.0.5" ] && break 2
+            kill -0 $DNSP 2> /dev/null || break
+            sleep 0.05
+        done
+        kill $DNSP 2> /dev/null; wait $DNSP 2> /dev/null; DNSP=""
+    done
+    check "dns de verdad: arranca en un puerto alto" '[ -n "$DNSP" ]'
     check "dns de verdad: <algo>.docker.test, a la direccion" '[ "$(ask blog-php83.docker.test 1)" == "0 1 127.0.0.5" ] && [ "$(ask PMA.Docker.Test 1)" == "0 1 127.0.0.5" ]'
     check "dns de verdad: IPv6, sin datos (no se queda esperando)" '[ "$(ask blog.docker.test 28)" == "0 0 -" ]'
     check "dns de verdad: lo demas, rechazado" '[ "$(ask google.com 1)" == "5 0 -" ] && [ "$(ask docker.testing.com 1)" == "5 0 -" ]'

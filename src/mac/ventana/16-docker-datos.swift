@@ -33,6 +33,13 @@ struct DockerVolume: Equatable {
     let name, driver: String
 }
 
+/// Lo que ha perdido su BBDD en Docker (gui-docker, Z): un proyecto, o una PostgreSQL común (postgres-<versión>),
+/// con su última copia de ~/nexum-backups ("" si no tiene)
+struct DockerLost: Equatable {
+    let name, copy: String
+    var label: String { name.hasPrefix("postgres-") ? "la PostgreSQL " + String(name.dropFirst(9)) : name }
+}
+
 struct DockerData: Equatable {
     /// docker instalado, Docker Desktop responde, su versión, la versión XAMPP-X activa en marcha y si
     /// está la aplicación Docker Desktop
@@ -43,6 +50,8 @@ struct DockerData: Equatable {
     var containers: [DockerContainer] = []
     var images: [DockerImage] = []
     var volumes: [DockerVolume] = []
+    /// Lo que ha perdido su BBDD en Docker (Z: nombre y su última copia, o ""; postgres-<versión>, una PostgreSQL común)
+    var lost: [DockerLost] = []
     /// El Apache de Docker (desde la 1.40)
     var web: DockerWeb? = nil
 }

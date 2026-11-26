@@ -44,7 +44,7 @@ common_used = {}  # comun/… -> sistemas que lo incluyen
 
 
 def read(path):
-    body = open(path, encoding="utf-8", newline="").read()
+    body = open(path, encoding="utf-8").read()
     if not body.endswith("\n"):
         sys.exit("construir: %s no acaba en salto de línea" % path)
     return body
@@ -100,7 +100,7 @@ def build(src):
     out = []
     used = set()
     for path in parts:
-        text = open(path, encoding="utf-8", newline="").read()
+        text = open(path, encoding="utf-8").read()
         if not text.endswith("\n"):
             sys.exit("construir: %s no acaba en salto de línea" % path)
         for line in text[:-1].split("\n"):
@@ -138,7 +138,7 @@ built = {}
 for src, dst in TARGETS:
     built[dst] = build(src)
 # Lo de src/comun, en los dos sistemas: si solo lo usa uno, va en la carpeta de ese sistema
-common = {os.path.relpath(p, os.path.join(root, "src")) for p in glob.glob(os.path.join(root, "src", "comun", "*", "*.sh"))}
+common = {os.path.relpath(p, os.path.join(root, "src")).replace(os.sep, "/") for p in glob.glob(os.path.join(root, "src", "comun", "*", "*.sh"))}
 for name in sorted(common | set(common_used)):
     users = common_used.get(name, set())
     if len(users) != len(TARGETS):

@@ -1,4 +1,4 @@
-# Prueba de la ventana nueva en un Mac (versión 1.57.37)
+# Prueba de la ventana nueva en un Mac (versión 1.57.51)
 
 La 1.39.0 cambia la ventana entera (como la de Linux 1.54) y añade Docker con Docker Desktop. La 1.39.9 añade el correo de pruebas con Mailpit (paso 7). La 1.39.3 instala el gestor en `/Library/Nexum/gestor` (de root, con su propio bash) y pasa las versiones de `/Applications` a `/Library/Nexum`. Se escribió y se probó desde Linux: la parte de bash y Python, con herramientas falsas (`otool`, `install_name_tool`, `docker`) y las pruebas de siempre. **El código Swift no se ha compilado**, porque en Linux no hay SwiftUI, **y el paso a /Library/Nexum no se ha probado en un Mac**: el paso 0 es para eso.
 
@@ -15,10 +15,10 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    ```
 
 2. **Una instantánea del disco**, por si hubiera que volver atrás del todo: `sudo tmutil localsnapshot` (se recupera desde la recuperación de macOS con Time Machine). Y, si tienes BBDD que no quieras perder, una copia: **Bases de datos → descargar** o `nexum exportar-bd <base> ~/copia.zip`.
-3. **Instala la 1.57.37** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
+3. **Instala la 1.57.51** desde Terminal (no desde la ventana, para ver todo lo que dice). Saca el `.zip` en Descargas y ejecuta:
 
    ```bash
-   bash ~/Downloads/nexum-mac-1.57.37/lvm-instalador.sh instalar-gestor
+   bash ~/Downloads/nexum-mac-1.57.51/lvm-instalador.sh instalar-gestor
    ```
 
    Tiene que pedir la contraseña **una vez** y decir, por este orden:
@@ -36,7 +36,7 @@ Esto **sí cambia tus versiones** (las mueve, con sus BBDD). Si algo falla a mit
    readlink /opt/homebrew/bin/nexum /opt/homebrew/bin/lvm                # /Library/Nexum/gestor/lvm-instalador.sh
    head -4 ~/lvm-instalador/lvm-instalador.sh                                     # el aviso, no el script
    /usr/libexec/PlistBuddy -c 'Print :LVMScript' ~/Applications/Nexum\ Dev\ Stack.app/Contents/Info.plist
-   nexum version                                                         # Nexum Dev Stack 1.57.37
+   nexum version                                                         # Nexum Dev Stack 1.57.51
    ```
 
 5. **Comprueba las versiones:**
@@ -410,6 +410,14 @@ Hace falta un proyecto de Astro, Next o Vite en htdocs.
 
 1. En **Configuración → GitHub**, pulsa «Conectar con un token…» y pega algo con forma de token que no sea bueno (por ejemplo, `ghp_` seguido de 36 letras).
 2. Sale una ventana «No se ha podido conectar con GitHub» con el motivo («GitHub no acepta ese token…»), y se queda hasta que pulsas Cerrar (antes era un aviso abajo que se iba solo).
+
+## Paso 31: la cola de tareas, las webs permitidas y los espacios de trabajo de VS Code (1.57.40 y 1.57.41)
+
+1. **Cola:** lanza una tarea larga (actualizar una versión), pásala a segundo plano y pide otra (por ejemplo, encender el correo de pruebas): sale «En la cola: «…». Empieza cuando acabe «…»», y el aviso de arriba dice «· 1 en la cola». Al acabar la primera, empieza la segunda sola. «Traer cambios» de un repositorio de otra carpeta va ya, sin esperar.
+2. **Webs permitidas:** en **Configuración → Seguridad entre webs**, «Añadir…» pide el dominio; pega una dirección entera (`https://erp.ejemplo-empresa.com/login`) y el texto de abajo dice «Se permite erp.ejemplo-empresa.com». «Permitir» pide la contraseña y la fila sale debajo, con el escudo verde y «Quitar». En Terminal: `sudo ls -l /Library/Nexum/XAMPP-compartido/lvm-barrera-permitidas` → de root, y `nexum barrera-web permitidas` la lista.
+3. Desde la consola de esa web (o de otra cualquiera para ver la diferencia): `fetch('http://web.local/', {method: 'POST', mode: 'no-cors'})` → desde la permitida, en el registro de acceso de Apache, un 200 o 404; desde otra, un 403. «Quitar» la vuelve a frenar.
+4. **Espacios de trabajo de VS Code:** en **Configuración → Carpetas**, «Elegir…» en «Espacios de trabajo de VS Code» y elige una carpeta. El botón «VS Code» de un proyecto sin el suyo dice «Espacio de trabajo nuevo: <carpeta>.code-workspace» y VS Code lo abre (en su título, «(Espacio de trabajo)»). La segunda vez, abre el mismo sin crear otro. «Quitar» vuelve a abrir la carpeta.
+5. **Registro de tareas** (Configuración → General): se ven al menos 3 filas.
 
 ## Qué apuntar
 

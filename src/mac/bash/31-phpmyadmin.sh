@@ -223,18 +223,79 @@ function node_log() {
     fi
 }
 
+# Nginx (pestaña Nginx): lo del Mac. El PHP-FPM de la versión activa (/Applications/XAMPP), lo que hace
+# falta para compilarlo (las herramientas de Xcode y pcre2 y openssl@3 de Homebrew, con tu usuario) y la
+# confianza del navegador
+NGINX_PHP_SOCK=$LINK/xamppfiles/var/run/php-fpm.sock
+
+function nginx_deps_missing() {
+    return 1
+}
+
+function nginx_build_deps() {
+    local f missing=()
+    echo "Lo que hace falta para compilar Nginx (las herramientas de Xcode; pcre2 y openssl@3 de Homebrew)"
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] brew install de los que falten"; return 0; }
+    if ! xcode-select -p > /dev/null 2>&1; then
+        echo "  Faltan las herramientas de línea de órdenes de Xcode: xcode-select --install, y vuelve a probar"
+        return 1
+    fi
+    command -v brew > /dev/null || { echo "  Falta Homebrew (brew.sh): instálalo y vuelve a probar"; return 1; }
+    for f in pcre2 openssl@3; do
+        brew_quiet list --versions "$f" > /dev/null 2>&1 || missing+=("$f")
+    done
+    [ ${#missing[@]} -eq 0 ] && { echo "  Ya estan todas instaladas"; return 0; }
+    echo "  Se instalan con Homebrew: ${missing[*]}"
+    { brew_quiet install --quiet "${missing[@]}" 2>&1 > /dev/null; } | brew_filter >&2
+    [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "  No se han podido instalar con Homebrew: ${missing[*]}"; return 1; }
+}
+
+# (con pcre2 y openssl@3 de Homebrew)
+function nginx_build_flags() {
+    local pcre ssl
+    pcre=$(brew_quiet --prefix pcre2 2> /dev/null) && ssl=$(brew_quiet --prefix openssl@3 2> /dev/null) \
+        || { echo "No están pcre2 y openssl@3 de Homebrew"; return 1; }
+    NGINX_BUILD_FLAGS=(--with-cc-opt="-I$pcre/include -I$ssl/include" --with-ld-opt="-L$pcre/lib -L$ssl/lib")
+}
+
+# Safari y Chrome aceptan sin aviso el certificado de <nombre>.localhost: va a tus ajustes de confianza
+# del llavero, solo para servidores (ssl), como el de *.docker.local
+function nginx_trust() {
+    local host=$1 crt=$NGINX_DIR/certs/$1.crt
+    # (en las pruebas, nunca en el llavero de verdad)
+    [ -n "$TEST_DIR" ] && return 0
+    [ -f "$crt" ] || [ "$DRY" -eq 1 ] || return 0
+    if [ "$DRY" -eq 0 ] && security verify-cert -c "$crt" -p ssl -s "$host" > /dev/null 2>&1; then
+        return 0
+    fi
+    echo "El Mac te pide la contraseña para que el navegador acepte el certificado de $host..."
+    if ! run security add-trusted-cert -r trustRoot -p ssl -k "$HOME/Library/Keychains/login.keychain-db" "$crt"; then
+        echo "No se ha cambiado (¿has cancelado la contraseña?): pulsa «Confiar» en la pestaña Nginx"
+        return 0
+    fi
+    echo "El navegador acepta el certificado de $host (Safari, Chrome; Firefox, si usa los certificados del Mac)"
+}
+#@incluir comun/phpmyadmin/nginx_get.sh
+
 # Tareas de la ventana (LVM_TAREA=1): lo que cambia algo pide la contraseña de administrador antes de
 # empezar, no a mitad. Si se cancela, no se ha hecho nada (antes, lo hecho hasta el primer sudo se
 # quedaba: el enlace de un proyecto al desmontarlo, por ejemplo). Lo que nunca la necesita, sin pedirla
 if [ "${LVM_TAREA:-}" == 1 ]; then
     case "$1" in
-        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual) ;;
+        gui-*|node-*|exportar-bd|descargar-bd|exportar-proyecto|docker-registros|construir-pila|version|--version|-v|acerca|about|novedades|procesos|limpieza|copias-ficheros|manual|nginx-usar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) ;;
         # (el tunel, los repositorios y la rama de un proyecto, solo con tu usuario; borrar una BBDD, solo con el MariaDB en marcha)
-        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;
+        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd|borrar-bd-marcadas|marcar-bd) ;;
         # (el administrador de pruebas: solo un ajuste de ~/.nexum)
         admin-pruebas) ;;
+        # (Nginx: con tu usuario; instalarlo, solo si en Linux falta algun paquete para compilarlo)
+        nginx-instalar) nginx_deps_missing && { sudo_first || exit 130; } ;;
         # (WP-CLI en las imagenes de PHP de Docker: un ajuste de ~/.nexum y las imagenes, con Docker Desktop)
         docker-wp-cli) ;;
+        # (PostgreSQL y Nginx de Docker: Docker sin root y ficheros de ~/.nexum)
+        docker-postgres) ;;
+        # (la copia de las BBDD de Docker: Docker sin root (o Docker Desktop) y ~/nexum-backups)
+        docker-copia) ;;
+        docker-nginx) ;;
         # (confiar: el certificado va a tu llavero, y el Mac pide la contraseña en su propio aviso)
         docker-web) [ "$2" == confiar ] || { sudo_first || exit 130; } ;;
         # (importar-bd: solo si va a vaciar la cache de una tienda con ficheros de Apache)
@@ -290,6 +351,8 @@ case "$1" in
     importar-bd) import_database "$2" "$3" "${@:4}" ;;
     crear-bd) create_database "$2" ;;
     borrar-bd) drop_database "$2" "$3" ;;
+    marcar-bd) db_mark_drop "$2" "$3" "$4" ;;
+    borrar-bd-marcadas) drop_marked_databases "$2" ;;
     gui-datos) gui_data ;;
     gui-vuelta) gui_round ;;
     gui-ramas) gui_branches ;;
@@ -312,6 +375,8 @@ case "$1" in
     node-parar) node_stop "$2" ;;
     node-registro) node_log "$2" ;;
     gui-node) gui_node ;;
+    gui-nginx) gui_nginx ;;
+    nginx-usar|nginx-instalar|nginx-arrancar|nginx-parar|nginx-reiniciar|nginx-anadir|nginx-quitar|nginx-puertos|nginx-registro|nginx-confiar) nginx_command "$@" ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-nuevo) shift; docker_web_create "$@" ;;
     docker-php-anadir) docker_web_add "$2" "$3" ;;
@@ -329,6 +394,10 @@ case "$1" in
     docker-migrar) docker_migrate_command "$2" ;;
     docker-imagen) docker_update_image "$2" ;;
     docker-wp-cli) docker_wp_cli_command "$2" "$3" ;;
+    docker-postgres) shift; docker_pg_command "$@" ;;
+    docker-copia) docker_backup_all ;;
+    docker-recuperar) shift; docker_recover "$@" ;;
+    docker-nginx) shift; docker_nginx_command "$@" ;;
     docker-clave) docker_db_password "$2" ;;
     docker-usuario-pruebas) docker_test_admin "$2" ;;
     actualizar-proyecto) shift; project_update "$@" ;;
@@ -375,7 +444,7 @@ case "$1" in
     exportar-bd|descargar-bd) export_database "$2" "$3" "$4" ;;
     copiar-bd) shift; copy_database "$@" ;;
     pasar-version) move_to_version "$2" "$3" ;;
-    barrera-web) web_barrier_command "$2" ;;
+    barrera-web) web_barrier_command "$2" "$3" ;;
     correo) mail_command "$2" "$3" ;;
     vincular-bd) link_database "$2" "$3" "$4" ;;
     rehacer|actualizar) cli_rebuild "$2" "$3" ;;

@@ -167,7 +167,7 @@ check "rama-proyecto como root: no" 'grep -q "if \[ \"\${EUID:-\$(id -u)}\" -eq 
 ) || fail=1
 
 # Las órdenes nuevas no piden la contraseña de administrador (tareas de la ventana)
-check "rama-proyecto sin contraseña de administrador (gui-ramas-proyecto va con las gui-*)" 'grep -q "^        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd) ;;" "$SRC" && grep -q "^    rama-proyecto) project_branch \"\$2\" \"\$3\" \"\$4\" ;;" "$SRC" && grep -q "^    gui-ramas-proyecto) gui_project_branches \"\$2\" ;;" "$SRC"'
+check "rama-proyecto sin contraseña de administrador (gui-ramas-proyecto va con las gui-*)" 'grep -q "^        tunel-abrir|tunel-instalar|tunel-cerrar|repo-traer|rama-proyecto|borrar-bd|borrar-bd-marcadas|marcar-bd) ;;" "$SRC" && grep -q "^    rama-proyecto) project_branch \"\$2\" \"\$3\" \"\$4\" ;;" "$SRC" && grep -q "^    gui-ramas-proyecto) gui_project_branches \"\$2\" ;;" "$SRC"'
 check "ayuda: rama-proyecto, gui-ramas-proyecto y montar-proyecto --sin-bd" 'grep -q "^#   nexum rama-proyecto <carpeta> <rama> \[--nueva\]" "$SRC" && grep -q "^#   nexum gui-ramas-proyecto <carpeta>" "$SRC" && grep -q "^#   nexum montar-proyecto <url de git> <carpeta> <version> --sin-bd" "$SRC"'
 
 # Las ventanas

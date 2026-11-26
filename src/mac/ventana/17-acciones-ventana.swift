@@ -16,6 +16,7 @@ extension AppModel {
         dkOpen = []
         if key == "docker" { reloadDocker(stats: true) }
         if key == "node" { reloadNode() }
+        if key == "nginx" { reloadNginx() }
         if key == "repos" {
             if repos == nil { reloadRepos(cache: true) }
             reloadRepos()
@@ -244,6 +245,8 @@ extension AppModel {
                 k.images.append(DockerImage(repo: repo, tag: tag, cid: "", size: f[2], created: f[3]))
             case "O" where f.count >= 3:
                 k.volumes.append(DockerVolume(name: f[1], driver: f[2]))
+            case "Z" where f.count >= 3:
+                k.lost.append(DockerLost(name: f[1], copy: f[2]))
             default:
                 break
             }
@@ -288,10 +291,20 @@ extension AppModel {
         dkForm = DockerForm()
         if let f = folder {
             dkForm.folder = f
+            dkForm.source = dockerDefaultSource(f)
             dkForm.domain = dockerSlug(f) + ".docker.local"
         }
         openTab("docker")
         panel = .dockerNew
+    }
+
+    /// La BBDD que se copia, de partida: la de la carpeta en la versión activa o, si no está en ella, la primera
+    /// que tenga en otra. Vacía solo si no tiene ninguna (si no, una tienda se montaba sin sus tablas: error 500)
+    func dockerDefaultSource(_ folder: String) -> String {
+        guard let x = projects?.list.first(where: { $0.name == folder }) else { return "" }
+        let pairs = projectPairs(x)
+        let pick = pairs.first(where: { $0.0.folder == data?.active }) ?? pairs.first
+        return pick.map { "\($0.0.folder)|\($0.1)" } ?? ""
     }
 
     /// Valores por omisión del formulario: la primera carpeta libre y las versiones más nuevas
@@ -299,7 +312,7 @@ extension AppModel {
         let k = docker ?? DockerData()
         if dkForm.folder.isEmpty || !folders.contains(dkForm.folder), let f = folders.first {
             dkForm.folder = f
-            dkForm.source = ""
+            dkForm.source = dockerDefaultSource(f)
             if !dkForm.domainSet { dkForm.domain = dockerSlug(f) + ".docker.local" }
         }
         if dkForm.php.isEmpty, let v = k.php.first { dkForm.php = v }
@@ -316,7 +329,9 @@ extension AppModel {
                                 ? slug + "." + tld : slug + "-php" + f.php.replacingOccurrences(of: ".", with: "") + "." + tld)
         var text = "Con el Apache de Docker (sin XAMPP-X): su PHP \(f.php) y su BBDD en la MariaDB \(f.maria) común. Se abrirá en \(site)."
         let src = f.source.split(separator: "|", maxSplits: 1).map(String.init)
-        let wp = projects?.list.first(where: { $0.name == f.folder })?.kind == "wp"
+        // (un WordPress o una tienda: en vivo, la misma que web.local, o una copia)
+        let kind = projects?.list.first(where: { $0.name == f.folder })?.kind ?? ""
+        let wp = kind == "wp" || kind == "ps"
         if src.count == 2 && wp && f.live {
             args += ["--bd", src[1], "--desde", src[0], "--en-vivo"]
             text += " Usa en vivo \(src[1]) de XAMPP-\(src[0]): la misma BBDD que web.local, sin copias."
@@ -348,7 +363,7 @@ extension AppModel {
         alert.messageText = "BBDD de \(p.folder) en Docker"
         alert.addButton(withTitle: "Usarla")
         alert.addButton(withTitle: "Cancelar")
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 380, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 380, height: 26), pullsDown: false)
         pop.addItems(withTitles: choices.map { $0.1 })
         pop.selectItem(at: choices.firstIndex(where: { $0.0 == now }) ?? 0)
         alert.accessoryView = dialogStack([
@@ -393,7 +408,7 @@ extension AppModel {
         alert.informativeText = "Solo cambia su contenedor de PHP: su BBDD y su configuración se quedan. La primera vez con cada versión se prepara su imagen. Si no arranca, vuelve a PHP \(p.php)."
         alert.addButton(withTitle: "Cambiar de PHP")
         alert.addButton(withTitle: "Cancelar")
-        let pop = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
+        let pop = DropDownButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
         pop.addItems(withTitles: k.php.map { "PHP \($0)" + ($0 == p.php ? "  (ahora)" : "") })
         if let i = k.php.firstIndex(of: p.php) { pop.selectItem(at: i) }
         alert.accessoryView = pop
@@ -407,6 +422,17 @@ extension AppModel {
 
     /// Los proyectos en Docker de antes de la 1.39.2 (PHP-FPM abierto en 127.0.0.1, sin clave) pasan a
     /// la web del contenedor con clave (docker-migrar --todos)
+    /// Docker vacío: rehace los contenedores de lo que ha perdido su BBDD y le carga su última copia (docker-recuperar)
+    func dockerRecover(_ lost: [DockerLost]) {
+        let steps = lost.map { "\($0.label): " + ($0.copy.isEmpty ? "sin copia, con la BBDD vacía" : ($0.copy as NSString).lastPathComponent) }
+        guard confirm("¿Recuperar lo de Docker?",
+                      "Se rehacen las imágenes y los contenedores de cada uno y se le carga su última copia. Lo que no tiene copia se queda con su BBDD vacía.",
+                      "Recuperar", steps: steps) else { return }
+        runTask("Recuperando lo de Docker", ["docker-recuperar"], progress: true, doneText: "Docker recuperado") { _, _, _ in
+            self.reloadDocker(stats: true)
+        }
+    }
+
     func dockerMigrateAll() {
         guard confirm("¿Cerrar el PHP-FPM de los proyectos en Docker?",
                       "Estaba abierto en 127.0.0.1 sin clave: cualquier programa del Mac podía ejecutar PHP con él. Su web pasa al contenedor (Apache con PHP), con una clave que solo tiene el Apache del Mac. Sus BBDD, configuración y dominios se conservan. Pide la contraseña de administrador.",
@@ -579,7 +605,7 @@ extension AppModel {
         // (ancho del nombre más largo: la BBDD con su versión, entera)
         let width = fitWidth(pairs.map { "\($0.1) (XAMPP-\($0.0.folder))" }, min: 300, max: 520)
         func popup(_ items: [String], _ selected: Int) -> NSPopUpButton {
-            let b = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
+            let b = DropDownButton(frame: NSRect(x: 0, y: 0, width: width, height: 26), pullsDown: false)
             b.addItems(withTitles: items)
             if selected >= 0 && selected < items.count { b.selectItem(at: selected) }
             b.translatesAutoresizingMaskIntoConstraints = false
@@ -603,7 +629,8 @@ extension AppModel {
         sources += pairs.map { ("\($0.0.folder)|\($0.1)", "\($0.1) (XAMPP-\($0.0.folder))") }
         let srcSel = sources.firstIndex(where: { !d.active.isEmpty && $0.0.hasPrefix(d.active + "|") }) ?? (sources.count - 1)
         let srcPop = popup(sources.map { $0.1 }, srcSel)
-        let wp = x.kind == "wp"
+        // (un WordPress o una tienda: en vivo, la misma que web.local, o una copia; de partida, en vivo)
+        let wp = x.kind == "wp" || x.kind == "ps"
         let modePop = popup(["En vivo: la misma que web.local (sin copias)", "Una copia en Docker"], 0)
         alert.accessoryView = dialogStack([
             dialogLabel("Con el Apache de Docker (sin XAMPP-X). Se descargan las imágenes que falten y se abre por su dominio (\(dockerSlug(x.name)).\(dockerTLD(k))). La carpeta y sus BBDD de XAMPP-X no se tocan.",

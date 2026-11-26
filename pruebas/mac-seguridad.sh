@@ -64,6 +64,9 @@ check "install_stack: la pila nueva ya sale asi" 'sed -n "/^function write_stack
 
 # --- La barrera entre webs se puede apagar ---
 extract "$SRC" web_barrier_on unknown_host_vhost || exit 1
+# (1.57.41: las webs permitidas, en el hueco de la barrera; sin la lista, el de siempre)
+grep -q '^function web_barrier_fill() {' "$SRC" && { extract "$SRC" web_barrier_fill web_barrier_allow_regex web_barrier_allowed || exit 1
+    eval "$(grep -E '^WEB_BARRIER_(SLOT|ALLOW_RE)=' "$SRC")"; WEB_BARRIER_ALLOW=$W/sin-lista; }
 UNKNOWN_HOST_VHOST=$VH TEST_DIR=$W WEB_BARRIER_OFF=$W/sin-barrera
 check "barrera puesta: el bloque tal cual" '[ "$(unknown_host_vhost)" == "${VH%$'"'"'\n'"'"'}" ] && unknown_host_vhost | grep -q "^# lvm-barrera-web:"'
 touch "$WEB_BARRIER_OFF"

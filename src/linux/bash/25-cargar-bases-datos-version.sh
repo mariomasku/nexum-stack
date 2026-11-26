@@ -127,6 +127,7 @@ function db_connect() {
 }
 
 #@incluir comun/cargar-bases-datos-version/db_valid_name.sh
+#@incluir comun/cargar-bases-datos-version/db_mark_drop.sh
 # crear-bd <base>: base vacia en utf8mb4_general_ci (como las de XAMPP)
 function create_database() {
     local db=$1 rc
@@ -181,9 +182,9 @@ function drop_database() {
     fi
 
     if [ $backup -eq 1 ]; then
-        local dest="$COPIES_DIR/lampp-$DB_FOLDER-$db-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local dest="$COPIES_DIR/bbdd/lampp-$DB_FOLDER/$db-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "Guardando copia de $db..."
-        run mkdir -p -m 700 "$COPIES_DIR"
+        copies_dir_of "$dest"
         if ! export_database "$db" "$dest" "$DB_FOLDER"; then
             echo "No se ha podido guardar la copia, asi que NO se borra nada."
 
@@ -194,6 +195,8 @@ function drop_database() {
     echo "Borrando la base de datos $db de lampp-$DB_FOLDER..."
     run "${DB_SAFE[@]}" "$DB_CLIENT" -uroot -e "DROP DATABASE \`$db\`" < /dev/null || return 1
     db_note_import "/opt/lampp/var/mysql" "$db"
+    # (si estaba marcada para borrar, ya no)
+    db_mark_set "$DB_FOLDER" "$db" ""
     echo "Base de datos $db borrada"
 }
 
@@ -215,7 +218,7 @@ except OSError:
 DB_TMP=""
 function db_temp_start() {
     local dir=$1 data=$1/var/mysql server args user grants=(--skip-grant-tables)
-    # (con --con-permisos, con sus usuarios: para cargar una base con su usuario lvm_bd_<base>)
+    # (con --con-permisos, con sus usuarios y permisos: para cargar una base como root)
     [ "$2" == "--con-permisos" ] && grants=()
     # Si su MariaDB ya esta en marcha (la arranco Docker, sin red), se usa esa: otra no podria abrir los
     # mismos datos. DB_TMP se queda vacio: db_temp_stop no la para
@@ -295,8 +298,7 @@ function db_temp_stop() {
 # [--sustituir [--copia]]: copia una base a otra version, para probar el proyecto con otro PHP. --como le da
 # otro nombre en la de destino (base_8_4 -> base_8_5) y --carpeta la vincula alli a esa carpeta de
 # proyecto (- = a ninguna; sin --carpeta, el vinculo no se toca). Se descarga de la de origen (como exportar-bd) a un
-# fichero solo tuyo y se carga en la de destino con la carga protegida de importar-bd (usuario de la
-# base, sin DEFINER, lo INVOKER y los eventos neutralizados). Si la de destino no es la activa en
+# fichero solo tuyo y se carga en la de destino con importar-bd (como root, sin DEFINER). Si la de destino no es la activa en
 # marcha, se arranca su MariaDB solo para la copia (sin red y con su propio socket). La de origen no
 # se toca
 function copy_database() {
@@ -377,9 +379,9 @@ function copy_database() {
         echo "lampp-$dst ya tiene $new: se sustituye."
         echo "Sin copia: la que tenia no se podra recuperar (con --copia se guarda antes en ~/nexum-backups)"
     elif [ $replace -eq 1 ]; then
-        local saved="$COPIES_DIR/lampp-$dst-$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
+        local saved="$COPIES_DIR/bbdd/lampp-$dst/$new-antes-de-copiar-$(date +%Y%m%d-%H%M%S).sql.gz"
         echo "lampp-$dst ya tiene $new: antes se guarda una copia suya en $saved"
-        mkdir -p -m 700 "$COPIES_DIR" || return 1
+        copies_dir_of "$saved" || return 1
         if ! export_database "$new" "$saved" "$dst"; then
             echo "No se ha podido guardar la copia de $new de lampp-$dst, asi que no se ha cambiado nada."
             return 1
@@ -955,49 +957,6 @@ function mail_export_filter() {
     return 0
 }
 
-# Mientras se carga un volcado, sus funciones y procedimientos ya existen: si fueran SQL SECURITY
-# INVOKER y la web (que entra como root) o phpMyAdmin los usaran a mitad de carga, se ejecutarian como
-# root y podrian cambiar otras bases o darle permisos a su usuario. Este filtro cambia al vuelo la
-# palabra INVOKER suelta por DEFINER (se ejecutan con el usuario de la base, que solo puede tocarla),
-# este donde este: asi da igual como se escriba (comentarios en medio, /*!...*/, trozos). No toca los
-# nombres que la llevan dentro (invoker_id, php-di/invoker...) y conserva el largo y las mayusculas
-# (no rompe los datos serializados de PHP); un texto con la palabra suelta cambia (documentado).
-# Por SQL dinamico (PREPARE) no se pueden crear rutinas, y una vista solo puede tocar lo que su
-# creador puede (su base); lo que quede lo neutraliza la limpieza
-INVOKER_PY='
-import re, sys
-# La palabra INVOKER suelta (no dentro de un nombre: invoker_id, $invoker, php-di/invoker,
-# Vendor\Invoker, x.invoker), en mayusculas o minusculas, pasa a DEFINER con las mismas mayusculas
-RX = re.compile(rb"(?<![A-Za-z0-9_$@.\\])(?<![^*]/)INVOKER(?![A-Za-z0-9_$.\\])", re.I)
-NEW = b"DEFINER"
-def swap(w):
-    return bytes(d if 65 <= c <= 90 else d + 32 for c, d in zip(w, NEW))
-CHUNK = int(sys.argv[1]) if len(sys.argv) > 1 else 1 << 20
-inp, out = sys.stdin.buffer, sys.stdout.buffer
-# buf[:skip] ya se ha escrito: solo sirve para mirar los dos caracteres de antes de una palabra
-buf, skip = b"", 0
-while True:
-    data = inp.read(CHUNK)
-    eof = not data
-    buf += data
-    # Las palabras que empiezan en los ultimos 8 bytes esperan al trozo siguiente
-    cut = len(buf) if eof else max(skip, len(buf) - 8)
-    parts, pos = [], skip
-    for m in RX.finditer(buf, skip):
-        if m.start() >= cut:
-            break
-        parts.append(buf[pos:m.start()])
-        parts.append(swap(m.group()))
-        pos = m.end()
-    cut = max(cut, pos)
-    parts.append(buf[pos:cut])
-    out.write(b"".join(parts))
-    if eof:
-        break
-    keep = max(0, cut - 2)
-    buf, skip = buf[keep:], cut - keep
-'
-
 # Copias en .zip (como las que se descargan del servidor): el .sql de dentro se lee sin
 # descomprimirlo a disco. "info <zip>" -> nombre|tamaño|empieza por la linea del modo sandbox (1/0);
 # "extraer <zip o ->" lo escribe en la salida ("-": el zip es la entrada estandar, para que el
@@ -1047,7 +1006,7 @@ with zipfile.ZipFile(sys.stdout.buffer, "w", zipfile.ZIP_DEFLATED) as z:
         shutil.copyfileobj(sys.stdin.buffer, m, 1 << 20)
 '
 
-# importar-bd <fichero .sql, .sql.gz o .zip> <base> [--crear] [--copia]: carga el fichero en el
+# importar-bd <fichero .sql, .gz o .zip> <base> [--crear] [--copia]: carga el fichero en el
 # MariaDB de la version activa. --crear crea la base si no existe. Si ya existe, siempre se vacia
 # antes (se borra y se crea de nuevo con su juego de caracteres): asi no quedan tablas que el volcado
 # ya no trae ni filas de una carga anterior que fallo a medias (los volcados de phpMyAdmin no llevan
@@ -1076,7 +1035,7 @@ function import_database() {
     done
 
     if [ -z "$file" ] || [ -z "$db" ]; then
-        echo "Uso: nexum importar-bd <fichero.sql|.sql.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
+        echo "Uso: nexum importar-bd <fichero.sql|.gz|.zip> <base de datos> [--crear] [--copia] [--proyecto <carpeta>]"
 
         return 1
     fi
@@ -1144,17 +1103,6 @@ function import_database() {
     echo "Destino: base $db en lampp-$folder (MariaDB $DB_VERSION)"
     [ $sandbox -eq 1 ] && echo "Se quita la primera linea (/*M!999999\- enable the sandbox mode */), que los MariaDB antiguos no entienden"
     # (antes de crear o vaciar la base: si no se puede cargar, no se toca nada)
-    # Con FEDERATED, CONNECT o SPIDER activos, una tabla del volcado podria conectarse a este mismo
-    # MariaDB como root (sin contraseña) y leer o cambiar cualquier base: no se carga (vienen
-    # desactivados; se activan a mano con INSTALL SONAME)
-    local engines
-    engines=$("${mysql[@]}" -N -e "SELECT GROUP_CONCAT(ENGINE) FROM information_schema.ENGINES
-        WHERE ENGINE IN ('FEDERATED', 'CONNECT', 'SPIDER', 'OQGRAPH') AND SUPPORT IN ('YES', 'DEFAULT')" < /dev/null 2> /dev/null)
-    if [ -n "$engines" ] && [ "$engines" != NULL ]; then
-        echo "No se carga: MariaDB tiene activos los motores $engines, con los que una tabla del volcado"
-        echo "podria entrar como root en este MariaDB. Desactivalos (UNINSTALL SONAME) y vuelve a cargarlo."
-        return 1
-    fi
     if ! db_exists "$db"; then
         if [ $create -eq 0 ]; then
             echo "La base $db no existe en lampp-$folder (con --crear se crea)"
@@ -1172,10 +1120,10 @@ function import_database() {
             return 1
         fi
         if [ "$tables" -gt 0 ] && [ $backup -eq 1 ]; then
-            saved="$COPIES_DIR/lampp-$DB_FOLDER-$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
+            saved="$COPIES_DIR/bbdd/lampp-$DB_FOLDER/$db-antes-de-cargar-$(date +%Y%m%d-%H%M%S).sql.gz"
             echo "$db ya tiene $tables $([ "$tables" == 1 ] && echo tabla || echo tablas): se borran todas antes de cargar."
             echo "Antes se guarda una copia suya en $saved"
-            run mkdir -p -m 700 "$COPIES_DIR"
+            copies_dir_of "$saved"
             if ! export_database "$db" "$saved" "$DB_FOLDER"; then
                 echo "No se ha podido guardar la copia de $db, asi que no se ha cambiado nada."
                 return 1
@@ -1202,39 +1150,24 @@ function import_database() {
     # de hasta 1 GB (hasta que se reinicie) y el cliente tambien
     "${mysql[@]}" -e "SET GLOBAL max_allowed_packet = GREATEST(@@GLOBAL.max_allowed_packet, 1073741824)" < /dev/null 2> /dev/null
 
-    # El volcado se carga con el usuario de esa base (lvm_bd_<base>), que solo puede tocarla (no
-    # root): un .sql de una web comprometida no puede cambiar otras bases, crear usuarios ni leer o
-    # escribir ficheros desde el servidor (sin el permiso FILE). En el permiso, el _ va escapado
-    # (si no, wp_x valdria tambien para wpYx). Al terminar se bloquea: no puede entrar, pero las
-    # vistas y disparadores del volcado (que son suyos) siguen funcionando.
-    local imp_user="lvm_bd_$db" imp_pass grant_db=${db//_/\\_}
-    imp_pass=$(head -c 18 /dev/urandom | base64 | tr -d '/+=\n')
-    db_drop_import_users "${mysql[@]}"
-    # (con su huella, no con la contraseña: la orden se ve en ps; la contraseña va en MYSQL_PWD)
-    local imp_hash
-    imp_hash=$(printf '%s' "$imp_pass" | db_pass_hash) || return 1
-    if ! "${mysql[@]}" -e "CREATE USER IF NOT EXISTS '$imp_user'@'localhost' IDENTIFIED BY PASSWORD '$imp_hash';
-            ALTER USER '$imp_user'@'localhost' IDENTIFIED BY PASSWORD '$imp_hash' ACCOUNT UNLOCK;
-            GRANT ALL PRIVILEGES ON \`$grant_db\`.* TO '$imp_user'@'localhost'" < /dev/null; then
-        echo "No se ha podido preparar el usuario de la base para cargar el volcado"
-        return 1
-    fi
-    # Si la carga se interrumpe, solo se marca: despues se limpia lo que haya cargado (con su
-    # usuario, que aun puede entrar) y se bloquea igual
+    # El volcado se carga como root, con todos los permisos: lo que traiga (otras bases, usuarios,
+    # SET GLOBAL, vistas y rutinas de cualquier tipo, eventos) se ejecuta tal cual, sin "Access denied".
+    # Si la carga se interrumpe, solo se marca para decirlo despues
     local imp_stop=0
     trap 'imp_stop=1' INT TERM HUP PIPE
-    local imp=(env MYSQL_PWD="$imp_pass" "${DB_SAFE[@]}" "$DB_CLIENT" -u"$imp_user" --default-character-set=utf8mb4
-               --binary-mode --local-infile=0)
+    local imp=("${mysql[@]}")
 
     # Lectura: descomprimir (gzip o zip), quitar la linea del modo sandbox y los DEFINER de vistas,
-    # disparadores y rutinas (son de otro usuario: con el temporal no se podrian crear)
-    local source=(cat) filter=(env LC_ALL=C sed -E -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
+    # disparadores y rutinas (son usuarios del servidor de origen, que aqui no existen: quedan de root).
+    # Los SET GLOBAL (algunos volcados empiezan con /*!40030 SET GLOBAL max_allowed_packet=... */) pasan
+    # a DO 0: cambiarian el MariaDB para todas las webs (bajarian el paquete de 1 GB de arriba)
+    local globals='s/^([[:space:]]*(\/\*!M?[0-9]*[[:space:]]*)?)[Ss][Ee][Tt][[:space:]]+([Gg][Ll][Oo][Bb][Aa][Ll][[:space:]]|@@[Gg][Ll][Oo][Bb][Aa][Ll]\.)[^;*]*/\1DO 0 /'
+    local source=(cat) filter=(env LC_ALL=C sed -E -e "$globals" -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     case $kind in
         gz) source=(gzip -dc) ;;
         zip) source=(python3 -I -c "$ZIP_SQL_PY" extraer -) ;;
     esac
-    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '/^\/\*M!999999\\-/d' -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
-    local definer=(python3 -I -c "$INVOKER_PY")
+    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '/^\/\*M!999999\\-/d' -e "$globals" -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     local start=$(date +%s)
 
     exec 3< "$file"
@@ -1250,23 +1183,16 @@ function import_database() {
         # sobre el .sql ya descomprimido)
         if [ $kind == zip ]; then
             ( set -o pipefail; python3 -I -c "$ZIP_SQL_PY" extraer "$file" | pv -s "$inner_size" \
-                | "${filter[@]}" | "${definer[@]}" | "${imp[@]}" --max-allowed-packet=1G "$db" )
+                | "${filter[@]}" | "${imp[@]}" --max-allowed-packet=1G "$db" )
         else
             ( set -o pipefail; pv -s "$size" <&3 | "${source[@]}" | "${filter[@]}" \
-                | "${definer[@]}" | "${imp[@]}" --max-allowed-packet=1G "$db" )
+                | "${imp[@]}" --max-allowed-packet=1G "$db" )
         fi
     else
-        ( set -o pipefail; "${source[@]}" <&3 | "${filter[@]}" | "${definer[@]}" | "${imp[@]}" --max-allowed-packet=1G "$db" )
+        ( set -o pipefail; "${source[@]}" <&3 | "${filter[@]}" | "${imp[@]}" --max-allowed-packet=1G "$db" )
     fi
     rc=$?
     exec 3<&-
-    # Primero se cortan sus conexiones (un evento del volcado que ya estuviera corriendo), despues
-    # eventos y tablas con DIRECTORY, luego lo INVOKER; se bloquea y root repasa que no quede nada
-    db_kill_user "$imp_user" "${mysql[@]}"
-    db_neutralize_extras "$db" "${imp[@]}"
-    db_neutralize_invoker "$db" "${imp[@]}"
-    db_lock_import_user "$imp_user" "${mysql[@]}"
-    db_root_cleanup "$db" "${mysql[@]}"
     trap - INT TERM HUP PIPE
     if [ $imp_stop -eq 1 ]; then
         echo "Carga interrumpida. Lo anterior ya esta en $db."
@@ -1278,8 +1204,6 @@ function import_database() {
     local secs=$(( $(date +%s) - start ))
     if [ $rc -ne 0 ]; then
         echo "Error al cargar $name. Lo anterior al error ya esta en $db."
-        echo "Si el error es «Access denied», el volcado intenta tocar otra base o crear usuarios:"
-        echo "solo se carga lo que va en $db (un volcado de una sola base, como los de phpMyAdmin)."
         [ -n "$saved" ] && echo "Lo que tenia antes esta en $saved (se vuelve a cargar con importar-bd)."
 
         return 1
@@ -1301,7 +1225,7 @@ function import_database() {
 }
 
 #@incluir comun/cargar-bases-datos-version/import_need_root.sh
-#@incluir comun/cargar-bases-datos-version/db_neutralize_invoker.sh
+#@incluir comun/cargar-bases-datos-version/db_lock_import_user.sh
 # MariaDB de XAMPP trae un usuario anonimo (sin nombre ni contraseña) y permisos para cualquiera
 # sobre las bases test y test_*: se quitan (las pilas propias ya se crean sin ellos). Con la version
 # montada en marcha; si root tiene contraseña, con MYSQL_PWD.
@@ -1371,14 +1295,14 @@ function repair_db_system() {
     if db_system_outdated; then
         echo "Las tablas del sistema de MariaDB de $name son de una version anterior: se ponen al dia"
         echo "(las bases de los proyectos no se tocan)."
-        [ $copy -eq 1 ] && backup="$COPIES_DIR/$name-mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
+        [ $copy -eq 1 ] && backup="$COPIES_DIR/bbdd/$name/mysql-sistema-$(date +%Y%m%d-%H%M%S).sql.gz"
         [ $copy -eq 0 ] && echo "Sin copia: las tablas del sistema de ahora no se podran recuperar (con --copia se guardan antes)"
         if [ "$DRY" -eq 1 ]; then
             [ -n "$backup" ] && echo "  [simulacion] copia de la base mysql en $backup"
             echo "  [simulacion] ${upgrade[0]##*/} --upgrade-system-tables --force"
         else
             if [ -n "$backup" ]; then
-                mkdir -p -m 700 "$COPIES_DIR" || return 1
+                copies_dir_of "$backup" || return 1
                 if ! ( set -o pipefail; umask 077; "${dump[@]}" --databases mysql < /dev/null | gzip > "$backup" ); then
                     rm -f "$backup"
                     echo "No se ha podido guardar la copia de la base mysql: no se cambia nada."

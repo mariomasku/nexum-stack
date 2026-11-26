@@ -9,6 +9,8 @@ struct ComponentsState: Equatable {
     var items: [String] = []
     var notes: [String] = []
     var errors: [String] = []
+    /// Hay un Docker Desktop nuevo (M): «Actualizar todo» copia antes las BBDD de Docker
+    var docker = false
 }
 
 func parseComponents(_ out: String) -> ComponentsState {
@@ -18,6 +20,11 @@ func parseComponents(_ out: String) -> ComponentsState {
         case "L" where f.count >= 5: c.items.append("XAMPP-\(f[1]): \(f[2]) \(f[3]) → \(f[4])")
         case "K" where f.count >= 3: c.items.append("\(f[1]) (\(f[2])): versión nueva en Docker Hub")
         case "X" where f.count >= 4: c.items.append("\(f[1]): \(f[2]) → \(f[3])")
+        // (Docker Desktop se instala a mano: «Actualizar todo» hace antes la copia de las BBDD de Docker y abre su descarga)
+        case "M" where f.count >= 4:
+            c.items.append("\(f[1]): \(f[2]) → \(f[3]) (se instala a mano, tras una copia de las BBDD de Docker)")
+            c.docker = true
+        case "N" where f.count >= 4: c.notes.append("\(f[1]) \(f[3]) publicado (Nexum pone el \(f[2]) hasta que lo traiga una versión suya)")
         case "F" where f.count >= 3 && f[2].contains("→"): c.notes.append("XAMPP-\(f[1]): \(f[2])")
         case "E" where f.count >= 2: c.errors.append(f[1])
         default: break
@@ -100,6 +107,10 @@ func sampleUsage() -> [String: UsagePart] {
 
 /// Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 let UPDATE_EVERY = 4
+/// Versión nueva del programa: otra búsqueda al volver a la ventana si hace más de esto de la última, y
+/// cada tanto con el programa abierto
+let UPDATE_RECHECK: TimeInterval = 30 * 60
+let UPDATE_RECHECK_OPEN: TimeInterval = 4 * 3600
 
 /// ¿Toca buscar una versión nueva al abrir? Se lleva en ~/.nexum/actualizaciones-arranques:
 /// la fecha y los arranques desde la última vez que se buscó (el mismo fichero que en Linux)

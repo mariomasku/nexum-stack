@@ -46,6 +46,8 @@ LOGO_PATHS = {
     # (bases de datos: discos apilados; Node: su hexágono)
     "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
     "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
+    # (Nginx: su hexágono con la N recortada, como su logotipo)
+    "nginx": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z M 8.2 16.5 L 9.9 16.5 L 9.9 10.8 L 14.1 16.5 L 15.8 16.5 L 15.8 7.5 L 14.1 7.5 L 14.1 13.2 L 9.9 7.5 L 8.2 7.5 Z",
     # (flecha de descarga: la tarea en segundo plano)
     "descarga": "M 10.6 3 L 13.4 3 L 13.4 11.6 L 17.2 7.8 L 19.2 9.8 L 12 17 L 4.8 9.8 L 6.8 7.8 L 10.6 11.6 Z M 4 19 L 20 19 L 20 21.6 L 4 21.6 Z",
     "actualizar": "M 17.53 7.53 C 17.823 7.237 17.823 6.763 17.53 6.47 L 12.53 1.47 C 12.39 1.329 12.199 1.25 12 1.25 C 11.801 1.25 11.61 1.329 11.47 1.47 L 6.47 6.47 C 6.177 6.763 6.177 7.237 6.47 7.53 C 6.763 7.823 7.237 7.823 7.53 7.53 L 11.25 3.811 L 11.25 15 C 11.25 15.414 11.586 15.75 12 15.75 C 12.414 15.75 12.75 15.414 12.75 15 L 12.75 3.811 L 16.47 7.53 C 16.763 7.823 17.237 7.823 17.53 7.53 Z M 21.212 19.109 C 21.249 18.647 21.25 18.052 21.25 17.2 L 21.25 14 C 21.25 13.586 21.586 13.25 22 13.25 C 22.414 13.25 22.75 13.586 22.75 14 L 22.75 17.232 C 22.75 18.045 22.75 18.701 22.707 19.232 C 22.662 19.778 22.568 20.258 22.341 20.703 C 21.982 21.408 21.408 21.982 20.703 22.341 C 20.258 22.568 19.778 22.662 19.232 22.707 C 18.701 22.75 18.045 22.75 17.232 22.75 L 6.768 22.75 C 5.955 22.75 5.299 22.75 4.769 22.707 C 4.222 22.662 3.742 22.568 3.298 22.341 C 2.592 21.982 2.018 21.408 1.659 20.703 C 1.432 20.258 1.338 19.778 1.293 19.232 C 1.25 18.701 1.25 18.045 1.25 17.232 L 1.25 14 C 1.25 13.586 1.586 13.25 2 13.25 C 2.414 13.25 2.75 13.586 2.75 14 L 2.75 17.2 C 2.75 18.052 2.751 18.647 2.788 19.109 C 2.825 19.563 2.895 19.824 2.995 20.021 C 3.211 20.445 3.555 20.789 3.979 21.005 C 4.176 21.105 4.437 21.174 4.891 21.212 C 5.353 21.249 5.948 21.25 6.8 21.25 L 17.2 21.25 C 18.052 21.25 18.647 21.249 19.109 21.212 C 19.563 21.174 19.824 21.105 20.021 21.005 C 20.445 20.789 20.789 20.445 21.005 20.021 C 21.105 19.824 21.174 19.563 21.212 19.109 Z",
@@ -287,7 +289,7 @@ LOGO_PATHS = {
 }
 
 # Color de cada logotipo: el de la marca y, con el tema oscuro, uno algo más claro para que se vea
-LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "node": ("#5FA04E", "#6CC24A"), "descarga": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
+LOGO_COLORS = {"log": ("#15803D", "#4ADE80"), "bbdd": ("#0284C7", "#38BDF8"), "node": ("#5FA04E", "#6CC24A"), "nginx": ("#009639", "#3FBF6F"), "descarga": ("#15803D", "#4ADE80"), "actualizar": ("#1C71D8", "#62A0EA"), "imagenes": ("#1C71D8", "#62A0EA"), "php": ("#777BB4", "#9A9ED6"), "apache": ("#D22128", "#EE5A4F"),
                "mariadb": ("#003545", "#C99A6E"), "phpmyadmin": ("#6C78AF", "#929CD2"),
                "perl": ("#39457E", "#7D95CF"), "xampp": ("#FB7A24", "#FB8A3C"),
                "wordpress": ("#21759B", "#55A6D2"), "prestashop": ("#DF0067", "#F0498F"),
@@ -304,7 +306,7 @@ LOGO_PARTS = {"phpmyadmin": [
 # se ven del mismo tamaño: cada uno ocupa la misma superficie que uno cuadrado que llena su recuadro (la bola del
 # mundo dejaba 2 de margen por lado; el velero de phpMyAdmin, apaisado, se veía más pequeño). Los apaisados o
 # alargados se salen por su lado largo, como mucho LOGO_OVER. Uno sin medir, la cuadrícula entera
-LOGO_BOX = {"actualizar": (1.25, 1.25, 21.5, 21.5), "apache": (5.2, 0, 13.6, 24), "bbdd": (3.5, 4, 17, 16), "cloudflare": (0, 6.6, 24, 10.85), "descarga": (4, 3, 16, 18.6), "docker": (0, 3.4, 24, 17.25), "github": (0, 0.3, 24, 23.4), "globo": (2, 2, 20, 20), "imagenes": (1.25, 1.25, 21.5, 21.5), "log": (2, 1, 20, 22), "mailpit": (0, 0.95, 24, 22.1), "mariadb": (0.05, 4.25, 23.95, 15.5), "node": (3.35, 2.2, 17.35, 19.6), "perl": (2.65, 0, 18.7, 24), "php": (0, 5.7, 24, 12.65), "phpmyadmin": (0.05, 3.5, 23.9, 17.05), "prestashop": (0, 1.05, 24, 21.95), "wordpress": (0, 0, 24, 24), "xampp": (0.1, 0, 23.8, 24)}
+LOGO_BOX = {"actualizar": (1.25, 1.25, 21.5, 21.5), "apache": (5.2, 0, 13.6, 24), "bbdd": (3.5, 4, 17, 16), "cloudflare": (0, 6.6, 24, 10.85), "descarga": (4, 3, 16, 18.6), "docker": (0, 3.4, 24, 17.25), "github": (0, 0.3, 24, 23.4), "globo": (2, 2, 20, 20), "imagenes": (1.25, 1.25, 21.5, 21.5), "log": (2, 1, 20, 22), "mailpit": (0, 0.95, 24, 22.1), "mariadb": (0.05, 4.25, 23.95, 15.5), "node": (3.35, 2.2, 17.35, 19.6), "nginx": (3.35, 2.2, 17.35, 19.6), "perl": (2.65, 0, 18.7, 24), "php": (0, 5.7, 24, 12.65), "phpmyadmin": (0.05, 3.5, 23.9, 17.05), "prestashop": (0, 1.05, 24, 21.95), "wordpress": (0, 0, 24, 24), "xampp": (0.1, 0, 23.8, 24)}
 LOGO_OVER = 1.2
 # Los que se dibujan con trazo, no rellenos
 LOGO_STROKED = {"imagenes"}
@@ -362,14 +364,16 @@ def logo(name, size=18):
 
 
 # Logotipos con su tipografía (Apariencia): los oficiales de Docker (docker.com), Node.js (nodejs.org; con
-# letra oscura en el tema claro y clara en el oscuro) y PHP (php.net), en SVG comprimido
+# letra oscura en el tema claro y clara en el oscuro), PHP (php.net) y NGINX (sus letras, en su verde #009639), en
+# SVG comprimido
 BRAND_SVG = {
+    "nginx": "eNq1VMty2zAM/BUOe2kOpAnwnYly6J8oiWKpkS2PrNiefn0BynZsN22nh+YQgQAIYoFdP2x3S3FY9ettJdtp2twvFvv9Xu+tHsblAo0xC8qQc8r9oe/Wb58lQs55UaJS7LuXqa0kgNcAKXop2qZbtlMl0WlyILt2XbP/NhwqaYQR51TxkfH4sBTTWK+3r8O4qmQx+3pqvioA7QOiF2wBOsQ7yt7UUyu6l0rWUtD/FThtXEw2CYuaK2bcKcjaBBey74uFLmdx9l2EpXjt+r6S62HdSLGdxuGtqeQXY3Kw+eRQBLd5rjeVHIf39cuV+/vQrW/9x7l4uTh2y206pwMDZyj0VceTxgToldeWPiLrQIgvgpx6dRDnTOssxSJclGlBuznZ6NnN1fpSQFGMBuGF1bmcE4Vjedxq8reK5sile0W3gS/O52e6adHEhEobSCEp1N76YLg+xGxS+PCQseVOXULLB8qPWVyG+6D5zbk2leaGit2qyE331E7mRlUoGOhEOCnGKUnbGBGhB519mQM1bRhF60/dW2qqTDjqYBiHusLfqnkqzClnkovw40SC09ov1xYNgbYEviyOL5Z5mJQTcQgoncC75KkSb4H+ArCnrIFxU0+7QINw3uSWqHeyn/m2z2W4OSGQgQYccj1PfHZWHa+fvp/1+b5tzqID41FbEoy81NOqnsbuQGISRYAEg3DYTMsg2SQHAe3dWcqRWGqyc4l+B1jj9+3YvNKDNb/1G5lqejfRXEBoaw0YxHQl06ejTI2jvWZLrLG0RYdmVmRyCYoBMfnw3/X47wMjPDqjT1aYvw/qid9YLD8lkPW0YeJg/mCQuqGQuqXQafc7FqULzgZLJDrbRxKJX0gkbkkk/kAi7pd//B9/AgYbhuM=",
     "docker": "eNqFVk1v2zgQvfdXCOqlC5AUvyWmtg976qEB9tRDLkXgOJaxWiewvHKKRf/7vkfKSdEmbhBLQ3I4M2/mzdiLcdpWu7tl/fn22+bw1dTV0z/DflzW/fH4eNU0p9NJnZx6OGwbq7VuoD6rXD0Nu/3frymalFKTT+tq2hzG3cN+WRsF29Nuc/rz4WlZ60pXxgZd2djVq8Xd5n5cLcbjt2GzelflPzUedfXfvKiq+90wXFX7h/3m47z3/d2LpvlF870NUd/fv6Zsf1BeD7tH+Xh77K+qfw/Dh/dcc/nHy0U+F02JbcHzv3CeU3ZWBoDDZn2EsdsRmUPgdXXa3R17oLY+qVRX/Wa37Y/LmnCb1aI524FYsG9fblvY264WtPyyieTB47VzXhijlVnLTjkZVJROKys76aMy0qlWqiRNUJ1M0iacWC+9Vt0A3ZDP8RG4t5atsrAlYc0JG3ACdeGSUJ3oKEHPtMoLblsP61Zzy0qXoJLgHuhwF9InvZbQNEkZYWkfAQgbRQdH2Igw5uDUi6gCjAfcidDmv295bFUSSePAORGpqOHIKC9dwE0TGLyB/w4RK4uAiElYOnISjqDJywDBiOf3M+Ze31wjFCsSguuli6qd+OizlNc318Yx0IsabWKYFzSsbZmQCxquZe6g8AkN8etxjhKldJejvKiRo/y9hv75+Iu+ITdf5Z33ubQuM885BKllJPFAnFSkiLqOwJ8lVFGjJllCqVDsCNyeZWYVv2Av9J4pMB1OenI0ThIEcmtpUUpPeoGUwlowz7tZurn20ZAFtqMm+KOlMySyh+MsMbrR2FkSz3uQpPF8ciWpUaR5523wMTEiA8dxrTMc3BExyRYR4T1mQSIkX6SYBDLV4o3zeWeWhGVvzReJJwZk4Wxcmg6d+0NotJIB0SMwBr4zGij5M675TWXqiOdrb2NqY8pGShpbpDEHll1kqaRxTl5g2H6WHGBiaHgOBcwaLHtMBAwUwyxxLLGtwYrAOiI7kaDOzOhKdkpGyI9Z8ozaighyJ1LXZ6ohBch2hw/9YJjN0tvAOt8Wzp35paNKQ0AFJTIdejwwDCOZGDnPYmQ9NDkY4Aszg6MuwOXEBwKBlczXt30aY2PmuFVuapXpkR+9tiR9yCll+hKnXJFGS1ScVGifnEzTw0MCXkHSyzzp0C3oIIZHCSRzhWSpSDlteVnIpc+pbPNAB+oiYa9Dz+s8moxHY/WhpS/HmeoKZ9DIhkWiOUojG9sLMjqHzr1L+DtDJbqYE5bwDVAKACxxbVl38pyYMjp+iWSpJ90mdhUHElIAcOxqK1h2vAhlioixLwOq2c4f/BZZ/Q9szgOv",
     "node-claro": "eNrlWNtOI0kS/ZVUzcu0tFlU3jNHGKnZ6d596NautBrePYXBaMsGYbfp5uv3nMgqjDGM2HkdCVzhzMjIuJ6I8ulmd60ebi63y1ljY2rUcnFzvdzOmtw1anezeDi//T5rOtUp7CouXt0Mw6xZ364Xjfq+GtabWbPcbu9+OTl5eHhoH1x7e399YruuO4Ho5ux0Nd/8V91czpp5o0j/tr7Z4sy3zeL+P3fzfvGv9W8bisItjfohn2/ps9n+GBazhlL09sfd4pfh2+pmPV/3C9xzN98uFa75SkW7f3a7VFqX8hJfHyetf7q6umpOzk5PKOLs9FoUgi73w88/zT8cCHG+LdmplNsUwtwrr+gEo01bnNNtMIOOrbFGuzaG3Ou2gMaybn3UbSxBtyZ73aaclGmtt9gwJH2y5FO2TZHibGiNy7rtimudxV7nE2TgEQcPQR6c2Yae4sBkIaY+Q7CqG0xuXXTadGDNZHJadm1Kmh+VCF258JATU99h2fGa4kUlPXLAoGeyQj/qD7XINlH10spp1TPOum1ThBG+EsHsrGmdx50KLHHUPo2bQ2g7E2FdMamHN0yAd1xRHjxZlBxJ0+Zgdxqyuqo+gmJFF4gJlVhauYiiESaqSQHyxO5uPKskWIxhKiogNlmH1jsz0mAKWXW8MEOM9pDh8c2ENOBLhtugZypzB52VfDxPCsQv08vF2J5CXGmTSzgSIW3PchCy1FM8EsYXJT6opEOowlN0xc8lvrxWZFpFmeYiQtkIC3ktss7RsbhXP+OZAqzGm/XkJi0JKskg7KSeSiZ8/tj5T6yafXF4ClC4sksIf4bboKyGucbCxNSFkY6IHApnTESJVOClQjBkxTFkSULWJSRJkKePUDhmmOBxHjVjYw2dQnp1YaTpJEYbZyg755FCBGAkI2A75nhk2Dokc2x9qeHQkntSr7k1nm6KdqJDS9/TEN5kHBZK8gq+S3GkQ5sLCgFrqbCUO5dVQSDhlNZnP0dtt5KJzA6IgEkm9lJ0Y6E4w5LQkCnEEnp5V+Zt8G2YsAa+CFKjEioaFryEKEsiQZcUak7VVJWUTeKwbCqJI8UpSQtPOoOCYtWNWIAlEap6Q/OQGW3uYiWlJHCSQY68RE4Vo2lnqvTKspC1ZcY4Sb7iA31pmHIh8lzwsdJIX5Siqp/VQO7SAOyqo1213w09S5LaVHmmDbBtLzusENsADTtRIkYCrXMMX8fwFO8raSRxOi4hCgI3lZRdpgzOajlb00jXbaHn+Ez0Gj+pYqeraNldUbZEp5ilYb31SL3q+myensAYZpeCzyU1YRfLtUAobffEfcSpMGEABUg3K72AsCrpkzPLpMpZIusdIVFSCWk25fxIBnaTMAI+1yBFMsoJtWSjMjvm/pKdyj6uBDmYIksoATwNXZbiLIWpWp8SIXloVulITVsU6i2EGmMf30IRrur7b+zmi91ifXt52ah+uLl7uUa08ah2RNvDs8HT2OzEdVKzROdCjEUFfrE13BnZYXtduyl8RSula1SA54ZfStPqxQAaA7PhoCIchQwAy4LcRo9D3D4CqohGLte4syyojhsYGuU6ThrscgwatMjOjbXWCeRmaUbZFulqRHxiuyEPEjfGjNQSxHZxFL83K12EDgCYq+VuMlw4YuXAnFDQdHFDMpBkFf+nFkE5DHbPLs5YZjgIGCRqcENOM61zeqFGPR4rvu0wdlgjvbyqoZ7USKqqQYsAK2JR/8zsPJldBOklZwTqYX4bO8ElLb56/CpYGTkTFYlOGUMI51WKarNUR/lEyZIpRT+5vOwQETMHRuNvwlIPa5OUT87TGlTjNINVJIeMWS8DoWWuUN0Xg7aUgChofcEece39lC6gvK1e8pOXDhw5SGI5SSx/dKEaLxy59Btc++jnC46oVtIjT3UhIDZyZP+4wrdUAPYJjuKUMI2AdpoA4zjRRsHVjEYE78YnR9GzXd0nVuZyMB7i+IgsQmHu03BWrqOm4TW6VobsdmXYyzm4R4337NWYpl43TZajqo8rdi2bcU9Bd5A5a5yvkR0VBUe6Ji96ZTCvgcfIkaTeXQri8Ley4AAUfHw1DcZi2KEpAr7/sFx4oacsY7zYQC+RD0teRmPHrsS6Aj6xxaXY/0H5lI2WKSvLG8pUU18M0h6XBjQOE/oRs6fK0U+lU7kZui4HukpGdRHnp307TC89weQ5FBeL7AFadJWHjdmUCQbMVKXPipSjYDpCzXKEmnv4gPB9S3HO/al+YjKUAYR41I2J85aT72QB4kSHY/SzjJKhv/F2Vt+onNiBBxyz860DDmCgxN9UJXVr0Pvj6UC8HsVXBj0xHIoQv18EJJipnT3UAkJ9TbuvtdVrtb2frzdXt/erWSPkMN8ufg6OveNvbIrR5qdX3Hpc3nt//1DdYtkAxIBXsz8TAwV6DfGl/F3aiSG+yJAjp0lw/pfsDyy4YxgMexREuVGaDe5VFMwVBVEjunK9qPNnZT4iYb381TKvHI8HGTN6oP8wJgs3xrXL6pUVXhxjkbEA9W/Z3yJtLSV8wTcUFV8s8ZIQnHLyHvTqDYu3b/j6/AaRYzhF54GXcbbAuM3uLFdr46RLym8Y1/X/cnG1OTsdbtaL+f0/7ueXN4v1Vn5v+b1R382s4XDiGvUDJAajiEU7a9DLC9ZAebwmNOp6PPj6jzNnp5vt7Z3ih+5vh9t7Vt/nfO5+pSKyd3t1tVlsZw0wrzliTO7zMWNxLxl//VjspyNGc8z2yZ6LBw6NftUJfXUC8CRXH2CaztUHMVcPtP6d9j+pbt5r40u+YFGu/pgvvTQy+vPkyytOO2L8eP7Zv9sbi+oN1NLoDAB7dQa0EmfUlf/PHV15U6lDRlveaWZ8p99yfDMQR+5g/f2bdUlHXB781veXQb6TyQkgK27wR9qz/wG5awL3",
     "node-oscuro": "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",
     "php": "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",
 }
-BRAND_RATIO = {"docker": 4.6642, "node-claro": 3.3375, "node-oscuro": 3.3375, "php": 1.854}
+BRAND_RATIO = {"docker": 4.6642, "node-claro": 3.3375, "node-oscuro": 3.3375, "php": 1.854, "nginx": 4.7595}
 _brand_cache = {}
 
 
@@ -449,11 +453,156 @@ def updates_ignore(items):
 # Menú lateral: sus apartados (clave, texto e icono) y cómo se ven (Apariencia: ~/.nexum/apariencia)
 SIDEBAR = [("ENTORNO", [("proyectos", "Proyectos", "folder-symbolic"), ("repos", "Repositorios", "logo:github"),
                         ("versiones", "Versiones de PHP", "logo:php"), ("bbdd", "Bases de datos", "logo:bbdd"),
-                        ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node")]),
+                        ("docker", "Docker", "logo:docker"), ("node", "Node", "logo:node"),
+                        ("nginx", "Nginx", "logo:nginx")]),
            ("SISTEMA", [("dominios", "Dominios y hosts", "network-workgroup-symbolic"),
                         ("config", "Configuración", "emblem-system-symbolic")])]
 # (siempre se ven: sin Configuración no se podrían volver a enseñar)
 SIDEBAR_FIXED = ("proyectos", "config")
+
+
+# Webs permitidas de la barrera entre webs (CROSS_SITE_ALLOW del script): un dominio por línea; *.empresa.com,
+# con sus subdominios
+CROSS_SITE_ALLOW_RE = r"^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+
+
+def cross_site_allowed():
+    try:
+        with open(os.path.join(LOG_DIR, "barrera-webs-permitidas"), encoding="utf-8", errors="replace") as fh:
+            lines = fh.read(100000).split("\n")
+    except OSError:
+        return []
+    return sorted({x.strip() for x in lines if re.match(CROSS_SITE_ALLOW_RE, x.strip())})
+
+
+def cross_site_domain(typed):
+    """Un dominio tal como se escribe o se pega (https://erp.empresa.com/login): sin el protocolo, la ruta ni el
+    puerto, en minúsculas (lo mismo que cross_site_domain del script). "" si no vale."""
+    d = typed.strip().lower()
+    d = d.split("://", 1)[-1]
+    for c in "/?:":
+        d = d.split(c, 1)[0]
+    d = d[:-1] if d.endswith(".") else d
+    return d if re.match(CROSS_SITE_ALLOW_RE, d) else ""
+
+
+# Espacios de trabajo de VS Code (Configuración, Carpetas): la carpeta con los .code-workspace de cada proyecto.
+# Elegida, «VS Code» abre el del proyecto (<carpeta>.code-workspace, o el que ya lleve su carpeta) y, si no
+# tiene, se le crea. Sin elegir, se abre la carpeta del proyecto. El mismo fichero que en el Mac
+VSCODE_WS_FILE = os.path.join(LOG_DIR, "vscode-espacios")
+_vscode_ws_sim = []
+
+
+def vscode_ws_dir():
+    """La carpeta elegida ("" sin elegir)."""
+    if _vscode_ws_sim:
+        return _vscode_ws_sim[0]
+    try:
+        with open(VSCODE_WS_FILE, encoding="utf-8", errors="replace") as fh:
+            path = fh.readline().strip()
+    except OSError:
+        return ""
+    return path if path.startswith("/") else ""
+
+
+def vscode_ws_save(path):
+    if SIMULATE:
+        _vscode_ws_sim[:] = [path]
+        return
+    if not path:
+        try:
+            os.remove(VSCODE_WS_FILE)
+        except FileNotFoundError:
+            pass
+        return
+    os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+    with open(VSCODE_WS_FILE + ".nuevo", "w", encoding="utf-8") as fh:
+        fh.write(path + "\n")
+    os.replace(VSCODE_WS_FILE + ".nuevo", VSCODE_WS_FILE)
+
+
+def vscode_ws_folders(path):
+    """Las carpetas de un .code-workspace (JSON con comentarios y comas de más, como lo guarda VS Code), con las
+    rutas relativas a su sitio ya resueltas. [] si no se puede leer."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read(1000000)
+    except OSError:
+        return []
+    # (sin los comentarios, fuera de las cadenas, ni las comas antes de ] o })
+    text = re.sub(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', lambda m: m.group(1) or "", text, flags=re.S)
+    text = re.sub(r",(\s*[\]}])", r"\1", text)
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    out = []
+    for f in data.get("folders", []) if isinstance(data, dict) else []:
+        p = f.get("path") if isinstance(f, dict) else None
+        if isinstance(p, str) and p:
+            p = os.path.expanduser(p)
+            out.append(os.path.realpath(os.path.join(os.path.dirname(path), p)))
+    return out
+
+
+def vscode_ws_candidates(wsdir):
+    """Los .code-workspace de la carpeta elegida y de sus subcarpetas de primer nivel (por si se tienen
+    clasificados por tipo de proyecto: wordpress/, tiendas/...): primero los de la carpeta, luego cada
+    subcarpeta por orden. Las subcarpetas ocultas no cuentan."""
+    out = []
+    try:
+        entries = sorted(os.listdir(wsdir))
+    except OSError:
+        return out
+    subdirs = []
+    for n in entries:
+        p = os.path.join(wsdir, n)
+        if n.endswith(".code-workspace") and os.path.isfile(p):
+            out.append(p)
+        elif not n.startswith(".") and os.path.isdir(p):
+            subdirs.append(p)
+    for d in subdirs:
+        try:
+            out.extend(os.path.join(d, n) for n in sorted(os.listdir(d))
+                       if n.endswith(".code-workspace") and os.path.isfile(os.path.join(d, n)))
+        except OSError:
+            pass
+    return out
+
+
+def vscode_workspace(folder, create=True):
+    """El .code-workspace de un proyecto en la carpeta de los espacios de trabajo o en una de sus subcarpetas de
+    primer nivel: <carpeta>.code-workspace si existe; si no, otro que ya tenga la carpeta del proyecto; si no hay
+    ninguno, se crea <carpeta>.code-workspace con ella en la carpeta elegida (con create). None sin carpeta
+    elegida o si no se ha podido crear."""
+    wsdir = vscode_ws_dir()
+    if not wsdir or not os.path.isdir(wsdir):
+        return None
+    folder = os.path.realpath(folder)
+    path = os.path.join(wsdir, os.path.basename(folder) + ".code-workspace")
+    found = vscode_ws_candidates(wsdir)
+    for p in found:
+        if os.path.basename(p) == os.path.basename(path):
+            return p
+    for p in found:
+        if folder in vscode_ws_folders(p):
+            return p
+    if not create:
+        return None
+    if SIMULATE:
+        return path
+    try:
+        with open(path, "x", encoding="utf-8") as fh:
+            json.dump({"folders": [{"path": folder}], "settings": {}}, fh, indent="\t")
+            fh.write("\n")
+    except OSError:
+        return None
+    return path
+
+
+def nginx_used():
+    """Nginx, apagado de serie: su pestaña solo sale encendido (Configuración, Nginx: nginx-usar si)."""
+    return os.path.exists(os.path.join(LOG_DIR, "nginx", "usar"))
 LOOK_FILE = os.path.join(LOG_DIR, "apariencia")
 _look_sim = {}
 
@@ -655,6 +804,7 @@ ROW_ICONS = [
     ("Hosts del sistema", ("icono", "network-server-symbolic", "")),
     ("Copias de seguridad", ("icono", "drive-harddisk-symbolic", "")),
     ("Copias de los ficheros", ("icono", "document-save-symbolic", "")),
+    ("Espacios de trabajo de VS Code", ("icono", "text-editor-symbolic", "")),
     ("Registros de instalaciones", ("icono", "document-open-recent-symbolic", "")),
     ("Caché de descargas", ("icono", "folder-download-symbolic", "")),
     ("error_log de ", ("logo", "apache")),
@@ -768,6 +918,29 @@ class ActionRow(Gtk.ListBoxRow):
     def add_suffix(self, w):
         w.set_valign(Gtk.Align.CENTER)
         self.suffix.pack_start(w, False, False, 0)
+
+    def text_lines(self, chars=60):
+        """Cuántas líneas ocupan su título y su subtítulo con los botones al lado (unos 60 caracteres)."""
+        sub = self.subtitle.get_text() if self.subtitle.get_visible() or self.subtitle.get_text() else ""
+        return sum(max(1, -(-len(t) // chars)) for t in [self.title.get_text()] + (sub.split("\n") if sub else []))
+
+    def suffix_below(self, chars=72):
+        """Los botones de la derecha, debajo del texto (a su derecha), y el texto con todo el ancho: para
+        una fila de más de dos líneas, que con los botones al lado se quedaba en una columna estrecha."""
+        if self.suffix.get_parent() is not self.header:
+            return
+        self.header.remove(self.suffix)
+        self.suffix.set_halign(Gtk.Align.END)
+        self.suffix.set_margin_top(8)
+        self.texts.pack_start(self.suffix, False, False, 0)
+        self.prefix.set_valign(Gtk.Align.START)
+        self.prefix.set_margin_top(2)
+        for w in self.prefix.get_children():
+            w.set_valign(Gtk.Align.START)
+        for lbl in (self.title, self.subtitle):
+            lbl.set_ellipsize(0)
+            lbl.set_line_wrap(True)
+            lbl.set_max_width_chars(chars)
 
 
 class ExpanderRow(ActionRow):
@@ -1192,46 +1365,26 @@ def copy_check(warn="Sin copia, lo que se sustituya no se podrá recuperar."):
     return box
 
 
-# TASK_GUARD[0](): con otra tarea en marcha, lo dice (nombrándola) y devuelve True; lo pone la ventana al abrirse
+# TASK_GUARD[0](): con otra tarea en marcha, lo que se añade a la pregunta de una tarea (que va a la cola), o None;
+# lo pone la ventana al abrirse
 TASK_GUARD = [None]
 
 
 def busy_guard(w, dim):
-    """Un botón (o interruptor, o desplegable) que lanza una tarea: con otra en marcha se puede pulsar igual, pero
-    en vez de hacer lo suyo dice cuál sigue (TASK_GUARD). dim: si se pinta atenuado ahora (hay una en marcha).
-    Se puede llamar cada vez que se redibuja: la guarda se pone una sola vez y mira si hay tarea al pulsar."""
+    """Un botón (o interruptor, o desplegable) que lanza una tarea: con otra en marcha se pinta atenuado (dim), pero
+    hace lo suyo igual: su tarea va a la cola y empieza cuando acabe la de ahora. Se puede llamar cada vez que se
+    redibuja."""
     w.get_style_context().add_class("nv-espera") if dim else w.get_style_context().remove_class("nv-espera")
-    if getattr(w, "nv_guard", None) is None:
-        def busy():
-            return TASK_GUARD[0] is not None and TASK_GUARD[0](check=True)
-
-        def pressed(gesture, *_):
-            if busy():
-                gesture.set_state(Gtk.EventSequenceState.CLAIMED)
-                GLib.idle_add(lambda: TASK_GUARD[0]() and False)
-            else:
-                gesture.set_state(Gtk.EventSequenceState.DENIED)
-
-        def key(_w, ev):
-            if ev.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter, Gdk.KEY_space) and busy():
-                GLib.idle_add(lambda: TASK_GUARD[0]() and False)
-                return True
-            return False
-        # (en la fase de captura: antes que el propio botón, y también para lo de dentro de un desplegable)
-        g = Gtk.GestureMultiPress(widget=w)
-        g.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        g.connect("pressed", pressed)
-        w.nv_guard = g
-        w.connect("key-press-event", key)
     return w
 
 
 def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=None, task=True):
     """Pregunta con Cancelar / ok_label. extra: widget opcional debajo del texto. steps: los
     cambios que se van a hacer (numerados); text va entonces debajo, como nota. task: lo que se
-    confirma es una tarea; con otra en marcha no se pregunta (no van dos a la vez) y se dice cuál sigue."""
-    if task and TASK_GUARD[0] is not None and TASK_GUARD[0]():
-        return False
+    confirma es una tarea; con otra en marcha, se dice que va a la cola."""
+    note = TASK_GUARD[0]() if task and TASK_GUARD[0] is not None else None
+    if note:
+        text = (text + "\n\n" if text else "") + note
     dlg = Gtk.MessageDialog(transient_for=parent, modal=True,
                             message_type=Gtk.MessageType.QUESTION,
                             buttons=Gtk.ButtonsType.NONE, text=title)
@@ -1253,6 +1406,27 @@ def confirm(parent, title, text, ok_label, destructive=False, extra=None, steps=
     return resp == Gtk.ResponseType.ACCEPT
 
 
+def screen_height(widget=None):
+    """Alto útil (sin barras del escritorio) del monitor de widget o, sin él, del principal."""
+    try:
+        disp = Gdk.Display.get_default()
+        win = widget.get_window() if widget is not None else None
+        mon = (disp.get_monitor_at_window(win) if win is not None else None) or \
+            disp.get_primary_monitor() or disp.get_monitor(0)
+        return mon.get_workarea().height
+    except Exception:  # noqa: BLE001
+        return 800
+
+
+def scroll_list(child, parent=None, top=360):
+    """child en un recuadro con scroll si no cabe: como mucho top de alto, y menos si la pantalla
+    (la de parent) es baja, para que el diálogo no crezca hasta salirse de ella."""
+    sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
+                            max_content_height=max(160, min(top, screen_height(parent) - 340)))
+    sw.add(child)
+    return sw
+
+
 # Los desplegables de la ventana con COMBO_SEARCH_MIN opciones o más: al abrirlos, en lugar del menú de
 # GTK, una lista con un buscador. Se escribe y se queda solo lo que lleva ese texto, como en la barra de
 # búsqueda de los proyectos; las flechas eligen, Intro la escoge y Esc cierra sin cambiar nada
@@ -1265,7 +1439,20 @@ def combo_search(combo):
     if model is None or len(model) < COMBO_SEARCH_MIN or not isinstance(model[0][0], str):
         return False
     names = [row[0] for row in model]
-    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.BOTTOM, modal=True)
+    # La lista no puede salir de su ventana (GTK 3 la recorta por el borde): se abre hacia donde haya
+    # más sitio (debajo, si cabe) y con el alto que quede, para que no se corte
+    up, room = False, 360
+    top = combo.get_toplevel()
+    pos = combo.translate_coordinates(top, 0, 0) if top is not None else None
+    if pos is not None:
+        win_h, combo_h = top.get_allocated_height(), combo.get_allocated_height()
+        below, above = win_h - pos[1] - combo_h, pos[1]
+        up = below < min(above, 300)
+        # (quitando el buscador, los márgenes y la flecha)
+        room = (above if up else below) - 80
+    pop = Gtk.Popover(relative_to=combo, position=Gtk.PositionType.TOP if up else Gtk.PositionType.BOTTOM,
+                      modal=True)
+    pop.set_constrain_to(Gtk.PopoverConstraint.WINDOW)
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
     entry = Gtk.SearchEntry(placeholder_text="Buscar…")
     lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE, activate_on_single_click=True)
@@ -1284,7 +1471,8 @@ def combo_search(combo):
     # (como poco, tan ancha como el desplegable; si los nombres son más largos, lo que haga falta para
     # verlos enteros, hasta 640)
     sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_height=True,
-                            propagate_natural_width=True, max_content_height=360, max_content_width=640,
+                            propagate_natural_width=True, max_content_height=max(120, min(360, room)),
+                            max_content_width=640,
                             min_content_width=max(combo.get_allocated_width(), 240))
     sw.add(lb)
     box.pack_start(entry, False, False, 0)

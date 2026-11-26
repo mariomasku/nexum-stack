@@ -1,33 +1,6 @@
-# Vistas y rutinas SQL SECURITY INVOKER de un volcado: se ejecutarian con los permisos de quien las
-# use (root en phpMyAdmin, o en la web si su wp-config.php usa root). Pasan a DEFINER, de
-# lvm_bd_<base> (lo hace ese mismo usuario). Con --force: una vista rota del volcado no para las
-# demas. Las que no se dejen cambiar se borran, y se avisa. db_neutralize_invoker <base> <cliente...>
-function db_neutralize_invoker() {
-    local db=$1 left
-    shift
-    local list="FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() AND SECURITY_TYPE = 'INVOKER'"
-    local rlist="FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE() AND SECURITY_TYPE = 'INVOKER'"
-    "$@" --raw -N "$db" -e "SELECT CONCAT('ALTER SQL SECURITY DEFINER VIEW \`', REPLACE(TABLE_NAME, '\`', '\`\`'), '\` AS ', VIEW_DEFINITION, ';') $list;
-        SELECT CONCAT('ALTER ', ROUTINE_TYPE, ' \`', REPLACE(ROUTINE_NAME, '\`', '\`\`'), '\` SQL SECURITY DEFINER;') $rlist" \
-        < /dev/null 2> /dev/null | "$@" --force "$db" > /dev/null 2>&1
-    left=$("$@" --raw -N "$db" -e "SELECT CONCAT('vista ', TABLE_NAME) $list; SELECT CONCAT(LOWER(ROUTINE_TYPE), ' ', ROUTINE_NAME) $rlist" < /dev/null 2> /dev/null)
-    [ -z "$left" ] && return 0
-    "$@" --raw -N "$db" -e "SELECT CONCAT('DROP VIEW IF EXISTS \`', REPLACE(TABLE_NAME, '\`', '\`\`'), '\`;') $list;
-        SELECT CONCAT('DROP ', ROUTINE_TYPE, ' IF EXISTS \`', REPLACE(ROUTINE_NAME, '\`', '\`\`'), '\`;') $rlist" \
-        < /dev/null 2> /dev/null | "$@" --force "$db" > /dev/null 2>&1
-    echo "Aviso: el volcado traia vistas o rutinas SQL SECURITY INVOKER que no se han podido pasar a"
-    echo "DEFINER (rotas o mal hechas). Se han borrado, porque se ejecutarian con los permisos de quien"
-    echo "las usara: $(printf '%s' "$left" | tr -c '[:alnum:]_ \n-' '?' | head -20 | paste -sd ',' - | sed 's/,/, /g')"
-    # (lo que no haya podido borrar este usuario, como los paquetes de MariaDB 10.4, lo borra root
-    # en db_root_cleanup)
-    return 0
-}
-
-# Eventos y tablas con DATA DIRECTORY o INDEX DIRECTORY de un volcado. Los eventos se ejecutan solos
-# (si el planificador de MariaDB esta encendido) aunque el usuario de la base este bloqueado, y
-# podrian volver a crear vistas INVOKER. Las tablas con esas opciones guardan sus ficheros fuera de
-# la carpeta de MariaDB (en las de otras versiones, en /tmp...). Se borran, y se avisa (lo hace el
-# usuario de la base). db_neutralize_extras <base> <cliente...>
+# Tablas con DATA DIRECTORY o INDEX DIRECTORY (guardan sus ficheros fuera de la carpeta de MariaDB):
+# las que borra db_root_cleanup. Desde la 1.57.48 los volcados se cargan como root y esto solo repasa
+# las bases de los usuarios lvm_bd_<base> de antes que se quedaran sin bloquear (db_drop_import_users)
 DB_DIRECTORY_PY='
 import re, sys
 # Salida de SHOW CREATE TABLE con -N --batch: nombre<TAB>sentencia, con \n \t \\ escapados
@@ -44,42 +17,6 @@ for line in sys.stdin:
     if re.search(r"(?i)\b(DATA|INDEX)\s+DIRECTORY\s*=?\s*Q", options(unesc(create))):
         print("DROP TABLE IF EXISTS `%s`;" % unesc(name).replace("`", "``"))
 '
-function db_neutralize_extras() {
-    local db=$1 events tables drop
-    shift
-    local elist="FROM information_schema.EVENTS WHERE EVENT_SCHEMA = DATABASE()"
-    events=$("$@" --raw -N "$db" -e "SELECT EVENT_NAME $elist" < /dev/null 2> /dev/null)
-    if [ -n "$events" ]; then
-        "$@" --raw -N "$db" -e "SELECT CONCAT('DROP EVENT IF EXISTS \`', REPLACE(EVENT_NAME, '\`', '\`\`'), '\`;') $elist" \
-            < /dev/null 2> /dev/null | "$@" --force "$db" > /dev/null 2>&1
-        echo "Aviso: el volcado traia eventos programados (se ejecutan solos en el servidor). Se han"
-        echo "borrado: $(printf '%s' "$events" | tr -c '[:alnum:]_ \n-' '?' | head -20 | paste -sd ',' - | sed 's/,/, /g')"
-    fi
-    # Las particionadas no lo dicen en CREATE_OPTIONS: se mira su SHOW CREATE TABLE
-    local tlist="FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'"
-    drop=$( { "$@" --raw -N "$db" -e "SELECT CONCAT('DROP TABLE IF EXISTS \`', REPLACE(TABLE_NAME, '\`', '\`\`'), '\`;')
-                $tlist AND CREATE_OPTIONS LIKE '%DIRECTORY%'" < /dev/null 2> /dev/null
-              "$@" --raw -N "$db" -e "SELECT CONCAT('SHOW CREATE TABLE \`', REPLACE(TABLE_NAME, '\`', '\`\`'), '\`;')
-                $tlist AND CREATE_OPTIONS LIKE '%partitioned%'" < /dev/null 2> /dev/null \
-                  | "$@" -N --batch --force "$db" 2> /dev/null | /usr/bin/python3 -I -c "$DB_DIRECTORY_PY"; } | sort -u)
-    [ -z "$drop" ] && return 0
-    tables=$(printf '%s\n' "$drop" | sed -e 's/^DROP TABLE IF EXISTS `//' -e 's/`;$//')
-    printf '%s\n' "$drop" | "$@" --force "$db" > /dev/null 2>&1
-    echo "Aviso: el volcado traia tablas con DATA DIRECTORY o INDEX DIRECTORY, que guardan sus ficheros"
-    echo "fuera de la carpeta de MariaDB. Se han borrado (con sus ficheros): $(printf '%s' "$tables" \
-        | tr -c '[:alnum:]_ \n-' '?' | head -20 | paste -sd ',' - | sed 's/,/, /g')"
-    if [ -n "$("$@" --raw -N "$db" -e "SELECT 1 $tlist AND CREATE_OPTIONS LIKE '%DIRECTORY%' LIMIT 1" < /dev/null 2> /dev/null)" ]; then
-        echo "ATENCION: siguen quedando tablas con DATA DIRECTORY en $db."
-    fi
-    return 0
-}
-
-# Huella mysql_native_password de una contraseña leida de la entrada (asi no va en ninguna linea de
-# ordenes, que cualquier usuario del equipo ve con ps)
-function db_pass_hash() {
-    python3 -I -c 'import hashlib, sys; p = sys.stdin.buffer.read(); print("*" + hashlib.sha1(hashlib.sha1(p).digest()).hexdigest().upper())'
-}
-
 # Bloquea el usuario de una base (con otra contraseña al azar): ya no puede entrar, pero lo suyo
 # (vistas, disparadores) sigue funcionando. Se borra y se vuelve a crear con solo los permisos de su
 # base: si durante la carga hubiera conseguido otros (globales, de otras bases, roles), no le quedan.

@@ -31,11 +31,24 @@ printf '#!/bin/sh\n' > "$W/src/public_html/run.sh"; chmod 755 "$W/src/public_htm
 fresh; out=$(go "$W/normal.zip" fusionar); rc=$?
 check "fusionar (.zip): copia lo que trae, de dentro de public_html" '[ $rc -eq 0 ] && [ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/wp-content/tema.php")" == tema ] && [ ! -e "$P/public_html" ]'
 check "fusionar: deja lo que no trae y .git" '[ -f "$P/antiguo/solo-aqui.php" ] && [ -f "$P/wp-content/uploads/foto.jpg" ] && [ "$(cat "$P/.git/config")" == repo ]'
-check "lo sustituido queda en las copias; lo igual ni se copia" '[ "$(cat "$W/copias/index.php")" == viejo ] && [ ! -e "$W/copias/igual.txt" ] && grep -q "1 iguales" <<< "$out" && grep -q "Lo que se ha sustituido o quitado esta en" <<< "$out"'
+check "lo sustituido queda en las copias; lo igual ni se copia" '[ "$(cat "$W/copias/index.php")" == viejo ] && [ ! -e "$W/copias/igual.txt" ] && grep -qE "│   Iguales: no se tocan +1 │" <<< "$out" && grep -q "Lo que se ha sustituido o quitado esta en" <<< "$out"'
+check "el registro: los primeros nuevos y modificados, cada uno aparte, y el recuadro con las cuentas (1.57.50)" 'grep -q "^Modificados, se sustituyen: 1 fichero$" <<< "$out" && grep -q "^  ~ index.php$" <<< "$out" && grep -q "^Nuevos, se copian: " <<< "$out" && grep -qE "│   Modificados: se sustituyen +1 │" <<< "$out" && grep -q "Código de producción" <<< "$out" && grep -qE "│ VIENEN EN EL CÓDIGO +[0-9]+ │" <<< "$out" && grep -qE "│ SOLO EN TU CARPETA \(no vienen\) +[1-9]" <<< "$out" && grep -qE "│   Se dejan como están \(fusionar\) +[1-9]" <<< "$out"' || echo "$out" | tail -15
+# Lo que no viene: hasta 25, una a una; con mas, por carpetas y la lista entera a un fichero (1.57.49)
+check "registro: lo que no viene, uno a uno y con una linea en blanco delante" 'grep -q "^  · antiguo/ (1 fichero)$" <<< "$out" && grep -B1 "^Solo en tu carpeta (no vienen en el código), se dejan como están: " <<< "$out" | head -1 | grep -q "^$"'
+fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/normal.zip" fusionar "$W/copias" "$W/tmp" 0 "$W/informes/proyecto-registro-1" 2>&1)
+check "registro: con mas de 25, por carpetas y la lista entera en un fichero" 'grep -q "^  · viejos/ (30 ficheros)$" <<< "$out" && ! grep -q "viejos/f1.php" <<< "$out" && grep -q "La lista entera, fichero a fichero: $W/informes/proyecto-registro-1-no-vienen-se-dejan.txt" <<< "$out" && [ "$(grep -c "^viejos/f" "$W/informes/proyecto-registro-1-no-vienen-se-dejan.txt")" = 30 ]' || echo "$out" | tail -25
+fresh; mkdir -p "$P/viejos"; for i in $(seq 1 30); do echo x > "$P/viejos/f$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/normal.zip" fusionar "$W/copias" "$W/tmp" 1 "$W/informes/simulado" 2>&1)
+check "registro: en simulacion no guarda la lista" '[ ! -e "$W/informes/simulado-no-vienen-se-dejan.txt" ]'
+fresh; mkdir -p "$W/muchos"; for i in $(seq 1 8); do echo n > "$W/muchos/n$i.php"; echo v > "$P/m$i.php"; echo n > "$W/muchos/m$i.php"; done
+out=$(python3 -I -c "$CODE" "$P" "$W/muchos" fusionar "$W/copias" "$W/tmp" 0 "$W/informes/primeros" 2>&1)
+check "registro: de nuevos y modificados, los 5 primeros de cada uno y la lista entera a un fichero" '[ "$(grep -c "^  + n" <<< "$out")" = 5 ] && [ "$(grep -c "^  ~ m" <<< "$out")" = 5 ] && [ "$(grep -c "^  ... y 3 más$" <<< "$out")" = 2 ] && grep -q "^Nuevos, se copian: 8 ficheros (los 5 primeros)$" <<< "$out" && [ "$(grep -c "^n" "$W/informes/primeros-nuevos.txt")" = 8 ] && [ "$(grep -c "^m" "$W/informes/primeros-modificados.txt")" = 8 ]' || echo "$out" | head -30
 check "no quedan ficheros a medias ni el temporal" '[ -z "$(find "$P" -name ".lvm-parte-*")" ] && [ -z "$(ls -A "$W/tmp")" ]'
 
 fresh; out=$(go "$W/normal.tgz" sobrescribir); rc=$?
 check "sobrescribir (.tar.gz): quita lo que no trae, a las copias" '[ $rc -eq 0 ] && [ ! -e "$P/antiguo" ] && [ ! -e "$P/wp-content/uploads" ] && [ -f "$W/copias/antiguo/solo-aqui.php" ] && [ -f "$W/copias/wp-content/uploads/foto.jpg" ]'
+check "sobrescribir: lo quitado sale en el registro, con los ficheros de cada carpeta" 'grep -q "^  - antiguo/ (1 fichero)" <<< "$out" && grep -qE "│   Se quitan \(sobrescribir\) +[1-9]" <<< "$out" && grep -q "^Solo en tu carpeta (no vienen en el código), se quitan: " <<< "$out"' || echo "$out" | tail -15
 check "sobrescribir: .git no se toca" '[ "$(cat "$P/.git/config")" == repo ] && [ ! -e "$W/copias/.git" ]'
 check "sobrescribir: lo que trae se queda" '[ "$(cat "$P/index.php")" == nuevo ] && [ "$(cat "$P/igual.txt")" == igual ] && [ -x "$P/run.sh" ]'
 
@@ -147,8 +160,21 @@ echo "SELECT 1;" > "$W/d.sql"
 fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "pasos: pull, codigo, BBDD (protegida, de este proyecto) y volver a cargar" '[ $rc -eq 0 ] && [ "$(grep -v connect "$W/orden" | cut -d" " -f1 | tr "\n" " ")" == "pull cierra bd carga " ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto" "$W/orden" && grep -q "carga proyecto  wp_x" "$W/orden" && [ "$(cat "$P/index.php")" == nuevo ] && [ ! -e "$COPIES_DIR" ] && grep -q "Sin copia" <<< "$out"'
 check "pull por SSH de su repositorio" 'grep -q "pull git@github.com:empresa/proyecto.git" "$W/orden"'
+# Sin BBDD (1.57.48): --crear-base la crea (vacia o con el volcado) y queda como la suya
+db_exists() { [ -n "$EXISTE" ]; }
+create_database() { echo "crea $1" >> "$W/orden"; }
+import_project() { echo "asocia $1 $2" >> "$W/orden"; }
+fresh; : > "$W/orden"; out=$(project_update proyecto --crear-base --base wp_nueva); rc=$?
+check "--crear-base sin nada mas: crea la BBDD vacia, la asocia y vuelve a cargarlo con ella" '[ $rc -eq 0 ] && [ "$(grep -v connect "$W/orden" | cut -d" " -f1 | tr "\n" " ")" == "crea asocia carga " ] && grep -q "asocia wp_nueva proyecto" "$W/orden" && grep -q "carga proyecto  wp_nueva" "$W/orden" && grep -q "no tenía BBDD" <<< "$out"' || echo "$out"
+fresh; : > "$W/orden"; out=$(EXISTE=1 project_update proyecto --crear-base --base wp_nueva); rc=$?
+check "--crear-base con una BBDD que ya existe: no la crea, solo la asocia" '[ $rc -eq 0 ] && ! grep -q "^crea" "$W/orden" && grep -q "asocia wp_nueva proyecto" "$W/orden"'
+fresh; : > "$W/orden"; out=$(project_update proyecto --crear-base --bd "$W/d.sql" --base wp_nueva); rc=$?
+check "--crear-base con volcado: se crea al cargarlo (importar-bd --crear)" '[ $rc -eq 0 ] && ! grep -q "^crea" "$W/orden" && grep -q "bd $W/d.sql wp_nueva --crear --proyecto proyecto" "$W/orden"'
+out=$(project_update proyecto --crear-base); rc=$?
+check "--crear-base sin --base: no vale" '[ $rc -ne 0 ] && grep -q "^Uso:" <<< "$out"'
+unset -f db_exists create_database import_project
 fresh; : > "$W/orden"; out=$(project_update proyecto --codigo "$W/normal.zip" --modo fusionar --bd "$W/d.sql" --base wp_x --copia); rc=$?
-check "con --copia: lo sustituido en ~/nexum-backups y la BBDD se carga con --copia" '[ $rc -eq 0 ] && [ "$(cat "$COPIES_DIR"/proyecto-antes-de-actualizar-*/index.php)" == viejo ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto --copia" "$W/orden"'
+check "con --copia: lo sustituido en ~/nexum-backups y la BBDD se carga con --copia" '[ $rc -eq 0 ] && [ "$(cat "$COPIES_DIR"/proyectos/proyecto/antes-de-actualizar-*/index.php)" == viejo ] && grep -q "bd $W/d.sql wp_x --crear --proyecto proyecto --copia" "$W/orden"'
 fresh; : > "$W/orden"; out=$(PULL_RC=1 project_update proyecto --codigo "$W/normal.zip" --pull --bd "$W/d.sql" --base wp_x); rc=$?
 check "si el pull falla, no se copia ni se carga nada" '[ $rc -ne 0 ] && [ "$(cat "$P/index.php")" == viejo ] && ! grep -qE "^(bd|carga)" "$W/orden" && grep -q "No se ha copiado" <<< "$out"'
 fresh; : > "$W/orden"; out=$(BD_RC=1 project_update proyecto --bd "$W/d.sql" --base wp_x); rc=$?
@@ -254,19 +280,40 @@ if grep -q "LVM_SWIFT" "$SRC"; then
     check "Mac: las zonas, altas y de otro color; al arrastrar, otro color y el borde azul" 'grep -q ".frame(minHeight: 112)" "$SRC" && grep -q ".stroke(over.wrappedValue || !path.isEmpty ? Color.blue : Color.primary.opacity(0.28)" "$SRC"'
     check "Mac: el nombre de la BBDD, como texto y en azul (campo solo si no tiene ninguna)" 'grep -q "Text(model.upDb).fontWeight(.bold).foregroundColor(.blue)" "$SRC" && grep -q "if model.upDbKnown {" "$SRC"'
     check "Mac: pregunta por el pull antes de copiar" 'grep -q "\"¿Hacer git pull antes de copiar?\"" "$SRC" && grep -q "\[\"gui-proyecto-git\", folder\]" "$SRC"'
-    check "Mac: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "model.upSql.isEmpty ? \"Se sigue usando la BBDD\" : \"Se carga en la BBDD\"" "$SRC" && grep -q "let can = (!model.upSql.isEmpty || !model.upCode.isEmpty)" "$SRC"'
+    check "Mac: sin BBDD lo dice y deja crearla (--crear-base)" 'grep -q "\"Este proyecto no tiene base de datos\"" "$SRC" && grep -q "(create ? \[\"--crear-base\"\] : \[\])" "$SRC"'
+    check "Mac: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "var dbLine: String = hasSql ? \"Se carga en la BBDD\" : \"Se sigue usando la BBDD\"" "$SRC" && grep -q "let can: Bool = (hasSql || hasCode || making)" "$SRC"'
     check "Mac: tambien solo con el codigo le dice su BBDD" 'grep -q "if !db.isEmpty { args += \[\"--base\", db\] }" "$SRC"'
 else
     check "Linux: el boton, en los del proyecto cargado" 'grep -q "(\"actualizar\", \"Actualizar\", (\"logo\", \"actualizar\"))" "$SRC" && grep -q "btns\[\"actualizar\"\] = nv_button(logo(\"actualizar\", 18), \"Actualizar\", \"Actualizar proyecto\"" "$SRC"'
     check "Linux: dialogo con sus dos zonas para arrastrar o elegir" 'grep -q "drag_dest_add_uri_targets()" "$SRC" && grep -q "connect(\"drag-data-received\"" "$SRC" && grep -q "def nv_update_project(self, x):" "$SRC"'
     check "Linux: las zonas, altas y de otro color; al arrastrar, otro color y el borde azul" 'grep -q "ev.set_size_request(-1, 112)" "$SRC" && grep -q "^.nv-zona { background-color: alpha(@theme_fg_color" "$SRC" && grep -q "^.nv-zona-lista { background-color: alpha(%(b)s, 0.10); border: 2px solid %(b)s; }" "$SRC" && grep -q "zone_ctx.add_class(\"nv-zona-lista\")" "$SRC" && grep -q "^.nv-zona:drop(active) { background-color: alpha(%(b)s, 0.30); border: 2px solid %(b)s" "$SRC"'
-    check "Linux: el nombre de la BBDD, como texto y en azul (campo solo si no tiene ninguna)" 'grep -q "label(known_db, \"nv-bbdd\", selectable=True) if known_db else db_entry" "$SRC" && grep -q "^.nv-bbdd { color: mix(%(b)s" "$SRC"'
+    check "Linux: el nombre de la BBDD, como texto y en azul (campo solo si no tiene ninguna)" 'grep -q "db_entry if no_db else label(known_db, \"nv-bbdd\", selectable=True)" "$SRC" && grep -q "^.nv-bbdd { color: mix(%(b)s" "$SRC"'
     check "Linux: pregunta por el pull antes de copiar" 'grep -q "\"¿Hacer git pull antes de copiar?\"" "$SRC" && grep -q "run_quick(\[\"gui-proyecto-git\", folder\], got)" "$SRC"'
-    check "Linux: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "\"Se carga en la BBDD\" if state\[\"sql\"\] else \"Se sigue usando la BBDD\"" "$SRC" && grep -q "go.set_sensitive(bool(state\[\"sql\"\] or state\[\"code\"\])" "$SRC"'
+    check "Linux: sin BBDD lo dice y deja crearla (--crear-base)" 'grep -q "\"Este proyecto no tiene base de datos\" if not known_db" "$SRC" && grep -q "\[\"--crear-base\"\] if making" "$SRC"'
+    check "Linux: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "\"Se carga en la BBDD\" if state\[\"sql\"\] else \"Se sigue usando la BBDD\"" "$SRC" && grep -q "go.set_sensitive(bool(state\[\"sql\"\] or state\[\"code\"\] or making)" "$SRC"'
     check "Linux: tambien solo con el codigo le dice su BBDD" 'grep -q "args += \[\"--base\", db\]" "$SRC"'
     check "Linux: el boton Log abre el error_log general de Apache" 'grep -q "^APACHE_ERROR_LOG = \"/opt/lampp/logs/error_log\"$" "$SRC" && grep -q "lambda \*_: self.show_log_tail(APACHE_ERROR_LOG), \"nv-proyecto-btn\"" "$SRC" && ! grep -q "loaded_project_log" "$SRC"'
 fi
 check "Imagenes de produccion: solo en WordPress y PrestaShop, en los dos visores" 'if grep -q "^let ERROR_LOG = " "$SRC"; then [ "$(grep -c "items\[\"imagenes\"\] = AnyView" "$SRC")" = 2 ] && grep -q "x.kind == \"wp\" || x.kind == \"ps\"" "$SRC" && grep -q "(\"imagenes\", \"Imágenes de producción\")" "$SRC" && [ "$(grep -c "name: \"Imágenes de producción\", icon: .logo(\"imagenes\")" "$SRC")" = 2 ] && grep -q "tip: \"Traer de producción las imágenes que falten\") {" "$SRC" && grep -q "tip.hasPrefix(name) ? tip" "$SRC" && ! grep -q "name: \"Importar\"" "$SRC"; else [ "$(grep -c "btns\[\"imagenes\"\] = self.nv_images_button" "$SRC")" = 2 ] && grep -q "if x\[\"kind\"\] in (\"wp\", \"ps\"):" "$SRC" && grep -q "(\"imagenes\", \"Imágenes de producción\", (\"logo\", \"imagenes\"))" "$SRC" && grep -q "nv_button(logo(\"imagenes\", 18), \"Imágenes de producción\"," "$SRC" && grep -q "\"Traer de producción las imágenes que falten\"," "$SRC"; fi'
+# Lo que trae el git pull, en el registro (1.57.49): la lista de lo que ya no trae y el recuadro
+extract "$SRC" repo_pull_summary summary_box || exit 1
+G=$W/git; mkdir -p "$G"
+( cd "$G" && git init -q o && cd o && for f in a b c; do echo $f > $f; done && git add . \
+    && git -c user.name=x -c user.email=x@x.test commit -qm 1 && cd .. && git clone -q o c && cd o && echo b2 > b && rm c \
+    && echo d > d && git add -A && git -c user.name=x -c user.email=x@x.test commit -qm 2 )
+b=$(git -C "$G/c" rev-parse HEAD); git -C "$G/c" pull -q 2> /dev/null
+out=$(repo_pull_summary "$G/c" "$b")
+check "pull: solo lista los que ya no trae (borrados), con su recuadro" '! grep -q "^  + d$" <<< "$out" && ! grep -q "^  ~ b$" <<< "$out" && grep -q "^  - c$" <<< "$out" && grep -q "^Ya no los trae (borrados en GitHub): 1 fichero$" <<< "$out" && grep -qE "│ Nuevos +1 │" <<< "$out" && grep -qE "│ Sin tocar +1 │" <<< "$out" && grep -qE "Ficheros del repositorio \(total\) +3 │" <<< "$out"' || echo "$out"
+( cd "$G/o" && mkdir -p tema && for i in $(seq 1 30); do echo $i > tema/t$i; done && git add -A && git -c user.name=x -c user.email=x@x.test commit -qm 3 \
+    && git rm -rq tema && git -c user.name=x -c user.email=x@x.test commit -qm 4 )
+b=$(git -C "$G/c" rev-parse HEAD); git -C "$G/c" pull -q 2> /dev/null; git -C "$G/c" pull -q 2> /dev/null
+b2=$(git -C "$G/c" rev-parse HEAD~1)
+out=$(LOG_DIR=$W/nexum repo_pull_summary "$G/c" "$b2")
+check "pull: con mas de 25 borrados, por carpetas y la lista entera en un fichero" 'grep -q "^  - tema/ (30 ficheros)$" <<< "$out" && ! grep -q "tema/t1$" <<< "$out" && f=$(ls "$W"/nexum/listas/c-*-borrados-en-github.txt) && ! ls "$W"/backups > /dev/null 2>&1 && [ "$(grep -c "^tema/t" "$f")" = 30 ]' || echo "$out"
+out=$(repo_pull_summary "$G/c" "$(git -C "$G/c" rev-parse HEAD)")
+check "pull: si ya estaba al dia, lo dice" 'grep -q "ya estaba al día" <<< "$out"'
+widths=$(summary_box "Título" "Uno|1" "Ya no están|12345" | while IFS= read -r l; do echo ${#l}; done | sort -u | wc -l)
+check "recuadro: todas sus lineas igual de anchas (con tildes)" '[ "$widths" = 1 ]'
 check "Los iconos de Reicon llevan su licencia MIT" 'grep -q "Copyright (c) 2025 REICON" "$SRC"'
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: el boton Log abre el error_log general de Apache" 'grep -q "^            model.showLogTail(ERROR_LOG)$" "$SRC" && grep -q "tip: hasLog ? \"Ver el log de Apache\"" "$SRC"'

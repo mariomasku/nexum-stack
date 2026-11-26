@@ -10,6 +10,7 @@ import fcntl
 import html
 import http.server
 import json
+import math
 import os
 import pty
 import re
@@ -320,6 +321,8 @@ def project_db(folder):
 # Registros mayores que esto no se abren en el editor de textos (solo «Ver el final»)
 LOG_OPEN_MAX = 20 * 1024 * 1024
 APACHE_ERROR_LOG = "/opt/lampp/logs/error_log"
+# Más, «Vaciar la caché de Chrome…»: su página de conexiones (desde ahí, a la izquierda, la de DNS)
+BROWSER_SOCKETS_URL = "chrome://net-internals/#sockets"
 # Dominio de un proyecto nuevo (pestaña Hosts): mitienda.com, sub.mitienda.es…
 DOMAIN_RX = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$")
 

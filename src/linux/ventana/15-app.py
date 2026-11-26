@@ -28,7 +28,9 @@ class App(AppPrograma,
             self.folded = set()
         self.extra_patches = []
         self.busy = False
-        TASK_GUARD[0] = lambda check=False: bool(self.task_running()) and (check or self.refuse_task() or True)
+        # La cola de tareas: las que se piden con otra en marcha, cada una con su título, su orden y lo suyo
+        self.task_queue, self.task_hold, self.task_from_offer = [], False, False
+        TASK_GUARD[0] = self.task_note
         # Formulario «Subir o actualizar una base de datos» (se conserva al redibujar la pestaña)
         self.imp = {"file": None, "db": None, "folder": None, "project": None}
         self.db_pwd = {}

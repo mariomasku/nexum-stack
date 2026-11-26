@@ -72,23 +72,8 @@ else
     check "Mac: parar el oficial solo cierra sus servidores" 'grep -q "httpd|mysqld|mariadbd|proftpd|php-fpm) \$SUDO kill -TERM" "$SRC"'
 fi
 
-# --- Filtro de INVOKER al cargar: la palabra suelta pasa a DEFINER (mismo largo y mayusculas)
-eval "$(sed -n "/^INVOKER_PY='/,/^'\$/p" "$SRC")"
-[ -n "$INVOKER_PY" ] || { bad "no esta INVOKER_PY"; exit 1; }
-printf 'CREATE FUNCTION a() RETURNS INT SQL SECURITY INVOKER RETURN 1;\nCREATE FUNCTION b() SQL SeCuRiTy /* x */ InVoKeR RETURN 1;\nCREATE FUNCTION c() SQL SECURITY --\001x\nINVOKER RETURN 1;\nCREATE FUNCTION d() SQL SECURITY /*M!999999 DEFINER */ INVOKER RETURN 1;\nCREATE FUNCTION e() SQL SECURITY/*!50013 */invoker RETURN 1;\nINSERT INTO t VALUES (%s);\n' \
-    "'php-di/invoker'),('Vendor\\\\Invoker\\\\X'),('invoker_id'),('\$invoker'),('a.invoker'),('SECURITYINVOKER'" > "$W/casos.sql"
-python3 -I -c "$INVOKER_PY" < "$W/casos.sql" > "$W/r.sql"
-check "INVOKER: no queda la palabra suelta (comentarios, -- con control, /*M! */ y /*! */ en medio)" '! grep -qiP "(?<![A-Za-z0-9_\$@.\\\\])(?<![^*]/)invoker(?![A-Za-z0-9_\$.\\\\])" "$W/r.sql" && [ "$(grep -o "DEFINER\|DeFiNeR\|definer" "$W/r.sql" | wc -l)" -ge 5 ]'
-check "INVOKER: los nombres que la llevan no cambian" 'grep -qF "php-di/invoker" "$W/r.sql" && grep -qF "Invoker" "$W/r.sql" && grep -qF "invoker_id" "$W/r.sql" && grep -qF "\$invoker" "$W/r.sql" && grep -qF "a.invoker" "$W/r.sql" && grep -qF "SECURITYINVOKER" "$W/r.sql"'
-check "INVOKER: mismo largo (no rompe los datos serializados)" '[ "$(wc -c < "$W/r.sql")" = "$(wc -c < "$W/casos.sql")" ]'
-same=1
-for n in 1 2 3 7 8 9 13 64; do
-    python3 -I -c "$INVOKER_PY" $n < "$W/casos.sql" | cmp -s - "$W/r.sql" || same=0
-done
-check "INVOKER: igual con cualquier tamaño de trozo" '[ $same = 1 ]'
-python3 -c 'import sys; sys.stdout.buffer.write(b"SQL SECURITY /*" + b"x" * 3000000 + b"*/ INVOKER\n")' > "$W/largo.sql"
-check "INVOKER: tambien tras un comentario de 3 MB (mas que un trozo)" '! python3 -I -c "$INVOKER_PY" < "$W/largo.sql" | grep -q INVOKER'
-check "INVOKER: la carga lo usa" 'grep -q "\"\${definer\[@\]}\" | \"\${imp\[@\]}\"" "$SRC"'
+# --- Desde la 1.57.48 los volcados se cargan como root, sin el filtro de INVOKER
+check "carga: sin el filtro de INVOKER (como root, el volcado va tal cual)" '! grep -q "INVOKER_PY" "$SRC"'
 
 # --- MariaDB temporal (sin red) para la carga y el bloqueo
 LD_LIBRARY_PATH=/opt/lampp-8.2.4/lib /opt/lampp-8.2.4/bin/mysql_install_db --no-defaults --basedir=/opt/lampp-8.2.4 \
@@ -104,29 +89,9 @@ db=wp_r8
 "${mysql[@]}" -e "CREATE DATABASE $db; CREATE DATABASE otra; CREATE TABLE otra.v (x VARCHAR(10)); INSERT INTO otra.v VALUES ('limpio');
     CREATE USER 'lvm_bd_$db'@'localhost' IDENTIFIED BY 'p'; GRANT ALL PRIVILEGES ON \`wp\\_r8\`.* TO 'lvm_bd_$db'@'localhost'; CREATE ROLE r8"
 imp=(env MYSQL_PWD=p "$W/client" -ulvm_bd_$db --binary-mode --local-infile=0)
-cat > "$W/malo.sql" <<'SQL'
-DELIMITER ;;
-CREATE FUNCTION f() RETURNS INT SQL SECURITY INVOKER MODIFIES SQL DATA BEGIN UPDATE otra.v SET x='pwned'; RETURN 1; END;;
-DELIMITER ;
-CREATE TABLE real_options (option_name VARCHAR(10));
-INSERT INTO real_options VALUES ('siteurl');
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 SQL SECURITY INVOKER */
-/*!50001 VIEW wp_options AS SELECT option_name, f() AS z FROM real_options */;
-DELIMITER ;;
-CREATE FUNCTION f2() RETURNS INT SQL SECURITY /*M!999999 DEFINER */ INVOKER MODIFIES SQL DATA BEGIN UPDATE otra.v SET x='pwned'; RETURN 1; END;;
-CREATE FUNCTION f3() RETURNS INT SQL SECURITY/*!50013 */InVoKeR MODIFIES SQL DATA BEGIN UPDATE otra.v SET x='pwned'; RETURN 1; END;;
-CREATE PROCEDURE p4() SQL SECURITY
-# comentario
-INVOKER BEGIN UPDATE otra.v SET x='pwned'; END;;
-DELIMITER ;
-SQL
-python3 -I -c "$INVOKER_PY" < "$W/malo.sql" | "${imp[@]}" $db 2>&1 | head -3
-types=$("${mysql[@]}" -N -e "SELECT SECURITY_TYPE FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='$db'
-    UNION ALL SELECT SECURITY_TYPE FROM information_schema.VIEWS WHERE TABLE_SCHEMA='$db'" | sort -u | paste -sd,)
-check "carga: la funcion y la vista quedan DEFINER desde el principio" '[ "$types" = DEFINER ]'
-"${mysql[@]}" -N -e "SELECT * FROM $db.wp_options; SELECT $db.f2(); SELECT $db.f3(); CALL $db.p4()" > /dev/null 2>&1
-check "carga: root usa la vista, las funciones y el procedimiento a mitad de carga y no toca otra base" '[ "$("${mysql[@]}" -N -e "SELECT x FROM otra.v")" = limpio ]'
+# (lo que dejo en su base un usuario lvm_bd_<base> de antes: una tabla y una vista suya)
+printf 'CREATE TABLE real_options (option_name VARCHAR(10));\nINSERT INTO real_options VALUES ("siteurl");\nCREATE VIEW wp_options AS SELECT option_name FROM real_options;\n' \
+    | "${imp[@]}" $db 2>&1 | head -3
 
 # --- Bloqueo: sin permisos de fuera de su base (globales, de otras bases, roles)
 extract "$SRC" db_lock_import_user db_kill_user || exit 1
@@ -192,9 +157,8 @@ check "montar-proyecto: una tienda recupera su dominio tras subir el volcado" 'g
 # --- Bajos arreglados en la 1.44.2 / Mac 1.32.3
 check "nexum-backups: al arrancar se deja solo para ti (700)" 'grep -q "chmod 700 \"\$COPIES_DIR\"" "$SRC" && ! grep -qE "mkdir -p \"\\\$COPIES_DIR\"" "$SRC" && ! grep -q "HOME/lvm-copias/" "$SRC"'
 imp=$(awk '/^function import_database\(\)/,/^}/' "$SRC")
-e=$(grep -n "information_schema.ENGINES" <<< "$imp" | head -1 | cut -d: -f1)
-d=$(grep -n "DROP DATABASE" <<< "$imp" | head -1 | cut -d: -f1)
-check "vaciar: los motores se miran antes de borrar la base" '[ -n "$e" ] && [ -n "$d" ] && [ "$e" -lt "$d" ]'
+# (desde la 1.57.48 se carga como root y ya no se miran los motores FEDERATED, CONNECT o SPIDER)
+check "vaciar: como root, sin mirar los motores" '! grep -q "information_schema.ENGINES" <<< "$imp" && grep -q "DROP DATABASE" <<< "$imp"'
 # (desde la 1.50.1 de Linux y la 1.37.0 de Mac un .local se puede apagar a mano: lo prueba extras.sh)
 if ! grep -q '^function local_off() {' "$SRC"; then
 extract "$SRC" hosts_fake_one || exit 1

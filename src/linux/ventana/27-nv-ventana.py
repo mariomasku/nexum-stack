@@ -28,6 +28,8 @@ class App2(NvBandeja,
     def do_activate(self):
         if getattr(self, "win", None):
             self.win.present()
+            # (abrir Nexum con la ventana escondida junto al reloj también es «abrirlo»: se busca otra vez)
+            self.update_recheck()
             return
         hand = Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer")
 
@@ -117,10 +119,12 @@ class App2(NvBandeja,
         self.repos, self.repos_all, self.github = None, False, None
         self.page_node, self.node_page = new_page(940)
         self.node_rows = None
+        self.page_nginx, self.nginx_page = new_page(940)
+        self.nginx_data = None
         self.page_vers, self.vers_page = new_page(900)
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
         for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
-                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node),
+                        ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node), ("nginx", self.page_nginx),
                         ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
             self.stack.add_named(w, name)
         body = Gtk.Box()
@@ -130,8 +134,12 @@ class App2(NvBandeja,
         self.term_paned.pack1(self.stack, True, False)
         self.term_paned.pack2(self.nv_term_panel(), False, False)
         body.pack_start(self.term_paned, True, True, 0)
+        # (abajo, a lo ancho de la ventana, la barra de estado: a dónde apunta web.local)
+        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        main.pack_start(body, True, True, 0)
+        main.pack_start(self.nv_status_bar(), False, False, 0)
         overlay = Gtk.Overlay()
-        overlay.add(body)
+        overlay.add(main)
         overlay.add_overlay(self.build_toast())
         self.win.add(overlay)
         self.nv_build_projects_shell()
@@ -151,11 +159,51 @@ class App2(NvBandeja,
         GLib.timeout_add_seconds(5, lambda: (self.np_repos_load(), False)[1])
         # Al abrir: si hay una versión nueva del programa (con los datos ya leídos: la versión actual)
         GLib.timeout_add_seconds(6, self.auto_check_package)
+        GLib.timeout_add_seconds(UPDATE_RECHECK_OPEN, lambda: (self.update_recheck(), True)[1])
         # (los correos sin leer, tambien al volver a la ventana)
         self.win.connect("notify::is-active", lambda w, _p: w.is_active() and self.nv_mail_poll())
         # Capturas de cada página (LVM_CAPTURA=<carpeta>: las del manual, con LVM_DEMO)
         if os.environ.get("LVM_CAPTURA"):
             GLib.timeout_add(6000, self.nv_capture_all)
+
+    # ------------------------------------------------------------------ barra de estado
+    def nv_status_bar(self):
+        """La barra de abajo: «web.local >>>>> proyecto» (los chevrones en verde, con su onda), «web.local
+        >>>>> dominio falseado · tienda.com» si el dominio del proyecto cargado está falseado o, sin proyecto
+        cargado, «web.local >>>>> sin enlace» (chevrones y texto en gris)."""
+        bar = css(Gtk.Box(spacing=6), "nv-estado")
+        self.st_link = label("web.local", "nv-mono", "nv-chico")
+        self.st_chev = LinkChevrons()
+        self.st_target = label("sin enlace", "nv-mono", "nv-chico", "nv-tenue", ellipsize=2)  # (Pango.EllipsizeMode.MIDDLE)
+        for w in (self.st_link, self.st_chev, self.st_target):
+            bar.pack_start(w, False, False, 0)
+        # (pegado a los chevrones, con el ancho de su nombre: el sitio que sobra queda a su derecha)
+        self.st_target.set_max_width_chars(90)
+        self.nv_status_update()
+        return bar
+
+    def nv_status_update(self):
+        if getattr(self, "st_link", None) is None:
+            return
+        p = self.projects or {}
+        self.st_link.set_text(p.get("link") or "web.local")
+        folder = self.loaded_project_folder()
+        ctx = self.st_target.get_style_context()
+        # (con el dominio del proyecto falseado, se dice: sus visitas van a esta copia y no a la web real)
+        fakes = [h["name"] for h in self.project_hosts(os.path.basename(folder)) if h["fake"]] if folder else []
+        if fakes:
+            self.st_target.set_text("dominio falseado · %s" % ", ".join(fakes))
+            ctx.remove_class("nv-tenue")
+            self.st_target.set_tooltip_text("%s, con %s falseado: va a esta copia y no a la web real" % (folder, ", ".join(fakes)))
+        elif folder:
+            self.st_target.set_text(os.path.basename(folder))
+            ctx.remove_class("nv-tenue")
+            self.st_target.set_tooltip_text(folder)
+        else:
+            self.st_target.set_text("sin enlace")
+            ctx.add_class("nv-tenue")
+            self.st_target.set_tooltip_text("Ningún proyecto cargado: %s enseña una página vacía" % (p.get("link") or "web.local"))
+        self.st_chev.set_linked(bool(folder))
 
     def nv_capture_all(self):
         """Una captura de cada página y de cada apartado de Configuración en LVM_CAPTURA (nombre-de-pagina.png),
@@ -168,7 +216,7 @@ class App2(NvBandeja,
         # (primero un paso sin captura: la ventana se termina de dibujar; la primera salía en blanco)
         steps = [(lambda: self.show_tab("versiones"), None)]
         steps += [(lambda n=n: self.show_tab(n), "pagina-" + n)
-                  for n in ("proyectos", "versiones", "bbdd", "docker", "node", "repos", "dominios") if n in self.tabs]
+                  for n in ("proyectos", "versiones", "bbdd", "docker", "node", "nginx", "repos", "dominios") if n in self.tabs]
         # (y cada bloque de General, con él arriba)
         for title in [t for t, _name, _ic in self.TOOLS_SECTIONS] + self.GENERAL_PARTS:
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower().translate(str.maketrans("áéíóúñ", "aeioun"))).strip("-")

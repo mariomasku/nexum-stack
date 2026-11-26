@@ -94,9 +94,10 @@ function docker_web_trust() {
 
 #@incluir comun/docker-su-propio-apache/docker_web_hosts.sh
 # Reglas de seguridad de todas las webs, las mismas que en LAMPP (de UNKNOWN_HOST_VHOST: ficheros que
-# no se sirven, CORS y la barrera entre webs, si esta encendida)
+# no se sirven, CORS y la barrera entre webs, si esta encendida, con las webs permitidas)
 function docker_web_security() {
     local text="# Configuracion, repositorios${UNKNOWN_HOST_VHOST#*$'\n'# Configuracion, repositorios}"
+    text=$(cross_site_fill "$text")
     if cross_site_on; then
         printf '%s\n' "$text"
     else
@@ -123,11 +124,13 @@ function docker_web_site() {
         printf '    ErrorDocument 502 "%s"\n    ErrorDocument 503 "%s"\n' "$DOCKER_STOPPED_MSG" "$DOCKER_STOPPED_MSG"
         printf '    <FilesMatch "\\.php$">\n        SetHandler "proxy:fcgi://%s:9000"\n    </FilesMatch>\n' "$(docker_web_container "$slug" "$v")"
         [ "$(docker_conf "$slug" TIPO)" == ps ] || docker_web_media "$folder"
+        docker_web_ps_live "$slug" "$dom"
         printf '</VirtualHost>\n'
     done
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_media.sh
+#@incluir comun/docker-su-propio-apache/docker_web_ps_live.sh
 function docker_web_write() {
     local d=$DOCKER_WEB_DIR p tmp pma_hosts="" v
     [ "$DRY" -eq 1 ] && return 0
@@ -163,6 +166,7 @@ LoadModule setenvif_module modules/mod_setenvif.so
 LoadModule headers_module modules/mod_headers.so
 LoadModule expires_module modules/mod_expires.so
 LoadModule filter_module modules/mod_filter.so
+LoadModule substitute_module modules/mod_substitute.so
 LoadModule deflate_module modules/mod_deflate.so
 LoadModule rewrite_module modules/mod_rewrite.so
 LoadModule dir_module modules/mod_dir.so
@@ -268,6 +272,9 @@ function docker_web_up() {
 }
 
 #@incluir comun/docker-su-propio-apache/docker_web_reload.sh
+# Nginx de Docker (en Linux, el PHP de cada proyecto es PHP-FPM, en su puerto 9000)
+DOCKER_NGINX_FASTCGI=1
+#@incluir comun/docker-su-propio-apache/docker_nginx_get.sh
 # docker-web [estado] | puertos <ip> <http> <https> | permitir | arrancar | parar | confiar
 #   estado: W|direccion|http|https|estado (marcha, parado o nuevo)|puertos permitidos (1/0)
 function docker_web_command() {
@@ -604,7 +611,8 @@ function docker_web_create() {
     # shellcheck disable=SC2209  # (tipo=otro es un texto, no una orden)
     if is_prestashop "$folder"; then tipo=ps; elif is_wordpress "$folder"; then tipo=wp; else tipo=otro; fi
     if [ $live -eq 1 ]; then
-        [ "$tipo" == wp ] && [ -n "$from" ] || { echo "--en-vivo: solo con un WordPress y su BBDD de una version LAMPP (--bd y --desde)"; return 1; }
+        [ "$tipo" == wp ] || [ "$tipo" == ps ] || { echo "--en-vivo: solo con un WordPress o una tienda PrestaShop"; return 1; }
+        [ -n "$from" ] || { echo "--en-vivo: con su BBDD de una version LAMPP (--bd y --desde)"; return 1; }
     fi
     dbname=${db:-$(tr '-' '_' <<< "$slug")}
     user=$(cut -c1-32 <<< "nx_$dbname")
@@ -624,7 +632,7 @@ function docker_web_create() {
     # se toca /etc/hosts: no hace falta
     docker_dns_on || sudo_first || return 1
     if [ $live -eq 1 ]; then
-        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir"
+        docker_web_create_live "$folder" "$php" "$maria" "$from" "$slug" "$dir" "$tipo"
         return
     fi
     task_plan "Montando $folder en Docker" "MariaDB $maria común" "Imagen de PHP $php" "BBDD $dbname" "Apache de Docker" "Certificado en el navegador"
@@ -693,16 +701,22 @@ EOF
 }
 
 # docker-nuevo ... --en-vivo: el proyecto sin BBDD en Docker, con la de esa version LAMPP en vivo (con el
-# usuario y la contraseña de su wp-config.php)
+# usuario y la contraseña de su wp-config.php o, en una tienda, de su parameters.php o settings.inc.php). Una
+# tienda sigue en su dominio de verdad (su BBDD no se toca): se lee de ella y lo cambia el Apache de Docker
+# (docker_web_ps_live)
 function docker_web_create_live() {
-    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 creds owner
-    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base del wp-config.php de $folder"; return 1; }
+    local folder=$1 php=$2 maria=$3 from=$4 slug=$5 dir=$6 tipo=${7:-wp} creds owner rel shop
+    creds=$(lampp_bd_creds "$folder") || { echo "No se puede leer el usuario y la base de la configuracion de $folder"; return 1; }
+    for rel in wp-config.php app/config/parameters.php config/settings.inc.php; do
+        [ -f "$HTDOCS_DIR/$folder/$rel" ] && [ ! -L "$HTDOCS_DIR/$folder/$rel" ] && break
+        rel=""
+    done
     owner=$(lampp_bd_owner "$from")
     mkdir -p -m 700 "$DOCKER_DIR" "$dir" || return 1
     ( umask 077
       printf 'DB_PASS=%s\n' "$(sed -n 2p <<< "$creds")" > "$dir/.env"
-      printf 'MODO=web\nCARPETA=%s\nTIPO=wp\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=wp-config.php\nLAMPP_BD=%s\n' \
-          "$folder" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$owner" > "$dir/proyecto.conf"
+      printf 'MODO=web\nCARPETA=%s\nTIPO=%s\nPHP=%s\nACTIVA=%s\nMARIADB=%s\nBBDD=%s\nUSUARIO=%s\nCONFIG=%s\nLAMPP_BD=%s\n' \
+          "$folder" "$tipo" "$php" "$php" "$maria" "$(head -1 <<< "$creds" | cut -d'|' -f2)" "${creds%%|*}" "$rel" "$owner" > "$dir/proyecto.conf"
       docker_fpm_conf > "$dir/fpm.conf" ) || return 1
     docker_conf_set "$slug" DOMINIO "$(docker_web_domain "$slug" "$php")"
     docker_web_config "$slug" "$php" && docker_web_compose "$slug" || return 1
@@ -713,6 +727,9 @@ function docker_web_create_live() {
     task_step
     echo "2/4 BBDD $(docker_conf "$slug" BBDD) de lampp-$owner, en vivo (la misma que web.local)"
     lampp_bd_up "$owner" && lampp_bd_bridge_up "$owner" || return 1
+    if [ "$tipo" == ps ]; then
+        lampp_bd_shop_live "$slug" || return 1
+    fi
     task_step
     echo "3/4 Apache de Docker y $(docker_web_domain "$slug" "$php")"
     docker_web_hosts poner "$(docker_web_pma)" "$(docker_web_domain "$slug" "$php")" || return 1
@@ -748,7 +765,7 @@ function docker_web_add() {
         return
     fi
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
-    docker_maria_up "$(docker_conf "$slug" MARIADB)" && docker_web_up || return 1
+    docker_web_db_up "$slug" && docker_web_up || return 1
     dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "php${php//./}" || return 1
     echo "Listo: $(docker_web_url "$(docker_web_domain "$slug" "$php")") (PHP $php)"
 }
@@ -767,7 +784,7 @@ function docker_web_switch() {
     docker_ready || { echo "Docker sin root no esta en marcha"; return 1; }
     docker_conf_set "$slug" ACTIVA "$php" || return 1
     docker_web_hosts poner "$(docker_web_domain "$slug" "$php")" || return 1
-    docker_maria_up "$(docker_conf "$slug" MARIADB)" || return 1
+    docker_web_db_up "$slug" || return 1
     local fresh=()
     docker_fpm_refresh "$slug" && fresh=(--force-recreate)
     if ! dk compose --project-directory "$dir" -f "$dir/compose.yaml" up -d "${fresh[@]}" "php${php//./}"; then

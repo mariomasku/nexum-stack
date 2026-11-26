@@ -22,7 +22,7 @@ check "sin copias-ficheros: la cache con la BBDD de Docker se borra y lo dice" '
 mkdir -p "$T/var/cache/prod"; params db nexum > "$T/var/cache/prod/appParameters.php"
 : > "$COPIES_FILES_FLAG"
 o=$(ps_stale_cache tienda)
-check "con copias-ficheros: se aparta a ~/nexum-backups y lo dice" '[ ! -e "$T/var/cache/prod" ] && ls -d "$COPIES_DIR"/tienda-cache-prod-* > /dev/null 2>&1 && grep -q "apartada" <<< "$o"'
+check "con copias-ficheros: se aparta a ~/nexum-backups y lo dice" '[ ! -e "$T/var/cache/prod" ] && ls -d "$COPIES_DIR"/proyectos/tienda/cache-prod-* > /dev/null 2>&1 && grep -q "apartada" <<< "$o"'
 check "la cache con la BBDD buena se queda" '[ -f "$T/var/cache/dev/appParameters.php" ]'
 o=$(ps_stale_cache tienda)
 check "otra vez: nada que apartar" '[ -z "$o" ] && [ -f "$T/var/cache/dev/appParameters.php" ]'

@@ -63,12 +63,14 @@ class NvBandeja:
     def nv_tray_hide(self):
         """La X de la ventana: con el icono, la esconde (True: no se cierra); sin él, se cierra como siempre."""
         if self.tray is None:
-            return False
+            # (sin el icono, se cierra el programa: con tareas en la cola, antes se pregunta)
+            return not self.task_queue_quit()
         self.win.hide()
         return True
 
     def nv_tray_open(self):
         self.win.present()
+        self.update_recheck()
         # (al volver, sus datos al momento: escondida solo se preguntaba lo del menú)
         if not self.busy:
             run_quick(["gui-vuelta"], self.on_round)
@@ -83,6 +85,8 @@ class NvBandeja:
             self.open_uri(self.project_web())
 
     def nv_tray_quit(self):
+        if not self.task_queue_quit():
+            return
         self.nv_tray_remove()
         self.win.destroy()
 
@@ -128,13 +132,28 @@ class NvBandeja:
         threading.Thread(target=watchdog, daemon=True).start()
 
     def auto_check_package(self):
+        """Si hay una versión nueva del programa: cada vez que se abre (1.57.51; antes, solo el primer arranque
+        del día), al volver a la ventana desde el icono si hace más de UPDATE_RECHECK que se miró y, con ella
+        abierta, cada UPDATE_RECHECK_OPEN. Los parches de los componentes, como antes (update_check_due)."""
         if self.data is None or self.busy:
             return True
+        self.update_checked = time.time()
+        self.check_package(auto=True)
         if self.update_check_due():
-            self.check_package(auto=True)
             # (y los parches de los componentes, un poco después: sin juntarse con el aviso del programa)
             GLib.timeout_add_seconds(25, self.nv_components_auto)
         return False
+
+    def update_recheck(self):
+        """Al volver a mostrar la ventana (o con el reloj): otra búsqueda si hace rato de la última y, si se
+        encontró una versión nueva con la ventana escondida, se ofrece ahora."""
+        pending = getattr(self, "update_pending", None)
+        if pending and self.win.get_visible():
+            self.update_pending = None
+            GLib.timeout_add_seconds(1, lambda: (self.offer_package(*pending), False)[1])
+            return
+        if time.time() - getattr(self, "update_checked", 0) >= UPDATE_RECHECK:
+            GLib.timeout_add_seconds(2, self.auto_check_package)
 
     def update_check_due(self):
         """¿Toca buscar una versión nueva al abrir? El primer arranque de cada día y, después, cada
@@ -252,7 +271,7 @@ class NvBandeja:
         pill.pack_start(Gtk.Box(), False, False, 2)
         self.warn_btn = Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE)
         wb = Gtk.Box(spacing=4)
-        wb.pack_start(icon("dialog-warning-symbolic"), False, False, 0)
+        wb.pack_start(css(icon("dialog-warning-symbolic"), "nv-aviso-icono"), False, False, 0)
         self.warn_num = label("0", "nv-aviso-num", valign=Gtk.Align.CENTER)
         wb.pack_start(self.warn_num, False, False, 0)
         self.warn_btn.add(wb)
