@@ -73,6 +73,9 @@ headerbar.nv-cabecera { min-height: 60px; padding-top: 8px; padding-bottom: 8px;
 /* El botón de Avisos, en amarillo (avisa, no es un error): el triángulo y su número */
 .nv-aviso-num { background-color: #ffd60a; color: #1d1d1f; border-radius: 9px; padding: 0 6px; font-size: 0.75em; font-weight: bold; }
 .nv-aviso-icono { color: #ffd60a; }
+/* El botón de Avisos, junto a ☰: sin recuadro, como él (al pasar el ratón, un fondo suave) */
+button.nv-avisos, button.nv-avisos:checked, button.nv-avisos:active { border: none; box-shadow: none; background: transparent; }
+button.nv-avisos:hover { background-color: alpha(@theme_fg_color, 0.08); }
 .nv-claro .nv-aviso-icono { color: #d4a300; }
 .nv-permitida { color: #30d158; }
 .nv-claro .nv-permitida { color: #1e9e45; }
@@ -149,6 +152,73 @@ list.caja, .nv-grupo { background-color: alpha(@theme_fg_color, 0.045); border-r
 .nv-proyecto-btn.nv-discontinuo { border-style: dashed; }
 /* (un túnel abierto: la web se ve desde fuera) */
 .nv-proyecto-btn.nv-boton-cuadrado { padding: 4px; border-radius: 12px; }
+/* Visor arriba (Apariencia): botones pequeños y cuadrados en la barra de arriba, con el nombre debajo */
+/* (sin el margen de arriba y abajo que el tema pone a los botones de la barra de título: se comía el cuadrado) */
+.nv-visor-arriba button { margin: 0; }
+.nv-visor-arriba button.nv-visor-btn { padding: 0; border-radius: 10px; min-height: 0; min-width: 0; }
+.nv-visor-nombre { font-size: 0.7em; }
+.nv-visor-cargado { font-weight: bold; }
+/* El proyecto cargado: sin recuadro, tampoco al pasar el ratón (un borde que aparece movía los demás botones) */
+.nv-visor-arriba button.nv-visor-proyecto, .nv-visor-arriba button.nv-visor-proyecto:hover,
+.nv-visor-arriba button.nv-visor-proyecto:active, .nv-visor-arriba button.nv-visor-proyecto:focus {
+    padding: 2px 8px; border-radius: 10px; border: 1px solid transparent; box-shadow: none; outline: none;
+    background-image: none; background-color: transparent; }
+.nv-visor-arriba button.nv-visor-proyecto:hover { background-color: alpha(@theme_fg_color, 0.08); }
+/* Las versiones de PHP del proyecto, en tarjetas (visor arriba) */
+button.nv-version-tarjeta { padding: 12px 14px; border-radius: 12px; background-image: none; box-shadow: none;
+                            background-color: alpha(@theme_fg_color, 0.03); border: 1px solid alpha(@theme_fg_color, 0.14); }
+button.nv-version-tarjeta:hover { border-color: %(b)s; background-color: alpha(%(b)s, 0.08); }
+button.nv-version-tarjeta.nv-version-actual, button.nv-version-tarjeta.nv-version-actual:disabled {
+    border-color: alpha(%(g)s, 0.7); background-color: alpha(%(g)s, 0.08); }
+button.nv-version-tarjeta:disabled label { color: @theme_fg_color; }
+button.nv-version-tarjeta:disabled label.nv-verde { color: %(g)s; }
+.nv-version-titulo { font-weight: bold; }
+/* Lo de la versión en la barra de estado (visor arriba): como en el recuadro de arriba, sin el recuadro */
+.nv-estado-version button { border: none; background: transparent; box-shadow: none; min-height: 0; }
+.nv-estado-version button.nv-servicios { border-radius: 8px; padding: 0 8px; }
+.nv-estado-version button.nv-servicios:hover, .nv-estado-version button.nv-servicios:checked { background-color: alpha(@theme_fg_color, 0.10); }
+.nv-estado-version button.nv-encender { border-radius: 8px; padding: 0 4px; }
+.nv-estado-version button.nv-encender.nv-play { color: %(g)s; }
+.nv-estado-version button.nv-encender.nv-stop { color: #e5534b; }
+.nv-estado-version button.nv-encender:hover { background-color: alpha(@theme_fg_color, 0.10); }
+.nv-estado-version button.nv-encender:disabled { opacity: 0.45; }
+.nv-estado-version .nv-sep { margin: 2px 2px; }
+/* Iconos en color (Apariencia) de los botones: por su función y, los demás, con los colores del logotipo de Nexum */
+.nv-tinta-verde { color: #2EA043; }
+.nv-tinta-rojo { color: #E5534B; }
+.nv-tinta-azul { color: #2F81F7; }
+.nv-tinta-naranja { color: #F0883E; }
+.nv-tinta-amarillo { color: #D4A300; }
+.nv-tinta-morado { color: #A371F7; }
+.nv-tinta-turquesa { color: #1F9E95; }
+/* (el azul de Nexum, algo más claro con el tema oscuro para que se vea) */
+.nv-tinta-nexum-0 { color: #3D9BE0; }
+.nv-claro .nv-tinta-nexum-0 { color: #006CB7; }
+.nv-tinta-nexum-1 { color: #88BB1D; }
+.nv-tinta-nexum-2 { color: #FFB608; }
+.nv-tinta-nexum-3 { color: #FF3B3B; }
+.nv-tinta-nexum-4 { color: #F20093; }
+/* La versión de PHP, pulsable (abre las versiones para cambiar), plana como lo demás de la barra */
+button.nv-version-btn { border: none; box-shadow: none; background: transparent; padding: 0 6px; border-radius: 8px; min-height: 0; }
+button.nv-version-btn:hover { background-color: alpha(@theme_fg_color, 0.10); }
+/* Las versiones, en abanico: cada fila aparece y se coloca un instante después que la anterior, desde la barra. Solo
+   cambia lo que sobra arriba y abajo de cada una (su alto no cambia: el desplegable no se mueve) */
+@keyframes nv-abanico-arriba { from { opacity: 0; margin-top: 10px; margin-bottom: 0; } to { opacity: 1; margin-top: 5px; margin-bottom: 5px; } }
+@keyframes nv-abanico-abajo { from { opacity: 0; margin-top: 0; margin-bottom: 10px; } to { opacity: 1; margin-top: 5px; margin-bottom: 5px; } }
+.nv-abanico-arriba { margin-top: 5px; margin-bottom: 5px; animation: nv-abanico-arriba 150ms ease-out both; }
+.nv-abanico-abajo { margin-top: 5px; margin-bottom: 5px; animation: nv-abanico-abajo 150ms ease-out both; }
+.nv-abanico-0 { animation-delay: 0ms; }
+.nv-abanico-1 { animation-delay: 28ms; }
+.nv-abanico-2 { animation-delay: 56ms; }
+.nv-abanico-3 { animation-delay: 84ms; }
+.nv-abanico-4 { animation-delay: 112ms; }
+.nv-abanico-5 { animation-delay: 140ms; }
+.nv-abanico-6 { animation-delay: 168ms; }
+.nv-abanico-7 { animation-delay: 196ms; }
+.nv-abanico-8 { animation-delay: 224ms; }
+.nv-abanico-9 { animation-delay: 252ms; }
+.nv-abanico-10 { animation-delay: 280ms; }
+.nv-abanico-11 { animation-delay: 308ms; }
 .nv-proyecto-btn.nv-compartiendo { border-color: #F38020; background-color: alpha(#F38020, 0.10); }
 switch:checked { background-color: %(g)s; border-color: transparent; }
 .nv-running { font-size: 0.86em; color: %(g)s; }
@@ -302,7 +372,7 @@ def autostart_text(script):
     """El acceso de inicio: abre la ventana de este script (con comillas si su ruta lleva espacios)."""
     exe = script if re.fullmatch(r"[A-Za-z0-9/._+-]+", script) else '"%s"' % re.sub(r'(["`$\\])', r"\\\1", script)
     return "\n".join(["[Desktop Entry]", "Type=Application", "Name=Nexum Dev Stack",
-                      "Comment=Abre Nexum Dev Stack al iniciar sesión (en Configuración, General)",
+                      "Comment=Abre Nexum Dev Stack al iniciar sesión (en Sistema, General)",
                       "Exec=%s ventana --al-iniciar" % exe, "Icon=nexum", "Terminal=false",
                       "X-GNOME-Autostart-enabled=true", "X-GNOME-Autostart-Delay=5", AUTOSTART_MARK, ""])
 
@@ -430,7 +500,8 @@ def nv_button(icon_name, text=None, tip=None, cb=None, *classes, flat=False):
         b.set_relief(Gtk.ReliefStyle.NONE)
     box = Gtk.Box(spacing=6)
     if icon_name is not None:
-        box.pack_start(icon_name if isinstance(icon_name, Gtk.Widget) else icon(icon_name), False, False, 0)
+        box.pack_start(icon_name if isinstance(icon_name, Gtk.Widget) else tint_icon(icon(icon_name), icon_name),
+                       False, False, 0)
     if text:
         box.pack_start(Gtk.Label(label=text), False, False, 0)
     b.add(box)

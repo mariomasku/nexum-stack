@@ -6,8 +6,8 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: sin apartado Visor de los proyectos (va en Apariencia)" '! grep -qF "(\"visor\", \"Visor de los proyectos\"" "$SRC" && ! grep -qF "func buttonsCard()" "$SRC" && grep -qF "block(\"Visor de los proyectos\"" "$SRC"'
-    check "Mac: Apariencia en tres bloques (los apartados del menú lateral, en dos columnas)" 'grep -qF "block(\"Iconos del menú lateral\"" "$SRC" && grep -qF "Text(\"Apartados del menú lateral\")" "$SRC" && grep -qF "navSwitches(Array(items.prefix(half)))" "$SRC" && grep -qF "navSwitches(Array(items.dropFirst(half)))" "$SRC"'
-    check "Mac: el título, el del apartado abierto" 'grep -qF "PageTitle(title: sec?.1 ?? \"Configuración\", sub: toolsDesc ?? \"Configuración\"," "$SRC" && grep -qF ".environment(\\.toolsSection, sec?.1)" "$SRC"'
+    check "Mac: Apariencia en bloques (los apartados del menú lateral, en tres columnas repartidas por orden)" 'grep -qF "block(\"Iconos del menú lateral\"" "$SRC" && grep -qF "Text(\"Apartados del menú lateral\")" "$SRC" && grep -qF "let per = (items.count + 2) / 3" "$SRC" && grep -qF "navSwitches(Array(items.prefix(per)))" "$SRC" && grep -qF "navSwitches(Array(items.dropFirst(per).prefix(per)))" "$SRC" && grep -qF "navSwitches(Array(items.dropFirst(2 * per)))" "$SRC"'
+    check "Mac: el título, el del apartado abierto" 'grep -qF "PageTitle(title: sec?.1 ?? (tab == \"sistema\" ? \"Sistema\" : \"Ajustes\"), sub: toolsDesc ?? \"\"," "$SRC" && grep -qF ".environment(\\.toolsSection, sec?.1)" "$SRC"'
     check "Mac: la tarjeta del apartado no repite el título" 'grep -qF "return t.hasPrefix(s)" "$SRC" && grep -qF ".preference(key: ToolsDescKey.self, value: isSectionCard ? description : nil)" "$SRC"'
     check "Mac: Seguridad entre webs, en cinco puntos" '[ "$(sed -n "/^let CROSS_SITE_HELP/,/^]/p" "$SRC" | grep -cE "^    \(\"")" -eq 5 ] && grep -qF "TileCard(\"Qué es\", wide: true)" "$SRC"'
 else

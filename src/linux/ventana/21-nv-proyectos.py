@@ -345,7 +345,7 @@ class NvProyectos:
             tt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             tt.pack_start(label("Docker sin root aún no puede usar los puertos %s y %s" % (w["http"], w["https"])), False, False, 0)
             tt.pack_start(label("Los puertos de menos de 1024 son de root: se permite una vez (pide la contraseña). "
-                                "O elige otros en Configuración.", "nv-chico", "nv-tenue"), False, False, 0)
+                                "O elige otros en Ajustes, Docker.", "nv-chico", "nv-tenue"), False, False, 0)
             r.pack_start(tt, True, True, 0)
             r.pack_end(nv_button(None, "Permitir", None, lambda *_: self.run_task(
                 "Permitiendo los puertos del Apache de Docker", ["docker-web", "permitir"], auto_close=True,
@@ -440,6 +440,8 @@ class NvProyectos:
         self.nv_list.show_all()
         self.nv_project_sizes()
         self.nv_count.set_label(plural(len(p["list"]), "proyecto", "proyectos") + " en /opt/htdocs")
+        # (y los botones del cargado en la barra de arriba, con el visor arriba)
+        self.nv_top_visor_fill()
 
     def nv_project_sizes(self):
         """Lo que ocupa cada proyecto en el disco: du en segundo plano, de 10 en 10 proyectos (sin límite de
@@ -575,6 +577,56 @@ class NvProyectos:
             w.set_valign(Gtk.Align.CENTER)
         return out
 
+    def nv_project_buttons(self, x):
+        """Los botones del proyecto cargado (clave: botón, como VISOR_BUTTONS) y Desmontar, nuevos: para el visor
+        de Proyectos (clásico) o el de arriba."""
+        kind, admin = self.loaded_project_admin()
+        # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
+        # (los que se ven, su orden y su estilo, como se haya elegido: nv_place_buttons)
+        web = self.project_web()
+        btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir %s" % web,
+                                 lambda *_: self.open_uri(web), "nv-proyecto-btn")}
+        code = vscode_app()
+        if code is not None:
+            img = None
+            if code.get_icon() is not None:
+                img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
+                img.set_pixel_size(18)
+            btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
+                                       "Abrir en Visual Studio Code", lambda *_: self.open_in_vscode(),
+                                       "nv-proyecto-btn")
+        # (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+        repo = repo_button(os.path.join(HTDOCS, x["name"]), self.open_uri)
+        if repo is not None:
+            btns["repo"] = repo
+        pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
+        pma.set_sensitive(bool(self.loaded_project_db()))
+        btns["pma"] = pma
+        adm = nv_button(logo("prestashop" if kind == "ps" else "wordpress", 18), "Panel",
+                        "Abrir el panel de administración",
+                        lambda *_: self.open_project_admin(), "nv-proyecto-btn")
+        adm.set_sensitive(bool(admin))
+        adm.nv_logo = "prestashop" if kind == "ps" else "wordpress"
+        btns["panel"] = adm
+        btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
+                                   lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
+        btns["compartir"] = self.nv_share_button(web.rstrip("/"), os.path.join(HTDOCS, x["name"]), x["name"])
+        # El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
+        has_log = os.path.isfile(APACHE_ERROR_LOG)
+        logb = nv_button(icon(visor_icon("log"), 18), "Log", "Ver el log de Apache" if has_log else "Aún no hay log de Apache",
+                         lambda *_: self.show_log_tail(APACHE_ERROR_LOG), "nv-proyecto-btn")
+        logb.set_sensitive(has_log)
+        btns["log"] = logb
+        btns["actualizar"] = nv_button(icon(visor_icon("actualizar"), 18), "Actualizar", "Actualizar proyecto",
+                                       lambda *_: self.nv_update_project(x), "nv-proyecto-btn")
+        busy_guard(btns["actualizar"], self.busy).set_sensitive(True)
+        if x["kind"] in ("wp", "ps"):
+            btns["imagenes"] = self.nv_images_button(x)
+        eject = nv_button(visor_icon("unlink"), "Unlink", "Unlink: desmontar el proyecto (web.local deja de apuntar a él)",
+                          lambda *_: self.on_unload_project(), "nv-proyecto-btn")
+        btns["unlink"] = eject
+        return btns, eject
+
     def nv_hero(self, x, loaded):
         clear(self.hero_box)
         p = self.projects
@@ -603,7 +655,9 @@ class NvProyectos:
             return
         top = Gtk.Box(spacing=20)
         # (el logotipo solo, sin recuadro: con el visor de la derecha más alto, el recuadro se estiraba)
-        img = kind_icon(x["kind"], 48)
+        # (el logotipo de su tipo: WordPress, PrestaShop, Laravel, Astro, Node…; si no se sabe, la carpeta)
+        brand = project_brand(x["name"], x["kind"])
+        img = logo(brand, 48) if brand else kind_icon(x["kind"], 48)
         img.set_valign(Gtk.Align.CENTER)
         top.pack_start(img, False, False, 0)
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)
@@ -665,62 +719,21 @@ class NvProyectos:
         card.pack_start(top, False, False, 0)
         card.pack_start(css(Gtk.Box(), "nv-pie"), False, False, 0)
         acts = Gtk.Box(spacing=8)
-        if is_loaded:
-            kind, admin = self.loaded_project_admin()
-            # (con los logotipos de siempre: el globo, VS Code, phpMyAdmin y WordPress o PrestaShop)
-            # (los que se ven, su orden y su estilo, como se haya elegido: nv_place_buttons)
-            web = self.project_web()
-            btns = {"web": nv_button(logo("globo", 18), "Abrir web", "Abrir %s" % web,
-                                     lambda *_: self.open_uri(web), "nv-proyecto-btn")}
-            code = vscode_app()
-            if code is not None:
-                img = None
-                if code.get_icon() is not None:
-                    img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
-                    img.set_pixel_size(18)
-                btns["vscode"] = nv_button(img or "text-editor-symbolic", "VS Code",
-                                           "Abrir en Visual Studio Code", lambda *_: self.open_in_vscode(),
-                                           "nv-proyecto-btn")
-            # (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
-            repo = repo_button(os.path.join(HTDOCS, x["name"]), self.open_uri)
-            if repo is not None:
-                btns["repo"] = repo
-            pma = nv_button(logo("phpmyadmin", 18), "phpMyAdmin", None, lambda *_: self.open_project_pma(), "nv-proyecto-btn")
-            pma.set_sensitive(bool(self.loaded_project_db()))
-            btns["pma"] = pma
-            adm = nv_button(logo("prestashop" if kind == "ps" else "wordpress", 18), "Panel",
-                            "Abrir el panel de administración",
-                            lambda *_: self.open_project_admin(), "nv-proyecto-btn")
-            adm.set_sensitive(bool(admin))
-            adm.nv_logo = "prestashop" if kind == "ps" else "wordpress"
-            btns["panel"] = adm
-            btns["docker"] = nv_button(logo("docker", 18), "Docker", "Montar en Docker",
-                                       lambda *_: self.nv_docker_loaded(x), "nv-proyecto-btn")
-            btns["compartir"] = self.nv_share_button(web.rstrip("/"), os.path.join(HTDOCS, x["name"]), x["name"])
-            # El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
-            has_log = os.path.isfile(APACHE_ERROR_LOG)
-            logb = nv_button(logo("log", 18), "Log", "Ver el log de Apache" if has_log else "Aún no hay log de Apache",
-                             lambda *_: self.show_log_tail(APACHE_ERROR_LOG), "nv-proyecto-btn")
-            logb.set_sensitive(has_log)
-            btns["log"] = logb
-            btns["actualizar"] = nv_button(logo("actualizar", 18), "Actualizar", "Actualizar proyecto",
-                                           lambda *_: self.nv_update_project(x), "nv-proyecto-btn")
-            busy_guard(btns["actualizar"], self.busy).set_sensitive(True)
-            if x["kind"] in ("wp", "ps"):
-                btns["imagenes"] = self.nv_images_button(x)
-            eject = nv_button("media-eject-symbolic", None, "Desmontar el proyecto",
-                              lambda *_: self.on_unload_project(), flat=True)
+        if is_loaded and getattr(self, "visor_mode", None) == "arriba":
+            # (con el visor arriba, sus botones ya están en la barra de arriba; otra versión, con «+ Nueva versión»)
+            pass
+        elif is_loaded:
+            btns, _eject = self.nv_project_buttons(x)
             # (en varias líneas si no caben: con los botones grandes, la fila pedía más que la ventana)
             flow = nv_button_flow()
-            self.nv_place_buttons(flow, btns, [(eject, ("icono", "media-eject-symbolic"), "Desmontar")])
-            nv_flow_add(flow, eject)
+            self.nv_place_buttons(flow, btns)
             acts.pack_start(flow, True, True, 0)
         else:
             acts.pack_start(nv_button("media-playback-start-symbolic", "Cargar", None,
                                       lambda *_: self.on_load_folder(x), "nv-azul"), False, False, 0)
         # (⋮, pegado a la derecha; con un proyecto cargado, del tamaño de los demás botones)
         more = self.nv_more_menu(x)
-        if is_loaded:
+        if is_loaded and getattr(self, "visor_mode", None) != "arriba":
             self.nv_restyle(more, buttons_conf(), ("icono", "view-more-symbolic"), "Más")
         acts.pack_end(more, False, False, 0)
         # Si su carpeta tiene un dominio en los vhosts: falsearlo o dejar de falsearlo desde aquí, como

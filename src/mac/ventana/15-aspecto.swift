@@ -60,7 +60,7 @@ struct OutlineBody: View {
             .overlay(shape.strokeBorder(border, style: StrokeStyle(lineWidth: 1, dash: kind == "dashed" ? [4, 3] : [])))
             .opacity(enabled ? 1 : 0.45)
             .contentShape(shape)
-            .animation(.easeOut(duration: 0.12), value: on)
+            // (sin transición de color: al momento)
             .onHover { hover = $0 }
             .hoverPointer()
     }
@@ -112,10 +112,11 @@ struct OutlineMenu<Items: View>: View {
         return Menu {
             items
         } label: {
+            // (la etiqueta de un Menu solo enseña texto e imágenes: el icono de Reicon, en una imagen de plantilla)
             if let t = title {
-                Label(t, systemImage: symbol)
+                Label { Text(t) } icon: { uiIconImage(symbol, size: 16) }
             } else {
-                Image(systemName: symbol)
+                uiIconImage(symbol, size: 16)
             }
         }
         .menuStyle(BorderlessButtonMenuStyle())
@@ -134,7 +135,7 @@ struct OutlineMenu<Items: View>: View {
 /// Botón de una tabla con solo un icono
 func iconAction(_ symbol: String, _ tip: String, kind: String = "", _ action: @escaping () -> Void) -> some View {
     Button(action: action) {
-        Image(systemName: symbol).frame(width: 14, height: 14)
+        TintIcon(symbol).frame(width: 14, height: 14)
     }
     .buttonStyle(OutlineButton(kind: kind, compact: true))
     .tip(tip)
@@ -243,7 +244,7 @@ struct KindIcon: View {
             let name = kind == "wp" ? "wordpress" : "prestashop"
             BrandLogo(name: name, size: size)
         } else {
-            Image(systemName: "folder").font(.system(size: size * 0.8)).foregroundColor(.secondary)
+            UIIcon("folder", size: size * 0.8).foregroundColor(.secondary)
                 .frame(width: size, height: size)
         }
     }
@@ -286,11 +287,11 @@ struct SearchField: View {
     let placeholder: String
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+            UIIcon("magnifyingglass").foregroundColor(.secondary)
             TextField(placeholder, text: $text).textFieldStyle(PlainTextFieldStyle())
             if !text.isEmpty {
                 Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                    UIIcon("xmark.circle.fill").foregroundColor(.secondary)
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 .hoverPointer()
@@ -377,7 +378,7 @@ struct SearchPicker: View {
                 HStack(spacing: 6) {
                     Text(items.first(where: { $0.0 == selection })?.1 ?? "").lineLimit(1).truncationMode(.tail)
                     Spacer(minLength: 4)
-                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .bold))
+                    UIIcon("chevron.up.chevron.down", size: 9, weight: .bold)
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 8)
@@ -599,7 +600,7 @@ struct WidePage<Content: View>: View {
                     .id("arriba")
             }
             .onChange(of: top) { _ in
-                withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("arriba", anchor: .top) }
+                withAnimation(.easeInOut(duration: UI_ANIM)) { proxy.scrollTo("arriba", anchor: .top) }
             }
         }
     }
@@ -647,7 +648,7 @@ struct SplitPage<Head: View, Content: View>: View {
                         .id("arriba")
                 }
                 .onChange(of: top) { _ in
-                    withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("arriba", anchor: .top) }
+                    withAnimation(.easeInOut(duration: UI_ANIM)) { proxy.scrollTo("arriba", anchor: .top) }
                 }
             }
             .background(GeometryReader { g in
@@ -694,7 +695,7 @@ struct PageTitle: View {
                 if let l = logo {
                     BrandLogo(name: l, size: 30)
                 } else if let sym = symbol {
-                    Image(systemName: sym).font(.system(size: 22, weight: .medium)).frame(width: 30, height: 30)
+                    UIIcon(sym, size: 22, weight: .medium).frame(width: 30, height: 30)
                 }
                 Text(title).font(.system(size: 22, weight: .bold))
             }
@@ -790,7 +791,7 @@ struct PanelBox<Content: View>: View {
                     Text(title).font(.headline).multilineTextAlignment(.center).frame(maxWidth: .infinity)
                     HStack {
                         Spacer()
-                        Button(action: close) { Image(systemName: "xmark") }
+                        Button(action: close) { TintIcon("xmark") }
                             .buttonStyle(OutlineButton(compact: true))
                             .keyboardShortcut(.cancelAction)
                             .tip("Cerrar")
@@ -801,7 +802,8 @@ struct PanelBox<Content: View>: View {
                 Divider()
                 content.padding(18)
             }
-            .frame(width: width)
+            .frame(width: dialogWidth(width))
+            .fitDialog()
             .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.windowBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.12), lineWidth: 1))
             .shadow(color: Color.black.opacity(0.3), radius: 24, y: 8)

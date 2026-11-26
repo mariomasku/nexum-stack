@@ -170,7 +170,7 @@ struct NewProjectWizard: View {
                 if let f = model.npFile {
                     Text((f as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle)
                     Button(action: { model.npFile = nil }) {
-                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                        UIIcon("xmark.circle.fill").foregroundColor(.secondary)
                     }
                     .buttonStyle(BorderlessButtonStyle())
                     .tip("Quitar el volcado: la BBDD se crea vacía")

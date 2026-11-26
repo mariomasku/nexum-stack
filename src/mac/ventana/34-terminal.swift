@@ -596,23 +596,23 @@ struct TermPanel: View {
                     }.onEnded { _ in dragStart = nil })
                     .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } })
             HStack(spacing: 8) {
-                Image(systemName: "terminal").foregroundColor(.secondary)
+                UIIcon("terminal").foregroundColor(.secondary)
                 Text("Terminal").font(.caption)
                 Text(model.termCwd).font(.caption).foregroundColor(.secondary).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Button(action: { model.termCd() }) { Label("Proyecto cargado", systemImage: "folder") }
+                Button(action: { model.termCd() }) { Label { Text("Proyecto cargado") } icon: { TintIcon("folder") } }
                     .buttonStyle(OutlineButton())
                     .tip("Ir a la carpeta del proyecto cargado (cd)")
-                Button(action: { model.termFlushDns() }) { Label("Vaciar DNS", systemImage: "network") }
+                Button(action: { model.termFlushDns() }) { Label { Text("Vaciar DNS") } icon: { TintIcon("network") } }
                     .buttonStyle(OutlineButton())
                     .tip("Vaciar la caché DNS")
-                Button(action: { model.termPing() }) { Label("ping", systemImage: "antenna.radiowaves.left.and.right") }
+                Button(action: { model.termPing() }) { Label { Text("ping") } icon: { TintIcon("antenna.radiowaves.left.and.right") } }
                     .buttonStyle(OutlineButton())
                     .tip("Hacer ping al dominio del proyecto cargado: 127.0.0.1 es que está falseado")
-                Button(action: { model.termNewTab() }) { Image(systemName: "plus") }
+                Button(action: { model.termNewTab() }) { TintIcon("plus") }
                     .buttonStyle(OutlineButton())
                     .tip("Otra pestaña de terminal (en la carpeta del proyecto cargado)")
-                Button(action: { model.termOpen = false }) { Image(systemName: "xmark") }
+                Button(action: { model.termOpen = false }) { TintIcon("xmark") }
                     .buttonStyle(OutlineButton())
                     .tip("Esconder la terminal (sigue abierta)")
             }
@@ -625,7 +625,7 @@ struct TermPanel: View {
                         ForEach(Array(model.terms.enumerated()), id: \.element.number) { i, s in
                             HStack(spacing: 5) {
                                 Text("Terminal \(s.number)").font(.caption)
-                                Button(action: { model.termClose(s) }) { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)) }
+                                Button(action: { model.termClose(s) }) { TintIcon("xmark", size: 9, weight: .semibold) }
                                     .buttonStyle(.plain)
                                     .tip("Cerrar esta pestaña (y lo que tenga en marcha)")
                             }

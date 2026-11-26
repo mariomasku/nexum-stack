@@ -100,6 +100,8 @@ fi
 check "export_database usa el filtro en las dos formas (MariaDB en marcha y temporal)" 'f=$(awk "/^function export_database\\(\\) \\{/,/^}/" "$SRC"); grep -q "test_admin_filter \"\$db\"" <<< "$f" && [ "$(grep -c "query=(" <<< "$f")" -ge 2 ]'
 # (1.55.4) Los volcados de las tablas aparte, sin su linea del modo sandbox (los MariaDB antiguos no la
 # entienden y la carga solo quitaba la primera); y la carga las quita todas
-check "los volcados aparte, sin la linea del modo sandbox" 'grep -q -- "--where=\"\${wheres\[\$i\]}\" \"\$db\" \"\${only\[\$i\]}\" | LC_ALL=C sed .\/^\\\\/\\\\\*M!999999" "$SRC"'
-check "la carga quita todas las lineas del modo sandbox, no solo la primera" 'grep -qF "filter=(env LC_ALL=C sed -E -e '"'"'/^\/\*M!999999\\\\-/d'"'"'" "$SRC" && ! grep -qF "1{/^\/\*M!999999" "$SRC"'
+check "los volcados aparte, sin la linea del modo sandbox (con M o sin ella)" 'grep -qF -- "\"\${only[\$i]}\" | LC_ALL=C sed -E '"'"'/^\/\*M?!999999\\\\-/d'"'"'" "$SRC"'
+check "la carga quita siempre todas las lineas del modo sandbox (con M o sin ella)" 'grep -qF "local source=(cat) filter=(env LC_ALL=C sed -E -e '"'"'/^\/\*M?!999999\\\\-/d'"'"'" "$SRC" && ! grep -qF "1{/^\/\*M!999999" "$SRC" && ! grep -qF "[ \$sandbox -eq 1 ] && filter=" "$SRC"'
+# (1.60.0) Las copias de MariaDB 10.6.18, 10.11.8, 11.4.2... empiezan por /*!999999\- (sin la M)
+check "la linea del modo sandbox sin la M tambien se reconoce (1.60.0)" 'grep -qF "re.match(rb\"/\\*M?!999999" "$SRC" && grep -qF "|| \"\$first\" == '"'"'/*!999999\\-'"'"'*" "$SRC"'
 exit $fail

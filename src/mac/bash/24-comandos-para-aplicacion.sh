@@ -30,9 +30,9 @@ function gui_data() {
     # T|barrera entre webs puesta (1) o apagada (0)|webs permitidas (separadas por espacios)
     echo "T|$(web_barrier_on && echo 1 || echo 0)|$(web_barrier_allowed | paste -sd ' ' -)"
     # Correo de pruebas: E|Mailpit instalado (1/0)|encendido (1/0)|modo de WordPress|Mailpit en marcha
-    # (1/0)|version instalada|direccion de su web|version que instala el gestor. Si la version activa
-    # esta en marcha y Mailpit no (se ha cerrado la sesion, por ejemplo), se arranca
-    [ "$DRY" -eq 0 ] && mailpit_sync --suave > /dev/null 2>&1
+    # (1/0)|version instalada|direccion de su web|version que instala el gestor. Aqui solo se mira: Mailpit
+    # arranca y para con la version y, si se ha parado (al cerrar la sesion, por ejemplo), al pulsar Correo
+    # (nexum correo arrancar), no en cada lectura de la ventana
     echo "E|$(mailpit_installed && echo 1 || echo 0)|$(mail_on && echo 1 || echo 0)|$(mail_wp_mode)|$([ -n "$(mailpit_pid)" ] && echo 1 || echo 0)|$(mailpit_installed_version)|$MAIL_UI_URL|$MAILPIT_VERSION"
     # Z|procesos de XAMPP que sobran en memoria (de otras versiones)
     local stray=$(stray_summary)

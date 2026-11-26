@@ -297,8 +297,7 @@ struct PasswordView: View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 64, height: 64)
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 12, weight: .bold))
+                UIIcon("lock.fill", size: 12, weight: .bold)
                     .foregroundColor(.white)
                     .frame(width: 26, height: 26)
                     .background(Circle().fill(Color.gray))
@@ -383,6 +382,35 @@ enum PasswordPanel {
     }
 }
 
+/// Lo que se deja libre alrededor de una ventana del programa (como DIALOG_MARGIN de Linux): ninguna puede ser más
+/// grande que la ventana principal menos esto, ni salirse de la pantalla
+let DIALOG_MARGIN: CGFloat = 80
+
+/// El tamaño máximo de una ventana del programa (hojas, diálogos, recuadros): la ventana principal menos DIALOG_MARGIN
+/// o, sin ella a la vista, la pantalla visible menos DIALOG_MARGIN (como nv_fit_dialog de Linux)
+func dialogMax() -> CGSize {
+    let main = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain && $0.sheetParent == nil && !($0 is NSPanel) })
+    let base: CGSize = main?.frame.size ?? NSScreen.main?.visibleFrame.size ?? CGSize(width: 1280, height: 800)
+    return CGSize(width: Swift.max(320, base.width - DIALOG_MARGIN), height: Swift.max(240, base.height - DIALOG_MARGIN))
+}
+
+/// Un ancho pedido, sin pasar del máximo de las ventanas del programa
+func dialogWidth(_ w: CGFloat) -> CGFloat {
+    return Swift.min(w, dialogMax().width)
+}
+
+/// Un alto pedido, sin pasar del máximo de las ventanas del programa (menos lo que ocupa lo de alrededor: extra)
+func dialogHeight(_ h: CGFloat, extra: CGFloat = 0) -> CGFloat {
+    return Swift.max(120, Swift.min(h, dialogMax().height - extra))
+}
+
+extension View {
+    /// Una hoja o un recuadro: no más alto que el máximo de las ventanas del programa
+    func fitDialog() -> some View {
+        frame(maxHeight: dialogMax().height)
+    }
+}
+
 extension NSAlert {
     /// Como runModal, pero con los botones de la ventana: grandes y el principal (el primero) en
     /// azul, o en rojo si borra; no con el color de acento del sistema (gris con el acento grafito)
@@ -394,6 +422,12 @@ extension NSAlert {
             if i == 0 {
                 b.bezelColor = b.hasDestructiveAction ? .systemRed : blue
             }
+        }
+        // (su vista accesoria, sin pasar del máximo de las ventanas del programa: lo de alrededor, unos 200 de alto)
+        if let acc = accessoryView {
+            let m = dialogMax()
+            let w = Swift.min(acc.frame.width, m.width - 40), h = Swift.min(acc.frame.height, Swift.max(120, m.height - 200))
+            if w != acc.frame.width || h != acc.frame.height { acc.setFrameSize(NSSize(width: w, height: h)) }
         }
         // (después de layout() se pueden mover sus vistas: NSAlert ya no las vuelve a colocar)
         layout()
@@ -592,7 +626,7 @@ func showLongText(_ title: String, _ text: String, subtitle: String = "", toEnd:
     alert.messageText = title
     alert.informativeText = subtitle
     alert.addButton(withTitle: "Cerrar")
-    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 720, height: 560))
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: dialogWidth(720) - 40, height: dialogHeight(560, extra: 200)))
     scroll.hasVerticalScroller = true
     let tv = NSTextView(frame: scroll.bounds)
     tv.isEditable = false

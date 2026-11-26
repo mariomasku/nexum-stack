@@ -66,5 +66,5 @@ check "otro servidor (GitLab, con puerto): su web" 'grep -q "^GITLAB=(.https://g
 check "una ruta local, file://, con .. o con caracteres raros: sin botón" 'grep -qx "LOCAL=None" "$W/o" && grep -qx "FILE=None" "$W/o" && grep -qx "PUNTOS=None" "$W/o" && grep -qx "RARO=None" "$W/o"'
 check "un worktree (.git es un fichero gitdir:)" 'grep -q "^WORKTREE=(.https://github.com/ana/arbol.," "$W/o"'
 check "sin git o sin remote origin (aunque tenga otro): sin botón" 'grep -qx "SINGIT=None" "$W/o" && grep -qx "SINORIGEN=None" "$W/o"'
-check "con el orden guardado de antes, el botón nuevo sale detrás de VS Code (y lo tuyo sigue en su orden)" 'grep -qx "ORDEN=log,actualizar,imagenes,web,vscode,repo,pma,panel,docker,compartir" "$W/o"'
+check "con el orden guardado de antes, el botón nuevo sale detrás de VS Code (y lo tuyo sigue en su orden)" 'grep -qx "ORDEN=log,actualizar,imagenes,web,vscode,repo,pma,panel,docker,compartir,unlink,correo,terminal" "$W/o"'
 exit $fail

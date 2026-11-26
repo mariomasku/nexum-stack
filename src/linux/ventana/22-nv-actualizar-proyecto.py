@@ -170,6 +170,49 @@ class NvActualizarProyecto:
         if resp == Gtk.ResponseType.ACCEPT:
             self.nv_update_project_ask(folder, state["sql"], db, state["code"], mode, making)
 
+    def nv_update_code(self, x):
+        """⋮ de una fila de la lista, «Actualizar código…»: solo el código de producción, sin cargar el proyecto ni
+        tocar su BBDD. Lo mismo que el código de Actualizar proyecto: fusionar o sobrescribir y, si es un repositorio,
+        la pregunta del git pull."""
+        folder = x["name"]
+        dlg = Gtk.Dialog(title="Actualizar código", transient_for=self.win, modal=True, use_header_bar=True)
+        dlg.set_default_size(680, -1)
+        dlg.get_header_bar().set_subtitle(folder)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=22)
+        state = {"code": ""}
+        box.pack_start(label("Solo el código: el proyecto no se carga y su BBDD no se toca.", "dim-label", wrap=True,
+                             halign=Gtk.Align.START), False, False, 0)
+
+        def set_code(path):
+            why = ""
+            ok = os.path.isdir(path) or (os.path.isfile(path) and path.lower().endswith(
+                (".zip", ".tar", ".tgz", ".tar.gz", ".tar.bz2", ".tar.xz")))
+            if path and not ok:
+                why, path = "Tiene que ser un .zip, un .tar.gz o una carpeta", ""
+            state["code"] = path
+            go.set_sensitive(bool(path))
+            return why
+        zone, _put = self.nv_drop_zone("Código de producción", ".zip, .tar.gz o carpeta", "folder-symbolic",
+                                       [("Elegir fichero…", False), ("Elegir carpeta…", True)], set_code)
+        box.pack_start(zone, False, False, 0)
+        merge = Gtk.RadioButton.new_with_label(None, "Fusionar: copia lo que trae y deja lo demás de la carpeta")
+        over = Gtk.RadioButton.new_with_label_from_widget(merge, "Sobrescribir: además borra lo que no traiga")
+        for w in (merge, over):
+            box.pack_start(w, False, False, 0)
+        box.pack_start(label("Se escribe sobre %s/%s. Su .git no se toca; lo sustituido o borrado solo se puede "
+                             "recuperar si al confirmar guardas antes una copia en ~/nexum-backups." % (HTDOCS, folder),
+                             "aviso-rojo", wrap=True), False, False, 0)
+        dlg.get_content_area().add(box)
+        dlg.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+        go = css(dlg.add_button("Actualizar…", Gtk.ResponseType.ACCEPT), "nv-azul")
+        go.set_sensitive(False)
+        dlg.show_all()
+        resp = run_dialog(dlg)
+        mode = "sobrescribir" if over.get_active() else "fusionar"
+        dlg.destroy()
+        if resp == Gtk.ResponseType.ACCEPT and state["code"]:
+            self.nv_update_project_ask(folder, "", "", state["code"], mode)
+
     def nv_update_project_ask(self, folder, sql, db, code, mode, making=False):
         """Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido.
         making: el proyecto no tiene BBDD y se crea (actualizar-proyecto --crear-base)."""
@@ -265,7 +308,7 @@ class NvActualizarProyecto:
         return m
 
     def nv_add_env_menu(self, x):
-        return self.nv_menu_button(None, "list-add-symbolic", [
+        return self.nv_menu_button("Nueva versión", "list-add-symbolic", [
             ("En otra versión de PHP (copiar su BBDD)…", lambda: self.on_replicate(x)),
             ("En Docker…", lambda: self.nv_docker_new_for(x))],
             "Añadir entorno: llevar el proyecto a otra versión de PHP o a Docker")
@@ -289,7 +332,8 @@ class NvActualizarProyecto:
     def nv_row_menu(self, x):
         """Menú ⋮ de una fila de la lista (aparece al pasar el ratón, con Cargar): llevar el proyecto a
         otra versión o a Docker, importar su SQL y lo del menú Más, sin cambiar el proyecto de arriba."""
-        items = [("Añadir entorno en otra versión de PHP…", lambda: self.on_replicate(x)),
+        items = [("Actualizar código…", lambda: self.nv_update_code(x)),
+                 ("Añadir entorno en otra versión de PHP…", lambda: self.on_replicate(x)),
                  ("Añadir entorno en Docker…", lambda: self.nv_docker_add_env(x)),
                  ("Importar SQL…", lambda: self.nv_import(x))] + self.nv_more_items(x)
         return self.nv_menu_button(None, "view-more-symbolic", items)
@@ -298,6 +342,9 @@ class NvActualizarProyecto:
         items = self.nv_more_items(x)
         loaded = self.loaded_project_folder()
         if loaded is not None and os.path.basename(loaded) == x["name"]:
+            # (las imágenes de producción del cargado ya tienen su botón en el visor)
+            items = [it for it in items if it[0] not in ("Imágenes de producción…",
+                                                         "Descargar de producción las imágenes que faltan…")]
             # (solo el cargado: se exporta con la versión de PHP donde está y su BBDD de esa versión)
             items.insert(2, ("Exportar proyecto…", lambda: self.nv_export_project(x)))
         return self.nv_menu_button(None, "view-more-symbolic", items)

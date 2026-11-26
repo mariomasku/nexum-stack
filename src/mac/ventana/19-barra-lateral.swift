@@ -6,15 +6,29 @@ let NAV: [(String, [(String, String, String)])] = [
                  ("versiones", "Versiones de PHP", "logo:php"),
                  ("bbdd", "Bases de datos", "logo:bbdd"), ("docker", "Docker", "logo:docker"),
                  ("node", "Node", "logo:node"), ("nginx", "Nginx", "logo:nginx")]),
-    ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("config", "Configuración", "gearshape")]),
+    ("SISTEMA", [("dominios", "Dominios y hosts", "network"), ("ajustes", "Ajustes", "gearshape"),
+                 ("sistema", "Sistema", "desktopcomputer")]),
 ]
 
+/// Lo que antes era Configuración, en dos pestañas que comparten página (ToolsView), como en Linux: Ajustes (lo
+/// que hay que configurar para que funcionen otras partes del programa) y Sistema (el resto: registros, aspecto,
+/// limpieza, información). Los apartados de Sistema, por su clave de ToolsView.sections; los demás, de Ajustes
+let CONFIG_TABS: Set<String> = ["ajustes", "sistema"]
+let CONFIG_SYSTEM: Set<String> = ["general", "tareas", "apariencia", "limpieza", "oficial", "info"]
+
+/// La pestaña (ajustes o sistema) de un apartado de Configuración (su clave de ToolsView.sections)
+func configTabOf(_ section: String) -> String {
+    return CONFIG_SYSTEM.contains(section) ? "sistema" : "ajustes"
+}
+
 /// Apariencia (~/.nexum/apariencia, el mismo fichero que en Linux): iconos en color, Docker, Node
-/// y PHP con su logotipo, y qué apartados no salen en el menú lateral (Proyectos y Configuración, siempre)
+/// y PHP con su logotipo, y qué apartados no salen en el menú lateral (Proyectos, Ajustes y Sistema, siempre:
+/// sin Ajustes ni Sistema no se podrían volver a enseñar)
 let LOOK_FILE = LOG_DIR + "/apariencia"
-let NAV_FIXED: Set<String> = ["proyectos", "config"]
+let NAV_FIXED: Set<String> = ["proyectos", "ajustes", "sistema"]
 /// Color de los símbolos del sistema con los iconos en color
-let NAV_TINTS: [String: Color] = ["proyectos": hexColor(0xE8A23A), "dominios": hexColor(0x1C9C6B), "config": hexColor(0x7C6FD8)]
+let NAV_TINTS: [String: Color] = ["proyectos": hexColor(0xE8A23A), "dominios": hexColor(0x1C9C6B), "ajustes": hexColor(0x7C6FD8),
+                                     "sistema": hexColor(0x4F8BD6)]
 
 struct LookConf: Equatable {
     var color = false
@@ -24,6 +38,12 @@ struct LookConf: Equatable {
     /// desenfocado detrás: lo hace macOS)
     var zoom = 100
     var cristal = false
+    /// Dónde van los botones del proyecto cargado: «arriba» (en la barra de arriba, y la versión de PHP, Apache,
+    /// MariaDB y el consumo en la de abajo; lo de partida) o «clasico» (el recuadro de la versión arriba y los
+    /// botones en Proyectos, como antes)
+    var visor = "arriba"
+    /// El icono elegido (1 o 2, VISOR_ICON_CHOICES) para Actualizar, Log y Unlink; los que faltan, el 1
+    var iconos: [String: Int] = [:]
 }
 
 let LOOK_ZOOMS = [80, 90, 100, 110]
@@ -38,13 +58,23 @@ func loadLook() -> LookConf {
     c.ocultos = Set((o["ocultos"] as? [String] ?? []).filter { keys.contains($0) })
     if let z = o["zoom"] as? Int, LOOK_ZOOMS.contains(z) { c.zoom = z }
     c.cristal = o["cristal"] as? Bool ?? false
+    c.visor = (o["visor"] as? String) == "clasico" ? "clasico" : "arriba"
+    // (solo esas claves y esos valores: lo demás se ignora, como en Linux)
+    if let m = o["iconos"] as? [String: Any] {
+        for (k, v) in m where VISOR_ICON_CHOICES[k] != nil {
+            if let n = v as? Int, n == 1 || n == 2 { c.iconos[k] = n }
+        }
+    }
     return c
 }
 
 func saveLook(_ c: LookConf) {
     if SIMULATE { return }
+    // (lo que lleva cálculos, antes del diccionario: así se comprueba deprisa al compilar)
+    let visor: String = c.visor == "clasico" ? "clasico" : "arriba"
+    let iconos: [String: Int] = c.iconos.filter { VISOR_ICON_CHOICES[$0.key] != nil && ($0.value == 1 || $0.value == 2) }
     let o: [String: Any] = ["color": c.color, "marcas": c.marcas, "ocultos": c.ocultos.sorted(),
-                            "zoom": c.zoom, "cristal": c.cristal]
+                            "zoom": c.zoom, "cristal": c.cristal, "visor": visor, "iconos": iconos]
     guard let data = try? JSONSerialization.data(withJSONObject: o) else { return }
     try? FileManager.default.createDirectory(atPath: LOG_DIR, withIntermediateDirectories: true,
                                              attributes: [.posixPermissions: 0o700])
@@ -143,22 +173,43 @@ struct AppearanceCard: View {
                         .toggleStyle(SwitchToggleStyle()).labelsHidden()
                 }
             }
-            // (en dos columnas: la primera mitad a la izquierda y el resto a la derecha)
+            // (en tres columnas del mismo ancho, repartidos por orden: de arriba abajo y de izquierda a derecha, como en
+            // Linux)
             let items = NAV.flatMap { $0.1 }.filter { !NAV_FIXED.contains($0.0) && ($0.0 != "nginx" || model.nginxUsed) }
-            let half = (items.count + 1) / 2
+            let per = (items.count + 2) / 3
             VStack(alignment: .leading, spacing: 2) {
                 Text("Apartados del menú lateral").font(.system(size: 13.5, weight: .semibold))
-                Text("Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)")
+                Text("Cuáles se ven en la columna de la izquierda (Proyectos, Ajustes y Sistema salen siempre)")
                     .font(.caption).foregroundColor(.secondary)
                 HStack(alignment: .top, spacing: 12) {
-                    TileCard(wide: true) { navSwitches(Array(items.prefix(half))) }
+                    TileCard(wide: true) { navSwitches(Array(items.prefix(per))) }
                         .frame(maxWidth: .infinity)
-                    TileCard(wide: true) { navSwitches(Array(items.dropFirst(half))) }
+                    TileCard(wide: true) { navSwitches(Array(items.dropFirst(per).prefix(per))) }
+                        .frame(maxWidth: .infinity)
+                    TileCard(wide: true) { navSwitches(Array(items.dropFirst(2 * per))) }
                         .frame(maxWidth: .infinity)
                 }
                 .padding(.top, 6)
             }
-            block("Visor de los proyectos", "Los botones de cada proyecto: cuáles se ven, en qué orden y cómo") {
+            block("Visor de los proyectos", "Dónde van los botones del proyecto cargado y cuáles se ven, en qué orden y cómo") {
+                // (cambia al momento: la barra de arriba, la de abajo y Proyectos)
+                Tile("Dónde", "Arriba: en la barra de arriba, a mano desde cualquier pestaña, y la versión de PHP, Apache, MariaDB y el consumo, en la barra de abajo. Clásico: en Proyectos, como antes") {
+                    SearchPicker(selection: Binding(get: { model.look.visor }, set: { model.look.visor = $0 }),
+                                 items: [("arriba", "Arriba"), ("clasico", "Clásico")], width: 120)
+                }
+                // (dos iconos a elegir para Actualizar, Log y Unlink: uno pulsado de cada)
+                Tile("Iconos", "Los de Actualizar, Log y Unlink") {
+                    HStack(spacing: 8) {
+                        ForEach([("actualizar", "Actualizar"), ("log", "Log"), ("unlink", "Unlink")], id: \.0) { item in
+                            Text(item.1).font(.caption).foregroundColor(.secondary).padding(.leading, 6)
+                            HStack(spacing: 0) {
+                                iconChoice(item.0, item.1, 1)
+                                iconChoice(item.0, item.1, 2)
+                            }
+                            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.primary.opacity(0.16), lineWidth: 1))
+                        }
+                    }
+                }
                 Tile("Botones", buttonsSummary()) {
                     Button("Personalizar…") { model.panel = .buttons }
                 }
@@ -166,6 +217,23 @@ struct AppearanceCard: View {
         }
         // (debajo del título grande de Configuración)
         .preference(key: ToolsDescKey.self, value: "Cómo se ve la ventana. Se guarda al momento y vale también para la versión de Linux.")
+    }
+
+    /// Uno de los dos iconos de Actualizar, Log o Unlink: pulsado, el elegido; cambia al momento
+    func iconChoice(_ key: String, _ name: String, _ n: Int) -> some View {
+        let on = (model.look.iconos[key] ?? 1) == n
+        let pair = VISOR_ICON_CHOICES[key] ?? ("file-text", "file-text")
+        return Button(action: { model.look.iconos[key] = n }) {
+            ReiconImage(name: n == 1 ? pair.0 : pair.1, size: 18)
+                .foregroundColor(on ? Color.white : Color.primary)
+                .frame(width: 32, height: 26)
+                .background(Rectangle().fill(on ? ACCENT : Color.primary.opacity(0.03)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .hoverPointer()
+        .tip(name + ": este icono")
     }
 
     /// Los interruptores de los apartados del menú lateral que se pueden ocultar
@@ -312,7 +380,7 @@ struct NavRow: View {
                 .fill(color ? (name == "github" ? Color.primary : brand(name)) : (on ? ACCENT : Color.secondary))
                 .frame(width: 21, height: 21)
         } else {
-            Image(systemName: icon).font(.system(size: 17)).frame(width: 21, height: 21)
+            UIIcon(icon, size: 17).frame(width: 21, height: 21)
                 .foregroundColor(color ? (NAV_TINTS[key] ?? ACCENT) : (on ? ACCENT : Color.secondary))
         }
     }
@@ -334,7 +402,7 @@ struct SubNavRow: View {
                     if icon.hasPrefix("logo:") {
                         LogoShape(d: LOGO_PATHS[String(icon.dropFirst(5))] ?? "").fill(on ? ACCENT : Color.secondary)
                     } else {
-                        Image(systemName: icon).font(.system(size: 14)).foregroundColor(on ? ACCENT : Color.secondary)
+                        UIIcon(icon, size: 14).foregroundColor(on ? ACCENT : Color.secondary)
                     }
                 }
                 .frame(width: 17, height: 17)

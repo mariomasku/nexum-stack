@@ -55,7 +55,7 @@ struct ProjectSheet: View {
                 .foregroundColor(.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                UIIcon("magnifyingglass").foregroundColor(.secondary)
                 TextField("Buscar una carpeta de htdocs", text: $filter).textFieldStyle(PlainTextFieldStyle())
             }
             .padding(.horizontal, 10)
@@ -85,7 +85,8 @@ struct ProjectSheet: View {
             .padding(.top, 8)
         }
         .padding(24)
-        .frame(width: 580)
+        .frame(width: dialogWidth(580))
+        .fitDialog()
     }
 
     /// Primero las que usan esta base, luego el resto por nombre

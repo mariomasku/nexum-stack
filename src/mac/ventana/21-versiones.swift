@@ -19,7 +19,7 @@ struct VersionsView: View {
                     }
                     .buttonStyle(OutlineButton())
                     .tip("Componentes de cada versión")
-                    Button(action: { model.panel = .install }) { Label("Instalar versión…", systemImage: "plus") }
+                    Button(action: { model.panel = .install }) { Label { Text("Instalar versión…") } icon: { TintIcon("plus") } }
                         .buttonStyle(OutlineButton(kind: "primary"))
                         .busyGuard(model.busy)
                 }
@@ -199,7 +199,7 @@ struct ComponentsPanel: View {
                             let n = String(h.1.dropFirst(5))
                             BrandLogo(name: n, size: 14)
                         } else {
-                            Image(systemName: h.1).font(.system(size: 11)).foregroundColor(.orange)
+                            UIIcon(h.1, size: 11).foregroundColor(.orange)
                         }
                         Text(h.0.uppercased()).font(.system(size: 10.5, weight: .semibold)).foregroundColor(.secondary)
                     }

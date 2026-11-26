@@ -14,7 +14,7 @@ if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: cerrar la ventana no corta la cola; salir con tareas en ella, se pregunta" 'grep -qF "if task == nil && oldValue != nil && taskQueue.isEmpty && !TrayIcon.shared.on" "$SRC" && grep -qF "if let m = AppModel.current, !m.taskQueueQuit() { return }" "$SRC"'
     check "Mac: traer los cambios, al lado de la otra si no es de su carpeta" 'grep -qF "let free = task != nil && taskFree(r.folder)" "$SRC" && grep -qF "runFree(title, args, doneText: \"Hecho\")" "$SRC"'
     check "Mac: crear una BBDD vacía espera a que acabe la tarea" 'grep -B1 -A2 "        if let cur = runningTask {" "$SRC" | grep -qF "refuseTask(cur)"'
-    check "Mac: Avisos en amarillo" 'grep -B2 -A1 "Image(systemName: \"exclamationmark.triangle.fill\").foregroundColor(.yellow)" "$SRC" | grep -qF "Text(\"\\(n)\")"'
+    check "Mac: Avisos en amarillo" 'grep -B2 -A1 "UIIcon(\"exclamationmark.triangle.fill\").foregroundColor(.yellow)" "$SRC" | grep -qF "Text(\"\\(n)\")"'
     check "Mac: el registro de tareas, con el alto medido de sus 4 primeras filas" 'grep -qF "private struct TaskRowHeightsKey: PreferenceKey {" "$SRC" && grep -qF ".frame(height: max(listHeight, 3 * 54))" "$SRC"'
     check "Mac: la página de Nginx, con el logotipo de NGINX" 'grep -qF "BrandImage(key: \"nginx\", height: 26)" "$SRC" && grep -qE "^    \"nginx\": \"JVBERi0" "$SRC"'
 else

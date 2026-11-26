@@ -233,7 +233,12 @@ class NvBandeja:
         self.menu_btn = mb
         # Recuadro de la version montada: el logotipo de PHP y su version y Apache y MariaDB con su punto
         # (verde si estan en marcha); al pulsar en ellos, sus servicios (arrancarlos, pararlos...)
+        # (php_group: lo de la versión, que con el visor arriba (Apariencia) baja a la barra de estado; pill, su
+        # recuadro en la barra de arriba con el visor clásico)
         pill = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-pastilla")
+        self.pill = pill
+        grp = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+        self.php_group = grp
         # ▶ / ■ (a la derecha de los servicios): arrancar o parar la version; sin ninguna activa, ▶
         # despliega las versiones para elegir
         self.power_btn = css(Gtk.Button(valign=Gtk.Align.CENTER), "nv-encender", "nv-play")
@@ -241,12 +246,21 @@ class NvBandeja:
         self.power_btn.add(self.power_img)
         self.power_btn.connect("clicked", lambda *_: self.nv_power_click())
         pill.pack_start(Gtk.Box(), False, False, 4)
-        pill.pack_start(logo("php", 18), False, False, 0)
+        pill.pack_start(grp, False, False, 0)
+        pill.pack_start(Gtk.Box(), False, False, 2)
+        # (la versión activa: al pulsarla, las instaladas para cambiar de versión)
+        self.php_btn = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER,
+                                      tooltip_text="Cambiar de versión de PHP"), "nv-version-btn")
+        vb = Gtk.Box(spacing=8)
+        vb.pack_start(logo("php", 18), False, False, 0)
         self.status_lbl = label("…")
-        pill.pack_start(self.status_lbl, False, False, 0)
+        vb.pack_start(self.status_lbl, False, False, 0)
         self.status_sub = label("", "nv-tenue", "nv-mono", "nv-chico")
-        pill.pack_start(self.status_sub, False, False, 0)
-        pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
+        vb.pack_start(self.status_sub, False, False, 0)
+        self.php_btn.add(vb)
+        self.php_btn.connect("clicked", lambda *_: self.nv_versions_fan())
+        grp.pack_start(self.php_btn, False, False, 0)
+        grp.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.status_btn = css(Gtk.MenuButton(tooltip_text="Servicios de la versión activa"), "nv-servicios")
         sbox = Gtk.Box(spacing=8)
         self.svc_dots = {}
@@ -258,18 +272,18 @@ class NvBandeja:
         self.status_btn.add(sbox)
         self.services_pop = Gtk.Popover(relative_to=self.status_btn)
         self.status_btn.set_popover(self.services_pop)
-        pill.pack_start(self.status_btn, False, False, 0)
-        pill.pack_start(self.power_btn, False, False, 0)
+        grp.pack_start(self.status_btn, False, False, 0)
+        grp.pack_start(self.power_btn, False, False, 0)
         # Lo que gastan Nexum y sus servicios juntos (al pasar el ratón, cada parte)
-        pill.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
+        grp.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 0)
         self.usage_lbl = label("CPU — · RAM —", "nv-mono", "nv-chico", "nv-tenue", width_chars=21, xalign=0.5,
                                tooltip_text="Consumo de Nexum y sus servicios")
-        pill.pack_start(self.usage_lbl, False, False, 0)
+        grp.pack_start(self.usage_lbl, False, False, 0)
         self.usage = UsageMeter()
         self.nv_usage_tick()
         GLib.timeout_add_seconds(3, self.nv_usage_tick)
-        pill.pack_start(Gtk.Box(), False, False, 2)
-        self.warn_btn = Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE)
+        self.warn_btn = css(Gtk.MenuButton(tooltip_text="Avisos", relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER),
+                            "nv-avisos")
         wb = Gtk.Box(spacing=4)
         wb.pack_start(css(icon("dialog-warning-symbolic"), "nv-aviso-icono"), False, False, 0)
         self.warn_num = label("0", "nv-aviso-num", valign=Gtk.Align.CENTER)
@@ -301,10 +315,23 @@ class NvBandeja:
         # Los avisos, a la izquierda del visor, y el menu, justo a su derecha (antes de Localhost)
         center = Gtk.Box(spacing=10, valign=Gtk.Align.CENTER)
         center.pack_start(self.task_badge, False, False, 0)
-        center.pack_start(self.warn_btn, False, False, 0)
-        center.pack_start(pill, False, False, 0)
+        # (en medio, el recuadro de la versión o, con el visor arriba, los botones del proyecto cargado)
+        self.center_slot = Gtk.Box(valign=Gtk.Align.CENTER)
+        center.pack_start(self.center_slot, False, False, 0)
         center.pack_start(self.menu_btn, False, False, 0)
         hb.set_custom_title(center)
+        self.header = hb
+        # Visor arriba: el proyecto cargado en web.local y sus botones, cuadrados y con su nombre, y Correo y
+        # Terminal igual que ellos. Todo el ancho que deje la barra; si no caben, se desplazan (rueda del ratón)
+        # sin ensanchar la ventana. Su alto, el de los botones: sin él, la barra los recortaba por abajo
+        self.top_wrap = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
+                                           vscrollbar_policy=Gtk.PolicyType.NEVER, propagate_natural_width=True,
+                                           valign=Gtk.Align.CENTER)
+        self.top_wrap.set_overlay_scrolling(True)
+        self.top_wrap.set_size_request(-1, TOP_VISOR_SIDE + 2)
+        self.top_btns = css(Gtk.Box(spacing=4, valign=Gtk.Align.CENTER), "nv-visor-arriba")
+        self.top_wrap.add(self.top_btns)
+        self.top_wrap.show_all()
         # Terminal: la de abajo de la ventana, que se enseña y se esconde (en lugar de Localhost; phpMyAdmin
         # ya está en la pestaña Bases de datos)
         self.term_btn = Gtk.ToggleButton(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER,
@@ -314,7 +341,6 @@ class NvBandeja:
         tbox.pack_start(Gtk.Label(label="Terminal"), False, False, 0)
         self.term_btn.add(tbox)
         self.term_btn.connect("toggled", lambda b: self.nv_term_show(b.get_active()))
-        hb.pack_end(self.term_btn)
         # Correo de pruebas: la bandeja de Mailpit, plano como Terminal y con los correos sin leer (se
         # pregunta solo con la ventana activa). Con el correo de pruebas apagado no sale
         self.mail_btn = Gtk.Button(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER)
@@ -329,5 +355,185 @@ class NvBandeja:
         self.mail_btn.add(mbox)
         self.mail_btn.connect("clicked", lambda *_: self.nv_open_mail())
         self.mail_btn.set_no_show_all(True)
-        hb.pack_end(self.mail_btn)
+        self.visor_mode = None
         return hb
+
+    def nv_versions_fan(self):
+        """Al pulsar la versión de PHP (en la barra de abajo o, con el visor clásico, en el recuadro de arriba): las
+        versiones instaladas en un desplegable, abriéndose en abanico (cada una un instante después, desde la barra).
+        La activa, marcada; al elegir otra, se cambia como desde Versiones de PHP (on_activate_version)."""
+        d = self.data or {}
+        installs = sorted(d.get("installs") or [], key=lambda i: ver_tuple(i["php"]), reverse=True)
+        if not installs:
+            self.toast("No hay ninguna versión de PHP instalada")
+            return
+        up = getattr(self, "visor_mode", None) == "arriba"
+        pop = Gtk.Popover(relative_to=self.php_btn, position=Gtk.PositionType.TOP if up else Gtk.PositionType.BOTTOM)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin=6)
+        title = label("Cambiar de versión de PHP", "nv-chico", "nv-tenue", margin_start=8, margin_bottom=4, margin_top=2)
+        rows = []
+        for i in installs:
+            here = i["folder"] == d.get("active")
+            b = css(Gtk.Button(relief=Gtk.ReliefStyle.NONE), "nv-menuitem")
+            row = Gtk.Box(spacing=10)
+            row.pack_start(logo("php", 16), False, False, 0)
+            row.pack_start(label("PHP %s" % i["php"]), False, False, 0)
+            row.pack_start(label("lampp-%s" % i["folder"], "nv-tenue", "nv-mono", "nv-chico"), True, True, 0)
+            if here:
+                row.pack_end(label("● %s" % ("en marcha" if d.get("running") else "activa"), "nv-chico",
+                                   "nv-verde" if d.get("running") else "nv-tenue"), False, False, 0)
+            b.add(row)
+            if here:
+                b.set_tooltip_text("Es la versión activa")
+            else:
+                busy_guard(b, self.busy)
+                b.connect("clicked", lambda _b, f=i["folder"]: (pop.popdown(), self.on_activate_version(None, f)))
+            rows.append(b)
+        # (el abanico: desde la barra hacia fuera, cada fila un poco después que la anterior)
+        order = list(reversed(rows)) if up else rows
+        for n, b in enumerate(order):
+            css(b, "nv-abanico-arriba" if up else "nv-abanico-abajo", "nv-abanico-%d" % min(n, 11))
+        box.pack_start(title, False, False, 0)
+        for b in rows:
+            box.pack_start(b, False, False, 0)
+        pop.add(box)
+        box.show_all()
+        pop.connect("closed", lambda *_: GLib.idle_add(pop.destroy))
+        pop.popup()
+
+    def nv_visor_layout(self):
+        """Coloca la barra de arriba como diga Apariencia (visor arriba o clásico). Arriba: los botones del
+        proyecto cargado (con Correo y Terminal iguales que ellos) donde iba el recuadro de la versión, y lo de
+        la versión, sin recuadro, en la barra de estado. Clásico: como siempre. Mueve los mismos elementos (lo
+        que los actualiza no cambia) y rehace el visor de Proyectos."""
+        mode = look_conf()["visor"]
+        if mode == self.visor_mode:
+            return
+        self.visor_mode = mode
+        for w in (self.php_group, self.mail_btn, self.term_btn, self.pill, self.top_wrap, self.menu_btn, self.warn_btn):
+            parent = w.get_parent()
+            if parent is not None:
+                parent.remove(w)
+        top = mode == "arriba"
+        self.nv_mail_term_look(top)
+        self.services_pop.set_position(Gtk.PositionType.TOP if top else Gtk.PositionType.BOTTOM)
+        if top:
+            self.center_slot.pack_start(self.top_wrap, False, False, 0)
+            self.st_right.pack_start(self.php_group, False, False, 0)
+            # (☰, pegado a la derecha, junto a minimizar, maximizar y cerrar: el sitio de en medio, para los botones;
+            # los avisos, justo a su izquierda)
+            self.header.pack_end(self.menu_btn)
+            self.header.pack_end(self.warn_btn)
+        else:
+            self.pill.pack_start(self.php_group, False, False, 0)
+            self.pill.reorder_child(self.php_group, 1)
+            self.center_slot.pack_start(self.pill, False, False, 0)
+            # (los avisos, justo a la izquierda de ☰)
+            self.center_slot.get_parent().pack_start(self.warn_btn, False, False, 0)
+            self.center_slot.get_parent().pack_start(self.menu_btn, False, False, 0)
+            self.header.pack_end(self.term_btn)
+            self.header.pack_end(self.mail_btn)
+        self.menu_btn.show_all()
+        self.term_btn.show()
+        self.php_group.show_all()
+        self.pill.show_all()
+        self.center_slot.show_all()
+        self.st_right.set_visible(top)
+        if getattr(self, "nv_list", None) is not None:
+            self.nv_build_projects()
+        self.nv_top_visor_fill()
+
+    def nv_mail_term_look(self, square, named=True):
+        """Correo y Terminal: planos, con el icono y el nombre al lado (clásico) o cuadrados, con el nombre
+        debajo, como los botones del visor de arriba. El número de correos sin leer va con ellos."""
+        unread = self.mail_num.get_visible()
+        for b in (self.mail_btn, self.term_btn):
+            old = b.get_child()
+            if old is not None:
+                if self.mail_num.get_parent() is not None:
+                    self.mail_num.get_parent().remove(self.mail_num)
+                b.remove(old)
+        ctx_m, ctx_t = self.mail_btn.get_style_context(), self.term_btn.get_style_context()
+        for b, ctx, ic, name in ((self.mail_btn, ctx_m, logo("mailpit", 18 if not square else TOP_VISOR_ICON), "Correo"),
+                                 (self.term_btn, ctx_t, tint_icon(icon("utilities-terminal-symbolic", 16 if not square else TOP_VISOR_ICON),
+                                                                  "utilities-terminal-symbolic"), "Terminal")):
+            if square:
+                box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, valign=Gtk.Align.CENTER)
+                row = Gtk.Box(spacing=3, halign=Gtk.Align.CENTER)
+                row.pack_start(ic, False, False, 0)
+                if b is self.mail_btn:
+                    row.pack_start(self.mail_num, False, False, 0)
+                box.pack_start(row, False, False, 0)
+                if named:
+                    box.pack_start(label(name, "nv-visor-nombre", xalign=0.5, ellipsize=3, max_width_chars=9), False, False, 0)
+                b.set_relief(Gtk.ReliefStyle.NORMAL)
+                for c in ("nv-proyecto-btn", "nv-boton-cuadrado", "nv-visor-btn"):
+                    ctx.add_class(c)
+                b.set_size_request(TOP_VISOR_SIDE, TOP_VISOR_SIDE)
+            else:
+                box = Gtk.Box(spacing=6)
+                box.pack_start(ic, False, False, 0)
+                box.pack_start(Gtk.Label(label=name), False, False, 0)
+                if b is self.mail_btn:
+                    box.pack_start(self.mail_num, False, False, 0)
+                b.set_relief(Gtk.ReliefStyle.NONE)
+                for c in ("nv-proyecto-btn", "nv-boton-cuadrado", "nv-visor-btn"):
+                    ctx.remove_class(c)
+                b.set_size_request(-1, -1)
+            b.add(box)
+            for w in box.get_children():
+                w.show_all()
+            box.show()
+        # (el número, solo con correos sin leer: lo enseña o lo esconde nv_mail_poll)
+        self.mail_num.set_visible(unread)
+
+    def nv_top_visor_fill(self):
+        """Visor arriba: el proyecto cargado y, como en Personalizar los botones (cuáles se ven y en qué orden), sus
+        botones, Unlink, Correo y Terminal; ⋮, el último de todos. Sin proyecto cargado, solo Correo y Terminal."""
+        if self.visor_mode != "arriba":
+            return
+        for w in list(self.top_btns.get_children()):
+            self.top_btns.remove(w)
+            if w not in (self.mail_btn, self.term_btn):
+                w.destroy()
+        x = self.loaded_project_entry() if self.projects and self.data else None
+        # (delante, el proyecto cargado, con el logotipo de su tipo y sin recuadro: al pulsarlo, Proyectos. A dónde
+        # apunta web.local ya lo dice la barra de abajo. Su nombre entero, sin cortar y sin el prefijo de su tipo)
+        who = Gtk.Button(relief=Gtk.ReliefStyle.NONE, valign=Gtk.Align.CENTER,
+                         tooltip_text=x["name"] if x else "Ningún proyecto cargado: elige uno en Proyectos")
+        css(who, "nv-visor-proyecto")
+        wb = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+        brand = project_brand(x["name"], x["kind"]) if x else None
+        wb.pack_start(logo(brand, 24) if brand else icon("folder-symbolic", 22), False, False, 0)
+        wb.pack_start(label(short_project_name(x["name"]) if x else "Sin proyecto",
+                            "nv-visor-cargado" if x else "nv-tenue"), False, False, 0)
+        who.add(wb)
+        who.connect("clicked", lambda *_: self.show_tab("proyectos"))
+        self.top_btns.pack_start(who, False, False, 0)
+        self.top_btns.pack_start(css(Gtk.Box(), "nv-sep"), False, False, 4)
+        # (siempre cuadrados y del mismo tamaño; con «Solo el icono», sin el nombre)
+        own = buttons_conf()
+        self.nv_mail_term_look(True, named=own["style"] != "icono")
+        conf = dict(own, style="grande", size=TOP_VISOR_SIDE, compacto=True, sin_nombre=own["style"] == "icono")
+        btns = self.nv_project_buttons(x)[0] if x is not None else {}
+        for key in conf["order"]:
+            if key in conf["hidden"]:
+                continue
+            if key == "correo":
+                self.top_btns.pack_start(self.mail_btn, False, False, 0)
+            elif key == "terminal":
+                self.top_btns.pack_start(self.term_btn, False, False, 0)
+            elif key in btns:
+                b = btns[key]
+                self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else visor_spec(key),
+                                dict((k, n) for k, n, _i in VISOR_BUTTONS)[key])
+                b.get_style_context().add_class("nv-visor-btn")
+                self.top_btns.pack_start(b, False, False, 0)
+        if x is not None:
+            more = self.nv_more_menu(x)
+            self.nv_restyle(more, conf, ("icono", "view-more-symbolic"), "Más")
+            more.get_style_context().add_class("nv-visor-btn")
+            self.top_btns.pack_start(more, False, False, 0)
+        for w in self.top_btns.get_children():
+            if w is not self.mail_btn:
+                w.show_all() if w is not self.term_btn else w.show()

@@ -108,14 +108,17 @@ class NvConfiguracion:
         self.nv_github_tools()
         self.nv_look_tools()
         self.nv_clean_tools()
+        # (el título de antes ya no está: lo pone el nuevo, al final)
+        self.tools_title = None
         self.nv_tools_sections()
-        self.tools_title = self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Configuración",
+        self.tools_title = self.nv_page_title(self.tools_box, "emblem-system-symbolic", "Ajustes",
                                               "Elige un apartado en la columna de la izquierda")
         self.nv_tools_title()
 
     # Apartados de Configuración: su nombre en la columna de la izquierda, su icono y el orden (los que no
     # estén aquí, al final)
     TOOLS_SECTIONS = [("General", "General", "preferences-system-symbolic"),
+                      ("Registro de tareas", "Registro de tareas", "document-open-recent-symbolic"),
                       ("Configuración", "Vhosts y hosts", "network-workgroup-symbolic"),
                       ("Seguridad entre webs", "Seguridad entre webs", "security-high-symbolic"),
                       ("Correo de pruebas (Mailpit)", "Correo de pruebas", "mail-unread-symbolic"),
@@ -130,9 +133,9 @@ class NvConfiguracion:
                       ("XAMPP sin registrar", "XAMPP sin registrar", "drive-harddisk-symbolic"),
                       ("Información", "Información", "help-about-symbolic")]
     # Lo que va junto en General, cada uno en su bloque con su título, en este orden
-    GENERAL_PARTS = ["Registro de errores", "Registro de tareas", "Parches nuevos", "Programa"]
-    GENERAL_DESC = ("Los registros de errores de la web cargada y de Apache, el de las tareas que lanza la ventana, "
-                    "los parches nuevos de lo que usa Nexum y el propio programa")
+    GENERAL_PARTS = ["Registro de errores", "Parches nuevos", "Programa"]
+    GENERAL_DESC = ("Los registros de errores de la web cargada y de Apache, los parches nuevos de lo que usa Nexum y el "
+                    "propio programa")
 
     def nv_tools_sections(self):
         """Configuración en dos columnas: a la izquierda, los encabezados de sus apartados; a la derecha, lo que
@@ -181,7 +184,7 @@ class NvConfiguracion:
             found.append(("General", -1, gen))
         found.sort(key=lambda x: (order.get(x[0], len(order)), x[1]))
         stack = Gtk.Stack(vhomogeneous=False, hhomogeneous=False, hexpand=True,
-                          transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=120)
+                          transition_type=Gtk.StackTransitionType.NONE)
         nav = css(Gtk.ListBox(valign=Gtk.Align.START), "nv-nav", "nv-subnav")
         rows = {}
         self.tools_desc = {"General": self.GENERAL_DESC}
@@ -229,23 +232,47 @@ class NvConfiguracion:
         def picked(_lb, row):
             if row is not None:
                 self.tools_section = row.section
+                self.tools_last[config_tab_of(row.section)] = row.section
                 stack.set_visible_child_name(row.section)
                 self.nv_tools_title()
         nav.connect("row-selected", picked)
-        want = getattr(self, "tools_section", None)
-        if want not in rows and found:
-            want = found[0][0]
+        if not hasattr(self, "tools_last"):
+            self.tools_last = {}
         for w in self.tools_side.get_children():
             w.destroy()
-        self.tools_side.pack_start(label("CONFIGURACIÓN", "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2),
-                                   False, False, 0)
+        self.tools_side_title = label("AJUSTES", "nv-seccion", margin_start=22, margin_top=16, margin_bottom=2)
+        self.tools_side.pack_start(self.tools_side_title, False, False, 0)
         self.tools_side.pack_start(nav, False, False, 0)
         self.tools_side.show_all()
         self.tools_box.pack_start(stack, True, True, 0)
         self.tools_nav = rows
         stack.show_all()
+        # (la de la pestaña abierta, Ajustes o Sistema, con sus apartados)
+        tab = getattr(self, "tools_tab", None) or config_tab_of(getattr(self, "tools_section", None))
+        self.nv_tools_group(tab)
+
+    def nv_tools_group(self, tab):
+        """Ajustes o Sistema: en la columna de los apartados, solo los suyos (config_tab_of), y abierto el último
+        que se miró en ella (o el apartado pedido con nv_tools_show, o el primero)."""
+        self.tools_tab = tab
+        rows = getattr(self, "tools_nav", None)
+        if not rows:
+            return
+        title = getattr(self, "tools_side_title", None)
+        if title is not None:
+            title.set_label("SISTEMA" if tab == "sistema" else "AJUSTES")
+        mine = [t for t, row in rows.items() if config_tab_of(t) == tab]
+        for t, row in rows.items():
+            row.set_visible(t in mine)
+        last = getattr(self, "tools_last", {})
+        sec = getattr(self, "tools_section", None)
+        want = sec if config_tab_of(sec) == tab and sec in mine else last.get(tab)
+        if want not in mine:
+            nav = next(iter(rows.values())).get_parent()
+            want = next((r.section for r in nav.get_children() if r.section in mine), None)
         if want:
-            nav.select_row(rows[want])
+            row = rows[want]
+            row.get_parent().select_row(row)
 
     def nv_tools_title(self):
         """El título grande de Configuración: el del apartado abierto (su icono, su nombre y su explicación)."""
@@ -256,6 +283,8 @@ class NvConfiguracion:
         tl, title_lbl, sub_lbl = parts
         info = {t: (name, ic) for t, name, ic in self.TOOLS_SECTIONS}
         name, ic = info.get(sec, (sec, "emblem-system-symbolic"))
+        if not tl.get_children():
+            return
         old = tl.get_children()[0]
         tl.remove(old)
         old.destroy()
@@ -264,7 +293,7 @@ class NvConfiguracion:
         tl.reorder_child(new, 0)
         new.show()
         title_lbl.set_label(name)
-        sub_lbl.set_label(getattr(self, "tools_desc", {}).get(sec) or "Configuración")
+        sub_lbl.set_label(getattr(self, "tools_desc", {}).get(sec) or "")
         # (lo que iba al lado del título del apartado: el de antes sale y entra el del abierto)
         for c in tl.get_children()[2:]:
             tl.remove(c)
@@ -278,7 +307,7 @@ class NvConfiguracion:
     def nv_admin_who(self):
         """El administrador de pruebas de ahora, para los textos: su correo (y la contraseña, si es local)."""
         mail, _password, own = test_admin_conf()
-        return "%s, con tu contraseña de Configuración" % mail if own else "local@local.test, contraseña local"
+        return "%s, con tu contraseña de Ajustes" % mail if own else "local@local.test, contraseña local"
 
     def nv_admin_tools(self):
         """Configuración, Administrador de pruebas: su correo (que es también el usuario) y su contraseña, con un
@@ -415,7 +444,7 @@ class NvConfiguracion:
          "se borra todo lo de ~/nexum-backups (la carpeta se queda): ya no se podrá volver atrás con ellas", False),
         ("correo", "Correo de pruebas",
          "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que "
-         "Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Configuración, Correo de "
+         "Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Ajustes, Correo de "
          "pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit "
          "sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la "
          "versión activa).",
@@ -431,7 +460,7 @@ class NvConfiguracion:
         ("registros-versiones", "Registros de las versiones",
          "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, "
          "los errores de PHP y MariaDB. Están en la carpeta logs de cada /opt/lampp-<versión> (el de MariaDB, "
-         "con sus datos). Sirven para buscar por qué falla una web (Configuración, General, Registro de "
+         "con sus datos). Sirven para buscar por qué falla una web (Sistema, General, Registro de "
          "errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo "
          "se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
          "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión (siguen en marcha)", True),
@@ -549,7 +578,7 @@ class NvConfiguracion:
         if part:
             section = "General"
         self.tools_section = section
-        self.show_tab("config")
+        self.show_tab(config_tab_of(section))
         row = getattr(self, "tools_nav", {}).get(section)
         if row is not None and row.get_parent() is not None:
             row.get_parent().select_row(row)
@@ -568,7 +597,7 @@ class NvConfiguracion:
         return False
 
     def nv_tasks_tools(self):
-        """Configuración, General, Registro de tareas: las tareas que ha lanzado la ventana (las TASKS_KEEP
+        """Sistema, Registro de tareas: las tareas que ha lanzado la ventana (las TASKS_KEEP
         últimas de TASKS_DIR), cada una con su fecha y cómo acabó; al pulsarla, entera."""
         # (en la demostración, la de siempre: la de verdad es la de su carpeta de ejemplo)
         home = os.path.expanduser("~")
@@ -715,6 +744,7 @@ class NvConfiguracion:
         view = css(Gtk.TextView(editable=False, monospace=True, cursor_visible=False, wrap_mode=Gtk.WrapMode.WORD_CHAR,
                                 left_margin=14, right_margin=14, top_margin=10, bottom_margin=10), "log", "nv-consola")
         view.get_buffer().set_text(text)
+        link_lists(view, self.open_uri)
         sw = css(Gtk.ScrolledWindow(vexpand=True), "nv-consola-marco")
         sw.add(view)
         dlg.get_content_area().add(sw)
@@ -862,7 +892,7 @@ class NvConfiguracion:
             row = ActionRow("Conviene ponerlos: son parches de seguridad",
                             "\n".join("• " + i for i in shown) + "\n\nLo de ahora sigue funcionando mientras se actualiza "
                             "(se puede seguir en segundo plano). Si no quieres cambiar nada, «Ahora no» lo deja hasta "
-                            "que salga otro parche; siguen en Configuración, General, Parches nuevos.")
+                            "que salga otro parche; siguen en Sistema, General, Parches nuevos.")
             row.add_prefix(icon("software-update-available-symbolic", 18))
             later = Gtk.Button(label="Ahora no", valign=Gtk.Align.CENTER)
             later.connect("clicked", lambda *_: (self.warn_btn.get_popover().popdown(), updates_ignore(res["items"]),

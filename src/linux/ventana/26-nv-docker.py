@@ -410,7 +410,7 @@ class NvDocker:
         repo = repo_button(folder, self.open_uri)
         if repo is not None:
             btns["repo"] = repo
-        lg = nv_button(logo("log", 18), "Log", "Ver el log de errores" if php_c else "Arráncalo para ver su log",
+        lg = nv_button(icon(visor_icon("log"), 18), "Log", "Ver el log de errores" if php_c else "Arráncalo para ver su log",
                        lambda *_: self.nv_docker_log(p, php_c), "nv-proyecto-btn")
         lg.set_sensitive(bool(php_c))
         btns["log"] = lg
@@ -671,14 +671,15 @@ class NvDocker:
                                          on_done=done), True)])  # noqa: B023 (done es el mismo en cada vuelta)
             row([name, label(""), img_cell, pma, label(cpu_text([c["name"] for c in items]), "nv-mono", "nv-chico", "nv-tenue"), acts],
                 on_click=lambda proj=proj: self.nv_dk_toggle(proj))
-            if not opened:
-                continue
-            # (desplegado: su visor, con sus accesos directos, encima de sus contenedores)
-            if p:
+            # (su visor, con sus accesos directos: desplegado o, si está en marcha, siempre, sin desplegarlo; al
+            # desplegarlo, sus contenedores debajo)
+            if p and (opened or up):
                 vr = Gtk.ListBoxRow(activatable=False, selectable=False)
                 vr.on_click = None
                 vr.add(self.nv_docker_visor(p, items))
                 lb.add(vr)
+            if not opened:
+                continue
             for c in visible:
                 on = c["state"] == "running"
                 kn = Gtk.Box(spacing=8)

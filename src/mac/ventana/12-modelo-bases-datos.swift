@@ -535,7 +535,7 @@ extension AppModel {
     /// Debajo del buscador, cuántos hay (con uno ya elegido, sigue lo que se va a clonar)
     func showNpReposNote() {
         if !npReposLoaded || !npUrl.isEmpty { return }
-        npRepoNote = npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo"
+        npRepoNote = npRepos.isEmpty ? "Sin la lista de GitHub (conéctalo en Ajustes, GitHub): escribe la dirección abajo"
             : "\(npRepos.count) repositorios de GitHub"
     }
 }

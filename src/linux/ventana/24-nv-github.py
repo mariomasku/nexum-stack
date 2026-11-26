@@ -219,7 +219,7 @@ class NvGithub:
                 img.set_pixel_size(18)
             add(img or "text-editor-symbolic", None, "Abrir en Visual Studio Code", lambda: self.open_in_vscode(path), task=False)
         add("folder-open-symbolic", None, "Abrir su carpeta", lambda: self.open_uri(GLib.filename_to_uri(path, None)), task=False)
-        add(logo("log", 18), None, "Registro: lo último que ha dicho su servidor", lambda: self.run_task(
+        add(icon(visor_icon("log"), 18), None, "Registro: lo último que ha dicho su servidor", lambda: self.run_task(
             "Registro de %s" % p["folder"], ["node-registro", p["folder"]]))
         if p["running"]:
             add("view-refresh-symbolic", None, "Volver a compilar y arrancar" if p["mode"] == "compilado" else "Reiniciar su servidor",
@@ -335,7 +335,7 @@ class NvGithub:
             if d["running"]:
                 text = "En marcha en este equipo: puertos %s (http) y %s (https)" % (d["http"], d["https"])
             else:
-                text = "Parado. Puertos %s (http) y %s (https), en Configuración, Nginx" % (d["http"], d["https"])
+                text = "Parado. Puertos %s (http) y %s (https), en Ajustes, Nginx" % (d["http"], d["https"])
             text += {"parado": ". El PHP de la versión activa no está en marcha: arráncala para que sirva PHP",
                      "sin-fpm": ". La versión activa no tiene PHP-FPM (un XAMPP oficial): solo sirve ficheros"}.get(d["php"], "")
             row = ActionRow("Nginx %s" % d["version"], text)
@@ -347,7 +347,7 @@ class NvGithub:
             if d["version"] != d["latest"]:
                 act("software-update-available-symbolic", "Actualizar a la %s" % d["latest"], "Compilar la versión de este gestor",
                     self.nv_nginx_install)
-            act(logo("log", 18), None, "Registro: sus errores", lambda: self.run_task("Registro de Nginx", ["nginx-registro"]))
+            act(icon(visor_icon("log"), 18), None, "Registro: sus errores", lambda: self.run_task("Registro de Nginx", ["nginx-registro"]))
             if d["running"]:
                 act("view-refresh-symbolic", None, "Reiniciar Nginx", lambda: self.nv_nginx_do("nginx-reiniciar", "Reiniciando Nginx",
                                                                                               "Nginx en marcha"))
@@ -578,7 +578,7 @@ class NvGithub:
         if r.get("error") and not h:
             card = css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10), "nv-mosaico")
             card.pack_start(label(r["error"], wrap=True, xalign=0), False, False, 0)
-            b = Gtk.Button(label="Ir a Configuración", halign=Gtk.Align.START)
+            b = Gtk.Button(label="Ir a Ajustes", halign=Gtk.Align.START)
             b.connect("clicked", lambda *_: self.nv_tools_show("GitHub (Repositorios)"))
             card.pack_start(b, False, False, 0)
             box.pack_start(card, False, False, 0)
@@ -604,6 +604,8 @@ class NvGithub:
             bar.pack_end(label("⚠ " + r["error"], "nv-chico", wrap=True, max_width_chars=40), False, False, 0)
         box.pack_start(bar, False, False, 0)
         lb = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE), "caja")
+        # (Clonar y Traer cambios, todos del ancho del más ancho)
+        self.repo_btn_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
         for repo in r.get("rows", []):
             lb.add(self.nv_repo_row(repo))
         if not r.get("rows"):
@@ -641,6 +643,13 @@ class NvGithub:
             b = css(busy_guard(Gtk.Button(label="Clonar", valign=Gtk.Align.CENTER,
                                tooltip_text="Clonar por SSH en /opt/htdocs"), self.busy), "verde")
             b.connect("clicked", lambda *_: self.nv_repo_fetch(repo))
+        # (Clonar, tan ancho como Traer cambios: los botones de todas las filas, en columna; y, aunque no haya ningún
+        # Traer cambios en la lista, del ancho que tendría)
+        group = getattr(self, "repo_btn_group", None)
+        if group is not None:
+            group.add_widget(b)
+        ref = Gtk.Button(label="Traer cambios")
+        b.set_size_request(max(ref.get_preferred_width()[1], b.get_preferred_width()[1]), -1)
         row.add_suffix(b)
         # (detrás, el repositorio en GitHub: sus cambios, ramas y pull requests; solo el logotipo, así
         # todos los botones quedan a la misma altura)
@@ -1033,11 +1042,10 @@ class NvGithub:
         """Los botones del visor (clave: botón) en acts: los que se ven, en su orden y con su estilo. fixed:
         los que van siempre (botón, icono, nombre), ya colocados: con el mismo estilo y el mismo tamaño."""
         conf = conf or buttons_conf()
-        specs = dict((k, i) for k, _n, i in VISOR_BUTTONS)
         for key in conf["order"]:
             if key in btns and key not in conf["hidden"]:
                 b = btns[key]
-                self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else specs[key],
+                self.nv_restyle(b, conf, ("logo", b.nv_logo) if getattr(b, "nv_logo", None) else visor_spec(key),
                                 dict((k, n) for k, n, _i in VISOR_BUTTONS)[key])
                 if isinstance(acts, Gtk.FlowBox):
                     nv_flow_add(acts, b)
@@ -1066,12 +1074,25 @@ class NvGithub:
             # (⋮ «Más», sin mensaje: solo despliega su menú)
             b.set_tooltip_text(None if name == "Más" else
                                "%s: %s" % (name, tip) if tip and not tip.startswith(name) else tip or name)
+        elif conf.get("compacto"):
+            # (el visor de arriba: pequeños, siempre del mismo lado, con el nombre en letra pequeña; ⋮, solo el icono)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, valign=Gtk.Align.CENTER)
+            box.pack_start(button_icon(spec, TOP_VISOR_ICON + (4 if conf.get("sin_nombre") else 0)), False, False, 0)
+            if name != "Más" and not conf.get("sin_nombre"):
+                box.pack_start(label(square_name(name, TOP_VISOR_SIDE - 6, 9, "nv-visor-nombre"), "nv-visor-nombre", xalign=0.5,
+                                     ellipsize=3, max_width_chars=9), False, False, 0)
+                if not b.get_tooltip_text():
+                    b.set_tooltip_text(name)
+            b.add(box)
+            b.get_style_context().add_class("nv-visor-btn")
         else:
             side = max(side, BUTTON_SIZE_NAMED)
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, valign=Gtk.Align.CENTER)
             box.pack_start(button_icon(spec, max(18, side * 2 // 5)), False, False, 0)
-            box.pack_start(label(name, "nv-chico", xalign=0.5, ellipsize=3, max_width_chars=max(6, side // 8)),
-                           False, False, 0)
+            # (⋮, solo el icono)
+            if name != "Más":
+                box.pack_start(label(square_name(name, side - 10, max(6, side // 8), "nv-chico"), "nv-chico", xalign=0.5, ellipsize=3,
+                                     max_width_chars=max(6, side // 8)), False, False, 0)
             b.add(box)
         b.set_size_request(side, side)
         b.set_valign(Gtk.Align.CENTER)
@@ -1080,15 +1101,17 @@ class NvGithub:
     def nv_buttons_dialog(self):
         """Personalizar los botones del visor: cuáles se ven, en qué orden y cómo."""
         conf = buttons_conf()
-        names = dict((k, (n, i)) for k, n, i in VISOR_BUTTONS)
+        names = dict((k, (n, visor_spec(k))) for k, n, _i in VISOR_BUTTONS)
         dlg = Gtk.Dialog(title="Botones del proyecto", transient_for=self.win, modal=True, use_header_bar=True)
         # (en horizontal: la lista a la izquierda y el estilo, el tamaño y la vista previa a la derecha, para
         # que quepa en la altura de un portátil)
         dlg.set_default_size(900, -1)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
         box.pack_start(label("Botones del visor del proyecto", "nv-titulo"), False, False, 0)
-        box.pack_start(label("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ "
-                             "y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.",
+        box.pack_start(label("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). ⋮, el último, y los "
+                             "propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre. Unlink es solo del "
+                             "proyecto cargado, y Correo y Terminal, del visor de arriba. «Icono y nombre en horizontal», "
+                             "solo en el visor clásico: en el de arriba van siempre cuadrados.",
                              "nv-tenue", wrap=True, max_width_chars=110), False, False, 0)
         cols = Gtk.Box(spacing=26)
         box.pack_start(cols, True, True, 0)
@@ -1138,7 +1161,7 @@ class NvGithub:
         size_lbl = label("", "nv-mono", "nv-tenue", width_chars=9)
         grid.attach(size_lbl, 2, 1, 1, 1)
         side.pack_start(grid, False, False, 0)
-        # Vista previa: los botones que se ven, como quedarán (con Desmontar y ⋮)
+        # Vista previa: los botones que se ven, como quedarán (con ⋮, el último)
         side.pack_start(label("Así quedan", "nv-chico", "nv-tenue"), False, False, 0)
         # (en varias filas si no caben: se ven todos, del tamaño que tendrán)
         preview = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, column_spacing=8, row_spacing=8,
@@ -1155,11 +1178,9 @@ class NvGithub:
             size_lbl.set_label("%d×%d px" % (side, side) if square else "—")
             preview.foreach(preview.remove)
             btns = {}
-            for key, name, spec in VISOR_BUTTONS:
-                btns[key] = nv_button(button_icon(spec, 18), name, None, None, "nv-proyecto-btn")
-            fixed = [(nv_button("media-eject-symbolic", None, "Desmontar", None, flat=True),
-                      ("icono", "media-eject-symbolic"), "Desmontar"),
-                     (self.nv_menu_button(None, "view-more-symbolic", []), ("icono", "view-more-symbolic"), "Más")]
+            for key, name, _spec in VISOR_BUTTONS:
+                btns[key] = nv_button(button_icon(visor_spec(key), 18), name, None, None, "nv-proyecto-btn")
+            fixed = [(self.nv_menu_button(None, "view-more-symbolic", []), ("icono", "view-more-symbolic"), "Más")]
             row = Gtk.Box()
             self.nv_place_buttons(row, btns, fixed, conf)
             for b in row.get_children() + [b for b, _spec, _name in fixed]:
@@ -1342,7 +1363,7 @@ class NvGithub:
         box.pack_start(fields, False, False, 0)
         box.pack_start(copied, False, False, 0)
         box.pack_start(label("Se cierra solo a las %s. %s Quién entra y lo que se bloquea queda en el registro del "
-                             "túnel (Configuración, Túnel de Cloudflare)." % (
+                             "túnel (Ajustes, Túnel de Cloudflare)." % (
                                  until, "El panel de administración va bloqueado." if blocked
                                  else "⚠ El panel de administración no va bloqueado."),
                              "nv-tenue", wrap=True, max_width_chars=64), False, False, 0)

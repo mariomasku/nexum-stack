@@ -3,6 +3,7 @@ extension AppModel {
 
     /// Abre el diálogo para actualizar el proyecto cargado con lo de producción
     func upOpen(_ x: Project) {
+        upCodeOnly = false
         upFolder = x.name
         upSql = ""
         upCode = ""
@@ -24,6 +25,25 @@ extension AppModel {
             if x.kind == "wp" { prefix = "wp_" } else if x.kind == "ps" { prefix = "ps_" }
             upDb = prefix + base
         }
+        upSqlError = ""
+        upCodeError = ""
+        upShown = true
+    }
+
+    /// ⋮ de una fila de la lista, «Actualizar código…»: solo el código de producción, sin cargar el proyecto ni tocar
+    /// su BBDD (como en Linux). El mismo diálogo y el mismo camino que el código de Actualizar proyecto (upAsk: el git
+    /// pull si es un repositorio), sin --bd ni --base
+    func upOpenCode(_ x: Project) {
+        upCodeOnly = true
+        upFolder = x.name
+        upSql = ""
+        upCode = ""
+        upMode = "fusionar"
+        upDb = ""
+        upNoDb = false
+        upCreateDb = false
+        upDbGone = ""
+        upDbKnown = false
         upSqlError = ""
         upCodeError = ""
         upShown = true
@@ -59,8 +79,10 @@ extension AppModel {
     /// Antes de copiar: si es un repositorio, ¿git pull antes?, avisando de lo que no se ha subido
     func upAsk() {
         upShown = false
-        let folder = upFolder, sql = upSql, db = upDb.trimmingCharacters(in: .whitespaces), code = upCode, mode = upMode
-        let making = upNoDb && upCreateDb
+        let only = upCodeOnly
+        let folder = upFolder, sql = only ? "" : upSql, db = only ? "" : upDb.trimmingCharacters(in: .whitespaces)
+        let code = upCode, mode = upMode
+        let making = !only && upNoDb && upCreateDb
         var what: [String] = []
         if making {
             let how: String = sql.isEmpty ? ", vacía," : " con el volcado"
@@ -1141,13 +1163,14 @@ extension AppModel {
     /// (en Configuración, el de su apartado). Los capítulos son los id de ayuda/index.html
     func showHelp() {
         let tabs = ["proyectos": "proyectos", "repos": "repositorios", "versiones": "versiones", "bbdd": "bbdd",
-                    "docker": "docker", "node": "node", "nginx": "nginx", "dominios": "dominios", "config": "configuracion"]
-        let sections = ["general": "general", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo", "admin": "admin-pruebas-config",
+                    "docker": "docker", "node": "node", "nginx": "nginx", "dominios": "dominios", "ajustes": "configuracion",
+                    "sistema": "configuracion"]
+        let sections = ["general": "general", "tareas": "tareas", "hosts": "vhosts", "seguridad": "seguridad-webs", "correo": "correo", "admin": "admin-pruebas-config",
                         "docker": "docker-config", "tunel": "tunel-config", "apariencia": "apariencia",
                         "github": "github-config", "limpieza": "limpieza", "carpetas": "carpetas",
                         "oficial": "configuracion-xampp-oficial", "info": "informacion"]
         var chapter = tabs[tab] ?? "ventana"
-        if tab == "config" { chapter = sections[toolsSection] ?? chapter }
+        if CONFIG_TABS.contains(tab) { chapter = sections[toolsSection] ?? chapter }
         runQuick(["manual", "--ruta", chapter]) { code, out in
             let path = out.split(separator: "\n").last.map(String.init) ?? ""
             if code == 0 && path.hasPrefix("/") && FileManager.default.fileExists(atPath: path) {

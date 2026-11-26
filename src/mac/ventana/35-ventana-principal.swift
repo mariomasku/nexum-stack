@@ -30,6 +30,8 @@ struct ContentView: View {
         }
         // Todos los botones: con borde, la mano y el borde azul al pasar el ratón (como en Linux)
         .buttonStyle(PointerButtonStyle())
+        // (Apariencia, iconos en color: también los de los botones; cambia al momento)
+        .environment(\.iconsTinted, model.look.color)
         .overlay(panel())
         .overlay(toastView(), alignment: .bottom)
         // (escondida en segundo plano, la hoja no se ve; la tarea sigue y su aviso está al lado del visor)
@@ -54,7 +56,8 @@ struct ContentView: View {
         case "node": NodeView()
         case "nginx": NginxView()
         case "dominios": HostsView()
-        case "config": ToolsView()
+        // (Ajustes y Sistema comparten la página de Configuración: cada una, con sus apartados)
+        case "ajustes", "sistema": ToolsView()
         default: ProjectsView()
         }
     }
@@ -81,7 +84,7 @@ struct ContentView: View {
                             ScrollView {
                                 VStack(alignment: .leading, spacing: 18) { InstallSection() }.padding(.trailing, 8)
                             }
-                            .frame(height: 490)
+                            .frame(height: dialogHeight(490, extra: 190))
                         }
                     case .dockerNew:
                         DockerNewPanel()
@@ -118,7 +121,8 @@ struct ContentView: View {
 
 /// La barra de abajo: «web.local >>>>> proyecto» (los chevrones en verde, con su onda), «web.local >>>>>
 /// dominio falseado · tienda.com» si el dominio del proyecto cargado está falseado o, sin proyecto cargado,
-/// «web.local >>>>> sin enlace» (chevrones y texto en gris)
+/// «web.local >>>>> sin enlace» (chevrones y texto en gris). Con el visor arriba (Apariencia), a la derecha, lo de
+/// la versión montada, sin recuadro: PHP, Apache y MariaDB, ▶ / ■ y el consumo (VersionVisor)
 struct StatusBar: View {
     @EnvironmentObject var model: AppModel
 
@@ -139,6 +143,9 @@ struct StatusBar: View {
                 .lineLimit(1).truncationMode(.middle)
                 .help(tip)
             Spacer(minLength: 0)
+            if model.look.visor != "clasico" {
+                VersionVisor(bottom: true)
+            }
         }
         .font(.system(size: 11, design: .monospaced))
         .padding(.horizontal, 16)

@@ -53,6 +53,10 @@ ICON = "nexum"
 # renombra a ~/.nexum al arrancar (y deja un enlace en su sitio) antes de abrir la ventana. Si no se ha pasado
 # (con --simular o en las pruebas), la de antes, como el script: no se crea una ~/.nexum al lado
 LOG_DIR = os.path.expanduser("~/.nexum")
+# Lo que un diálogo queda por dentro de la ventana de Nexum (px, entre los dos lados): nunca más grande que ella
+DIALOG_MARGIN = 80
+# Lo que tarda en abrirse un desplegable (ms): corto, que se note que se abre sin hacer esperar (GTK, 250)
+REVEAL_MS = 90
 LOG_DIR_OLD = os.path.expanduser("~/.lvm-instalador")
 if not os.path.lexists(LOG_DIR) and os.path.isdir(LOG_DIR_OLD) and not os.path.islink(LOG_DIR_OLD):
     LOG_DIR = LOG_DIR_OLD
@@ -173,6 +177,67 @@ def project_kind(folder):
             os.path.isdir(os.path.join(path, "wp-includes")):
         return "wp"
     return ""
+
+
+# Prefijos del nombre de la carpeta que dicen su tipo: en el visor de arriba, junto al logotipo, sobran
+PROJECT_NAME_PREFIXES = ("dob-prestashop-", "dob-wordpress-")
+
+
+def short_project_name(name):
+    """El nombre de un proyecto para el visor de arriba, sin el prefijo de su tipo (el logotipo ya lo dice)."""
+    for prefix in PROJECT_NAME_PREFIXES:
+        if name.startswith(prefix) and len(name) > len(prefix):
+            return name[len(prefix):]
+    return name
+
+
+def _json_file(path):
+    """El contenido de un JSON pequeño del proyecto (package.json, composer.json), o {} si no se puede leer."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            data = json.loads(fh.read(400000))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def project_brand(folder, kind=None):
+    """El logotipo del tipo de proyecto (visor de arriba), por sus ficheros: WordPress y PrestaShop (project_kind);
+    con composer.json, Laravel, Symfony, Drupal, Joomla o Magento; con package.json, Astro, Next.js, Nuxt, Angular,
+    Svelte, Vue o React, y si no, Node. None si no se sabe (se pone la carpeta). Solo lee ficheros: no ejecuta nada."""
+    kind = project_kind(folder) if kind is None else kind
+    if kind in ("wp", "ps"):
+        return {"wp": "wordpress", "ps": "prestashop"}[kind]
+    path = os.path.join(HTDOCS, folder)
+    composer = _json_file(os.path.join(path, "composer.json"))
+    req = {}
+    for k in ("require", "require-dev"):
+        if isinstance(composer.get(k), dict):
+            req.update(composer[k])
+    if os.path.isfile(os.path.join(path, "artisan")) or "laravel/framework" in req:
+        return "laravel"
+    if "drupal/core" in req or "drupal/core-recommended" in req or os.path.isfile(os.path.join(path, "core", "lib", "Drupal.php")):
+        return "drupal"
+    if any(k.startswith("magento/") for k in req) or os.path.isfile(os.path.join(path, "app", "etc", "env.php")):
+        return "magento"
+    if os.path.isfile(os.path.join(path, "libraries", "src", "Version.php")) and os.path.isdir(os.path.join(path, "administrator")):
+        return "joomla"
+    if "symfony/framework-bundle" in req or (os.path.isfile(os.path.join(path, "bin", "console"))
+                                             and os.path.isfile(os.path.join(path, "symfony.lock"))):
+        return "symfony"
+    pkg = os.path.join(path, "package.json")
+    if os.path.isfile(pkg):
+        deps = {}
+        data = _json_file(pkg)
+        for k in ("dependencies", "devDependencies"):
+            if isinstance(data.get(k), dict):
+                deps.update(data[k])
+        for dep, name in (("astro", "astro"), ("next", "nextdotjs"), ("nuxt", "nuxtdotjs"), ("@angular/core", "angular"),
+                          ("@sveltejs/kit", "svelte"), ("svelte", "svelte"), ("vue", "vuedotjs"), ("react", "react")):
+            if dep in deps:
+                return name
+        return "node"
+    return None
 
 
 # Lo que se hace con la configuración del proyecto al subirle una base nueva
@@ -405,8 +470,9 @@ button.verde, button.verde:hover, button.verde:active {
 }
 button.verde:hover { background-color: shade(GREEN, 1.08); }
 button.verde:disabled { background-color: alpha(GREEN, 0.4); color: alpha(white, 0.7); }
-/* Todos los botones: transición suave y, al pasar el ratón, un poco más claros */
-button { transition: background-color 120ms ease-out, box-shadow 120ms ease-out, color 120ms ease-out; }
+/* Todos los botones: al pasar el ratón, un poco más claros. Sin transiciones: el cambio, al momento (con ellas, cada
+   pulsación y cada pestaña parecían ir con retraso) */
+* { transition: none; }
 button:hover:not(.verde):not(:disabled) { box-shadow: inset 0 0 0 999px alpha(@theme_fg_color, 0.07); }
 button.verde:active { background-color: shade(GREEN, 0.92); }
 /* Cargar proyecto: contenedor hundido con el título dentro */
@@ -438,7 +504,6 @@ progressbar progress { background-image: none; background-color: GREEN; border-c
 list.barra-lateral { background-color: transparent; }
 list.barra-lateral > row {
   margin: 2px 8px; padding: 12px 12px; min-height: 22px; border-radius: 10px;
-  transition: background-color 120ms ease-out;
 }
 list.barra-lateral > row:hover { background-color: alpha(@theme_fg_color, 0.06); }
 list.barra-lateral > row:selected, list.barra-lateral > row:selected:hover {
@@ -466,7 +531,6 @@ messagedialog .dialog-action-box { margin-top: 6px; }
 .opcion {
   border: 1px solid alpha(@theme_fg_color, 0.12); border-radius: 10px;
   background-color: alpha(@theme_fg_color, 0.03); padding: 10px 14px;
-  transition: border-color 120ms ease-out, background-color 120ms ease-out;
 }
 .opcion.elegida { border-color: GREEN; background-color: alpha(GREEN, 0.08); }
 /* Dentro de la tarjeta, el botón de radio sin su propio recuadro (el del foco del tema): la

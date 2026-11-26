@@ -177,7 +177,7 @@ out=$(tunnel_open "http://localhost:$WP/" 2>&1); rc=$?
 check "sin direccion de Cloudflare: lo dice, con lo ultimo de cloudflared" '[ $rc -ne 0 ] && grep -q "No se ha podido abrir el tunel" <<< "$out" && grep -q "failed to request quick Tunnel" <<< "$out" && [ ! -e "$TUNNEL_STATE" ]'
 
 if grep -q "LVM_SWIFT" "$SRC"; then
-    check "ventana (Mac): Compartir en el visor del proyecto cargado (por su direccion, la de Abrir web) y en el de Docker" 'grep -q "items\[\"compartir\"\] = AnyView(model.shareButton(String(web.dropLast" "$SRC" && grep -q "model.share(t.1, folder: folder, name: p.folder)" "$SRC"'
+    check "ventana (Mac): Compartir en el visor del proyecto cargado (por su direccion, la de Abrir web) y en el de Docker" 'grep -q "items\[\"compartir\"\] = AnyView(self.shareButton(String(web.dropLast" "$SRC" && grep -q "model.share(t.1, folder: folder, name: p.folder)" "$SRC"'
     check "ventana (Mac): el logotipo de Cloudflare (solo M, L, C y Z) y su apartado en Configuración" 'grep -qE "^    \"cloudflare\": \"M [0-9. LCMZ-]+\",$" "$SRC" && grep -q "tunnelCard()" "$SRC"'
     check "ventana (Mac): al compartir se eligen el tiempo (desde 15 minutos) y el admin; la contraseña, al azar (sin escribirla)" 'awk "/    func share\\(_ url/,/    func shareDialog/" "$SRC" > "$W/share" && grep -q "\"--minutos\", String(minutes)," "$W/share" && ! grep -qi "password\|NSTextField(string" "$W/share" && ! grep "\"tunel-config\"" "$SRC" | grep -qv ": \"tunel-config\""'
     check "ventana (Mac): el tunel abierto, con su contraseña" 'grep -q "copy(t.password, \"Contraseña copiada\")" "$SRC"'

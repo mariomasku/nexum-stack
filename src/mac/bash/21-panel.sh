@@ -133,7 +133,7 @@ function panel_set_aside() {
     text+="  2. Se copian todas sus bases de datos (.zip) en ~/nexum-backups/xampp-oficial/XAMPP-oficial-<fecha>.\n"
     text+="  3. Se copian sus proyectos a $COMMON/htdocs y sus vhosts al fichero compartido.\n"
     text+="  4. Se mueve a $APPS_DIR/XAMPP-oficial-<fecha>.\n\n"
-    text+="Despues, activa una version y carga sus bases (en la ventana, en Configuración).\n"
+    text+="Despues, activa una version y carga sus bases (en la ventana, en Sistema, XAMPP oficial).\n"
     text+="Se puede deshacer con Volver al XAMPP oficial.\n\n¿Apartarlo?"
 
     ui_yesno "$text" || return 0

@@ -4,7 +4,7 @@
 SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/comun.sh"
 if grep -q "^let ERROR_LOG = " "$SRC"; then
-    check "Mac: zoom y cristal en el fichero de Apariencia (se leen y se guardan)" 'grep -qF "let LOOK_ZOOMS = [80, 90, 100, 110]" "$SRC" && grep -qF "if let z = o[\"zoom\"] as? Int, LOOK_ZOOMS.contains(z) { c.zoom = z }" "$SRC" && grep -qF "\"zoom\": c.zoom, \"cristal\": c.cristal]" "$SRC"'
+    check "Mac: zoom y cristal en el fichero de Apariencia (se leen y se guardan)" 'grep -qF "let LOOK_ZOOMS = [80, 90, 100, 110]" "$SRC" && grep -qF "if let z = o[\"zoom\"] as? Int, LOOK_ZOOMS.contains(z) { c.zoom = z }" "$SRC" && grep -qF "\"zoom\": c.zoom, \"cristal\": c.cristal, \"visor\":" "$SRC"'
     check "Mac: la ventana entera a escala, y al 100 % tal cual" 'grep -qF ".scaleEffect(zoom, anchor: .topLeading)" "$SRC" && grep -qF "ZoomBox(zoom: CGFloat(model.look.zoom) / 100) {" "$SRC" && grep -qF "        if zoom == 1 {" "$SRC"'
     check "Mac: cristal con el material de macOS y la ventana sin opacar" 'grep -qF "v.blendingMode = .behindWindow" "$SRC" && grep -qF "w.isOpaque = !on" "$SRC" && grep -qF ".background(GlassBackground(on: model.look.cristal))" "$SRC"'
     check "Mac: con el cristal, la barra del visor sólida (azul oscuro o blanca)" 'grep -qF ".background(model.look.cristal ? (scheme == .dark ? Color(red: 0.078, green: 0.129, blue: 0.239)" "$SRC"'

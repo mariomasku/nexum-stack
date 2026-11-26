@@ -150,6 +150,41 @@ func scriptArgs(_ args: [String]) -> [String] {
     return [SCRIPT] + (SIMULATE ? ["--simular"] : []) + args
 }
 
+/// Lo último que leyó la ventana de cada una de estas órdenes, para pintarla al momento al abrirse (como
+/// DATA_CACHED de Linux): se guarda al acabar bien cada una y se lee una vez, al arrancar, antes de las de verdad
+let DATA_CACHE_DIR = LOG_DIR + "/cache/ventana"
+let DATA_CACHED: Set<String> = ["gui-datos", "gui-hosts", "gui-servicios", "gui-proyectos", "gui-docker"]
+let DATA_CACHE_MAX = 4 * 1024 * 1024
+
+/// Lo guardado de una orden de DATA_CACHED, o nil (en la simulación, nada)
+func dataCacheRead(_ cmd: String) -> String? {
+    guard !SIMULATE, DATA_CACHED.contains(cmd),
+          let h = FileHandle(forReadingAtPath: DATA_CACHE_DIR + "/" + cmd) else { return nil }
+    let data = h.readData(ofLength: DATA_CACHE_MAX)
+    h.closeFile()
+    let text = String(decoding: data, as: UTF8.self)
+    return text.isEmpty ? nil : text
+}
+
+/// Guarda la salida de una orden de DATA_CACHED (carpeta 0700, fichero 0600, a un .nuevo y renombrado), solo si ha
+/// cambiado. Se llama desde la cola de fondo de runQuick, nunca desde la interfaz; si algo falla, no pasa nada
+func dataCacheWrite(_ cmd: String, _ out: String) {
+    guard !SIMULATE, DATA_CACHED.contains(cmd), !out.isEmpty, out.utf8.count <= DATA_CACHE_MAX else { return }
+    let path = DATA_CACHE_DIR + "/" + cmd
+    if dataCacheRead(cmd) == out { return }
+    let fm = FileManager.default
+    do {
+        try fm.createDirectory(atPath: DATA_CACHE_DIR, withIntermediateDirectories: true,
+                               attributes: [.posixPermissions: 0o700])
+        let tmp = path + ".nuevo"
+        try? fm.removeItem(atPath: tmp)
+        guard fm.createFile(atPath: tmp, contents: Data(out.utf8), attributes: [.posixPermissions: 0o600]) else { return }
+        if rename(tmp, path) != 0 { try? fm.removeItem(atPath: tmp) }
+    } catch {
+        return
+    }
+}
+
 /// Comando sin sudo ni preguntas, en segundo plano. done(codigo, salida) en el hilo principal.
 func runQuick(_ args: [String], env: [String: String] = [:], input: String? = nil,
               _ done: @escaping (Int32, String) -> Void) {
@@ -178,6 +213,10 @@ func runQuick(_ args: [String], env: [String: String] = [:], input: String? = ni
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
         let out = String(decoding: data, as: UTF8.self)
+        // (las de la ventana, para pintarla al momento la próxima vez que se abra: aquí, en la cola de fondo)
+        if p.terminationStatus == 0 && args.count == 1 && env.isEmpty && input == nil {
+            dataCacheWrite(args[0], out)
+        }
         DispatchQueue.main.async { done(p.terminationStatus, out) }
     }
 }
@@ -441,7 +480,7 @@ func openAdminLogin(kind: String, admin: String, site: String, name: String, com
             // (ya hay un usuario de verdad con el correo del administrador de pruebas: no se ha tocado)
             if out.contains("de verdad con") {
                 message("Ya hay un usuario de verdad con \(testAdminConf().mail)",
-                        "No se cambia ni se crea el de pruebas en esa BBDD. Elige otro correo en Configuración › Administrador de pruebas. Se abre el panel sin él.")
+                        "No se cambia ni se crea el de pruebas en esa BBDD. Elige otro correo en Ajustes › Administrador de pruebas. Se abre el panel sin él.")
             }
             openURL(base)
             return
@@ -556,8 +595,27 @@ func loginPage(title: String, project: String, action: String, fields: [(String,
 
 /// Visual Studio Code, si está instalado (para abrir con él y para su icono)
 func vscodeURL() -> URL? {
-    return NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.VSCode")
+    // (se pide en cada fila de Proyectos y en cada redibujado: preguntar a Launch Services, medio minuto como mucho)
+    if Date().timeIntervalSince(vscodeCache.0) < 30 { return vscodeCache.1 }
+    let u = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.microsoft.VSCode")
+    vscodeCache = (Date(), u)
+    return u
 }
+
+private var vscodeCache: (Date, URL?) = (Date.distantPast, nil)
+private var vscodeIcons: [String: NSImage] = [:]
+
+/// El icono de Visual Studio Code (leído una vez por ruta)
+func vscodeIcon(_ code: URL) -> NSImage {
+    if let i = vscodeIcons[code.path] { return i }
+    let i = NSWorkspace.shared.icon(forFile: code.path)
+    vscodeIcons[code.path] = i
+    return i
+}
+
+/// Lo que dura lo que se despliega o se pliega o se desplaza solo (como REVEAL_MS de Linux: 90 ms). Cambiar de
+/// pestaña, de apartado o pasar el ratón por un botón, sin animación
+let UI_ANIM: Double = 0.09
 
 /// Carpeta del proyecto cargado (a la que apunta el enlace del vhost), solo si es una carpeta de htdocs
 func loadedProjectFolder(_ current: String) -> String? {

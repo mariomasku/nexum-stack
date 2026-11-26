@@ -6,7 +6,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: boton en la hoja mientras sigue" 'grep -qF "Button(\"Seguir en segundo plano\") { task.model?.taskHidden = true }" "$SRC"'
     check "Mac: escondida, la hoja no se ve y la tarea sigue" 'grep -qF ".sheet(item: Binding(get: { model.taskHidden ? nil : model.task }," "$SRC" && grep -qF "set: { t in if t == nil && !model.taskHidden { model.task = nil } }" "$SRC"'
-    check "Mac: el aviso al lado del visor" 'grep -B3 "^            visor()$" "$SRC" | grep -qF "TaskBadge(task: t)" && grep -q "^struct TaskBadge: View {" "$SRC" && grep -qF "repeatForever(autoreverses: true)) { pulse = true }" "$SRC"'
+    check "Mac: el aviso al lado del visor" 'grep -B3 "^ *visor()$" "$SRC" | grep -qF "TaskBadge(task: t)" && grep -q "^struct TaskBadge: View {" "$SRC" && grep -qF "repeatForever(autoreverses: true)) { pulse = true }" "$SRC"'
     check "Mac: si acaba sin cerrarse sola, vuelve" 'grep -A3 "} else if model?.taskHidden == true {" "$SRC" | grep -qF "model?.taskHidden = false"'
     check "Mac: no van dos tareas a la vez (la otra, a la cola)" 'grep -A3 "        if task != nil {" "$SRC" | grep -qF "taskQueue.append(q)"'
     check "Mac: el aviso dice lo que hace" 'grep -qF "Text((task.title.split(separator: \" \").first.map(String.init) ?? \"En marcha\") + \"…\")" "$SRC" && grep -qF "self.title = title" "$SRC"'

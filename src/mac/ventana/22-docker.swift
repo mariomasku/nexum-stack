@@ -33,7 +33,7 @@ struct DockerView: View {
                 let running = k.containers.filter { $0.state == "running" && ownContainer($0.name) }.count
                 Button(action: { model.dockerStopAll() }) {
                     HStack(spacing: 6) {
-                        Image(systemName: "stop.fill").foregroundColor(RED)
+                        UIIcon("stop.fill").foregroundColor(RED)
                         Text("Parar todos")
                     }
                 }
@@ -41,7 +41,7 @@ struct DockerView: View {
                 .disabled(running == 0).busyGuard(model.busy)
                 .tip(running > 0 ? "Parar \(running) contenedores de Nexum"
                      : "No hay ningún contenedor de Nexum en marcha")
-                Button(action: { model.openDockerForm(folder: nil) }) { Label("Proyecto en Docker…", systemImage: "plus") }
+                Button(action: { model.openDockerForm(folder: nil) }) { Label { Text("Proyecto en Docker…") } icon: { TintIcon("plus") } }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .busyGuard(model.busy)
             }
@@ -78,7 +78,7 @@ struct DockerView: View {
     }
 
     func sharingNote() -> some View {
-        Text("Docker Desktop solo deja a los contenedores usar las carpetas de su lista (Settings › Resources › File sharing), y /Library no está: añade \(HTDOCS) y pulsa Apply. Los proyectos nuevos van con el Apache de Docker (en 127.0.0.2: sin XAMPP-X y con varias versiones de PHP a la vez); su BBDD, en una MariaDB común, y su phpMyAdmin, en https://pma.docker.local (o pma.docker.test, con el DNS de Docker de Configuración; la llave de su fila copia la contraseña). Los de antes siguen con XAMPP-X delante hasta que los pasas.")
+        Text("Docker Desktop solo deja a los contenedores usar las carpetas de su lista (Settings › Resources › File sharing), y /Library no está: añade \(HTDOCS) y pulsa Apply. Los proyectos nuevos van con el Apache de Docker (en 127.0.0.2: sin XAMPP-X y con varias versiones de PHP a la vez); su BBDD, en una MariaDB común, y su phpMyAdmin, en https://pma.docker.local (o pma.docker.test, con el DNS de Docker de Ajustes; la llave de su fila copia la contraseña). Los de antes siguen con XAMPP-X delante hasta que los pasas.")
             .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -100,7 +100,7 @@ struct DockerView: View {
             // (Docker vacío: lo de antes sigue en el disco, pero no se ve; o Docker Desktop ha empezado con un disco nuevo)
             if !k.lost.isEmpty {
                 HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.yellow)
+                    UIIcon("exclamationmark.triangle.fill").foregroundColor(.yellow)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(lostTitle(k.lost))
                         Text(lostText(k.lost))
@@ -116,7 +116,7 @@ struct DockerView: View {
             // (solo con proyectos de antes: los del Apache de Docker no necesitan XAMPP-X)
             if !k.xampp && k.projects.contains(where: { !$0.isWeb }) {
                 HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+                    UIIcon("exclamationmark.triangle.fill").foregroundColor(.orange)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("La versión XAMPP-X activa está parada")
                         Text("Los proyectos en Docker de antes se abren por su Apache (los del Apache de Docker, no).").font(.caption).foregroundColor(.secondary)
@@ -131,7 +131,7 @@ struct DockerView: View {
             let old = k.projects.filter { $0.old }
             if !old.isEmpty {
                 HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(RED)
+                    UIIcon("exclamationmark.triangle.fill").foregroundColor(RED)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("PHP-FPM abierto en 127.0.0.1: " + old.map { $0.folder }.joined(separator: ", "))
                         Text("Sin clave: cualquier programa del Mac puede ejecutar PHP con él. Se cierra solo al arrancarlos, o ahora.")
@@ -169,12 +169,12 @@ struct DockerView: View {
                 if w.ok {
                     StatusDot(on: w.state == "marcha", size: 8)
                 } else {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+                    UIIcon("exclamationmark.triangle.fill").foregroundColor(.orange)
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(!w.ok ? "La dirección \(w.ip) del Apache de Docker aún no está en este Mac"
                          : (w.state == "marcha" ? "Apache de Docker en marcha" : "Apache de Docker parado"))
-                    Text(!w.ok ? "macOS solo tiene 127.0.0.1: se da de alta una vez (pide la contraseña) y queda puesta en cada arranque. O elige otra en Configuración, Docker."
+                    Text(!w.ok ? "macOS solo tiene 127.0.0.1: se da de alta una vez (pide la contraseña) y queda puesta en cada arranque. O elige otra en Ajustes, Docker."
                          : "En \(w.ip) (http \(w.http), https \(w.https)): sirve los proyectos de Docker sin XAMPP-X, con las mismas reglas de seguridad. phpMyAdmin: \(dockerWebURL(k, "pma." + dockerTLD(k)))")
                         .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
@@ -277,14 +277,17 @@ struct DockerView: View {
             TableHead(cols: [("Nombre", 230), ("ID", 100), ("Imagen", 130), ("Puertos", 0), ("CPU", 55),
                              ("Acciones", DK_ACTIONS_WIDTH)], lastRight: true)
             ForEach(list) { g in
+                let open = dkIsOpen(g)
+                let up = !g.items.isEmpty && g.items.allSatisfy { $0.state == "running" }
                 Divider()
                 groupRow(g)
-                if dkIsOpen(g) {
-                    // (desplegado: su visor, con sus accesos directos, encima de sus contenedores)
-                    if let p = g.project {
-                        Divider()
-                        visor(p, g)
-                    }
+                // (su visor, con sus accesos directos: desplegado o, si está en marcha, siempre, sin desplegarlo; al
+                // desplegarlo, sus contenedores debajo)
+                if let p = g.project, open || up {
+                    Divider()
+                    visor(p, g)
+                }
+                if open {
                     ForEach(g.visible) { c in
                         Divider()
                         containerRow(c, g)
@@ -313,8 +316,7 @@ struct DockerView: View {
             model.dkOpen = model.dkOpen.contains(g.id) ? [] : [g.id]
         }) { _ in
             HStack(spacing: 8) {
-                Image(systemName: open ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary).frame(width: 10)
+                UIIcon(open ? "chevron.down" : "chevron.right", size: 10, weight: .semibold).foregroundColor(.secondary).frame(width: 10)
                 BrandLogo(name: "docker", size: 16)
                 Text(g.title).font(.system(size: 13, weight: .semibold)).lineLimit(1).truncationMode(.middle)
                 if up { StatusDot(on: true, size: 7).tip("Todos sus contenedores en marcha") }
@@ -514,7 +516,7 @@ struct DockerView: View {
             model.dockerOpenPma(p)
         }.disabled(!up || (!p.isWeb && p.pma.isEmpty)))
         if let code = vscodeURL() {
-            items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
+            items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(vscodeIcon(code)),
                                                   tip: "Abrir en Visual Studio Code") {
                 openInVSCode(folder)
             })
@@ -526,7 +528,7 @@ struct DockerView: View {
                                                 icon: github ? .logo("github") : .symbol("globe", Color.blue),
                                                 tip: "Abrir el repositorio: \(url)") { openURL(url) })
         }
-        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
+        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: visorChoice("log", model.look.iconos),
                                            tip: webC.map { _ in "Ver el log de errores" }
                                             ?? "Aún no tiene contenedor de la web: arráncalo") {
             if let n = webC { model.dockerWebLog(p, n) }

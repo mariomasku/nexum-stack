@@ -12,8 +12,10 @@ class NvDatosAvisos:
             self.nv_power_state()
             self.nv_projects_refresh()
             self.nv_mail_header()
-            GLib.idle_add(self.nv_secure_after_update)
-            GLib.idle_add(self.nv_apache_old_check)
+            # (lo que pregunta algo, con los datos de verdad: no con lo guardado al abrir)
+            if not getattr(self, "data_from_cache", False):
+                GLib.idle_add(self.nv_secure_after_update)
+                GLib.idle_add(self.nv_apache_old_check)
         self.nv_tray_update()
         return res
 
@@ -93,9 +95,7 @@ class NvDatosAvisos:
         ctx = self.power_btn.get_style_context()
         ctx.remove_class("nv-play" if on else "nv-stop")
         ctx.add_class("nv-stop" if on else "nv-play")
-        self.power_img.set_from_icon_name("media-playback-stop-symbolic" if on else "media-playback-start-symbolic",
-                                          Gtk.IconSize.MENU)
-        self.power_img.set_pixel_size(22)
+        set_icon(self.power_img, "media-playback-stop-symbolic" if on else "media-playback-start-symbolic", 22)
         if on:
             tip = "Parar y desactivar lampp-%s" % d["active"]
         elif d.get("active"):
@@ -124,7 +124,9 @@ class NvDatosAvisos:
         except OSError:
             last = ""
         installs = sorted(d.get("installs") or [], key=lambda i: (i["folder"] != last, i["folder"]))
-        pop = Gtk.Popover(relative_to=self.power_btn, position=Gtk.PositionType.BOTTOM)
+        # (con el visor arriba, el botón está en la barra de abajo: se abre hacia arriba)
+        pop = Gtk.Popover(relative_to=self.power_btn, position=Gtk.PositionType.TOP if getattr(self, "visor_mode", None) == "arriba"
+                          else Gtk.PositionType.BOTTOM)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1, margin=6)
         box.pack_start(label("Arrancar una versión", "nv-chico", "nv-tenue", margin_start=8, margin_bottom=4),
                        False, False, 0)

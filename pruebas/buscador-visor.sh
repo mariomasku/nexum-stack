@@ -10,14 +10,14 @@ if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: filtra por lo que lleva el texto, sin distinguir mayúsculas" 'grep -qF "items.filter { \$0.1.lowercased().contains(q) }" "$SRC"'
     check "Mac: flechas, Intro y Esc en el buscador" 'grep -qF "case #selector(NSResponder.moveDown(_:)): parent.onMove(1)" "$SRC" && grep -qF "case #selector(NSResponder.insertNewline(_:)): parent.onEnter()" "$SRC" && grep -qF "case #selector(NSResponder.cancelOperation(_:)):" "$SRC"'
     check "Mac: todos los desplegables (también el tamaño de Apariencia; no los de opciones ni los segmentos) son SearchPicker" '[ "$(grep -c "^ *SearchPicker(selection:" "$SRC")" -ge 16 ] && [ "$(grep -c "^ *Picker(\"\", selection:" "$SRC")" -eq 3 ]'
-    check "Mac: ▶ / ■ a la derecha de los servicios" 'grep -A3 "ServicesView(close: { servicesOpen = false })" "$SRC" | grep -qF "powerButton()"'
+    check "Mac: ▶ / ■ a la derecha de los servicios" 'grep -A3 "ServicesView(close: { servicesOpen = false })" "$SRC" | grep -qF "powerButton(edge)"'
     check "Mac: sin ninguna activa, ▶ despliega las versiones (la última primero) y la arranca" 'grep -qF "if active.isEmpty { powerOpen.toggle() } else { model.power() }" "$SRC" && grep -qF "model.activate(i.folder)" "$SRC" && grep -qF "let LAST_VERSION_FILE = LOG_DIR + \"/ultima-version\"" "$SRC"'
     check "Mac: al parar, se recuerda cuál era" 'grep -qF "try? (d.active + \"\\n\").write(toFile: LAST_VERSION_FILE, atomically: true, encoding: .utf8)" "$SRC"'
 else
     check "Linux: los desplegables de 8 o más se abren con buscador" 'grep -qx "COMBO_SEARCH_MIN = 8" "$SRC" && grep -qF "widget.connect(\"notify::popup-shown\", popup_shown)" "$SRC" && grep -qF "GLib.idle_add(lambda: (combo_search(combo), False)[1])" "$SRC"'
-    check "Linux: ▶ / ■ a la derecha de los servicios" 'grep -A1 "pill.pack_start(self.status_btn, False, False, 0)" "$SRC" | grep -qF "pill.pack_start(self.power_btn, False, False, 0)"'
+    check "Linux: ▶ / ■ a la derecha de los servicios" 'grep -A1 "grp.pack_start(self.status_btn, False, False, 0)" "$SRC" | grep -qF "grp.pack_start(self.power_btn, False, False, 0)"'
     check "Linux: sin ninguna activa, ▶ despliega las versiones (la última primero) y la arranca" 'grep -qF "key=lambda i: (i[\"folder\"] != last, i[\"folder\"])" "$SRC" && grep -qF "self.on_activate_version(None, f)" "$SRC" && grep -qF "LAST_VERSION_FILE = os.path.join(LOG_DIR, \"ultima-version\")" "$SRC"'
-    check "Linux: el icono, solo (sin círculo ni borde) y de 22" 'grep -qF "self.power_img.set_pixel_size(22)" "$SRC" && ! grep -qF "button.nv-encender { border-radius: 50%" "$SRC"'
+    check "Linux: el icono, solo (sin círculo ni borde) y de 22" 'grep -qE "self.power_img.set_pixel_size\(22\)|self.power_img = symbol\(\"media-playback-start-symbolic\", 22\)" "$SRC" && ! grep -qF "button.nv-encender { border-radius: 50%" "$SRC"'
     if [ -n "$DISPLAY$WAYLAND_DISPLAY" ] && python3 -c "import gi" 2> /dev/null; then
         W=$(mktemp -d "$TMPBASE/buscador.XXXXXX") || exit 1
         trap 'rm -rf "${W:?}"' EXIT

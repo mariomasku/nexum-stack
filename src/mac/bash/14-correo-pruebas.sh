@@ -319,6 +319,8 @@ function mail_apply() {
 function mail_command() {
     local mode old
     case $1 in
+        # (al pulsar Correo en la ventana, si no esta en marcha: lo arranca si toca, con la version en marcha)
+        arrancar) mailpit_sync --suave ;;
         ""|estado)
             if mail_on; then
                 echo "Correo de pruebas encendido: lo que mandan las webs va a Mailpit"

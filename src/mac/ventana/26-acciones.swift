@@ -195,7 +195,7 @@ extension AppModel {
             field("Dirección", t.url, copyURL), field("Contraseña", t.password, copyPass), copied, openRow,
             dialogLabel("Se cierra solo a las \(hour). "
                         + (t.block ? "El panel de administración va bloqueado." : "⚠ El panel de administración no va bloqueado.")
-                        + " Quién entra y lo que se bloquea queda en el registro del túnel (Configuración, Túnel de Cloudflare).",
+                        + " Quién entra y lo que se bloquea queda en el registro del túnel (Ajustes, Túnel de Cloudflare).",
                         color: .secondaryLabelColor, align: .left),
         ], spacing: 10)
         let r = alert.runStyled()

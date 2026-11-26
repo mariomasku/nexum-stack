@@ -6,7 +6,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 if grep -q "^let ERROR_LOG = " "$SRC"; then
     check "Mac: visor sin nada en disco" 'grep -q "conf.websiteDataStore = WKWebsiteDataStore.nonPersistent()" "$SRC" && grep -q "^import WebKit$" "$SRC"'
     check "Mac: debajo de las tarjetas y con el mismo visor siempre" 'grep -q "MailWebView(host: model.mailWeb, url: m.url)" "$SRC" && grep -q "lazy var mailWeb = MailWebHost()" "$SRC"'
-    check "Mac: el boton Correo lleva a su apartado, sin navegador" '! sed -n "/^    func openMail() {/,/^    }/p" "$SRC" | grep -q openURL && sed -n "/^    func openMail() {/,/^    }/p" "$SRC" | grep -q "toolsSection = \"correo\""'
+    check "Mac: el boton Correo lleva a su apartado, sin navegador" '! sed -n "/^    func openMail(retried: Bool = false) {/,/^    }/p" "$SRC" | grep -q openURL && sed -n "/^    func openMail(retried: Bool = false) {/,/^    }/p" "$SRC" | grep -q "openTools(\"correo\")"'
     check "Mac: ya no hay boton Abrir en la bandeja" '! grep -q "Button(\"Abrir\") { openURL(m.url) }" "$SRC"'
     check "Mac: fuera de Mailpit no se navega; al navegador solo con clic" 'grep -q "if action.navigationType == .linkActivated { external(action.request.url) }" "$SRC" && grep -q "if let u = url, u.scheme == \"http\" || u.scheme == \"https\"" "$SRC"'
 else

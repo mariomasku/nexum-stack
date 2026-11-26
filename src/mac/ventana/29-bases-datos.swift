@@ -44,7 +44,7 @@ struct DatabasesView: View {
             .buttonStyle(OutlineButton())
             .disabled(act == nil || !d.running)
             .tip("phpMyAdmin de la versión activa")
-            Button(action: { model.createDb() }) { Label("Nueva BBDD…", systemImage: "plus") }
+            Button(action: { model.createDb() }) { Label { Text("Nueva BBDD…") } icon: { TintIcon("plus") } }
                 .buttonStyle(OutlineButton(kind: "primary"))
                 .disabled(act == nil).busyGuard(model.busy)
                 .tip("Crear una BBDD vacía")
@@ -131,8 +131,7 @@ struct DatabasesView: View {
             }
         }) { _ in
             HStack(spacing: 8) {
-                Image(systemName: open ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .semibold)).foregroundColor(.secondary).frame(width: 10)
+                UIIcon(open ? "chevron.down" : "chevron.right", size: 10, weight: .semibold).foregroundColor(.secondary).frame(width: 10)
                 LogoIcon("mariadb", size: 18)
                 Text("XAMPP-\(inst.folder)").font(.system(size: 12.5, weight: .semibold, design: .monospaced))
                 if active { SmallTag(text: "Activa", blue: true) }
@@ -264,9 +263,9 @@ struct DatabasesView: View {
         let hint = model.importHint()
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "square.and.arrow.up").foregroundColor(.secondary)
+                UIIcon("square.and.arrow.up").foregroundColor(.secondary)
                 Text("Subir o actualizar una BBDD").font(.system(size: 13, weight: .semibold))
-                Image(systemName: "info.circle").foregroundColor(.secondary).tip(desc)
+                UIIcon("info.circle").foregroundColor(.secondary).tip(desc)
                 if let a = act {
                     Text("en XAMPP-\(a.folder) · MariaDB \(a.mariadb)").font(.caption).foregroundColor(.secondary)
                 }

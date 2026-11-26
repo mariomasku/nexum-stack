@@ -41,17 +41,31 @@ extension AppModel {
     }
 
     /// Botón Correo de arriba: la bandeja de Mailpit o, si no está instalado o parado, por qué
-    func openMail() {
+    /// (retried: ya se ha intentado arrancar Mailpit; si sigue parado, se dice, sin volver a intentarlo)
+    func openMail(retried: Bool = false) {
         guard let m = data?.mail else { return }
         if !m.installed {
-            toolsSection = "correo"
-            tab = "config"
-            toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
-        } else if !m.running {
+            openTools("correo")
+            toast("Instala Mailpit en Ajustes, apartado Correo de pruebas")
+        } else if !m.running && !(data?.running ?? false) {
             toast("Mailpit arranca con la versión activa: arráncala arriba")
+        } else if !m.running && retried {
+            toast("No se ha podido arrancar Mailpit: mira Ajustes, Correo de pruebas")
+        } else if !m.running {
+            // (no se mira en cada lectura de la ventana: se arranca ahora, al pedirlo, y se abre)
+            toast("Arrancando Mailpit…")
+            runQuick(["correo", "arrancar"]) { rc, _ in
+                guard rc == 0 else {
+                    self.toast("No se ha podido arrancar Mailpit: mira Ajustes, Correo de pruebas")
+                    return
+                }
+                runQuick(["gui-datos"]) { rc2, out2 in
+                    self.onData(rc2, out2)
+                    self.openMail(retried: true)
+                }
+            }
         } else {
-            toolsSection = "correo"
-            tab = "config"
+            openTools("correo")
         }
     }
 
@@ -143,7 +157,7 @@ extension AppModel {
 
     func setAside() {
         if !confirm("¿Apartar el XAMPP oficial?",
-                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/nexum-backups), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Configuración (ahí también puedes volver a él). Pide la contraseña de administrador.",
+                    "/Applications/XAMPP tiene que ser un enlace a la versión activa. Sin borrar nada, se para, se copian sus BBDD (.zip, a ~/nexum-backups), sus proyectos y sus vhosts, y se mueve a /Applications/XAMPP-oficial-<fecha>.\n\nDespués, carga sus BBDD en Sistema, XAMPP oficial (ahí también puedes volver a él). Pide la contraseña de administrador.",
                     "Apartar el XAMPP oficial") { return }
         runTask("Apartando el XAMPP oficial", ["apartar"], doneText: "XAMPP oficial apartado. Sus BBDD están copiadas en ~/nexum-backups")
     }

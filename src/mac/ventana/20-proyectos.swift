@@ -37,7 +37,9 @@ struct UpdateProjectSheet: View {
         let dbOk = validDbName(model.upDb.trimmingCharacters(in: .whitespaces))
         let making = model.upNoDb && model.upCreateDb
         let hasSql = !model.upSql.isEmpty, hasCode = !model.upCode.isEmpty
-        let can: Bool = (hasSql || hasCode || making) && ((!hasSql && !making) || dbOk)
+        // («Actualizar código…»: solo el código, sin la BBDD)
+        let only: Bool = model.upCodeOnly
+        let can: Bool = only ? hasCode : (hasSql || hasCode || making) && ((!hasSql && !making) || dbOk)
         // (los textos, ya calculados: en la vista, sin ternarias que el compilador tenga que resolver)
         var warn: String = "Este proyecto no tiene base de datos"
         if !model.upDbGone.isEmpty { warn = "La BBDD de este proyecto, " + model.upDbGone + ", no existe en la versión activa" }
@@ -46,14 +48,17 @@ struct UpdateProjectSheet: View {
         let goTitle: String = making && !hasSql && !hasCode ? "Crear la BBDD…" : "Actualizar…"
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Actualizar proyecto").font(.headline)
+                Text(only ? "Actualizar código" : "Actualizar proyecto").font(.headline)
                 Text(model.upFolder).font(.caption).foregroundColor(.secondary)
             }
+            if only {
+                Text("Solo el código: el proyecto no se carga y su BBDD no se toca.").foregroundColor(.secondary)
+            }
             // Sin BBDD: se dice y se puede crear desde aquí (vacía, o con el volcado que se elija debajo)
-            if model.upNoDb {
+            if model.upNoDb && !only {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        UIIcon("exclamationmark.triangle.fill")
                         Text(verbatim: warn)
                     }
                     .foregroundColor(.orange).font(.system(size: 13, weight: .semibold))
@@ -62,10 +67,12 @@ struct UpdateProjectSheet: View {
                         .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            zone("Base de datos de producción", ".sql, .gz o .zip", symbol: "cylinder.split.1x2", path: model.upSql, error: model.upSqlError,
-                 over: $overSql, code: false, folders: false)
+            if !only {
+                zone("Base de datos de producción", ".sql, .gz o .zip", symbol: "cylinder.split.1x2", path: model.upSql, error: model.upSqlError,
+                     over: $overSql, code: false, folders: false)
+            }
             // (sin fichero de BBDD no se toca: se sigue usando la misma)
-            if model.upDbKnown || hasSql || making {
+            if !only && (model.upDbKnown || hasSql || making) {
                 HStack(spacing: 8) {
                     Text(verbatim: dbLine).foregroundColor(.secondary)
                     // (su nombre, como texto; solo si el proyecto no tiene ninguna hay que escribirlo)
@@ -102,12 +109,13 @@ struct UpdateProjectSheet: View {
             }
         }
         .padding(22)
-        .frame(width: 640)
+        .frame(width: dialogWidth(640))
+        .fitDialog()
     }
 
     func zone(_ title: String, _ formats: String, symbol: String, path: String, error: String, over: Binding<Bool>, code: Bool, folders: Bool) -> some View {
         HStack(spacing: 16) {
-            Image(systemName: symbol).font(.system(size: 30)).foregroundColor(.blue)
+            UIIcon(symbol, size: 30).foregroundColor(.blue)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(!error.isEmpty ? error : (path.isEmpty ? "Arrástralo aquí: \(formats)" : path))
@@ -116,7 +124,7 @@ struct UpdateProjectSheet: View {
             }
             Spacer(minLength: 8)
             if !path.isEmpty {
-                Button(action: { model.upSet(code: code, "") }) { Image(systemName: "xmark.circle") }
+                Button(action: { model.upSet(code: code, "") }) { TintIcon("xmark.circle") }
                     .buttonStyle(LinkHoverButton())
                     .tip("Quitar")
             }
@@ -223,8 +231,13 @@ struct ProjectsView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let x = x {
                 HStack(alignment: .center, spacing: 18) {
-                    // (el logotipo solo, sin recuadro: con el visor de la derecha más alto, se estiraba)
-                    KindIcon(kind: x.kind, size: 48)
+                    // (el logotipo solo, sin recuadro: con el visor de la derecha más alto, se estiraba. El de su tipo:
+                    // WordPress, PrestaShop, Laravel, React…, como en la barra de arriba)
+                    if let b = projectBrand(x) {
+                        BrandLogo(name: b, size: 48)
+                    } else {
+                        KindIcon(kind: x.kind, size: 48)
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 10) {
                             // (los nombres largos, en dos líneas, no cortados)
@@ -252,6 +265,24 @@ struct ProjectsView: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.12), lineWidth: 1))
     }
 
+    /// Los interruptores «Falsear Host» de los dominios del proyecto cargado (como en Dominios y hosts)
+    func hostSwitches(_ x: Project) -> some View {
+        ForEach(model.projectHosts(x.name), id: \.name) { h in
+            HStack(spacing: 10) {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(h.fake ? "Host falseado" : "Falsear Host")
+                    Text(h.name).font(.caption).foregroundColor(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
+                    .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
+                    .busyGuard(model.busy)
+            }
+            .padding(.trailing, 6)
+            .tip(h.fake ? "Host falseado" : "Falsear Host")
+        }
+    }
+
     /// El entorno (versión de PHP o Docker) y su BBDD, en un recuadro hundido. Elegir otro entorno lo
     /// carga en esa versión (o lleva a Docker)
     func envBox(_ x: Project, _ isLoaded: Bool, _ d: AppData) -> some View {
@@ -265,7 +296,7 @@ struct ProjectsView: View {
           HStack(alignment: .bottom, spacing: 12) {
             // Llevarlo a otro entorno: el +, a la izquierda del entorno (su SQL se importa en la
             // pestaña Bases de datos; la fila de abajo queda para los accesos directos del proyecto)
-            OutlineMenu(nil, symbol: "plus") {
+            OutlineMenu("Nueva versión", symbol: "plus") {
                 Button("En otra versión de PHP (copiar su BBDD)…") { model.replicate(x) }
                 Button("En Docker…") { model.openDockerForm(folder: x.name) }
             }
@@ -284,7 +315,7 @@ struct ProjectsView: View {
                     .frame(width: 170, alignment: .leading)
                     .padding(.vertical, 3)
             }
-            Button(action: { model.linkProject(x) }) { Image(systemName: "link") }
+            Button(action: { model.linkProject(x) }) { TintIcon("link") }
                 .buttonStyle(LinkHoverButton())
                 .disabled(model.data == nil).busyGuard(model.busy)
                 .tip("Opciones de la BBDD…")
@@ -297,10 +328,13 @@ struct ProjectsView: View {
 
     func actions(_ x: Project, _ isLoaded: Bool, _ p: ProjectsData) -> some View {
         HStack(spacing: 8) {
-            if isLoaded {
+            if isLoaded && model.look.visor != "clasico" {
+                // (con el visor arriba, sus botones ya están en la barra de arriba; otra versión, con «+ Nueva versión»)
+                EmptyView()
+            } else if isLoaded {
                 loadedButtons(x, p)
             } else {
-                Button(action: { model.loadFolder(x) }) { Label("Cargar", systemImage: "play.fill") }
+                Button(action: { model.loadFolder(x) }) { Label { Text("Cargar") } icon: { TintIcon("play.fill") } }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .busyGuard(model.busy)
                     .tip("Cargar \(x.name)")
@@ -309,136 +343,24 @@ struct ProjectsView: View {
             // Si su carpeta tiene un dominio en los vhosts: falsearlo o dejar de falsearlo desde aquí,
             // como en Dominios y hosts
             if isLoaded {
-                ForEach(model.projectHosts(x.name), id: \.name) { h in
-                    HStack(spacing: 10) {
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text(h.fake ? "Host falseado" : "Falsear Host")
-                            Text(h.name).font(.caption).foregroundColor(.secondary)
-                                .lineLimit(1).truncationMode(.middle)
-                        }
-                        Toggle("", isOn: Binding(get: { h.fake }, set: { model.setHostFake(h, $0) }))
-                            .toggleStyle(SwitchToggleStyle()).labelsHidden().tint(GREEN)
-                            .busyGuard(model.busy)
-                    }
-                    .padding(.trailing, 6)
-                    .tip(h.fake ? "Host falseado" : "Falsear Host")
-                }
+                hostSwitches(x)
             }
             // (⋮, pegado a la derecha)
-            moreMenu(x, square: isLoaded)
+            // (con el visor arriba, con su aspecto normal: sin el estilo de los botones del visor)
+            moreMenu(x, square: isLoaded && model.look.visor == "clasico")
         }
     }
 
     /// Botones del proyecto cargado, con sus logotipos (los que se ven, en su orden y con su estilo:
-    /// Botones del proyecto) y, siempre, desmontar
+    /// Botones del proyecto), Unlink (desmontar) entre ellos
     @ViewBuilder
     func loadedButtons(_ x: Project, _ p: ProjectsData) -> some View {
         let c = model.visorConf
-        let items = loadedItems(x, p, c)
+        let items = model.loadedItems(x, p, c)
+        // (Unlink, uno más, con su nombre; Correo y Terminal siguen en la cabecera: aquí no hay)
         ForEach(c.order.filter { !c.hidden.contains($0) && items[$0] != nil }, id: \.self) { k in
             items[k]!
         }
-        if c.square {
-            VisorButton(conf: c, name: "Desmontar", icon: .symbol("eject.fill", Color.secondary),
-                        tip: "Desmontar el proyecto") {
-                model.unloadProject()
-            }
-            .busyGuard(model.busy)
-        } else {
-            Button(action: { model.unloadProject() }) { Image(systemName: "eject.fill") }
-                .buttonStyle(LinkHoverButton())
-                .busyGuard(model.busy)
-                .tip("Desmontar el proyecto")
-        }
-    }
-
-    /// Los botones que se pueden ordenar y ocultar del proyecto cargado, por su clave
-    func loadedItems(_ x: Project, _ p: ProjectsData, _ c: VisorConf) -> [String: AnyView] {
-        let folder = loadedProjectFolder(p.current)
-        let db = cleanDbName(model.loadedDb(x))
-        let admin = folder.map { projectAdmin($0) } ?? ("", "")
-        let web = p.webURL
-        var items: [String: AnyView] = [:]
-        items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
-                                           tip: "Abrir \(web)") { openURL(web) })
-        if let code = vscodeURL(), let f = folder {
-            items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(NSWorkspace.shared.icon(forFile: code.path)),
-                                                  tip: "Abrir en Visual Studio Code") {
-                openInVSCode(f)
-            })
-        }
-        // (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
-        if let f = folder, let repo = projectRepoURL(f) {
-            let url = repo.0, host = repo.1
-            let github = host == "github.com" || host.hasSuffix(".github.com")
-            items["repo"] = AnyView(VisorButton(conf: c, name: github ? "GitHub" : "Repositorio",
-                                                icon: github ? .logo("github") : .symbol("globe", Color.blue),
-                                                tip: "Abrir el repositorio: \(url)") { openURL(url) })
-        }
-        items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
-                                           tip: db.isEmpty ? "Sin BBDD" : "Abrir \(db) en phpMyAdmin") {
-            openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)")
-        }.disabled(db.isEmpty))
-        items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
-                                             tip: admin.1.isEmpty ? "No tiene panel de administración"
-                                                : "Abrir el panel de administración") {
-            openProjectAdmin(kind: admin.0, admin: admin.1, site: String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), db: db, folder: folder)
-        }.disabled(admin.1.isEmpty))
-        items["docker"] = AnyView(VisorButton(conf: c, name: "Docker", icon: .logo("docker"),
-                                              tip: model.dockerOf(x.name).isEmpty ? "Montar en Docker"
-                                                : "Arrancar en Docker") {
-            model.dockerForLoaded(x)
-        }.busyGuard(model.busy))
-        items["compartir"] = AnyView(model.shareButton(String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
-            .busyGuard(model.busy))
-        // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
-        let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)
-        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: .logo("log"),
-                                           tip: hasLog ? "Ver el log de Apache" : "Aún no hay log de Apache") {
-            model.showLogTail(ERROR_LOG)
-        }.disabled(!hasLog))
-        items["actualizar"] = AnyView(VisorButton(conf: c, name: "Actualizar", icon: .logo("actualizar"),
-                                                  tip: "Actualizar proyecto") {
-            model.upOpen(x)
-        }.busyGuard(model.busy))
-        if x.kind == "wp" || x.kind == "ps" {
-            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
-                                                    tip: "Traer de producción las imágenes que falten") {
-                model.importImages(x)
-            }.busyGuard(model.busy))
-        }
-        return items
-    }
-
-    /// Opciones del menú ⋮ de un proyecto
-    func moreItems(_ x: Project) -> [(String, () -> Void)] {
-        let db = model.projectBase(x)
-        var items: [(String, () -> Void)] = [("Opciones de la BBDD…", { model.linkProject(x) }),
-                                             ("Abrir la carpeta", { showFolder(HTDOCS + "/" + x.name) })]
-        if model.loadedEntry()?.name == x.name {
-            // (solo el cargado: se exporta con la versión de PHP donde está y su BBDD de esa versión)
-            items.append(("Exportar proyecto…", { model.exportProject(x) }))
-        }
-        for dp in model.dockerOf(x.name) {
-            // (uno por entorno de Docker: cada uno dice el suyo)
-            items.append(("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…", { model.dockerDelete(dp) }))
-        }
-        if x.kind == "ps" && !db.isEmpty {
-            items.append(("Vaciar la caché de la tienda", { model.clearCache(folder: x.name, db: db) }))
-        }
-        items.append(("Limpiar proyecto…", { model.cleanProject(x) }))
-        if x.kind == "ps" || x.kind == "wp" {
-            items.append(("Imágenes de producción…", { model.wpMedia(x) }))
-        }
-        if x.kind == "ps" {
-            items.append(("Descargar de producción las imágenes que faltan…", { model.psImages(x) }))
-        }
-        if !model.projectHosts(x.name).isEmpty {
-            items.append(("Vaciar la caché de Chrome…", { model.browserCacheHelp() }))
-        }
-        items.append(("Personalizar los botones…", { model.panel = .buttons }))
-        items.append(("Borrar el proyecto…", { model.deleteProject(x) }))
-        return items
     }
 
     /// ⋮ no lleva mensaje al dejar el ratón encima: solo despliega su menú
@@ -447,7 +369,7 @@ struct ProjectsView: View {
     /// ⋮ (con un proyecto cargado y los botones cuadrados, del mismo tamaño que los demás)
     @ViewBuilder
     func moreMenu(_ x: Project, square: Bool = false) -> some View {
-        let items = moreItems(x)
+        let items = model.moreItems(x)
         if square && model.visorConf.square {
             VisorButton(conf: model.visorConf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: moreTip) {
                 popMenu(items)
@@ -487,7 +409,7 @@ struct ProjectsView: View {
             SearchPicker(selection: $model.projKind,
                          items: [("all", "Todos"), ("wp", "WordPress"), ("ps", "PrestaShop"), ("", "Otros")], width: 120)
             // (en azul, como «Nueva BBDD…»: el asistente de clonar de git, con su versión y su BBDD)
-            Button(action: { model.newProject(true) }) { Label("Nuevo proyecto…", systemImage: "plus") }
+            Button(action: { model.newProject(true) }) { Label { Text("Nuevo proyecto…") } icon: { TintIcon("plus") } }
                 .buttonStyle(OutlineButton(kind: "primary"))
                 .busyGuard(model.busy)
                 .tip("Clonar y montar un repositorio")
@@ -582,28 +504,34 @@ struct ProjectsView: View {
                         .allowsHitTesting(hover)
                     // (lo que antes solo se hacía arriba con el proyecto elegido, sin cambiar el de arriba)
                     OutlineMenu(nil, symbol: "ellipsis") {
-                        Button("Añadir entorno en otra versión de PHP…") { model.replicate(x) }
-                        Button("Añadir entorno en Docker…") { model.dockerForLoaded(x) }
-                        Button("Importar SQL…") { model.importFor(x) }
-                        Button("Opciones de la BBDD…") { model.linkProject(x) }
-                        Button("Abrir la carpeta") { showFolder(HTDOCS + "/" + x.name) }
-                        ForEach(model.dockerOf(x.name)) { dp in
-                            Button("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…") { model.dockerDelete(dp) }
+                        // (en dos Group: más de 10 opciones no caben en un ViewBuilder de macOS 12)
+                        Group {
+                            Button("Actualizar código…") { model.upOpenCode(x) }
+                            Button("Añadir entorno en otra versión de PHP…") { model.replicate(x) }
+                            Button("Añadir entorno en Docker…") { model.dockerForLoaded(x) }
+                            Button("Importar SQL…") { model.importFor(x) }
+                            Button("Opciones de la BBDD…") { model.linkProject(x) }
+                            Button("Abrir la carpeta") { showFolder(HTDOCS + "/" + x.name) }
                         }
-                        if x.kind == "ps" && !model.projectBase(x).isEmpty {
-                            Button("Vaciar la caché de la tienda") { model.clearCache(folder: x.name, db: model.projectBase(x)) }
+                        Group {
+                            ForEach(model.dockerOf(x.name)) { dp in
+                                Button("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…") { model.dockerDelete(dp) }
+                            }
+                            if x.kind == "ps" && !model.projectBase(x).isEmpty {
+                                Button("Vaciar la caché de la tienda") { model.clearCache(folder: x.name, db: model.projectBase(x)) }
+                            }
+                            Button("Limpiar proyecto…") { model.cleanProject(x) }
+                            if x.kind == "ps" || x.kind == "wp" {
+                                Button("Imágenes de producción…") { model.wpMedia(x) }
+                            }
+                            if x.kind == "ps" {
+                                Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
+                            }
+                            if !model.projectHosts(x.name).isEmpty {
+                                Button("Vaciar la caché de Chrome…") { model.browserCacheHelp() }
+                            }
+                            Button("Borrar el proyecto…") { model.deleteProject(x) }
                         }
-                        Button("Limpiar proyecto…") { model.cleanProject(x) }
-                        if x.kind == "ps" || x.kind == "wp" {
-                            Button("Imágenes de producción…") { model.wpMedia(x) }
-                        }
-                        if x.kind == "ps" {
-                            Button("Descargar de producción las imágenes que faltan…") { model.psImages(x) }
-                        }
-                        if !model.projectHosts(x.name).isEmpty {
-                            Button("Vaciar la caché de Chrome…") { model.browserCacheHelp() }
-                        }
-                        Button("Borrar el proyecto…") { model.deleteProject(x) }
                     }
                     .busyGuard(model.busy)
                     .tip(hover ? moreTip : "")
@@ -626,7 +554,7 @@ struct ProjectsView: View {
         return HStack(spacing: 4) {
             if let code = vscodeURL() {
                 Button(action: { openInVSCode(folder) }) {
-                    VisorIconView(icon: .image(NSWorkspace.shared.icon(forFile: code.path)), size: 16)
+                    VisorIconView(icon: .image(vscodeIcon(code)), size: 16)
                 }
                 .buttonStyle(OutlineButton(compact: true))
                 .tip("Abrir \(x.name) en Visual Studio Code")
@@ -647,4 +575,106 @@ struct ProjectsView: View {
             }
         }
     }
+}
+
+
+/// Los botones del proyecto cargado y su menú ⋮, en el modelo: los usan el visor de Proyectos (clásico) y el de la
+/// barra de arriba (TopVisorBar), cada uno con su VisorConf
+extension AppModel {
+    /// Los botones que se pueden ordenar y ocultar del proyecto cargado, por su clave
+    func loadedItems(_ x: Project, _ p: ProjectsData, _ c: VisorConf) -> [String: AnyView] {
+        let folder = loadedProjectFolder(p.current)
+        let db = cleanDbName(self.loadedDb(x))
+        let admin = folder.map { projectAdmin($0) } ?? ("", "")
+        let web = p.webURL
+        var items: [String: AnyView] = [:]
+        items["web"] = AnyView(VisorButton(conf: c, name: "Abrir web", icon: .symbol("globe", Color.blue),
+                                           tip: "Abrir \(web)") { openURL(web) })
+        if let code = vscodeURL(), let f = folder {
+            items["vscode"] = AnyView(VisorButton(conf: c, name: "VS Code", icon: .image(vscodeIcon(code)),
+                                                  tip: "Abrir en Visual Studio Code") {
+                openInVSCode(f)
+            })
+        }
+        // (el repositorio del proyecto en el navegador, solo si tiene: su remote origin)
+        if let f = folder, let repo = projectRepoURL(f) {
+            let url = repo.0, host = repo.1
+            let github = host == "github.com" || host.hasSuffix(".github.com")
+            items["repo"] = AnyView(VisorButton(conf: c, name: github ? "GitHub" : "Repositorio",
+                                                icon: github ? .logo("github") : .symbol("globe", Color.blue),
+                                                tip: "Abrir el repositorio: \(url)") { openURL(url) })
+        }
+        items["pma"] = AnyView(VisorButton(conf: c, name: "phpMyAdmin", icon: .logo("phpmyadmin"),
+                                           tip: db.isEmpty ? "Sin BBDD" : "Abrir \(db) en phpMyAdmin") {
+            openURL("http://127.0.0.1/phpmyadmin/index.php?route=/database/structure&db=\(db)")
+        }.disabled(db.isEmpty))
+        items["panel"] = AnyView(VisorButton(conf: c, name: "Panel", icon: .logo(admin.0 == "ps" ? "prestashop" : "wordpress"),
+                                             tip: admin.1.isEmpty ? "No tiene panel de administración"
+                                                : "Abrir el panel de administración") {
+            openProjectAdmin(kind: admin.0, admin: admin.1, site: String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), db: db, folder: folder)
+        }.disabled(admin.1.isEmpty))
+        items["docker"] = AnyView(VisorButton(conf: c, name: "Docker", icon: .logo("docker"),
+                                              tip: self.dockerOf(x.name).isEmpty ? "Montar en Docker"
+                                                : "Arrancar en Docker") {
+            self.dockerForLoaded(x)
+        }.busyGuard(self.busy))
+        items["compartir"] = AnyView(self.shareButton(String(web.dropLast(web.hasSuffix("/") ? 1 : 0)), folder: HTDOCS + "/" + x.name, name: x.name, conf: c)
+            .busyGuard(self.busy))
+        // El registro general de Apache: lo primero que se mira con un error (el del vhost, en Herramientas)
+        let hasLog = FileManager.default.fileExists(atPath: ERROR_LOG)
+        items["log"] = AnyView(VisorButton(conf: c, name: "Log", icon: visorChoice("log", self.look.iconos),
+                                           tip: hasLog ? "Ver el log de Apache" : "Aún no hay log de Apache") {
+            self.showLogTail(ERROR_LOG)
+        }.disabled(!hasLog))
+        items["actualizar"] = AnyView(VisorButton(conf: c, name: "Actualizar", icon: visorChoice("actualizar", self.look.iconos),
+                                                  tip: "Actualizar proyecto") {
+            self.upOpen(x)
+        }.busyGuard(self.busy))
+        // (Unlink: desmontar el proyecto cargado; en el visor clásico, uno más de los botones, con su nombre)
+        items["unlink"] = AnyView(VisorButton(conf: c, name: "Unlink", icon: visorChoice("unlink", self.look.iconos),
+                                              tip: UNLINK_TIP) {
+            self.unloadProject()
+        }.busyGuard(self.busy))
+        if x.kind == "wp" || x.kind == "ps" {
+            items["imagenes"] = AnyView(VisorButton(conf: c, name: "Imágenes de producción", icon: .logo("imagenes"),
+                                                    tip: "Traer de producción las imágenes que falten") {
+                self.importImages(x)
+            }.busyGuard(self.busy))
+        }
+        return items
+    }
+
+    /// Opciones del menú ⋮ de un proyecto
+    func moreItems(_ x: Project) -> [(String, () -> Void)] {
+        let db = self.projectBase(x)
+        var items: [(String, () -> Void)] = [("Opciones de la BBDD…", { self.linkProject(x) }),
+                                             ("Abrir la carpeta", { showFolder(HTDOCS + "/" + x.name) })]
+        if self.loadedEntry()?.name == x.name {
+            // (solo el cargado: se exporta con la versión de PHP donde está y su BBDD de esa versión)
+            items.append(("Exportar proyecto…", { self.exportProject(x) }))
+        }
+        for dp in self.dockerOf(x.name) {
+            // (uno por entorno de Docker: cada uno dice el suyo)
+            items.append(("Eliminar de Docker (PHP \(dp.isWeb && !dp.versions.isEmpty ? dp.versions.joined(separator: ", ") : dp.php))…", { self.dockerDelete(dp) }))
+        }
+        if x.kind == "ps" && !db.isEmpty {
+            items.append(("Vaciar la caché de la tienda", { self.clearCache(folder: x.name, db: db) }))
+        }
+        items.append(("Limpiar proyecto…", { self.cleanProject(x) }))
+        // (las imágenes de producción del cargado ya tienen su botón en el visor)
+        let loaded = self.loadedEntry()?.name == x.name
+        if !loaded && (x.kind == "ps" || x.kind == "wp") {
+            items.append(("Imágenes de producción…", { self.wpMedia(x) }))
+        }
+        if !loaded && x.kind == "ps" {
+            items.append(("Descargar de producción las imágenes que faltan…", { self.psImages(x) }))
+        }
+        if !self.projectHosts(x.name).isEmpty {
+            items.append(("Vaciar la caché de Chrome…", { self.browserCacheHelp() }))
+        }
+        items.append(("Personalizar los botones…", { self.panel = .buttons }))
+        items.append(("Borrar el proyecto…", { self.deleteProject(x) }))
+        return items
+    }
+
 }

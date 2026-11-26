@@ -275,16 +275,16 @@ fi
 
 # La ventana
 if grep -q "LVM_SWIFT" "$SRC"; then
-    check "Mac: el boton, en los del proyecto cargado" 'grep -q "(\"actualizar\", \"Actualizar\")" "$SRC" && grep -q "name: \"Actualizar\", icon: .logo(\"actualizar\")" "$SRC" && grep -q "tip: \"Actualizar proyecto\") {" "$SRC"'
+    check "Mac: el boton, en los del proyecto cargado" 'grep -q "(\"actualizar\", \"Actualizar\")" "$SRC" && grep -q "name: \"Actualizar\", icon: visorChoice(\"actualizar\", self.look.iconos)" "$SRC" && grep -q "tip: \"Actualizar proyecto\") {" "$SRC"'
     check "Mac: dialogo con sus dos zonas para arrastrar o elegir" 'grep -q "struct UpdateProjectSheet: View" "$SRC" && [ "$(grep -c "\.onDrop(of: \[UTType.fileURL\]" "$SRC")" -ge 1 ] && grep -q "func upPick(code: Bool, folder: Bool)" "$SRC" && grep -q "^import UniformTypeIdentifiers" "$SRC"'
     check "Mac: las zonas, altas y de otro color; al arrastrar, otro color y el borde azul" 'grep -q ".frame(minHeight: 112)" "$SRC" && grep -q ".stroke(over.wrappedValue || !path.isEmpty ? Color.blue : Color.primary.opacity(0.28)" "$SRC"'
     check "Mac: el nombre de la BBDD, como texto y en azul (campo solo si no tiene ninguna)" 'grep -q "Text(model.upDb).fontWeight(.bold).foregroundColor(.blue)" "$SRC" && grep -q "if model.upDbKnown {" "$SRC"'
     check "Mac: pregunta por el pull antes de copiar" 'grep -q "\"¿Hacer git pull antes de copiar?\"" "$SRC" && grep -q "\[\"gui-proyecto-git\", folder\]" "$SRC"'
     check "Mac: sin BBDD lo dice y deja crearla (--crear-base)" 'grep -q "\"Este proyecto no tiene base de datos\"" "$SRC" && grep -q "(create ? \[\"--crear-base\"\] : \[\])" "$SRC"'
-    check "Mac: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "var dbLine: String = hasSql ? \"Se carga en la BBDD\" : \"Se sigue usando la BBDD\"" "$SRC" && grep -q "let can: Bool = (hasSql || hasCode || making)" "$SRC"'
+    check "Mac: sin fichero de BBDD dice que se sigue usando la misma" 'grep -q "var dbLine: String = hasSql ? \"Se carga en la BBDD\" : \"Se sigue usando la BBDD\"" "$SRC" && grep -qF "let can: Bool = only ? hasCode : (hasSql || hasCode || making)" "$SRC"'
     check "Mac: tambien solo con el codigo le dice su BBDD" 'grep -q "if !db.isEmpty { args += \[\"--base\", db\] }" "$SRC"'
 else
-    check "Linux: el boton, en los del proyecto cargado" 'grep -q "(\"actualizar\", \"Actualizar\", (\"logo\", \"actualizar\"))" "$SRC" && grep -q "btns\[\"actualizar\"\] = nv_button(logo(\"actualizar\", 18), \"Actualizar\", \"Actualizar proyecto\"" "$SRC"'
+    check "Linux: el boton, en los del proyecto cargado" 'grep -q "(\"actualizar\", \"Actualizar\", (\"logo\", \"actualizar\"))" "$SRC" && grep -q "btns\[\"actualizar\"\] = nv_button(icon(visor_icon(\"actualizar\"), 18), \"Actualizar\", \"Actualizar proyecto\"" "$SRC"'
     check "Linux: dialogo con sus dos zonas para arrastrar o elegir" 'grep -q "drag_dest_add_uri_targets()" "$SRC" && grep -q "connect(\"drag-data-received\"" "$SRC" && grep -q "def nv_update_project(self, x):" "$SRC"'
     check "Linux: las zonas, altas y de otro color; al arrastrar, otro color y el borde azul" 'grep -q "ev.set_size_request(-1, 112)" "$SRC" && grep -q "^.nv-zona { background-color: alpha(@theme_fg_color" "$SRC" && grep -q "^.nv-zona-lista { background-color: alpha(%(b)s, 0.10); border: 2px solid %(b)s; }" "$SRC" && grep -q "zone_ctx.add_class(\"nv-zona-lista\")" "$SRC" && grep -q "^.nv-zona:drop(active) { background-color: alpha(%(b)s, 0.30); border: 2px solid %(b)s" "$SRC"'
     check "Linux: el nombre de la BBDD, como texto y en azul (campo solo si no tiene ninguna)" 'grep -q "db_entry if no_db else label(known_db, \"nv-bbdd\", selectable=True)" "$SRC" && grep -q "^.nv-bbdd { color: mix(%(b)s" "$SRC"'
@@ -316,6 +316,30 @@ widths=$(summary_box "Título" "Uno|1" "Ya no están|12345" | while IFS= read -r
 check "recuadro: todas sus lineas igual de anchas (con tildes)" '[ "$widths" = 1 ]'
 check "Los iconos de Reicon llevan su licencia MIT" 'grep -q "Copyright (c) 2025 REICON" "$SRC"'
 if grep -q "^let ERROR_LOG = " "$SRC"; then
-    check "Mac: el boton Log abre el error_log general de Apache" 'grep -q "^            model.showLogTail(ERROR_LOG)$" "$SRC" && grep -q "tip: hasLog ? \"Ver el log de Apache\"" "$SRC"'
+    check "Mac: el boton Log abre el error_log general de Apache" 'grep -q "^            self.showLogTail(ERROR_LOG)$" "$SRC" && grep -q "tip: hasLog ? \"Ver el log de Apache\"" "$SRC"'
+fi
+# (1.60.0) La columna «En git» del recuadro: lo mismo, sin lo que deja fuera el .gitignore (node_modules, caches); y
+# las listas de los cambiados (todos y solo los de git), cuya ruta sale en el registro. Sin git, una sola columna
+if command -v git > /dev/null; then
+    G=$W/git
+    mkdir -p "$G/proy" "$G/prod/node_modules/x" "$G/prod/cache" "$G/listas"
+    ( cd "$G/proy" && git init -q && printf 'node_modules/\ncache/\n' > .gitignore && echo a > index.php && echo b > estilo.css \
+        && echo solo > local.php && git add -A && git -c user.email=t@t -c user.name=t commit -qm i ) > /dev/null 2>&1
+    mkdir -p "$G/proy/node_modules/x" "$G/proy/cache"
+    echo 1 > "$G/proy/node_modules/x/a.js"; echo 2 > "$G/proy/cache/c1"
+    echo a2 > "$G/prod/index.php"; echo b > "$G/prod/estilo.css"; echo nuevo > "$G/prod/nuevo.php"
+    echo 9 > "$G/prod/node_modules/x/a.js"; echo 8 > "$G/prod/node_modules/x/b.js"; echo 7 > "$G/prod/cache/c2"
+    out=$(python3 -I -c "$CODE" "$G/proy" "$G/prod" fusionar "" "$W/tmp" 0 "$G/listas/proy-1" 2>&1)
+    check "recuadro: la columna En git, sin node_modules ni la caché (1.60.0)" 'grep -qE "│ Código de producción +Todo +En git │" <<< "$out" && grep -qE "│   Nuevos: se copian +3 +1 │" <<< "$out" && grep -qE "│   Modificados: se sustituyen +2 +1 │" <<< "$out" && grep -qE "│ SOLO EN TU CARPETA \(no vienen\) +3 +2 │" <<< "$out"' || echo "$out" | tail -14
+    check "las listas de los cambiados, todos y solo los de git, con su ruta en el registro (1.60.0)" 'grep -qF "Todos los cambiados: $G/listas/proy-1-cambiados.txt" <<< "$out" && grep -qF "Solo los de git: $G/listas/proy-1-cambiados-git.txt" <<< "$out" && grep -qx "nuevo.php" "$G/listas/proy-1-cambiados-git.txt" && ! grep -q "node_modules" "$G/listas/proy-1-cambiados-git.txt" && grep -q "node_modules/x/b.js" "$G/listas/proy-1-cambiados.txt"'
+    rm -rf "${G:?}/proy/.git"
+    out=$(python3 -I -c "$CODE" "$G/proy" "$G/prod" fusionar "" "$W/tmp" 1 2>&1)
+    check "sin git, una sola columna y lo dice (1.60.0)" '! grep -q "En git │" <<< "$out" && grep -q "no es un repositorio de git" <<< "$out"'
+fi
+if grep -q "^def project_brand(folder, kind=None):" "$SRC"; then
+    check "ventana: la cabecera del proyecto, con el logotipo de su tipo (1.60.0)" 'grep -qF "img = logo(brand, 48) if brand else kind_icon(x[\"kind\"], 48)" "$SRC"'
+fi
+if grep -q "LISTS_LINK_RE = " "$SRC"; then
+    check "ventana: las rutas de ~/.nexum/listas del registro se pueden pulsar (1.60.0)" 'grep -qF "link_lists(self.log, self.app.open_uri)" "$SRC" && grep -qF "link_lists(view, self.open_uri)" "$SRC" && grep -qF "if path and os.path.realpath(path).startswith(folder + os.sep) and os.path.isfile(path):" "$SRC"'
 fi
 exit $fail

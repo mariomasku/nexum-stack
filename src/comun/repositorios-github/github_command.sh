@@ -315,7 +315,7 @@ function gui_project_git() {
 # paquete no se saca nada fuera de la carpeta (rutas con .. o absolutas) ni enlaces ni dispositivos: el
 # codigo de produccion es de fuera. Si todo va dentro de una carpeta (public_html), se usa lo de dentro.
 PROJECT_CODE_PY='
-import filecmp, os, shutil, signal, stat, sys, tarfile, tempfile, zipfile
+import filecmp, os, shutil, signal, stat, subprocess, sys, tarfile, tempfile, zipfile
 
 target, source, mode, backup, tmp_base, simulate = sys.argv[1:7]
 report = sys.argv[7] if len(sys.argv) > 7 else ""
@@ -331,6 +331,8 @@ LIST_FIRST = 5
 lists = {"new": [], "changed": [], "gone": [], "kept": []}
 LIST_INLINE = 25
 errors, seen = [], set()
+# (los iguales, uno a uno: solo para contar cuantos le importan a git)
+same_files = []
 
 
 def stop(_sig, _frame):
@@ -508,6 +510,7 @@ def copy_file(e, out, sub):
     if exists and not os.path.islink(out) and os.path.isfile(out) \
             and os.path.getsize(out) == e.stat().st_size and filecmp.cmp(e.path, out, shallow=False):
         counts["same"] += 1
+        same_files.append(sub)
         return
     counts["copied"] += 1
     note("changed" if exists else "new", sub)
@@ -627,6 +630,41 @@ def save_full(title, group, what):
         print("  No se ha podido guardar la lista entera en %s: %s" % (path, exc))
 
 
+def show_rest(title, group, mark, what, git_files):
+    """Lo que esta en la carpeta y no viene en el codigo (se deja o se quita), con una linea en blanco delante: con
+    git, los LIST_FIRST primeros de los que le importan a git (los que no ves venir: lo demas suele ser cache o
+    node_modules), y sus listas enteras a un fichero; sin git, como show_list."""
+    if git_files is None:
+        show_list(title, group, mark, what)
+        return
+    items = lists[group]
+    if not items:
+        return
+    print()
+    print("%s: %s, %s en git" % (title, plural(counts[group]), num(len(git_files)))
+          + (" (los %d primeros)" % LIST_FIRST if len(git_files) > LIST_FIRST else ""))
+    for rel in git_files[:LIST_FIRST]:
+        print("  %s %s" % (mark, rel))
+    if len(git_files) > LIST_FIRST:
+        print("  ... y %s más en git" % num(len(git_files) - LIST_FIRST))
+    if not report or simulate:
+        return
+    for name, files, label in ((what + "-git", git_files, "Solo los de git"), (what, None, "Todos")):
+        if name == what + "-git" and not files:
+            continue
+        path = "%s-%s.txt" % (report, name)
+        try:
+            os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+            with open(path, "w", encoding="utf-8", errors="replace") as f:
+                f.write("%s%s: %s\nProyecto: %s\n\n" % (title, " (solo los de git)" if files is not None else "",
+                                                         plural(len(files) if files is not None else counts[group]), target))
+                for rel in files if files is not None else [r for _rel, _n, _f, fs in items for r in fs]:
+                    f.write(rel + "\n")
+            print("  %s: %s" % (label, path))
+        except OSError as exc:
+            print("  No se ha podido guardar la lista en %s: %s" % (path, exc))
+
+
 def show_first(title, group, mark, what):
     """Los LIST_FIRST primeros de un grupo (nuevos, modificados), con una linea en blanco delante; si hay mas,
     cuantos faltan y la lista entera a un fichero."""
@@ -642,34 +680,109 @@ def show_first(title, group, mark, what):
         save_full(title, group, what)
 
 
-def summary():
+def git_ignored(paths):
+    """De esas rutas del proyecto, las que git no tiene en cuenta (su .gitignore: caches, node_modules, vendor...),
+    con git check-ignore, que solo lee. Las que ya estan en el repositorio cuentan aunque casen con el .gitignore.
+    None si el proyecto no es un repositorio de git o git no responde: entonces no se separa."""
+    if not paths:
+        return set()
+    cmd = ["git", "-C", target, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "safe.directory=*",
+           "check-ignore", "--stdin", "-z"]
+    try:
+        res = subprocess.run(cmd, input="\0".join(paths).encode("utf-8", "surrogateescape"), stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, timeout=300, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # (0: alguna ignorada; 1: ninguna; otro: no ha podido)
+    if res.returncode not in (0, 1):
+        return None
+    return set(res.stdout.decode("utf-8", "surrogateescape").split("\0")) - {""}
+
+
+def group_files(group):
+    return [f for _rel, _n, _folder, files in lists[group] for f in files]
+
+
+def git_counts():
+    """Lo mismo que las cuentas del recuadro, pero solo de lo que le importa a git (sin lo de su .gitignore). None
+    si no se puede saber (no es un repositorio de git)."""
+    only = "gone" if mode == "sobrescribir" else "kept"
+    groups = {"new": group_files("new"), "changed": group_files("changed"), "same": same_files, "only": group_files(only)}
+    if not os.path.exists(os.path.join(target, ".git")):
+        return None, groups
+    ignored = git_ignored(sorted({f for fs in groups.values() for f in fs}))
+    if ignored is None:
+        return None, groups
+    return {k: [f for f in fs if f not in ignored] for k, fs in groups.items()}, groups
+
+
+def save_changed(groups, git):
+    """Los ficheros cambiados (nuevos y modificados), todos y, en otro fichero, solo los que le importan a git, en
+    <informe>-cambiados(-git).txt: la ruta sale en el registro y en la ventana se puede pulsar."""
+    if not report or simulate or not (groups["new"] or groups["changed"]):
+        return
+    out = [("cambiados", "Ficheros cambiados (nuevos y modificados)", groups)]
+    if git is not None:
+        out.append(("cambiados-git", "Ficheros cambiados que le importan a git (sin lo de su .gitignore)", git))
+    for what, title, g in out:
+        path = "%s-%s.txt" % (report, what)
+        try:
+            os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+            with open(path, "w", encoding="utf-8", errors="replace") as f:
+                f.write("%s\nProyecto: %s\n" % (title, target))
+                for key, name in (("new", "Nuevos"), ("changed", "Modificados")):
+                    f.write("\n%s: %s\n" % (name, plural(len(g[key]))))
+                    for rel in g[key]:
+                        f.write(rel + "\n")
+            print("%s: %s" % ("Todos los cambiados" if what == "cambiados" else "Solo los de git", path))
+        except OSError as exc:
+            print("No se ha podido guardar la lista en %s: %s" % (path, exc))
+
+
+def summary(git=None):
     """El recuadro con las cuentas, para el registro de la tarea (que va en letra de ancho fijo). Dos partes que no
     se mezclan: lo que viene en el codigo (y que se hace con ello) y lo que solo esta en la carpeta del proyecto
     (no viene: al fusionar se deja; al sobrescribir se quita)."""
     sim = simulate
     came = counts["new"] + counts["changed"] + counts["same"]
     only = counts["gone"] if mode == "sobrescribir" else counts["kept"]
-    rows = [("VIENEN EN EL CÓDIGO", came),
-            ("  Nuevos: " + ("se copiarían" if sim else "se copian"), counts["new"]),
-            ("  Modificados: " + ("se sustituirían" if sim else "se sustituyen"), counts["changed"]),
-            ("  Iguales: no se tocan", counts["same"]),
+    # (la segunda columna: lo mismo, solo lo que le importa a git; sin git, una sola)
+    g = {k: len(v) for k, v in git.items()} if git is not None else None
+    gcol = (lambda k: g[k]) if g is not None else (lambda k: None)
+    rows = [("VIENEN EN EL CÓDIGO", came, None if g is None else g["new"] + g["changed"] + g["same"]),
+            ("  Nuevos: " + ("se copiarían" if sim else "se copian"), counts["new"], gcol("new")),
+            ("  Modificados: " + ("se sustituirían" if sim else "se sustituyen"), counts["changed"], gcol("changed")),
+            ("  Iguales: no se tocan", counts["same"], gcol("same")),
             None,
-            ("SOLO EN TU CARPETA (no vienen)", only),
-            (("  Se quitarían" if sim else "  Se quitan") + " (sobrescribir)" if mode == "sobrescribir"
-             else "  Se dejan como están (fusionar)", only)]
+            ("SOLO EN TU CARPETA (no vienen)", only, gcol("only")),
+            ((("  Se quitarían" if sim else "  Se quitan") + " (sobrescribir)") if mode == "sobrescribir"
+             else "  Se dejan como están (fusionar)", only, gcol("only"))]
     title = "Código de producción" + (" (simulación)" if sim else "")
-    width = max(len(title), max(len(r[0]) + 2 + len(num(r[1])) for r in rows if r))
+    c1 = max(len("Todo"), max(len(num(r[1])) for r in rows if r))
+    c2 = max(len("En git"), max(len(num(r[2])) for r in rows if r and r[2] is not None)) if g is not None else 0
+    label_w = max(len(r[0]) for r in rows if r)
+    width = max(len(title), label_w + 2 + c1 + (3 + c2 if g is not None else 0))
+
+    def cells(a, b):
+        text = a.rjust(c1) + ("   " + b.rjust(c2) if g is not None else "")
+        return text
     line = "\u2500" * (width + 2)
     print("\u250c" + line + "\u2510")
-    print("\u2502 " + title.ljust(width) + " \u2502")
+    head = cells("Todo", "En git") if g is not None else ""
+    print("\u2502 " + title + " " * (width - len(title) - len(head)) + head + " \u2502")
     print("\u251c" + line + "\u2524")
     for r in rows:
         if r is None:
             print("\u251c" + line + "\u2524")
             continue
-        t, n = r
-        print("\u2502 " + t + " " * (width - len(t) - len(num(n))) + num(n) + " \u2502")
+        t, n, gn = r
+        c = cells(num(n), num(gn) if gn is not None else "")
+        print("\u2502 " + t + " " * (width - len(t) - len(c)) + c + " \u2502")
     print("\u2514" + line + "\u2518")
+    if g is not None:
+        print("En git: sin lo que el .gitignore del proyecto deja fuera (cachés, node_modules, vendor...)")
+    else:
+        print("El proyecto no es un repositorio de git: no se separa lo que le importa a git")
 
 
 def main():
@@ -714,17 +827,22 @@ def main():
             shutil.rmtree(work, ignore_errors=True)
     if simulate:
         print("[simulacion] no se cambia nada: esto es lo que se haría")
-    # (nuevos y modificados, cada uno con sus primeros; lo que no viene, entero o por carpetas)
+    # (lo que le importa a git, antes de las listas: lo que no viene se enseña por ahí)
+    git, groups = git_counts()
+    # (nuevos y modificados, cada uno con sus primeros; lo que no viene, los primeros de git o, sin git, entero o por
+    # carpetas)
     show_first("Nuevos, " + ("se copiarían" if simulate else "se copian"), "new", "+", "nuevos")
     show_first("Modificados, " + ("se sustituirían" if simulate else "se sustituyen"), "changed", "~", "modificados")
     # (las dos son lo mismo: lo que esta en la carpeta y no viene en el codigo; cambia lo que se hace con ello)
+    rest = git["only"] if git is not None else None
     if mode == "sobrescribir":
-        show_list("Solo en tu carpeta (no vienen en el código), " + ("se quitarían" if simulate else "se quitan"),
-                  "gone", "-", "no-vienen-se-quitan")
+        show_rest("Solo en tu carpeta (no vienen en el código), " + ("se quitarían" if simulate else "se quitan"),
+                  "gone", "-", "no-vienen-se-quitan", rest)
     else:
-        show_list("Solo en tu carpeta (no vienen en el código), se dejan como están", "kept", "·", "no-vienen-se-dejan")
+        show_rest("Solo en tu carpeta (no vienen en el código), se dejan como están", "kept", "·", "no-vienen-se-dejan", rest)
     print()
-    summary()
+    summary(git)
+    save_changed(groups, git)
     if counts["skipped"]:
         print("%d no se han copiado (enlaces, dispositivos o rutas fuera de la carpeta)" % counts["skipped"])
     if backup and os.path.isdir(backup):

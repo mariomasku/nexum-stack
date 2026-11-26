@@ -60,13 +60,25 @@ class NvCorreo:
             self.mail_btn.set_tooltip_text("Correo de las webs (Mailpit)%s" % (": %d sin leer" % n if n else ""))
         return False
 
-    def nv_open_mail(self):
+    def nv_open_mail(self, retried=False):
         m = self.nv_mail()
         if not m.get("installed"):
             self.nv_tools_show("Correo de pruebas (Mailpit)")
-            self.toast("Instala Mailpit en Configuración, apartado Correo de pruebas")
-        elif not m.get("running"):
+            self.toast("Instala Mailpit en Ajustes, apartado Correo de pruebas")
+        elif not m.get("running") and not (self.data or {}).get("running"):
             self.toast("Mailpit arranca con la versión activa: arráncala arriba")
+        elif not m.get("running") and retried:
+            self.toast("No se ha podido arrancar Mailpit: mira Ajustes, Correo de pruebas")
+        elif not m.get("running"):
+            # (no se mira en cada lectura de la ventana: se arranca ahora, al pedirlo, y se abre)
+            def started(rc, _out):
+                if rc != 0:
+                    self.toast("No se ha podido arrancar Mailpit")
+                    return False
+                run_quick(["gui-datos"], lambda rc2, out2: (self.on_data(rc2, out2), self.nv_open_mail(True))[0])
+                return False
+            self.toast("Arrancando Mailpit…")
+            run_quick(["correo", "arrancar"], started)
         elif self.nv_mail_webkit() is None or getattr(self, "mail_web_dead", False):
             # (sin el componente del visor, o si se ha caído: como antes, en el navegador)
             self.open_uri(m["url"])
@@ -324,6 +336,9 @@ class NvCorreo:
 
     def show_tab(self, name):
         name = {"hosts": "dominios", "herramientas": "config", "servicios": "versiones"}.get(name, name)
+        # (Configuración ya no es una pestaña: la de su apartado abierto, Ajustes o Sistema)
+        if name == "config":
+            name = config_tab_of(getattr(self, "tools_section", None))
         if name in self.tabs:
             lb, row = self.tabs[name]
             lb.select_row(row)

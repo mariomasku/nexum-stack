@@ -98,14 +98,28 @@ func clockTime(_ t: Int) -> String {
 // MARK: botones del visor
 
 /// Botones del visor de un proyecto (el cargado y los de Docker) que se pueden ocultar y ordenar: clave y
-/// nombre. Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre
+/// nombre. ⋮ (el último) y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre. Unlink es solo
+/// del proyecto cargado, y Correo y Terminal, del visor de arriba (en el clásico siguen en la cabecera)
 let VISOR_BUTTONS: [(String, String)] = [("web", "Abrir web"), ("vscode", "VS Code"), ("repo", "Repositorio"),
                                          ("pma", "phpMyAdmin"),
                                          ("panel", "Panel"), ("docker", "Docker"), ("compartir", "Compartir"),
                                          ("log", "Log"), ("actualizar", "Actualizar"),
-                                         ("imagenes", "Imágenes de producción")]
-let VISOR_STYLES: [(String, String)] = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
-                                        ("grande", "Icono y nombre (cuadrado)")]
+                                         ("imagenes", "Imágenes de producción"),
+                                         ("unlink", "Unlink"), ("correo", "Correo"), ("terminal", "Terminal")]
+/// (los que antes no se elegían e iban al final: en una configuración guardada sin ellos, al final)
+let VISOR_LATE_KEYS: Set<String> = ["unlink", "correo", "terminal"]
+let VISOR_STYLES: [(String, String)] = [("nombre", "Icono y nombre en horizontal (solo en el visor clásico)"),
+                                        ("icono", "Solo el icono (cuadrado)"), ("grande", "Icono y nombre (cuadrado)")]
+/// Apariencia: dos iconos a elegir (de Reicon) para Actualizar, Log y Unlink (~/.nexum/apariencia, «iconos»)
+let VISOR_ICON_CHOICES: [String: (String, String)] = ["actualizar": ("upload", "refresh-circle"),
+                                                      "log": ("file-text", "code-file"),
+                                                      "unlink": ("link-broken", "logout")]
+
+/// El icono elegido en Apariencia para Actualizar, Log o Unlink (1 si no se ha elegido)
+func visorChoice(_ key: String, _ iconos: [String: Int]) -> VisorIcon {
+    let pair = VISOR_ICON_CHOICES[key] ?? ("file-text", "file-text")
+    return .reicon(iconos[key] == 2 ? pair.1 : pair.0, Color.primary)
+}
 /// Lado del cuadrado de cada estilo si no se ha elegido otro, y lo que deja el deslizador (con el nombre
 /// debajo hace falta algo más de sitio)
 let VISOR_SIZES: [String: Int] = ["icono": 44, "grande": 88]
@@ -114,15 +128,29 @@ let VISOR_SIZE_MAX = 128
 let VISOR_SIZE_NAMED = 72
 /// El mismo fichero que en Linux (JSON con order, hidden, style y size)
 let VISOR_FILE = LOG_DIR + "/botones-visor"
+/// Visor arriba (Apariencia): sus botones, cuadrados y con el nombre debajo, siempre de este lado (pt), con el icono
+/// de este tamaño y el nombre en letra pequeña (como en Linux: 56 y 20, el nombre a 0,7 del tamaño normal), para
+/// que no crezcan con el tamaño elegido para el visor de Proyectos
+let TOP_VISOR_SIDE: CGFloat = 56
+let TOP_VISOR_ICON: CGFloat = 20
+let TOP_VISOR_NAME: CGFloat = 9.5
+/// «Unlink»: el botón de desmontar el proyecto cargado (el de expulsar)
+let UNLINK_TIP = "Unlink: desmontar el proyecto (web.local deja de apuntar a él)"
 
 struct VisorConf: Equatable {
     var order: [String] = VISOR_BUTTONS.map { $0.0 }
     var hidden: Set<String> = []
     var style = "nombre"
     var size = 44
-    var square: Bool { return style != "nombre" }
+    /// Los del visor de arriba (TopVisorBar): cuadrados de TOP_VISOR_SIDE, con el nombre debajo en letra pequeña.
+    /// No se guarda: lo pone la barra de arriba sobre lo elegido (el orden y los ocultos)
+    var compact = false
+    var square: Bool { return compact || style != "nombre" }
     /// Lado del cuadrado: sin nombre, igual de alto que de ancho; con el nombre, al menos VISOR_SIZE_NAMED
-    var side: CGFloat { return CGFloat(style == "grande" ? Swift.max(size, VISOR_SIZE_NAMED) : size) }
+    var side: CGFloat {
+        if compact { return TOP_VISOR_SIDE }
+        return CGFloat(style == "grande" ? Swift.max(size, VISOR_SIZE_NAMED) : size)
+    }
 }
 
 func loadVisorConf() -> VisorConf {
@@ -136,9 +164,12 @@ func loadVisorConf() -> VisorConf {
         seen.insert(k)
         order.append(k)
     }
-    // (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS)
+    // (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS; Unlink,
+    // Correo y Terminal, que antes no se elegían e iban al final, al final)
     for (i, k) in keys.enumerated() where !seen.contains(k) {
-        if let before = keys[..<i].last(where: { order.contains($0) }), let at = order.firstIndex(of: before) {
+        if VISOR_LATE_KEYS.contains(k) {
+            order.append(k)
+        } else if let before = keys[..<i].last(where: { order.contains($0) }), let at = order.firstIndex(of: before) {
             order.insert(k, at: at + 1)
         } else {
             order.insert(k, at: 0)
@@ -169,6 +200,16 @@ func saveVisorConf(_ c: VisorConf) -> Bool {
 /// La web del repositorio de una carpeta (su remote origin, de .git/config, sin ejecutar git): (dirección,
 /// servidor) o nil. Solo https o ssh, sin usuario ni contraseña en la dirección (nunca se enseña un token)
 func projectRepoURL(_ folder: String) -> (String, String)? {
+    // (la ventana se redibuja a menudo, y cada fila de Proyectos lo pide: lo leído vale medio minuto)
+    if let c = repoURLCache[folder], Date().timeIntervalSince(c.0) < 30 { return c.1 }
+    let found = projectRepoURLRead(folder)
+    repoURLCache[folder] = (Date(), found)
+    return found
+}
+
+private var repoURLCache: [String: (Date, (String, String)?)] = [:]
+
+func projectRepoURLRead(_ folder: String) -> (String, String)? {
     func match(_ pattern: String, _ s: String) -> [String]? {
         guard let rx = try? NSRegularExpression(pattern: "^(?:" + pattern + ")$"),
               let m = rx.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) else { return nil }
@@ -210,21 +251,25 @@ enum VisorIcon {
     case symbol(String, Color)
     case logo(String)
     case image(NSImage)
+    /// (un icono de Reicon por su nombre, de ese color)
+    case reicon(String, Color)
 }
 
 /// Icono de cada botón que se puede ordenar (el del diálogo de los botones y su vista previa)
-func visorIcon(_ key: String) -> VisorIcon {
+func visorIcon(_ key: String, _ iconos: [String: Int] = [:]) -> VisorIcon {
     switch key {
+    case "actualizar", "log", "unlink": return visorChoice(key, iconos)
+    case "correo": return .logo("mailpit")
+    case "terminal": return .symbol("terminal", Color.primary)
     case "web": return .symbol("globe", Color.blue)
     case "vscode":
-        if let code = vscodeURL() { return .image(NSWorkspace.shared.icon(forFile: code.path)) }
+        if let code = vscodeURL() { return .image(vscodeIcon(code)) }
         return .symbol("chevron.left.forwardslash.chevron.right", Color.primary)
     case "repo": return .logo("github")
     case "pma": return .logo("phpmyadmin")
     case "panel": return .logo("wordpress")
     case "docker": return .logo("docker")
     case "compartir": return .logo("cloudflare")
-    case "actualizar": return .logo("actualizar")
     case "imagenes": return .logo("imagenes")
     default: return .logo("log")
     }
@@ -233,12 +278,21 @@ func visorIcon(_ key: String) -> VisorIcon {
 struct VisorIconView: View {
     let icon: VisorIcon
     let size: CGFloat
+    @Environment(\.iconsTinted) var tinted
+    @Environment(\.colorScheme) var scheme
+
+    /// (con los iconos en color, los que no tienen color propio: los de Reicon y los símbolos del color del texto)
+    func iconColor(_ name: String, _ c: Color) -> Color {
+        guard tinted, c == Color.primary || c == Color.secondary else { return c }
+        return iconTint(name, dark: scheme == .dark)
+    }
+
     var body: some View {
         switch icon {
         case .symbol(let s, let c):
             // (casi todo el recuadro, como los logotipos, que llenan el suyo: más pequeño, la bola del mundo no
             // tenía el tamaño del círculo de WordPress)
-            Image(systemName: s).font(.system(size: size * 0.92)).foregroundColor(c).frame(width: size, height: size)
+            UIIcon(s, size: size * 0.77).foregroundColor(iconColor(s, c)).frame(width: size, height: size)
         case .logo(let l):
             if LOGO_STROKED.contains(l) {
                 LogoShape(d: LOGO_PATHS[l] ?? "")
@@ -249,6 +303,8 @@ struct VisorIconView: View {
             }
         case .image(let i):
             Image(nsImage: i).resizable().frame(width: size, height: size)
+        case .reicon(let n, let c):
+            ReiconImage(name: n, size: size).foregroundColor(iconColor(n, c))
         }
     }
 }
@@ -259,10 +315,23 @@ struct VisorSquareLabel: View {
     let name: String
     let icon: VisorIcon
     var body: some View {
-        if conf.style == "grande" {
+        if conf.compact {
+            // (el visor de arriba: pequeños, siempre del mismo lado, con el nombre en letra pequeña; ⋮, solo el icono.
+            // Con «Solo el icono» en Personalizar los botones, sin el nombre y con el icono algo mayor)
+            VStack(spacing: 3) {
+                VisorIconView(icon: icon, size: conf.style == "icono" ? TOP_VISOR_ICON + 4 : TOP_VISOR_ICON)
+                if name != "Más" && conf.style != "icono" {
+                    // (si no cabe entero: «PMA», «Imágenes»)
+                    Text(squareName(name, conf.side - 6, TOP_VISOR_NAME)).font(.system(size: TOP_VISOR_NAME)).lineLimit(1).truncationMode(.tail).frame(maxWidth: conf.side - 6)
+                }
+            }
+        } else if conf.style == "grande" {
             VStack(spacing: 4) {
                 VisorIconView(icon: icon, size: Swift.max(18, conf.side * 2 / 5))
-                Text(name).font(.system(size: 11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: conf.side - 8)
+                // (⋮, solo el icono)
+                if name != "Más" {
+                    Text(squareName(name, conf.side - 8, 11)).font(.system(size: 11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: conf.side - 8)
+                }
             }
         } else {
             VisorIconView(icon: icon, size: Swift.max(16, conf.side / 2))
@@ -289,10 +358,13 @@ struct SquareBody: View {
     var body: some View {
         let on = hover && enabled
         let share = kind == "compartiendo"
+        // («marcado»: Terminal con la terminal abierta, en el visor de arriba)
+        let marked = kind == "marcado"
         let tint: Color = kind == "stop" ? RED : (kind == "play" ? GREEN : (share ? CLOUDFLARE : ACCENT))
         let shape = RoundedRectangle(cornerRadius: 12)
-        let fill: Color = share ? CLOUDFLARE.opacity(0.10) : Color.primary.opacity(configuration.isPressed ? 0.10 : 0.03)
-        let border: Color = on ? tint : (share ? CLOUDFLARE : Color.primary.opacity(0.16))
+        let fill: Color = share ? CLOUDFLARE.opacity(0.10) : (marked ? ACCENT.opacity(0.13)
+                                                                     : Color.primary.opacity(configuration.isPressed ? 0.10 : 0.03))
+        let border: Color = on ? tint : (share ? CLOUDFLARE : (marked ? ACCENT : Color.primary.opacity(0.16)))
         return configuration.label
             .foregroundColor(on ? ACCENT : Color.primary)
             .frame(width: side, height: side)
@@ -300,7 +372,7 @@ struct SquareBody: View {
             .overlay(shape.strokeBorder(border, lineWidth: 1))
             .opacity(enabled ? 1 : 0.45)
             .contentShape(shape)
-            .animation(.easeOut(duration: 0.12), value: on)
+            // (sin transición de color: al momento)
             .onHover { hover = $0 }
             .hoverPointer()
     }
@@ -316,12 +388,21 @@ struct VisorButton: View {
     var kind = ""
     let action: () -> Void
 
+    /// El mensaje al pasar el ratón por un botón cuadrado (en una función: la expresión, con todo seguido, tardaba en
+    /// comprobarse al compilar)
+    func tipText() -> String {
+        if name == "Más" { return "" }
+        if conf.compact && conf.style != "icono" { return tip.isEmpty ? name : tip }
+        if conf.style == "icono" { return tip.isEmpty ? name : (tip.hasPrefix(name) ? tip : name + ": " + tip) }
+        return tip
+    }
+
     var body: some View {
         if conf.square {
             // (⋮ «Más», sin mensaje: solo despliega su menú)
             Button(action: action) { VisorSquareLabel(conf: conf, name: name, icon: icon) }
                 .buttonStyle(SquareButton(side: conf.side, kind: kind))
-                .tip(name == "Más" ? "" : conf.style == "icono" ? (tip.isEmpty ? name : tip.hasPrefix(name) ? tip : name + ": " + tip) : tip)
+                .tip(tipText())
         } else {
             Button(action: action) {
                 HStack(spacing: 6) {
@@ -347,7 +428,7 @@ struct ButtonsPanel: View {
         // (en horizontal: la lista a la izquierda y el estilo, el tamaño y la vista previa a la derecha, para
         // que quepa en la altura de un portátil)
         return VStack(alignment: .leading, spacing: 14) {
-            Text("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.")
+            Text("Los que se ven y en qué orden (el del proyecto cargado y el de Docker). ⋮, el último, y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre. Unlink es solo del proyecto cargado, y Correo y Terminal, del visor de arriba. «Icono y nombre en horizontal», solo en el visor clásico: en el de arriba van siempre cuadrados.")
                 .font(.callout).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .top, spacing: 24) {
                 VStack(spacing: 0) {
@@ -359,12 +440,12 @@ struct ButtonsPanel: View {
                             }))
                             .toggleStyle(CheckboxToggleStyle()).labelsHidden()
                             .tip("Verlo en el visor")
-                            VisorIconView(icon: visorIcon(key), size: 18)
+                            VisorIconView(icon: visorIcon(key, model.look.iconos), size: 18)
                             Text(names[key] ?? key)
                             Spacer()
-                            Button(action: { move(i, -1) }) { Image(systemName: "chevron.up") }
+                            Button(action: { move(i, -1) }) { TintIcon("chevron.up") }
                                 .buttonStyle(OutlineButton(compact: true)).disabled(i == 0).tip("Antes")
-                            Button(action: { move(i, 1) }) { Image(systemName: "chevron.down") }
+                            Button(action: { move(i, 1) }) { TintIcon("chevron.down") }
                                 .buttonStyle(OutlineButton(compact: true)).disabled(i == conf.order.count - 1).tip("Después")
                         }
                         .padding(.horizontal, 12)
@@ -417,16 +498,15 @@ struct ButtonsPanel: View {
         }
     }
 
-    /// Los botones que se ven, como quedarán (con Desmontar y ⋮), en varias filas si no caben
+    /// Los botones que se ven, como quedarán (con ⋮ al final), en varias filas si no caben
     func preview(_ names: [String: String]) -> some View {
         let keys = conf.order.filter { !conf.hidden.contains($0) }
         let width: CGFloat = conf.square ? conf.side : 120
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width + 40), spacing: 8, alignment: .leading)],
                          alignment: .leading, spacing: 8) {
             ForEach(keys, id: \.self) { k in
-                VisorButton(conf: conf, name: names[k] ?? k, icon: visorIcon(k), tip: "", action: {})
+                VisorButton(conf: conf, name: names[k] ?? k, icon: visorIcon(k, model.look.iconos), tip: "", action: {})
             }
-            VisorButton(conf: conf, name: "Desmontar", icon: .symbol("eject.fill", Color.secondary), tip: "", action: {})
             VisorButton(conf: conf, name: "Más", icon: .symbol("ellipsis", Color.primary), tip: "", action: {})
         }
         .padding(4)

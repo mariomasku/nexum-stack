@@ -78,6 +78,8 @@ final class AppModel: ObservableObject {
     /// Actualizar proyecto: si se ve su diálogo, el proyecto, la BBDD, el código, qué hacer con la carpeta
     /// (fusionar o sobrescribir) y lo que no vale de lo arrastrado
     @Published var upShown = false
+    /// «Actualizar código…» (⋮ de una fila): el mismo diálogo, solo con el código (sin cargar el proyecto ni tocar su BBDD)
+    @Published var upCodeOnly = false
     @Published var upFolder = ""
     @Published var upSql = ""
     @Published var upCode = ""
@@ -120,9 +122,13 @@ final class AppModel: ObservableObject {
     @Published var newDb = ""
     // Ventana: apartado de la barra lateral, proyecto elegido en Proyectos (se ve arriba) y su filtro
     @Published var tab = "proyectos"
-    /// Apartado elegido en Configuración (su clave de ToolsView.sections)
-    @Published var toolsSection = "general"
-    /// Sube cada vez que una tarea empieza o acaba: Configuración, General, vuelve a leer el registro de tareas
+    /// Apartado elegido en Configuración (su clave de ToolsView.sections). Ajustes y Sistema, las dos pestañas
+    /// que comparten la página de Configuración, recuerdan cada una el último que se abrió en ella (toolsLast)
+    @Published var toolsSection = "general" {
+        didSet { toolsLast[configTabOf(toolsSection)] = toolsSection }
+    }
+    var toolsLast: [String: String] = [:]
+    /// Sube cada vez que una tarea empieza o acaba: Sistema, Registro de tareas, vuelve a leer el registro de tareas
     @Published var taskLogsChanged = 0
     @Published var selProject: String? = nil
     @Published var projKind = "all"
@@ -304,7 +310,7 @@ final class AppModel: ObservableObject {
         termCwd = cwd
     }
 
-    /// «ping»: un ping (3 veces) a cada dominio del proyecto cargado, escrito en la terminal. Con 127.0.0.1 está
+    /// «ping»: un ping (una sola respuesta) a cada dominio del proyecto cargado, escrito en la terminal. Con 127.0.0.1 está
     /// falseado (lleva a este Mac); si no, sale la dirección de la web real
     func termPing() {
         var cur = projects?.current ?? ""
@@ -315,7 +321,7 @@ final class AppModel: ObservableObject {
             toast(name.isEmpty ? "No hay ningún proyecto cargado" : "El proyecto cargado no tiene dominio propio (solo web.local)")
             return
         }
-        let cmd = doms.map { "ping -c 3 '" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }.joined(separator: "; ")
+        let cmd = doms.map { "ping -c 1 '" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }.joined(separator: "; ")
         term.write(Data((cmd + "\r").utf8))
     }
 
@@ -360,6 +366,8 @@ final class AppModel: ObservableObject {
     init() {
         AppModel.current = self
         TASK_NOTE = { [weak self] in self?.taskNote }
+        // (lo de la última vez, al momento; las órdenes de verdad lo sustituyen al llegar)
+        loadDataCache()
         reload(branches: true)
         // Los repositorios del buscador de Nuevo proyecto, ya cargados cuando se abra: los de la última
         // vez y, en cuanto la ventana ha cargado lo suyo, los de GitHub

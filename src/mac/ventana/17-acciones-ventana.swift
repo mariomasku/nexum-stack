@@ -9,6 +9,12 @@ extension AppModel {
     }
 
     func openTab(_ key: String) {
+        // (Configuración ya no es una pestaña: la de su apartado, Ajustes o Sistema; y cada una, con el último
+        // apartado que se abrió en ella o, la primera vez, con el primero de los suyos)
+        let key = key == "config" ? configTabOf(toolsSection) : key
+        if CONFIG_TABS.contains(key) && configTabOf(toolsSection) != key {
+            toolsSection = toolsLast[key] ?? (ToolsView.sections.first(where: { configTabOf($0.0) == key })?.0 ?? "general")
+        }
         tab = key
         // Al entrar en un apartado, sus desplegables aparecen plegados (las versiones de Bases de datos
         // y los proyectos de Docker; con una búsqueda se siguen viendo desplegados)

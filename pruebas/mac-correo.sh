@@ -196,7 +196,7 @@ mailpit_sync > /dev/null; p=$(mailpit_pid)
 lampp_running() { false; }
 mailpit_sync > /dev/null
 check "al parar la version se para" '[ -n "$p" ] && ! kill -0 "$p" 2> /dev/null && [ -z "$(mailpit_pid)" ]'
-check "arranca y para con la version: use, arrancar/parar, disable, servicio, cargar-proyecto, los cambios del correo y la ventana" '[ "$(grep -c "^    mailpit_sync$" "$SRC")" -ge 6 ] && grep -q "mailpit_sync --suave > /dev/null 2>&1" "$SRC" && for f in use_version load_project_steps service_control disable_version control_lampp mail_apply; do sed -n "/^function $f() {/,/^}/p" "$SRC" | grep -q "^    mailpit_sync$" || exit 1; done'
+check "arranca y para con la version: use, arrancar/parar, disable, servicio, cargar-proyecto, los cambios del correo y la ventana" '[ "$(grep -c "^    mailpit_sync$" "$SRC")" -ge 6 ] && grep -q "        arrancar) mailpit_sync --suave ;;" "$SRC" && for f in use_version load_project_steps service_control disable_version control_lampp mail_apply; do sed -n "/^function $f() {/,/^}/p" "$SRC" | grep -q "^    mailpit_sync$" || exit 1; done'
 check "nunca como root" 'sed -n "/^function mailpit_start() {/,/^}/p" "$SRC" | grep -q "\"\$(id -u)\" -eq 0 ] && { echo \"Mailpit no se arranca como root\""'
 # Otro programa en su puerto: no arranca y, desde la ventana (--suave), no se reintenta en 5 minutos
 printf '#!/bin/bash\nexit 1\n' > "$W/bin/mailpit-malo"; chmod 755 "$W/bin/mailpit-malo"
@@ -263,12 +263,12 @@ o=$(cli vaciar)
 check "correo vaciar sin Mailpit en marcha: lo dice" 'grep -q "no esta en marcha" <<< "$o"'
 check "la ayuda y el comando correo" 'grep -q "^#   nexum correo \[estado\]" "$SRC" && grep -q "^    correo) mail_command \"\$2\" \"\$3\" ;;" "$SRC" && grep -q "de root en /Library/Nexum/mailpit" "$SRC"'
 check "mail_apply: asegura todas, recarga Apache y PHP-FPM con xampp_ctl y pone al dia el proyecto cargado" 'sed -n "/^function mail_apply() {/,/^}/p" "$SRC" | grep -q "run xampp_ctl reloadapache" && sed -n "/^function mail_apply() {/,/^}/p" "$SRC" | grep -q "^    mail_loaded_project$"'
-check "gui-datos: E| con lo de Mailpit (y lo arranca si se ha cerrado)" 'grep -q "echo \"E|\$(mailpit_installed && echo 1 || echo 0)|\$(mail_on && echo 1 || echo 0)|\$(mail_wp_mode)|" "$SRC" && sed -n "/^function gui_data() {/,/^}/p" "$SRC" | grep -q "mailpit_sync --suave"'
+check "gui-datos: E| con lo de Mailpit (sin arrancarlo: eso, al pulsar Correo) (1.60.0)" 'grep -q "echo \"E|\$(mailpit_installed && echo 1 || echo 0)|\$(mail_on && echo 1 || echo 0)|\$(mail_wp_mode)|" "$SRC" && sed -n "/^function gui_data() {/,/^}/p" "$SRC" | grep -q "mailpit_sync"; [ $? -ne 0 ]'
 
 # --- La ventana (Swift)
 SW=$(sed -n "/^    cat <<'LVM_SWIFT'$/,/^LVM_SWIFT$/p" "$SRC")
 check "ventana: lee la linea E| de gui-datos" 'grep -q "case \"E\" where f.count >= 8:" <<< "$SW" && grep -q "^struct MailState: Equatable {" <<< "$SW"'
-check "ventana: botón Correo arriba, junto a Localhost, con el logotipo y los sin leer; oculto si esta apagado" 'grep -q "^            mailButton()$" <<< "$SW" && grep -q "if let m = model.data?.mail, m.on {" <<< "$SW" && grep -q "LOGO_PATHS\[\"mailpit\"\]" <<< "$SW" && grep -q "\"99+\"" <<< "$SW"'
+check "ventana: botón Correo arriba, junto a Localhost, con el logotipo y los sin leer; oculto si esta apagado" 'grep -q "^ *mailButton()$" <<< "$SW" && grep -q "if let m = model.data?.mail, m.on {" <<< "$SW" && grep -q "LOGO_PATHS\[\"mailpit\"\]" <<< "$SW" && grep -q "\"99+\"" <<< "$SW"'
 check "ventana: los sin leer de api/v1/info, con el curl del sistema y sin proxy, solo con la ventana a la vista" 'grep -q "\"api/v1/info\"" <<< "$SW" && grep -q "\"/usr/bin/curl\"" <<< "$SW" && grep -q "\"--noproxy\", \"\*\"" <<< "$SW" && sed -n "/func pollMail() {/,/^    }/p" <<< "$SW" | grep -q "isVisible"'
 check "ventana: Configuración, interruptor (confirma al apagar), los tres modos de WordPress e instalar o la bandeja" 'grep -q "Card(\"Correo de pruebas (Mailpit)\"" <<< "$SW" && grep -q "¿Apagar el correo de pruebas?" <<< "$SW" && grep -q "(\"mailpit\", \"Llevarlos a Mailpit\")" <<< "$SW" && grep -q "(\"desactivar\", \"Desactivarlos en la copia local\")" <<< "$SW" && grep -q "(\"nada\", \"No tocarlos\")" <<< "$SW" && grep -q "\[\"correo\", \"wordpress\", mode\]" <<< "$SW" && grep -q "Button(\"Instalar Mailpit\")" <<< "$SW" && grep -qE "(Row|Tile)\(\"Bandeja de entrada\"" <<< "$SW" && grep -q "args.append(\"--instalar\")" <<< "$SW"'
 check "ventana: las filas del correo con el logotipo de Mailpit (ROW_ICONS)" 'grep -q "(\"Mailpit\", \"logo:mailpit\", brand(\"mailpit\"))" <<< "$SW" && grep -q "(\"Bandeja de entrada\", \"logo:mailpit\", brand(\"mailpit\"))" <<< "$SW" && grep -q "(\"Correo de pruebas\", \"logo:mailpit\", brand(\"mailpit\"))" <<< "$SW"'

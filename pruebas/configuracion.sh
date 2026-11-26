@@ -7,7 +7,7 @@ SRC=$1 HERE=$(cd "$(dirname "$0")" && pwd)
 W=$(mktemp -d "$TMPBASE/configuracion.XXXXXX") || exit 1
 trap 'rm -rf "${W:?}"' EXIT
 if grep -q "^let ERROR_LOG = " "$SRC"; then
-    check "Mac: la columna de apartados, fuera de la página" 'sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF ".frame(width: 220)" && sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF "Text(\"CONFIGURACIÓN\")"'
+    check "Mac: la columna de apartados, fuera de la página" 'sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF ".frame(width: 220)" && sed -n "/^struct ToolsView: View {/,/^    func section/p" "$SRC" | grep -qF "Text(tab == \"sistema\" ? \"SISTEMA\" : \"AJUSTES\")"'
     check "Mac: en filas salvo con tiles" 'grep -qF "if !tiles {" "$SRC" && grep -qF ".environment(\\.tileRow, !tiles)" "$SRC"'
     check "Mac: Docker y el correo, en tarjetas" 'grep "TileCard(\"Docker\"" "$SRC" | grep -qF "tiles: true" && grep -qF "TileCard(tiles: true) {" "$SRC" && grep -A1 "TileCard(\"Correo de pruebas (Mailpit)\"" "$SRC" | grep -qF "tiles: true"'
     check "Mac: el interruptor del correo, en su título (sin su tarjeta)" '! grep -qF "Tile(\"Correo de pruebas\", m.on ?" "$SRC" && grep -qF "lead: AnyView(BrandLogo(name: \"mailpit\"" "$SRC"'

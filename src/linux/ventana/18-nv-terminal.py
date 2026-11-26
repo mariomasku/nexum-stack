@@ -245,7 +245,7 @@ class NvTerminal:
         return [h["name"] for h in self.project_hosts(os.path.basename(cur))] if cur else []
 
     def nv_term_ping(self):
-        """«ping»: escribe en la terminal un ping (3 veces) a cada dominio del proyecto cargado. Con 127.0.0.1 está
+        """«ping»: escribe en la terminal un ping (una sola respuesta) a cada dominio del proyecto cargado. Con 127.0.0.1 está
         falseado (lleva a este equipo); si no, sale la dirección de la web real."""
         if self.term is None:
             return
@@ -255,7 +255,7 @@ class NvTerminal:
             self.toast("El proyecto cargado no tiene dominio propio (solo web.local)" if cur
                        else "No hay ningún proyecto cargado")
             return
-        self.nv_term_type("; ".join("ping -c 3 %s" % shlex.quote(d) for d in doms))
+        self.nv_term_type("; ".join("ping -c 1 %s" % shlex.quote(d) for d in doms))
 
     def nv_term_flush_dns(self):
         """«Vaciar DNS»: escribe la orden de este sistema (dns_flush_command) en la terminal."""
@@ -312,8 +312,7 @@ class NvTerminal:
         _logo_cache.clear()
         if getattr(self, "theme_item", None):
             img, lbl = self.theme_item
-            img.set_from_icon_name("weather-clear-symbolic" if dark else "weather-clear-night-symbolic",
-                                   Gtk.IconSize.BUTTON)
+            set_icon(img, "weather-clear-symbolic" if dark else "weather-clear-night-symbolic")
             lbl.set_label("Tema claro" if dark else "Tema oscuro")
 
     def nv_power(self):
@@ -413,6 +412,19 @@ class NvTerminal:
         if key in ("zoom", "cristal"):
             self.nv_apply_look()
             return
+        if key == "visor":
+            self.nv_visor_layout()
+            return
+        if key == "color":
+            # (los iconos de los botones, en color o no: se rehacen después de este cambio, no durante)
+            self.nv_sidebar_fill()
+            GLib.idle_add(lambda: (self.nv_tunnel_refresh(), self.nv_top_visor_fill(), False)[2])
+            return
+        if key == "iconos":
+            # (los botones del proyecto, con los iconos elegidos)
+            if getattr(self, "nv_list", None) is not None:
+                self.nv_build_projects()
+            return
         self.nv_sidebar_fill()
 
     def nv_apply_look(self):
@@ -483,22 +495,49 @@ class NvTerminal:
         switch(lb, "Cristal", "Paneles translúcidos sobre un fondo de color. Gasta algo más al redibujar la ventana, "
                "nada mientras no cambia", "cristal", look["cristal"])
         lb = block("Apartados del menú lateral",
-                   "Cuáles se ven en la columna de la izquierda (Proyectos y Configuración salen siempre)")
-        # (en dos columnas: la primera mitad a la izquierda y el resto a la derecha)
+                   "Cuáles se ven en la columna de la izquierda (Proyectos, Ajustes y Sistema salen siempre)")
+        # (en tres columnas, por orden: de arriba abajo y de izquierda a derecha)
         b = lb.get_parent()
         b.remove(lb)
         cols = Gtk.Box(spacing=12, homogeneous=True, margin_top=8)
         b.pack_start(cols, False, False, 0)
         names = [(name, text) for _g, items in SIDEBAR for name, text, _ic in items if name not in SIDEBAR_FIXED
                  and (name != "nginx" or nginx_used())]
-        half = (len(names) + 1) // 2
-        for chunk in (names[:half], names[half:]):
+        per = (len(names) + 2) // 3
+        for chunk in (names[:per], names[per:2 * per], names[2 * per:]):
             col = css(Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, valign=Gtk.Align.START), "caja")
             col.connect("row-activated", on_row_activated)
             cols.pack_start(col, True, True, 0)
             for name, text in chunk:
                 switch(col, text, None, "@" + name, name not in look["ocultos"])
-        lb = block("Visor de los proyectos", "Los botones de cada proyecto: cuáles se ven, en qué orden y cómo")
+        lb = block("Visor de los proyectos", "Dónde van los botones del proyecto cargado y cuáles se ven, en qué orden y cómo")
+        row = ActionRow("Dónde", "Arriba: en la barra de arriba, a mano desde cualquier pestaña, y la versión de PHP, "
+                        "Apache, MariaDB y el consumo, en la barra de abajo. Clásico: en Proyectos, como antes")
+        where = Gtk.ComboBoxText(valign=Gtk.Align.CENTER)
+        where.append("arriba", "Arriba")
+        where.append("clasico", "Clásico")
+        where.set_active_id(look["visor"])
+        where.connect("changed", lambda w: w.get_active_id() and self.nv_look_set("visor", w.get_active_id()))
+        row.add_suffix(where)
+        lb.add(row)
+        # (dos iconos a elegir para Actualizar, Log y Unlink: uno pulsado de cada)
+        row = ActionRow("Iconos", "Los de Actualizar, Log y Unlink")
+        for key, name in (("actualizar", "Actualizar"), ("log", "Log"), ("unlink", "Unlink")):
+            pair = css(Gtk.Box(valign=Gtk.Align.CENTER, margin_start=10), "linked")
+            first = None
+            for n, ic in enumerate(VISOR_ICON_CHOICES[key], 1):
+                rb = Gtk.RadioButton.new_from_widget(first)
+                rb.set_mode(False)
+                rb.add(icon(ic, 18))
+                rb.set_tooltip_text("%s: este icono" % name)
+                rb.set_active(look["iconos"].get(key, 1) == n)
+                rb.connect("toggled", lambda w, k=key, n=n: w.get_active() and self.nv_look_set(
+                    "iconos", dict(look_conf()["iconos"], **{k: n})))
+                pair.pack_start(rb, False, False, 0)
+                first = first or rb
+            row.add_suffix(label(name, "nv-chico", "nv-tenue", valign=Gtk.Align.CENTER, margin_start=12))
+            row.add_suffix(pair)
+        lb.add(row)
         conf = buttons_conf()
         shown = [n for k, n, _i in sorted(VISOR_BUTTONS, key=lambda b: conf["order"].index(b[0])) if k not in conf["hidden"]]
         row = ActionRow("Botones", "%s · %s" % (", ".join(shown) or "ninguno",
@@ -517,7 +556,10 @@ class NvTerminal:
         for other in self.tab_lists:
             if other is not lb:
                 other.unselect_all()
-        self.stack.set_visible_child_name(row.tab_name)
+        # (Ajustes y Sistema comparten la página de Configuración: cada una enseña sus apartados)
+        self.stack.set_visible_child_name("config" if row.tab_name in CONFIG_TABS else row.tab_name)
+        if row.tab_name in CONFIG_TABS:
+            self.nv_tools_group(row.tab_name)
         # Al entrar en una pestaña, sus apartados desplegables aparecen plegados
         if any(k.startswith("@db") for k in self.expanded) or self.dk_open:
             self.expanded.difference_update({k for k in self.expanded if k.startswith("@db")})

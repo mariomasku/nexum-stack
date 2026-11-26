@@ -4,6 +4,31 @@ Todo lo que ha incluido cada versión de Nexum Stack para Linux (antes LAMPP Ver
 
 [← Volver al README](README.md)
 
+## 1.60.0 · 27 nov 2026
+
+- Cargar una BBDD (también al actualizar un proyecto) ya no vacía la base y se para con «Unknown command '\-'» cuando la copia viene de un MariaDB de mediados de 2024 (10.6.18, 10.11.8, 11.4.2…): su primera línea, la del modo sandbox, va sin la M y no se quitaba. Ahora se quitan las dos formas.
+- **Terminal de abajo:** el botón «ping» hace un solo ping (ping -c 1), con una línea de respuesta en lugar de tres.
+- Visor arriba, de serie (el clásico, en Sistema, Apariencia, Visor de los proyectos, «Dónde»): los botones del proyecto cargado, cuadrados y con su nombre (o solo el icono, según Personalizar los botones), van en la barra de arriba, con el proyecto y el logotipo de su tipo delante y Correo y Terminal al final: a mano desde cualquier pestaña. El menú ☰, a la derecha del todo. La versión de PHP, Apache, MariaDB, ▶ / ■ y el consumo pasan a la barra de abajo.
+- **Proyectos, con el visor arriba:** arriba, el proyecto cargado como siempre (su entorno, su BBDD, Falsear Host y ⋮), sin los botones (ya están en la barra). El + del entorno dice «Nueva versión».
+- **Visor arriba:** el nombre del proyecto, entero y sin el prefijo de su tipo (dob-wordpress-, dob-prestashop-). Unlink, Correo y Terminal se eligen y ordenan en Personalizar los botones, como los demás; ⋮, el último. «Icono y nombre en horizontal», solo en el visor clásico.
+- **Ventana más ágil:** las pestañas y los apartados salen al momento (sin fundido) y los botones responden sin transición; los desplegables se abren más deprisa.
+- Los avisos (el triángulo amarillo), justo a la izquierda del menú ☰ y sin recuadro, en los dos visores.
+- Al pulsar la versión de PHP (en la barra de abajo o, con el visor clásico, en el recuadro de arriba), las versiones instaladas se despliegan en abanico para cambiar de una a otra.
+- **Botones cuadrados:** si no cabe el nombre, «PMA» e «Imágenes».
+- **Iconos en color (Apariencia):** los de los botones de acción, del color de lo que hacen (arrancar en verde, parar y borrar en rojo, actualizar en azul…), y los demás sin color propio, con los del logotipo de Nexum.
+- **Repositorios:** «Clonar», tan ancho como «Traer cambios».
+- Los diálogos y las ventanas de las tareas, siempre más pequeños que la ventana de Nexum y dentro de la pantalla.
+- Mailpit ya no se mira en cada lectura de la ventana (cada 20 s): va con la versión de PHP y, si se ha parado, arranca al pulsar Correo. La ventana lee sus datos algo más deprisa.
+- **Arranque al momento:** la ventana se pinta con lo último que leyó (guardado en `~/.nexum/cache/ventana`) y lo pone al día en cuanto llegan los datos de verdad, segundo y medio después.
+- Iconos de Actualizar, Log y Unlink, de Reicon, a elegir entre dos en Apariencia. En el ⋮ del proyecto cargado ya no salen las imágenes de producción (tienen su botón).
+- **Lista de proyectos, ⋮ de cada fila:** «Actualizar código…». El código de producción (.zip, .`tar.gz` o carpeta) en ese proyecto sin cargarlo ni tocar su BBDD, con la pregunta del git pull como en Actualizar proyecto.
+- **Logotipo del tipo de proyecto:** WordPress, PrestaShop, Laravel, Symfony, Drupal, Joomla, Magento, Astro, Next.js, Nuxt, Angular, Svelte, Vue, React o Node (Simple Icons).
+- Iconos de la ventana de Reicon (reicon.dev), iguales en Linux y Mac.
+- **Docker:** los proyectos en marcha enseñan su visor de botones sin tener que desplegarlos.
+- Configuración se divide en Ajustes (lo que hay que configurar para que funcionen otras partes del programa) y Sistema (General, Registro de tareas, Apariencia, Limpieza, XAMPP sin registrar e Información). El Registro de tareas, en su propio apartado.
+- El botón Desmontar se llama Unlink, y ⋮ va sin el texto «Más».
+- **Actualizar proyecto:** el recuadro del código tiene una segunda columna, «En git», con lo mismo pero solo lo que le importa a git (sin lo que deja fuera su .gitignore: cachés, node_modules, vendor…). Y debajo, la lista de todos los cambiados y la de solo los de git, que se pueden pulsar en el registro para abrirlas. De lo que está en tu carpeta y no viene (se deja o se quita), los 5 primeros que están en git (los que no verías venir), con sus listas enteras.
+
 ## 1.57.51 · 25 nov 2026
 
 - **Mac:** la ventana vuelve a compilar (el botón Abrir de los espacios de trabajo de VS Code llamaba a algo que no existía en esa vista, y se quedaba solo el Terminal).

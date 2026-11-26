@@ -126,16 +126,16 @@ struct ServicesView: View {
             Spacer(minLength: 8)
             if sv.running {
                 Button(action: { model.service(sv.name, "reiniciar", title) }) {
-                    Label("Reiniciar", systemImage: "arrow.clockwise")
+                    Label { Text("Reiniciar") } icon: { TintIcon("arrow.clockwise") }
                 }
                 .busyGuard(model.busy)
                 Button(action: { model.service(sv.name, "parar", title) }) {
-                    Label("Parar", systemImage: "stop.fill")
+                    Label { Text("Parar") } icon: { TintIcon("stop.fill") }
                 }
                 .busyGuard(model.busy)
             } else {
                 Button(action: { model.service(sv.name, "arrancar", title) }) {
-                    Label("Arrancar", systemImage: "play.fill")
+                    Label { Text("Arrancar") } icon: { TintIcon("play.fill") }
                 }
                 .buttonStyle(OutlineButton(kind: "primary"))
                 .busyGuard(model.busy)
@@ -154,7 +154,7 @@ struct Badge: View {
     let color: Color
     var body: some View {
         HStack(spacing: 4) {
-            if let sym = symbol { Image(systemName: sym) }
+            if let sym = symbol { UIIcon(sym, size: 10, weight: .bold) }
             Text(text)
         }
         .font(.caption.weight(.bold))
@@ -212,7 +212,7 @@ struct HostsView: View {
                 PageTitle(title: "Dominios y hosts",
                           sub: "Los dominios de los vhosts y los que se llevan a este equipo en /etc/hosts", symbol: "network")
                 Spacer(minLength: 12)
-                Button(action: { model.viewHostsFile() }) { Label("Ver fichero de hosts", systemImage: "doc.text") }
+                Button(action: { model.viewHostsFile() }) { Label { Text("Ver fichero de hosts") } icon: { TintIcon("doc.text") } }
                     .buttonStyle(OutlineButton())
                     .tip("Ver \(model.data?.hosts ?? "/etc/hosts")")
             }
@@ -242,7 +242,7 @@ struct HostsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Text("Dominios de los vhosts").font(.system(size: 13.5, weight: .semibold))
-                        Image(systemName: "info.circle").foregroundColor(.secondary)
+                        UIIcon("info.circle").foregroundColor(.secondary)
                             .tip("Los que llevan a su web real. Encendido, el dominio lleva a este Mac (127.0.0.1 y ::1) y sube al recuadro de arriba. Se pide la contraseña de administrador para cambiar /etc/hosts.")
                     }
                     if others.isEmpty {
@@ -329,7 +329,7 @@ struct HostsView: View {
                 StatusDot(on: !fake.isEmpty, blink: false)
                 Text("DOMINIOS Y HOSTS FALSEADOS")
                     .font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
-                Image(systemName: "info.circle").foregroundColor(.secondary)
+                UIIcon("info.circle").foregroundColor(.secondary)
                     .tip("Llevan a este Mac y no a internet. Los .local, siempre; el dominio de una tienda PrestaShop, mientras está cargada (al cargarla se crea lo que le falte, su vhost y su certificado, y al cargar otro proyecto vuelve a llevar a la web real), y los que falsees tú. Apagado, el dominio baja a «Dominios de los vhosts» y lleva a su web real.")
                 Spacer()
                 if !fake.isEmpty {
@@ -390,7 +390,7 @@ struct HostsView: View {
                 .tip("\(h.https ? "https" : "http")://\(h.name)")
             }
             if h.name.lowercased().hasSuffix(".local") {
-                Button(action: { model.mediaProxy(h) }) { Image(systemName: "photo") }
+                Button(action: { model.mediaProxy(h) }) { TintIcon("photo") }
                     .busyGuard(model.busy)
                     .tip("Imágenes de producción"
                          + (h.media.isEmpty ? "" : ": \(h.media)"))
@@ -421,9 +421,11 @@ struct ToolsView: View {
     /// La explicación del apartado abierto (la de su tarjeta)
     @State private var toolsDesc: String? = nil
 
-    /// Apartados de Configuración (como en Linux): su clave, su nombre en la columna de la izquierda y su icono
+    /// Apartados de Configuración (como en Linux): su clave, su nombre en la columna de la izquierda y su icono.
+    /// Cada pestaña (Ajustes o Sistema, configTabOf) enseña solo los suyos
     static let sections: [(String, String, String)] = [
         ("general", "General", "slider.horizontal.3"),
+        ("tareas", "Registro de tareas", "clock.arrow.circlepath"),
         ("hosts", "Vhosts y hosts", "network"),
         ("seguridad", "Seguridad entre webs", "lock.shield"),
         ("correo", "Correo de pruebas", "envelope"),
@@ -438,20 +440,24 @@ struct ToolsView: View {
         ("oficial", "XAMPP oficial", "externaldrive"),
         ("info", "Información", "info.circle")]
     /// La explicación de General (cada uno de sus bloques lleva la suya)
-    static let generalDesc = "Los registros de errores de la web cargada y de Apache, el de las tareas que lanza la ventana, los parches nuevos de lo que usa Nexum y el propio programa"
+    static let generalDesc = "Los registros de errores de la web cargada y de Apache, los parches nuevos de lo que usa Nexum y el propio programa"
+    /// La explicación del Registro de tareas (su apartado propio en Sistema)
+    static let tasksDesc = "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.nexum/tareas, solo para ti; las contraseñas y los tokens no se escriben."
 
     var body: some View {
-        // Los apartados, en una columna pegada al menú lateral; a la derecha, lo que se puede cambiar del elegido
-        HStack(spacing: 0) {
+        // Los apartados, en una columna pegada al menú lateral; a la derecha, lo que se puede cambiar del elegido.
+        // (Ajustes y Sistema comparten esta página: cada una, con sus apartados y su título)
+        let tab = model.tab == "sistema" ? "sistema" : "ajustes"
+        return HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("CONFIGURACIÓN")
+                    Text(tab == "sistema" ? "SISTEMA" : "AJUSTES")
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.leading, 12)
                         .padding(.top, 14)
                         .padding(.bottom, 3)
-                    ForEach(ToolsView.sections, id: \.0) { sec in
+                    ForEach(ToolsView.sections.filter { configTabOf($0.0) == tab }, id: \.0) { sec in
                         SubNavRow(key: sec.0, text: sec.1, icon: sec.2)
                     }
                 }
@@ -465,7 +471,7 @@ struct ToolsView: View {
                 // (el título, el del apartado abierto: su icono, su nombre y su explicación)
                 let sec = ToolsView.sections.first(where: { $0.0 == model.toolsSection })
                 HStack(alignment: .firstTextBaseline, spacing: 14) {
-                    PageTitle(title: sec?.1 ?? "Configuración", sub: toolsDesc ?? "Configuración",
+                    PageTitle(title: sec?.1 ?? (tab == "sistema" ? "Sistema" : "Ajustes"), sub: toolsDesc ?? "",
                               symbol: (sec?.2 ?? "gearshape").hasPrefix("logo:") ? nil : (sec?.2 ?? "gearshape"),
                               logo: (sec?.2 ?? "").hasPrefix("logo:") ? String((sec?.2 ?? "").dropFirst(5)) : nil)
                     // (el correo se enciende con el interruptor de su título)
@@ -517,7 +523,7 @@ struct ToolsView: View {
                 }
                 ForEach(d.barrierAllowed, id: \.self) { dom in
                     Tile(dom, dom.hasPrefix("*.") ? "\(dom.dropFirst(2)) y todos sus subdominios" : "Solo este dominio",
-                         leading: { Image(systemName: "checkmark.shield").font(.system(size: 15)).foregroundColor(.green).frame(width: 22) },
+                         leading: { UIIcon("checkmark.shield", size: 15).foregroundColor(.green).frame(width: 22) },
                          trailing: {
                              Button("Quitar") { model.removeBarrierAllowed(dom) }.busyGuard(model.busy)
                          })
@@ -526,7 +532,7 @@ struct ToolsView: View {
             // Qué es, explicado: el problema, lo que hace, cuándo apagarla y dónde vale
             TileCard("Qué es", wide: true) {
                 ForEach(CROSS_SITE_HELP, id: \.1) { h in
-                    Tile(h.1, h.2, leading: { Image(systemName: h.0).font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                    Tile(h.1, h.2, leading: { UIIcon(h.0, size: 15).foregroundColor(.secondary).frame(width: 22) },
                          trailing: { EmptyView() })
                 }
             }
@@ -581,6 +587,10 @@ struct ToolsView: View {
             }
         case "oficial":
             officialCard(d)
+        case "tareas":
+            // (antes, un bloque de General; ahora, su apartado en Sistema)
+            TaskLogsCard()
+                .preference(key: ToolsDescKey.self, value: ToolsView.tasksDesc)
         case "info":
             TileCard("Información") {
                 Tile("Comandos de nexum", "Todos los comandos para la terminal y qué hace cada uno") {
@@ -598,7 +608,7 @@ struct ToolsView: View {
         }
     }
 
-    /// General: el registro de errores, el de tareas, los parches nuevos y el programa, cada uno en su bloque con
+    /// General: el registro de errores, los parches nuevos y el programa, cada uno en su bloque con
     /// su título y su explicación a la vista
     func generalSection(_ d: AppData) -> some View {
         VStack(alignment: .leading, spacing: 30) {
@@ -610,9 +620,6 @@ struct ToolsView: View {
                     }
                     errorLogRow(d, path: ERROR_LOG, title: d.active.isEmpty ? "error_log de Apache" : "error_log de Apache (XAMPP-\(d.active))")
                 }
-            }
-            generalBlock("Registro de tareas", "Cada tarea que lanza la ventana (instalar, activar, arrancar, copiar una BBDD, limpiar…) guarda aquí su registro entero: la orden de nexum que se ha ejecutado, todo lo que ha dicho, lo mismo que en su ventana, y cómo acabó. Se guardan las \(TASKS_KEEP) últimas en ~/.nexum/tareas, solo para ti; las contraseñas y los tokens no se escriben.") {
-                TaskLogsCard()
             }
             generalBlock("Parches nuevos", "Los parches de seguridad de todo lo que usa Nexum: cada versión de PHP (PHP, Apache, MariaDB, ProFTPD, Perl y phpMyAdmin, frente a lo último de su rama), Docker Desktop (frente a la que ofrece su actualizador) y las imágenes de Docker (las MariaDB comunes, phpMyAdmin y PHP, frente a Docker Hub), los Node que ha descargado Nexum (frente a lo último de su rama), Mailpit, cloudflared y Nginx. Se busca al abrir la ventana el primer arranque del día y cada pocos arranques. Las versiones XAMPP-X.Y se rehacen (la de ahora sigue funcionando mientras se compila); las XAMPP-X.Y.Z llevan su parche en el nombre: la nueva se instala a su lado. Los contenedores de Docker se rehacen en unos segundos, con sus BBDD. Docker Desktop se instala a mano: antes, «Actualizar todo» copia todas las BBDD de Docker en ~/nexum-backups y abre su descarga.") {
                 componentsCard()
@@ -916,7 +923,7 @@ struct ToolsView: View {
     }
 }
 
-/// Configuración, General, Registro de tareas (como en Linux): las tareas que ha lanzado la ventana (las
+/// Sistema, Registro de tareas (como en Linux): las tareas que ha lanzado la ventana (las
 /// TASKS_KEEP últimas de TASKS_DIR), cada una con su fecha y cómo acabó; con «Ver», entera
 /// Configuración, Administrador de pruebas (nexum admin-pruebas): la cuenta con la que el botón Panel entra en
 /// WordPress y PrestaShop. Su correo (que es también el usuario) y su contraseña, con un ojo para verla, se leen
@@ -969,7 +976,7 @@ struct AdminTestCard: View {
                     .disableAutocorrection(true)
                     .onChange(of: password) { _ in error = "" }
                     Button(action: { show.toggle() }) {
-                        Image(systemName: show ? "eye.slash" : "eye")
+                        UIIcon(show ? "eye.slash" : "eye")
                     }
                     .buttonStyle(BorderlessButtonStyle())
                     .tip(show ? "Ocultar la contraseña" : "Mostrar la contraseña")
@@ -988,10 +995,10 @@ struct AdminTestCard: View {
             }
             TileCard("Cómo funciona", wide: true) {
                 Tile("Una cuenta de verdad no se toca", "Si una BBDD ya tiene un usuario de verdad con ese correo (sin la marca de Nexum), no se cambia ni su contraseña ni su rol: ahí no se crea el de pruebas y se avisa. Elige otro correo.",
-                     leading: { Image(systemName: "lock.shield").font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                     leading: { UIIcon("lock.shield", size: 15).foregroundColor(.secondary).frame(width: 22) },
                      trailing: { EmptyView() })
                 Tile("Fuera de las copias", "Al descargar una BBDD o exportar un proyecto se quita el de ahora, local@local.test y los que hayas puesto antes, solo si llevan la marca de Nexum.",
-                     leading: { Image(systemName: "tray.and.arrow.down").font(.system(size: 15)).foregroundColor(.secondary).frame(width: 22) },
+                     leading: { UIIcon("tray.and.arrow.down", size: 15).foregroundColor(.secondary).frame(width: 22) },
                      trailing: { EmptyView() })
             }
             .padding(.top, 10)
@@ -1125,7 +1132,7 @@ struct TaskLogsCard: View {
             : state == "error" ? ("xmark.octagon.fill", RED, "Ha fallado")
             : state == "cancel" ? ("stop.circle", Color.secondary, "Cancelada")
             : ("play.circle", Color.secondary, "En marcha")
-        return Image(systemName: m.0).font(.system(size: 16)).foregroundColor(m.1).frame(width: 22).tip(m.2)
+        return UIIcon(m.0, size: 16).foregroundColor(m.1).frame(width: 22).tip(m.2)
     }
 }
 
@@ -1147,13 +1154,13 @@ let CLEAN_ITEMS: [CleanItem] = [
               desc: "Las copias que guardó el programa cuando se lo pediste («Guardar antes una copia» al borrar, sustituir o actualizar una BBDD o una versión), las de las BBDD del XAMPP oficial al apartarlo y, si lo tienes encendido, las de los ficheros que cambia por su cuenta (hosts, vhosts…). Están en ~/nexum-backups. Sirven para volver atrás si algo salió mal. Tus proyectos y sus BBDD de ahora no las usan y siguen igual, pero lo que había antes ya no se podrá recuperar (las del XAMPP oficial que no hayas cargado siguen en el XAMPP apartado): por eso va sin marcar.",
               step: "se borra todo lo de ~/nexum-backups (la carpeta se queda): ya no se podrá volver atrás con ellas", on: false),
     CleanItem(key: "correo", title: "Correo de pruebas",
-              desc: "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Configuración, Correo de pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la versión activa).",
+              desc: "Los correos que han mandado tus webs locales (formularios, pedidos, contraseñas olvidadas…) y que Mailpit ha recogido para que no lleguen a nadie: los de su bandeja, en Ajustes, Correo de pruebas. Solo sirven para ver qué mandaron las webs. Si se limpia, la bandeja se queda vacía y Mailpit sigue recogiendo los nuevos; las webs no notan nada. Mailpit tiene que estar en marcha (va con la versión activa).",
               step: "se vacía la bandeja de Mailpit", on: false),
     CleanItem(key: "registros", title: "Registros del programa",
               desc: "Lo que el programa ha ido apuntando de sus tareas: las instalaciones y actualizaciones de las versiones (y lo que dejan las que fallan), el registro de tareas de la ventana, las listas de ficheros de Actualizar proyecto, los de los servidores de Node parados y el de la compilación de la ventana. Están en ~/.nexum. Solo sirven para ver qué pasó en una tarea anterior o buscar por qué falló. Sus ajustes no se tocan, ni lo que esté usando una tarea o un servidor en marcha: el programa y tus proyectos siguen igual.",
               step: "se borran los registros de ~/.nexum (no sus ajustes ni lo que esté usando una tarea o un servidor de Node en marcha)", on: true),
     CleanItem(key: "registros-versiones", title: "Registros de las versiones",
-              desc: "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, los errores de PHP y MariaDB. Están en xamppfiles/logs de cada /Library/Nexum/XAMPP-<versión> (el de MariaDB, con sus datos). Sirven para buscar por qué falla una web (Configuración, General, Registro de errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
+              desc: "Lo que apunta cada versión de PHP: Apache (las visitas y los errores, también los de cada web), PHP-FPM, los errores de PHP y MariaDB. Están en xamppfiles/logs de cada /Library/Nexum/XAMPP-<versión> (el de MariaDB, con sus datos). Sirven para buscar por qué falla una web (Sistema, General, Registro de errores). Se vacían, no se borran: Apache, PHP y MariaDB siguen escribiendo en ellos sin pararse. Solo se pierde lo que decían hasta ahora; las webs y sus BBDD no cambian.",
               step: "se vacían los registros de Apache, PHP-FPM, PHP y MariaDB de cada versión (siguen en marcha)", on: true),
     CleanItem(key: "caches-proyectos", title: "Cachés de los proyectos",
               desc: "Las páginas y plantillas que WordPress (wp-content/cache, la de sus plugins de caché) y PrestaShop (var/cache y las de Smarty) guardan ya preparadas para ir más deprisa, en cada proyecto de \(HTDOCS). Son solo una copia que se rehace sola: si se limpia, la primera visita a cada página va algo más lenta mientras se vuelve a crear. Nada más del proyecto se toca: ni sus ficheros, ni sus imágenes, ni su BBDD.",

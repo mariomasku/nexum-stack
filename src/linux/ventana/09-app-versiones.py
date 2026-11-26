@@ -150,7 +150,7 @@ class AppVersiones:
         search_row.pack_start(self.proj_rep_btn, False, False, 0)
         search_row.pack_start(self.proj_new_btn, False, False, 0)
         box.pack_start(search_row, False, False, 0)
-        self.new_proj_rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self.new_proj_rev = Gtk.Revealer(transition_type=Gtk.RevealerTransitionType.SLIDE_DOWN, transition_duration=REVEAL_MS)
         self.new_proj_rev.add(self.build_new_project())
         # Plegado, oculto del todo: si no, el hueco entre filas del recuadro deja más espacio
         # debajo del buscador que encima de la primera fila
@@ -780,7 +780,7 @@ class AppVersiones:
         if not w["url"].get_text():
             n = len(self.np_repos)
             w["repo_note"].set_label("%d repositorios de GitHub" % n if n else
-                                     "Sin la lista de GitHub (conéctalo en Configuración, GitHub): escribe la dirección abajo")
+                                     "Sin la lista de GitHub (conéctalo en Ajustes, GitHub): escribe la dirección abajo")
             # (si ya se estaba escribiendo cuando ha llegado)
             if w["repo"].get_text().strip():
                 self.new_project_search()

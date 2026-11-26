@@ -27,7 +27,7 @@ printf '# a mano\n' >> "$W/r/lvm-instalador.sh"
 check "un cambio a mano en el script construido: --comprobar falla" '! "$W/r/construir.sh" --comprobar > /dev/null 2>&1'
 "$W/r/construir.sh" > /dev/null
 check "construir.sh lo deja como el de src/" 'cmp -s "$W/r/lvm-instalador.sh" "$ROOT/lvm-instalador.sh"'
-printf '// cambio en src\n' >> "$W/r/src/mac/ventana/35-ventana-principal.swift"
+printf '// cambio en src\n' >> "$(ls "$W/r/src/mac/ventana/"[0-9]*.swift | tail -1)"
 "$W/r/construir.sh" > /dev/null
 check "un cambio en un fichero de src/mac/ventana/ llega al script del Mac (al final de su heredoc)" 'awk "/cat <<.LVM_SWIFT.\$/{f=1;next} /^LVM_SWIFT\$/{f=0} f" "$W/r/macos/lvm-instalador.sh" | tail -1 | grep -qx "// cambio en src"'
 : > "$W/r/src/linux/suelto.py"

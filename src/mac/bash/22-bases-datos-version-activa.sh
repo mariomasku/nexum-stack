@@ -253,7 +253,7 @@ if mode == "info":
     with z.open(sqls[0]) as m:
         first = m.readline(200)
     print("%s|%d|%d" % (clean(sqls[0].filename).replace("|", " "), sqls[0].file_size,
-                        1 if first.startswith(b"/*M!999999\\-") else 0))
+                        1 if re.match(rb"/\*M?!999999\\-", first.lstrip(b"\xef\xbb\xbf")) else 0))
     sys.exit(0)
 try:
     with z.open(sqls[0]) as m:
@@ -1008,7 +1008,7 @@ function export_database() {
         # sandbox de cada volcado: solo la del primero, que la carga sabe quitar)
         for i in "${!only[@]}"; do
             "${dump[@]}" --default-character-set=utf8mb4 --single-transaction --quick --triggers \
-                --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" | LC_ALL=C sed '/^\/\*M!999999\\-/d' || exit 1
+                --max-allowed-packet=1G --where="${wheres[$i]}" "$db" "${only[$i]}" | LC_ALL=C sed -E '/^\/\*M?!999999\\-/d' || exit 1
         done
         [ -z "$mail_sql" ] || printf '%s\n' "$mail_sql"; } < /dev/null 2> "$errors" | "${out[@]}" > "$part" ) &
     pid=$!
@@ -1036,7 +1036,8 @@ function export_database() {
 # DROP TABLE y sus INSERT se suman a lo que haya). Si tiene tablas y se pide --copia, antes se guarda
 # una copia suya en ~/nexum-backups (sin --copia, no se guarda y se dice). --sin-copia y --vaciar se
 # admiten, pero ya no hacen falta.
-# Las copias hechas con mariadb-dump moderno empiezan por "/*M!999999\- enable the sandbox mode */",
+# Las copias hechas con mariadb-dump moderno empiezan por "/*M!999999\- enable the sandbox mode */"
+# (o "/*!999999\- ...", sin la M, la de 10.5.25, 10.6.18, 10.11.8 y 11.x de esa tanda),
 # que los clientes de MariaDB anteriores a 10.5.25 no entienden: esa primera linea se quita al
 # vuelo, sin tocar el fichero.
 # Avance: el fichero se abre como descriptor 3 del script y los programas que lo leen comparten su
@@ -1098,7 +1099,8 @@ function import_database() {
             IFS='|' read -r inner inner_size sandbox <<< "$info"
             ;;
     esac
-    [[ "$first" == '/*M!999999\-'* ]] && sandbox=1
+    first=${first#$'\xef\xbb\xbf'}
+    [[ "$first" == '/*M!999999\-'* || "$first" == '/*!999999\-'* ]] && sandbox=1
 
     # (copiar-bd a una version que no es la activa: DB_CLIENT ya va a su MariaDB temporal)
     if [ -n "$DB_TARGET_FOLDER" ]; then
@@ -1123,7 +1125,7 @@ function import_database() {
     echo "Fichero: $file ($(human_size "$size"))"
     [ $kind == zip ] && echo "Dentro del zip: $inner ($(human_size "$inner_size"), se descomprime al vuelo)"
     echo "Destino: base $db en XAMPP-$DB_FOLDER (MariaDB $DB_VERSION)"
-    [ $sandbox -eq 1 ] && echo "Se quita la primera linea (/*M!999999\- enable the sandbox mode */), que los MariaDB antiguos no entienden"
+    [ $sandbox -eq 1 ] && echo "Se quita la linea del modo sandbox (/*M!999999\- o /*!999999\- enable the sandbox mode */), que los MariaDB antiguos no entienden"
     # (antes de crear o vaciar la base: si no se puede cargar, no se toca nada)
     if ! db_exists "$db"; then
         if [ $create -eq 0 ]; then
@@ -1193,12 +1195,11 @@ function import_database() {
     # Los SET GLOBAL (algunos volcados empiezan con /*!40030 SET GLOBAL max_allowed_packet=... */) pasan
     # a DO 0: cambiarian el MariaDB para todas las webs (bajarian el paquete de 1 GB de arriba)
     local globals='s/^([[:space:]]*(\/\*!M?[0-9]*[[:space:]]*)?)[Ss][Ee][Tt][[:space:]]+([Gg][Ll][Oo][Bb][Aa][Ll][[:space:]]|@@[Gg][Ll][Oo][Bb][Aa][Ll]\.)[^;*]*/\1DO 0 /'
-    local source=(cat) filter=(env LC_ALL=C sed -E -e "$globals" -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
+    local source=(cat) filter=(env LC_ALL=C sed -E -e '/^\/\*M?!999999\\-/d' -e "$globals" -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     case $kind in
         gz) source=(gzip -dc) ;;
         zip) source=(python3 -I -c "$ZIP_SQL_PY" extraer -) ;;
     esac
-    [ $sandbox -eq 1 ] && filter=(env LC_ALL=C sed -E -e '/^\/\*M!999999\\-/d' -e "$globals" -e 's/DEFINER=`[^`]*`@`[^`]*`//g')
     local start=$(date +%s)
 
     exec 3< "$file"

@@ -116,6 +116,45 @@ def branch_name_ok(name):
     return all(part and not part.startswith(".") and not part.endswith(".lock") for part in name.split("/"))
 
 
+# Lo último que leyó la ventana de cada una de estas órdenes, guardado para pintarla al momento la próxima vez que se
+# abra (la lectura de verdad tarda segundo y medio y lo sustituye al llegar). Se escribe en el hilo de la orden, solo
+# si ha cambiado: a la ventana no le cuesta nada. No en la simulación ni en la demostración (no son tus datos)
+DATA_CACHE_DIR = os.path.join(LOG_DIR, "cache", "ventana")
+DATA_CACHED = ("gui-datos", "gui-hosts", "gui-servicios", "gui-proyectos", "gui-docker")
+
+
+def data_cache_read(cmd):
+    """Lo guardado de una orden de DATA_CACHED, o None."""
+    if SIMULATE or DEMO or cmd not in DATA_CACHED:
+        return None
+    try:
+        with open(os.path.join(DATA_CACHE_DIR, cmd), encoding="utf-8", errors="replace") as fh:
+            return fh.read(4 * 1024 * 1024) or None
+    except OSError:
+        return None
+
+
+def data_cache_write(cmd, out):
+    """Guarda la salida de una orden de DATA_CACHED (solo para ti, y solo si ha cambiado)."""
+    if SIMULATE or DEMO or cmd not in DATA_CACHED or not out:
+        return
+    path = os.path.join(DATA_CACHE_DIR, cmd)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            if fh.read(4 * 1024 * 1024 + 1) == out:
+                return
+    except OSError:
+        pass
+    try:
+        os.makedirs(DATA_CACHE_DIR, mode=0o700, exist_ok=True)
+        fd = os.open(path + ".nuevo", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(out)
+        os.replace(path + ".nuevo", path)
+    except OSError:
+        pass
+
+
 def run_quick(args, callback, env=None, timeout=180):
     """Comando sin sudo ni preguntas, en segundo plano. callback(rc, salida) en la interfaz."""
     def work():
@@ -124,6 +163,8 @@ def run_quick(args, callback, env=None, timeout=180):
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                  env=script_env(**(env or {})), timeout=timeout)
             out = res.stdout.decode("utf-8", "replace")
+            if res.returncode == 0 and len(args) == 1 and not env:
+                data_cache_write(args[0], out)
             once(callback, res.returncode, out)
         except Exception as exc:  # noqa: BLE001 - cualquier fallo se muestra como error
             once(callback, 1, "ERROR|%s" % exc)
@@ -144,14 +185,33 @@ def run_quick_input(args, text, callback, timeout=60):
 
 
 # Botones del visor de un proyecto (el cargado y los de Docker) que se pueden ocultar y ordenar:
-# clave, nombre e icono. «Desmontar», ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar)
-# se ven siempre
+# clave, nombre e icono. ⋮ (el último) y los propios de Docker (Versiones de PHP, Arrancar o Parar) se ven siempre.
+# Unlink, solo en el proyecto cargado; Correo y Terminal, solo en el visor de arriba. Los iconos de Actualizar, Log y
+# Unlink, los elegidos en Apariencia (visor_spec)
 VISOR_BUTTONS = [("web", "Abrir web", ("logo", "globo")), ("vscode", "VS Code", ("vscode", "text-editor-symbolic")),
                  ("repo", "Repositorio", ("logo", "github")),
                  ("pma", "phpMyAdmin", ("logo", "phpmyadmin")), ("panel", "Panel", ("logo", "wordpress")),
                  ("docker", "Docker", ("logo", "docker")), ("compartir", "Compartir", ("logo", "cloudflare")),
                  ("log", "Log", ("logo", "log")), ("actualizar", "Actualizar", ("logo", "actualizar")),
-                 ("imagenes", "Imágenes de producción", ("logo", "imagenes"))]
+                 ("imagenes", "Imágenes de producción", ("logo", "imagenes")),
+                 ("unlink", "Unlink", ("icono", "nexum-unlink-1-symbolic")),
+                 ("correo", "Correo", ("logo", "mailpit")), ("terminal", "Terminal", ("icono", "utilities-terminal-symbolic"))]
+# Apariencia: dos iconos a elegir (de Reicon) para Actualizar, Log y Unlink
+VISOR_ICON_CHOICES = {"actualizar": ("nexum-actualizar-1-symbolic", "nexum-actualizar-2-symbolic"),
+                      "log": ("nexum-log-1-symbolic", "nexum-log-2-symbolic"),
+                      "unlink": ("nexum-unlink-1-symbolic", "nexum-unlink-2-symbolic")}
+
+
+def visor_icon(key):
+    """El icono elegido en Apariencia para Actualizar, Log o Unlink."""
+    return VISOR_ICON_CHOICES[key][look_conf()["iconos"].get(key, 1) - 1]
+
+
+def visor_spec(key):
+    """El icono de un botón del visor (VISOR_BUTTONS), con el elegido en Apariencia para los que se pueden cambiar."""
+    if key in VISOR_ICON_CHOICES:
+        return ("icono", visor_icon(key))
+    return next(i for k, _n, i in VISOR_BUTTONS if k == key)
 # Configuración, Seguridad entre webs: qué es, en cinco puntos (el mismo texto en el Mac)
 CROSS_SITE_HELP = [
     ("dialog-warning-symbolic", "El problema",
@@ -175,14 +235,17 @@ CROSS_SITE_HELP = [
      "el Apache de Docker. Al cambiarla se recargan, si están en marcha."),
 ]
 
-BUTTON_STYLES = [("nombre", "Con su nombre"), ("icono", "Solo el icono (cuadrado)"),
-                 ("grande", "Icono y nombre (cuadrado)")]
+BUTTON_STYLES = [("nombre", "Icono y nombre en horizontal (solo en el visor clásico)"),
+                 ("icono", "Solo el icono (cuadrado)"), ("grande", "Icono y nombre (cuadrado)")]
 # Lado del cuadrado (px) de los estilos icono y grande: el de cada uno si no se ha elegido otro
 BUTTON_SIZES = {"icono": 44, "grande": 88}
 BUTTON_SIZE_MIN, BUTTON_SIZE_MAX = 32, 128
 # (con el nombre debajo hace falta algo más de sitio)
 BUTTON_SIZE_NAMED = 72
 BUTTONS_FILE = os.path.join(LOG_DIR, "botones-visor")
+# Visor arriba (Apariencia): sus botones, cuadrados y con el nombre debajo, siempre de este lado (px) y con el
+# icono de este tamaño, para que no crezcan con el tamaño elegido para el visor de Proyectos
+TOP_VISOR_SIDE, TOP_VISOR_ICON = 56, 20
 # Al abrir la ventana se busca una versión nueva el primer arranque de cada día y, después, cada tantos
 UPDATE_EVERY = 4
 # Versión nueva del programa: otra búsqueda al volver a la ventana si hace más de esto (s) de la última, y
@@ -206,9 +269,12 @@ def buttons_conf():
     if not isinstance(conf, dict):
         conf = {}
     order = [k for k in conf.get("order", []) if k in keys] if isinstance(conf.get("order"), list) else []
-    # (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS)
+    # (los que no estaban en lo guardado, como un botón nuevo: detrás del que les precede en VISOR_BUTTONS; Unlink,
+    # Correo y Terminal, que antes no se elegían e iban al final, al final)
     for i, k in enumerate(keys):
-        if k not in order:
+        if k not in order and k in ("unlink", "correo", "terminal"):
+            order.append(k)
+        elif k not in order:
             before = [b for b in keys[:i] if b in order]
             order.insert(order.index(before[-1]) + 1 if before else 0, k)
     hidden = {k for k in conf.get("hidden", []) if k in keys} if isinstance(conf.get("hidden"), list) else set()
@@ -279,6 +345,51 @@ def repo_button(folder, opener, cls="nv-proyecto-btn"):
     return b
 
 
+# Nombres que no caben debajo del icono en los botones cuadrados: su forma corta
+SQUARE_SHORT_NAMES = {"phpMyAdmin": "PMA", "Imágenes de producción": "Imágenes"}
+
+
+def square_name(name, avail, max_chars, *classes):
+    """El nombre de un botón cuadrado (debajo de su icono): entero si cabe (en avail píxeles con esa letra y en las
+    max_chars letras de su etiqueta, que corta lo que pasa) y, si no, su forma corta (SQUARE_SHORT_NAMES), si tiene."""
+    if name in SQUARE_SHORT_NAMES and (len(name) > max_chars
+                                       or label(name, *classes).get_preferred_width()[1] > avail):
+        return SQUARE_SHORT_NAMES[name]
+    return name
+
+
+# Iconos en color (Apariencia): los de los botones de acción, del color de lo que hacen; los demás que no tienen color
+# propio, uno de los del logotipo de Nexum, al azar (el mismo icono, el mismo color mientras la ventana está abierta)
+ICON_TINTS = {}
+for _tint, _names in (
+        ("verde", ("media-playback-start", "system-run", "emblem-ok", "object-select", "list-add", "folder-new")),
+        ("rojo", ("media-playback-stop", "process-stop", "user-trash", "user-trash-full", "window-close", "dialog-error",
+                  "list-remove", "nexum-unlink-1", "nexum-unlink-2", "media-eject")),
+        ("azul", ("view-refresh", "software-update-available", "system-software-install", "document-send", "go-up",
+                  "go-down", "nexum-actualizar-1", "nexum-actualizar-2", "document-save", "folder-download")),
+        ("naranja", ("document-edit", "text-editor", "edit-clear-all", "edit-undo")),
+        ("amarillo", ("dialog-password", "starred", "dialog-warning", "channel-insecure")),
+        ("morado", ("insert-link", "web-browser", "network-workgroup", "network-wired", "network-server",
+                    "network-transmit-receive", "folder-remote")),
+        ("turquesa", ("utilities-terminal", "edit-copy", "nexum-log-1", "nexum-log-2", "text-x-generic",
+                      "document-open-recent", "drive-multidisk", "drive-harddisk"))):
+    for _n in _names:
+        ICON_TINTS[_n + "-symbolic"] = _tint
+_nexum_tints = {}
+
+
+def tint_icon(img, name):
+    """Con los iconos en color (Apariencia), el icono de un botón en el color de su función o, si no tiene, en uno
+    de los colores del logotipo de Nexum."""
+    if not isinstance(name, str) or not look_conf()["color"]:
+        return img
+    t = ICON_TINTS.get(name)
+    if t is None:
+        import random
+        t = _nexum_tints.setdefault(name, "nexum-%d" % random.randrange(5))
+    return css(img, "nv-tinta-" + t)
+
+
 def button_icon(spec, size):
     if spec[0] == "logo":
         return logo(spec[1], size)
@@ -288,7 +399,7 @@ def button_icon(spec, size):
             img = Gtk.Image.new_from_gicon(code.get_icon(), Gtk.IconSize.BUTTON)
             img.set_pixel_size(size)
             return img
-    return icon(spec[1], size)
+    return tint_icon(icon(spec[1], size), spec[1])
 
 
 # Consumo de Nexum y sus servicios (el visor de arriba): los procesos de cada parte, leídos de /proc

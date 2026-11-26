@@ -36,7 +36,7 @@ PY
     check "Mac: Bases de datos y Node con su icono" 'grep -qF "(\"bbdd\", \"Bases de datos\", \"logo:bbdd\")" "$SRC" && grep -qF "(\"node\", \"Node\", \"logo:node\")" "$SRC"'
     check "Mac: se guarda al cambiar y, si se oculta el apartado abierto, a Proyectos" 'grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "saveLook(look)" && grep -A5 "@Published var look = loadLook() {" "$SRC" | grep -qF "if look.ocultos.contains(tab) { openTab(\"proyectos\") }"'
     check "Mac: en la simulacion no se guarda" 'sed -n "/^func saveLook/,/^}/p" "$SRC" | grep -qF "if SIMULATE { return }"'
-    check "Mac: Proyectos y Configuracion, siempre" 'grep -qF "let NAV_FIXED: Set<String> = [\"proyectos\", \"config\"]" "$SRC" && grep -qF "group.1.filter { NAV_FIXED.contains(\$0.0) || (!model.look.ocultos.contains(\$0.0) && (\$0.0 != \"nginx\" || model.nginxUsed)) }" "$SRC"'
+    check "Mac: Proyectos, Ajustes y Sistema, siempre" 'grep -qF "let NAV_FIXED: Set<String> = [\"proyectos\", \"ajustes\", \"sistema\"]" "$SRC" && grep -qF "group.1.filter { NAV_FIXED.contains(\$0.0) || (!model.look.ocultos.contains(\$0.0) && (\$0.0 != \"nginx\" || model.nginxUsed)) }" "$SRC"'
     check "Mac: Docker y Node con su logotipo, PHP en color" 'grep -qF "if look.marcas && (key == \"docker\" || key == \"node\") {" "$SRC" && grep -qF "if look.marcas && look.color && key == \"versiones\" {" "$SRC"'
     check "Mac: apartado Apariencia" 'grep -qF "(\"apariencia\", \"Apariencia\", \"paintpalette\")" "$SRC" && grep -qF "case \"apariencia\":" "$SRC" && grep -q "^struct AppearanceCard: View {" "$SRC"'
     check "Mac: las imagenes se leen una vez" 'grep -A2 "^func brandImage" "$SRC" | grep -qF "if let i = brandImages[key] { return i }"'
@@ -52,12 +52,12 @@ code = t[start:t.index("\nclass MonoLogo(Gtk.DrawingArea):", start)]
 g = {"os": os, "json": json, "LOG_DIR": w, "SIMULATE": False}
 exec(code, g)
 c = g["look_conf"]()
-print("%d|sin fichero: de un color, sin logotipos y todo a la vista" % (c == {"color": False, "marcas": False, "ocultos": set(), "zoom": 100, "cristal": False}))
+print("%d|sin fichero: de un color, sin logotipos y todo a la vista" % (c == {"color": False, "marcas": False, "ocultos": set(), "zoom": 100, "cristal": False, "visor": "arriba", "iconos": {}}))
 open(g["LOOK_FILE"], "w").write("no es json")
 print("%d|un fichero roto no rompe nada" % (g["look_conf"]()["ocultos"] == set()))
 json.dump({"color": True, "marcas": "si", "ocultos": ["node", "proyectos", "config", "inventado", 3]}, open(g["LOOK_FILE"], "w"))
 c = g["look_conf"]()
-print("%d|solo lo que vale: Proyectos, Configuracion y lo desconocido no se ocultan" % (c == {"color": True, "marcas": False, "ocultos": {"node"}, "zoom": 100, "cristal": False}))
+print("%d|solo lo que vale: Proyectos, Ajustes, Sistema y lo desconocido no se ocultan" % (c == {"color": True, "marcas": False, "ocultos": {"node"}, "zoom": 100, "cristal": False, "visor": "arriba", "iconos": {}}))
 c["marcas"] = True; c["ocultos"] = {"docker", "repos"}
 g["look_save"](c)
 print("%d|se guarda y se vuelve a leer igual" % (g["look_conf"]() == c and not os.path.exists(g["LOOK_FILE"] + ".nuevo")))

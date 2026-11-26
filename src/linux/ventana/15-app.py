@@ -111,7 +111,7 @@ class App(AppPrograma,
         header.pack_end(mb)
         self.win.set_titlebar(header)
 
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
         self.page_versions, self.ver_box = page()
         # Instalar va dentro de Versiones, debajo de las instaladas
         self.inst_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)

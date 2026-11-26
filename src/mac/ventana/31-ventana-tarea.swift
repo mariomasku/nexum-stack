@@ -9,8 +9,7 @@ struct TaskView: View {
         VStack(alignment: .leading, spacing: 12) {
             // «Terminado» en gris no se ve de un vistazo: check azul grande y el título en azul
             if task.succeeded {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60))
+                UIIcon("checkmark.circle.fill", size: 60)
                     .foregroundColor(ACCENT)
                     .frame(maxWidth: .infinity)
             }
@@ -53,8 +52,7 @@ struct TaskView: View {
             // El registro, como una terminal (sin DisclosureGroup: su botón tomaría el estilo de la ventana)
             Button(action: { task.showLog.toggle() }) {
                 HStack(spacing: 6) {
-                    Image(systemName: task.showLog ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .semibold)).frame(width: 12)
+                    UIIcon(task.showLog ? "chevron.down" : "chevron.right", size: 11, weight: .semibold).frame(width: 12)
                     Text("Ver registro")
                 }
                 .contentShape(Rectangle())
@@ -87,7 +85,8 @@ struct TaskView: View {
             .padding(.top, 4)
         }
         .padding(24)
-        .frame(width: 620)
+        .frame(width: dialogWidth(620))
+        .fitDialog()
         .interactiveDismissDisabled(true)
         .sheet(isPresented: $task.showReport) { ReportView(task: task).buttonStyle(PointerButtonStyle()) }
     }
@@ -95,9 +94,9 @@ struct TaskView: View {
     @ViewBuilder
     func partState(_ i: Int) -> some View {
         if task.finished && task.failedPart == i && task.head != task.doneText {
-            Image(systemName: "xmark.circle.fill").foregroundColor(.red)
+            UIIcon("xmark.circle.fill").foregroundColor(.red)
         } else if i < task.cur {
-            Image(systemName: "checkmark.circle.fill").foregroundColor(ACCENT)
+            UIIcon("checkmark.circle.fill").foregroundColor(ACCENT)
         } else if i == task.cur && !task.finished {
             ProgressView().scaleEffect(0.5).frame(width: 16, height: 16)
         } else {
@@ -148,29 +147,53 @@ struct TaskConsole: View {
     var toEnd = true
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(log)
-                        .font(.system(size: 11.5, design: .monospaced))
-                        .foregroundColor(CONSOLE_TEXT)
-                        .lineSpacing(3)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Color.clear.frame(height: 1).id("fin")
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-            }
+        // (en un NSTextView: las listas de ficheros que deja la tarea, como las de Actualizar proyecto, se pueden
+        // pulsar para abrirlas)
+        ConsoleTextView(log: log, toEnd: toEnd)
             .frame(height: height)
             .background(CONSOLE_BG)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.25), lineWidth: 1))
             // (la barra de desplazamiento, la de un fondo oscuro)
             .environment(\.colorScheme, .dark)
-            .onAppear { if toEnd { proxy.scrollTo("fin", anchor: .bottom) } }
-            .onChange(of: log) { _ in if toEnd { proxy.scrollTo("fin", anchor: .bottom) } }
+    }
+}
+
+/// La consola de una tarea: el registro en monoespaciada clara sobre el fondo oscuro, seleccionable, con las rutas
+/// de las listas como enlaces; abajo del todo cada vez que cambia (toEnd)
+struct ConsoleTextView: NSViewRepresentable {
+    let log: String
+    let toEnd: Bool
+
+    final class Coordinator {
+        var shown: String? = nil
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.appearance = NSAppearance(named: .darkAqua)
+        if let tv = scroll.documentView as? NSTextView {
+            tv.isEditable = false
+            tv.drawsBackground = false
+            tv.textContainerInset = NSSize(width: 10, height: 10)
+            setupListLinks(tv)
+        }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard context.coordinator.shown != log, let tv = scroll.documentView as? NSTextView else { return }
+        context.coordinator.shown = log
+        tv.textStorage?.setAttributedString(listsAttributed(log, font: NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular),
+                                                            color: NSColor(CONSOLE_TEXT), lineSpacing: 3))
+        if toEnd {
+            tv.scrollToEndOfDocument(nil)
+        } else {
+            tv.scrollToBeginningOfDocument(nil)
         }
     }
 }
@@ -189,7 +212,7 @@ struct ReportView: View {
                  + "Los logs completos están en \(folder).")
                 .foregroundColor(.secondary).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity)
-            TaskConsole(log: text, height: 420, toEnd: false)
+            TaskConsole(log: text, height: dialogHeight(420, extra: 200), toEnd: false)
             HStack(spacing: 10) {
                 Spacer()
                 Button(copied ? "Copiado" : "Copiar todo") {
@@ -208,6 +231,7 @@ struct ReportView: View {
             }
         }
         .padding(20)
-        .frame(width: 760)
+        .frame(width: dialogWidth(760))
+        .fitDialog()
     }
 }

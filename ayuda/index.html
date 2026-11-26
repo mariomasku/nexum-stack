@@ -40,20 +40,23 @@
     <li><a href="#nginx">Nginx</a></li>
     <li class="grupo">Sistema</li>
     <li><a href="#dominios">Dominios y hosts</a></li>
-    <li class="con-sub"><a href="#configuracion">Configuración</a>
+    <li class="con-sub"><a href="#configuracion">Ajustes y Sistema</a>
       <ul class="sub">
-        <li><a href="#general">General</a></li>
         <li><a href="#vhosts">Vhosts y hosts</a></li>
         <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
         <li><a href="#correo">Correo de pruebas</a></li>
+        <li><a href="#admin-pruebas-config">Administrador de pruebas</a></li>
         <li><a href="#docker-config">Docker</a></li>
         <li><a href="#nginx-config">Nginx</a></li>
         <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
         <li><a href="#github-config">GitHub</a></li>
+        <li><a href="#carpetas">Carpetas</a></li>
+        <li><a href="#general">General</a></li>
+        <li><a href="#tareas">Registro de tareas</a></li>
         <li><a href="#apariencia">Apariencia</a></li>
         <li><a href="#limpieza">Limpieza</a></li>
-        <li><a href="#carpetas">Carpetas</a></li>
         <li data-so="linux"><a href="#xampp-registrar">XAMPP sin registrar</a></li>
+        <li data-so="mac"><a href="#configuracion-xampp-oficial">XAMPP oficial</a></li>
         <li><a href="#informacion">Información</a></li>
       </ul>
     </li>
@@ -292,8 +295,10 @@
 <section class="capitulo" id="ventana">
   <div class="antetitulo">Empezar</div>
   <h2>La ventana de un vistazo</h2>
-  <p class="entrada">Arriba, siempre a la vista, lo que está funcionando ahora; a la izquierda, las páginas del programa; en el centro,
-    la página elegida; y abajo, cuando la pides, una terminal.</p>
+  <p class="entrada">Arriba, siempre a la vista, el proyecto cargado y sus botones; abajo, en la barra de estado, la versión de PHP que
+    está funcionando; a la izquierda, las páginas del programa; en el centro, la página elegida; y abajo, cuando la pides, una terminal.
+    Así es con el visor «Arriba», el de serie; con el «Clásico» (el de las capturas), lo de la versión va arriba y los botones, en
+    Proyectos. Ver <a href="#ventana-visor">Dónde va el visor</a>.</p>
 
   <figure class="pantalla">
     <div class="barra">
@@ -331,10 +336,10 @@
         en blanco<span data-so="mac">, y <kbd>⌘</kbd>+<kbd>K</kbd> borra lo de arriba y deja la línea en la que escribes</span>.</span></li>
       <li data-x="3.5" data-y="11"><b>Entorno</b><span>Lo de tu trabajo diario: <a href="#proyectos">Proyectos</a>,
         <a href="#repositorios">Repositorios</a>, <a href="#versiones">Versiones de PHP</a>, <a href="#bbdd">Bases de datos</a>,
-        <a href="#docker">Docker</a>, <a href="#node">Node</a> y <a href="#nginx">Nginx</a>. En Configuración → Apariencia puedes ocultar las que no uses y, con
+        <a href="#docker">Docker</a>, <a href="#node">Node</a> y <a href="#nginx">Nginx</a>. En Sistema → Apariencia puedes ocultar las que no uses y, con
         «Logotipos de Docker, Node y PHP», Docker y Node llevan su icono y, al lado, su logotipo de letras en lugar del nombre.</span></li>
       <li data-x="3.5" data-y="48"><b>Sistema</b><span>Lo que se toca de vez en cuando: <a href="#dominios">Dominios y hosts</a> y
-        <a href="#configuracion">Configuración</a>.</span></li>
+        <a href="#ajustes">Ajustes</a> y <a href="#sistema">Sistema</a>, que se ven siempre.</span></li>
       <li data-x="58" data-y="70"><b>La página</b><span>Lo de la página elegida. Muchas cosas enseñan más al pasar el ratón por encima (en un recuadro justo debajo de la
         flecha), y casi
         todo lo que cambia algo te dice antes qué va a hacer, con los pasos numerados.</span></li>
@@ -347,8 +352,8 @@
     borra). Los cortos, de menos de 8 opciones, se abren como una lista. Todos se abren justo debajo (o encima, si debajo no hay sitio) y
     con el alto que cabe en la ventana: no se cortan ni aparecen lejos del botón.</div>
 
-  <div class="nota"><b>Dos botones que solo salen a veces</b>Junto al recuadro de la versión activa pueden aparecer dos botones
-    más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo amarillo con un número), cuando hay algo que conviene
+  <div class="nota"><b>Dos botones que solo salen a veces</b>Arriba, a la izquierda del proyecto cargado (con el visor «Clásico»,
+    junto al recuadro de la versión activa), pueden aparecer dos botones más, que en la captura no están porque no hacen falta: el de <b>Avisos</b> (un triángulo amarillo con un número), cuando hay algo que conviene
     hacer, y el de la <b>tarea en segundo plano</b> (una flecha verde que late), cuando una tarea sigue trabajando sin su ventana.</div>
 
   <div class="nota"><b>La ventana y la orden nexum</b>Todo lo que cambia algo en esta ventana lo hace la orden
@@ -357,8 +362,37 @@
     un <b>enlace simbólico</b> (un acceso directo a otra carpeta) que apunta a la carpeta de esa versión,
     <code data-so="linux">/opt/lampp-8.4</code><code data-so="mac">/Library/Nexum/XAMPP-8.4.27</code>.</div>
 
+  <h3 id="ventana-visor">Dónde va el visor: «Arriba» o «Clásico»</h3>
+  <p>El <b>visor</b> es el proyecto cargado con sus botones. Dónde va lo eliges en <a href="#apariencia">Sistema → Apariencia</a>, en el
+    bloque «Visor de los proyectos», fila «Dónde»:</p>
+  <ul>
+    <li><b>«Arriba»</b> (el de serie): en la barra de arriba de la ventana, a mano desde cualquier pestaña.
+      <ul>
+        <li><b>En el centro, el proyecto cargado</b>, sin recuadro: el logotipo de su tipo (WordPress, PrestaShop, Laravel, Symfony,
+          Drupal, Joomla, Magento, Astro, Next.js, Nuxt, Angular, Svelte, Vue, React o Node, que se reconoce por sus ficheros:
+          <code>composer.json</code>, <code>package.json</code>, <code>artisan</code>…) y su nombre, entero y sin el prefijo de su tipo
+          (<code>dob-wordpress-</code> o <code>dob-prestashop-</code>: el logotipo ya lo dice). Al pulsarlo te lleva a
+          <a href="#proyectos">Proyectos</a>. Sin proyecto cargado pone «Sin proyecto».</li>
+        <li><b>A su derecha, sus botones</b> (los de <a href="#botones-proyecto">los botones del proyecto cargado</a>), cuadrados y
+          pequeños, con su nombre debajo, o solo el icono si en <a href="#personalizar-botones">Personalizar los botones</a> eliges
+          «Solo el icono». Con ellos, <b>Unlink</b>, <b>Correo</b> y <b>Terminal</b>, con el mismo estilo cuadrado: cuáles se ven y en
+          qué orden se elige en Personalizar los botones. Y <b>⋮</b>, siempre el último. Si no caben, se desplazan con la rueda del
+          ratón.</li>
+        <li><b>El menú ☰</b>, a la derecha del todo de la barra<span data-so="linux">, junto a minimizar, maximizar y cerrar</span>.</li>
+        <li><b>La versión de PHP activa, Apache y MariaDB</b> con su punto (al pulsarlos, <a href="#ventana-servicios">sus servicios</a>),
+          el <b>▶ / ■</b> y el consumo (CPU y RAM) van en la <a href="#ventana-barra-estado">barra de estado</a> de abajo, a la derecha,
+          sin recuadro. Al pulsar la versión de PHP se despliegan hacia arriba, en abanico, las versiones instaladas: la activa va
+          marcada y, al elegir otra, se cambia a ella (te pide confirmarlo, como en <a href="#versiones">Versiones de PHP</a>). Con el
+          visor «Clásico», lo mismo al pulsar la versión en el recuadro de arriba (se despliegan hacia abajo).</li>
+      </ul></li>
+    <li><b>«Clásico»</b>: el de las capturas. Arriba, en el centro, el recuadro de la versión activa (con Apache, MariaDB, ▶ / ■ y el
+      consumo) y el menú ☰; Correo y Terminal, arriba a la derecha; y los botones del proyecto cargado, en la parte de arriba de
+      <a href="#visor">Proyectos</a>.</li>
+  </ul>
+  <p>Se guarda al momento en <code>~/.nexum/apariencia</code>: <code>"visor": "arriba"</code> o <code>"visor": "clasico"</code>.</p>
+
   <h3 id="ventana-encender">Arrancar y parar con ▶ / ■</h3>
-  <p>El botón redondo del recuadro de arriba es la forma más rápida de encender o apagar tu entorno.</p>
+  <p>El botón redondo que va junto a Apache y MariaDB (en la barra de estado o, con el visor «Clásico», en el recuadro de arriba) es la forma más rápida de encender o apagar tu entorno.</p>
   <ul>
     <li><b>▶ con una versión activa y parada</b> la arranca: Apache y MariaDB se ponen en marcha y tus proyectos vuelven a abrirse en el
       navegador. Sale una ventana de tarea que se cierra sola y un aviso que dice cuál es: «Versión activa arrancada: <span data-so="linux">lampp-8.4</span><span data-so="mac">XAMPP-8.4</span> (PHP 8.4.14)».</li>
@@ -427,10 +461,10 @@
   </details>
 
   <h3 id="ventana-servicios">Los servicios de la versión activa</h3>
-  <p>Pulsa «Apache · MariaDB» en el recuadro de arriba. Se despliega un panel con los servicios de la versión activa. Un
+  <p>Pulsa «Apache · MariaDB» en la barra de estado (con el visor «Clásico», en el recuadro de arriba). Se despliega un panel con los servicios de la versión activa. Un
     <b>servicio</b> es un programa que se queda funcionando en segundo plano esperando peticiones. Cada uno escucha en un
     <b>puerto</b>: un número que dice a qué programa del equipo va cada conexión (el 80 es el de las webs, el 3306 el de MariaDB). Si no
-    hay ninguna versión activa, te dice «Ninguna versión activa»: arranca una con <b>▶</b>, en el mismo recuadro, o actívala en
+    hay ninguna versión activa, te dice «Ninguna versión activa»: arranca una con <b>▶</b>, junto a ellos, o actívala en
     <a href="#versiones">Versiones de PHP</a>.</p>
   <ul>
     <li><b>Arriba</b>, «Servicios de <span data-so="linux">lampp-8.4</span><span data-so="mac">XAMPP-8.4.27</span>» y cuántos están en
@@ -492,7 +526,8 @@
   </details>
 
   <h3 id="ventana-avisos">Los avisos</h3>
-  <p>Cuando hay algo que conviene hacer, junto al recuadro de la versión activa sale un botón con un triángulo y el número de
+  <p>Cuando hay algo que conviene hacer, arriba, a la izquierda del proyecto cargado (con el visor «Clásico», junto al recuadro de la
+    versión activa), sale un botón con un triángulo y el número de
     avisos. Púlsalo para ver la lista. Si no hay ninguno, el botón no está. Cada aviso explica qué pasa y tiene su botón:</p>
   <ul>
     <li><b>«Hay parches nuevos»</b> (siempre el primero): la lista de lo que tiene un parche de seguridad publicado (versiones de PHP y sus
@@ -500,7 +535,7 @@
       (de PHP 8.4.26 a 8.4.27, por ejemplo). <b>«Actualizar todo»</b> te enseña los pasos (con la casilla «Guardar antes una
       copia en ~/nexum-backups», como en <a href="#parches">Parches nuevos</a>) y, si aceptas, lo actualiza todo en una tarea; lo de ahora
       sigue funcionando mientras tanto. <b>«Ahora no»</b> lo quita hasta que salga otro parche distinto; los sigues
-      teniendo en Configuración → General, <a href="#parches">Parches nuevos</a>. Se busca al abrir la ventana, el primer arranque de cada día y cada
+      teniendo en Sistema → General, <a href="#parches">Parches nuevos</a>. Se busca al abrir la ventana, el primer arranque de cada día y cada
       cuatro arranques; si hay, te lo dice un mensaje abajo: «Hay parches nuevos: míralos en los avisos de arriba».
       <details class="terminal"><summary>En la terminal</summary>
         <p>La orden del programa: <code>nexum componentes</code> (ver qué hay) y
@@ -719,7 +754,7 @@
       que abras una y escribas <code>nexum</code>.</span></li>
     <li><b>«Carpeta de registros»</b>: abre <code>~/.nexum</code>, donde se guardan los registros de lo que hace el programa. El
       signo <code>~</code> es tu carpeta personal; el punto delante del nombre hace que sea una carpeta oculta.</li>
-    <li><b>«Ayuda»</b>: abre este manual en tu navegador, en el capítulo de la página en la que estás (en Configuración, en el de su
+    <li><b>«Ayuda»</b>: abre este manual en tu navegador, en el capítulo de la página en la que estás (en Ajustes y en Sistema, en el de su
       apartado). Va dentro del programa: no necesita conexión.</li>
     <li><b>«Novedades»</b>: qué ha cambiado en cada versión del programa.</li>
     <li><b>«Acerca de Nexum Dev Stack»</b>: el nombre, la versión y la firma del programa.</li>
@@ -811,12 +846,14 @@
   <p>Lo que hace por dentro está en <a href="#instalar">Instalar y actualizar</a>, en su recuadro «En la terminal».</p>
 
   <h3 id="ventana-correo">El botón Correo</h3>
-  <p>Abre la bandeja del <a href="#correo">correo de pruebas</a> dentro de la propia ventana (en Configuración → Correo de pruebas). El
+  <p>Abre la bandeja del <a href="#correo">correo de pruebas</a> dentro de la propia ventana (en Ajustes → Correo de pruebas). El
     número son los correos sin leer; al dejar el ratón encima también lo dice. Mailpit es el programa que recoge esos correos: en lugar
     de mandarlos a su destinatario, los guarda para que los veas tú.</p>
   <ul>
-    <li>Si Mailpit no está instalado, te lleva a Configuración para instalarlo.</li>
+    <li>Si Mailpit no está instalado, te lleva a Ajustes → Correo de pruebas para instalarlo.</li>
     <li>Si la versión activa está parada, te avisa: Mailpit arranca con la versión activa.</li>
+    <li>Si la versión está en marcha pero Mailpit no (por ejemplo, después de cerrar la sesión), lo arranca en ese momento («Arrancando
+      Mailpit…») y abre la bandeja. El programa no lo comprueba por su cuenta cada poco: solo cuando lo pides.</li>
     <li>Si falta el componente que enseña la bandeja dentro de la ventana, la abre en el navegador
       (<code>http://127.0.0.1:8025/</code>).</li>
   </ul>
@@ -829,9 +866,12 @@
     <code>web.local &gt;&gt;&gt;&gt;&gt; dominio falseado · panaderia-luna.com</code>; sus visitas van a esta copia y no a la web real.
     Sin proyecto cargado (al desmontarlo, por ejemplo) se ven en gris y quietos, con <b>«sin enlace»</b>:
     <code>web.local</code> enseña una página vacía.</p>
+  <p>Con el visor «Arriba», a la derecha de la barra van, sin recuadro, la versión de PHP activa, Apache y MariaDB con su punto (al
+    pulsarlos, <a href="#ventana-servicios">sus servicios</a>), el <a href="#ventana-encender">▶ / ■</a> y el consumo (CPU y RAM). Con
+    el «Clásico», todo eso va en el recuadro de arriba.</p>
 
   <h3 id="ventana-terminal">La terminal de abajo</h3>
-  <p>El botón <b>«Terminal»</b> de arriba a la derecha la enseña o la esconde. Es tu terminal de siempre, con tu usuario, y empieza en la
+  <p>El botón <b>«Terminal»</b> de arriba (el último de la barra o, con el visor «Clásico», arriba a la derecha) la enseña o la esconde. Es tu terminal de siempre, con tu usuario, y empieza en la
     carpeta del proyecto cargado (o en la carpeta de los proyectos si no hay ninguno). Al esconderla sigue abierta, con lo que tuvieras
     escrito. A su lado, arriba, la carpeta en la que empezó, y estos botones:</p>
   <ul>
@@ -842,7 +882,7 @@
       y qué orden está instalada. Si no usa systemd-resolved, te lo dice y no escribe nada.</span><code data-so="mac">sudo dscacheutil
       -flushcache; sudo killall -HUP mDNSResponder</code>. Sirve cuando acabas de falsear o dejar de falsear un dominio y el navegador sigue yendo al sitio de antes. La
       contraseña te la pide la propia terminal.</li>
-    <li><b>«ping»</b>: escribe por ti <code>ping -c 3 panaderia-luna.com</code> con el dominio del proyecto cargado (uno detrás de otro, si
+    <li><b>«ping»</b>: escribe por ti <code>ping -c 1 panaderia-luna.com</code> con el dominio del proyecto cargado (uno detrás de otro, si
       tiene varios), para saber de un vistazo adónde lleva: si contesta <code>127.0.0.1</code>, está falseado y va a tu copia; si sale otra
       dirección, es la de la web real. Si el proyecto cargado no tiene dominio propio (solo <code>web.local</code>), o no hay ninguno cargado,
       te lo dice y no escribe nada.</li>
@@ -879,7 +919,7 @@
     «No se ha podido completar», la barra se pone roja, se abre el registro y aparece <b>«Ver el log del error»</b>: abre el informe del
     error (o el registro entero) para copiarlo, con <b>«Copiar todo»</b>, <b>«Abrir la carpeta de logs»</b> y <b>«Cerrar»</b>.</p>
   <p>Cada tarea guarda además su registro entero (la orden de <code>nexum</code> que se ha ejecutado, toda su salida y cómo acabó), sin
-    contraseñas: lo tienes después, aunque hayas cerrado su ventana, en Configuración → General, <a href="#tareas">Registro de
+    contraseñas: lo tienes después, aunque hayas cerrado su ventana, en Sistema → <a href="#tareas">Registro de
     tareas</a>.</p>
   <h3 id="ventana-cola">La cola de tareas</h3>
   <p>Solo trabaja una tarea a la vez, porque dos tocarían lo mismo (por ejemplo, actualizar los componentes y compilar otra versión de
@@ -921,9 +961,9 @@
 
   <h3 id="ventana-bandeja">El icono <span data-so="linux">junto al reloj</span><span data-so="mac">de la barra de menús</span></h3>
   <p>Mientras el programa está abierto, junto al reloj hay un icono suyo, para usar lo básico sin abrir la ventana.
-    <span data-so="linux">Con él, la <b>✕</b> de la ventana no cierra el programa: lo esconde. Viene encendido; se apaga en Configuración →
+    <span data-so="linux">Con él, la <b>✕</b> de la ventana no cierra el programa: lo esconde. Viene encendido; se apaga en Sistema →
     General, <a href="#programa">Programa</a>, «Dejar en la bandeja al cerrar» (si falta su componente, ahí mismo te dice cómo instalarlo).</span>
-    <span data-so="mac">Con él, cerrar la ventana no cierra la aplicación. Se quita y se pone en Configuración → General,
+    <span data-so="mac">Con él, cerrar la ventana no cierra la aplicación. Se quita y se pone en Sistema → General,
     <a href="#programa">Programa</a>, «Dejar en la barra de menús al cerrar».</span> Su menú:</p>
   <ul>
     <li><b>«Abrir Nexum Dev Stack»</b>: vuelve a enseñar la ventana<span data-so="linux"> (también con el clic de la rueda del ratón sobre
@@ -991,7 +1031,7 @@
       <li data-x="85.0" data-y="4.1"><b>Terminal</b><span>Abre una terminal abajo, dentro de la ventana, para lanzar <code>git</code>,
         <code>composer</code>, <code>wp</code> o lo que necesites. Su botón «Proyecto cargado» te lleva a la carpeta del proyecto.</span></li>
       <li data-x="14.2" data-y="26.1"><b>El menú lateral</b><span>Las páginas del programa: lo de tu trabajo (proyectos, repositorios,
-        versiones de PHP, bases de datos, Docker y Node) y, debajo, lo del sistema (dominios y configuración).</span></li>
+        versiones de PHP, bases de datos, Docker y Node) y, debajo, lo del sistema (dominios, ajustes y sistema).</span></li>
       <li data-x="21.1" data-y="20.7"><b>El proyecto cargado</b><span>Su nombre y su carpeta. El punto verde de «Proyecto cargado» dice que
         es el que abre <code>web.local</code> («en web.local», arriba a la derecha). Si no hay ninguno cargado, aquí sale el que elijas en
         la lista, como «Proyecto elegido».</span></li>
@@ -1019,7 +1059,7 @@
       <li data-x="72.9" data-y="30.8"><b>Actualizar</b><span>Lo pone al día con lo de producción: su base de datos (un <code>.sql</code>) y su
         código (un <code>.zip</code>, un <code>.tar.gz</code> o una carpeta), con <code>git pull</code> antes si quieres. Si marcas su casilla,
         guarda una copia de lo que sustituye. Ver <a href="#actualizar-proyecto">Actualizar un proyecto</a>.</span></li>
-      <li data-x="81.1" data-y="30.8"><b>Desmontar</b><span>Lo descarga: <code>web.local</code> deja de abrirlo y enseña una página vacía. No
+      <li data-x="81.1" data-y="30.8"><b>Unlink</b><span>Desmonta el proyecto: <code>web.local</code> deja de abrirlo y enseña una página vacía. No
         pregunta antes, pero no se borra nada, ni la carpeta ni la base de datos.</span></li>
       <li data-x="91" data-y="30.8"><b>Falsear Host</b><span>Si el proyecto tiene un dominio en los vhosts (debajo sale cuál), este
         interruptor hace que su dirección de verdad se abra en tu equipo y no en internet. Sirve para probar una tienda con su dominio
@@ -1046,8 +1086,13 @@
 
   <!-- ------------------------------------------------------------------ el visor -->
   <h3 id="visor">El visor de arriba</h3>
-  <p>Arriba está siempre <b>el proyecto cargado</b>, con todos sus botones. Elegir otra fila de la lista no lo cambia: la fila elegida
-    solo se marca. Así no pierdes de vista con qué estás trabajando.</p>
+  <p>Arriba está siempre <b>el proyecto cargado</b>. Elegir otra fila de la lista no lo cambia: la fila elegida solo se marca. Así no
+    pierdes de vista con qué estás trabajando. Lo que se ve aquí depende de dónde va el visor (en <a href="#apariencia">Sistema →
+    Apariencia</a>, «Dónde»; ver <a href="#ventana-visor">Dónde va el visor</a>).</p>
+  <p><b>Con el visor «Arriba»</b>, los botones del proyecto cargado están en la barra de arriba de la ventana. Aquí queda lo mismo que con
+    el «Clásico» (su cabecera, el selector de Entorno con su BBDD y el <b>+</b>, «Opciones de la BBDD…», <a href="#falsear-host">Falsear
+    Host</a> y ⋮), sin esos botones. Para llevarlo a otra versión de PHP, el <b>«+ Nueva versión»</b> del Entorno.</p>
+  <p><b>Con el visor «Clásico»</b> (el de la captura), aquí van también todos sus botones, junto al selector de Entorno y el <b>+</b>:</p>
   <ul>
     <li><b>«PROYECTO CARGADO»</b>, con el punto verde: el que abre <code>web.local</code>. Tiene todos los botones.</li>
     <li><b>«PROYECTO ELEGIDO»</b>: solo cuando no hay ninguno cargado. Es la fila que has pulsado. Arriba a la derecha pone
@@ -1177,8 +1222,9 @@
     <b>+</b> de «Entorno» (<a href="#replicar">Replicar</a>).</div>
 
   <!-- ------------------------------------------------------------------ desmontar -->
-  <h3 id="desmontar">Desmontar</h3>
-  <p>El botón con el icono de expulsar (⏏), «Desmontar el proyecto», está al final de los botones del proyecto cargado. Sirve para
+  <h3 id="desmontar">Unlink (desmontar)</h3>
+  <p>El botón <b>«Unlink»</b>, con el icono de expulsar (⏏), está al final de los botones del proyecto cargado. Al dejar el ratón encima
+    dice «Unlink: desmontar el proyecto (web.local deja de apuntar a él)». Sirve para
     dejar <code>web.local</code> sin ningún proyecto: por ejemplo, cuando terminas y no quieres que ninguna web quede abierta, o para
     devolver a su web real los dominios que estaban falseados.</p>
   <ul>
@@ -1304,7 +1350,7 @@
       <code data-so="linux">xdg-open https://web.local/</code><code data-so="mac">open https://web.local/</code>.</li>
     <li><b>«VS Code»</b>: abre su carpeta en Visual Studio Code (el editor de código). Si ya estaba abierta, trae su ventana delante. Solo
       sale si VS Code está instalado. En la terminal: <code>code /opt/htdocs/panaderia-luna</code>. Si trabajas con espacios de trabajo
-      de VS Code, elige su carpeta en <a href="#carpetas">Configuración → Carpetas</a>: entonces abre el del proyecto
+      de VS Code, elige su carpeta en <a href="#carpetas">Ajustes → Carpetas</a>: entonces abre el del proyecto
       (<code>code ~/"Espacios de VS Code/panaderia-luna.code-workspace"</code>) y, si aún no tiene, se le crea.</li>
     <li><b>«GitHub»</b>: abre su repositorio en el navegador, por ejemplo <code>https://github.com/ana/panaderia-luna</code>. Solo sale si
       la carpeta es un repositorio git con un remote <code>origin</code>; si es de otro servidor (GitLab, Bitbucket…), se llama
@@ -1314,7 +1360,7 @@
       <code>http://127.0.0.1/phpmyadmin/</code> (el de la versión activa). Sale apagado si no se sabe qué base usa. No cambia nada.</li>
     <li><b>«Panel»</b>: el escritorio de WordPress (<code>wp-admin</code>) o el back office de PrestaShop (con su logotipo). Antes deja al
       día el <b>administrador de pruebas</b> (<code>local@local.test</code>, contraseña <code>local</code>, o el que pongas en
-      Configuración, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Entra por la dirección en la que el
+      Ajustes, <a href="#admin-pruebas-config">Administrador de pruebas</a>) y abre la pantalla de acceso con los dos ya escritos: solo hay que pulsar Entrar. Entra por la dirección en la que el
       panel guarda la sesión: en una tienda con su dominio falseado, por ese dominio (<code>https://tienda-luna.es/…</code>), porque su back
       office salta allí al entrar; y por <code>https</code> si la tienda tiene SSL activado o el WordPress tiene su dirección en https, porque
       entonces la sesión solo se guarda por https. Sale apagado si el proyecto no es un WordPress ni una tienda. Si la base ya tiene un usuario de verdad con ese correo, no lo toca: te avisa y abre el
@@ -1370,7 +1416,7 @@
       llega).</li>
     <li><b>«Actualizar»</b>: lo pone al día con lo de producción. Ver <a href="#actualizar-proyecto">Actualizar un proyecto</a>.</li>
     <li><b>«Imágenes de producción»</b>: solo en WordPress y PrestaShop. Ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
-    <li><b>Desmontar (⏏)</b>: ver <a href="#desmontar">Desmontar</a>.</li>
+    <li><b>Unlink (⏏)</b>: ver <a href="#desmontar">Unlink</a>.</li>
     <li><b>Falsear Host</b>: ver <a href="#falsear-host">Falsear Host</a>.</li>
     <li><b>⋮</b>: ver <a href="#menu-mas">el menú Más</a>.</li>
   </ul>
@@ -1472,19 +1518,27 @@
     estaba al día»). Del código: cuántos ficheros y carpetas trae el paquete y lo que ocupan; los 5 primeros nuevos (<code>+</code>, se copian)
     y, aparte, los 5 primeros modificados (<code>~</code>, se sustituyen), con la lista entera de cada uno en un fichero si hay más; la
     lista de lo que hay en la carpeta del proyecto y no viene en el código, y un recuadro con dos partes que no se mezclan:
-    <pre>┌─────────────────────────────────────┐
-│ Código de producción                │
-├─────────────────────────────────────┤
-│ VIENEN EN EL CÓDIGO           4.812 │
-│   Nuevos: se copian              12 │
-│   Modificados: se sustituyen    340 │
-│   Iguales: no se tocan        4.460 │
-├─────────────────────────────────────┤
-│ SOLO EN TU CARPETA (no vienen)   35 │
-│   Se dejan como están (fusionar) 35 │
-└─────────────────────────────────────┘</pre>
+    <pre>┌─────────────────────────────────────────────────┐
+│ Código de producción              Todo   En git │
+├─────────────────────────────────────────────────┤
+│ VIENEN EN EL CÓDIGO              4.812      306 │
+│   Nuevos: se copian                 12        4 │
+│   Modificados: se sustituyen       340       18 │
+│   Iguales: no se tocan           4.460      284 │
+├─────────────────────────────────────────────────┤
+│ SOLO EN TU CARPETA (no vienen)      35        3 │
+│   Se dejan como están (fusionar)    35        3 │
+└─────────────────────────────────────────────────┘</pre>
     <b>Vienen en el código</b>: todo lo que trae el paquete, y qué se hace con cada fichero. <b>Solo en tu carpeta</b>: lo que tienes en el
-    proyecto y el paquete no trae; al fusionar se deja como está y al sobrescribir se quita («Se quitan (sobrescribir)»). Con más de 25
+    proyecto y el paquete no trae; al fusionar se deja como está y al sobrescribir se quita («Se quitan (sobrescribir)»). La columna
+    <b>En git</b> cuenta lo mismo, pero solo lo que le importa a git: sin lo que el <code>.gitignore</code> del proyecto deja fuera (cachés,
+    <code>node_modules</code>, <code>vendor</code>…), que suele ser la mayoría y no interesa. Lo que ya está en el repositorio cuenta aunque
+    case con el <code>.gitignore</code>. Si el proyecto no es un repositorio de git, sale solo la primera columna. Con git, de lo que
+    está en tu carpeta y no viene (se deja o se quita) salen arriba los 5 primeros que están en git, que son los que no verías venir,
+    y las rutas de su lista y de la de todo (<code>…-no-vienen-se-dejan-git.txt</code> y <code>…-no-vienen-se-dejan.txt</code>, o
+    <code>-se-quitan</code>). Debajo del recuadro, la
+    ruta de dos listas, que se pueden pulsar para abrirlas: <b>todos los cambiados</b> (nuevos y modificados) en
+    <code>~/.nexum/listas/panaderia-luna-…-cambiados.txt</code> y <b>solo los de git</b> en <code>…-cambiados-git.txt</code>. Con más de 25
     ficheros, su lista se resume por carpetas (las que más tienen) y la lista entera, fichero a fichero, se guarda para mirarla con calma
     en <code>~/.nexum/listas/panaderia-luna-…-no-vienen-se-dejan.txt</code> (son registros, no copias: van con los del programa y los
     borra la Limpieza de «Registros del programa») (o <code>-no-vienen-se-quitan.txt</code>,
@@ -1769,7 +1823,8 @@
     <li><b>«Limpiar proyecto…»</b>: su caché, sus registros y, en WordPress, los restos de las actualizaciones. Ver
       <a href="#limpiar-proyecto">Limpiar un proyecto</a>.</li>
     <li><b>«Imágenes de producción…»</b> (WordPress y PrestaShop) y <b>«Descargar de producción las imágenes que faltan…»</b>
-      (PrestaShop): ver <a href="#imagenes-produccion">Imágenes de producción</a>.</li>
+      (PrestaShop), en el ⋮ de las filas de la lista: ver <a href="#imagenes-produccion">Imágenes de producción</a>. En el del proyecto
+      cargado no salen: para él está el botón «Imágenes de producción» del visor.</li>
     <li><b>«Vaciar la caché de Chrome…»</b>: solo en los proyectos con dominio. Para cuando acabas de falsear o dejar de falsear su
       dominio y Chrome sigue en la otra web. Copia <code>chrome://net-internals/#sockets</code> y te dice qué hacer: pegarlo en la barra de
       direcciones, pulsar <b>«Flush socket pools»</b> y, a la izquierda, en <b>DNS</b>, <b>«Clear host cache»</b>; después, recargar la
@@ -1781,9 +1836,14 @@
 
   <h3 id="menu-fila">El menú ⋮ de cada fila</h3>
   <p>Sale al pasar el ratón por una fila que no es la cargada, junto a «Cargar». Actúa sobre ese proyecto <b>sin cambiar el de arriba</b>.
-    Tiene tres opciones más, y después las mismas del <a href="#menu-mas">menú Más</a> (menos «Exportar proyecto…», que es solo del
+    Tiene cuatro opciones más, y después las mismas del <a href="#menu-mas">menú Más</a> (menos «Exportar proyecto…», que es solo del
     cargado):</p>
   <ul>
+    <li><b>«Actualizar código…»</b>: el código de producción (un <code>.zip</code>, un <code>.tar.gz</code> o una carpeta) en ese proyecto,
+      <b>sin cargarlo y sin tocar su BBDD</b>. Se arrastra a la zona «Código de producción» (o se elige), se marca Fusionar o Sobrescribir
+      y «Actualizar…». Desde ahí es igual que el código de <a href="#actualizar-proyecto">Actualizar un proyecto</a>: si es un
+      repositorio de git, te pregunta si hacer <code>git pull</code> antes, puedes guardar una copia de lo que se sustituye, y el registro
+      sale igual.</li>
     <li><b>«Añadir entorno en otra versión de PHP…»</b>: <a href="#replicar">Replicar</a>, con ese proyecto ya elegido.</li>
     <li><b>«Añadir entorno en Docker…»</b>: ver <a href="#docker-desde-proyectos">Docker desde Proyectos</a>.</li>
     <li><b>«Importar SQL…»</b>: te lleva a <a href="#bbdd">Bases de datos</a>, a «Subir o actualizar una BBDD», con ese proyecto y su base
@@ -1922,22 +1982,29 @@
 
   <!-- ------------------------------------------------------------------ personalizar -->
   <h3 id="personalizar-botones">Personalizar los botones</h3>
-  <p>«Personalizar los botones…», en el menú ⋮ (o «Personalizar…» en <a href="#apariencia">Configuración → Apariencia</a>). Vale para los
+  <p>«Personalizar los botones…», en el menú ⋮ (o «Personalizar…» en <a href="#apariencia">Sistema → Apariencia</a>). Vale para los
     botones del proyecto cargado y para los del visor de un proyecto de Docker. Solo cambia cómo se ve la ventana: no toca ningún
     proyecto.</p>
   <ul>
-    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. Su casilla
+    <li><b>La lista</b> (a la izquierda): Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar,
+      Imágenes de producción, Unlink, Correo y Terminal (estos dos, solo en el visor «Arriba»). En los cuadrados con el nombre
+      debajo, si no cabe, phpMyAdmin sale como «PMA» e Imágenes de producción como «Imágenes». Su casilla
       dice si se ve («Verlo en el visor»), y las flechas <b>«Antes»</b> y <b>«Después»</b> lo mueven.</li>
-    <li><b>Estilo</b>: <b>«Con su nombre»</b> (como vienen), <b>«Solo el icono (cuadrado)»</b> o <b>«Icono y nombre (cuadrado)»</b>. Con solo
+    <li><b>Estilo</b>: <b>«Icono y nombre en horizontal (solo en el visor clásico)»</b> (como vienen), <b>«Solo el icono (cuadrado)»</b> o
+      <b>«Icono y nombre (cuadrado)»</b>. Con solo
       el icono, el nombre sale al dejar el ratón encima.</li>
     <li><b>Tamaño</b>: el lado del cuadrado, de 32 a 128 píxeles (se ve al lado, como «44×44 px»). Al cambiar de estilo propone 44 o 88; con
-      «Icono y nombre», como poco 72. Con «Con su nombre» no se usa. Si en el visor no caben todos en una línea, los que no caben pasan a
+      «Icono y nombre», como poco 72. Con «en horizontal» no se usa. Si en el visor no caben todos en una línea, los que no caben pasan a
       la siguiente: la ventana no se ensancha por ellos.</li>
-    <li><b>«Así quedan»</b>: una vista previa, del tamaño real, con Desmontar y ⋮.</li>
+    <li><b>Con el visor «Arriba»</b>, los de la barra de arriba son siempre cuadrados y pequeños, con su nombre debajo (con «Solo el icono
+      (cuadrado)», sin el nombre), y el tamaño no se usa: ahí valen la lista, el orden y si llevan el nombre.</li>
+    <li><b>⋮</b>, con los estilos cuadrados, sale solo con su icono, sin el texto «Más».</li>
+    <li><b>«Así quedan»</b>: una vista previa, del tamaño real, con ⋮ al final.</li>
     <li><b>«Como al principio»</b>: todos visibles, en el orden de siempre y con su nombre.</li>
     <li><b>«Guardar»</b> lo aplica. «Cancelar» lo deja como estaba.</li>
   </ul>
-  <p>Desmontar, ⋮ y los propios de Docker (Versiones de PHP, Arrancar o Parar) salen siempre. Falsear Host no se puede quitar.
+  <p>⋮ (el último) y los propios de Docker (Versiones de PHP, Arrancar o Parar) salen siempre. Unlink es solo del proyecto cargado, y
+    Correo y Terminal, del visor «Arriba» (en el clásico van en la cabecera). Falsear Host no se puede quitar.
     <span data-so="linux">Lo que eliges se guarda en <code>~/.nexum/botones-visor</code>.</span></p>
 
   <!-- ------------------------------------------------------------------ lista -->
@@ -1976,7 +2043,7 @@
     debajo te dice, en rojo, lo que falla.</p>
   <ol class="pasos-tarea">
     <li><b>Paso 1 de 4: el repositorio.</b> En «¿De qué repositorio de GitHub?» escribe parte de su nombre: salen los tuyos (si has
-      conectado GitHub en <a href="#github-config">Configuración → GitHub</a>). Elige uno con el ratón, con Intro o con la flecha abajo. O
+      conectado GitHub en <a href="#github-config">Ajustes → GitHub</a>). Elige uno con el ratón, con Intro o con la flecha abajo. O
       escribe la dirección de otro, de GitHub o de cualquier servidor (<code>https://…</code> o <code>git@servidor:usuario/repositorio.git</code>).
       En «Carpeta en <code data-so="linux">/opt/htdocs</code><code data-so="mac">htdocs</code>» se pone su nombre solo; cámbialo si quieres
       (no puede existir ya). Se clona con tu usuario, por <b>SSH</b> con tu clave (una forma de entrar en el servidor de git sin escribir
@@ -2081,7 +2148,7 @@
     <p>Solo se guardan las que pides: al cargar una base encima de otra, al
       sustituirla, al actualizar o al borrar, marcando «Guardar antes una copia en ~/nexum-backups» (viene desmarcada). Los vhosts, el
       fichero de hosts y la configuración de los proyectos se copian antes de cambiarlos si enciendes las copias de los ficheros que
-      cambia el programa, en <a href="#carpetas">Configuración → Carpetas</a>. Allí ves cuánto ocupan y las borras con «Borrar…». Lo que
+      cambia el programa, en <a href="#carpetas">Ajustes → Carpetas</a>. Allí ves cuánto ocupan y las borras con «Borrar…». Lo que
       guardaban las versiones anteriores, todo suelto en <code>~/nexum-backups</code>, se ordena solo en esas carpetas al abrir el programa
       (sin borrar nada).</p></details>
   <details><summary>¿Qué se borra al borrar un proyecto?</summary>
@@ -2108,8 +2175,8 @@
     <b>por SSH, con tu propia clave</b>: SSH es una forma cifrada de conectar con otro equipo, y tu clave SSH es un par de ficheros de tu
     carpeta <code>~/.ssh</code> que demuestran a GitHub que eres tú sin escribir contraseña. El token solo sirve para ver la lista; para
     clonar y traer cambios se usa siempre tu clave.</p>
-  <p>Antes de usar esta página hay que conectar GitHub en <b>Configuración → GitHub</b> (lo explica la primera tarea). Si no está conectado,
-    o falta la organización o cuenta, la página lo dice en una tarjeta con el botón <b>«Ir a Configuración»</b>, que te lleva directamente
+  <p>Antes de usar esta página hay que conectar GitHub en <b>Ajustes → GitHub</b> (lo explica la primera tarea). Si no está conectado,
+    o falta la organización o cuenta, la página lo dice en una tarjeta con el botón <b>«Ir a Ajustes»</b>, que te lleva directamente
     a ese apartado.</p>
 
   <figure class="pantalla">
@@ -2148,7 +2215,7 @@
 
   <h3>Conectar GitHub (la primera vez)</h3>
   <ol class="pasos-tarea">
-    <li><b>Ve a Configuración → GitHub</b> y pulsa <b>«Conectar con un token…»</b>. Si tienes instalada la herramienta <code>gh</code> y ya
+    <li><b>Ve a Ajustes → GitHub</b> y pulsa <b>«Conectar con un token…»</b>. Si tienes instalada la herramienta <code>gh</code> y ya
       has entrado con <code>gh auth login</code>, también tienes <b>«Usar la sesión de gh»</b>, que no necesita token.<span data-so="linux">
       Si en el equipo falta <code>secret-tool</code> (el paquete <code>libsecret-tools</code>, con el que se guarda el token en el llavero),
       antes sale la ventana «Hace falta secret-tool para guardar el token»: <b>«Instalarlo»</b> lo instala (pide la contraseña de
@@ -2284,7 +2351,7 @@
     <p>No: solo lo clona. Para clonarlo y montarlo de una vez (carpeta, base de datos y configuración), usa «Nuevo proyecto» en
       la página <a href="#proyectos">Proyectos</a>.</p></details>
   <details><summary>Dice que el token ya no vale</summary>
-    <p>Ha caducado o lo has borrado en GitHub. Crea otro y conéctalo de nuevo en Configuración → GitHub con «Conectar con un token…».</p></details>
+    <p>Ha caducado o lo has borrado en GitHub. Crea otro y conéctalo de nuevo en Ajustes → GitHub con «Conectar con un token…».</p></details>
   <details><summary>El botón «Clonar» está gris</summary>
     <p>Ya hay en tu carpeta de proyectos una carpeta con el nombre del repositorio que no es un clon suyo. Muévela o cámbiale el nombre.</p></details>
   <details><summary>¿El token puede cambiar mis repositorios?</summary>
@@ -3023,7 +3090,7 @@
         <code>--binary-mode</code> y <code>--local-infile=0</code> impiden que el volcado ejecute órdenes o lea ficheros de tu equipo. Si el
         volcado empieza por <code>/*M!999999\- enable the sandbox mode */</code>, se quita esa línea (los MariaDB antiguos no la entienden).</li>
       <li>Apunta la fecha de la carga en <code>~/.nexum/importaciones</code> (la «· importada» de la lista).</li>
-      <li>Crea o deja al día el administrador de pruebas, <code>local@local.test</code> o el de Configuración (lo mismo que
+      <li>Crea o deja al día el administrador de pruebas, <code>local@local.test</code> o el de Ajustes (lo mismo que
         <code>nexum usuario-pruebas wp_panaderia_luna</code>) y pone la base en el correo de pruebas (lo mismo que
         <code>nexum correo bd wp_panaderia_luna</code>).</li>
       <li>Con <code>--proyecto</code>: apunta la base como la de esa carpeta en <code>~/.nexum/proyectos</code> y, en un WordPress, rehace su
@@ -3399,7 +3466,7 @@
     de una versión LAMPP.</p>
   <p>Cada proyecto tiene su dirección <code>https://…</code>. De partida acaban en <code>.docker.local</code> (por ejemplo,
     <code>https://academia-flor-php84.docker.local</code>) y phpMyAdmin está en <code>https://pma.docker.local</code>. Si activas el DNS en
-    <a href="#docker-config">Configuración → Docker</a>, pasan a acabar en <code>.docker.test</code>, como en la captura.</p>
+    <a href="#docker-config">Ajustes → Docker</a>, pasan a acabar en <code>.docker.test</code>, como en la captura.</p>
 
   <div class="nota"><b>Dónde guarda Docker lo de cada proyecto</b>Todo lo que el programa escribe para Docker está en
     <code>~/.nexum/docker</code> (<code>~</code> es tu carpeta personal), solo para tu usuario: una carpeta por proyecto con su
@@ -3447,8 +3514,8 @@
         usa nadie.</span></li>
       <li data-x="81.6" data-y="43.4"><b>Buscar</b><span>Filtra la lista por nombre.</span></li>
       <li data-x="96.4" data-y="43.4"><b>Solo en marcha</b><span>Deja solo lo que está funcionando.</span></li>
-      <li data-x="19.6" data-y="54.1"><b>Cada proyecto</b><span>Pulsa la fila para desplegarlo: verás su visor (con sus accesos directos) y
-        cada uno de sus contenedores. Vuelve a pulsarla para plegarlo. Solo hay uno desplegado a la vez.</span></li>
+      <li data-x="19.6" data-y="54.1"><b>Cada proyecto</b><span>Si está en marcha, su visor (con sus accesos directos) sale siempre, sin desplegarlo.
+        Pulsa la fila para desplegarlo: verás además cada uno de sus contenedores (y, si está parado, su visor). Vuelve a pulsarla para plegarlo. Solo hay uno desplegado a la vez.</span></li>
       <li data-x="30.4" data-y="60.1"><b>El punto verde</b><span>Todos sus contenedores están en marcha.</span></li>
       <li data-x="51.6" data-y="54.1"><b>Su botón de PHP</b><span>Con qué versiones de PHP funciona. Púlsalo para añadir, quitar o elegir
         versiones. En WordPress puedes tener <b>varias a la vez</b>, cada una con su dirección.</span></li>
@@ -3561,10 +3628,10 @@
       (de los que se abren por el Apache de LAMPP). Los del Apache de Docker no lo necesitan. Arranca la versión activa, como el botón de
       encendido de la ventana.</li>
     <li data-so="linux"><b>«Docker sin root aún no puede usar los puertos 80 y 443»</b>, con el botón <b>«Permitir»</b>. Los puertos de menos
-      de 1024 son de root: se permite una vez y pide la contraseña de administrador. O elige otros puertos en Configuración.</li>
+      de 1024 son de root: se permite una vez y pide la contraseña de administrador. O elige otros puertos en Ajustes → Docker.</li>
     <li data-so="mac"><b>«La dirección 127.0.0.2 aún no está en este Mac»</b>, con el botón <b>«Permitir»</b>. macOS solo tiene de partida la
       dirección <code>127.0.0.1</code>: la del Apache de Docker se da de alta una vez y se vuelve a poner en cada arranque. Pide la contraseña
-      de administrador. O elige otra dirección en Configuración.</li>
+      de administrador. O elige otra dirección en Ajustes → Docker.</li>
     <li><b>«Docker se ha quedado sin las BBDD de …»</b>, con el botón <b>«Recuperar…»</b>. Sale cuando Docker ya no tiene la base de datos
       de algún proyecto: pasa si cambia de almacén de imágenes (Docker 29 usa el de containerd en las instalaciones nuevas<span
       data-so="mac">; en Docker Desktop, Settings › General › «Use containerd for pulling and storing images»: al dejarlo como estaba, lo de
@@ -3639,8 +3706,9 @@
     <p>Para comprobarlo: <code>docker ps --filter name=nexum-web</code> y abre <code>https://pma.docker.local</code>.</p>
   </details>
 
-  <h3 id="docker-visor">Al desplegar un proyecto: su visor</h3>
-  <p>Arriba de sus contenedores sale su visor, como el del proyecto cargado en Proyectos. Enseña su logotipo, su nombre, si es WordPress o
+  <h3 id="docker-visor">El visor de un proyecto</h3>
+  <p>Un proyecto en marcha enseña su visor siempre, sin desplegar su fila; uno parado (o a medias), solo al desplegarla. Al desplegarla,
+    sus contenedores salen debajo. Es como el del proyecto cargado en Proyectos. Enseña su logotipo, su nombre, si es WordPress o
     PrestaShop, sus versiones de PHP, su base de datos (la MariaDB común o «BBDD de lampp-… en vivo (la de web.local)»), su dirección y si
     está «En marcha», «A medias» (unos contenedores sí y otros no) o «Parado». Sus botones:</p>
   <ul>
@@ -3660,7 +3728,7 @@
     <li><b>«Arrancar»</b> o <b>«Parar»</b>: todos sus contenedores.</li>
   </ul>
   <p>Con el proyecto parado, casi todos se ven apagados («Está parado: arráncalo antes»). Qué botones se ven y en qué orden lo eliges en
-    Configuración, en «Botones del proyecto»; «Versiones de PHP…» (o «Pasar») y «Arrancar»/«Parar» se ven siempre.</p>
+    <a href="#personalizar-botones">Personalizar los botones</a>; «Versiones de PHP…» (o «Pasar») y «Arrancar»/«Parar» se ven siempre.</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa: <code>nexum docker-usuario-pruebas academia-flor</code> (antes de abrir el panel).</p>
     <p>Lo que hace, paso a paso:</p>
@@ -3669,7 +3737,7 @@
       <li>Entra como <code>root</code> en la MariaDB común, sin poner la contraseña en ninguna orden (la toma dentro del contenedor):
         <code>docker exec -i nexum-mariadb-11-8 sh -c 'MYSQL_PWD=$MARIADB_ROOT_PASSWORD mariadb -uroot'</code>.</li>
       <li>Crea o pone al día el administrador de pruebas (<code>local@local.test</code> con la contraseña <code>local</code>, o el de
-        Configuración) en las tablas de usuarios de WordPress (o de empleados de PrestaShop), como administrador y con la marca de Nexum. Uno
+        Ajustes) en las tablas de usuarios de WordPress (o de empleados de PrestaShop), como administrador y con la marca de Nexum. Uno
         de verdad con ese correo no se toca.</li>
     </ol>
     <p>Después la ventana abre el panel con la sesión ya iniciada. Para comprobarlo: entra en <code>https://academia-flor-php84.docker.local/wp-admin</code>
@@ -3677,7 +3745,7 @@
   </details>
 
   <h3 id="docker-contenedores">Al desplegar un proyecto: sus contenedores</h3>
-  <p>Debajo del visor sale cada contenedor, con su nombre corto (<code>db-1</code>, <code>php84</code>…), su ID (el número con el que Docker lo
+  <p>Al desplegar la fila, debajo del visor sale cada contenedor, con su nombre corto (<code>db-1</code>, <code>php84</code>…), su ID (el número con el que Docker lo
     identifica), su imagen, sus puertos y su CPU. Al pasar el ratón por el nombre ves el nombre completo y desde cuándo está en marcha. Sus
     botones:</p>
   <ul>
@@ -4020,7 +4088,7 @@
 
   <h3>Preguntas</h3>
   <details><summary>¿Se paran solos si no los uso?</summary>
-    <p>Sí. En <b>Configuración → Docker</b>, «Parar los proyectos sin visitas»: nunca, a la hora o a las horas que elijas (3, si no
+    <p>Sí. En <b>Ajustes → Docker</b>, «Parar los proyectos sin visitas»: nunca, a la hora o a las horas que elijas (3, si no
       cambias nada). Se mira cada 15 minutos, también con la ventana cerrada, y se para también lo común que ya no use nadie. En la terminal:
       <code>nexum docker-reposo horas 3</code> (0: nunca). Lo mira un temporizador de tu usuario que lanza
       <code>nexum docker-reposo comprobar</code><span data-so="linux"> (<code>systemctl --user status nexum-reposo.timer</code>)</span>.</p></details>
@@ -4035,7 +4103,7 @@
     <p>No hace falta: el botón «Panel» del visor entra solo con <code>local@local.test</code> y la contraseña <code>local</code> (o con el de
       <a href="#admin-pruebas-config">Administrador de pruebas</a>).</p></details>
   <details><summary>¿Por qué en la captura las direcciones acaban en .docker.test?</summary>
-    <p>Porque ese equipo tiene activado el DNS de Docker en Configuración. De partida acaban en <code>.docker.local</code>.</p></details>
+    <p>Porque ese equipo tiene activado el DNS de Docker en Ajustes → Docker. De partida acaban en <code>.docker.local</code>.</p></details>
 </section>
 
 <!-- =========================================================================================== NODE -->
@@ -4214,13 +4282,13 @@
     todo con Laravel o Symfony. Con esta página tienes uno en tu equipo para ver tus proyectos como en producción, sin dejar de usar Apache:
     un proyecto sigue abriéndose por Apache como siempre, y además por Nginx si se lo añades.</p>
   <p><b>Viene apagado</b>: esta página no sale en el menú lateral hasta que enciendes «Usar Nginx» en
-    <a href="#nginx-config">Configuración → Nginx</a>. Si no lo necesitas, no tienes que hacer nada. Apagarlo de nuevo lo para y vuelve a
+    <a href="#nginx-config">Ajustes → Nginx</a>. Si no lo necesitas, no tienes que hacer nada. Apagarlo de nuevo lo para y vuelve a
     ocultar la página, sin borrar sus proyectos ni sus ajustes. Para tener Nginx en Docker, mira
     <a href="#docker-nginx">el Nginx de Docker</a>.</p>
   <p>Hay un solo Nginx para todo el equipo. Se instala en <code>~/.nexum/nginx</code> y funciona con tu usuario: ni instalarlo ni arrancarlo
     piden la contraseña de administrador (en Linux, solo la primera vez si faltan los paquetes para compilarlo). Solo contesta desde tu equipo,
     nunca desde la red, en sus <b>puertos</b> (el número que distingue a cada programa que espera conexiones): el 8080 para http y el 8443
-    para https, que se cambian en <a href="#nginx-config">Configuración → Nginx</a>.</p>
+    para https, que se cambian en <a href="#nginx-config">Ajustes → Nginx</a>.</p>
   <p>Cada proyecto se abre por su nombre: la carpeta <code>tienda-laravel</code>, en <code>http://tienda-laravel.localhost:8080</code> y
     <code>https://tienda-laravel.localhost:8443</code>. El navegador lleva cualquier nombre que acabe en <code>.localhost</code> a tu
     equipo, sin tocar <code>/etc/hosts</code>. PHP lo pone la <a href="#versiones">versión de PHP</a> activa (su PHP-FPM, el mismo que usa
@@ -4248,7 +4316,7 @@
         no se abre.</span></li>
       <li data-x="89.7" data-y="23.8"><b>Reiniciar</b><span>Solo en marcha: lo para y lo vuelve a arrancar.</span></li>
       <li data-x="94.3" data-y="23.8"><b>Arrancar o Parar</b><span>Arranca Nginx en tu equipo o lo para. Apache no cambia. Si su puerto ya lo usa
-        otro programa, lo dice y no arranca: cámbialo en Configuración → Nginx.</span></li>
+        otro programa, lo dice y no arranca: cámbialo en Ajustes → Nginx.</span></li>
       <li data-x="31" data-y="37.1"><b>Un proyecto</b><span>Su carpeta, su dirección (<code>https://…localhost:8443/</code>) y lo que sirve: una
         subcarpeta (<code>public/</code>) o la carpeta entera. Si su carpeta ya no está, lo dice.</span></li>
       <li data-x="79.5" data-y="37.1"><b>VS Code y su carpeta</b><span>«Abrir en Visual Studio Code» (solo si lo tienes instalado) y «Abrir su
@@ -4292,7 +4360,7 @@
     <p>Chrome, Firefox y Edge llevan cualquier <code>….localhost</code> a tu equipo por su cuenta. Si tu navegador no lo hace, prueba con otro.</p></details>
   <details><summary>El https dice que la conexión no es privada</summary>
     <p>El certificado de cada proyecto se acepta en el navegador al añadirlo. Si lo has quitado, o usas otro navegador, pulsa «Confiar» en
-      Configuración → Nginx. Si Chrome estaba abierto, ciérralo y vuelve a abrirlo.</p></details>
+      Ajustes → Nginx. Si Chrome estaba abierto, ciérralo y vuelve a abrirlo.</p></details>
   <details><summary>Sale «502 Bad Gateway»</summary>
     <p>El PHP de la versión activa no está en marcha. Arráncala en la barra de arriba o en <a href="#versiones">Versiones de PHP</a>.</p></details>
   <details><summary>¿Sigue en marcha si cierro la ventana?</summary>
@@ -4344,7 +4412,7 @@
     <ol class="puntos">
       <li data-x="92.1" data-y="13.7"><b>Ver fichero de hosts</b><span>Arriba, qué dominios se pueden falsear y cómo está cada uno («falseado» o
         «sin falsear»; los <code>.local</code>, «encendido» o «apagado»), con su carpeta; debajo, el contenido entero del fichero. Solo para
-        leer, con «Copiar todo» y «Actualizar». Para editarlo a mano: menú ☰ → «Editar /etc/hosts», o Configuración → Vhosts y hosts.</span></li>
+        leer, con «Copiar todo» y «Actualizar». Para editarlo a mano: menú ☰ → «Editar /etc/hosts», o Ajustes → Vhosts y hosts.</span></li>
       <li data-x="24" data-y="24.5"><b>Dominios y hosts falseados</b><span>Arriba a la izquierda, en su recuadro: todos los dominios que
         llevan a tu equipo, también los <code>.local</code>, uno debajo de otro. Cada uno con su botón «Abrir» y su interruptor; a la derecha de
         la cabecera, cuántos son. Si no hay ninguno, dice «Ningún dominio falseado»: todos llevan a su web real.</span></li>
@@ -4691,7 +4759,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Con el interruptor, no: solo cambia ese. Con «Crear y falsear» o al cargar un proyecto, sí: queda falseado solo el suyo.</p></details>
   <details><summary>¿Puedo recuperar el fichero de hosts de antes?</summary>
     <p>Sí, si tienes encendidas las <a href="#carpetas">copias de los ficheros que cambia el programa</a>: entonces, antes de cada
-      cambio se guarda en <code>~/nexum-backups</code>, con la fecha en el nombre. Vienen apagadas; enciéndelas en Configuración →
+      cambio se guarda en <code>~/nexum-backups</code>, con la fecha en el nombre. Vienen apagadas; enciéndelas en Ajustes →
       Carpetas antes de hacer cambios que quieras poder deshacer. Para volver a una: <code>sudo cp ~/nexum-backups/sistema/hosts/hosts-&lt;fecha&gt; /etc/hosts</code>.</p></details>
   <details><summary>Ha salido «No se ha cambiado /etc/hosts»</summary>
     <p>No se ha podido hacer el cambio (por ejemplo, porque has cancelado la contraseña). El interruptor vuelve a como estaba.</p></details>
@@ -4705,27 +4773,33 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
 <!-- =========================================================================================== CONFIGURACIÓN -->
 <section class="capitulo" id="configuracion">
   <div class="antetitulo">Sistema</div>
-  <h2>Configuración</h2>
-  <p class="entrada">Lo que se ajusta una vez y se deja. A la izquierda, sus apartados; a la derecha, lo del elegido. Aquí tienes cada
-    apartado con lo que se puede configurar en él, cómo viene de partida y qué hace por dentro cada botón, para que puedas hacerlo tú
-    en la terminal si lo necesitas.</p>
+  <h2>Ajustes y Sistema</h2>
+  <p class="entrada">Lo que se ajusta una vez y se deja, en dos pestañas del menú lateral, en el grupo SISTEMA: <b>Ajustes</b>, lo que hay
+    que configurar para que funcionen otras partes del programa, y <b>Sistema</b>, lo del propio programa (registros, aspecto, limpieza e
+    información). En cada una, a la izquierda, sus apartados; a la derecha, lo del elegido. Aquí tienes cada apartado con lo que se puede
+    configurar en él, cómo viene de partida y qué hace por dentro cada botón, para que puedas hacerlo tú en la terminal si lo
+    necesitas.</p>
   <ul class="saltos">
-    <li><a href="#general">General</a></li>
+    <li><a href="#ajustes">Ajustes</a></li>
     <li><a href="#vhosts">Vhosts y hosts</a></li>
     <li><a href="#seguridad-webs">Seguridad entre webs</a></li>
     <li><a href="#correo">Correo de pruebas</a></li>
     <li><a href="#admin-pruebas-config">Administrador de pruebas</a></li>
     <li><a href="#docker-config">Docker</a></li>
+    <li><a href="#nginx-config">Nginx</a></li>
     <li><a href="#tunel-config">Túnel de Cloudflare</a></li>
     <li><a href="#github-config">GitHub</a></li>
+    <li><a href="#carpetas">Carpetas</a></li>
+    <li><a href="#sistema">Sistema</a></li>
+    <li><a href="#general">General</a></li>
+    <li><a href="#tareas">Registro de tareas</a></li>
     <li><a href="#apariencia">Apariencia</a></li>
     <li><a href="#limpieza">Limpieza</a></li>
-    <li><a href="#carpetas">Carpetas</a></li>
     <li data-so="linux"><a href="#xampp-registrar">XAMPP sin registrar</a></li>
     <li data-so="mac"><a href="#configuracion-xampp-oficial">XAMPP oficial</a></li>
     <li><a href="#informacion">Información</a></li>
   </ul>
-  <p>Arriba de cada apartado van su nombre y una frase que dice para qué sirve. Mientras hay una tarea en marcha, los botones que cambian algo
+  <p>Ajustes y Sistema se ven siempre: no se pueden ocultar en <a href="#apariencia">Apariencia</a>. Arriba de cada apartado van su nombre y una frase que dice para qué sirve. Mientras hay una tarea en marcha, los botones que cambian algo
     se ven algo atenuados hasta que acabe. Se pueden pulsar: lo que lanzan va a la <a href="#ventana-cola">cola de tareas</a>.</p>
 
   <h3 id="configuracion-antes">Antes de empezar: tres ideas que salen en todo el capítulo</h3>
@@ -4752,326 +4826,11 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     simbólico</i>: un acceso directo que apunta a la carpeta de esa versión. Tus proyectos están en
     <code>/Library/Nexum/XAMPP-compartido/htdocs</code> y los vhosts, en <code>/Library/Nexum/XAMPP-compartido/httpd-vhosts.conf</code>.</div>
 
-  <h3 id="general">General</h3>
-  <p>El primer apartado de la columna, con lo que más se consulta, junto. Lleva cuatro bloques, cada uno con su título y, debajo, para qué
-    sirve: <a href="#errores">Registro de errores</a>, <a href="#tareas">Registro de tareas</a>, <a href="#parches">Parches nuevos</a> y
-    <a href="#programa">Programa</a>. Baja por la página para llegar a los de abajo.</p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-general.png" data-linux="img/linux/config-general.png" data-mac="img/mac/config-general.png" alt="Configuración, General" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="24" data-y="14"><b>Los apartados</b><span>La columna de Configuración. General es el primero. Pulsa uno para verlo a la derecha. El elegido se recuerda al volver.</span></li>
-      <li data-x="44" data-y="19"><b>Registro de errores</b><span>Los dos registros que hay que mirar cuando una web da un error.</span></li>
-      <li data-x="44" data-y="42"><b>Registro de tareas</b><span>Las últimas tareas que ha lanzado la ventana, cada una con su fecha y cómo acabó.</span></li>
-    </ol>
-  </figure>
-
-  <h3 id="errores">General › Registro de errores</h3>
-  <p>Los dos ficheros que hay que mirar cuando una web da un error. Un <i>registro</i> (en inglés, <i>log</i>) es un fichero de texto donde
-    un programa va apuntando lo que pasa, una línea detrás de otra. Lo más reciente está al final.</p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-registro-de-errores.png" data-linux="img/linux/config-registro-de-errores.png" data-mac="img/mac/config-registro-de-errores.png" alt="Configuración, Registro de errores" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="46" data-y="22.5"><b>El del proyecto cargado</b><span>El registro de su vhost: ahí van los errores de PHP de esa web, como el «error crítico» de WordPress. Solo sale con un proyecto cargado que tenga su propio registro.</span></li>
-      <li data-x="45" data-y="28.5"><b>El general de Apache</b><span>El de la versión activa: lo que impide arrancar a Apache, un vhost mal escrito…</span></li>
-      <li data-x="88" data-y="23"><b>Ver el final</b><span>Las últimas 400 líneas, en una ventana con «Copiar todo» y «Actualizar». Apagado si el fichero está vacío.</span></li>
-      <li data-x="94.5" data-y="23"><b>Abrir</b><span>El fichero entero en tu editor. Si pasa de 20 MB, está apagado: usa «Ver el final».</span></li>
-    </ol>
-  </figure>
-  <div class="se-configura"><b>Qué se puede configurar</b>
-    <ul>
-      <li>Debajo de cada uno: su ruta, lo que ocupa y cuándo cambió. Si aún no existe, lo dice: se crea con el primer error.</li>
-      <li>Aquí no se configura nada: es para consultar. Para vaciarlos, en <a href="#limpieza">Limpieza</a>, «Registros de las versiones».</li>
-    </ul>
-  </div>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: no hay. «Ver el final» y «Abrir» leen el fichero desde la propia ventana, sin cambiar nada.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>El del proyecto cargado: busca en los vhosts el bloque de <code>web.local</code> (o el dominio del proyecto) y lee su línea
-        <code>ErrorLog</code>, que dice dónde escribe sus errores.</li>
-      <li data-so="linux">El general: <code>/opt/lampp/logs/error_log</code>.</li>
-      <li data-so="mac">El general: <code>/Applications/XAMPP/xamppfiles/logs/error_log</code>.</li>
-      <li>«Ver el final» lee solo el último trozo del fichero y enseña sus últimas 400 líneas.</li>
-    </ol>
-    <p>Para verlo tú: <span data-so="linux"><code>tail -n 400 /opt/lampp/logs/error_log</code></span><span data-so="mac"><code>tail -n 400 /Applications/XAMPP/xamppfiles/logs/error_log</code></span>.
-      Con <code>tail -f</code> en lugar de <code>-n 400</code>, se queda mirando y enseña cada error nuevo según llega (Ctrl+C para
-      salir).</p>
-  </details>
-
-  <h3 id="tareas">General › Registro de tareas</h3>
-  <p>Todo lo que ha hecho la ventana por ti, tarea a tarea. Cada tarea que lanza (instalar o actualizar una versión, activarla, arrancar un
-    servicio, copiar o cargar una BBDD, limpiar…) guarda su registro entero: la orden de <code>nexum</code> que se ha ejecutado, con todo lo
-    que lleva detrás, todo lo que ha dicho (lo mismo que se ve en su ventana, en «Ver registro») y cómo acabó. Sirve para saber qué se hizo
-    y cuándo, y para mirar con calma por qué falló algo aunque ya hayas cerrado su ventana.</p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-registro-de-tareas.png" data-linux="img/linux/config-registro-de-tareas.png" data-mac="img/mac/config-registro-de-tareas.png" alt="Configuración, General, Registro de tareas" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="45" data-y="23"><b>Cada tarea</b><span>Su título, la fecha y la hora en que empezó y cómo acabó: con el check verde, «Terminada bien»; con la señal roja, «Ha fallado (código N)»; también «Cancelada» o, mientras sigue, «En marcha». Deja el ratón encima para ver su orden.</span></li>
-      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta». Una tarea en marcha guarda lo que va diciendo cada 3 segundos y su ventana se actualiza sola, como una consola: abajo del todo ves lo último que está haciendo, hasta que acaba.</span></li>
-      <li data-x="70" data-y="33"><b>La lista</b><span>Se ven 4 tareas, la más nueva arriba. Si hay más, la lista se desplaza dentro de su recuadro, con su barra a la derecha: baja con la rueda del ratón para ver las anteriores.</span></li>
-      <li data-x="82" data-y="47"><b>Vaciar el registro…</b><span>Te pregunta antes «¿Vaciar el registro de tareas?», con cuántas se borran, y pulsa «Vaciar», en rojo. Borra los registros de las tareas que ya han acabado; el de una tarea que sigue en marcha se queda. No toca nada más: ni tus proyectos, ni los demás registros. Apagado si no hay ninguna acabada. Es lo mismo que «Registros del programa» en <a href="#limpieza">Limpieza</a>, pero solo con el registro de tareas.</span></li>
-      <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.nexum/tareas</code>, donde está cada una en su fichero de texto.</span></li>
-    </ol>
-  </figure>
-  <div class="se-configura"><b>Qué se puede configurar</b>
-    <ul>
-      <li><b>Nada:</b> se guarda solo, desde que la tarea empieza.</li>
-      <li><b>Cuántas se guardan:</b> las 200 últimas. Al empezar una tarea, las más viejas se borran solas.</li>
-      <li><b>Sin secretos:</b> la contraseña de administrador nunca pasa por la salida (se le da directamente a <code>sudo</code>). La de
-        MariaDB, que algunas tareas llevan aparte (en <code>MYSQL_PWD</code>), no se escribe: sale <code>••••••</code>. Tampoco lo que va
-        detrás de «Contraseña:» o «token=» (como la contraseña de un túnel de Cloudflare), los tokens de GitHub ni la contraseña de una
-        dirección como <code>mysql://usuario:contraseña@…</code>.</li>
-      <li><b>Solo para ti:</b> la carpeta y sus ficheros son tuyos y nadie más del equipo los puede leer.</li>
-      <li>Para borrarlas antes de tiempo: <a href="#limpieza">Limpieza</a>, «Registros del programa».</li>
-    </ul>
-  </div>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: no hay. Lo escribe la propia ventana, sin contraseña, en <code>~/.nexum/tareas</code> (la carpeta,
-      con permisos 700; cada fichero, 600: solo tú puedes leerlos).</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Al empezar una tarea, crea su fichero, con la fecha y la hora en el nombre (<code>20261110-173512-…txt</code>), y apunta
-        «En marcha». Si hay más de 200, borra los más viejos.</li>
-      <li>Al acabar, lo escribe entero: arriba, <code>Tarea:</code>, <code>Orden:</code> (por ejemplo, <code>nexum use 8.3</code>),
-        <code>Fecha:</code>, <code>Resultado:</code> («Terminada bien», «Ha fallado (código N)» o «Cancelada») y <code>Duración:</code>;
-        debajo de una raya de <code>=</code>, toda la salida.</li>
-    </ol>
-    <p>Para verlas: <code>ls ~/.nexum/tareas</code> y, la última, <code>cat "$(ls -d ~/.nexum/tareas/* | tail -1)"</code>.</p>
-  </details>
-
-  <h3 id="parches">General › Parches nuevos</h3>
-  <p>Los parches de seguridad de todo lo que usa el programa, en un solo sitio, y ponerlo todo al día de una vez. Un <i>parche</i> es una
-    versión nueva que arregla fallos sin cambiar nada más: por ejemplo, pasar de PHP 8.3.14 a 8.3.15. Cada versión de PHP pertenece a una
-    <i>rama</i> (la 8.3, la 8.2…) y solo se pone al día dentro de su rama: una 8.3 nunca pasa sola a la 8.4.</p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png" alt="Configuración, Parches nuevos" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="40" data-y="66"><b>Componentes</b><span>Mientras mira, dice «Buscando parches nuevos…». Luego, «Todo al día: no hay parches nuevos.», o la lista de lo que tiene un parche nuevo, con la versión de ahora y la nueva (cada versión de PHP con su Apache, MariaDB, FTP, Perl y phpMyAdmin, <span data-so="linux">los paquetes de Docker</span><span data-so="mac">Docker Desktop</span>, las imágenes de Docker, los Node de Nexum, Mailpit, cloudflared y Nginx). Si algo no se ha podido consultar (por ejemplo, sin internet), dice «No se ha podido consultar: …». Debajo, con ·, lo publicado más nuevo que lo que pone Nexum (Mailpit, cloudflared o Nginx): solo para saberlo.</span></li>
-      <li data-x="92" data-y="66"><b>Buscar de nuevo</b><span>Vuelve a consultar ahora. Si hay algo, sale al lado «Actualizar todo (N)», en verde, que lo pone al día de una vez.</span></li>
-    </ol>
-  </figure>
-  <p>Qué se mira de cada cosa:</p>
-  <ul>
-    <li><b>Cada versión de PHP</b>: su PHP, Apache (el servidor web), MariaDB (la base de datos), ProFTPD (el FTP), Perl y phpMyAdmin,
-      frente a lo último publicado de su rama (lo consulta en php.net y en la web de cada uno). Los XAMPP oficiales y las versiones que
-      instalaste en un parche concreto (como una 7.4.33) no se ponen al día solas: no salen en la lista.</li>
-    <li><b>Las imágenes de Docker</b>: una <i>imagen</i> es el paquete del que sale un <i>contenedor</i> (un pequeño sistema aislado donde
-      funciona un programa, como la MariaDB de tus proyectos de Docker). Se compara su huella con la de Docker Hub (el sitio de donde se
-      descargan), sin descargar nada.</li>
-    <li data-so="linux"><b>Docker</b>: sus paquetes de Ubuntu (docker.io, docker-compose-v2 y rootlesskit), frente a la versión que ofrece apt.</li>
-    <li data-so="mac"><b>Docker Desktop</b>, frente a la que ofrece su actualizador. Se instala a mano, como cualquier aplicación.</li>
-    <li><b>Node</b>: los que ha descargado el programa (en ~/.nexum/node), frente a lo último de su rama en nodejs.org.</li>
-    <li><b>Mailpit</b> (el correo de pruebas), <b>cloudflared</b> (el de los túneles) y <b>Nginx</b>, frente a los que trae esta versión del
-      programa. Si se ha publicado uno más nuevo, se dice, pero no cuenta como parche: llega con una versión del programa.</li>
-  </ul>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum componentes</code> (la que lanzan la búsqueda al abrir la ventana y «Buscar de nuevo»).
-      Con <code>--sin-docker</code> no mira las imágenes de Docker.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Consulta en php.net las últimas versiones de cada rama de PHP.</li>
-      <li data-so="linux">Para cada <code>/opt/lampp-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y escribe
-        una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
-      <li data-so="mac">Para cada <code>/Library/Nexum/XAMPP-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y
-        escribe una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
-      <li>Mira también que cada pieza de la versión esté entera: que estén los programas de PHP, PHP-FPM, Apache, MariaDB (su servidor
-        y su cliente), ProFTPD y Perl, y el <code>index.php</code> de phpMyAdmin<span data-so="linux">, y que respondan
-        (<code>--version</code>)</span>. Una que falta<span data-so="linux"> o no responde</span> sale como dañada aunque esté en lo último
-        de su rama, <code>L|8.4|MariaDB|dañado|11.8.10</code> («<span data-so="linux">lampp</span><span data-so="mac">XAMPP</span>-8.4: MariaDB dañado → 11.8.10»), y al actualizar se rehace la
-        versión entera (sus piezas se compilan juntas) conservando sus bases de datos.</li>
-      <li>Si Docker está en marcha, compara cada imagen que usas (<code>mariadb:</code><i>versión</i>, la de phpMyAdmin y la base de cada
-        imagen de PHP, <code>php:</code><i>versión</i><code>-fpm</code>) con Docker Hub: <code>K|mariadb:11.4|…</code>.</li>
-      <li data-so="linux">Compara los paquetes de Docker con los de apt: <code>X|docker.io|29.1.3-…|29.1.4-…</code>.</li>
-      <li data-so="mac">Compara Docker Desktop con su actualizador: <code>M|Docker Desktop|4.99.0|4.100.0|…</code>.</li>
-      <li>Cada rama de Node: <code>X|Node|22.11.0|22.12.0</code>.</li>
-      <li>Compara Mailpit, cloudflared y Nginx con los que trae el programa (<code>X|Mailpit|1.21.0|1.22.0</code>) y con los publicados
-        (<code>N|Mailpit|1.32.0|1.34.0</code>, que no cuenta en <code>S|</code>).</li>
-      <li>Al final, <code>S|</code><i>número</i>: cuántas cosas tienen parche. Las líneas <code>F|</code> son versiones que no se ponen al día
-        solas, y las <code>E|</code>, lo que no se ha podido consultar.</li>
-    </ol>
-    <p>Para comprobarlo: <code>nexum componentes</code> (si termina en <code>S|0</code>, todo está al día).</p>
-  </details>
-  <div class="se-configura"><b>Qué se puede configurar</b>
-    <ul>
-      <li><b>Cuándo se buscan:</b> solos, al abrir la ventana el primer día y después cada pocos arranques (cada cuatro); y cuando pulses
-        «Buscar de nuevo». Si al abrir hay alguno, abajo sale «Hay parches nuevos: míralos en los avisos de arriba».</li>
-      <li><b>Actualizar todo (N):</b> te pregunta «¿Actualizar todo?» con la lista de lo que se va a poner al día. Las versiones de PHP se
-        vuelven a <i>compilar</i> (se construyen desde su código fuente) con lo último de su rama: la de ahora sigue funcionando mientras
-        tanto, varios minutos. Los contenedores de Docker en marcha se rehacen en segundos, sin cambiar sus bases de datos ni su
-        configuración; Mailpit y cloudflared se reinstalan; los Node, con lo último de su rama. <span data-so="linux">Docker va primero: antes
-        se copian todas sus BBDD en ~/nexum-backups (si la copia falla, Docker no se toca), y luego se instalan sus paquetes nuevos y se
-        arranca de nuevo.</span><span data-so="mac">Docker Desktop: se copian todas sus BBDD en ~/nexum-backups y se abre su página de
-        descarga.</span> Trae la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada:
-        márcala si alguna versión puede cambiar de rama de MariaDB, porque entonces empieza con las bases de datos vacías. Sin ella, avisa
-        en rojo: «Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar.» Pulsa «Actualizar todo» y escribe la contraseña
-        de administrador. La tarea «Actualizando los componentes» acaba con «Componentes al día».</li>
-      <li><b>El aviso de arriba:</b> «Hay parches nuevos (N)», con «Conviene ponerlos: son parches de seguridad» y la lista (las 6 primeras y
-        «…y N más»). «Actualizar todo» hace lo mismo que aquí. Con «Ahora no» no vuelve a avisar hasta que salga otro parche; siguen en
-        este apartado.</li>
-    </ul>
-  </div>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum componentes-actualizar</code> (la de «Actualizar todo»), o
-      <code>nexum componentes-actualizar --copia</code> si marcas la casilla de la copia.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Busca de nuevo los parches (como <code>nexum componentes</code>) y dice lo que va a poner al día. Si no hay nada:
-        «Todo está al día: no hay parches nuevos.»</li>
-      <li data-so="linux">Docker: <code>nexum docker-copia</code>; fija el almacén de imágenes en <code>~/.config/docker/daemon.json</code>
-        (<code>features.containerd-snapshotter</code>); <code>sudo apt-get install -y --only-upgrade docker.io …</code>; apaga otra vez el
-        Docker del sistema y <code>systemctl --user restart docker.service</code>.</li>
-      <li>Cada MariaDB común de Docker con versión nueva: descarga la imagen (<code>docker pull mariadb:</code><i>versión</i>) y, si su
-        contenedor está en marcha, lo vuelve a crear con ella. Sus bases de datos no se tocan (están aparte, en un volumen).</li>
-      <li>phpMyAdmin de Docker: <code>docker pull</code> de su imagen y, si el Apache de Docker está en marcha, se rehace.</li>
-      <li>Cada imagen de PHP de Docker: se vuelve a construir la imagen <code>nexum-php:</code><i>versión</i> con lo último de Docker Hub,
-        y los contenedores en marcha de los proyectos que la usan se rehacen (<code>docker compose … up -d</code>). Luego se borran las
-        imágenes viejas que ya no usa nadie: <code>docker image prune -f</code>.</li>
-      <li>Mailpit y cloudflared: se descargan e instalan otra vez, con su versión nueva.</li>
-      <li>Cada rama de Node con parche: se descarga, como al arrancar un proyecto de Node, y se quitan los anteriores de esa rama que no
-        estén en marcha.</li>
-      <li>Cada versión de PHP con parche: se recompila en su carpeta, como <code>nexum actualizar</code> <i>versión</i> (con
-        <code>--copia</code>, guarda antes sus bases de datos en <code>~/nexum-backups</code>). Esto pide la contraseña de administrador,
-        porque las carpetas de las versiones son suyas.</li>
-      <li>Al acabar: «Todo al día.», o «Algo no se ha podido actualizar: mira lo de arriba.»</li>
-    </ol>
-    <p>Para comprobarlo: <code>nexum componentes</code> tiene que acabar en <code>S|0</code>.</p>
-  </details>
-
-  <h3 id="programa">General › Programa</h3>
-  <p>El propio programa: sus actualizaciones, su icono, la bandeja y si se abre al iniciar sesión. <span data-so="mac">En el Mac, aquí
-    están «Dejar en la barra de menús al cerrar» y «Abrir al iniciar sesión»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-programa.png" data-linux="img/linux/config-programa.png" data-mac="img/mac/config-programa.png" alt="Configuración, Programa" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="42" data-y="81"><b>Buscar una versión nueva</b><span>«Buscar» mira en GitHub (y en tu carpeta de Descargas) si hay una versión más nueva y firmada. Si no la hay: «Tienes la última versión (…)».</span></li>
-      <li data-x="44" data-y="87"><b>Icono en el menú</b><span>«Crear de nuevo» vuelve a poner «Nexum Dev Stack» en el menú de aplicaciones, si no aparece o no abre esta ventana. Dice «Icono creado en el menú de aplicaciones».</span></li>
-      <li data-x="41.5" data-y="93"><b>Dejar en la bandeja al cerrar</b><span>Encendido, cerrar la ventana la esconde en un icono junto al reloj, con lo básico: abrirla, arrancar o parar, web.local y salir.</span></li>
-    </ol>
-  </figure>
-  <p><b>Abrir al iniciar sesión.</b> Debajo de «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
-    menús</span> al cerrar», un interruptor: encendido, Nexum Dev Stack se abre solo cada vez que entras en tu sesión. Si también está
-    puesto el icono <span data-so="linux">junto al reloj</span><span data-so="mac">de la barra de menús</span>, arranca escondido en él,
-    sin abrir la ventana: la abres desde su menú cuando la necesites. Apagado, deja de abrirse.</p>
-  <p><b>Si hay una versión nueva</b></p>
-  <ol class="pasos-tarea">
-    <li><b>Lee el aviso</b> «Hay una versión nueva de Nexum Dev Stack»: de qué versión a cuál, de dónde viene y su huella SHA-256 (el código
-      que identifica ese fichero exacto). Que esté <i>firmada</i> quiere decir que la ha publicado quien hace el programa y nadie la ha
-      cambiado por el camino.</li>
-    <li><b>Pulsa «Actualizar a la X»</b> y escribe la contraseña de administrador. Tus versiones, proyectos y bases de datos no se tocan.</li>
-    <li><b>Espera.</b> La ventana se cierra y se vuelve a abrir con la versión nueva.</li>
-  </ol>
-  <div class="nota" data-so="linux"><b>«La versión X se instala una vez en la terminal»</b>Algunas versiones cambian el propio programa que
-    instala las actualizaciones, y hay que instalarlas a mano una vez. No es un error. «Copiar la orden» copia lo que tienes que pegar en una
-    terminal (<code>sudo apt install</code> con la ruta del paquete); después, abre de nuevo el programa.</div>
-  <div class="se-configura"><b>Qué se puede configurar</b>
-    <ul>
-      <li><b>De partida:</b> con el icono junto al reloj, y sin abrirse al iniciar sesión.</li>
-      <li data-so="linux"><b>Si lo quitas en «Aplicaciones al inicio»</b> de Ubuntu, el interruptor sale apagado.</li>
-      <li data-so="linux"><b>Si falta su componente</b>, el interruptor sale apagado y la fila dice cómo instalarlo: <code>sudo apt install gir1.2-ayatanaappindicator3-0.1</code>.</li>
-    </ul>
-  </div>
-  <details class="terminal"><summary>En la terminal</summary>
-    <div data-so="linux">
-      <p>La orden del programa: <code>nexum gui-paquete</code> (la de «Buscar»: solo busca). Instalar lo hace la ventana con el
-        ayudante del paquete: <code>pkexec /opt/nexum/nexum-actualizar</code> <i>paquete</i> <i>huella</i>.</p>
-      <p>Lo que hace, paso a paso:</p>
-      <ol>
-        <li>Mira la última versión publicada en la página del programa en GitHub y, si es más nueva, la descarga a
-          <code>~/.nexum/actualizaciones</code>.</li>
-        <li>Busca también paquetes <code>nexum_</code><i>versión</i><code>_all.deb</code> en esa carpeta y en tus Descargas.</li>
-        <li>De cada uno comprueba que es del programa, que solo lleva ficheros normales y que está firmado. Uno sin firma no se instala desde la
-          ventana: te dice que lo instales tú en la terminal.</li>
-        <li>Si hay uno más nuevo, da su versión, su fecha y su huella: <code>N|</code><i>versión</i><code>|</code><i>fecha</i><code>|</code><i>huella</i><code>|</code><i>ruta</i>.</li>
-        <li>Al pulsar «Actualizar», el ayudante (que funciona como administrador; <code>pkexec</code> te pide la contraseña) copia el paquete a
-          su carpeta, comprueba otra vez la huella y lo instala.</li>
-      </ol>
-      <p>Para hacerlo a mano: <code>sudo apt install ./nexum_</code><i>versión</i><code>_all.deb</code>. Para comprobarlo:
-        <code>nexum --version</code>.</p>
-    </div>
-    <div data-so="mac">
-      <p>La orden del programa: <code>nexum gui-paquete</code> (busca) y, al aceptar, <code>nexum actualizar-gestor</code>
-        <i>paquete</i>.</p>
-      <p>Lo que hace, paso a paso:</p>
-      <ol>
-        <li>Mira la última versión publicada en la página del programa en GitHub y comprueba que está firmada.</li>
-        <li>Si hay una más nueva, la ofrece con su huella; al aceptar, la instala (pide la contraseña de administrador) y la ventana se vuelve a
-          abrir.</li>
-      </ol>
-      <p>Para comprobarlo: <code>nexum --version</code>.</p>
-    </div>
-  </details>
-  <details class="terminal" data-so="linux"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum gui-crear-acceso</code> (la de «Crear de nuevo»). No pide contraseña.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Pone el icono del programa en <code>~/.local/share/icons/nexum.png</code>.</li>
-      <li>Escribe el acceso del menú de aplicaciones, <code>~/.local/share/applications/nexum.desktop</code>: un fichero de
-        texto con <code>Name=Nexum Dev Stack</code>, la orden que abre la ventana (<code>Exec=</code>… <code>ventana</code>) y el icono, y lo
-        hace ejecutable (<code>chmod +x</code>).</li>
-      <li>Avisa al escritorio de que lo vuelva a leer: <code>update-desktop-database -q ~/.local/share/applications</code>.</li>
-    </ol>
-    <p>Para comprobarlo: <code>cat ~/.local/share/applications/nexum.desktop</code>.</p>
-  </details>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: no hay. El interruptor «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
-      menús</span> al cerrar» lo guarda la propia ventana, sin contraseña.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Escribe <code>si</code> o <code>no</code> en <code>~/.nexum/ventana-bandeja</code>. Si el fichero no existe, cuenta como
-        encendido.</li>
-      <li>Pone o quita el icono junto al reloj al momento.</li>
-    </ol>
-    <p>Para comprobarlo: <code>cat ~/.nexum/ventana-bandeja</code>.</p>
-  </details>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: no hay. El interruptor «Abrir al iniciar sesión» lo guarda la propia ventana, sin contraseña.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li data-so="linux">Encendido, escribe el acceso de inicio de tu sesión, <code>~/.config/autostart/nexum.desktop</code> (el mismo sitio
-        que usa «Aplicaciones al inicio»), que abre la ventana con <code>nexum ventana --al-iniciar</code>.</li>
-      <li data-so="mac">Encendido, escribe <code>~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>, que abre la
-        aplicación con <code>--al-iniciar</code> al entrar en tu sesión.</li>
-      <li>Con <code>--al-iniciar</code> y el icono puesto, la ventana se queda escondida en él.</li>
-      <li>Apagado, borra ese fichero. Solo si es el de Nexum Dev Stack: uno tuyo con el mismo nombre (o un enlace) no se toca, y te lo dice.</li>
-    </ol>
-    <p>Para comprobarlo: <code data-so="linux">cat ~/.config/autostart/nexum.desktop</code><code data-so="mac">cat
-      ~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>.</p>
-  </details>
+  <h3 id="ajustes">La pestaña Ajustes</h3>
+  <p>Lo que hay que configurar para que funcionen otras partes del programa: <a href="#vhosts">Vhosts y hosts</a>,
+    <a href="#seguridad-webs">Seguridad entre webs</a>, <a href="#correo">Correo de pruebas</a>,
+    <a href="#admin-pruebas-config">Administrador de pruebas</a>, <a href="#docker-config">Docker</a>, <a href="#nginx-config">Nginx</a>,
+    <a href="#tunel-config">Túnel de Cloudflare</a>, <a href="#github-config">GitHub</a> y <a href="#carpetas">Carpetas</a>.</p>
 
   <h3 id="vhosts">Vhosts y hosts</h3>
   <p>Los dos ficheros del sistema que deciden qué web se abre con cada dirección, para cambiarlos a mano con red de seguridad. Los dos son del
@@ -5091,7 +4850,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-configuracion.png" data-linux="img/linux/config-configuracion.png" data-mac="img/mac/config-configuracion.png" alt="Configuración, Vhosts y hosts" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-configuracion.png" data-linux="img/linux/config-configuracion.png" data-mac="img/mac/config-configuracion.png" alt="Ajustes, Vhosts y hosts" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="21"><b>Virtual hosts</b><span>El fichero de vhosts que comparten todas las versiones: qué carpeta se abre con cada dominio. Debajo, su ruta.</span></li>
@@ -5188,7 +4947,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-seguridad-entre-webs.png" data-linux="img/linux/config-seguridad-entre-webs.png" data-mac="img/mac/config-seguridad-entre-webs.png" alt="Configuración, Seguridad entre webs" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-seguridad-entre-webs.png" data-linux="img/linux/config-seguridad-entre-webs.png" data-mac="img/mac/config-seguridad-entre-webs.png" alt="Ajustes, Seguridad entre webs" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="21"><b>Barrera entre webs</b><span>«Encendida: tus proyectos solo aceptan lo que llega desde ellos mismos». Apagada: «Apagada: enciéndela cuando acabes de probar los pagos».</span></li>
@@ -5343,7 +5102,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Configuración, Docker" width="1434" height="919" loading="lazy">
+      <img src="img/linux/config-docker.png" data-linux="img/linux/config-docker.png" data-mac="img/mac/config-docker.png" alt="Ajustes, Docker" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="26"><b>Dirección y puertos</b><span>Dónde escucha el Apache de Docker: 127.0.0.2, con 80 y 443, de partida. Cambia los campos «Dirección», «HTTP» y «HTTPS» y pulsa «Guardar». Con 80 y 443, las direcciones van sin puerto; con otro HTTPS, lo llevan (<code>https://…:8443</code>). HTTP lleva siempre a https.</span></li>
@@ -5547,7 +5306,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
 
   <h4 id="docker-postgres">PostgreSQL de Docker</h4>
   <p>Una base de datos <b>PostgreSQL</b> común por versión (la 18, la 17 o la 16), como las MariaDB comunes, para todos los proyectos de
-    Docker. Se crea al final de Configuración → Docker, eligiendo la versión y pulsando «Crear», que descarga su imagen oficial.</p>
+    Docker. Se crea al final de Ajustes → Docker, eligiendo la versión y pulsando «Crear», que descarga su imagen oficial.</p>
   <ul>
     <li><b>Desde los proyectos de Docker</b>, su servidor es <code>nexum-postgres-18</code>, puerto <code>5432</code>.</li>
     <li><b>Desde tu equipo</b>, para tus herramientas de BBDD (DBeaver, pgAdmin, <code>psql</code>…): <code>127.0.0.1</code> y el puerto
@@ -5592,7 +5351,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-nginx.png" data-linux="img/linux/config-nginx.png" data-mac="img/mac/config-nginx.png" alt="Configuración, Nginx" width="1434" height="919" loading="lazy">
+      <img src="img/linux/config-nginx.png" data-linux="img/linux/config-nginx.png" data-mac="img/mac/config-nginx.png" alt="Ajustes, Nginx" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="95.1" data-y="24.2"><b>Usar Nginx</b><span>Apagado de serie. Encendido, sale la página <a href="#nginx">Nginx</a> en el menú
@@ -5618,7 +5377,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-tunel-de-cloudflare.png" data-linux="img/linux/config-tunel-de-cloudflare.png" data-mac="img/mac/config-tunel-de-cloudflare.png" alt="Configuración, Túnel de Cloudflare" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-tunel-de-cloudflare.png" data-linux="img/linux/config-tunel-de-cloudflare.png" data-mac="img/mac/config-tunel-de-cloudflare.png" alt="Ajustes, Túnel de Cloudflare" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="39" data-y="25"><b>cloudflared</b><span>Su versión y dónde está. Si aún no está: «Aún no está: se descarga de GitHub la primera vez que compartes (unos 40 MB)», con «Instalar». Si hay una nueva, «Actualizar a la X». Se descarga comprobada, con tu usuario (no pide la contraseña de administrador).</span></li>
@@ -5679,7 +5438,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-github-repositorios.png" data-linux="img/linux/config-github-repositorios.png" data-mac="img/mac/config-github-repositorios.png" alt="Configuración, GitHub" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-github-repositorios.png" data-linux="img/linux/config-github-repositorios.png" data-mac="img/mac/config-github-repositorios.png" alt="Ajustes, GitHub" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="40" data-y="25"><b>Conexión</b><span>«Conectado como …, con el token del llavero» (o «con tu sesión de gh»); «Sin conectar», o «⚠ El token ya no vale (¿caducado?): conéctalo de nuevo». Botones: «Conectar con un token…» (en verde si no estás conectado), «Usar la sesión de gh» (solo si tienes <code>gh</code> instalado y no la usas ya) y «Desconectar» (solo si estás conectado).</span></li>
@@ -5750,6 +5509,415 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Para comprobarlo: <code>cat ~/.nexum/github</code>.</p>
   </details>
 
+  <h3 id="carpetas">Carpetas</h3>
+  <p>Las carpetas importantes del programa, a un clic. «Abrir» las abre en tu explorador de archivos; no cambia nada (es como
+    <span data-so="linux"><code>xdg-open /opt/htdocs</code></span><span data-so="mac"><code>open /Library/Nexum/XAMPP-compartido/htdocs</code></span>
+    en la terminal).</p>
+  <p>Los ajustes del programa, sus registros y lo que guarda de tus proyectos (los vínculos con sus BBDD, Docker, el túnel, el correo de
+    pruebas, la apariencia…) están en <code>~/.nexum</code>, una carpeta oculta de tu carpeta personal que solo puedes ver tú. Es la de
+    «Registros de instalaciones».</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-carpetas.png" data-linux="img/linux/config-carpetas.png" data-mac="img/mac/config-carpetas.png" alt="Ajustes, Carpetas" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="39" data-y="22"><b>Proyectos</b><span>La carpeta de tus proyectos, la que comparten todas las versiones.</span></li>
+      <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
+      <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
+      <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
+      <li data-x="40" data-y="40.7"><b>Espacios de trabajo de VS Code</b><span>La carpeta donde guardas tus <code>.code-workspace</code>. Elegida, dice «cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no tiene, se le crea uno aquí)»; sin elegir, «los proyectos se abren como carpeta». No pide la contraseña.</span></li>
+      <li data-x="87.5" data-y="40.7"><b>Elegir… o Cambiar…</b><span>Abre el selector de carpetas para elegirla. Con una elegida que existe, sale también «Abrir», que la abre en tu explorador de archivos.</span></li>
+      <li data-x="94.3" data-y="40.7"><b>Quitar</b><span>Deja de usarla: los proyectos vuelven a abrirse en VS Code como carpeta. Sus <code>.code-workspace</code> no se tocan.</span></li>
+      <li data-x="40" data-y="46.9"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
+      <li data-x="40" data-y="53.1"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span><span data-so="mac"> (<code>/Library/Nexum/descargas</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
+      <li data-x="94" data-y="53.1"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Copias de los ficheros que cambia el programa</b>: apagado de partida. Encendido, se guarda en <code>~/nexum-backups</code>
+        el fichero de hosts, los vhosts o la configuración de un proyecto (su <code>wp-config.php</code> o su <code>parameters.php</code>) antes
+        de que el programa los cambie, y la caché vieja de una tienda se aparta allí en lugar de borrarse. En la terminal:
+        <code>nexum copias-ficheros si</code> (o <code>no</code>).</li>
+      <li>Las copias de bases de datos y de código no dependen de este ajuste: se guardan cuando marcas su casilla en cada diálogo.</li>
+      <li><b>Espacios de trabajo de VS Code</b>: sin elegir de partida (cada proyecto se abre como carpeta). Con una carpeta elegida, el botón
+        «VS Code» de cada proyecto abre su espacio de trabajo, que busca en esa carpeta y en sus subcarpetas de primer nivel (por si los
+        tienes clasificados por tipo de proyecto, como <code>wordpress/</code> o <code>tiendas/</code>): <i>carpeta-del-proyecto</i><code>.code-workspace</code>
+        si lo hay; si no, otro que ya tenga la carpeta del proyecto entre sus carpetas (aunque se llame distinto); y si no tiene ninguno, le crea
+        <i>carpeta-del-proyecto</i><code>.code-workspace</code> con su carpeta en la carpeta elegida («Espacio de trabajo nuevo: …»), que luego puedes cambiar
+        en VS Code como cualquier otro. Así, un proyecto nuevo tiene el suyo la primera vez que lo abres. Se guarda en
+        <code>~/.nexum/vscode-espacios</code>; es tuyo, de tu usuario, y cada uno en su equipo elige la suya.</li>
+      <li>Lo demás no se configura: «Abrir» abre cada carpeta en tu explorador de archivos, y «Borrar…» y «Vaciar…» las vacían.</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum copias vaciar</code> (la de «Borrar las copias»). Sin <code>vaciar</code>,
+      <code>nexum copias</code> dice cuántos ficheros hay y cuánto ocupan.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Comprueba que <code>~/nexum-backups</code> es una carpeta tuya y no un enlace.</li>
+      <li>Borra todo lo de dentro, sin pasar a otros discos y sin seguir enlaces: <code>find ~/nexum-backups -xdev -mindepth 1 -delete</code>.
+        La carpeta se queda.</li>
+      <li>Si queda algo (copias que hizo el administrador), lo borra con <code>sudo</code>, solo dentro de esa carpeta:
+        <code>sudo find ~/nexum-backups -xdev -mindepth 1 -delete</code>.</li>
+    </ol>
+    <p>Para comprobarlo: <code>ls -A ~/nexum-backups</code> (no sale nada).</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum copias-ficheros si</code> al encender el interruptor y
+      <code>nexum copias-ficheros no</code> al apagarlo. Sin nada detrás, dice cómo está.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>El interruptor es un fichero vacío: <code>~/.nexum/copias-ficheros</code>. Encender lo crea
+        (<code>touch ~/.nexum/copias-ficheros</code>); apagar lo borra (<code>rm -f ~/.nexum/copias-ficheros</code>).</li>
+      <li>Desde entonces, cada vez que el programa vaya a cambiar el fichero de hosts, los vhosts o la configuración de un proyecto, mira si
+        está ese fichero y, si está, guarda antes el de ahora en <code>~/nexum-backups</code> con la fecha en el nombre.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum copias-ficheros</code>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum descargas vaciar</code> (la de «Vaciar la caché»). Sin <code>vaciar</code>,
+      <code>nexum descargas</code> lista lo que hay y lo que ocupa.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Comprueba que la carpeta existe y no es un enlace.</li>
+      <li>Borra sus ficheros, con permiso de administrador porque la carpeta es suya:
+        <span data-so="linux"><code>sudo find /var/cache/nexum-stack -mindepth 1 -maxdepth 1 -type f -delete</code></span><span data-so="mac"><code>sudo find /Library/Nexum/descargas -mindepth 1 -maxdepth 1 -type f -delete</code></span>.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum descargas</code> («La cache de descargas … esta vacia»).</p>
+  </details>
+
+  <h3 id="sistema">La pestaña Sistema</h3>
+  <p>Lo del propio programa: <a href="#general">General</a>, <a href="#tareas">Registro de tareas</a>, <a href="#apariencia">Apariencia</a>,
+    <a href="#limpieza">Limpieza</a>, <span data-so="linux"><a href="#xampp-registrar">XAMPP sin registrar</a></span><span
+    data-so="mac"><a href="#configuracion-xampp-oficial">XAMPP oficial</a></span> e <a href="#informacion">Información</a>.</p>
+
+  <h3 id="general">General</h3>
+  <p>El primer apartado de Sistema, con lo que más se consulta, junto: «Los registros de errores de la web cargada y de Apache, los
+    parches nuevos de lo que usa Nexum y el propio programa». Lleva tres bloques, cada uno con su título y, debajo, para qué sirve:
+    <a href="#errores">Registro de errores</a>, <a href="#parches">Parches nuevos</a> y <a href="#programa">Programa</a>. Baja por la
+    página para llegar a los de abajo.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-general.png" data-linux="img/linux/config-general.png" data-mac="img/mac/config-general.png" alt="Sistema, General" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="24" data-y="14"><b>Los apartados</b><span>La columna de Sistema. General es el primero. Pulsa uno para verlo a la derecha. El elegido se recuerda al volver.</span></li>
+      <li data-x="44" data-y="19"><b>Registro de errores</b><span>Los dos registros que hay que mirar cuando una web da un error.</span></li>
+    </ol>
+  </figure>
+
+  <h3 id="errores">General › Registro de errores</h3>
+  <p>Los dos ficheros que hay que mirar cuando una web da un error. Un <i>registro</i> (en inglés, <i>log</i>) es un fichero de texto donde
+    un programa va apuntando lo que pasa, una línea detrás de otra. Lo más reciente está al final.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-registro-de-errores.png" data-linux="img/linux/config-registro-de-errores.png" data-mac="img/mac/config-registro-de-errores.png" alt="Sistema, Registro de errores" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="46" data-y="22.5"><b>El del proyecto cargado</b><span>El registro de su vhost: ahí van los errores de PHP de esa web, como el «error crítico» de WordPress. Solo sale con un proyecto cargado que tenga su propio registro.</span></li>
+      <li data-x="45" data-y="28.5"><b>El general de Apache</b><span>El de la versión activa: lo que impide arrancar a Apache, un vhost mal escrito…</span></li>
+      <li data-x="88" data-y="23"><b>Ver el final</b><span>Las últimas 400 líneas, en una ventana con «Copiar todo» y «Actualizar». Apagado si el fichero está vacío.</span></li>
+      <li data-x="94.5" data-y="23"><b>Abrir</b><span>El fichero entero en tu editor. Si pasa de 20 MB, está apagado: usa «Ver el final».</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li>Debajo de cada uno: su ruta, lo que ocupa y cuándo cambió. Si aún no existe, lo dice: se crea con el primer error.</li>
+      <li>Aquí no se configura nada: es para consultar. Para vaciarlos, en <a href="#limpieza">Limpieza</a>, «Registros de las versiones».</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. «Ver el final» y «Abrir» leen el fichero desde la propia ventana, sin cambiar nada.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>El del proyecto cargado: busca en los vhosts el bloque de <code>web.local</code> (o el dominio del proyecto) y lee su línea
+        <code>ErrorLog</code>, que dice dónde escribe sus errores.</li>
+      <li data-so="linux">El general: <code>/opt/lampp/logs/error_log</code>.</li>
+      <li data-so="mac">El general: <code>/Applications/XAMPP/xamppfiles/logs/error_log</code>.</li>
+      <li>«Ver el final» lee solo el último trozo del fichero y enseña sus últimas 400 líneas.</li>
+    </ol>
+    <p>Para verlo tú: <span data-so="linux"><code>tail -n 400 /opt/lampp/logs/error_log</code></span><span data-so="mac"><code>tail -n 400 /Applications/XAMPP/xamppfiles/logs/error_log</code></span>.
+      Con <code>tail -f</code> en lugar de <code>-n 400</code>, se queda mirando y enseña cada error nuevo según llega (Ctrl+C para
+      salir).</p>
+  </details>
+
+  <h3 id="parches">General › Parches nuevos</h3>
+  <p>Los parches de seguridad de todo lo que usa el programa, en un solo sitio, y ponerlo todo al día de una vez. Un <i>parche</i> es una
+    versión nueva que arregla fallos sin cambiar nada más: por ejemplo, pasar de PHP 8.3.14 a 8.3.15. Cada versión de PHP pertenece a una
+    <i>rama</i> (la 8.3, la 8.2…) y solo se pone al día dentro de su rama: una 8.3 nunca pasa sola a la 8.4.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-parches-nuevos.png" data-linux="img/linux/config-parches-nuevos.png" data-mac="img/mac/config-parches-nuevos.png" alt="Sistema, Parches nuevos" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="40" data-y="66"><b>Componentes</b><span>Mientras mira, dice «Buscando parches nuevos…». Luego, «Todo al día: no hay parches nuevos.», o la lista de lo que tiene un parche nuevo, con la versión de ahora y la nueva (cada versión de PHP con su Apache, MariaDB, FTP, Perl y phpMyAdmin, <span data-so="linux">los paquetes de Docker</span><span data-so="mac">Docker Desktop</span>, las imágenes de Docker, los Node de Nexum, Mailpit, cloudflared y Nginx). Si algo no se ha podido consultar (por ejemplo, sin internet), dice «No se ha podido consultar: …». Debajo, con ·, lo publicado más nuevo que lo que pone Nexum (Mailpit, cloudflared o Nginx): solo para saberlo.</span></li>
+      <li data-x="92" data-y="66"><b>Buscar de nuevo</b><span>Vuelve a consultar ahora. Si hay algo, sale al lado «Actualizar todo (N)», en verde, que lo pone al día de una vez.</span></li>
+    </ol>
+  </figure>
+  <p>Qué se mira de cada cosa:</p>
+  <ul>
+    <li><b>Cada versión de PHP</b>: su PHP, Apache (el servidor web), MariaDB (la base de datos), ProFTPD (el FTP), Perl y phpMyAdmin,
+      frente a lo último publicado de su rama (lo consulta en php.net y en la web de cada uno). Los XAMPP oficiales y las versiones que
+      instalaste en un parche concreto (como una 7.4.33) no se ponen al día solas: no salen en la lista.</li>
+    <li><b>Las imágenes de Docker</b>: una <i>imagen</i> es el paquete del que sale un <i>contenedor</i> (un pequeño sistema aislado donde
+      funciona un programa, como la MariaDB de tus proyectos de Docker). Se compara su huella con la de Docker Hub (el sitio de donde se
+      descargan), sin descargar nada.</li>
+    <li data-so="linux"><b>Docker</b>: sus paquetes de Ubuntu (docker.io, docker-compose-v2 y rootlesskit), frente a la versión que ofrece apt.</li>
+    <li data-so="mac"><b>Docker Desktop</b>, frente a la que ofrece su actualizador. Se instala a mano, como cualquier aplicación.</li>
+    <li><b>Node</b>: los que ha descargado el programa (en ~/.nexum/node), frente a lo último de su rama en nodejs.org.</li>
+    <li><b>Mailpit</b> (el correo de pruebas), <b>cloudflared</b> (el de los túneles) y <b>Nginx</b>, frente a los que trae esta versión del
+      programa. Si se ha publicado uno más nuevo, se dice, pero no cuenta como parche: llega con una versión del programa.</li>
+  </ul>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum componentes</code> (la que lanzan la búsqueda al abrir la ventana y «Buscar de nuevo»).
+      Con <code>--sin-docker</code> no mira las imágenes de Docker.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Consulta en php.net las últimas versiones de cada rama de PHP.</li>
+      <li data-so="linux">Para cada <code>/opt/lampp-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y escribe
+        una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
+      <li data-so="mac">Para cada <code>/Library/Nexum/XAMPP-</code><i>versión</i>, compara lo que lleva instalado con lo último de su rama y
+        escribe una línea por cada cosa con parche: <code>L|8.3|PHP|8.3.14|8.3.15</code>.</li>
+      <li>Mira también que cada pieza de la versión esté entera: que estén los programas de PHP, PHP-FPM, Apache, MariaDB (su servidor
+        y su cliente), ProFTPD y Perl, y el <code>index.php</code> de phpMyAdmin<span data-so="linux">, y que respondan
+        (<code>--version</code>)</span>. Una que falta<span data-so="linux"> o no responde</span> sale como dañada aunque esté en lo último
+        de su rama, <code>L|8.4|MariaDB|dañado|11.8.10</code> («<span data-so="linux">lampp</span><span data-so="mac">XAMPP</span>-8.4: MariaDB dañado → 11.8.10»), y al actualizar se rehace la
+        versión entera (sus piezas se compilan juntas) conservando sus bases de datos.</li>
+      <li>Si Docker está en marcha, compara cada imagen que usas (<code>mariadb:</code><i>versión</i>, la de phpMyAdmin y la base de cada
+        imagen de PHP, <code>php:</code><i>versión</i><code>-fpm</code>) con Docker Hub: <code>K|mariadb:11.4|…</code>.</li>
+      <li data-so="linux">Compara los paquetes de Docker con los de apt: <code>X|docker.io|29.1.3-…|29.1.4-…</code>.</li>
+      <li data-so="mac">Compara Docker Desktop con su actualizador: <code>M|Docker Desktop|4.99.0|4.100.0|…</code>.</li>
+      <li>Cada rama de Node: <code>X|Node|22.11.0|22.12.0</code>.</li>
+      <li>Compara Mailpit, cloudflared y Nginx con los que trae el programa (<code>X|Mailpit|1.21.0|1.22.0</code>) y con los publicados
+        (<code>N|Mailpit|1.32.0|1.34.0</code>, que no cuenta en <code>S|</code>).</li>
+      <li>Al final, <code>S|</code><i>número</i>: cuántas cosas tienen parche. Las líneas <code>F|</code> son versiones que no se ponen al día
+        solas, y las <code>E|</code>, lo que no se ha podido consultar.</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum componentes</code> (si termina en <code>S|0</code>, todo está al día).</p>
+  </details>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Cuándo se buscan:</b> solos, al abrir la ventana el primer día y después cada pocos arranques (cada cuatro); y cuando pulses
+        «Buscar de nuevo». Si al abrir hay alguno, abajo sale «Hay parches nuevos: míralos en los avisos de arriba».</li>
+      <li><b>Actualizar todo (N):</b> te pregunta «¿Actualizar todo?» con la lista de lo que se va a poner al día. Las versiones de PHP se
+        vuelven a <i>compilar</i> (se construyen desde su código fuente) con lo último de su rama: la de ahora sigue funcionando mientras
+        tanto, varios minutos. Los contenedores de Docker en marcha se rehacen en segundos, sin cambiar sus bases de datos ni su
+        configuración; Mailpit y cloudflared se reinstalan; los Node, con lo último de su rama. <span data-so="linux">Docker va primero: antes
+        se copian todas sus BBDD en ~/nexum-backups (si la copia falla, Docker no se toca), y luego se instalan sus paquetes nuevos y se
+        arranca de nuevo.</span><span data-so="mac">Docker Desktop: se copian todas sus BBDD en ~/nexum-backups y se abre su página de
+        descarga.</span> Trae la casilla «Guardar antes una copia en ~/nexum-backups», desmarcada:
+        márcala si alguna versión puede cambiar de rama de MariaDB, porque entonces empieza con las bases de datos vacías. Sin ella, avisa
+        en rojo: «Sin copia, si su MariaDB cambia de rama, sus BBDD no se podrán recuperar.» Pulsa «Actualizar todo» y escribe la contraseña
+        de administrador. La tarea «Actualizando los componentes» acaba con «Componentes al día».</li>
+      <li><b>El aviso de arriba:</b> «Hay parches nuevos (N)», con «Conviene ponerlos: son parches de seguridad» y la lista (las 6 primeras y
+        «…y N más»). «Actualizar todo» hace lo mismo que aquí. Con «Ahora no» no vuelve a avisar hasta que salga otro parche; siguen en
+        este apartado.</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum componentes-actualizar</code> (la de «Actualizar todo»), o
+      <code>nexum componentes-actualizar --copia</code> si marcas la casilla de la copia.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Busca de nuevo los parches (como <code>nexum componentes</code>) y dice lo que va a poner al día. Si no hay nada:
+        «Todo está al día: no hay parches nuevos.»</li>
+      <li data-so="linux">Docker: <code>nexum docker-copia</code>; fija el almacén de imágenes en <code>~/.config/docker/daemon.json</code>
+        (<code>features.containerd-snapshotter</code>); <code>sudo apt-get install -y --only-upgrade docker.io …</code>; apaga otra vez el
+        Docker del sistema y <code>systemctl --user restart docker.service</code>.</li>
+      <li>Cada MariaDB común de Docker con versión nueva: descarga la imagen (<code>docker pull mariadb:</code><i>versión</i>) y, si su
+        contenedor está en marcha, lo vuelve a crear con ella. Sus bases de datos no se tocan (están aparte, en un volumen).</li>
+      <li>phpMyAdmin de Docker: <code>docker pull</code> de su imagen y, si el Apache de Docker está en marcha, se rehace.</li>
+      <li>Cada imagen de PHP de Docker: se vuelve a construir la imagen <code>nexum-php:</code><i>versión</i> con lo último de Docker Hub,
+        y los contenedores en marcha de los proyectos que la usan se rehacen (<code>docker compose … up -d</code>). Luego se borran las
+        imágenes viejas que ya no usa nadie: <code>docker image prune -f</code>.</li>
+      <li>Mailpit y cloudflared: se descargan e instalan otra vez, con su versión nueva.</li>
+      <li>Cada rama de Node con parche: se descarga, como al arrancar un proyecto de Node, y se quitan los anteriores de esa rama que no
+        estén en marcha.</li>
+      <li>Cada versión de PHP con parche: se recompila en su carpeta, como <code>nexum actualizar</code> <i>versión</i> (con
+        <code>--copia</code>, guarda antes sus bases de datos en <code>~/nexum-backups</code>). Esto pide la contraseña de administrador,
+        porque las carpetas de las versiones son suyas.</li>
+      <li>Al acabar: «Todo al día.», o «Algo no se ha podido actualizar: mira lo de arriba.»</li>
+    </ol>
+    <p>Para comprobarlo: <code>nexum componentes</code> tiene que acabar en <code>S|0</code>.</p>
+  </details>
+
+  <h3 id="programa">General › Programa</h3>
+  <p>El propio programa: sus actualizaciones, su icono, la bandeja y si se abre al iniciar sesión. <span data-so="mac">En el Mac, aquí
+    están «Dejar en la barra de menús al cerrar» y «Abrir al iniciar sesión»; la versión nueva se busca desde el menú ☰ de arriba.</span></p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-programa.png" data-linux="img/linux/config-programa.png" data-mac="img/mac/config-programa.png" alt="Sistema, Programa" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="42" data-y="81"><b>Buscar una versión nueva</b><span>«Buscar» mira en GitHub (y en tu carpeta de Descargas) si hay una versión más nueva y firmada. Si no la hay: «Tienes la última versión (…)».</span></li>
+      <li data-x="44" data-y="87"><b>Icono en el menú</b><span>«Crear de nuevo» vuelve a poner «Nexum Dev Stack» en el menú de aplicaciones, si no aparece o no abre esta ventana. Dice «Icono creado en el menú de aplicaciones».</span></li>
+      <li data-x="41.5" data-y="93"><b>Dejar en la bandeja al cerrar</b><span>Encendido, cerrar la ventana la esconde en un icono junto al reloj, con lo básico: abrirla, arrancar o parar, web.local y salir.</span></li>
+    </ol>
+  </figure>
+  <p><b>Abrir al iniciar sesión.</b> Debajo de «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
+    menús</span> al cerrar», un interruptor: encendido, Nexum Dev Stack se abre solo cada vez que entras en tu sesión. Si también está
+    puesto el icono <span data-so="linux">junto al reloj</span><span data-so="mac">de la barra de menús</span>, arranca escondido en él,
+    sin abrir la ventana: la abres desde su menú cuando la necesites. Apagado, deja de abrirse.</p>
+  <p><b>Si hay una versión nueva</b></p>
+  <ol class="pasos-tarea">
+    <li><b>Lee el aviso</b> «Hay una versión nueva de Nexum Dev Stack»: de qué versión a cuál, de dónde viene y su huella SHA-256 (el código
+      que identifica ese fichero exacto). Que esté <i>firmada</i> quiere decir que la ha publicado quien hace el programa y nadie la ha
+      cambiado por el camino.</li>
+    <li><b>Pulsa «Actualizar a la X»</b> y escribe la contraseña de administrador. Tus versiones, proyectos y bases de datos no se tocan.</li>
+    <li><b>Espera.</b> La ventana se cierra y se vuelve a abrir con la versión nueva.</li>
+  </ol>
+  <div class="nota" data-so="linux"><b>«La versión X se instala una vez en la terminal»</b>Algunas versiones cambian el propio programa que
+    instala las actualizaciones, y hay que instalarlas a mano una vez. No es un error. «Copiar la orden» copia lo que tienes que pegar en una
+    terminal (<code>sudo apt install</code> con la ruta del paquete); después, abre de nuevo el programa.</div>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>De partida:</b> con el icono junto al reloj, y sin abrirse al iniciar sesión.</li>
+      <li data-so="linux"><b>Si lo quitas en «Aplicaciones al inicio»</b> de Ubuntu, el interruptor sale apagado.</li>
+      <li data-so="linux"><b>Si falta su componente</b>, el interruptor sale apagado y la fila dice cómo instalarlo: <code>sudo apt install gir1.2-ayatanaappindicator3-0.1</code>.</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <div data-so="linux">
+      <p>La orden del programa: <code>nexum gui-paquete</code> (la de «Buscar»: solo busca). Instalar lo hace la ventana con el
+        ayudante del paquete: <code>pkexec /opt/nexum/nexum-actualizar</code> <i>paquete</i> <i>huella</i>.</p>
+      <p>Lo que hace, paso a paso:</p>
+      <ol>
+        <li>Mira la última versión publicada en la página del programa en GitHub y, si es más nueva, la descarga a
+          <code>~/.nexum/actualizaciones</code>.</li>
+        <li>Busca también paquetes <code>nexum_</code><i>versión</i><code>_all.deb</code> en esa carpeta y en tus Descargas.</li>
+        <li>De cada uno comprueba que es del programa, que solo lleva ficheros normales y que está firmado. Uno sin firma no se instala desde la
+          ventana: te dice que lo instales tú en la terminal.</li>
+        <li>Si hay uno más nuevo, da su versión, su fecha y su huella: <code>N|</code><i>versión</i><code>|</code><i>fecha</i><code>|</code><i>huella</i><code>|</code><i>ruta</i>.</li>
+        <li>Al pulsar «Actualizar», el ayudante (que funciona como administrador; <code>pkexec</code> te pide la contraseña) copia el paquete a
+          su carpeta, comprueba otra vez la huella y lo instala.</li>
+      </ol>
+      <p>Para hacerlo a mano: <code>sudo apt install ./nexum_</code><i>versión</i><code>_all.deb</code>. Para comprobarlo:
+        <code>nexum --version</code>.</p>
+    </div>
+    <div data-so="mac">
+      <p>La orden del programa: <code>nexum gui-paquete</code> (busca) y, al aceptar, <code>nexum actualizar-gestor</code>
+        <i>paquete</i>.</p>
+      <p>Lo que hace, paso a paso:</p>
+      <ol>
+        <li>Mira la última versión publicada en la página del programa en GitHub y comprueba que está firmada.</li>
+        <li>Si hay una más nueva, la ofrece con su huella; al aceptar, la instala (pide la contraseña de administrador) y la ventana se vuelve a
+          abrir.</li>
+      </ol>
+      <p>Para comprobarlo: <code>nexum --version</code>.</p>
+    </div>
+  </details>
+  <details class="terminal" data-so="linux"><summary>En la terminal</summary>
+    <p>La orden del programa: <code>nexum gui-crear-acceso</code> (la de «Crear de nuevo»). No pide contraseña.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Pone el icono del programa en <code>~/.local/share/icons/nexum.png</code>.</li>
+      <li>Escribe el acceso del menú de aplicaciones, <code>~/.local/share/applications/nexum.desktop</code>: un fichero de
+        texto con <code>Name=Nexum Dev Stack</code>, la orden que abre la ventana (<code>Exec=</code>… <code>ventana</code>) y el icono, y lo
+        hace ejecutable (<code>chmod +x</code>).</li>
+      <li>Avisa al escritorio de que lo vuelva a leer: <code>update-desktop-database -q ~/.local/share/applications</code>.</li>
+    </ol>
+    <p>Para comprobarlo: <code>cat ~/.local/share/applications/nexum.desktop</code>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. El interruptor «Dejar en la <span data-so="linux">bandeja</span><span data-so="mac">barra de
+      menús</span> al cerrar» lo guarda la propia ventana, sin contraseña.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Escribe <code>si</code> o <code>no</code> en <code>~/.nexum/ventana-bandeja</code>. Si el fichero no existe, cuenta como
+        encendido.</li>
+      <li>Pone o quita el icono junto al reloj al momento.</li>
+    </ol>
+    <p>Para comprobarlo: <code>cat ~/.nexum/ventana-bandeja</code>.</p>
+  </details>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. El interruptor «Abrir al iniciar sesión» lo guarda la propia ventana, sin contraseña.</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li data-so="linux">Encendido, escribe el acceso de inicio de tu sesión, <code>~/.config/autostart/nexum.desktop</code> (el mismo sitio
+        que usa «Aplicaciones al inicio»), que abre la ventana con <code>nexum ventana --al-iniciar</code>.</li>
+      <li data-so="mac">Encendido, escribe <code>~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>, que abre la
+        aplicación con <code>--al-iniciar</code> al entrar en tu sesión.</li>
+      <li>Con <code>--al-iniciar</code> y el icono puesto, la ventana se queda escondida en él.</li>
+      <li>Apagado, borra ese fichero. Solo si es el de Nexum Dev Stack: uno tuyo con el mismo nombre (o un enlace) no se toca, y te lo dice.</li>
+    </ol>
+    <p>Para comprobarlo: <code data-so="linux">cat ~/.config/autostart/nexum.desktop</code><code data-so="mac">cat
+      ~/Library/LaunchAgents/io.github.mariomasku.nexum.inicio.plist</code>.</p>
+  </details>
+
+  <h3 id="tareas">Registro de tareas</h3>
+  <p>El apartado de Sistema que va justo después de General. Todo lo que ha hecho la ventana por ti, tarea a tarea. Cada tarea que lanza (instalar o actualizar una versión, activarla, arrancar un
+    servicio, copiar o cargar una BBDD, limpiar…) guarda su registro entero: la orden de <code>nexum</code> que se ha ejecutado, con todo lo
+    que lleva detrás, todo lo que ha dicho (lo mismo que se ve en su ventana, en «Ver registro») y cómo acabó. Sirve para saber qué se hizo
+    y cuándo, y para mirar con calma por qué falló algo aunque ya hayas cerrado su ventana.</p>
+  <figure class="pantalla">
+    <div class="barra">
+      <span class="tenue">Pulsa un número o empieza el recorrido</span>
+      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
+      <button class="boton ocultar" type="button">Ocultar los números</button>
+    </div>
+    <div class="lienzo">
+      <img src="img/linux/config-registro-de-tareas.png" data-linux="img/linux/config-registro-de-tareas.png" data-mac="img/mac/config-registro-de-tareas.png" alt="Sistema, Registro de tareas" width="1442" height="919" loading="lazy">
+    </div>
+    <ol class="puntos">
+      <li data-x="45" data-y="23"><b>Cada tarea</b><span>Su título, la fecha y la hora en que empezó y cómo acabó: con el check verde, «Terminada bien»; con la señal roja, «Ha fallado (código N)»; también «Cancelada» o, mientras sigue, «En marcha». Deja el ratón encima para ver su orden.</span></li>
+      <li data-x="95" data-y="23"><b>Ver</b><span>La tarea entera (también al pulsar la fila): arriba, su fecha y cómo acabó; debajo, la orden y toda su salida. Con «Copiar», para buscar la solución o mandarla, y «Abrir la carpeta». Una tarea en marcha guarda lo que va diciendo cada 3 segundos y su ventana se actualiza sola, como una consola: abajo del todo ves lo último que está haciendo, hasta que acaba.</span></li>
+      <li data-x="70" data-y="33"><b>La lista</b><span>Se ven 4 tareas, la más nueva arriba. Si hay más, la lista se desplaza dentro de su recuadro, con su barra a la derecha: baja con la rueda del ratón para ver las anteriores.</span></li>
+      <li data-x="82" data-y="47"><b>Vaciar el registro…</b><span>Te pregunta antes «¿Vaciar el registro de tareas?», con cuántas se borran, y pulsa «Vaciar», en rojo. Borra los registros de las tareas que ya han acabado; el de una tarea que sigue en marcha se queda. No toca nada más: ni tus proyectos, ni los demás registros. Apagado si no hay ninguna acabada. Es lo mismo que «Registros del programa» en <a href="#limpieza">Limpieza</a>, pero solo con el registro de tareas.</span></li>
+      <li data-x="93" data-y="47"><b>Abrir la carpeta</b><span>Abre <code>~/.nexum/tareas</code>, donde está cada una en su fichero de texto.</span></li>
+    </ol>
+  </figure>
+  <div class="se-configura"><b>Qué se puede configurar</b>
+    <ul>
+      <li><b>Nada:</b> se guarda solo, desde que la tarea empieza.</li>
+      <li><b>Cuántas se guardan:</b> las 200 últimas. Al empezar una tarea, las más viejas se borran solas.</li>
+      <li><b>Sin secretos:</b> la contraseña de administrador nunca pasa por la salida (se le da directamente a <code>sudo</code>). La de
+        MariaDB, que algunas tareas llevan aparte (en <code>MYSQL_PWD</code>), no se escribe: sale <code>••••••</code>. Tampoco lo que va
+        detrás de «Contraseña:» o «token=» (como la contraseña de un túnel de Cloudflare), los tokens de GitHub ni la contraseña de una
+        dirección como <code>mysql://usuario:contraseña@…</code>.</li>
+      <li><b>Solo para ti:</b> la carpeta y sus ficheros son tuyos y nadie más del equipo los puede leer.</li>
+      <li>Para borrarlas antes de tiempo: <a href="#limpieza">Limpieza</a>, «Registros del programa».</li>
+    </ul>
+  </div>
+  <details class="terminal"><summary>En la terminal</summary>
+    <p>La orden del programa: no hay. Lo escribe la propia ventana, sin contraseña, en <code>~/.nexum/tareas</code> (la carpeta,
+      con permisos 700; cada fichero, 600: solo tú puedes leerlos).</p>
+    <p>Lo que hace, paso a paso:</p>
+    <ol>
+      <li>Al empezar una tarea, crea su fichero, con la fecha y la hora en el nombre (<code>20261110-173512-…txt</code>), y apunta
+        «En marcha». Si hay más de 200, borra los más viejos.</li>
+      <li>Al acabar, lo escribe entero: arriba, <code>Tarea:</code>, <code>Orden:</code> (por ejemplo, <code>nexum use 8.3</code>),
+        <code>Fecha:</code>, <code>Resultado:</code> («Terminada bien», «Ha fallado (código N)» o «Cancelada») y <code>Duración:</code>;
+        debajo de una raya de <code>=</code>, toda la salida.</li>
+    </ol>
+    <p>Para verlas: <code>ls ~/.nexum/tareas</code> y, la última, <code>cat "$(ls -d ~/.nexum/tareas/* | tail -1)"</code>.</p>
+  </details>
+
   <h3 id="apariencia">Apariencia</h3>
   <p>Cómo se ve la ventana. Se guarda al momento. En el Mac tienes lo mismo.</p>
   <figure class="pantalla">
@@ -5759,10 +5927,13 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-apariencia.png" data-linux="img/linux/config-apariencia.png" data-mac="img/mac/config-apariencia.png" alt="Configuración, Apariencia" width="1434" height="919" loading="lazy">
+      <img src="img/linux/config-apariencia.png" data-linux="img/linux/config-apariencia.png" data-mac="img/mac/config-apariencia.png" alt="Sistema, Apariencia" width="1434" height="919" loading="lazy">
     </div>
     <ol class="puntos">
-      <li data-x="38" data-y="26"><b>Iconos en color</b><span>Cada apartado del menú lateral con su color; apagado, de un color, como el texto.</span></li>
+      <li data-x="38" data-y="26"><b>Iconos en color</b><span>Cada apartado del menú lateral con su color, y los iconos de los botones: los de acción, del color de
+        lo que hacen (arrancar en verde; parar, borrar y Unlink en rojo; actualizar en azul; editar y limpiar en naranja; claves y avisos en
+        amarillo; enlaces y web en morado; terminal, copiar y registros en turquesa) y los demás que no tienen color propio, con uno de
+        los colores del logotipo de Nexum. Apagado, todos de un color, como el texto.</span></li>
       <li data-x="42" data-y="32"><b>Logotipos de Docker, Node y PHP</b><span>En el menú lateral, Docker y Node con su icono y, al lado, su logotipo de letras en lugar del nombre; con los iconos en color, Versiones de PHP con el logotipo de PHP.</span></li>
       <li data-x="94" data-y="47"><b>Tamaño de la ventana</b><span>80, 90, 100 o 110 %: letras, márgenes y botones cambian a la vez, al momento.
         Más pequeña, cabe más en la pantalla. 100 % es el tamaño de siempre.</span></li>
@@ -5770,26 +5941,39 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
         fondo de color difuminado (azul, violeta y verde). En el Mac, la ventana es translúcida y deja ver el escritorio desenfocado detrás;
         lo pinta macOS. En los dos, la cabecera del visor queda sólida: azul oscuro con el tema oscuro y blanca con el claro. Viene apagado. Mientras no cambia nada en la ventana no gasta; al redibujarla gasta algo más que sin él, muy
         poco.</span></li>
-      <li data-x="40" data-y="60.5"><b>Apartados del menú lateral</b><span>Un interruptor por página, en dos columnas: Repositorios, Versiones de PHP, Bases de datos, Docker, Node y Dominios y hosts. Apaga las que no uses. Proyectos y Configuración se ven siempre.</span></li>
-      <li data-x="92.5" data-y="92.3"><b>Personalizar…</b><span>Los botones del visor de los proyectos (la parte de arriba de la página Proyectos, con el proyecto cargado). A su izquierda, «Botones» dice cuáles se ven y con qué estilo.</span></li>
+      <li data-x="40" data-y="60.5"><b>Apartados del menú lateral</b><span>Un interruptor por página, en dos columnas: Repositorios, Versiones de PHP, Bases de datos, Docker, Node y Dominios y hosts. Apaga las que no uses. Proyectos, Ajustes y Sistema salen siempre.</span></li>
+      <li data-x="92.5" data-y="92.3"><b>Personalizar…</b><span>En el bloque «Visor de los proyectos»: los botones del proyecto cargado (en la barra de arriba o, con el visor «Clásico», en la parte de arriba de la página Proyectos). A su izquierda, «Botones» dice cuáles se ven y con qué estilo.</span></li>
     </ol>
   </figure>
+  <p><b>El bloque «Visor de los proyectos»</b>: «Dónde van los botones del proyecto cargado y cuáles se ven, en qué orden y cómo».</p>
+  <ul>
+    <li><b>«Dónde»</b>: <b>«Arriba»</b> (el de serie), en la barra de arriba, a mano desde cualquier pestaña, con la versión de PHP,
+      Apache, MariaDB y el consumo en la barra de abajo; o <b>«Clásico»</b>, en Proyectos. Cambia al momento. Lo explica
+      <a href="#ventana-visor">Dónde va el visor</a>.</li>
+    <li><b>«Iconos»</b>: los de Actualizar, Log y Unlink, dos a elegir para cada uno (el pulsado es el que se usa). Cambia al
+      momento.</li>
+    <li><b>«Botones»</b>, con «Personalizar…»: el diálogo de abajo.</li>
+  </ul>
   <p><b>El diálogo «Botones del proyecto»</b></p>
   <ul>
-    <li><b>La lista</b>: Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar e Imágenes de producción. La casilla de cada uno lo enseña u
+    <li><b>La lista</b>: Abrir web, VS Code, Repositorio (GitHub), phpMyAdmin, Panel, Docker, Compartir, Log, Actualizar, Imágenes de
+      producción, Unlink, Correo y Terminal. La casilla de cada uno lo enseña u
       oculta en el visor; las flechas «Antes» y «Después» lo mueven.</li>
-    <li><b>«Estilo»</b>: «Con su nombre», «Solo el icono (cuadrado)» o «Icono y nombre (cuadrado)».</li>
-    <li><b>«Tamaño»</b>: el lado del cuadrado, de 32 a 128 px, con su medida al lado. Con «Con su nombre» no se usa. De partida, 44 px solo con el
+    <li><b>«Estilo»</b>: «Icono y nombre en horizontal (solo en el visor clásico)», «Solo el icono (cuadrado)» o «Icono y nombre
+      (cuadrado)».</li>
+    <li><b>«Tamaño»</b>: el lado del cuadrado, de 32 a 128 px, con su medida al lado. Con «en horizontal» no se usa. De partida, 44 px solo con el
       icono y 88 px con icono y nombre.</li>
-    <li><b>«Así quedan»</b>: la vista previa, con Desmontar y ⋮, que salen siempre.</li>
+    <li><b>«Así quedan»</b>: la vista previa, con ⋮, que sale siempre, al final.</li>
     <li><b>«Como al principio»</b>: vuelve a los botones de siempre.</li>
     <li><b>«Cancelar» / «Guardar»</b>: al guardar, abajo sale «Botones del proyecto guardados».</li>
   </ul>
   <div class="se-configura"><b>Qué se puede configurar</b>
     <ul>
-      <li><b>De partida:</b> iconos sin color, sin logotipos y todas las páginas a la vista; botones con su nombre, todos y en el orden de la lista.</li>
-      <li><b>Los botones del visor</b> valen para el del proyecto cargado y el de Docker. Desmontar, ⋮ y los propios de Docker (Versiones de PHP,
+      <li><b>De partida:</b> iconos sin color, sin logotipos y todas las páginas a la vista; el visor «Arriba»; botones con su nombre, todos y en el orden de la lista.</li>
+      <li><b>Los botones del visor</b> valen para el del proyecto cargado y el de Docker. ⋮ y los propios de Docker (Versiones de PHP,
         Arrancar o Parar) se ven siempre.</li>
+      <li><b>Los iconos de Actualizar, Log y Unlink</b>: dos a elegir para cada uno (fila «Iconos»). Se guardan en
+        <code>~/.nexum/apariencia</code>, en <code>"iconos"</code>.</li>
     </ul>
   </div>
   <details class="terminal"><summary>En la terminal</summary>
@@ -5797,8 +5981,9 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Lo que hace, paso a paso:</p>
     <ol>
       <li>Los interruptores del menú lateral, en <code>~/.nexum/apariencia</code>, por ejemplo:
-        <code>{"color": true, "marcas": false, "ocultos": ["node", "repos"]}</code> (<code>color</code>: iconos en color; <code>marcas</code>:
-        logotipos; <code>ocultos</code>: las páginas apagadas).</li>
+        <code>{"color": true, "marcas": false, "ocultos": ["node", "repos"], "visor": "arriba"}</code> (<code>color</code>: iconos en
+        color; <code>marcas</code>: logotipos; <code>ocultos</code>: las páginas apagadas; <code>visor</code>: dónde va el visor,
+        <code>"arriba"</code> o <code>"clasico"</code>).</li>
       <li>Los botones del visor, en <code>~/.nexum/botones-visor</code>, por ejemplo:
         <code>{"order": ["web", "vscode", "pma", …], "hidden": ["log"], "style": "icono", "size": 44}</code>.</li>
     </ol>
@@ -5818,7 +6003,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-limpieza.png" data-linux="img/linux/config-limpieza.png" data-mac="img/mac/config-limpieza.png" alt="Configuración, Limpieza" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-limpieza.png" data-linux="img/linux/config-limpieza.png" data-mac="img/mac/config-limpieza.png" alt="Sistema, Limpieza" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="41" data-y="23"><b>Lo que se puede limpiar</b><span>El total de todo y lo que suma lo que tienes marcado. Mientras mide,
@@ -5912,89 +6097,6 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>Para comprobarlo: <code>nexum limpieza</code> (lo limpiado sale «vacío»).</p>
   </details>
 
-  <h3 id="carpetas">Carpetas</h3>
-  <p>Las carpetas importantes del programa, a un clic. «Abrir» las abre en tu explorador de archivos; no cambia nada (es como
-    <span data-so="linux"><code>xdg-open /opt/htdocs</code></span><span data-so="mac"><code>open /Library/Nexum/XAMPP-compartido/htdocs</code></span>
-    en la terminal).</p>
-  <p>Los ajustes del programa, sus registros y lo que guarda de tus proyectos (los vínculos con sus BBDD, Docker, el túnel, el correo de
-    pruebas, la apariencia…) están en <code>~/.nexum</code>, una carpeta oculta de tu carpeta personal que solo puedes ver tú. Es la de
-    «Registros de instalaciones».</p>
-  <figure class="pantalla">
-    <div class="barra">
-      <span class="tenue">Pulsa un número o empieza el recorrido</span>
-      <button class="boton azul recorrido" type="button">▶ Recorrido guiado</button>
-      <button class="boton ocultar" type="button">Ocultar los números</button>
-    </div>
-    <div class="lienzo">
-      <img src="img/linux/config-carpetas.png" data-linux="img/linux/config-carpetas.png" data-mac="img/mac/config-carpetas.png" alt="Configuración, Carpetas" width="1442" height="919" loading="lazy">
-    </div>
-    <ol class="puntos">
-      <li data-x="39" data-y="22"><b>Proyectos</b><span>La carpeta de tus proyectos, la que comparten todas las versiones.</span></li>
-      <li data-x="40" data-y="28.3"><b>Copias de seguridad</b><span><code>~/nexum-backups</code>: las copias que pides al borrar, sustituir o actualizar (con la casilla «Guardar antes una copia en ~/nexum-backups» de cada diálogo) y, si enciendes el interruptor de abajo, las de los ficheros que cambia el programa. Dice lo que ocupa y cuántos ficheros tiene, o «vacía». Si aún no existe, «Abrir» la crea.</span></li>
-      <li data-x="93.9" data-y="28.3"><b>Borrar…</b><span>Te pregunta antes «¿Borrar las copias de seguridad?», con los pasos: «Se borra todo lo que hay en ~/nexum-backups: N ficheros (tamaño). La carpeta se queda, vacía.» y «Si alguna copia es del administrador, se pide su contraseña para borrarla.», y la nota «Las copias borradas no se pueden recuperar.». Pulsa «Borrar las copias», en rojo. Apagado si la carpeta está vacía.</span></li>
-      <li data-x="95.4" data-y="34.5"><b>Copias de los ficheros que cambia el programa</b><span>«El fichero de hosts, los vhosts y la configuración de los proyectos, antes de cambiarlos». Encendido, antes de cambiar uno de esos ficheros por su cuenta (al falsear un dominio, encender o apagar un <code>.local</code>, crear un dominio, arreglar certificados, editar los vhosts o el fichero de hosts, cargar un proyecto…) se guarda el de antes en <code>~/nexum-backups</code>. Viene apagado. No pide la contraseña.</span></li>
-      <li data-x="40" data-y="40.7"><b>Espacios de trabajo de VS Code</b><span>La carpeta donde guardas tus <code>.code-workspace</code>. Elegida, dice «cada proyecto se abre con su .code-workspace, que se busca aquí y en sus subcarpetas (si no tiene, se le crea uno aquí)»; sin elegir, «los proyectos se abren como carpeta». No pide la contraseña.</span></li>
-      <li data-x="87.5" data-y="40.7"><b>Elegir… o Cambiar…</b><span>Abre el selector de carpetas para elegirla. Con una elegida que existe, sale también «Abrir», que la abre en tu explorador de archivos.</span></li>
-      <li data-x="94.3" data-y="40.7"><b>Quitar</b><span>Deja de usarla: los proyectos vuelven a abrirse en VS Code como carpeta. Sus <code>.code-workspace</code> no se tocan.</span></li>
-      <li data-x="40" data-y="46.9"><b>Registros de instalaciones</b><span><code>~/.nexum</code>: los registros de las instalaciones y de la ventana.</span></li>
-      <li data-x="40" data-y="53.1"><b>Caché de descargas</b><span>Lo ya descargado de PHP, Apache, MariaDB… para no volver a descargarlo al reintentar, y para usarlo si su web no responde. Dice dónde está<span data-so="linux"> (<code>/var/cache/nexum-stack</code>)</span><span data-so="mac"> (<code>/Library/Nexum/descargas</code>)</span>, lo que ocupa y cuántos ficheros tiene, o «vacía».</span></li>
-      <li data-x="94" data-y="53.1"><b>Vaciar…</b><span>Te pregunta antes «¿Vaciar la caché de descargas?» y pulsa «Vaciar la caché». Pide la contraseña de administrador (la carpeta es suya). Las versiones instaladas no se tocan; la próxima instalación lo descargará otra vez. Apagado si la caché está vacía.</span></li>
-    </ol>
-  </figure>
-  <div class="se-configura"><b>Qué se puede configurar</b>
-    <ul>
-      <li><b>Copias de los ficheros que cambia el programa</b>: apagado de partida. Encendido, se guarda en <code>~/nexum-backups</code>
-        el fichero de hosts, los vhosts o la configuración de un proyecto (su <code>wp-config.php</code> o su <code>parameters.php</code>) antes
-        de que el programa los cambie, y la caché vieja de una tienda se aparta allí en lugar de borrarse. En la terminal:
-        <code>nexum copias-ficheros si</code> (o <code>no</code>).</li>
-      <li>Las copias de bases de datos y de código no dependen de este ajuste: se guardan cuando marcas su casilla en cada diálogo.</li>
-      <li><b>Espacios de trabajo de VS Code</b>: sin elegir de partida (cada proyecto se abre como carpeta). Con una carpeta elegida, el botón
-        «VS Code» de cada proyecto abre su espacio de trabajo, que busca en esa carpeta y en sus subcarpetas de primer nivel (por si los
-        tienes clasificados por tipo de proyecto, como <code>wordpress/</code> o <code>tiendas/</code>): <i>carpeta-del-proyecto</i><code>.code-workspace</code>
-        si lo hay; si no, otro que ya tenga la carpeta del proyecto entre sus carpetas (aunque se llame distinto); y si no tiene ninguno, le crea
-        <i>carpeta-del-proyecto</i><code>.code-workspace</code> con su carpeta en la carpeta elegida («Espacio de trabajo nuevo: …»), que luego puedes cambiar
-        en VS Code como cualquier otro. Así, un proyecto nuevo tiene el suyo la primera vez que lo abres. Se guarda en
-        <code>~/.nexum/vscode-espacios</code>; es tuyo, de tu usuario, y cada uno en su equipo elige la suya.</li>
-      <li>Lo demás no se configura: «Abrir» abre cada carpeta en tu explorador de archivos, y «Borrar…» y «Vaciar…» las vacían.</li>
-    </ul>
-  </div>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum copias vaciar</code> (la de «Borrar las copias»). Sin <code>vaciar</code>,
-      <code>nexum copias</code> dice cuántos ficheros hay y cuánto ocupan.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Comprueba que <code>~/nexum-backups</code> es una carpeta tuya y no un enlace.</li>
-      <li>Borra todo lo de dentro, sin pasar a otros discos y sin seguir enlaces: <code>find ~/nexum-backups -xdev -mindepth 1 -delete</code>.
-        La carpeta se queda.</li>
-      <li>Si queda algo (copias que hizo el administrador), lo borra con <code>sudo</code>, solo dentro de esa carpeta:
-        <code>sudo find ~/nexum-backups -xdev -mindepth 1 -delete</code>.</li>
-    </ol>
-    <p>Para comprobarlo: <code>ls -A ~/nexum-backups</code> (no sale nada).</p>
-  </details>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum copias-ficheros si</code> al encender el interruptor y
-      <code>nexum copias-ficheros no</code> al apagarlo. Sin nada detrás, dice cómo está.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>El interruptor es un fichero vacío: <code>~/.nexum/copias-ficheros</code>. Encender lo crea
-        (<code>touch ~/.nexum/copias-ficheros</code>); apagar lo borra (<code>rm -f ~/.nexum/copias-ficheros</code>).</li>
-      <li>Desde entonces, cada vez que el programa vaya a cambiar el fichero de hosts, los vhosts o la configuración de un proyecto, mira si
-        está ese fichero y, si está, guarda antes el de ahora en <code>~/nexum-backups</code> con la fecha en el nombre.</li>
-    </ol>
-    <p>Para comprobarlo: <code>nexum copias-ficheros</code>.</p>
-  </details>
-  <details class="terminal"><summary>En la terminal</summary>
-    <p>La orden del programa: <code>nexum descargas vaciar</code> (la de «Vaciar la caché»). Sin <code>vaciar</code>,
-      <code>nexum descargas</code> lista lo que hay y lo que ocupa.</p>
-    <p>Lo que hace, paso a paso:</p>
-    <ol>
-      <li>Comprueba que la carpeta existe y no es un enlace.</li>
-      <li>Borra sus ficheros, con permiso de administrador porque la carpeta es suya:
-        <span data-so="linux"><code>sudo find /var/cache/nexum-stack -mindepth 1 -maxdepth 1 -type f -delete</code></span><span data-so="mac"><code>sudo find /Library/Nexum/descargas -mindepth 1 -maxdepth 1 -type f -delete</code></span>.</li>
-    </ol>
-    <p>Para comprobarlo: <code>nexum descargas</code> («La cache de descargas … esta vacia»).</p>
-  </details>
-
   <h3 id="xampp-registrar" data-so="linux">XAMPP sin registrar</h3>
   <div data-so="linux">
     <p>Solo sale si en <code>/opt/lampp</code> hay una instalación de XAMPP completa, y no un enlace a una de tus versiones (por ejemplo, un
@@ -6076,7 +6178,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       <button class="boton ocultar" type="button">Ocultar los números</button>
     </div>
     <div class="lienzo">
-      <img src="img/linux/config-informacion.png" data-linux="img/linux/config-informacion.png" data-mac="img/mac/config-informacion.png" alt="Configuración, Información" width="1442" height="919" loading="lazy">
+      <img src="img/linux/config-informacion.png" data-linux="img/linux/config-informacion.png" data-mac="img/mac/config-informacion.png" alt="Sistema, Información" width="1442" height="919" loading="lazy">
     </div>
     <ol class="puntos">
       <li data-x="42" data-y="21"><b>Comandos de nexum</b><span>«Ver»: todos los comandos de la terminal y qué hace cada uno (lo mismo que <code>nexum --ayuda</code>), con «Copiar todo».</span></li>
@@ -6098,7 +6200,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
   <p class="entrada">Lo que mandan tus webs (un pedido, un formulario, una contraseña nueva) llega a una bandeja de tu equipo y
     <b>nunca a un cliente real</b>, aunque la base de datos sea una copia de producción.</p>
   <p>Lo recoge <b>Mailpit</b>, que se instala comprobado y arranca y se para con la versión activa. Solo se ve desde tu equipo. Está encendido
-    de partida. Todo está en <b>Configuración → Correo de pruebas</b>, y el botón <b>«Correo»</b> de arriba te lleva ahí desde cualquier página.</p>
+    de partida. Todo está en <b>Ajustes → Correo de pruebas</b>, y el botón <b>«Correo»</b> de arriba te lleva ahí desde cualquier página.</p>
   <p><b>Mailpit</b> es un programa que hace de servidor de correo falso: recibe los correos como si fuera el de verdad, pero en lugar de
     mandarlos los guarda y te los enseña en una bandeja. Escucha por <b>SMTP</b> (el idioma con el que los programas entregan correo a un
     servidor) en el <b>puerto</b> 1025 de tu equipo (un puerto es un número de «puerta» por la que se habla con un programa), y su bandeja
@@ -6114,7 +6216,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     </div>
     <div class="lienzo">
       <img src="img/linux/config-correo-de-pruebas-mailpit.png" data-linux="img/linux/config-correo-de-pruebas-mailpit.png"
-           data-mac="img/mac/config-correo-de-pruebas-mailpit.png" alt="Configuración, Correo de pruebas" width="1442" height="919">
+           data-mac="img/mac/config-correo-de-pruebas-mailpit.png" alt="Ajustes, Correo de pruebas" width="1442" height="919">
     </div>
     <ol class="puntos">
       <li data-x="53" data-y="13"><b>Encendido o apagado</b><span>El interruptor, al lado del título. Apagado, lo que manden las webs <b>puede llegar de
@@ -6318,7 +6420,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
   <details><summary>No veo el botón «Correo» arriba</summary>
     <p>Sale solo con el correo de pruebas encendido.</p></details>
   <details><summary>Pulso «Correo» y no se abre la bandeja</summary>
-    <p>Si Mailpit no está instalado, te lleva a Configuración → Correo de pruebas para instalarlo. Si está parado, te dice que arranques la
+    <p>Si Mailpit no está instalado, te lleva a Ajustes → Correo de pruebas para instalarlo. Si está parado, te dice que arranques la
       versión activa: Mailpit funciona con ella.</p></details>
 </section>
 
@@ -6433,7 +6535,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <li><b>«Cerrar el túnel»</b> (en rojo): lo cierra ya. La dirección deja de llevar a ningún sitio.</li>
     <li><b>«Listo»</b>: cierra el diálogo y deja el túnel abierto.</li>
   </ul>
-  <p>Lo vuelves a abrir con «Compartiendo» o en Configuración → Túnel de Cloudflare → «Ver».</p>
+  <p>Lo vuelves a abrir con «Compartiendo» o en Ajustes → Túnel de Cloudflare → «Ver».</p>
   <details class="terminal"><summary>En la terminal</summary>
     <p>La orden del programa de «Cerrar el túnel»: <code>nexum tunel-cerrar</code>. «Copiar» y «Abrir» no lanzan
       ninguna orden: copian al portapapeles o abren la dirección en el navegador.</p>
@@ -6459,7 +6561,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     <p>No, nunca: phpMyAdmin no pasa por el túnel, ni los paneles de XAMPP, el estado del servidor ni los ficheros ocultos. El panel de
       WordPress o de PrestaShop, tampoco, salvo que apagues el bloqueo.</p></details>
   <details><summary>¿Quién ha entrado?</summary>
-    <p>En Configuración → Túnel de Cloudflare → «Registro del túnel»: quién entra, las contraseñas equivocadas y lo que se ha bloqueado.
+    <p>En Ajustes → Túnel de Cloudflare → «Registro del túnel»: quién entra, las contraseñas equivocadas y lo que se ha bloqueado.
       Con 8 contraseñas equivocadas en 10 minutos desde el mismo sitio, sale «Demasiados intentos» y tiene que esperar unos minutos.</p></details>
   <details><summary>¿Se puede tener más de un túnel?</summary>
     <p>No: uno a la vez. Al abrir otro, se cierra el que había.</p></details>
@@ -6490,7 +6592,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
       de GitHub se guarda en el llavero de tu sesión, nunca en un fichero.</p></div>
     <div class="tarjeta"><b>Copia antes de cambiar</b><p>Antes de borrar o sustituir una base de datos, cada diálogo te ofrece guardar una copia
       en <code>~/nexum-backups</code>, y te avisa en rojo si no la guardas. Las del fichero de hosts y los vhosts, si las enciendes en
-      Configuración → Carpetas. La carpeta es solo tuya.</p></div>
+      Ajustes → Carpetas. La carpeta es solo tuya.</p></div>
     <div class="tarjeta"><b>Certificados con límite</b><p>El navegador acepta el certificado propio de cada proyecto, y el de un dominio real solo
       mientras está falseado.</p></div>
   </div>
@@ -6563,7 +6665,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
     que el navegador no las usa desde otra web. Un formulario, una petición o un PHP siguen sin pasar. Va encendida de partida, en
     todas las versiones. El Apache de Docker la lleva también: al cambiarla, se rehace su configuración y, si está en marcha, se recarga
     al momento.</p>
-  <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Configuración
+  <p>Una pasarela de pago que vuelve a la tienda con un envío no pasa la barrera. Mientras la pruebas, apágala en <a href="#seguridad-webs">Ajustes
     → Seguridad entre webs</a>, con el interruptor «Barrera entre webs», y vuelve a encenderla al acabar. Pide la contraseña de administrador.</p>
   <p>Las webs de confianza, como el ERP de tu empresa, no hace falta apagarla: añádelas en «Webs permitidas», en el mismo sitio. Lo que
     llega de ellas pasa la barrera (lo dice su <code>Origin</code> o, si no lo trae, su <code>Referer</code>), y la cabecera
@@ -6660,7 +6762,7 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
   <div class="antetitulo">Más</div>
   <h2>Comandos de la terminal</h2>
   <p class="entrada">Todo lo de la ventana se puede hacer también con <code>nexum</code> en una terminal. La lista completa, con
-    lo que hace cada uno, sale con <code>nexum --ayuda</code> (o en Configuración → Información).</p>
+    lo que hace cada uno, sale con <code>nexum --ayuda</code> (o en Sistema → Información).</p>
 
   <h3 id="comandos-empezar">Antes de empezar</h3>
   <ul>
@@ -7128,12 +7230,12 @@ subjectAltName = DNS:panaderia-luna.com,DNS:www.panaderia-luna.com</code></pre>
 
   <h3>Dónde mirar</h3>
   <ul>
-    <li><b>Una web da un error o sale en blanco:</b> Configuración → General, <a href="#errores">Registro de errores</a>. El del proyecto cargado tiene los errores de
+    <li><b>Una web da un error o sale en blanco:</b> Sistema → General, <a href="#errores">Registro de errores</a>. El del proyecto cargado tiene los errores de
       PHP; el general de Apache, lo que impide arrancar. Un <b>registro</b> (o log) es un fichero de texto donde un programa va apuntando lo
       que hace y los errores que encuentra.</li>
     <li><b>Una instalación ha fallado:</b> no se queda nada a medias. La ventana de la tarea tiene «Ver el log del error», con un
       <b>informe</b> que se puede copiar entero: el sistema, el paso que falló, sus errores y el final de su registro.</li>
-    <li><b>Una tarea de hace un rato:</b> Configuración → General, <a href="#tareas">Registro de tareas</a>: cada una, entera, con su orden y
+    <li><b>Una tarea de hace un rato:</b> Sistema → <a href="#tareas">Registro de tareas</a>: cada una, entera, con su orden y
       todo lo que dijo.</li>
     <li><b>Los registros de todo:</b> menú ☰ → «Carpeta de registros» (<code>~/.nexum</code>).</li>
   </ul>

@@ -134,6 +134,59 @@ func taskLogs() -> [TaskLogEntry] {
     return out
 }
 
+// MARK: listas que se pueden pulsar
+
+/// Las rutas de las listas que dejan las tareas (las de Actualizar proyecto: «La lista entera, fichero a fichero»,
+/// «Todos los cambiados», «Solo los de git»), en ~/.nexum/listas: en los registros, subrayadas y en azul, y al
+/// pulsarlas se abren (como LISTS_LINK_RE y link_lists de Linux)
+let LISTS_DIR = LOG_DIR + "/listas"
+let LISTS_LINK_RX = try! NSRegularExpression(pattern: NSRegularExpression.escapedPattern(for: LISTS_DIR) + "/[^\\s/]+\\.txt")
+
+/// El texto de un registro con las rutas de las listas como enlaces (file://), con su letra y su color
+func listsAttributed(_ text: String, font: NSFont, color: NSColor, lineSpacing: CGFloat = 0) -> NSAttributedString {
+    let para = NSMutableParagraphStyle()
+    para.lineSpacing = lineSpacing
+    let out = NSMutableAttributedString(string: text, attributes: [.font: font, .foregroundColor: color,
+                                                                     .paragraphStyle: para])
+    let ns = text as NSString
+    for m in LISTS_LINK_RX.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+        out.addAttribute(.link, value: URL(fileURLWithPath: ns.substring(with: m.range)), range: m.range)
+    }
+    return out
+}
+
+/// Abre una lista pulsada en un registro: solo si es un fichero de verdad dentro de ~/.nexum/listas (su ruta real,
+/// sin enlaces que lleven fuera)
+func openListFile(_ url: URL) -> Bool {
+    guard url.isFileURL else { return false }
+    let real = url.resolvingSymlinksInPath().path
+    let dir = URL(fileURLWithPath: LISTS_DIR).resolvingSymlinksInPath().path
+    guard real.hasPrefix(dir + "/"), real.hasSuffix(".txt"),
+          let attrs = try? FileManager.default.attributesOfItem(atPath: real),
+          (attrs[.type] as? FileAttributeType) == .typeRegular else { return false }
+    NSWorkspace.shared.open(URL(fileURLWithPath: real))
+    return true
+}
+
+/// El delegado de los registros con listas: al pulsar un enlace, openListFile (cualquier otro no se abre)
+final class ListLinkDelegate: NSObject, NSTextViewDelegate {
+    static let shared = ListLinkDelegate()
+    func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+        if let u = link as? URL { _ = openListFile(u) }
+        // (true: ya está atendido; el sistema no abre nada por su cuenta)
+        return true
+    }
+}
+
+/// Prepara un NSTextView de registro para enseñar las listas como enlaces (subrayados, en azul, con la mano)
+func setupListLinks(_ tv: NSTextView) {
+    tv.delegate = ListLinkDelegate.shared
+    tv.isSelectable = true
+    tv.linkTextAttributes = [.foregroundColor: NSColor(srgbRed: 0x4C / 255.0, green: 0x8D / 255.0, blue: 1, alpha: 1),
+                             .underlineStyle: NSUnderlineStyle.single.rawValue,
+                             .cursor: NSCursor.pointingHand]
+}
+
 /// Una tarea del registro, entera (su orden y toda su salida), con «Copiar» y «Abrir la carpeta»
 func showTaskLog(_ path: String) {
     guard let got = taskLogRead(path) else {
@@ -146,13 +199,16 @@ func showTaskLog(_ path: String) {
     alert.addButton(withTitle: "Cerrar")
     alert.addButton(withTitle: "Copiar")
     alert.addButton(withTitle: "Abrir la carpeta")
-    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 760, height: 560))
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: dialogWidth(760) - 40, height: dialogHeight(560, extra: 200)))
     scroll.hasVerticalScroller = true
     let tv = NSTextView(frame: scroll.bounds)
     tv.isEditable = false
     tv.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
     tv.textContainerInset = NSSize(width: 10, height: 10)
-    tv.string = got.1
+    // (las listas de ficheros que deja la tarea, como las de Actualizar proyecto, se pueden pulsar)
+    let logFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+    setupListLinks(tv)
+    tv.textStorage?.setAttributedString(listsAttributed(got.1, font: logFont, color: NSColor.textColor))
     tv.autoresizingMask = [.width]
     scroll.documentView = tv
     alert.accessoryView = scroll
@@ -169,7 +225,7 @@ func showTaskLog(_ path: String) {
                 let visible = scroll.contentView.documentVisibleRect
                 let atEnd = visible.maxY >= tv.bounds.height - 40
                 shown = now.1
-                tv.string = now.1
+                tv.textStorage?.setAttributedString(listsAttributed(now.1, font: logFont, color: NSColor.textColor))
                 if atEnd { tv.scrollToEndOfDocument(nil) }
             }
             if !(now.0["Resultado"] ?? "").hasPrefix("En marcha") { timer.invalidate() }
@@ -571,7 +627,7 @@ final class TaskRunner: ObservableObject, Identifiable {
         if let path = pfile { try? FileManager.default.removeItem(atPath: path) }
         let ok = rc == 0 && !cancelled
         saveLog(cancelled ? "Cancelada" : (ok ? "Terminada bien" : "Ha fallado (código \(rc))"), log.isEmpty ? "(sin salida)" : log)
-        // (Configuración, General: el registro de tareas, con esta ya acabada)
+        // (Sistema, Registro de tareas, con esta ya acabada)
         model?.taskLogsChanged += 1
         info = "Tiempo total: \(fmtClock(Int(Date().timeIntervalSince(started))))"
         if cancelled {

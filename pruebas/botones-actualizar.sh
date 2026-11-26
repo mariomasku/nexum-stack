@@ -92,7 +92,7 @@ while IFS='|' read -r st name; do
 done <<< "$out"
 check "actualizaciones: si se dice que no, ya no se apunta la versión rechazada" '! grep -q "declined_update" "$SRC"'
 check "ventana: «Personalizar los botones…» en el menú ⋮ y en Configuración" 'grep -q "(\"Personalizar los botones…\", lambda: self.nv_buttons_dialog())" "$SRC" && grep -q "lb = block(\"Visor de los proyectos\"" "$SRC"'
-check "ventana: Desmontar, ⋮ y los fijos de Docker, del mismo estilo y tamaño" 'grep -q "\[(eject, (\"icono\", \"media-eject-symbolic\"), \"Desmontar\")\]" "$SRC" && grep -q "self.nv_restyle(more, buttons_conf()" "$SRC" && grep -q "self.nv_restyle(power, conf" "$SRC" && grep -q "self.nv_restyle(vb, conf" "$SRC"'
+check "ventana: Unlink, uno más de los que se eligen; ⋮ y los fijos de Docker, del mismo estilo y tamaño (1.60.0)" 'grep -qF "btns[\"unlink\"] = eject" "$SRC" && grep -qF "self.nv_place_buttons(flow, btns)" "$SRC" && grep -q "self.nv_restyle(more, buttons_conf()" "$SRC" && grep -q "self.nv_restyle(power, conf" "$SRC" && grep -q "self.nv_restyle(vb, conf" "$SRC"'
 check "ventana: sin nombre, el cuadrado mide lo mismo de alto que de ancho" 'grep -q "b.set_size_request(side, side)" "$SRC"'
 check "ventana: al cargar un proyecto, la lista sube sola (el visor, fijo arriba)" 'grep -qF "smooth_scroll(getattr(self, \"proj_scroll\", self.page_projects))" "$SRC" && grep -qF "self.proj_list_page.pack_start(self.nv_list" "$SRC"'
 # (1.57.25) Con los botones grandes, la fila del visor pedía más que la ventana y el margen de la página, que

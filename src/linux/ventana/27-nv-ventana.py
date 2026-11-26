@@ -54,6 +54,16 @@ class App2(NvBandeja,
                 widget.connect("notify::popup-shown", popup_shown)
             return True
         GObject.add_emission_hook(Gtk.Widget, "realize", combo_hook)
+
+        # Los diálogos (y las ventanas de las tareas), siempre más pequeños que la ventana de Nexum y dentro de la
+        # pantalla: al abrirse, su tamaño se recorta a esos límites y no se pueden agrandar más allá
+        def dialog_hook(widget, *_):
+            if isinstance(widget, Gtk.Window) and widget is not getattr(self, "win", None) \
+                    and widget.get_window_type() == Gtk.WindowType.TOPLEVEL:
+                self.nv_fit_dialog(widget)
+            return True
+        # (al crearse su ventana, antes de verse: con «show», PyGObject se cae)
+        GObject.add_emission_hook(Gtk.Widget, "realize", dialog_hook)
         # (las dos hojas se guardan con su texto: el tamaño de Apariencia las vuelve a cargar a escala)
         self.nv_css = []
         for text in (CSS, NEW_CSS):
@@ -122,7 +132,8 @@ class App2(NvBandeja,
         self.page_nginx, self.nginx_page = new_page(940)
         self.nginx_data = None
         self.page_vers, self.vers_page = new_page(900)
-        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        # (sin fundido: la pestaña elegida sale al momento)
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.NONE)
         for name, w in [("proyectos", self.page_projects), ("repos", self.page_repos), ("versiones", self.page_vers),
                         ("bbdd", self.page_dbs), ("docker", self.page_docker), ("node", self.page_node), ("nginx", self.page_nginx),
                         ("dominios", self.page_hosts), ("config", self.tools_wrap)]:
@@ -146,6 +157,8 @@ class App2(NvBandeja,
         for box in (self.db_box, self.vers_page):
             self.loading(box)
         self.win.show_all()
+        # (la barra de arriba y la de abajo como diga Apariencia: visor arriba o clásico)
+        self.nv_visor_layout()
         # (abierta al iniciar sesión y con el icono junto al reloj: se queda en él; se esconde antes de que
         # la ventana llegue a pintarse)
         if START_HIDDEN and self.tray is not None:
@@ -166,6 +179,37 @@ class App2(NvBandeja,
         if os.environ.get("LVM_CAPTURA"):
             GLib.timeout_add(6000, self.nv_capture_all)
 
+    def nv_fit_dialog(self, dlg):
+        """Un diálogo, más pequeño que la ventana de Nexum (y que la pantalla), centrado sobre ella: su tamaño de
+        partida se recorta a DIALOG_MARGIN menos que ella y no se puede agrandar más (si su contenido pide más, se
+        queda en el límite). Sin la ventana a la vista (escondida junto al reloj), el límite es la pantalla."""
+        win = getattr(self, "win", None)
+        if win is None or getattr(dlg, "nv_fitted", False):
+            return
+        dlg.nv_fitted = True
+        disp = Gdk.Display.get_default()
+        gw = win.get_window() if win.get_visible() else None
+        mon = disp.get_monitor_at_window(gw) if gw is not None else disp.get_primary_monitor() or disp.get_monitor(0)
+        if mon is None:
+            return
+        area = mon.get_workarea()
+        mw, mh = win.get_size() if gw is not None else (area.width, area.height)
+        lim_w = max(320, min(mw, area.width) - DIALOG_MARGIN)
+        lim_h = max(240, min(mh, area.height) - DIALOG_MARGIN)
+        dw, dh = dlg.get_default_size()
+        want_w = dw if dw > 0 else dlg.get_preferred_width()[1]
+        want_h = dh if dh > 0 else dlg.get_preferred_height()[1]
+        if want_w > lim_w or want_h > lim_h:
+            dlg.set_default_size(min(want_w, lim_w), min(want_h, lim_h))
+            dlg.resize(min(want_w, lim_w), min(want_h, lim_h))
+        geom = Gdk.Geometry()
+        geom.max_width, geom.max_height = lim_w, lim_h
+        dlg.set_geometry_hints(None, geom, Gdk.WindowHints.MAX_SIZE)
+        if gw is not None:
+            if dlg.get_transient_for() is None:
+                dlg.set_transient_for(win)
+            dlg.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
+
     # ------------------------------------------------------------------ barra de estado
     def nv_status_bar(self):
         """La barra de abajo: «web.local >>>>> proyecto» (los chevrones en verde, con su onda), «web.local
@@ -179,6 +223,11 @@ class App2(NvBandeja,
             bar.pack_start(w, False, False, 0)
         # (pegado a los chevrones, con el ancho de su nombre: el sitio que sobra queda a su derecha)
         self.st_target.set_max_width_chars(90)
+        # (a la derecha, con el visor arriba de Apariencia: la versión activa, Apache y MariaDB, ▶ / ■ y el
+        # consumo, sin recuadro; lo coloca nv_visor_layout)
+        self.st_right = css(Gtk.Box(spacing=8, valign=Gtk.Align.CENTER), "nv-estado-version")
+        self.st_right.set_no_show_all(True)
+        bar.pack_end(self.st_right, False, False, 0)
         self.nv_status_update()
         return bar
 

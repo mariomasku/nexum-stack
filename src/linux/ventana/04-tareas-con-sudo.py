@@ -192,6 +192,8 @@ class Task:
                                     wrap_mode=Gtk.WrapMode.WORD_CHAR, left_margin=14, right_margin=14,
                                     top_margin=10, bottom_margin=10, pixels_below_lines=3), "log", "nv-consola")
         self.console = Console(self.log.get_buffer())
+        # (las listas de ficheros que deja la tarea, como las de Actualizar proyecto, se pueden pulsar)
+        link_lists(self.log, self.app.open_uri)
         self.log_sw = css(Gtk.ScrolledWindow(min_content_height=220 if self.progress else 180, margin_top=8),
                           "nv-consola-marco")
         self.log_sw.add(self.log)

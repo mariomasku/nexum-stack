@@ -245,7 +245,19 @@ extension AppModel {
         if let p = text("gui-proyectos") { onProjects(p.0, p.1) }
     }
 
-    private func onData(_ rc: Int32, _ out: String) {
+    /// Al abrirse la ventana, antes de las órdenes de verdad: lo que leyó la última vez (DATA_CACHED), por el mismo
+    /// código que interpreta cada respuesta, para pintarla al momento. Las de verdad lo sustituyen al llegar. Sin
+    /// avisos ni preguntas: gui-datos, sin lo que hace onData después de guardar los datos (cached)
+    func loadDataCache() {
+        if let out = dataCacheRead("gui-datos") { onData(0, out, cached: true) }
+        if let out = dataCacheRead("gui-hosts") { onHosts(0, out) }
+        if let out = dataCacheRead("gui-servicios") { onServices(0, out) }
+        if let out = dataCacheRead("gui-proyectos") { onProjects(0, out) }
+        if let out = dataCacheRead("gui-docker") { onDocker(out) }
+    }
+
+    /// (cached: lo guardado de la última vez; solo se pintan los datos, sin preguntas, avisos ni nada más)
+    private func onData(_ rc: Int32, _ out: String, cached: Bool = false) {
         var d = AppData()
         for f in parseLines(out) {
             switch f[0] {
@@ -326,6 +338,7 @@ extension AppModel {
         }
         if let db = impDb, !(d.dbs[d.active] ?? []).contains(db) { impDb = nil }
         if d != data { data = d }
+        if cached { return }
         // (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
         dbMarksCheck()
         // (los correos sin leer, solo con Mailpit en marcha)

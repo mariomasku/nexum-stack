@@ -299,7 +299,7 @@ class AppPrograma:
                 # (ya hay un usuario de verdad con el correo del administrador de pruebas: no se ha tocado)
                 if any("de verdad con" in l for l in out.splitlines()):
                     self.toast("Ya hay un usuario de verdad con %s: no se cambia. Elige otro correo en "
-                               "Configuración › Administrador de pruebas" % test_admin_conf()[0])
+                               "Ajustes › Administrador de pruebas" % test_admin_conf()[0])
                 self.open_uri(base)
                 return False
             user, password = mine[0][2], mine[0][3]
@@ -381,6 +381,23 @@ class AppPrograma:
 
     # datos
     def reload(self, branches=False):
+        # (la primera vez, al abrir: lo último que se leyó, al momento; la lectura de verdad llega después y lo
+        # sustituye)
+        if not getattr(self, "data_cache_shown", False):
+            self.data_cache_shown = True
+            for cmd, fn in (("gui-datos", self.on_data), ("gui-hosts", self.on_hosts_data),
+                            ("gui-servicios", self.on_services_data), ("gui-proyectos", self.on_projects_data),
+                            ("gui-docker", self.on_docker_data)):
+                out = data_cache_read(cmd)
+                if out:
+                    # (con lo guardado solo se pinta: lo que pregunta algo, con los datos de verdad)
+                    self.data_from_cache = True
+                    try:
+                        fn(0, out)
+                    except Exception:  # noqa: BLE001 - lo guardado es de otra versión o está a medias: se espera
+                        pass
+                    finally:
+                        self.data_from_cache = False
         run_quick(["gui-datos"], self.on_data)
         run_quick(["gui-hosts"], self.on_hosts_data)
         run_quick(["gui-servicios"], self.on_services_data)
@@ -496,6 +513,10 @@ class AppPrograma:
             message(self.win, "No se han podido leer las versiones instaladas", out[-600:],
                     Gtk.MessageType.ERROR)
         if d == self.data:
+            # (los de verdad, iguales a lo guardado con que se abrió: falta lo que se dejó para ellos)
+            if getattr(self, "data_marks_pending", False) and not getattr(self, "data_from_cache", False):
+                self.data_marks_pending = False
+                self.nv_db_marks_check()
             return False
         old_active = (self.data or {}).get("active")
         self.data = d
@@ -515,8 +536,12 @@ class AppPrograma:
         self.build_tools()
         if self.branches is not None:
             self.build_install()
-        # (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta)
-        self.nv_db_marks_check()
+        # (con la versión ya cargada y en marcha: si tiene BBDD marcadas para borrar, se pregunta; no con lo guardado)
+        if not getattr(self, "data_from_cache", False):
+            self.data_marks_pending = False
+            self.nv_db_marks_check()
+        else:
+            self.data_marks_pending = True
         return False
 
     def on_branches(self, rc, out):

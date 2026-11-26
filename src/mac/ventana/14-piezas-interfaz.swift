@@ -27,7 +27,7 @@ struct SunkenBackground: View {
     }
 }
 
-/// Al pasar el ratón por un botón: la mano y un poco más de luz, con una transición corta
+/// Al pasar el ratón por un botón: la mano y un poco más de luz, al momento
 struct HoverPointer: ViewModifier {
     @Environment(\.isEnabled) var enabled
     @Environment(\.colorScheme) var scheme
@@ -35,8 +35,8 @@ struct HoverPointer: ViewModifier {
     @State private var pushed = false
     func body(content: Content) -> some View {
         content
+            // (sin transición: al momento, como en Linux; con ella, la ventana parecía ir con retraso)
             .brightness(hover && enabled ? (scheme == .dark ? 0.08 : -0.05) : 0)
-            .animation(.easeOut(duration: 0.12), value: hover)
             .onHover { inside in
                 hover = inside
                 if inside && enabled && !pushed {
@@ -299,7 +299,9 @@ struct Page<Content: View>: View {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-let LOGO_PATHS: [String: String] = [
+/// Todos los logotipos: los de los paquetes y, detrás, los del tipo de proyecto (FRAMEWORK_PATHS, Simple Icons)
+let LOGO_PATHS: [String: String] = LOGO_PATHS_BASE.merging(FRAMEWORK_PATHS, uniquingKeysWith: { a, _ in a })
+let LOGO_PATHS_BASE: [String: String] = [
     // (bases de datos: discos apilados; Node: su hexágono)
     "bbdd": "M 3.5 7 C 3.5 5.34 7.31 4 12 4 C 16.69 4 20.5 5.34 20.5 7 C 20.5 8.66 16.69 10 12 10 C 7.31 10 3.5 8.66 3.5 7 Z M 3.5 8.4 C 3.5 10.06 7.31 11.4 12 11.4 C 16.69 11.4 20.5 10.06 20.5 8.4 L 20.5 12 C 20.5 13.66 16.69 15 12 15 C 7.31 15 3.5 13.66 3.5 12 Z M 3.5 13.4 C 3.5 15.06 7.31 16.4 12 16.4 C 16.69 16.4 20.5 15.06 20.5 13.4 L 20.5 17 C 20.5 18.66 16.69 20 12 20 C 7.31 20 3.5 18.66 3.5 17 Z",
     "node": "M 10.61 2.8 C 12 2 12 2 13.39 2.8 L 19.27 6.2 C 20.66 7 20.66 7 20.66 8.6 L 20.66 15.4 C 20.66 17 20.66 17 19.27 17.8 L 13.39 21.2 C 12 22 12 22 10.61 21.2 L 4.73 17.8 C 3.34 17 3.34 17 3.34 15.4 L 3.34 8.6 C 3.34 7 3.34 7 4.73 6.2 Z",
@@ -347,7 +349,8 @@ func hexColor(_ v: UInt32) -> Color {
 }
 
 /// Color de cada marca (el fondo de su icono)
-let LOGO_COLORS: [String: Color] = [
+let LOGO_COLORS: [String: Color] = LOGO_COLORS_BASE.merging(FRAMEWORK_COLORS, uniquingKeysWith: { a, _ in a })
+let LOGO_COLORS_BASE: [String: Color] = [
     "log": hexColor(0x16A34A), "actualizar": hexColor(0x3584E4), "imagenes": hexColor(0x3584E4),
     "php": hexColor(0x777BB4), "apache": hexColor(0xD22128), "mariadb": hexColor(0x003545),
     "phpmyadmin": hexColor(0x6C78AF), "perl": hexColor(0x39457E), "xampp": hexColor(0xFB7A24),
@@ -476,8 +479,7 @@ struct ColorIcon: View {
                 .fill(Color.white)
                 .frame(width: size * 0.64, height: size * 0.64)
         } else {
-            Image(systemName: symbol)
-                .font(.system(size: size * 0.5, weight: .semibold))
+            UIIcon(symbol, size: size * 0.5, weight: .semibold)
                 .foregroundColor(.white)
         }
     }
@@ -606,7 +608,7 @@ struct Card<Content: View>: View {
                 HStack(spacing: 6) {
                     if let t = title { Text(t).font(.headline) }
                     if let d = description {
-                        Image(systemName: "info.circle").foregroundColor(.secondary).tip(d)
+                        UIIcon("info.circle").foregroundColor(.secondary).tip(d)
                     }
                 }
             }
@@ -642,15 +644,14 @@ struct FoldCard<Content: View>: View {
                 Button(action: { model.setFolded(key, open) }) {
                     HStack(spacing: 6) {
                         Text(title).font(.headline).foregroundColor(.primary)
-                        Image(systemName: open ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
+                        UIIcon(open ? "chevron.down" : "chevron.right", size: 11, weight: .semibold).foregroundColor(.secondary)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle()).hoverPointer()
                 .tip(open ? "Plegar" : "Desplegar")
                 if let d = description {
-                    Image(systemName: "info.circle").foregroundColor(.secondary).tip(d)
+                    UIIcon("info.circle").foregroundColor(.secondary).tip(d)
                 }
                 if !open && !summary.isEmpty {
                     Text(summary).font(.callout).foregroundColor(.secondary)
@@ -820,7 +821,7 @@ struct TileCard<Content: View>: View {
                     if let l = lead { l }
                     if let t = title { Text(t).font(.headline) }
                     if let d = description {
-                        Image(systemName: "info.circle").foregroundColor(.secondary).tip(d)
+                        UIIcon("info.circle").foregroundColor(.secondary).tip(d)
                     }
                     if let r = tail { r.padding(.leading, 6) }
                 }
@@ -967,7 +968,7 @@ struct Expander<Trailing: View, Inner: View>: View {
                 }
                 Spacer(minLength: 8)
                 trailing
-                Image(systemName: open ? "chevron.up" : "chevron.down").foregroundColor(.secondary)
+                UIIcon(open ? "chevron.up" : "chevron.down").foregroundColor(.secondary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -1008,8 +1009,13 @@ struct IconButton: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol).foregroundColor(tint)
-                .font(big ? .system(size: 20, weight: .medium) : .body)
+            Group {
+                if let t = tint {
+                    UIIcon(symbol, size: big ? 20 : 13, weight: big ? .medium : .regular).foregroundColor(t)
+                } else {
+                    TintIcon(symbol, size: big ? 20 : 13, weight: big ? .medium : .regular)
+                }
+            }
                 .frame(width: big ? 36 : nil, height: big ? 36 : nil)
                 .contentShape(Rectangle())
         }

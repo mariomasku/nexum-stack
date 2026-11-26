@@ -408,10 +408,10 @@ struct NodeView: View {
             Spacer(minLength: 8)
             // (los de siempre, solo con su icono: el proyecto en el editor, en su carpeta y lo que dice su servidor)
             if let code = vscodeURL() {
-                iconButton(.image(NSWorkspace.shared.icon(forFile: code.path)), "Abrir en Visual Studio Code") { openInVSCode(path) }
+                iconButton(.image(vscodeIcon(code)), "Abrir en Visual Studio Code") { openInVSCode(path) }
             }
             iconButton(.symbol("folder", Color.primary), "Abrir su carpeta") { showFolder(path) }
-            iconButton(.logo("log"), "Registro: lo último que ha dicho su servidor") {
+            iconButton(visorChoice("log", model.look.iconos), "Registro: lo último que ha dicho su servidor") {
                 model.runTask("Registro de \(p.folder)", ["node-registro", p.folder])
             }
             .busyGuard(model.busy)
@@ -542,7 +542,7 @@ struct NginxView: View {
         } else if n.running {
             text = "En marcha en este Mac: puertos \(n.http) (http) y \(n.https) (https)"
         } else {
-            text = "Parado. Puertos \(n.http) (http) y \(n.https) (https), en Configuración, Nginx"
+            text = "Parado. Puertos \(n.http) (http) y \(n.https) (https), en Ajustes, Nginx"
         }
         if n.installed && n.php == "parado" { text += ". El PHP de la versión activa no está en marcha: arráncala para que sirva PHP" }
         if n.installed && n.php == "sin-fpm" { text += ". La versión activa no tiene PHP-FPM (un XAMPP oficial): solo sirve ficheros" }
@@ -562,7 +562,7 @@ struct NginxView: View {
                 if n.version != n.latest {
                     Button("Actualizar a la \(n.latest)") { model.nginxInstall() }.busyGuard(model.busy)
                 }
-                Button(action: { model.runTask("Registro de Nginx", ["nginx-registro"]) }) { VisorIconView(icon: .logo("log"), size: 16) }
+                Button(action: { model.runTask("Registro de Nginx", ["nginx-registro"]) }) { VisorIconView(icon: visorChoice("log", model.look.iconos), size: 16) }
                     .buttonStyle(OutlineButton()).tip("Registro: sus errores").busyGuard(model.busy)
                 if n.running {
                     Button(action: { model.nginxDo("nginx-reiniciar", "Reiniciando Nginx", "Nginx en marcha") }) {
@@ -599,7 +599,7 @@ struct NginxView: View {
             Spacer(minLength: 8)
             if p.exists {
                 if let code = vscodeURL() {
-                    Button(action: { openInVSCode(path) }) { VisorIconView(icon: .image(NSWorkspace.shared.icon(forFile: code.path)), size: 16) }
+                    Button(action: { openInVSCode(path) }) { VisorIconView(icon: .image(vscodeIcon(code)), size: 16) }
                         .buttonStyle(OutlineButton()).tip("Abrir en Visual Studio Code")
                 }
                 Button(action: { showFolder(path) }) { VisorIconView(icon: .symbol("folder", Color.primary), size: 16) }
@@ -719,7 +719,7 @@ struct ReposView: View {
             if let e = r?.error, h.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(e)
-                    Button("Ir a Configuración") { model.openTools("github") }
+                    Button("Ir a Ajustes") { model.openTools("github") }
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -741,7 +741,7 @@ struct ReposView: View {
                     if model.reposLoading || r == nil {
                         ProgressView().scaleEffect(0.6)
                     } else {
-                        Button(action: { model.reloadRepos() }) { Image(systemName: "arrow.clockwise") }
+                        Button(action: { model.reloadRepos() }) { TintIcon("arrow.clockwise") }
                             .tip("Leer de nuevo la lista de GitHub")
                     }
                 }
@@ -774,7 +774,7 @@ struct ReposView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(item.name).font(.system(size: 13, weight: .medium))
-                    if item.isPrivate { Image(systemName: "lock.fill").font(.system(size: 10)).foregroundColor(.secondary) }
+                    if item.isPrivate { UIIcon("lock.fill", size: 10).foregroundColor(.secondary) }
                 }
                 Text(bits.joined(separator: " · ")).font(.caption).foregroundColor(.secondary).lineLimit(1)
             }
@@ -785,12 +785,13 @@ struct ReposView: View {
                     .busyGuard(model.busy)
                     .tip("Actualizar con git pull")
             } else if item.state == "ocupado" {
-                Button("Clonar") {}
+                // («Clonar», tan ancho como «Traer cambios», en todas las filas)
+                Button(action: {}) { Text("Clonar").frame(minWidth: CLONE_WIDTH) }
                     .buttonStyle(OutlineButton())
                     .disabled(true)
                     .tip("Ya hay una carpeta con ese nombre")
             } else {
-                Button("Clonar") { model.fetchRepo(item) }
+                Button(action: { model.fetchRepo(item) }) { Text("Clonar").frame(minWidth: CLONE_WIDTH) }
                     .buttonStyle(OutlineButton(kind: "primary"))
                     .busyGuard(model.busy)
                     .tip("Clonar por SSH en htdocs")
@@ -800,7 +801,7 @@ struct ReposView: View {
                 copyText("git@github.com:\(item.full).git")
                 model.toast("Repositorio copiado: \(item.name)")
             }) {
-                Image(systemName: "doc.on.doc")
+                UIIcon("doc.on.doc")
             }
             .buttonStyle(OutlineButton())
             .tip("Copiar repositorio")
@@ -815,3 +816,7 @@ struct ReposView: View {
         .padding(.vertical, 9)
     }
 }
+
+/// El ancho de «Traer cambios» con la letra de los botones (OutlineButton: 12,5; la de «Clonar», en negrita), para que
+/// «Clonar» sea igual de ancho en todas las filas
+let CLONE_WIDTH: CGFloat = ceil(("Traer cambios" as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12.5)]).width) + 2

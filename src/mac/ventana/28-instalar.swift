@@ -66,7 +66,7 @@ struct InstallSection: View {
                             Button(action: { model.selected.remove(v) }) {
                                 HStack(spacing: 3) {
                                     Text("PHP \(v)").font(.caption)
-                                    Image(systemName: "xmark.circle.fill").font(.caption).foregroundColor(.secondary)
+                                    UIIcon("xmark.circle.fill", size: 10).foregroundColor(.secondary)
                                 }
                             }
                             .buttonStyle(BorderlessButtonStyle())

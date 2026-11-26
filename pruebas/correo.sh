@@ -224,7 +224,7 @@ mailpit_sync > /dev/null; p=$(mailpit_pid)
 lampp_running() { false; }
 mailpit_sync > /dev/null
 check "al parar la version se para" '[ -n "$p" ] && ! kill -0 "$p" 2> /dev/null && [ -z "$(mailpit_pid)" ]'
-check "arranca y para con la version: use, arrancar/parar, disable, servicio, cargar-proyecto y la ventana" '[ "$(grep -c "^    mailpit_sync$" "$SRC")" -ge 6 ] && grep -q "mailpit_sync --suave > /dev/null 2>&1" "$SRC"'
+check "arranca y para con la version: use, arrancar/parar, disable, servicio, cargar-proyecto y, desde la ventana, al pulsar Correo (1.60.0)" '[ "$(grep -c "^    mailpit_sync$" "$SRC")" -ge 6 ] && grep -q "        arrancar) mailpit_sync --suave ;;" "$SRC" && ! sed -n "/^function gui_data()/,/^}/p" "$SRC" | grep -q mailpit_sync'
 # Otro programa en su puerto: no arranca y, desde la ventana (--suave), no se reintenta en 5 minutos
 printf '#!/bin/bash\nexit 1\n' > "$W/bin/mailpit-malo"; chmod 755 "$W/bin/mailpit-malo"
 lampp_running() { true; }
