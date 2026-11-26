@@ -304,7 +304,7 @@ class NvActualizarProyecto:
 
     def nv_more_items(self, x):
         items = [("Opciones de la BBDD…", lambda: self.on_link_project(x)),
-                 ("Abrir la carpeta", lambda: self.open_uri("file://%s/%s" % (HTDOCS, x["name"])))]
+                 ("Abrir la carpeta", lambda: self.open_uri(GLib.filename_to_uri(os.path.join(HTDOCS, x["name"]))))]
         for dp in self.nv_docker_of(x["name"]):
             # (uno por entorno de Docker: cada uno dice el suyo)
             items.append(("Eliminar de Docker (PHP %s)…" % ", ".join(dp.get("versions") or [dp["php"]]),

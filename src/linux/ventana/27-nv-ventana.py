@@ -68,7 +68,7 @@ class App2(NvBandeja,
         for name, cb in [("localhost", lambda *_: self.open_uri("http://localhost/")),
                          ("phpmyadmin", lambda *_: self.open_uri("http://127.0.0.1/phpmyadmin/")),
                          ("vhosts", self.on_vhosts), ("hosts", self.on_hosts),
-                         ("logs", lambda *_: self.open_uri("file://" + LOG_DIR)),
+                         ("logs", lambda *_: self.open_uri(GLib.filename_to_uri(LOG_DIR))),
                          ("update", lambda *_: self.check_package(manual=True)),
                          ("terminal", self.on_terminal), ("refresh", self.on_refresh),
                          ("changes", self.on_changes), ("about", self.on_about)]:

@@ -118,12 +118,13 @@ class Task:
     El resto: barra en movimiento y la salida en el registro."""
 
     def __init__(self, app, title, args, progress=False, done_text=None, on_done=None,
-                 auto_close=False, env=None, cancel_text=None, free=False):
+                 auto_close=False, env=None, cancel_text=None, free=False, command=None):
         self.app, self.args, self.progress = app, args, progress
         # free: va al lado de la que sigue, sin cola (run_task): no se esconde en segundo plano
         self.free = free
         self.ok = self.closed = False
         self.env, self.cancel_text = env or {}, cancel_text
+        self.command = command
         self.done_text, self.on_done, self.auto_close = done_text, on_done, auto_close
         # (escondida con «Seguir en segundo plano»: el aviso de al lado del visor la trae de vuelta)
         self.background = False
@@ -258,7 +259,7 @@ class Task:
             # recuerda la autorizacion como en una terminal normal
             fcntl.ioctl(1, termios.TIOCSCTTY, 0)
 
-        self.proc = subprocess.Popen(script_cmd(*self.args), stdin=subprocess.DEVNULL,
+        self.proc = subprocess.Popen(self.command or script_cmd(*self.args), stdin=subprocess.DEVNULL,
                                      stdout=slave, stderr=slave, env=env,
                                      # (preexec_fn con hilos: solo hace un ioctl, sin reservar memoria ni bloqueos)
                                      start_new_session=True, preexec_fn=as_terminal)  # noqa: PLW1509
@@ -643,7 +644,7 @@ class Task:
         copy.connect("clicked", on_copy)
         row.pack_start(copy, False, False, 0)
         folder_btn = css(Gtk.Button(label="Abrir la carpeta de logs"), "pildora")
-        folder_btn.connect("clicked", lambda *_: self.app.open_uri("file://" + folder))
+        folder_btn.connect("clicked", lambda *_: self.app.open_uri(GLib.filename_to_uri(folder)))
         row.pack_start(folder_btn, False, False, 0)
         close = css(Gtk.Button(label="Cerrar"), "pildora")
         close.connect("clicked", lambda *_: dlg.destroy())

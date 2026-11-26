@@ -38,7 +38,9 @@ class NvDocker:
         title = BrandLogo("docker", 34)
         title.set_halign(Gtk.Align.START)
         t.pack_start(title, False, False, 0)
-        t.pack_start(label("Docker %s · sin root, con tu usuario" % d["version"], "nv-chico", "nv-tenue"), False, False, 0)
+        subtitle = ("Docker Desktop %s · Windows, conectado por WSL" if d.get("backend") == "desktop"
+                    else "Docker %s · sin root, con tu usuario") % d["version"]
+        t.pack_start(label(subtitle, "nv-chico", "nv-tenue"), False, False, 0)
         head.pack_start(t, True, True, 0)
         new = nv_button("list-add-symbolic", "Proyecto en Docker…", None, lambda *_: self.nv_docker_new(), "nv-azul")
         head.pack_end(new, False, False, 0)
@@ -60,7 +62,7 @@ class NvDocker:
                                  ("Apagarlo", lambda *_: self.run_task("Apagando el Docker del sistema", ["docker-instalar"],
                                                                          done_text="Docker del sistema apagado", auto_close=True,
                                                                          on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data))))]
-                               if d.get("rootful") else []) + \
+                               if d.get("rootful") and d.get("backend") != "desktop" else []) + \
                               ([("La versión LAMPP activa está parada", "Los proyectos en Docker de antes se abren por su "
                                  "Apache (los del Apache de Docker, no).", ("Arrancarla", lambda *_: self.nv_power()))]
                                if not d["lampp"] and any(not p.get("web") for p in d["projects"]) else []) + \

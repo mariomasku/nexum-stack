@@ -12,6 +12,10 @@
 # (LVM_DOCKER, LVM_DOCKER_DIR y LVM_DOCKER_HOST solo para pruebas)
 DOCKER_DIR=${LVM_DOCKER_DIR:-$LOG_DIR/docker}
 DOCKER_BIN=${LVM_DOCKER:-/usr/bin/docker}
+if [ -z "${LVM_DOCKER:-}" ] && [ ! -x "$DOCKER_BIN" ] && [ -n "${WSL_DISTRO_NAME:-}" ] \
+        && [ -x /mnt/wsl/docker-desktop/cli-tools/usr/bin/docker ]; then
+    DOCKER_BIN=/mnt/wsl/docker-desktop/cli-tools/usr/bin/docker
+fi
 # Versiones que se ofrecen: imagenes oficiales php:<version>-fpm y mariadb:<version> de Docker Hub
 DOCKER_PHP_VERSIONS="8.5 8.4 8.3 8.2 8.1 8.0 7.4 7.3 7.2 7.1 7.0 5.6"
 DOCKER_MARIADB_VERSIONS="11.8 11.4 10.11 10.6 10.5 10.4"
@@ -23,9 +27,28 @@ DOCKER_PACKAGES="docker.io docker-compose-v2 rootlesskit uidmap slirp4netns dbus
 # Puertos de 127.0.0.1 para el phpMyAdmin de cada proyecto (uno por proyecto, desde este)
 DOCKER_PMA_PORT=28080
 
-# Docker sin root siempre por su socket: nunca el del demonio del sistema
+# Se conserva el motor rootless existente. En WSL, sin ese socket, se admite
+# la integracion de Docker Desktop; docker_ready verifica la identidad del motor.
 function docker_sock() {
-    echo "${LVM_DOCKER_HOST:-unix://${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock}"
+    local rootless=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock
+    if [ -n "${LVM_DOCKER_HOST:-}" ]; then
+        echo "$LVM_DOCKER_HOST"
+    elif [ ! -S "$rootless" ] && [ -n "${WSL_DISTRO_NAME:-}" ]; then
+        echo unix:///var/run/docker.sock
+    else
+        echo "unix://$rootless"
+    fi
+}
+
+# WSL sin motor rootless usa Docker Desktop, incluso cuando falta su integracion.
+# Un enlace docker roto no significa que haya que instalar Docker de Ubuntu.
+function docker_backend() {
+    if [ -n "${WSL_DISTRO_NAME:-}" ] \
+            && [ "$(docker_sock)" != "unix://${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock" ]; then
+        echo desktop
+    else
+        echo rootless
+    fi
 }
 
 # Configuracion del cliente de Docker: una carpeta del gestor (solo tuya) y no ~/.docker, donde
@@ -62,8 +85,20 @@ function dk() {
 function docker_ready() {
     [ -x "$DOCKER_BIN" ] || return 1
     local info
-    info=$(dk info --format '{{json .SecurityOptions}}' 2> /dev/null) || return 1
-    [[ "$info" == *rootless* ]]
+    info=$(dk info --format '{{json .SecurityOptions}}|{{.OperatingSystem}}|{{.OSType}}' 2> /dev/null) || return 1
+    [[ "$info" == *rootless* ]] || {
+        [ -n "${WSL_DISTRO_NAME:-}" ] && [ "$(docker_sock)" == unix:///var/run/docker.sock ] \
+            && [[ "$info" == *'|Docker Desktop|linux' ]]
+    }
+}
+
+# Solo conexion: Doctor usa exactamente el mismo motor que la ventana, sin
+# migrar proyectos ni arrancar servicios al consultar su estado.
+function gui_docker_connection() {
+    local version
+    docker_ready || return 1
+    version=$(dk version --format '{{.Server.Version}}') || return 1
+    printf 'D|%s|%s\n' "$(docker_sock)" "$version"
 }
 
 # Nombre corto de un proyecto: el de su carpeta en minusculas, solo letras, numeros y - (va en el
@@ -116,6 +151,7 @@ function docker_projects() {
 #     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" p
+    echo "B|$(docker_backend)|${WSL_DISTRO_NAME:-}"
     [ -x "$DOCKER_BIN" ] && installed=1
     if [ $installed -eq 1 ] && docker_ready; then
         ready=1
@@ -434,6 +470,14 @@ WantedBy=default.target
 # usuarios (subuid/subgid) y, si Ubuntu limita los espacios de usuarios, el perfil de AppArmor de
 # rootlesskit. Despues, ya con tu usuario, el servicio de Docker sin root (systemctl --user)
 function docker_install() {
+    if [ "$(docker_backend)" == desktop ]; then
+        if docker_ready; then
+            echo 'Docker Desktop conectado mediante integracion WSL. No se instala otro motor.'
+            return 0
+        fi
+        echo "Docker Desktop no conectado a ${WSL_DISTRO_NAME:-WSL}. Abre Docker Desktop y habilita Settings > Resources > WSL Integration > ${WSL_DISTRO_NAME:-tu distribucion}, y pulsa Apply. No se instala Docker de Ubuntu."
+        return 1
+    fi
     local me=$(id -un) p missing=""
     if ! command -v apt-get > /dev/null; then
         echo "Docker sin root solo se instala en Ubuntu o Debian. Instalalo a mano: https://docs.docker.com/engine/security/rootless/"

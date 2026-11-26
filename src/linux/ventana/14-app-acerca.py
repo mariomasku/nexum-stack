@@ -75,7 +75,7 @@ class AppAcerca:
         def opened(rc, out):
             path = (out.strip().splitlines() or [""])[-1]
             if rc == 0 and path.startswith("/") and os.path.isfile(path):
-                self.open_uri("file://" + path)
+                self.open_uri(GLib.filename_to_uri(path))
             else:
                 message(self.win, "No se ha podido abrir el manual", out.strip() or "Error al sacar el manual.",
                         Gtk.MessageType.ERROR)

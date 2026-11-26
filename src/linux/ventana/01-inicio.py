@@ -100,7 +100,9 @@ VSCODE_IDS = ("com.microsoft.VSCode.desktop", "code.desktop", "code_code.desktop
 
 def vscode_app():
     """Acceso de Visual Studio Code (None si no está instalado)."""
-    for app_id in VSCODE_IDS:
+    ids = (("nexum-windows-vscode.desktop",) + VSCODE_IDS
+           if os.environ.get("WSL_DISTRO_NAME") else VSCODE_IDS)
+    for app_id in ids:
         try:
             app = Gio.DesktopAppInfo.new(app_id)
         except (TypeError, GLib.Error):

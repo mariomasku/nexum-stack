@@ -4,9 +4,12 @@ class AppDocker:
     # ------------------------------------------------------------------ Docker
     def on_docker_data(self, rc, out):
         d = {"installed": False, "ready": False, "version": "", "lampp": False,
-             "php": [], "maria": [], "projects": [], "containers": []}
+             "php": [], "maria": [], "projects": [], "containers": [], "backend": "rootless",
+             "distribution": os.environ.get("WSL_DISTRO_NAME", "WSL")}
         for f in parse_lines(out):
-            if f[0] == "S" and len(f) >= 5:
+            if f[0] == "B" and len(f) >= 3:
+                d.update(backend=f[1], distribution=f[2])
+            elif f[0] == "S" and len(f) >= 5:
                 d.update(installed=f[1] == "1", ready=f[2] == "1", version=f[3], lampp=f[4] == "1",
                          rootful=len(f) > 5 and f[5] == "1")
             elif f[0] == "V" and len(f) >= 3:
@@ -46,13 +49,30 @@ class AppDocker:
             return
         if d["ready"]:
             self.docker_box.pack_start(self.build_docker_console(), False, False, 0)
-        box, lb = group("Docker sin root",
+        desktop = d.get("backend") == "desktop"
+        box, lb = group("Docker Desktop (Windows)" if desktop else "Docker sin root",
+                        "Usa el motor de Docker Desktop de Windows mediante la integración WSL de %s. "
+                        "Contenedores, imágenes y volúmenes pertenecen a ese motor. No se instala otro Docker en Ubuntu."
+                        % d.get("distribution", "WSL") if desktop else
                         "Cada proyecto en Docker va con el PHP que quieras (de la 5.6 a la 8.5), también "
                         "con varias versiones a la vez y la misma BBDD, en una MariaDB común. Docker tiene "
                         "su propio Apache, con las mismas reglas de seguridad y los .htaccess de cada "
                         "proyecto, así que no necesita LAMPP y funcionan a la vez. Docker corre sin root, "
                         "con tu usuario: ni un proyecto ni Docker pueden hacerse administradores del equipo.")
-        if not d["installed"]:
+        if desktop and not d["ready"]:
+            row = ActionRow("Docker Desktop no conectado a %s" % d.get("distribution", "WSL"),
+                            "Abre Docker Desktop en Windows, usa contenedores Linux y activa Settings › Resources › "
+                            "WSL Integration › %s. Pulsa Apply y después Comprobar."
+                            % d.get("distribution", "WSL"))
+            row.add_prefix(label("●", "punto-gris"))
+            help_button = Gtk.Button(label="Cómo conectarlo")
+            help_button.connect("clicked", lambda *_: self.open_uri("https://docs.docker.com/desktop/features/wsl/"))
+            row.add_suffix(help_button)
+            refresh = css(Gtk.Button(label="Comprobar", sensitive=not self.busy), "verde")
+            refresh.connect("clicked", lambda *_: run_quick(["gui-docker"], self.on_docker_data))
+            row.add_suffix(refresh)
+            lb.add(row)
+        elif not d["installed"]:
             row = ActionRow("Docker no está instalado",
                             "Se instala Docker de Ubuntu en modo sin root (el Docker del sistema, con "
                             "root, se deja apagado). Pide la contraseña de administrador.")
@@ -75,10 +95,11 @@ class AppDocker:
             row.add_suffix(b)
             lb.add(row)
         else:
-            row = ActionRow("Docker %s, sin root" % d["version"], "En marcha con tu usuario")
+            row = ActionRow("Docker Desktop %s" % d["version"] if desktop else "Docker %s, sin root" % d["version"],
+                            "Motor Windows conectado por WSL" if desktop else "En marcha con tu usuario")
             row.add_prefix(label("●", "punto-verde"))
             lb.add(row)
-            if d.get("rootful"):
+            if d.get("rootful") and not desktop:
                 # (lo deja en marcha el paquete de Ubuntu: corre como root y no hace falta)
                 row = ActionRow("Hay otro Docker en marcha: el de Ubuntu, como administrador",
                                 "Este programa usa el suyo, con tu usuario. El de Ubuntu arranca solo con el equipo, "

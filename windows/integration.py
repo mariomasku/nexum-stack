@@ -62,7 +62,8 @@ def doctor():
         'systemd': ['systemctl', '--user', 'is-system-running'],
         'gtk': ['python3', '-c', 'import gi;gi.require_version("Gtk","3.0");from gi.repository import Gtk,Gdk,GdkPixbuf;assert Gtk.init_check()[0];p=GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB,True,8,2,2);assert Gdk.cairo_surface_create_from_pixbuf(p,1,None)'],
         'engine': ['/opt/nexum/nexum.sh', 'version'],
-        'docker': ['docker', 'info', '--format', '{{.ServerVersion}}'],
+        'docker': ['/opt/nexum/nexum.sh', 'gui-docker-conexion'],
+        'vscode_windows': ['python3', '/opt/nexum/windows/vscode.py', '--check'],
         'keyring': ['gdbus', 'call', '--session', '--dest', 'org.freedesktop.secrets', '--object-path', '/org/freedesktop/secrets', '--method', 'org.freedesktop.DBus.Peer.Ping'],
     }.items():
         try:
@@ -70,14 +71,22 @@ def doctor():
             output = (p.stdout + p.stderr).strip()
             ok = p.returncode == 0
             if name == 'docker':
-                ok = ok and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+[^\s]*', p.stdout.strip()) is not None
+                ok = ok and re.fullmatch(r'D\|unix://[^\n|]+\|[0-9]+\.[0-9]+\.[0-9]+[^\s]*', p.stdout.strip()) is not None
             checks[name] = dict(ok=ok, output=output)
         except (OSError, subprocess.TimeoutExpired) as error:
             checks[name] = dict(ok=False, output=str(error))
     checks['linux_projects'] = dict(ok=str(pathlib.Path('/opt/htdocs').resolve()).startswith('/opt/'), output='/opt/htdocs')
     checks['secret_tool'] = dict(ok=shutil.which('secret-tool') is not None, output=shutil.which('secret-tool') or 'Instalar libsecret-tools')
+    build_info = pathlib.Path('/opt/nexum/windows/build-info.json')
+    if build_info.is_file():
+        try:
+            checks['windows_build'] = dict(ok=True, output=json.loads(build_info.read_text()))
+        except (OSError, ValueError) as error:
+            checks['windows_build'] = dict(ok=False, output=str(error))
+    else:
+        checks['windows_build'] = dict(ok=False, output='Procedencia no registrada. Reinstala la integracion Windows.')
     print(json.dumps(checks, ensure_ascii=False, indent=2))
-    return 0 if all(c['ok'] for n, c in checks.items() if n != 'docker') else 1
+    return 0 if all(c['ok'] for n, c in checks.items() if n not in ('docker', 'vscode_windows')) else 1
 
 
 if __name__ == '__main__':

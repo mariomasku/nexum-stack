@@ -340,6 +340,7 @@ case "$1" in
     gui-ramas) gui_branches ;;
     gui-fechas) gui_php_dates ;;
     gui-docker) gui_docker ;;
+    gui-docker-conexion) gui_docker_connection ;;
     docker-instalar) docker_install ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" "$3" ;;

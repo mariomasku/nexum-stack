@@ -47,7 +47,18 @@ class AppPrograma:
             self.update_declined = getattr(self, "update_declined", set()) | {version}
             return False
         if SIMULATE:
-            self.toast("[simulación] pkexec apt-get install -y %s" % path)
+            self.toast("[simulación] Instalar actualización firmada: %s" % path)
+            return True
+
+        if os.environ.get("WSL_DISTRO_NAME") or not shutil.which("pkexec"):
+            def installed(ok, task, _progress):
+                if ok:
+                    GLib.idle_add(self.restart_updated)
+                elif "instalalo en la terminal" in task.log_text():
+                    self.terminal_install(version, path)
+            self.run_task("Actualizando a la versión %s" % version, ["actualizar-programa"],
+                          command=["/usr/bin/sudo", "/opt/nexum/nexum-actualizar", path, sha],
+                          on_done=installed, done_text="Nexum actualizado")
             return True
 
         dlg = Gtk.Dialog(title="Actualizando", transient_for=self.win, modal=True, deletable=False)
@@ -62,11 +73,7 @@ class AppPrograma:
             if rc == 0:
                 # La version nueva esta en /opt/nexum: se abre su ventana cuando se
                 # cierre esta (misma aplicacion: si siguiera abierta, solo se traeria al frente)
-                subprocess.Popen(["sh", "-c", 'sleep 1; exec "$0" ventana',
-                                  "/opt/nexum/nexum.sh"], start_new_session=True,
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
-                self.quit()
+                self.restart_updated()
             elif rc in (126, 127):
                 self.toast("Actualización cancelada")
             elif "instalalo en la terminal" in out:
@@ -92,6 +99,14 @@ class AppPrograma:
             GLib.idle_add(done, rc, out)
         threading.Thread(target=work, daemon=True).start()
         return True
+
+    def restart_updated(self):
+        subprocess.Popen(["sh", "-c", 'sleep 1; exec "$0" ventana',
+                          "/opt/nexum/nexum.sh"], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+        self.quit()
+        return False
 
     def terminal_install(self, version, path):
         """La versión nueva cambia el ayudante de actualización (o su acción de polkit): el ayudante
@@ -214,6 +229,13 @@ class AppPrograma:
     def open_text(self, path):
         """Abre un fichero de texto con el editor de textos, aunque no tenga extensión (error_log,
         hosts): el programa por defecto según su contenido podría ser otro."""
+        if os.environ.get("WSL_DISTRO_NAME"):
+            try:
+                subprocess.run(["/usr/bin/python3", "/opt/nexum/windows/open.py", "--text", path],
+                               check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=20)
+            except (OSError, subprocess.SubprocessError) as exc:
+                message(self.win, "No se ha podido abrir %s" % path, str(exc), Gtk.MessageType.ERROR)
+            return
         app = Gio.AppInfo.get_default_for_type("text/plain", False)
         if app is None:
             self.open_uri(GLib.filename_to_uri(path))
@@ -363,12 +385,25 @@ class AppPrograma:
 
     def open_uri(self, uri):
         try:
+            bridge = "/opt/nexum/windows/open.py"
+            if os.environ.get("WSL_DISTRO_NAME") and os.path.isfile(bridge):
+                subprocess.run(["/usr/bin/python3", bridge, uri], check=True,
+                               stdin=subprocess.DEVNULL, capture_output=True, timeout=20)
+                return
             Gtk.show_uri_on_window(self.win, uri, Gdk.CURRENT_TIME)
-        except GLib.Error as exc:
-            message(self.win, "No se ha podido abrir %s" % uri, exc.message,
+        except (GLib.Error, OSError, subprocess.SubprocessError) as exc:
+            detail = (exc.stderr or b"").decode("utf-8", "replace") if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+            message(self.win, "No se ha podido abrir %s" % uri, detail,
                     Gtk.MessageType.ERROR)
 
     def on_terminal(self, *_):
+        bridge = "/opt/nexum/windows/open.py"
+        if os.environ.get("WSL_DISTRO_NAME") and os.path.isfile(bridge):
+            try:
+                subprocess.Popen(["/usr/bin/python3", bridge, "--terminal"], start_new_session=True)
+                return
+            except OSError:
+                pass
         for cmd in (["gnome-terminal", "--geometry=100x32", "--", SCRIPT],
                     ["x-terminal-emulator", "-e", SCRIPT]):
             try:

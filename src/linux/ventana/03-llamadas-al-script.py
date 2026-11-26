@@ -26,7 +26,7 @@ for n in range(len(args), 0, -1):
 ENV_KEEP = {"HOME", "USER", "LOGNAME", "LANG", "LANGUAGE", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "SSH_AUTH_SOCK",
             "DBUS_SESSION_BUS_ADDRESS", "TMPDIR", "PATH", "LVM_PRUEBA", "PHP_TIMEZONE",
             "http_proxy", "https_proxy", "no_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY",
-            "NO_PROXY", "ALL_PROXY"}
+            "NO_PROXY", "ALL_PROXY", "WSL_DISTRO_NAME", "WSL_INTEROP"}
 
 
 def script_env(**extra):

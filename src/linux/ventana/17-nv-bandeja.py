@@ -209,7 +209,7 @@ class NvBandeja:
                 [("Volver a leer las versiones", "view-refresh-symbolic", lambda: self.on_refresh()),
                  ("Buscar actualizaciones", "software-update-available-symbolic", lambda: self.check_package(manual=True)),
                  ("Abrir el panel en la terminal", "utilities-terminal-symbolic", lambda: self.on_terminal()),
-                 ("Carpeta de registros", "folder-documents-symbolic", lambda: self.open_uri("file://" + LOG_DIR))],
+                 ("Carpeta de registros", "folder-documents-symbolic", lambda: self.open_uri(GLib.filename_to_uri(LOG_DIR)))],
                 [("Ayuda", "help-browser-symbolic", lambda: self.on_help()),
                  ("Novedades", "starred-symbolic", lambda: self.on_changes()),
                  ("Acerca de Nexum Dev Stack", "help-about-symbolic", lambda: self.on_about())]]):
