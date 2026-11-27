@@ -36,6 +36,9 @@ PY
 bash "$work/construir.sh"
 bash "$work/empaquetar-deb.sh" "$work/packages"
 as_root apt-get install --reinstall -y "$work"/packages/nexum_*_all.deb
+# Keep domains managed by Nexum when WSL restarts, and recover the standard
+# project domain if WSL already regenerated /etc/hosts before this installation.
+as_root /usr/bin/python3 "$work/windows/configure-hosts.py"
 as_root install -d -m 755 /opt/nexum/windows
 as_root install -m 755 "$work/windows/integration.py" /opt/nexum/windows/integration.py
 as_root install -m 755 "$work/windows/open.py" /opt/nexum/windows/open.py

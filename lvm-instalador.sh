@@ -28377,7 +28377,7 @@ class Task:
         self.append(out)
 
     def sudo_asking(self):
-        """¿Hay un sudo de root de esta tarea (descendiente de su proceso) en su terminal y sin hijos?
+        """¿Hay un sudo de root de esta tarea (su proceso o un descendiente) en su terminal y sin hijos?
         Es lo que pasa cuando pide la contraseña. Cualquier programa de la tarea puede escribir la
         marca (la hereda en SUDO_PROMPT) y apagar el eco: así no se le manda a él"""
         procs = {}
@@ -28408,14 +28408,14 @@ class Task:
             if p in seen:
                 continue
             seen.add(p)
-            for c in children.get(p, []):
-                stack.append(c)
-                # Solo cuenta un sudo de root (el de verdad es setuid): un programa tuyo que se
-                # llame sudo no vale. Y en la terminal de la tarea, sin hijos (con hijos ya está
-                # ejecutando la orden y la contraseña iría a ella)
-                _, comm, euid, tty = procs[c]
-                if comm == "sudo" and euid == "0" and tty == self.tty and not children.get(c):
-                    found.append(c)
+            stack.extend(children.get(p, []))
+            # La actualización arranca sudo directamente: también cuenta el proceso inicial.
+            # Solo cuenta un sudo de root (el de verdad es setuid), en la terminal de la tarea
+            # y sin hijos: con hijos ya ejecuta la orden y la contraseña iría a ella.
+            if p in procs:
+                _, comm, euid, tty = procs[p]
+                if comm == "sudo" and euid == "0" and tty == self.tty and not children.get(p):
+                    found.append(p)
         return bool(found)
 
     def ask_password(self):

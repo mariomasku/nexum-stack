@@ -55,10 +55,23 @@ en `/opt/nexum/windows/window.py`, por lo que el paquete Linux no los sustituye.
 Estos adaptadores dependen de la estructura de la ventana GTK del motor; cambios
 incompatibles futuros requieren instalar una nueva integración Windows.
 
+Cada tarea abre su propia pseudoterminal. La autorización previa de sudo en otra
+tarea o terminal no garantiza que la actualización pueda reutilizarla; puede pedir
+la contraseña otra vez. Nexum no guarda la contraseña. El adaptador mantiene sudo
+como hijo de la tarea para que los motores anteriores también reconozcan su
+petición y no cancelen la actualización con el aviso «no la pide sudo».
+
 Install configura Descargas, Documentos y Escritorio de este usuario WSL con las
 carpetas reales de Windows, incluidas ubicaciones movidas a OneDrive u otro disco.
 Los selectores y exportaciones usan esas rutas; proyectos y BBDD siguen en Linux.
 Archivos de texto sin extensión (hosts, registros) se abren con Bloc de notas.
+
+Install establece `generateHosts=false` en la sección `[network]` de `/etc/wsl.conf`
+para que WSL conserve los dominios añadidos por Nexum tras reiniciar. Si ya existe
+el vhost `web.local` y WSL borró sus entradas, recupera los nombres que falten en
+`/etc/hosts`; respeta entradas existentes y dominios de producción desactivados.
+Guarda los ficheros anteriores en `/etc/wsl.conf.nexum.bak` y `/etc/hosts.nexum.bak`
+cuando los modifica. El acompañante de Windows sincroniza después hosts y certificados.
 
 Open solicita elevacion Windows para el acompañante de integracion. Mientras la
 ventana siga abierta, revisa dominios cada tres segundos y sincroniza hosts y

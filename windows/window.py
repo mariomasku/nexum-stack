@@ -18,7 +18,10 @@ def adapt(gui):
 
     def script_command(*args):
         if args and args[0] == 'windows-update':
-            return ['/usr/bin/sudo', '/opt/nexum/nexum-actualizar', *args[1:]]
+            # Older engines only authenticate sudo descendants of the task process.
+            # Keep bash alive until sudo exits; pass package paths as arguments.
+            return ['/bin/bash', '-c', '/usr/bin/sudo "$@"; exit $?',
+                    'nexum-windows-update', '/opt/nexum/nexum-actualizar', *args[1:]]
         return original_command(*args)
 
     gui['script_cmd'] = script_command
