@@ -46,7 +46,7 @@ class NvDocker:
         head.pack_end(new, False, False, 0)
         # Parar todo lo de Nexum de una vez (proyectos, MariaDB comunes y el Apache de Docker)
         running = [c for c in d.get("containers", []) if c["state"] == "running" and docker_own(c["name"])]
-        stop = nv_button("media-playback-stop-symbolic", "Parar todos",
+        stop = nv_button("media-playback-stop-symbolic", "Parar Nexum",
                          "Parar %d contenedores de Nexum" % len(running) if running else
                          "No hay ningún contenedor de Nexum en marcha",
                          lambda *_: self.run_task("Parando todos los contenedores de Nexum", ["docker-parar-todo"],
@@ -56,6 +56,9 @@ class NvDocker:
         busy_guard(stop, self.busy).set_sensitive(bool(running))
         head.pack_end(stop, False, False, 0)
         box.pack_start(head, False, False, 0)
+        if os.environ.get("WSL_DISTRO_NAME"):
+            # Reuse the base panel's selector, including while Desktop is ready.
+            box.pack_start(self.docker_backend_picker(), False, False, 0)
         for text, sub, btn in ([("Hay otro Docker en marcha: el de Ubuntu, como administrador",
                                  "Este programa usa el suyo, con tu usuario: el de Ubuntu no hace falta y quien lo use "
                                  "puede hacerse con el equipo. Apágalo salvo que lo uses fuera de este programa.",
@@ -130,9 +133,13 @@ class NvDocker:
 
     def nv_container_delete(self, c):
         """Eliminar un contenedor suelto de un proyecto en Docker."""
+        explanation = ("Se vuelve a crear al arrancar el proyecto; los datos de la BBDD siguen en su volumen. "
+                       "Para quitar el proyecto entero, usa la papelera de su fila." if docker_own(c["name"]) else
+                       "Se elimina este contenedor de Docker Desktop, incluso si está en marcha. "
+                       "Se pierden los datos guardados dentro del contenedor fuera de volúmenes o carpetas montadas. "
+                       "Los volúmenes se conservan. Nexum no vuelve a crear este contenedor externo.")
         if not confirm(self.win, "¿Eliminar el contenedor %s?" % c["name"],
-                       "Se vuelve a crear al arrancar el proyecto; los datos de la BBDD siguen en su volumen. "
-                       "Para quitar el proyecto entero, usa la papelera de su fila.",
+                       explanation,
                        "Eliminar el contenedor", destructive=True):
             return
         self.run_task("Eliminando %s" % c["name"], ["docker-contenedor", "borrar", c["name"]],
@@ -691,7 +698,7 @@ class NvDocker:
                                     tooltip_text="%s · %s" % (c["name"], docker_status_text(c["status"]))), False, False, 0)
                 ports = ", ".join(pp.replace("/tcp", "").replace("127.0.0.1:", "").replace("->", ":")
                                   for pp in c["ports"].split(", ") if "->" in pp) or "—"
-                own = docker_own(c["name"])
+                actionable = docker_own(c["name"]) or d.get("backend") == "desktop"
                 row([kn, label(c["id"] or "—", "nv-mono", "nv-chico", "nv-tenue", selectable=True,
                                tooltip_text="ID del contenedor"),
                      label(c["image"], "nv-mono", "nv-chico", "nv-enlace", ellipsize=3),
@@ -701,12 +708,13 @@ class NvDocker:
                                lambda c=c, on=on: (not on or self.nv_stop_shared_ok([c["name"]], c["name"])) and self.run_task(
                                    ("Parando %s" if on else "Arrancando %s") % c["name"],
                                                                 ["docker-contenedor", "parar" if on else "arrancar", c["name"]],
-                                                                auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), own),
+                                                                auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), actionable),
                               ("view-refresh-symbolic", "Reiniciar", lambda c=c: self.run_task("Reiniciando %s" % c["name"],
-                                                                                              ["docker-contenedor", "reiniciar", c["name"]], auto_close=True), own and on),
+                                                                                              ["docker-contenedor", "reiniciar", c["name"]], auto_close=True,
+                                                                                              on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), actionable and on),
                               ("text-x-generic-symbolic", "Registros", lambda c=c: self.run_task("Registros de %s" % c["name"],
-                                                                                                ["docker-contenedor", "registros", c["name"]]), own),
-                              ("user-trash-symbolic", "Eliminar este contenedor", lambda c=c: self.nv_container_delete(c), own)])],
+                                                                                                ["docker-contenedor", "registros", c["name"]]), actionable),
+                              ("user-trash-symbolic", "Eliminar este contenedor", lambda c=c: self.nv_container_delete(c), actionable)])],
                     indent=26)
         if not shown:
             r = Gtk.ListBoxRow(activatable=False)

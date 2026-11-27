@@ -9,6 +9,7 @@ class AppDocker:
         for f in parse_lines(out):
             if f[0] == "B" and len(f) >= 3:
                 d.update(backend=f[1], distribution=f[2])
+                d["preference"] = f[3] if len(f) > 3 else "auto"
             elif f[0] == "S" and len(f) >= 5:
                 d.update(installed=f[1] == "1", ready=f[2] == "1", version=f[3], lampp=f[4] == "1",
                          rootful=len(f) > 5 and f[5] == "1")
@@ -41,6 +42,28 @@ class AppDocker:
             self.build_docker()
         return False
 
+    def docker_backend_picker(self):
+        d = self.docker
+        choice_box, choice_list = group("Motor Docker",
+                "Desktop usa Docker de Windows mediante su integración WSL. Cada motor conserva sus "
+                "contenedores y volúmenes: cambiar no migra datos ni detiene el motor anterior.")
+        row = ActionRow("Usar motor")
+        choice = Gtk.ComboBoxText(valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        for key, title in (("auto", "Automático (conservar datos existentes)"),
+                               ("desktop", "Docker Desktop (Windows)"),
+                               ("rootless", "Docker sin root (WSL)")):
+            choice.append(key, title)
+        choice.set_active_id(d.get("preference", "auto"))
+        row.add_suffix(choice)
+        apply_button = css(Gtk.Button(label="Aplicar", sensitive=not self.busy), "verde")
+        apply_button.connect("clicked", lambda *_: self.run_task(
+                "Seleccionando motor Docker", ["docker-motor", choice.get_active_id()],
+                done_text="Preferencia Docker guardada", auto_close=True,
+                on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+        row.add_suffix(apply_button)
+        choice_list.add(row)
+        return choice_box
+
     def build_docker(self):
         clear(self.docker_box)
         d = self.docker
@@ -50,6 +73,8 @@ class AppDocker:
         if d["ready"]:
             self.docker_box.pack_start(self.build_docker_console(), False, False, 0)
         desktop = d.get("backend") == "desktop"
+        if os.environ.get("WSL_DISTRO_NAME"):
+            self.docker_box.pack_start(self.docker_backend_picker(), False, False, 0)
         box, lb = group("Docker Desktop (Windows)" if desktop else "Docker sin root",
                         "Usa el motor de Docker Desktop de Windows mediante la integración WSL de %s. "
                         "Contenedores, imágenes y volúmenes pertenecen a ese motor. No se instala otro Docker en Ubuntu."

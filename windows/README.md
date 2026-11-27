@@ -27,8 +27,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\nexum.ps1 Install
 
 Install usa el acceso root que WSL concede al propietario Windows de la distribucion,
 instala GTK y dependencias, construye un snapshot
-LF en el disco Linux, instala el paquete de Nexum y crea acceso en Inicio. Cambia
-el navegador HTTP/HTTPS y apertura de carpetas de este usuario Ubuntu para abrirlos
+LF en el disco Linux, instala el paquete de Nexum y crea acceso en Inicio.
+Si el motor instalado tiene una versión superior, Install permite sustituirlo por
+la versión de este checkout, incluidos sus cambios Windows. Esto puede retirar
+funciones de versiones posteriores. No cambia la política global de APT.
+Cambia el navegador HTTP/HTTPS y apertura de carpetas de este usuario Ubuntu para abrirlos
 en Windows. No instala ninguna versión de PHP automáticamente.
 En Ubuntu 26 cambia la alternativa sudo-rs por sudo clásico del propio Ubuntu:
 la interfaz necesita su marcador SUDO_PROMPT para mostrar el diálogo de contraseña.
@@ -90,13 +93,40 @@ del usuario Windows y recuerda cuales añadió: al desmapear dominios retira eso
 certificados, sin retirar confianza que ya existiera antes de Nexum. HTTPS Windows
 requiere validacion con navegadores reales; esta preview no promete paridad completa.
 
-Docker: habilitar explícitamente esta distribución en Settings > Resources > WSL
-Integration de Docker Desktop, con contenedores Linux. Sin socket rootless existente,
+Docker: elegir motor desde la pestaña Docker (Automático, Docker Desktop Windows o
+Docker sin root WSL). La preferencia se guarda para ventana, CLI y Doctor.
+También desde PowerShell:
+
+```powershell
+.\nexum.ps1 Run docker-motor desktop
+.\nexum.ps1 Run docker-motor rootless
+.\nexum.ps1 Run docker-motor auto
+```
+
+Automático prefiere Desktop en instalaciones nuevas; conserva rootless si encuentra
+su socket, almacén o unidad de usuario, incluso con el servicio parado. Elegir Desktop
+explícitamente permite usarlo aunque exista rootless. No migra imágenes ni volúmenes,
+no para servicios y no cambia a otro motor si el elegido deja de responder.
+Para volver a ver datos del motor anterior, seleccionarlo de nuevo.
+
+Con Desktop, las filas individuales de todos sus contenedores permiten arrancar,
+parar, reiniciar, leer registros y eliminar con confirmación. Desplegar el grupo
+para ver sus filas. Los contenedores externos se gestionan por su nombre concreto;
+Nexum no los recrea ni migra sus datos. El botón «Parar Nexum» solo detiene
+contenedores de Nexum, no todos los de Desktop. Rootless conserva su restricción
+a contenedores de Nexum.
+
+Desktop usa su cliente Linux integrado y conserva rutas Compose y proyectos en
+disco Linux. No sustituye ese cliente por `docker.exe`: los montajes y sockets de
+estos proyectos dependen de rutas Linux. WSL sigue siendo necesario para Nexum.
+
+Para Desktop, habilitar explícitamente esta distribución en Settings > Resources > WSL
+Integration de Docker Desktop, con contenedores Linux. Al seleccionar Desktop,
 Nexum usa `/var/run/docker.sock` y verifica que responde Docker Desktop para Linux.
 Si falta el socket o el enlace `docker` está roto, el panel indica conexión pendiente
 y permite volver a comprobarla; no ofrece instalar Docker de Ubuntu. Habilitar Ubuntu
 en Docker Desktop y pulsar Apply crea la integración necesaria.
-Si existe socket rootless, conserva ese motor y sus datos. No fusiona imágenes,
+En modo Automático, si existe rootless, conserva ese motor y sus datos. No fusiona imágenes,
 contenedores ni volúmenes entre motores. «Instalar Docker» reutiliza Desktop cuando
 su socket está presente, sin instalar ni apagar otro motor. Sin integración Desktop,
 sigue disponible la instalación rootless de Nexum.

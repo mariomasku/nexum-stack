@@ -92,6 +92,9 @@
 #   nexum github-llavero-instalar
 #       Instala (con sudo) libsecret-tools, el paquete de secret-tool, para guardar el token en el llavero
 #
+#   nexum docker-motor auto|desktop|rootless
+#       En WSL, elige Docker Desktop de Windows o Docker sin root. No migra datos ni para servicios.
+#
 #   nexum docker-reposo [estado] | horas <0-24> | comprobar
 #       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos
@@ -18999,20 +19002,54 @@ DOCKER_PACKAGES="docker.io docker-compose-v2 rootlesskit uidmap slirp4netns dbus
 # Puertos de 127.0.0.1 para el phpMyAdmin de cada proyecto (uno por proyecto, desde este)
 DOCKER_PMA_PORT=28080
 
-# Se conserva el motor rootless existente. En WSL, sin ese socket, se admite
-# la integracion de Docker Desktop; docker_ready verifica la identidad del motor.
+# Preferencia persistente, compartida por CLI, ventana y Doctor. Auto conserva
+# almacenes rootless existentes incluso si su servicio esta parado.
+function docker_preference() {
+    local preference
+    preference=$(cat "$LOG_DIR/docker-backend" 2> /dev/null)
+    case $preference in desktop|rootless) echo "$preference" ;; *) echo auto ;; esac
+}
+
+function docker_use_desktop() {
+    [ -n "${WSL_DISTRO_NAME:-}" ] || return 1
+    case $(docker_preference) in
+        desktop) return 0 ;;
+        rootless) return 1 ;;
+    esac
+    # Cambiar de motor ocultaria los volumenes anteriores: no hacerlo por caida
+    # temporal de un servicio ni por la aparicion de un socket Desktop.
+    [ ! -d "${XDG_DATA_HOME:-$HOME/.local/share}/docker" ] \
+        && [ ! -f "$HOME/.config/systemd/user/docker.service" ] \
+        && [ ! -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock" ]
+}
+
+function docker_select_backend() {
+    [ -n "${WSL_DISTRO_NAME:-}" ] || { echo 'Seleccion de motor disponible solo en WSL.'; return 1; }
+    case ${1:-} in
+        auto|desktop|rootless) ;;
+        *) echo 'Uso: nexum docker-motor auto|desktop|rootless'; return 1 ;;
+    esac
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] Motor Docker: $1"; return 0; }
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    local temporary
+    temporary=$(mktemp "$LOG_DIR/.docker-backend.XXXXXX") || return 1
+    printf '%s\n' "$1" > "$temporary" && mv -fT "$temporary" "$LOG_DIR/docker-backend" \
+        || { rm -f -- "$temporary"; return 1; }
+    echo "Motor Docker: $1. Imagenes y volumenes siguen en su motor original; no se migran ni se paran servicios."
+}
+
 function docker_sock() {
     local rootless=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock
     if [ -n "${LVM_DOCKER_HOST:-}" ]; then
         echo "$LVM_DOCKER_HOST"
-    elif [ ! -S "$rootless" ] && [ -n "${WSL_DISTRO_NAME:-}" ]; then
+    elif docker_use_desktop; then
         echo unix:///var/run/docker.sock
     else
         echo "unix://$rootless"
     fi
 }
 
-# WSL sin motor rootless usa Docker Desktop, incluso cuando falta su integracion.
+# La seleccion Desktop se mantiene incluso cuando falta su integracion.
 # Un enlace docker roto no significa que haya que instalar Docker de Ubuntu.
 function docker_backend() {
     if [ -n "${WSL_DISTRO_NAME:-}" ] \
@@ -19022,6 +19059,13 @@ function docker_backend() {
         echo rootless
     fi
 }
+
+# El cliente integrado conserva rutas y sockets Linux de Compose. docker.exe
+# interpreta esas rutas como Windows y no es intercambiable para estos proyectos.
+if [ -z "${LVM_DOCKER:-}" ] && [ "$(docker_backend)" == desktop ] \
+        && [ -x /mnt/wsl/docker-desktop/cli-tools/usr/bin/docker ]; then
+    DOCKER_BIN=/mnt/wsl/docker-desktop/cli-tools/usr/bin/docker
+fi
 
 # Configuracion del cliente de Docker: una carpeta del gestor (solo tuya) y no ~/.docker, donde
 # cualquier programa tuyo puede dejar un complemento (cli-plugins/docker-*) o un ayudante de claves
@@ -19138,7 +19182,7 @@ function docker_state() {
 #     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" p
-    echo "B|$(docker_backend)|${WSL_DISTRO_NAME:-}"
+    echo "B|$(docker_backend)|${WSL_DISTRO_NAME:-}|$(docker_preference)"
     [ -x "$DOCKER_BIN" ] && installed=1
     if [ $installed -eq 1 ] && docker_ready; then
         ready=1
@@ -19185,26 +19229,35 @@ function gui_docker_stats() {
     return 0
 }
 
-# docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>: uno solo de los contenedores de
-# un proyecto del gestor (nexum-<proyecto>-php|db|pma-N), no cualquiera de tu Docker
+# docker-contenedor: Nexum en rootless; en Desktop tambien contenedores externos
+# elegidos individualmente. La parada global sigue limitada a Nexum.
 function docker_container_action() {
-    local action=$1 name=$2
+    local action=$1 name=$2 own=1
+    case $action in
+        arrancar|parar|reiniciar|registros|borrar) ;;
+        *) echo "Uso: nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
+    esac
     if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ \
             || "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-php[0-9]{2}$ \
             || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$ ]]; then
-        echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
-        return 1
+        own=0
+        if [ "$(docker_backend)" != desktop ] \
+                || ! [[ "$name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$ ]]; then
+            echo "Contenedor no valido: $name (contenedores externos solo en Docker Desktop)"
+            return 1
+        fi
+        docker_ready || { echo 'Docker Desktop no responde o no usa contenedores Linux.'; return 1; }
     fi
     case $action in
         arrancar)
-            if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+            if [ "$own" -eq 1 ] && [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
                 local f=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}}
                 lampp_bd_up "$f" && lampp_bd_bridge_up "$f"
                 return
             fi
             run dk start "$name" ;;
         parar)
-            docker_shared_warn "$name"
+            [ "$own" -eq 1 ] && docker_shared_warn "$name"
             run dk stop "$name" ;;
         reiniciar) run dk restart "$name" ;;
         registros) dk logs --tail 200 "$name" ;;
@@ -32922,6 +32975,7 @@ class AppDocker:
         for f in parse_lines(out):
             if f[0] == "B" and len(f) >= 3:
                 d.update(backend=f[1], distribution=f[2])
+                d["preference"] = f[3] if len(f) > 3 else "auto"
             elif f[0] == "S" and len(f) >= 5:
                 d.update(installed=f[1] == "1", ready=f[2] == "1", version=f[3], lampp=f[4] == "1",
                          rootful=len(f) > 5 and f[5] == "1")
@@ -32954,6 +33008,28 @@ class AppDocker:
             self.build_docker()
         return False
 
+    def docker_backend_picker(self):
+        d = self.docker
+        choice_box, choice_list = group("Motor Docker",
+                "Desktop usa Docker de Windows mediante su integración WSL. Cada motor conserva sus "
+                "contenedores y volúmenes: cambiar no migra datos ni detiene el motor anterior.")
+        row = ActionRow("Usar motor")
+        choice = Gtk.ComboBoxText(valign=Gtk.Align.CENTER, sensitive=not self.busy)
+        for key, title in (("auto", "Automático (conservar datos existentes)"),
+                               ("desktop", "Docker Desktop (Windows)"),
+                               ("rootless", "Docker sin root (WSL)")):
+            choice.append(key, title)
+        choice.set_active_id(d.get("preference", "auto"))
+        row.add_suffix(choice)
+        apply_button = css(Gtk.Button(label="Aplicar", sensitive=not self.busy), "verde")
+        apply_button.connect("clicked", lambda *_: self.run_task(
+                "Seleccionando motor Docker", ["docker-motor", choice.get_active_id()],
+                done_text="Preferencia Docker guardada", auto_close=True,
+                on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)))
+        row.add_suffix(apply_button)
+        choice_list.add(row)
+        return choice_box
+
     def build_docker(self):
         clear(self.docker_box)
         d = self.docker
@@ -32963,6 +33039,8 @@ class AppDocker:
         if d["ready"]:
             self.docker_box.pack_start(self.build_docker_console(), False, False, 0)
         desktop = d.get("backend") == "desktop"
+        if os.environ.get("WSL_DISTRO_NAME"):
+            self.docker_box.pack_start(self.docker_backend_picker(), False, False, 0)
         box, lb = group("Docker Desktop (Windows)" if desktop else "Docker sin root",
                         "Usa el motor de Docker Desktop de Windows mediante la integración WSL de %s. "
                         "Contenedores, imágenes y volúmenes pertenecen a ese motor. No se instala otro Docker en Ubuntu."
@@ -40714,7 +40792,7 @@ class NvDocker:
         head.pack_end(new, False, False, 0)
         # Parar todo lo de Nexum de una vez (proyectos, MariaDB comunes y el Apache de Docker)
         running = [c for c in d.get("containers", []) if c["state"] == "running" and docker_own(c["name"])]
-        stop = nv_button("media-playback-stop-symbolic", "Parar todos",
+        stop = nv_button("media-playback-stop-symbolic", "Parar Nexum",
                          "Parar %d contenedores de Nexum" % len(running) if running else
                          "No hay ningún contenedor de Nexum en marcha",
                          lambda *_: self.run_task("Parando todos los contenedores de Nexum", ["docker-parar-todo"],
@@ -40724,6 +40802,9 @@ class NvDocker:
         busy_guard(stop, self.busy).set_sensitive(bool(running))
         head.pack_end(stop, False, False, 0)
         box.pack_start(head, False, False, 0)
+        if os.environ.get("WSL_DISTRO_NAME"):
+            # Reuse the base panel's selector, including while Desktop is ready.
+            box.pack_start(self.docker_backend_picker(), False, False, 0)
         for text, sub, btn in ([("Hay otro Docker en marcha: el de Ubuntu, como administrador",
                                  "Este programa usa el suyo, con tu usuario: el de Ubuntu no hace falta y quien lo use "
                                  "puede hacerse con el equipo. Apágalo salvo que lo uses fuera de este programa.",
@@ -40798,9 +40879,13 @@ class NvDocker:
 
     def nv_container_delete(self, c):
         """Eliminar un contenedor suelto de un proyecto en Docker."""
+        explanation = ("Se vuelve a crear al arrancar el proyecto; los datos de la BBDD siguen en su volumen. "
+                       "Para quitar el proyecto entero, usa la papelera de su fila." if docker_own(c["name"]) else
+                       "Se elimina este contenedor de Docker Desktop, incluso si está en marcha. "
+                       "Se pierden los datos guardados dentro del contenedor fuera de volúmenes o carpetas montadas. "
+                       "Los volúmenes se conservan. Nexum no vuelve a crear este contenedor externo.")
         if not confirm(self.win, "¿Eliminar el contenedor %s?" % c["name"],
-                       "Se vuelve a crear al arrancar el proyecto; los datos de la BBDD siguen en su volumen. "
-                       "Para quitar el proyecto entero, usa la papelera de su fila.",
+                       explanation,
                        "Eliminar el contenedor", destructive=True):
             return
         self.run_task("Eliminando %s" % c["name"], ["docker-contenedor", "borrar", c["name"]],
@@ -41359,7 +41444,7 @@ class NvDocker:
                                     tooltip_text="%s · %s" % (c["name"], docker_status_text(c["status"]))), False, False, 0)
                 ports = ", ".join(pp.replace("/tcp", "").replace("127.0.0.1:", "").replace("->", ":")
                                   for pp in c["ports"].split(", ") if "->" in pp) or "—"
-                own = docker_own(c["name"])
+                actionable = docker_own(c["name"]) or d.get("backend") == "desktop"
                 row([kn, label(c["id"] or "—", "nv-mono", "nv-chico", "nv-tenue", selectable=True,
                                tooltip_text="ID del contenedor"),
                      label(c["image"], "nv-mono", "nv-chico", "nv-enlace", ellipsize=3),
@@ -41369,12 +41454,13 @@ class NvDocker:
                                lambda c=c, on=on: (not on or self.nv_stop_shared_ok([c["name"]], c["name"])) and self.run_task(
                                    ("Parando %s" if on else "Arrancando %s") % c["name"],
                                                                 ["docker-contenedor", "parar" if on else "arrancar", c["name"]],
-                                                                auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), own),
+                                                                auto_close=True, on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), actionable),
                               ("view-refresh-symbolic", "Reiniciar", lambda c=c: self.run_task("Reiniciando %s" % c["name"],
-                                                                                              ["docker-contenedor", "reiniciar", c["name"]], auto_close=True), own and on),
+                                                                                              ["docker-contenedor", "reiniciar", c["name"]], auto_close=True,
+                                                                                              on_done=lambda *a: run_quick(["gui-docker"], self.on_docker_data)), actionable and on),
                               ("text-x-generic-symbolic", "Registros", lambda c=c: self.run_task("Registros de %s" % c["name"],
-                                                                                                ["docker-contenedor", "registros", c["name"]]), own),
-                              ("user-trash-symbolic", "Eliminar este contenedor", lambda c=c: self.nv_container_delete(c), own)])],
+                                                                                                ["docker-contenedor", "registros", c["name"]]), actionable),
+                              ("user-trash-symbolic", "Eliminar este contenedor", lambda c=c: self.nv_container_delete(c), actionable)])],
                     indent=26)
         if not shown:
             r = Gtk.ListBoxRow(activatable=False)
@@ -45295,6 +45381,7 @@ case "$1" in
     gui-fechas) gui_php_dates ;;
     gui-docker) gui_docker ;;
     gui-docker-conexion) gui_docker_connection ;;
+    docker-motor) docker_select_backend "${2:-}" ;;
     docker-instalar) docker_install ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" "$3" ;;

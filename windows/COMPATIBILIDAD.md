@@ -9,7 +9,16 @@ reconstruir e instalar la integración para llegar a la aplicación instalada.
 - VS Code: el instalador detecta `Code.exe` en Windows y registra un acceso que abre
   proyectos por Remote WSL, conservando distribución y ruta Linux. Rutas del proyecto
   viajan como URI y datos Base64; no se interpolan como código PowerShell.
-- Docker: selección del socket rootless existente o integración Desktop de WSL.
+- Docker: selector persistente Automático/Desktop/rootless en panel y CLI
+  (`docker-motor`). Automático conserva almacenes y unidades rootless aunque el
+  servicio esté parado; instalaciones nuevas usan Desktop. Elección explícita
+  Desktop tiene prioridad sobre socket rootless. No hay migración de datos ni
+  cambio de motor por fallo de conexión. Cliente Desktop Linux conserva rutas
+  Compose y montajes WSL; no se usa `docker.exe` para operaciones de proyectos.
+  Acciones individuales Desktop admiten contenedores externos con nombre validado
+  y comprobación del servidor Desktop/Linux. La ventana habilita sus botones y
+  distingue eliminación externa de contenedores recreables de proyectos Nexum.
+  La parada global permanece limitada a Nexum y se etiqueta «Parar Nexum».
   Se admite Desktop solo cuando el servidor se identifica como Docker Desktop/Linux.
   El instalador Docker no instala ni desactiva servicios si encuentra ese socket.
   Sin integración WSL, el panel muestra «Docker Desktop no conectado» e instrucciones

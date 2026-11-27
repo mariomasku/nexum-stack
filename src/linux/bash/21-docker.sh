@@ -27,20 +27,54 @@ DOCKER_PACKAGES="docker.io docker-compose-v2 rootlesskit uidmap slirp4netns dbus
 # Puertos de 127.0.0.1 para el phpMyAdmin de cada proyecto (uno por proyecto, desde este)
 DOCKER_PMA_PORT=28080
 
-# Se conserva el motor rootless existente. En WSL, sin ese socket, se admite
-# la integracion de Docker Desktop; docker_ready verifica la identidad del motor.
+# Preferencia persistente, compartida por CLI, ventana y Doctor. Auto conserva
+# almacenes rootless existentes incluso si su servicio esta parado.
+function docker_preference() {
+    local preference
+    preference=$(cat "$LOG_DIR/docker-backend" 2> /dev/null)
+    case $preference in desktop|rootless) echo "$preference" ;; *) echo auto ;; esac
+}
+
+function docker_use_desktop() {
+    [ -n "${WSL_DISTRO_NAME:-}" ] || return 1
+    case $(docker_preference) in
+        desktop) return 0 ;;
+        rootless) return 1 ;;
+    esac
+    # Cambiar de motor ocultaria los volumenes anteriores: no hacerlo por caida
+    # temporal de un servicio ni por la aparicion de un socket Desktop.
+    [ ! -d "${XDG_DATA_HOME:-$HOME/.local/share}/docker" ] \
+        && [ ! -f "$HOME/.config/systemd/user/docker.service" ] \
+        && [ ! -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock" ]
+}
+
+function docker_select_backend() {
+    [ -n "${WSL_DISTRO_NAME:-}" ] || { echo 'Seleccion de motor disponible solo en WSL.'; return 1; }
+    case ${1:-} in
+        auto|desktop|rootless) ;;
+        *) echo 'Uso: nexum docker-motor auto|desktop|rootless'; return 1 ;;
+    esac
+    [ "$DRY" -eq 1 ] && { echo "  [simulacion] Motor Docker: $1"; return 0; }
+    mkdir -p -m 700 "$LOG_DIR" || return 1
+    local temporary
+    temporary=$(mktemp "$LOG_DIR/.docker-backend.XXXXXX") || return 1
+    printf '%s\n' "$1" > "$temporary" && mv -fT "$temporary" "$LOG_DIR/docker-backend" \
+        || { rm -f -- "$temporary"; return 1; }
+    echo "Motor Docker: $1. Imagenes y volumenes siguen en su motor original; no se migran ni se paran servicios."
+}
+
 function docker_sock() {
     local rootless=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock
     if [ -n "${LVM_DOCKER_HOST:-}" ]; then
         echo "$LVM_DOCKER_HOST"
-    elif [ ! -S "$rootless" ] && [ -n "${WSL_DISTRO_NAME:-}" ]; then
+    elif docker_use_desktop; then
         echo unix:///var/run/docker.sock
     else
         echo "unix://$rootless"
     fi
 }
 
-# WSL sin motor rootless usa Docker Desktop, incluso cuando falta su integracion.
+# La seleccion Desktop se mantiene incluso cuando falta su integracion.
 # Un enlace docker roto no significa que haya que instalar Docker de Ubuntu.
 function docker_backend() {
     if [ -n "${WSL_DISTRO_NAME:-}" ] \
@@ -50,6 +84,13 @@ function docker_backend() {
         echo rootless
     fi
 }
+
+# El cliente integrado conserva rutas y sockets Linux de Compose. docker.exe
+# interpreta esas rutas como Windows y no es intercambiable para estos proyectos.
+if [ -z "${LVM_DOCKER:-}" ] && [ "$(docker_backend)" == desktop ] \
+        && [ -x /mnt/wsl/docker-desktop/cli-tools/usr/bin/docker ]; then
+    DOCKER_BIN=/mnt/wsl/docker-desktop/cli-tools/usr/bin/docker
+fi
 
 # Configuracion del cliente de Docker: una carpeta del gestor (solo tuya) y no ~/.docker, donde
 # cualquier programa tuyo puede dejar un complemento (cli-plugins/docker-*) o un ayudante de claves
@@ -151,7 +192,7 @@ function docker_projects() {
 #     vacio, tras cambiar de almacen de imagenes o de disco); postgres-<version>, una PostgreSQL comun
 function gui_docker() {
     local installed=0 ready=0 version="" p
-    echo "B|$(docker_backend)|${WSL_DISTRO_NAME:-}"
+    echo "B|$(docker_backend)|${WSL_DISTRO_NAME:-}|$(docker_preference)"
     [ -x "$DOCKER_BIN" ] && installed=1
     if [ $installed -eq 1 ] && docker_ready; then
         ready=1
@@ -198,26 +239,35 @@ function gui_docker_stats() {
     return 0
 }
 
-# docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>: uno solo de los contenedores de
-# un proyecto del gestor (nexum-<proyecto>-php|db|pma-N), no cualquiera de tu Docker
+# docker-contenedor: Nexum en rootless; en Desktop tambien contenedores externos
+# elegidos individualmente. La parada global sigue limitada a Nexum.
 function docker_container_action() {
-    local action=$1 name=$2
+    local action=$1 name=$2 own=1
+    case $action in
+        arrancar|parar|reiniciar|registros|borrar) ;;
+        *) echo "Uso: nexum docker-contenedor arrancar|parar|reiniciar|registros|borrar <contenedor>"; return 1 ;;
+    esac
     if ! [[ "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-(php|db|pma)-[0-9]{1,3}$ \
             || "$name" =~ ^nexum-[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?-php[0-9]{2}$ \
             || "$name" =~ ^nexum-(web|pma|mariadb-[0-9]{1,2}-[0-9]{1,2}|lampp-bd-[0-9]{1,2}-[0-9]{1,2}(-[0-9]{1,3})?)$ ]]; then
-        echo "Contenedor no valido: $name (solo los de los proyectos en Docker del gestor)"
-        return 1
+        own=0
+        if [ "$(docker_backend)" != desktop ] \
+                || ! [[ "$name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$ ]]; then
+            echo "Contenedor no valido: $name (contenedores externos solo en Docker Desktop)"
+            return 1
+        fi
+        docker_ready || { echo 'Docker Desktop no responde o no usa contenedores Linux.'; return 1; }
     fi
     case $action in
         arrancar)
-            if [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
+            if [ "$own" -eq 1 ] && [[ "$name" =~ ^nexum-lampp-bd-([0-9]{1,2})-([0-9]{1,2})(-([0-9]{1,3}))?$ ]]; then
                 local f=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}${BASH_REMATCH[4]:+.${BASH_REMATCH[4]}}
                 lampp_bd_up "$f" && lampp_bd_bridge_up "$f"
                 return
             fi
             run dk start "$name" ;;
         parar)
-            docker_shared_warn "$name"
+            [ "$own" -eq 1 ] && docker_shared_warn "$name"
             run dk stop "$name" ;;
         reiniciar) run dk restart "$name" ;;
         registros) dk logs --tail 200 "$name" ;;

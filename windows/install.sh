@@ -35,7 +35,10 @@ for path in target.rglob('*'):
 PY
 bash "$work/construir.sh"
 bash "$work/empaquetar-deb.sh" "$work/packages"
-as_root apt-get install --reinstall -y "$work"/packages/nexum_*_all.deb
+# Install explicitly selects this checkout, even after a newer Linux release
+# was installed by Nexum's updater. Keep downgrade permission local to this
+# invocation; do not change APT policy or the shared application version.
+as_root apt-get install --reinstall --allow-downgrades -y "$work"/packages/nexum_*_all.deb
 # Keep domains managed by Nexum when WSL restarts, and recover the standard
 # project domain if WSL already regenerated /etc/hosts before this installation.
 as_root /usr/bin/python3 "$work/windows/configure-hosts.py"
@@ -56,18 +59,24 @@ version = re.search(r'^APP_VERSION="([0-9.]+)"', header, re.M).group(1)
 PY
 as_root install -m 644 "$work/build-info.json" /opt/nexum/windows/build-info.json
 mkdir -p "$HOME/.local/share/applications"
-if /usr/bin/python3 /opt/nexum/windows/vscode.py --check > /dev/null 2>&1; then
-    cat > "$HOME/.local/share/applications/nexum-windows-vscode.desktop" <<'EOF'
+vscode_icon_dir="$HOME/.local/share/icons"
+if vscode_icon_source=$(/usr/bin/python3 /opt/nexum/windows/vscode.py --icon 2> /dev/null); then
+    mkdir -p "$vscode_icon_dir"
+    rm -f "$vscode_icon_dir/nexum-windows-vscode.svg" "$vscode_icon_dir/nexum-windows-vscode.png"
+    vscode_icon="$vscode_icon_dir/nexum-windows-vscode.${vscode_icon_source##*.}"
+    install -m 644 "$vscode_icon_source" "$vscode_icon"
+    cat > "$HOME/.local/share/applications/nexum-windows-vscode.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Visual Studio Code (Windows / WSL)
 Exec=/usr/bin/python3 /opt/nexum/windows/vscode.py %f
-Icon=visual-studio-code
+Icon=$vscode_icon
 Terminal=false
 NoDisplay=true
 EOF
 else
     rm -f "$HOME/.local/share/applications/nexum-windows-vscode.desktop"
+    rm -f "$vscode_icon_dir/nexum-windows-vscode.svg" "$vscode_icon_dir/nexum-windows-vscode.png"
     echo 'VS Code Windows no encontrado. Instala VS Code y su extension WSL; vuelve a ejecutar Install.'
 fi
 cat > "$HOME/.local/share/applications/nexum-windows-open.desktop" <<'EOF'

@@ -92,6 +92,9 @@
 #   nexum github-llavero-instalar
 #       Instala (con sudo) libsecret-tools, el paquete de secret-tool, para guardar el token en el llavero
 #
+#   nexum docker-motor auto|desktop|rootless
+#       En WSL, elige Docker Desktop de Windows o Docker sin root. No migra datos ni para servicios.
+#
 #   nexum docker-reposo [estado] | horas <0-24> | comprobar
 #       Los proyectos de Docker que llevan esas horas sin visitas se paran solos (y lo comun que
 #       ya no use nadie). 0: nunca. Por defecto, 3 h. Lo comprueba un temporizador cada 15 minutos

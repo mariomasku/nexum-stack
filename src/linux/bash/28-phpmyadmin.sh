@@ -341,6 +341,7 @@ case "$1" in
     gui-fechas) gui_php_dates ;;
     gui-docker) gui_docker ;;
     gui-docker-conexion) gui_docker_connection ;;
+    docker-motor) docker_select_backend "${2:-}" ;;
     docker-instalar) docker_install ;;
     docker-crear) shift; docker_create "$@" ;;
     docker-arrancar|docker-parar|docker-registros|docker-borrar) docker_action "${1#docker-}" "$2" "$3" ;;
